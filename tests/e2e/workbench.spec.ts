@@ -1,0 +1,324 @@
+import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { mockBitcoin, PUBLIC_ZPUB, RECEIVE_ADDRESS, TX_FUNDING } from '../fixtures/bitcoin';
+
+const PASSWORD = 'public-test-only-passphrase';
+const STORAGE = 'chaingraph.encrypted-workspaces.v1';
+const browserErrors = new WeakMap<Page, string[]>();
+test.beforeEach(({ page }) => {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on('pageerror', (error) => errors.push(error.message));
+});
+test.afterEach(({ page }) => {
+  expect(browserErrors.get(page) ?? [], 'uncaught browser errors').toEqual([]);
+});
+
+async function createWorkspace(page: Page, name = 'Private investigation', demo = false) {
+  if (demo) await page.getByRole('button', { name: /Explore the CoinJoin laboratory/ }).click();
+  else await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
+  const dialog = page.getByRole('dialog', {
+    name: demo ? 'Open the CoinJoin laboratory' : 'Create a workspace',
+  });
+  await dialog.getByLabel('Workspace name').fill(name);
+  if (!demo) await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
+  await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await dialog.getByLabel('Confirm password').fill(PASSWORD);
+  await dialog.getByRole('button', { name: 'Create workspace' }).click();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Open workspaces' })
+      .getByRole('button', { name: new RegExp(name) }),
+  ).toBeVisible();
+  const tour = page.getByRole('dialog', { name: 'Guided tour' });
+  if (await tour.isVisible()) await tour.getByRole('button', { name: 'Skip tour' }).click();
+}
+
+async function addAndScanWallet(page: Page) {
+  await page.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add a wallet' });
+  await dialog.getByLabel('Wallet name').fill('My private BIP84 wallet');
+  await dialog.getByLabel('Extended public key').fill(PUBLIC_ZPUB);
+  await dialog.getByRole('button', { name: 'Preview first receive address' }).click();
+  await expect(dialog.getByText(RECEIVE_ADDRESS, { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Scan wallet', exact: true }).click();
+  await expect(
+    page.getByText('Gap limit reached on both branches.', { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator('.statusbar')).toContainText('2 transactions');
+}
+
+async function selectTransaction(page: Page, hash = TX_FUNDING) {
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Entity type').selectOption('transaction');
+  await page.getByLabel('Filter graph entities').fill(hash);
+  await page.locator('.entity-list .entity-row').first().click();
+  await expect(page.getByLabel('Node label')).toBeVisible();
+}
+
+async function saved(page: Page) {
+  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+}
+
+test('requires password confirmation and offers a restartable guided tour', async ({ page }) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
+  const dialog = page.getByRole('dialog', { name: 'Create a workspace' });
+  await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await dialog.getByLabel('Confirm password').fill('different-password');
+  await dialog.getByRole('button', { name: 'Create workspace' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Passwords do not match.');
+  await dialog.getByLabel('Confirm password').fill(PASSWORD);
+  await dialog.getByRole('button', { name: 'Create workspace' }).click();
+  const tour = page.getByRole('dialog', { name: 'Guided tour' });
+  await expect(tour).toBeVisible();
+  await tour.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(tour).toContainText('Bring your wallets together');
+  await tour.getByRole('button', { name: 'Skip tour' }).click();
+  await page.getByRole('button', { name: 'Help and guided tour' }).click();
+  await expect(tour).toContainText('An investigation has its own space');
+});
+
+test('public BIP84 wallet scans both branches, annotates and bookmarks graph entities without transmitting xpubs', async ({
+  page,
+}) => {
+  const calls = await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page);
+  await addAndScanWallet(page);
+  await expect(page.getByTestId('graph-view').locator('canvas')).toBeVisible();
+  await selectTransaction(page);
+  await page.getByLabel('Node label').fill('Salary origin');
+  await page.getByLabel('Node notes').fill('Public fixture, personal note retained privately.');
+  await page.getByLabel('Node icon').selectOption('★');
+  await page.getByLabel('Bookmark', { exact: true }).check();
+  await page.getByRole('button', { name: 'Save context' }).click();
+  await expect(page.locator('.selection-heading h2')).toHaveText('Salary origin');
+  await page.getByRole('button', { name: 'Bookmarks', exact: true }).click();
+  await expect(
+    page.locator('.entity-list').getByRole('button', { name: /Salary origin/ }),
+  ).toBeVisible();
+  await saved(page);
+  const storage = await page.evaluate(() =>
+    JSON.stringify(Object.fromEntries(Object.entries(localStorage))),
+  );
+  expect(storage).toContain('ciphertext');
+  for (const secret of [
+    PUBLIC_ZPUB,
+    'Private investigation',
+    'My private BIP84 wallet',
+    'Salary origin',
+    'personal note',
+    PASSWORD,
+  ])
+    expect(storage).not.toContain(secret);
+  expect(JSON.stringify(calls)).not.toContain(PUBLIC_ZPUB);
+  expect(calls.filter((c) => c.method === 'getrawtransaction')).toHaveLength(2);
+  expect(
+    calls.filter((c) => c.method === 'blockchain.scripthash.get_history').length,
+  ).toBeGreaterThanOrEqual(40);
+});
+
+test('locks, rejects the wrong password, and restores a saved workspace after reload', async ({
+  page,
+}) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page, 'Secret study');
+  await page.getByRole('button', { name: 'Workspace menu' }).click();
+  await page.getByRole('button', { name: 'Save and lock workspace' }).click();
+  await expect(page.locator('.saved-row')).toHaveCount(1);
+  await expect(page.locator('.saved-row')).toContainText('Encrypted workspace');
+  await expect(page.getByRole('navigation')).not.toContainText('Secret study');
+  await page.reload();
+  await page.locator('.saved-row').click();
+  const dialog = page.getByRole('dialog', { name: 'Unlock workspace' });
+  await dialog.getByLabel('Password', { exact: true }).fill('definitely-wrong');
+  await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Could not unlock');
+  await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole('navigation')).toContainText('Secret study');
+});
+
+test('maintains independent multiple workspace tabs', async ({ page }) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page, 'First investigation');
+  await createWorkspace(page, 'Second investigation');
+  const tabs = page.getByRole('navigation', { name: 'Open workspaces' });
+  await expect(tabs.getByRole('button', { name: /First investigation/ })).toBeVisible();
+  await expect(tabs.getByRole('button', { name: /Second investigation/ })).toHaveClass(/active/);
+  await tabs.getByRole('button', { name: /First investigation/ }).click();
+  await expect(tabs.getByRole('button', { name: /First investigation/ })).toHaveClass(/active/);
+  await saved(page);
+  await expect
+    .poll(() =>
+      page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]').length, STORAGE),
+    )
+    .toBe(2);
+});
+
+test('exports encrypted data and reimports a copy with annotations intact', async ({
+  page,
+}, testInfo) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page, 'Export study');
+  await page.getByLabel('Transaction, output, or address').fill(TX_FUNDING);
+  await page.getByRole('button', { name: 'Add to graph' }).click();
+  await expect(page.getByLabel('Node label')).toBeVisible();
+  await page.getByLabel('Node label').fill('A portable label');
+  await page.getByRole('button', { name: 'Save context' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const download = await downloadPromise;
+  const file = testInfo.outputPath('workspace.chaingraph');
+  await download.saveAs(file);
+  const contents = await readFile(file, 'utf8');
+  expect(JSON.parse(contents).cipher).toBe('AES-256-GCM');
+  expect(contents).not.toContain('A portable label');
+  expect(contents).not.toContain('Export study');
+  await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
+  await page.locator('input[type=file][accept=".chaingraph,.json"]').setInputFiles(file);
+  const dialog = page.getByRole('dialog', { name: 'Open encrypted workspace' });
+  await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await dialog.getByRole('button', { name: 'Open workspace', exact: true }).click();
+  await expect(page.getByRole('navigation')).toContainText('Export study (copy)');
+  await selectTransaction(page);
+  await expect(page.getByLabel('Node label')).toHaveValue('A portable label');
+});
+
+test('renders the 150-input laboratory and runs, excludes, restores and clears analysis overlays', async ({
+  page,
+}) => {
+  await mockBitcoin(page, false);
+  await page.goto('/');
+  await createWorkspace(page, 'CoinJoin laboratory', true);
+  await expect(page.getByTestId('graph-view').locator('canvas')).toBeVisible();
+  await expect(page.locator('.statusbar')).toContainText('543 transactions');
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await page.locator('.entity-row').click();
+  await expect(page.locator('.details')).toContainText('150 / 150');
+  await page.getByRole('button', { name: 'Flat', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Flat', exact: true })).toHaveClass(/active/);
+  await page.getByLabel('Size nodes by').selectOption('value');
+  await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
+  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page
+    .locator('.right-panel')
+    .getByRole('button', { name: /^Analysis/ })
+    .click();
+  await page
+    .locator('.analysis-tool')
+    .filter({ has: page.getByRole('heading', { name: 'Equal-output detection' }) })
+    .getByRole('button')
+    .click();
+  await expect(page.locator('.finding')).toHaveCount(3);
+  await page.locator('.finding').first().getByRole('button', { name: 'Exclude' }).click();
+  await expect(page.locator('.finding.excluded')).toHaveCount(1);
+  await page.locator('.finding.excluded').getByRole('button', { name: 'Restore' }).click();
+  await expect(page.locator('.finding.excluded')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await expect(page.locator('.finding')).toHaveCount(0);
+  for (const name of ['Common-input ownership', 'Address reuse']) {
+    await page
+      .locator('.analysis-tool')
+      .filter({ has: page.getByRole('heading', { name, exact: true }) })
+      .getByRole('button')
+      .click();
+    await expect(page.getByRole('status').filter({ hasText: `${name}: 0 findings` })).toBeVisible();
+  }
+});
+
+test('CIOH and address-reuse findings operate on loaded wallet history', async ({ page }) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page);
+  await addAndScanWallet(page);
+  await page
+    .locator('.right-panel')
+    .getByRole('button', { name: /^Analysis/ })
+    .click();
+  for (const name of ['Common-input ownership', 'Address reuse']) {
+    await page
+      .locator('.analysis-tool')
+      .filter({ has: page.getByRole('heading', { name, exact: true }) })
+      .getByRole('button')
+      .click();
+    await expect(page.locator('.finding')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Clear all', exact: true }).click();
+  }
+  await expect(page.locator('.finding')).toHaveCount(0);
+});
+
+for (const width of [320, 375, 414, 768])
+  test(`responsive workspace fits ${width}px without horizontal overflow`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockBitcoin(page);
+    await page.goto('/');
+    const overflow = () =>
+      page.evaluate(() => ({
+        content: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+      }));
+    let dimensions = await overflow();
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+    await createWorkspace(page, `Mobile ${width}`);
+    dimensions = await overflow();
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+    const switcher = page.locator('.mobile-switch');
+    if (await switcher.isVisible())
+      await switcher.getByRole('button', { name: 'Wallets', exact: true }).click();
+    await addAndScanWallet(page);
+    dimensions = await overflow();
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+    if (await switcher.isVisible()) {
+      for (const name of ['Wallets', 'Inspector', 'Graph']) {
+        await switcher.getByRole('button', { name, exact: true }).click();
+        dimensions = await overflow();
+        expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+      }
+    }
+  });
+
+test('keeps multiple wallets independent inside one encrypted workspace', async ({ page }) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page, 'Two wallets');
+  await addAndScanWallet(page);
+  await page.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  const add = page.getByRole('dialog', { name: 'Add a wallet' });
+  await add.getByLabel('Wallet name').fill('Taproot savings');
+  // Public BIP86 account vector, BSD-2-Clause; also verified in wallet.test.ts.
+  await add
+    .getByLabel('Extended public key')
+    .fill(
+      'xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ',
+    );
+  await add.getByLabel('Address type').selectOption('p2tr');
+  await add.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  await expect(page.locator('.wallet-row')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Scan wallet', exact: true }).click();
+  await expect(
+    page.getByText('Gap limit reached on both branches.', { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator('.statusbar')).toContainText('2 transactions');
+  await saved(page);
+  await page.reload();
+  await page.locator('.saved-row').click();
+  const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
+  await unlock.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(page.locator('.wallet-row')).toHaveCount(2);
+  await page.locator('.wallet-row').filter({ hasText: 'Taproot savings' }).click();
+  await page.getByRole('button', { name: 'Remove wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove wallet', exact: true }).click();
+  await expect(page.locator('.wallet-row')).toHaveCount(1);
+  await expect(page.locator('.wallet-row')).toContainText('My private BIP84 wallet');
+  await expect(page.locator('.statusbar')).toContainText('2 transactions');
+});

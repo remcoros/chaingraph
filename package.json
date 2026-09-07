@@ -1,0 +1,55 @@
+{
+  "name": "chaingraph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --use-system-ca --import tsx scripts/dev.ts",
+    "dev:live": "node --use-system-ca --env-file=.env.live --import tsx scripts/dev.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "node --use-system-ca --import tsx server/index.ts",
+    "start:live": "node --use-system-ca --env-file=.env.live --import tsx server/index.ts",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check": "npm run build && npm test",
+    "test:live": "node --use-system-ca --env-file=.env.live --import tsx scripts/smoke-live.ts",
+    "licenses": "node scripts/licenses.mjs",
+    "format": "prettier --write src server scripts tests *.ts *.css *.json",
+    "format:check": "prettier --check src server scripts tests *.ts *.css *.json"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip32": "^2.4.0",
+    "3d-force-graph": "^1.80.0",
+    "bitcoinjs-lib": "^7.0.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "lucide-react": "^1.42.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.185.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@types/three": "^0.185.4",
+    "@vitejs/plugin-react": "^6.1.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  }
+}

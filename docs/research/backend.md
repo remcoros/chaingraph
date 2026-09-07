@@ -1,0 +1,44 @@
+# Stateless proxy implementation references
+
+Checked 2026-09-08. These references informed the implementation in `server/`. Safe live verification results and their limits appear below.
+
+## Upstream protocol contracts
+
+| Source | Applied decision |
+| --- | --- |
+| [Bitcoin Core 30 getblockchaininfo](https://bitcoincore.org/en/doc/30.0.0/rpc/blockchain/getblockchaininfo/) | Validate the actual Core `chain` before each API query. Public network names are `mainnet` and `testnet4`; Core reports `main` and `testnet4`. |
+| [Bitcoin Core 30 getrawtransaction](https://bitcoincore.org/en/doc/30.0.0/rpc/rawtransactions/getrawtransaction/) | Allow a transaction hash, optional verbosity, and optional block hash. Arbitrary historical lookup depends on upstream transaction availability, typically `txindex`, or supplying its block hash. |
+| [Bitcoin Core 30 getblock](https://bitcoincore.org/en/doc/30.0.0/rpc/blockchain/getblock/) | Restrict verbosity to the documented 0–3 range and enforce a response-size limit. Large blocks may exceed that limit; failure is explicit. |
+| [Electrum protocol basics](https://electrum-protocol.readthedocs.io/en/latest/protocol-basics.html) | TCP/TLS messages are newline-delimited JSON; handle fragmented/coalesced frames and correlate responses by ID. Send `server.version` first. Negotiate protocol 1.4, which includes the requested scripthash methods. |
+| [Electrum methods](https://electrum-protocol.readthedocs.io/en/latest/protocol-methods.html) | `server.features` supplies genesis identity; compare it with Core's block zero before forwarding Electrum queries. `blockchain.headers.subscribe` provides an initial tip plus later notifications: return only the requested initial response and discard notifications. |
+| [Node 24 HTTP](https://nodejs.org/docs/latest-v24.x/api/http.html) | Use bounded keepalive agents, explicit connect/request deadlines and request destruction on cancellation. Consume response bytes incrementally instead of allocating an unlimited body. |
+
+## Implemented boundary
+
+One process uses one configured Core/Fulcrum pair. `GET /api/status` verifies both network identities, sends a fresh Electrum ping, and reports connection state and Core height. `POST /api/rpc` accepts only `{target, method, params}` with a finite method allowlist and method-specific validation. The backend does not accept wallet imports, arbitrary destinations, scripts, writes or broadcast requests, and does not persist/cache query results. The retained state is transport connections, pending requests, negotiated connection metadata, and an optional global rate-limit counter.
+
+Core methods: `getblockchaininfo`, `getrawtransaction`, `getblockhash`, `getblock`, `gettxout`. Electrum methods: `server.version`, `blockchain.scripthash.get_history`, `blockchain.scripthash.get_balance`, `blockchain.scripthash.listunspent`, `blockchain.transaction.get`, `blockchain.headers.subscribe`. Internal `server.features` and `server.ping` are not part of the public allowlist. Public `server.version` takes no parameters and reports the existing connection's negotiated version rather than renegotiating a shared session. Handshake validation rejects incompatible negotiated versions and a non-SHA256 script hash function.
+
+The browser owns scanning, state and algorithms. There is no backend scan loop, and the copied example-only `MAX_REQUEST_UPSTREAM_CALLS`, `MAX_OUTSPEND_HISTORY_TXS`, and `LOG_LEVEL` settings were removed from `.env.example` because they did not govern implemented behavior. Each accepted proxy request makes a fixed small number of upstream calls. `MAX_ADDRESS_HISTORY_TXS` rejects oversized histories instead of returning a silent partial history.
+
+## Local deployment boundary
+
+The default bind is loopback. Host validation blocks unconfigured DNS names; Origin validation blocks other web origins unless listed in `CORS_ALLOW_ORIGINS`. JSON-only POST prevents simple form submissions. This is browser-origin protection for a trusted self-hosted app, not authentication for a public multi-user service. For a reverse proxy, preserve the original Host and list the externally used origin explicitly; backend forwarding headers are not trusted automatically.
+
+Production serves `dist` with a same-origin content security policy. API responses use `Cache-Control: no-store`. Request and upstream exception strings, URLs, credentials and cookie contents are not logged or returned. Live RPC requires user/password or a cookie file, with exactly one mode. With neither configured the backend still starts for demo use, returns a safe disconnected status and rejects RPC with HTTP 503. Incomplete or conflicting authentication settings are configuration errors. Cookies are reread on every call, malformed contents are rejected before transmission, and authentication failures have a safe distinct message. TLS uses normal certificate verification. Node's `--use-system-ca` uses the host trust store; a separate private authority can be supplied through `NODE_EXTRA_CA_CERTS`. Neither disables certificate verification. The startup path loads `.env` quietly; `.env.live` is never opened by project code and may instead be supplied by the explicitly authorized Node `--env-file` launch command.
+
+Cancellation removes queued requests immediately. Once an Electrum request is on the wire, the protocol offers no per-request cancellation: its concurrency slot stays occupied until a response or the bounded deadline, and an abandoned result is discarded. This prevents repeated browser cancellations from exceeding the upstream concurrency cap. Closing the app destroys HTTP agents and the shared Electrum socket; timeouts and disconnects reject pending work and release slots.
+
+## Verification
+
+`npx vitest run server/app.test.ts` exercises mock upstream HTTP/TCP traffic: network mismatch, protocol/hash negotiation, fresh health pings, credential forwarding and cookie rotation, allowlist rejection, Host/Origin rejection, fragmented messages, notifications, out-of-order IDs, shared-connection reuse, disconnect/reconnect, request deadlines, byte/history limits, safe errors, bounded queues and cancellation. It is independent of live credentials. Production browser validation remains a separate integration check for the coordinating agent.
+
+The reusable `scripts/smoke-live.ts` starts an isolated loopback server on port 3300 (override with `SMOKE_PORT`) and checks status, latest block lookup, Core raw transaction retrieval, and matching Electrum retrieval. It consumes only its process environment and prints a safe count summary. Run it with `node --use-system-ca --env-file=.env.live --import tsx scripts/smoke-live.ts`; it never reads or logs that file itself.
+
+The initial live attempt without system CAs failed before any check passed. After using the existing host CA store, live testnet4 smoke passed **5 checks, 0 failures**, at height **151422**. This passed again after the handshake/health-check changes. Certificate and hostname verification remained enabled. No credentials, endpoints, or transaction data are recorded here. This verifies the configured pair's connectivity and one matching transaction lookup; it does not establish complete wallet history, mainnet operation, index synchronization, or reorganization handling.
+
+## Sibling implementation review
+
+The local MIT-licensed `mempool-api-proxy/mempool-api-proxy` checkout at commit `d10bccc` was reviewed, specifically `docs/IMPLEMENTATION-NOTES.md`, `src/core/client.ts`, `src/electrum/client.ts`, its secure transport and schemas, and `src/upstream/preflight.ts`. This informed the system-CA launch setting, cookie-rotation checks, transport review, and explicit preflight boundaries. Changes here were implemented locally; no sibling source was copied. [Node's system-CA option](https://nodejs.org/api/cli.html#--use-system-ca) and the installed Node 24 help confirm the launch flag.
+
+That proxy's stricter preflight compares exact Core/Fulcrum tips, requires a synced Core `txindex`, excludes initial block download, and briefly caches successful readiness. Chaingraph currently checks reachability, Core network, and matching genesis; **`connected` does not mean both upstream indexes share the same current tip**. Requiring `txindex` would reject legitimate Fulcrum fallback use, and caching successful readiness would add backend result retention outside this slice's design. Exact-tip/IBD/index diagnostics may be added as explicit informational fields later. A lagging index can return incomplete recent history today.

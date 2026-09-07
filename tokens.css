@@ -1,0 +1,44 @@
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4
+ * Workbench · Terminal palette · N3 side-rail · Ft2 inline status
+ * Audience: personal-wallet owners and hobbyists; use: follow and annotate coin paths;
+ * tone: technical, calm. UI is the product, not a marketing simulation.
+ */
+:root {
+  --color-paper: #14191b;
+  --color-surface: #1c2225;
+  --color-raised: #242c2f;
+  --color-hover: #2c3539;
+  --color-ink: #edf0e9;
+  --color-muted: #a1adb0;
+  --color-faint: #859298;
+  --color-rule: #303a3e;
+  --color-accent: #b5e879;
+  --color-accent-ink: #17230c;
+  --color-tx: #e3b477;
+  --color-output: #79b5bd;
+  --color-address: #b0a0e0;
+  --color-error: #f09a91;
+  --color-warning: #e3b477;
+  --color-backdrop: #090e12b8;
+  --color-shadow: #00000055;
+  --font-display: 'Manrope Variable', system-ui, sans-serif;
+  --font-body: 'Manrope Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 17px;
+  --text-xl: 24px;
+  --radius-sm: 5px;
+  --radius-md: 9px;
+  --radius-lg: 16px;
+  --rule-hair: 1px;
+  --ease-ui: cubic-bezier(0.2, 0.65, 0.3, 1);
+  --dur-ui: 140ms;
+}
