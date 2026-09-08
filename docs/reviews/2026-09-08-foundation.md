@@ -61,3 +61,18 @@ No remote publication, GitHub release, native ARM run, physical-device test or
 consensus/signature validation is implied by these results.
 
 The subsequent 47-test main run passed 46 and exposed a short-canvas hover card covering its node before a click. The card title now provides an explicit shared selection button. All seven graph browser tests passed after that fix; the build, 203 unit tests and formatting also passed. The optional renderer-recovery event is shared so a restored experimental renderer can clear the common WebGL fallback.
+
+## Final combined UI check
+
+Main integrated the corrected Kimi foundation at `0547e2b`, transaction geometry
+refinement at `b3de0fd`, and Opus panel sizing at `9ba99e5`. Build and 209 unit
+tests passed. The final serial browser run passed all 48 tests after adjusting a
+stale scroll-offset assertion for the taller desktop panel. A row that already
+fits need not scroll; phone overflow and deliberate scrolling remain asserted.
+
+The rebuilt hardened container passed the extended production-browser round trip.
+A fresh live public-testnet4 walkthrough passed at height 151457 with no browser
+errors, including tags, parents, exact spending discovery and raw inspection.
+Updated desktop and phone screenshots show the selected tagged output fully
+inside its panel. A separate Core idle-socket investigation and its final
+verification are recorded in the backend review and validation report.

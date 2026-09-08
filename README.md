@@ -6,7 +6,7 @@ Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, bro
 
 Filter the graph by entity type, labels, notes, bookmarks, value and loaded funding/spending evidence. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. A synthetic laboratory contains three 150-input/150-output transactions with expandable paths. Three verified real testnet4 output examples are also available.
 
-![Real testnet4 tracing and fee findings in Chaingraph](docs/screenshots/release-analysis.png)
+![Real testnet4 transaction tracing, input/output inspection and tags in Chaingraph](docs/screenshots/foundation-live-desktop.png)
 
 ## Docker and Compose
 

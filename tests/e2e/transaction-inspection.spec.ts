@@ -214,7 +214,6 @@ test('keeps selected rows visible through tag wrapping and resize, preserves man
       };
     });
   await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
-  const initialScroll = (await geometry()).scroll;
   await page.getByRole('button', { name: 'Tags', exact: true }).click();
   await page.getByRole('button', { name: 'New tag', exact: true }).click();
   await page.getByLabel('Tag name', { exact: true }).fill('A long public example exchange tag');
@@ -223,7 +222,8 @@ test('keeps selected rows visible through tag wrapping and resize, preserves man
     'A long public example exchange tag',
   );
   await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
-  expect((await geometry()).scroll).toBeGreaterThan(initialScroll);
+  // A taller desktop panel can fit the tagged row without scrolling. The
+  // invariant is visibility; the phone resize below also exercises real overflow.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
   await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
