@@ -81,7 +81,7 @@ kbd {
   gap: 6px;
 }
 .graph-navigation select {
-  padding: 4px 6px;
+  padding: 4px 26px 4px 8px;
 }
 .graph-navigation .view-summary {
   margin-left: auto;

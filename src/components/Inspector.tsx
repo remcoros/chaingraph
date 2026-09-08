@@ -83,7 +83,7 @@ export function AnnotationEditor({
         </div>
       )}
       <div className="section-title">
-        <h3>Your context</h3>
+        <h3>Label and notes</h3>
         <Bookmark size={15} />
       </div>
       <label>
@@ -411,6 +411,15 @@ export function NodeInspector({
               : 'No spending transaction is loaded. This does not establish that these coins are unspent.'}
           </p>
         )}
+      </div>
+      <AnnotationEditor
+        key={annotationKey}
+        annotation={w.annotations[selected.id] ?? emptyAnnotation}
+        editToken={editToken}
+        onEditHandled={onEditHandled}
+        onSave={onSave}
+      />
+      <div className="panel-section selection-actions">
         {onSelectNode && (spendingCount > 0 || (selected.kind === 'output' && tx)) && (
           <div className="related-transactions">
             {selected.kind === 'output' && tx && (
@@ -494,13 +503,6 @@ export function NodeInspector({
           </button>
         )}
       </div>
-      <AnnotationEditor
-        key={annotationKey}
-        annotation={w.annotations[selected.id] ?? emptyAnnotation}
-        editToken={editToken}
-        onEditHandled={onEditHandled}
-        onSave={onSave}
-      />
     </>
   );
 }

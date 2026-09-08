@@ -98,7 +98,7 @@ test('public BIP84 wallet scans both branches, annotates and bookmarks graph ent
   await selectTransaction(page);
   await page.getByLabel('Node label').fill('Salary origin');
   await page.getByLabel('Node notes').fill('Public fixture, personal note retained privately.');
-  await page.getByRole('button', { name: 'Node icon', exact: true }).click();
+  await page.getByRole('button', { name: /Node icon/ }).click();
   await page.getByRole('button', { name: 'Star', exact: true }).click();
   await page.getByLabel('Bookmark', { exact: true }).check();
   await page.getByRole('button', { name: 'Save context' }).click();

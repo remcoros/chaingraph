@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useDialogFocus } from './Dialogs';
 import './icon-picker.css';
 
@@ -72,7 +72,8 @@ export function IconPicker({ value, onChange }: Props) {
         ref={trigger}
         type="button"
         className="icon-picker-trigger"
-        aria-label="Node icon"
+        aria-label={`Node icon: ${label}`}
+        title={`Node icon: ${label}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -81,8 +82,6 @@ export function IconPicker({ value, onChange }: Props) {
         <span className="icon-picker-preview" aria-hidden="true">
           {value || '∅'}
         </span>
-        <span>{label}</span>
-        <ChevronDown size={14} />
       </button>
       {open &&
         createPortal(

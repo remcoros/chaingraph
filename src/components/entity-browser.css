@@ -117,8 +117,10 @@
 }
 .entity-pagination select {
   width: auto;
-  padding: 3px;
+  padding: 3px 22px 3px 6px;
   font-size: 10px;
+  background-position: right 6px center;
+  background-size: 11px;
 }
 .entity-pagination nav {
   margin-top: 8px;
