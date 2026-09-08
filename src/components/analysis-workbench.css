@@ -57,7 +57,7 @@
 .scan-scope select,
 .scan-results-heading select {
   width: auto;
-  padding: 5px 8px;
+  padding: 5px 30px 5px 8px;
 }
 .scan-settings,
 .scan-coverage {
@@ -102,7 +102,7 @@
 }
 .scan-settings input,
 .scan-settings select {
-  padding: 5px 8px;
+  padding: 5px 30px 5px 8px;
 }
 .scan-run-note,
 .scan-notice {
@@ -216,16 +216,46 @@
   flex-wrap: wrap;
 }
 .scan-evidence {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  max-height: 230px;
+  list-style: none;
+  padding: 0;
+  max-height: 320px;
   overflow: auto;
-  gap: 2px;
-  margin: 10px 0 16px;
+  margin: 6px 0 16px;
+  border-top: 1px solid var(--color-rule);
+}
+.scan-detail h4 {
+  font-size: 12px;
+  margin: 14px 0 4px;
+}
+.scan-evidence li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-rule);
 }
 .scan-evidence button {
   min-height: 30px;
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+  gap: 7px;
+  max-width: 100%;
+}
+.scan-evidence-reference {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.scan-evidence-value,
+.scan-evidence-label {
+  padding-inline: 10px;
+  font-size: 12px;
+}
+.scan-evidence-label {
+  display: block;
+}
+.scan-evidence .scan-evidence-address {
+  color: var(--color-muted);
+  font-size: 11px;
 }
 .scan-empty {
   max-width: 700px;

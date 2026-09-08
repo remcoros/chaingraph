@@ -20,7 +20,7 @@ flowchart LR
 | `src/domain/workspace.ts`                                | Input schema validation and derivation of graph nodes/links from loaded transactions                              |
 | `src/domain/analysis.ts`, `src/domain/analysis/`         | Local analysis registry, parameter contracts, scoped evidence and run reports                                     |
 | `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods and explicit connected context                                |
-| `src/domain/workspaceTemplates.ts`                                     | Supported-network catalog and lazy real-chain template snapshots                                                                   |
+| `src/domain/workspaceTemplates.ts`                       | Supported-network catalog and lazy real-chain template snapshots                                                  |
 | `src/lib/wallet.ts`                                      | Account-key validation, receive/change derivation, script construction, and Electrum script hashes                |
 | `src/lib/api.ts`                                         | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion                          |
 | `src/lib/crypto.ts`                                      | Versioned authenticated-encryption envelope and strict envelope decoding                                          |
@@ -95,9 +95,11 @@ The seven built-in tools cover privacy patterns, value/structure and imported wa
 
 `domain/analysisScan.ts` resolves the selected transaction, output, address or wallet into loaded transaction IDs, or uses the complete loaded workspace. It runs the existing registry with independent reports and cancellation between tools. Loaded parents can supply evidence without becoming targets. Exclusions survive reruns only with matching node/transaction evidence. Wallet evidence or transaction mutations mark findings stale; labels remain independent.
 
-The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Analysis and Trace consume the same workspace and selection as Graph, with transient reports and trail state. They introduce no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Trace history is temporary to the active workspace. Locking cancels pending work.
+The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Graph and Analysis are the enabled modes. The Trace workbench is disabled, and saved `workbench: trace` opens Graph. Analysis consumes the shared workspace and selection, with no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Locking cancels pending work. The displayed **Current selection** scope retains the existing `context` session value for compatibility. Every affected entity and supporting transaction in a finding has an individual graph navigation control; output values and addresses come from the same loaded workspace records.
 
-`domain/traceWorkbench.ts` performs bounded, network-scoped output lookups using existing API primitives. Trace records exact creating/spending outpoints separately from explicit continuation choices. The UI only commits fetched data while the initiating workspace and source still exist. Pending work cancels on mode change or lock. Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. See [Trace semantics and limits](research/simple-trace.md).
+The dormant `domain/traceWorkbench.ts` and Trace component remain for a later iteration; they are not mounted or reachable through the current workbench navigation. Their original bounded lookup design and limitations remain documented in [Trace semantics and limits](research/simple-trace.md). Existing graph transaction traversal is independent of this disabled workbench.
+
+Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. **Isolate selection** reuses the existing Paths focus filter, defaults to one hop and follows shared selection changes. Paths can expand it to two hops. Turning the toggle off clears graph filters, leaving manual hiding intact. Finding isolation continues to use explicit include IDs, with the same visible reset.
 
 ## Verification boundaries
 
@@ -203,7 +205,6 @@ while amount filters are active, including legacy records without provenance.
 These passes never mutate cached data, annotations or manual visibility. All flow
 links have low-poly arrows; selected incident links have larger arrows and thicker
 accent lines. Address associations remain arrowless.
-
 
 ## Recording-driven interaction refinements
 

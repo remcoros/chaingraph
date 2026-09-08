@@ -304,10 +304,12 @@ a {
   display: none;
 }
 
-.graph-navigation .graph-lock-selection .graph-nav-caption {
+.graph-navigation .graph-lock-selection .graph-nav-caption,
+.graph-navigation .graph-isolate-selection .graph-nav-caption {
   display: inline;
 }
-.graph-navigation .graph-lock-selection.active {
+.graph-navigation .graph-lock-selection.active,
+.graph-navigation .graph-isolate-selection.active {
   color: var(--color-accent);
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));

@@ -2,9 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { analysisTools } from '../../src/domain/analysis';
 import type { Workspace } from '../../src/domain/types';
-import { newWorkspace } from '../../src/domain/workspace';
+import { newWorkspace, parseWorkspace } from '../../src/domain/workspace';
 import { decryptWorkspace, encryptWorkspace } from '../../src/lib/crypto';
-import { mockBitcoin, transactions, TX_FUNDING } from '../fixtures/bitcoin';
+import {
+  mockBitcoin,
+  transactions,
+  TX_SPENDING,
+  CHANGE_ADDRESS,
+  TX_FUNDING,
+} from '../fixtures/bitcoin';
 
 const password = 'public-simple-workbench-fixture';
 const originOutput = `out:${TX_FUNDING}:0`;
@@ -35,6 +41,7 @@ async function seed(page: Page, customize?: (workspace: Workspace) => void) {
     transactionFlow: { open: false, transactionId: TX_FUNDING },
   };
   customize?.(workspace);
+  parseWorkspace(workspace);
   const entry = {
     id: workspace.id,
     publicName: workspace.name,
@@ -146,7 +153,7 @@ test('plain workbench switches preserve the existing canvas, manual camera and s
   await page.waitForTimeout(1200);
   const before = (await saved(page)).view;
   await workbench(page, 'Analysis').click();
-  await workbench(page, 'Trace').click();
+  await expect(workbench(page, 'Trace')).toHaveCount(0);
   await workbench(page, 'Graph').click();
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute('data-test-instance', 'original');
@@ -158,7 +165,110 @@ test('plain workbench switches preserve the existing canvas, manual camera and s
   expect(after.transactionFlow).toEqual(before.transactionFlow);
 });
 
-test('Trace requires an output choice, follows one explicit branch and shares encrypted annotations', async ({
+test('saved Trace mode opens Graph and selection isolation toggles with keyboard and preserves manual hides', async ({
+  page,
+}) => {
+  await seed(page, (workspace) => {
+    workspace.view.workbench = 'trace';
+    workspace.view.hiddenNodeIds = [siblingOutput];
+  });
+  await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
+  await expect(workbench(page, 'Trace')).toHaveCount(0);
+  await expect(page.locator('.trace-workbench')).toHaveCount(0);
+  const isolate = page.getByRole('button', { name: 'Isolate selection', exact: true });
+  await isolate.focus();
+  await page.keyboard.press('Enter');
+  await expect(isolate).toHaveAttribute('aria-pressed', 'true');
+  await expect
+    .poll(async () => (await saved(page)).view.filters?.focus)
+    .toEqual({ id: originOutput, hops: 1 });
+  await page.getByLabel('Focus graph paths').selectOption('2');
+  await expect.poll(async () => (await saved(page)).view.filters?.focus?.hops).toBe(2);
+  await screenshot(page, 'graph-selection-isolated-desktop');
+  await page.locator(`.entity-row[title="tx:${TX_FUNDING}"]`).click();
+  await expect
+    .poll(async () => (await saved(page)).view.filters?.focus?.id)
+    .toBe(`tx:${TX_FUNDING}`);
+  await isolate.click();
+  await expect(isolate).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(async () => (await saved(page)).view.filters?.focus).toBeUndefined();
+  expect((await saved(page)).view.hiddenNodeIds).toEqual([siblingOutput]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
+  await isolate.click();
+  await expect(isolate).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await screenshot(page, 'graph-selection-isolated-mobile');
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
+  await expect(isolate).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('equal-output evidence links all six outputs, their addresses and the supporting transaction', async ({
+  page,
+}) => {
+  const { calls } = await seed(page, (workspace) => {
+    const tx = workspace.transactions[TX_SPENDING];
+    tx.vout = Array.from({ length: 6 }, (_, n) => ({ ...tx.vout[0], n, value: 20 }));
+    tx.vout[5].scriptPubKey = { ...transactions[TX_SPENDING].vout[1].scriptPubKey };
+    workspace.inputContext = { [TX_SPENDING]: [0] };
+    workspace.view.selectionId = `tx:${TX_SPENDING}`;
+  });
+  await workbench(page, 'Analysis').click();
+  const analysis = page.locator('.analysis-workbench');
+  await expect(
+    analysis.getByRole('option', { name: 'Current selection', exact: true }),
+  ).toHaveCount(1);
+  await expect(analysis.getByRole('button', { name: 'Trace', exact: true })).toHaveCount(0);
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  await analysis
+    .locator('.scan-result-list button')
+    .filter({ hasText: /6 equal/ })
+    .click();
+  const evidence = analysis.getByRole('list', { name: 'Affected entities' });
+  await expect(evidence.getByRole('button', { name: /^Show output/ })).toHaveCount(6);
+  await expect(evidence).toContainText('2,000,000,000');
+  await screenshot(page, 'six-outputs-evidence-desktop');
+  await evidence
+    .getByRole('button', { name: `Show address ${CHANGE_ADDRESS} on graph`, exact: true })
+    .click();
+  await expect.poll(async () => (await saved(page)).view.showAddresses).toBe(true);
+  await expect
+    .poll(async () => (await saved(page)).view.selectionId)
+    .toBe(`addr:${CHANGE_ADDRESS}`);
+  await expect.poll(async () => (await saved(page)).inputContext?.[TX_SPENDING]).toBeUndefined();
+  await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
+  for (let n = 0; n < 6; n++) {
+    await evidence
+      .getByRole('button', { name: `Show output ${TX_SPENDING}:${n} on graph`, exact: true })
+      .click();
+    await expect
+      .poll(async () => (await saved(page)).view.selectionId)
+      .toBe(`out:${TX_SPENDING}:${n}`);
+    expect((await saved(page)).view.filters?.includeIds).toBeUndefined();
+    await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
+  }
+  await evidence
+    .getByRole('button', { name: /^Show address/ })
+    .first()
+    .click();
+  await expect.poll(async () => (await saved(page)).view.showAddresses).toBe(true);
+  await expect.poll(async () => (await saved(page)).view.selectionId).toMatch(/^addr:/);
+  await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
+  await analysis
+    .getByRole('list', { name: 'Supporting transactions' })
+    .getByRole('button', { name: `Show transaction ${TX_SPENDING} on graph`, exact: true })
+    .click();
+  await expect.poll(async () => (await saved(page)).view.selectionId).toBe(`tx:${TX_SPENDING}`);
+  await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await evidence.scrollIntoViewIfNeeded();
+  await screenshot(page, 'six-outputs-evidence-mobile');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(calls).toEqual([]);
+});
+
+// Retain the original journeys while the Trace workbench is intentionally disabled.
+test.skip('Trace requires an output choice, follows one explicit branch and shares encrypted annotations', async ({
   page,
 }) => {
   const { workspace, calls } = await seed(page, (workspace) => {
@@ -238,7 +348,7 @@ test('Trace requires an output choice, follows one explicit branch and shares en
   );
 });
 
-test('bounded Trace errors and empty results retain unknown status and the selected branch', async ({
+test.skip('bounded Trace errors and empty results retain unknown status and the selected branch', async ({
   page,
 }) => {
   const { calls } = await seed(page, (workspace) => {
@@ -275,7 +385,7 @@ test('bounded Trace errors and empty results retain unknown status and the selec
   expect(Object.keys((await saved(page)).transactions)).toEqual([TX_FUNDING]);
 });
 
-test('leaving Trace cancels a pending lookup and discards its late spending result', async ({
+test.skip('leaving Trace cancels a pending lookup and discards its late spending result', async ({
   page,
 }) => {
   await seed(page, (workspace) => {
@@ -313,7 +423,7 @@ test('leaving Trace cancels a pending lookup and discards its late spending resu
   expect(Object.keys((await saved(page)).transactions)).toEqual([TX_FUNDING]);
 });
 
-test('Trace shows a timestamped unspent observation and clears it on a failed recheck', async ({
+test.skip('Trace shows a timestamped unspent observation and clears it on a failed recheck', async ({
   page,
 }) => {
   await seed(page, (workspace) => {
@@ -357,7 +467,7 @@ test('Trace shows a timestamped unspent observation and clears it on a failed re
   await expect(trace).not.toContainText('Observed unspent at');
 });
 
-test('Trace timeout leaves its anchor and saved transactions intact', async ({ page }) => {
+test.skip('Trace timeout leaves its anchor and saved transactions intact', async ({ page }) => {
   await seed(page, (workspace) => {
     delete workspace.transactions['b'.repeat(64)];
   });

@@ -68,15 +68,15 @@ The **Entities** panel filters both the list and canvas. Search identifiers, lab
 
 Navigation floats at the top of the graph canvas once transactions are loaded. On narrow screens, navigation uses compact icons with accessible names and tooltips.
 
-**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Focus graph**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
+**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Isolate selection**, next to **Lock to selection**, toggles the same path filter. It starts at one connection and follows your selection; choose two connections in **Paths** for a wider view. Turning isolation off or choosing **Reset filters** clears graph filters while preserving deliberate manual hiding. **Center selection** reveals selections omitted by filters and moves the camera. Manually hidden entities remain hidden until explicitly restored. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Focus graph**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
 
 ## Run analysis
 
-The compact **Graph**, **Analysis** and **Trace** navigation belongs to the unlocked workspace, below the workspace tabs. Graph keeps its camera, layout, Inspector and wallet tabs when you move between workbenches.
+The compact **Graph** and **Analysis** navigation belongs to the unlocked workspace, below the workspace tabs. Graph keeps its camera, layout, Inspector and wallet tabs when you move between workbenches. The Trace workbench is disabled for now; saved workspaces last used in Trace open Graph.
 
-Open **Analysis** and press **Scan** to run every applicable existing tool. The scope follows the selected transaction, output, address or wallet. Without one, it covers the loaded workspace, including data outside graph filters. Outputs include their creating transaction and loaded exact spenders. Read the scope before scanning. Optional settings expose the registry defaults. No analysis request downloads chain data.
+Open **Analysis** and press **Scan** to run every applicable existing tool. **Current selection** follows the selected transaction, output, address or wallet. Without a selection, it covers the loaded workspace, including data outside graph filters. Choose **Loaded workspace** to scan all loaded transactions explicitly. Outputs include their creating transaction and loaded exact spenders. Read the scope before scanning. Optional settings expose the registry defaults. No analysis request downloads chain data.
 
-Results use the main screen, with a readable evidence and limits view. The scan report accounts for every tool, including skipped tools, missing context and no matches. Current selection can change without changing the last scan's evidence. Temporary controls and reports stay with each unlocked workspace, including workspace tab switches. Locking clears these controls; saved findings remain encrypted.
+Results use the main screen, with a readable evidence and limits view. **Affected entities** links every referenced output, address or transaction individually. Output rows include their outpoint, loaded value, saved label when present and a link to their address when known. **Supporting transactions** provides the transaction links alongside these affected entities. These links open Graph without implicitly isolating the evidence. The scan report accounts for every tool, including skipped tools, missing context and no matches. Current selection can change without changing the last scan's evidence. Temporary controls and reports stay with each unlocked workspace, including workspace tab switches. Locking clears these controls; saved findings remain encrypted.
 
 | Tool                          | What it explains                                                                                                                                                 |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,13 +92,9 @@ Results use the main screen, with a readable evidence and limits view. The scan 
 
 Exclude a finding to remove its overlay, or restore it later. New wallet or transaction evidence marks old findings stale. Annotations remain independent from analysis.
 
-## Trace an output
+## Trace workbench
 
-Select an output, or an input that references a previous output, then open **Trace**. Other selection kinds offer an explicit output choice. The compact previous/current/next view follows only the chosen branch. Backward and forward actions inspect one hop with explicit request and history limits; cancel an outstanding request from Trace. Switching workbenches or locking cancels pending Trace work.
-
-Creating and spending links reference an exact outpoint. Continuing through a transaction is a hypothesis or a manual choice: Bitcoin does not record an authoritative input-to-output satoshi mapping. Trace explains sole-output and consolidation hints. Multiple choices require your decision, and collaborative-spend ambiguity prevents automatic continuation. Missing spending evidence means unknown, not unspent. Current UTXO checks are timestamped observations, not permanent guarantees.
-
-The trail stays in memory while this workspace is active. **Label**, **Tags** and **Icon** open the same Inspector controls as Graph; **Back to Trace** returns to the trail. These annotations use the existing encrypted workspace storage.
+The Trace workbench is disabled pending a later iteration. Its source is retained for future work, but there are no active Trace navigation or workbench controls. Existing graph funding/spending actions and the transaction input/output view remain available. Missing spending evidence still means unknown, not unspent, and Bitcoin does not record which input funded a particular output.
 
 ## Hide, restore and remove entities
 
@@ -245,7 +241,6 @@ canvas, including retained context. This follows graph amount filters and manual
 visibility, and is saved per workspace. Choose **Not hidden** or **All entities**
 to inspect observations omitted by the graph amount filter, or **Hidden** to
 restore manually hidden items. Changing this list mode does not remove chain data.
-
 
 **Center selection** frames the selected node with its immediate connections.
 **Fit graph** frames all displayed nodes. Both account for node sizes, displayed

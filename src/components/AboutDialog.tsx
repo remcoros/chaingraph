@@ -59,18 +59,20 @@ export function AboutDialog({
             </li>
             <li>
               <strong>Follow one path at a time.</strong> Cubes are transactions; spheres are
-              outputs. Open Trace from a selected output or input, then choose one backward or
-              forward branch.
+              outputs. Select an output in Graph and use its creating or spending transaction links
+              to inspect the loaded flow. The separate Trace workbench is disabled for now.
             </li>
             <li>
               <strong>Narrow your view.</strong> Use Entities to filter labels, values, funding
-              details and loaded spends. Graph shows active filters with Reset filters; manual
-              hiding stays separate.
+              details and loaded spends. Isolate selection, beside Lock to selection, follows one
+              connection around your selection; Paths can expand it to two. Turn it off or use Reset
+              filters to clear filters while preserving manual hiding.
             </li>
             <li>
-              <strong>Review the evidence.</strong> Open Analysis and Scan the current context or
-              loaded workspace. Every applicable tool runs together. Findings explain assumptions
-              and become stale when underlying data changes.
+              <strong>Review the evidence.</strong> Open Analysis and Scan Current selection or
+              Loaded workspace. Every applicable tool runs together. Open affected outputs,
+              addresses and supporting transactions individually from a finding. Findings explain
+              assumptions and become stale when underlying data changes.
             </li>
             <li>
               <strong>Label what you know.</strong> Add notes, bookmarks and workspace tags for

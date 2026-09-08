@@ -12,9 +12,7 @@ for (const id of [
   'mainnet-large-value-path',
   'mainnet-public-wallet',
 ]) {
-  test(`${id} supports readable scoped analysis and an explicit loaded trace branch`, async ({
-    page,
-  }) => {
+  test(`${id} supports readable scoped analysis and graph isolation`, async ({ page }) => {
     const calls = await mockBitcoin(page, false);
     await page.goto('/');
     // Load through Vite, matching the browser's JSON module handling.
@@ -87,52 +85,11 @@ for (const id of [
       fullPage: true,
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
-    if (id === 'mainnet-public-wallet') {
-      await navigation.getByRole('button', { name: 'Graph', exact: true }).click();
-      await page.getByRole('button', { name: 'Entities', exact: true }).click();
-      await page.getByLabel('Entity type').selectOption('output');
-      await page.getByLabel('Filter graph entities').fill(`${input!.txid!}:${input!.vout!}`);
-      await page.locator(`.entity-row[title="${anchor}"]`).click();
-    }
-    await navigation.getByRole('button', { name: 'Trace', exact: true }).click();
-    const trace = page.getByRole('region', { name: 'Trace workbench', exact: true });
-    await trace.getByRole('button', { name: 'Scan forward', exact: true }).click();
-    const choices = trace.getByRole('region', { name: 'Choose continuation', exact: true });
-    await expect(choices).toContainText('Choose a next output');
-    if (id === 'mainnet-wabisabi' || id === 'mainnet-equal-outputs') {
-      await expect(choices).toContainText('Ambiguous continuation');
-      await expect(choices).toContainText('CoinJoin');
-    }
-    await expect(trace.getByLabel('Trace branch', { exact: true })).toHaveValue('');
-    await expect(
-      trace.getByRole('button', { name: 'Follow selected branch', exact: true }),
-    ).toBeDisabled();
-    await page.screenshot({
-      path: `artifacts/simple-workbenches/${id}-trace-desktop.png`,
-      fullPage: true,
-    });
-    // This explicitly chosen test branch is a recorded output, never an inferred satoshi path.
-    const chosen = root.vout[0];
-    await trace
-      .getByLabel('Trace branch', { exact: true })
-      .selectOption(outputNodeId(root.txid, chosen.n));
-    await trace.getByRole('button', { name: 'Follow selected branch', exact: true }).click();
-    await expect(trace.locator('.trace-current > .trace-id[title]')).toHaveAttribute(
-      'title',
-      `${root.txid}:${chosen.n}`,
-    );
-    await trace.getByRole('button', { name: 'Scan backward', exact: true }).click();
-    await expect(choices).toContainText(
-      'Bitcoin does not identify which input funded this particular output.',
-    );
-    await page.setViewportSize({ width: 390, height: 844 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
-    await page.screenshot({
-      path: `artifacts/simple-workbenches/${id}-trace-mobile.png`,
-      fullPage: true,
-    });
-    expect(calls, 'bundled public data supplies every observed hop').toEqual([]);
+    await analysis.getByRole('button', { name: 'Isolate', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Reset filters', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
+    await expect(analysis.locator('.scan-detail')).toBeVisible();
+    expect(calls, 'analysis and isolation use only bundled public data').toEqual([]);
   });
 }

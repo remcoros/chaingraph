@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowRight, Focus, Network, X } from 'lucide-react';
+import { Activity, Focus, Network, X } from 'lucide-react';
 import { analysisTools } from '../domain/analysis';
 import {
   analysisScanScope,
@@ -10,6 +10,9 @@ import {
 } from '../domain/analysisScan';
 import {
   short,
+  addressNodeId,
+  formatSats,
+  sats,
   txNodeId,
   type AnalysisFinding,
   type GraphNode,
@@ -17,6 +20,7 @@ import {
   type Workspace,
 } from '../domain/types';
 import { walletEvidenceChanged } from '../domain/walletActivity';
+import { outputAddress } from '../domain/workspace';
 import './analysis-workbench.css';
 
 export interface AnalysisWorkbenchSession {
@@ -36,7 +40,60 @@ export interface AnalysisWorkbenchProps {
   wallet?: Wallet;
   onFindings: (findings: AnalysisFinding[]) => void;
   onGraph: (ids: string[], isolate?: boolean) => void;
-  onTrace: () => void;
+}
+
+function EvidenceReference({
+  id,
+  workspace,
+  onGraph,
+}: {
+  id: string;
+  workspace: Workspace;
+  onGraph: AnalysisWorkbenchProps['onGraph'];
+}) {
+  const [prefix, txid, index] = id.split(':');
+  const kind = prefix === 'out' ? 'Output' : prefix === 'tx' ? 'Transaction' : 'Address';
+  const reference = id.slice(id.indexOf(':') + 1);
+  const output =
+    prefix === 'out'
+      ? workspace.transactions[txid]?.vout.find((item) => item.n === Number(index))
+      : undefined;
+  const address = output && outputAddress(output);
+  const label = workspace.annotations[id]?.label;
+  return (
+    <li>
+      <div className="scan-evidence-reference">
+        <button
+          className="text-button"
+          title={reference}
+          aria-label={`Show ${kind.toLowerCase()} ${reference} on graph`}
+          onClick={() => onGraph([id])}
+        >
+          <span>{kind}</span>
+          <span className="mono">
+            {prefix === 'out' ? `${short(txid, 12)}:${index}` : short(reference, 12)}
+          </span>
+        </button>
+        {prefix === 'out' && (
+          <span className="scan-evidence-value">
+            {formatSats(output ? sats(output.value) : undefined)}
+          </span>
+        )}
+      </div>
+      {label && <span className="scan-evidence-label">{label}</span>}
+      {address && (
+        <button
+          className="text-button scan-evidence-address"
+          title={address}
+          aria-label={`Show address ${address} on graph`}
+          onClick={() => onGraph([addressNodeId(address)])}
+        >
+          <span>Address</span>
+          <span className="mono">{short(address, 12)}</span>
+        </button>
+      )}
+    </li>
+  );
 }
 
 export function AnalysisWorkbench({
@@ -45,7 +102,6 @@ export function AnalysisWorkbench({
   wallet,
   onFindings,
   onGraph,
-  onTrace,
   active,
   cache,
 }: AnalysisWorkbenchProps) {
@@ -174,10 +230,6 @@ export function AnalysisWorkbench({
               Cancel
             </button>
           )}
-          <button onClick={onTrace}>
-            <ArrowRight size={14} />
-            Trace
-          </button>
         </div>
       </header>
       <div className="scan-scope">
@@ -188,12 +240,15 @@ export function AnalysisWorkbench({
             value={scopeMode}
             onChange={(event) => setScopeMode(event.target.value)}
           >
-            <option value="context">Current context</option>
+            <option value="context">Current selection</option>
             <option value="workspace">Loaded workspace</option>
           </select>
         </label>
         <div>
           <strong>{scope.label}</strong>
+          {scopeMode === 'context' && scope.kind === 'workspace' && (
+            <p>No current selection. The scan uses the loaded workspace.</p>
+          )}
           <p>{scope.explanation}</p>
           <p className="muted">
             Loaded data only · {scope.txids.length} transaction{scope.txids.length === 1 ? '' : 's'}
@@ -294,7 +349,7 @@ export function AnalysisWorkbench({
           <p className="scan-run-note">
             Last scan: {scan.scope.label} · {scan.scope.txids.length} transactions ·{' '}
             <time dateTime={scan.runAt}>{new Date(scan.runAt).toLocaleTimeString()}</time>
-            {changed && <span> · Context or settings changed. Scan again to update.</span>}
+            {changed && <span> · Scope or settings changed. Scan again to update.</span>}
           </p>
         )}
       </div>
@@ -379,7 +434,7 @@ export function AnalysisWorkbench({
             ? 'No findings match this evidence filter.'
             : scan
               ? 'No findings in this scan. Review Scan coverage for skipped records, missing data and tools with no matches.'
-              : 'Scan the current context to inspect its patterns and limits.'}
+              : 'Scan the current selection or loaded workspace to inspect its patterns and limits.'}
         </p>
       ) : (
         <div className="scan-results">
@@ -450,20 +505,33 @@ export function AnalysisWorkbench({
               </div>
               <h3>Evidence</h3>
               <p className="muted">
-                {detail.nodeIds.length} related graph entities. Open a supporting transaction:
+                Open an affected entity or supporting transaction to inspect it on the graph.
               </p>
-              <div className="scan-evidence">
-                {detail.txids.map((txid) => (
-                  <button
-                    key={txid}
-                    className="text-button mono"
-                    title={txid}
-                    onClick={() => onGraph([txNodeId(txid)])}
-                  >
-                    {short(txid, 12)}
-                  </button>
-                ))}
-              </div>
+              {detail.nodeIds.length > 0 && (
+                <>
+                  <h4>Affected entities</h4>
+                  <ul className="scan-evidence" aria-label="Affected entities">
+                    {[...new Set(detail.nodeIds)].map((id) => (
+                      <EvidenceReference key={id} id={id} workspace={workspace} onGraph={onGraph} />
+                    ))}
+                  </ul>
+                </>
+              )}
+              {detail.txids.length > 0 && (
+                <>
+                  <h4>Supporting transactions</h4>
+                  <ul className="scan-evidence" aria-label="Supporting transactions">
+                    {[...new Set(detail.txids)].map((txid) => (
+                      <EvidenceReference
+                        key={txid}
+                        id={txNodeId(txid)}
+                        workspace={workspace}
+                        onGraph={onGraph}
+                      />
+                    ))}
+                  </ul>
+                </>
+              )}
               {report && (
                 <details>
                   <summary>Method coverage</summary>

@@ -30,6 +30,7 @@ import {
   ArrowRight,
   Crosshair,
   Focus,
+  Filter,
   Download,
   Ellipsis,
   Eye,
@@ -65,7 +66,6 @@ import { setNodesHidden, showAllNodes } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
 import { AnalysisWorkbench, type AnalysisWorkbenchSession } from './components/AnalysisWorkbench';
-import { TraceWorkbench } from './components/TraceWorkbench';
 import './components/workbenches.css';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
@@ -75,6 +75,7 @@ import {
   clearContextProvenance,
   markContextTransactions,
   promoteInputContext,
+  outputAddress,
 } from './domain/workspace';
 import { filterSmallAmounts, omitAmountOrphans } from './domain/smallAmounts';
 import {
@@ -145,8 +146,8 @@ export default function App() {
       if (!unlocked.has(id)) analysisSessions.current.delete(id);
   }, [ws.sessions]);
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
-  const [workbench, setWorkbench] = useState<'graph' | 'analysis' | 'trace'>('graph');
-  const [returnWorkbench, setReturnWorkbench] = useState<'analysis' | 'trace'>();
+  const [workbench, setWorkbench] = useState<'graph' | 'analysis'>('graph');
+  const [returnWorkbench, setReturnWorkbench] = useState<'analysis'>();
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
@@ -451,6 +452,14 @@ export default function App() {
       // a hidden sibling explicitly reveals the complete parent before selecting.
       if (active && target && scope && (target[1] === 'tx' || !scope.includes(Number(target[3]))))
         ws.update(active.id, (current) => promoteInputContext(current, [target[2]]), false);
+      if (active && id.startsWith('addr:')) {
+        const address = id.slice(5);
+        const creators = Object.keys(active.inputContext ?? {}).filter((txid) =>
+          active.transactions[txid]?.vout.some((output) => outputAddress(output) === address),
+        );
+        if (creators.length)
+          ws.update(active.id, (current) => promoteInputContext(current, creators), false);
+      }
       setSelectedId(id);
       setGraphFilters((filters) =>
         filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
@@ -475,7 +484,11 @@ export default function App() {
     setSelectedWallet(w?.view.selectedWallet);
     setLeftTab(w?.view.leftTab ?? 'wallets');
     setRightTab(w?.view.rightTab === 'analysis' ? 'inspect' : (w?.view.rightTab ?? 'inspect'));
-    setWorkbench(w?.view.workbench ?? (w?.view.rightTab === 'analysis' ? 'analysis' : 'graph'));
+    setWorkbench(
+      w?.view.workbench === 'analysis' || (!w?.view.workbench && w?.view.rightTab === 'analysis')
+        ? 'analysis'
+        : 'graph',
+    );
     setReturnWorkbench(undefined);
     setLockingWorkspace(false);
     setMobilePanel(w?.view.mobilePanel ?? 'graph');
@@ -1159,35 +1172,38 @@ export default function App() {
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
-  function switchWorkbench(next: 'graph' | 'analysis' | 'trace') {
+  function switchWorkbench(next: 'graph' | 'analysis') {
     flushActiveGraph();
     setWorkbench(next);
+  }
+  function prepareIsolation(ids: string[]) {
+    const transactionIds = [
+      ...new Set(
+        ids.flatMap((nodeId) => {
+          const match = /^(?:tx|out):([0-9a-f]{64})/.exec(nodeId);
+          return match ? [match[1]] : [];
+        }),
+      ),
+    ];
+    change(
+      (current) => ({
+        ...promoteInputContext(current, transactionIds),
+        view: {
+          ...current.view,
+          smallAmountThreshold: undefined,
+          showAddresses:
+            ids.some((nodeId) => nodeId.startsWith('addr:')) || current.view.showAddresses,
+        },
+      }),
+      false,
+    );
   }
   function showFindingOnGraph(ids: string[], isolate = false) {
     setReturnWorkbench('analysis');
     switchWorkbench('graph');
     const id = ids.find((candidate) => !hiddenIds.has(candidate)) ?? ids[0];
     if (isolate) {
-      const transactionIds = [
-        ...new Set(
-          ids.flatMap((nodeId) => {
-            const match = /^(?:tx|out):([0-9a-f]{64})/.exec(nodeId);
-            return match ? [match[1]] : [];
-          }),
-        ),
-      ];
-      change(
-        (current) => ({
-          ...promoteInputContext(current, transactionIds),
-          view: {
-            ...current.view,
-            smallAmountThreshold: undefined,
-            showAddresses:
-              ids.some((nodeId) => nodeId.startsWith('addr:')) || current.view.showAddresses,
-          },
-        }),
-        false,
-      );
+      prepareIsolation(ids);
       updateFilters({ includeIds: ids, preserveContext: true });
     }
     if (id) {
@@ -1248,6 +1264,23 @@ export default function App() {
       >
         <Focus size={14} />
         <span className="graph-nav-caption">Lock to selection</span>
+      </button>
+      <button
+        aria-label="Isolate selection"
+        title="Show the selection and connected entities; Paths sets the hop limit"
+        aria-pressed={!!graphFilters.focus}
+        className={`graph-isolate-selection ${graphFilters.focus ? 'active' : ''}`}
+        disabled={!graphFilters.focus && (!selected || hiddenIds.has(selected.id))}
+        onClick={() => {
+          if (graphFilters.focus) resetGraphFilters();
+          else if (selectedId) {
+            prepareIsolation([selectedId]);
+            updateFilters({ focus: { id: selectedId, hops: 1 } });
+          }
+        }}
+      >
+        <Filter size={14} />
+        <span className="graph-nav-caption">Isolate selection</span>
       </button>
       <label>
         <span className="graph-path-label">Paths</span>
@@ -1426,27 +1459,21 @@ export default function App() {
       ) : (
         <>
           <nav className="workbench-nav" aria-label="Workbench">
-            {(['graph', 'analysis', 'trace'] as const).map((mode) => (
+            {(['graph', 'analysis'] as const).map((mode) => (
               <button
                 key={mode}
                 aria-pressed={workbench === mode}
                 className={workbench === mode ? 'active' : ''}
                 onClick={() => switchWorkbench(mode)}
               >
-                {mode === 'graph' ? (
-                  <GitBranch size={15} />
-                ) : mode === 'analysis' ? (
-                  <Search size={15} />
-                ) : (
-                  <ArrowRight size={15} />
-                )}
-                {mode === 'graph' ? 'Graph' : mode === 'analysis' ? 'Analysis' : 'Trace'}
+                {mode === 'graph' ? <GitBranch size={15} /> : <Search size={15} />}
+                {mode === 'graph' ? 'Graph' : 'Analysis'}
               </button>
             ))}
             {workbench === 'graph' && returnWorkbench && (
               <button className="workbench-return" onClick={() => switchWorkbench(returnWorkbench)}>
                 <ArrowLeft size={14} />
-                Back to {returnWorkbench === 'analysis' ? 'Analysis' : 'Trace'}
+                Back to Analysis
               </button>
             )}
           </nav>
@@ -2053,41 +2080,6 @@ export default function App() {
               wallet={wallet}
               onFindings={(findings) => change((current) => ({ ...current, findings }))}
               onGraph={showFindingOnGraph}
-              onTrace={() => switchWorkbench('trace')}
-            />
-          </section>
-          <section
-            className="workbench-page"
-            hidden={workbench !== 'trace' || !!tourStep}
-            id="trace-workspace"
-            tabIndex={-1}
-            aria-label="Trace workspace"
-          >
-            <TraceWorkbench
-              key={w.id}
-              workspace={w}
-              selected={selected}
-              active={workbench === 'trace' && !lockingWorkspace}
-              canQuery={canQuery}
-              queryDisabledReason={queryDisabledReason}
-              onSelect={select}
-              renderMetadata={renderEntityMetadata}
-              onMerge={(transactions, requiredSourceId) =>
-                wRef.current?.id === w.id &&
-                mergeTransactions(w.id, transactions, undefined, undefined, requiredSourceId)
-              }
-              onGraph={(id) => {
-                setReturnWorkbench('trace');
-                switchWorkbench('graph');
-                select(id);
-                centerNode(id);
-              }}
-              onAnnotate={(id, target) => {
-                setReturnWorkbench('trace');
-                switchWorkbench('graph');
-                setFocusGraph(false);
-                editNode(id, target);
-              }}
             />
           </section>
           <footer className="statusbar">
