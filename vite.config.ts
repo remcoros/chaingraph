@@ -18,7 +18,9 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.CHAINGRAPH_PROXY_TARGET ?? 'http://127.0.0.1:3000',
-        changeOrigin: true,
+        // Preserve the browser-facing Host so the backend can validate the
+        // same-origin request on a separate local preview port.
+        changeOrigin: false,
       },
     },
   },

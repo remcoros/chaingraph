@@ -45,7 +45,7 @@ CHAINGRAPH_PROXY_TARGET=http://127.0.0.1:4400 \
   --host 127.0.0.1 --port 3103 --strictPort
 ```
 
-The backend's `CORS_ALLOW_ORIGINS` must include that exact preview origin, such as `http://127.0.0.1:3103`. A connected status alone does not prove that browser RPC requests are allowed. Test an actual transaction lookup. Keep the browser and API on the same preview origin through Vite's proxy; do not weaken production Origin checks to make a preview work.
+Vite preserves the browser-facing Host header so the backend can validate same-origin requests on local preview ports. A connected status alone does not prove that browser RPC requests are allowed. Test an actual transaction lookup. Keep the browser and API on the same preview origin through Vite's proxy; do not weaken production Origin checks to make a preview work. Non-loopback hostnames still need the exact frontend origin in the backend's `CORS_ALLOW_ORIGINS` configuration, as described in the deployment guide.
 
 Browser storage is tied to each origin. Two preview ports have separate workspace lists. Use synthetic/public data for comparison or intentionally export/import an encrypted workspace.
 

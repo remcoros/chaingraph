@@ -1494,7 +1494,7 @@ export default function App() {
               };
             });
             setNotice(
-              `Imported ${Object.keys(result.annotations).length} labels. ${result.skipped} unsupported records skipped.`,
+              `Imported ${Object.keys(result.annotations).length} labels. ${result.skipped} records skipped (unsupported type or no label).`,
             );
           } catch (err) {
             setError(err instanceof Error ? err.message : 'Label import failed.');

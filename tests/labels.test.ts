@@ -5,8 +5,8 @@ import { exportLabels, importLabels } from '../src/lib/labels';
 import { isExtendedPublicKey } from '../src/lib/wallet';
 import { newWorkspace } from '../src/domain/workspace';
 
-// Public BIP32/BIP84 vectors (CC0): a valid depth-2 parent xpub, the BIP84
-// account zpub, and the BIP32 test vector 1 master xprv.
+// Public BIP32/BIP86 vectors (BSD-2-Clause) and BIP84 vectors (CC0).
+// Sources and attribution: docs/research/wallet-security.md.
 const parentXpub =
   'xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5';
 const taprootXpub =
@@ -15,8 +15,8 @@ const zpub =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
 const masterXprv =
   'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi';
-// Widely quoted "example xpub" whose payload is private-shaped (key data is
-// 0x00 followed by 32 bytes); it must be rejected despite its public version.
+// BIP32 invalid-key test vector: public version with private key data.
+// It must be rejected despite its public version and valid checksum.
 const privateShapedXpub =
   'xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm';
 const txid = 'a'.repeat(64);
