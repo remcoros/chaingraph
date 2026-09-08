@@ -80,6 +80,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let dimensions: 2 | 3 | undefined;
   let needsFit = true;
   let visible = false;
+  let fitPadding = 40;
   let settled = false;
   let pendingFocus: string | undefined;
   let dead = false;
@@ -160,7 +161,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     // Keep a pending request while empty. Engine stop must not consume it.
     needsFit = true;
     pendingFocus = undefined;
-    if (visible && graph.graphData().nodes.length) graph.zoomToFit(duration(), 65);
+    if (visible && graph.graphData().nodes.length) graph.zoomToFit(duration(), fitPadding);
   };
   const emitHover = () => {
     if (!dead && !pointers.size && point.pointerType !== 'touch')
@@ -265,7 +266,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         settled = true;
         if (visible && needsFit && graph.graphData().nodes.length) {
           needsFit = false;
-          graph.zoomToFit(duration(), 65);
+          graph.zoomToFit(duration(), fitPadding);
         }
       });
     graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -451,12 +452,15 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       if (dead) return;
       visible = width > 0 && height > 0;
       if (!visible) return;
+      // A fixed margin can exhaust a short canvas below the transaction panel.
+      // Reserve at most 10% per side, including on narrow phone viewports.
+      fitPadding = Math.min(40, width * 0.1, height * 0.1);
       graph.width(width).height(height);
       halos.material.uniforms.viewportScale.value = height * graph.renderer().getPixelRatio();
       if (pendingFocus) focus(pendingFocus);
       else if (needsFit && settled && graph.graphData().nodes.length) {
         needsFit = false;
-        graph.zoomToFit(duration(), 65);
+        graph.zoomToFit(duration(), fitPadding);
       }
     },
     focus,

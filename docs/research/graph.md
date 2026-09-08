@@ -28,3 +28,7 @@ An isolated React StrictMode browser harness rendered 3,001 frozen synthetic nod
 The persistent `tests/e2e/graph-hover.spec.ts` fixture uses the real renderer and mouse picking. It reads rendered pixels to locate and compare cube, sphere, and octahedron silhouettes, then exercises node cards, all three link relationships, callback targets, delayed pointer leave, editing focus, and keyboard opening/dismissal. Its temporary Vite cache and data are isolated from the app and browser workspace storage.
 
 The component passed TypeScript checking when the domain interfaces became available. Complete application build status is recorded by the coordinating agent. Production GPU/mobile performance still requires representative device measurements. There is no arbitrary truncation in the graph component.
+
+## Short-canvas fitting
+
+On 2026-09-08, the integrated transaction panel exposed a fixed-margin issue. The installed `three-render-objects` fit calculation reduces camera field of view by `1 - 2 * padding / height`; a 65-pixel margin can exhaust a 110-pixel canvas. The force adapter now caps padding at 40 pixels and 10% of each available dimension. A persistent real-WebGL test verifies all fixture nodes and actual output picking after fitting a 390 by 110 pixel canvas. This is a local inspection of the installed dependency, not a claim about every upstream version.

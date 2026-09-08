@@ -54,7 +54,7 @@ const [shown,setShown]=React.useState(true),[hidden,setHidden]=React.useState(fa
 window.fixture={setLoaded,setSelected,setShown,setHidden,setBusy};
 return <><input id="notes" aria-label="Notes editor"/><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="action">{action}</output><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="selected">{selected||'none'}</output>
 <div><button onClick={()=>setDimensions(d=>d===2?3:2)}>Toggle dimensions</button><button onClick={()=>setFit(n=>n+1)}>Fit graph</button><button onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Focus output</button><button onClick={()=>setLoaded(true)}>Load data</button></div>
-<div style={{display:hidden?'none':undefined,position:'relative',height:'600px',width:'min(900px, 100%)','--color-paper':'#111a20','--color-muted':'#74818b','--color-accent':'#eab66b'}}>
+<div id="fixture-graph" style={{display:hidden?'none':undefined,position:'relative',height:'600px',width:'min(900px, 100%)','--color-paper':'#111a20','--color-muted':'#74818b','--color-accent':'#eab66b'}}>
 {shown && <Graph toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
 busy={busy} onTrace={id=>setAction('trace:'+id)} onEdit={id=>{setAction('edit:'+id);document.getElementById('notes').focus();}}/>}
 </div></>};createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
@@ -450,5 +450,28 @@ test('first data loaded while the canvas is hidden fits on reveal', async ({ pag
     'output',
     'spending',
   ]);
+  expect(errors).toEqual([]);
+});
+
+test('fit keeps nodes visible and selectable in a short transaction-panel canvas', async ({
+  page,
+}) => {
+  const errors = await render(page);
+  await page.addStyleTag({
+    content:
+      '#fixture-graph { height: 110px !important; width: 390px !important; } .graph-view { min-height: 0; }',
+  });
+  await expect.poll(async () => (await page.locator('canvas').boundingBox())?.height).toBe(110);
+  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page.waitForTimeout(800);
+  const meshes = await visibleMeshes(page);
+  expect(Object.keys(meshes).sort()).toEqual(['address', 'creating', 'output', 'spending']);
+  // The short viewport may place the hover card over its node. Its title remains
+  // an explicit selection action instead of requiring a click through the card.
+  await hover(page, meshes.output);
+  const select = page.getByRole('button', { name: 'Select graph item', exact: true });
+  await expect(select).toBeInViewport({ ratio: 1 });
+  await select.click();
+  await expect(page.getByTestId('selected')).toHaveText(outputId);
   expect(errors).toEqual([]);
 });

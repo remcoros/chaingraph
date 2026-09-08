@@ -44,6 +44,8 @@ export interface GraphAdapterEvents {
   select(event: GraphPointerEvent): void;
   dismiss(): void;
   error(): void;
+  /** A recoverable renderer has restored its graphics context. */
+  recovered?(): void;
 }
 export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;

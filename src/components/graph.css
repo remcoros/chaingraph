@@ -62,8 +62,20 @@
 }
 .graph-card-label {
   display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   font-size: 14px;
+  font-weight: 700;
   overflow-wrap: anywhere;
+}
+.graph-card-label:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .graph-card-facts {
   display: grid;

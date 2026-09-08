@@ -425,7 +425,9 @@ export default function TagsPanel({
                   <>
                     {tag.description && <p className="small">{tag.description}</p>}
                     <p className="small muted">
-                      {ids.length} loaded entities · {tag.nodeIds.length} assigned references
+                      {ids.length} loaded {ids.length === 1 ? 'entity' : 'entities'} ·{' '}
+                      {tag.nodeIds.length} assigned{' '}
+                      {tag.nodeIds.length === 1 ? 'reference' : 'references'}
                     </p>
                     <div className="tag-form-actions">
                       <button disabled={!ids.length} onClick={() => onShow(tag)}>

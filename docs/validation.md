@@ -1,5 +1,18 @@
 # Validation results
 
+## Shared analysis foundation, 2026-09-08
+
+The [foundation review](reviews/2026-09-08-foundation.md) records renderer isolation, transaction/script inspection, wallet refresh and encrypted tags. The application remains version 0.2.0; experimental renderers and layouts are reviewed in separate local branches.
+
+- Production build and all 203 unit/backend tests passed after responsive graph fitting was adjusted.
+- The full 47-test browser run passed 46 tests and exposed one new short-canvas selection issue: its hover card could cover the node before the click. The shared card title now explicitly selects the item. All seven graph browser tests passed after that correction, including visible nodes and selection with a 390 by 110 pixel canvas. Remaining workflows retain the 46 passing checks from the full run; a final combined run follows independent review integration.
+- The hardened linux/amd64 image `chaingraph:foundation-check` built successfully. Its read-only runtime is healthy under UID/GID 1000, with capabilities dropped and privilege escalation disabled. The production-browser check passed against actual built assets and CSP, including transaction rows, tags, annotations, encrypted persistence, reload and unlock. Chain requests in this container check use synthetic fixtures.
+- The separate read-only Core/Electrum smoke passed five checks at testnet4 height 151449. A fresh browser then loaded a public testnet4 output, one previous level and its exact spender, added a tag and note, and explicitly inspected raw/witness data. At height 151450 it completed with no uncaught browser errors. These live checks used the host proxy, not the production container.
+
+[Live desktop walkthrough](screenshots/foundation-live-desktop.png) and [phone walkthrough](screenshots/foundation-live-mobile.png) contain a public example and disposable annotations. They exposed the cost of fixed fit margins in a short canvas; the renderer now caps each margin at 10% of the available dimension. The extended production check initially expected a transaction's label in an output row, then encountered singular tag-count wording. Its journey now annotates an output and verifies that output after reopening; the tag-count copy was corrected.
+
+No release was published. Native ARM runtime, physical-device GPU performance and a real GitHub release remain unverified. Wallet refresh tests use deterministic public vectors and synthetic histories, including a simulated return days later; they do not establish completeness for a personal wallet.
+
 ## Release polish, version 0.2.0, 2026-09-08
 
 | Check | Result |

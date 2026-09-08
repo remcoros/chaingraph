@@ -123,6 +123,7 @@ export default function GraphView(props: GraphViewProps) {
         },
         dismiss: () => dismissCard(),
         error: () => setError(true),
+        recovered: () => setError(false),
       });
       graphRef.current = adapter;
       adapter.canvas.tabIndex = 0;
@@ -261,7 +262,18 @@ export default function GraphView(props: GraphViewProps) {
                 ×
               </button>
             </div>
-            <strong className="graph-card-label">{hoveredNode.label}</strong>
+            <button
+              type="button"
+              className="graph-card-label"
+              aria-label="Select graph item"
+              title="Select this item in the transaction view and Inspector"
+              onClick={() => {
+                props.onSelect(hoveredNode.id);
+                dismissCard();
+              }}
+            >
+              {hoveredNode.label}
+            </button>
             {props.renderMetadata?.(hoveredNode.id)}
             {hoveredLink && (
               <p className="graph-card-explanation">

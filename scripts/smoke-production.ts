@@ -44,9 +44,24 @@ try {
   await page.getByRole('button', { name: 'Add to graph' }).click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await expect(page.locator('canvas')).toBeVisible();
+  await page
+    .locator('.transaction-view')
+    .getByRole('button', { name: /^Output 0:/ })
+    .click();
   await page.getByLabel('Node label').fill('Production saved label');
   await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
+  await expect(page.locator('.transaction-view')).toBeVisible();
+  await page.getByRole('button', { name: 'Tags', exact: true }).click();
+  await page.getByRole('button', { name: 'New tag', exact: true }).click();
+  await page.getByLabel('Tag name', { exact: true }).fill('Production saved tag');
+  await page.getByRole('button', { name: 'Create tag', exact: true }).click();
+  const tags = page.getByRole('region', { name: 'Tags and wallet matches' });
+  await tags.locator('summary').click();
+  await tags.getByRole('checkbox', { name: /Production saved tag/ }).check();
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  const stored = await page.evaluate(() => JSON.stringify(localStorage));
+  expect(stored).not.toContain('Production saved label');
+  expect(stored).not.toContain('Production saved tag');
   await page.getByRole('button', { name: 'Workspace menu' }).click();
   await page.getByRole('button', { name: 'Save and lock workspace' }).click();
   await page.reload();
@@ -58,9 +73,17 @@ try {
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Production saved label');
   await expect(page.locator('.entity-row')).toHaveCount(1);
+  await page.locator('.entity-row').click();
+  await expect(page.locator('.transaction-view')).toContainText('Production saved label');
+  await expect(page.getByRole('region', { name: 'Tags and wallet matches' })).toContainText(
+    'Production saved tag',
+  );
+  await page.getByRole('button', { name: 'Tags', exact: true }).click();
+  await expect(page.locator('.tag-card')).toContainText('Production saved tag');
+  await expect(page.locator('.tag-card')).toContainText(/1 loaded entit(?:y|ies)/);
   expect(errors, 'production browser errors').toEqual([]);
   console.log(
-    'Production browser smoke passed: built WebGL, CSP, annotation, encrypted save and reload/unlock.',
+    'Production browser smoke passed: built WebGL, CSP, transaction view, annotation, tags, encrypted save and reload/unlock.',
   );
 } finally {
   await browser.close();

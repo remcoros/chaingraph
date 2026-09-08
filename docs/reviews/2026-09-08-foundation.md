@@ -52,8 +52,12 @@ Save was previously clipped by its scrolling ancestor. It now precedes annotatio
 fields and is tested with full viewport intersection. The phone laboratory badge
 was also overlapping wrapped controls; controls occupy their own layout strip and
 the badge/legend now belong to the graph viewport. Waiting for the force layout to
-settle resolves the initially tiny sparse graph; this does not establish sustained
-GPU performance. The custom renderer remains a separately tested comparison.
+settle improves initial framing. A subsequent live screenshot review exposed an
+additional short-canvas defect: a fixed 65-pixel fit margin could consume the usable
+height. The margin now adapts to the canvas, with actual rendered-node and picking
+coverage at 390 by 110 pixels. This does not establish sustained GPU performance. The custom renderer remains a separately tested comparison.
 
 No remote publication, GitHub release, native ARM run, physical-device test or
 consensus/signature validation is implied by these results.
+
+The subsequent 47-test main run passed 46 and exposed a short-canvas hover card covering its node before a click. The card title now provides an explicit shared selection button. All seven graph browser tests passed after that fix; the build, 203 unit tests and formatting also passed. The optional renderer-recovery event is shared so a restored experimental renderer can clear the common WebGL fallback.

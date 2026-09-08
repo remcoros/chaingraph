@@ -33,3 +33,20 @@ Every worktree installs separate dependencies and uses separate preview/test por
 - [Docker Compose pull](https://docs.docker.com/reference/cli/docker/compose/pull/): explicitly refresh the selected image before upgrading an existing deployment.
 
 The initial Copilot commands also named a nonexistent `skill` tool in the tool exclusion list. The CLI warned and ignored that extra name; skill disabling itself was verified through `disabledSkills` and was effective. Subsequent launcher commands omit the unsupported tool name.
+
+## Follow-up foundation reviews
+
+After integration at `0b0b271`, fresh isolated Copilot sessions review the new
+transaction/script, tag and wallet-refresh code in `review/opus-foundation` and
+`review/kimi-foundation`. CLI session-start metadata again confirms exact
+`claude-opus-4.8` and `kimi-k3`, `high` effort and `long_context`. New per-session
+configuration directories retain disabled memory, hooks, dynamic skill retrieval,
+IDE attachment and all four discovered skills. Authentication is supplied in the
+child process environment, without copying authentication files. No context token
+count is inferred from the tier name.
+
+Clean Codex followups rebase the original custom renderer and studio layout onto
+that same foundation. They use committed source and standalone prompts, not
+inherited conversation, skill instructions or memories. The shared graph boundary
+was independently tested before this rebase. Final branch outcomes are recorded in
+the experiment and review reports once their checks complete.
