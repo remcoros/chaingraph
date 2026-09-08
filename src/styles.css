@@ -249,9 +249,10 @@ small,
 .topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 57px;
-  padding: 0 16px;
+  gap: 12px;
+  min-height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px;
   border-bottom: 1px solid var(--color-rule);
   background: var(--color-surface);
 }
@@ -268,13 +269,6 @@ small,
 .wordmark-dot {
   color: var(--color-accent);
 }
-.top-context {
-  display: none;
-  font-size: var(--text-xs);
-  color: var(--color-faint);
-  border-left: 1px solid var(--color-rule);
-  padding-left: 18px;
-}
 .connection {
   display: flex;
   align-items: center;
@@ -284,10 +278,6 @@ small,
   font-family: var(--font-mono);
   font-size: 10px;
   white-space: nowrap;
-}
-.connection-caption {
-  display: none;
-  color: var(--color-faint);
 }
 .status-dot {
   width: 5px;
@@ -304,15 +294,16 @@ small,
 .workspace-tabs {
   display: flex;
   align-items: stretch;
-  min-height: 43px;
+  min-height: 48px;
+  min-width: 0;
+  flex: 1;
   gap: 2px;
-  padding-left: 8px;
   overflow-x: auto;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--color-rule);
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
 .workspace-tabs button {
+  flex-shrink: 0;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -480,12 +471,12 @@ small,
   margin-top: 3px;
 }
 .workbench-toolbar {
-  min-height: 58px;
+  min-height: 50px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 12px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--color-rule);
 }
 .search-form {
@@ -1409,13 +1400,6 @@ small,
   background: var(--color-accent);
 }
 @media (min-width: 640px) {
-  .topbar {
-    padding: 0 22px;
-  }
-  .top-context,
-  .connection-caption {
-    display: block;
-  }
   .welcome {
     padding: 65px 40px;
   }
@@ -1476,7 +1460,7 @@ small,
 }
 @media (max-width: 480px) {
   .topbar {
-    min-height: 51px;
+    min-height: 46px;
     gap: 5px;
     padding-inline: 10px;
   }
@@ -1602,30 +1586,6 @@ small,
   width: 100%;
 }
 
-.trace-options {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 7px 20px;
-  border-bottom: 1px solid var(--color-rule);
-  background: var(--color-surface);
-  flex-shrink: 0;
-  font-size: 11px;
-}
-.trace-options label {
-  flex-direction: row;
-  align-items: center;
-  gap: 9px;
-}
-.trace-options select {
-  padding: 5px 26px 5px 8px;
-}
-.trace-options button {
-  font-size: 11px;
-  padding: 4px 9px;
-  min-height: 30px;
-}
 .graph-legend .entity-dot.transaction,
 .entity-row .entity-dot.transaction {
   border-radius: 1px;
@@ -1659,18 +1619,6 @@ small,
   overflow-wrap: anywhere;
   max-height: 150px;
   overflow: auto;
-}
-@media (max-width: 760px) {
-  .trace-options {
-    padding: 6px 12px;
-    gap: 6px 10px;
-  }
-  .trace-options > .muted {
-    display: none;
-  }
-  .trace-options .button-row {
-    flex-wrap: wrap;
-  }
 }
 
 .wallet-card {
@@ -1707,4 +1655,84 @@ small,
 }
 .wallet-key-details summary {
   cursor: pointer;
+}
+
+/* Compact application chrome keeps workspace space available for investigation. */
+.wordmark,
+.topbar > .connection,
+.help-menu {
+  flex-shrink: 0;
+}
+.help-menu {
+  position: relative;
+}
+.help-menu-items {
+  top: calc(100% + 5px);
+  min-width: 220px;
+  max-width: calc(100vw - 16px);
+  z-index: 50;
+}
+.lookup-prefetch {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.lookup-prefetch select {
+  width: 86px;
+  padding: 6px 24px 6px 8px;
+  font-size: 11px;
+}
+@media (max-width: 999px) {
+  .topbar .wordmark > span,
+  .topbar .home-tab > span,
+  .connection-text {
+    display: none;
+  }
+  .topbar .connection {
+    min-width: 28px;
+    justify-content: center;
+  }
+  .workspace-tab {
+    max-width: 210px;
+  }
+  .workspace-tabs {
+    min-height: 46px;
+  }
+  .lookup-prefetch > span {
+    display: none;
+  }
+  .workbench-toolbar {
+    gap: 6px;
+  }
+  .workbench-toolbar .workspace-actions {
+    gap: 2px;
+  }
+}
+.workspace-actions .dropdown > .mobile-workspace-undo {
+  display: none;
+}
+@media (max-width: 560px) {
+  .workbench-toolbar {
+    gap: 5px;
+  }
+  .workbench-toolbar .search-form {
+    flex: 1;
+  }
+  .lookup-prefetch > span {
+    display: none;
+  }
+  .lookup-prefetch select {
+    width: 80px;
+  }
+  .workbench-toolbar .workspace-actions > .workspace-undo,
+  .workbench-toolbar .workspace-actions > .export-button {
+    display: none;
+  }
+  .workspace-actions .dropdown > .mobile-workspace-undo {
+    display: flex;
+  }
 }

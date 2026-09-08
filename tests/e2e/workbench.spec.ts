@@ -83,7 +83,8 @@ test('requires password confirmation and offers a restartable guided tour', asyn
   await tour.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(tour).toContainText('Bring your wallets together');
   await tour.getByRole('button', { name: 'Skip tour' }).click();
-  await page.getByRole('button', { name: 'Help and guided tour' }).click();
+  await page.getByRole('button', { name: 'Help and samples' }).click();
+  await page.getByRole('menuitem', { name: 'Show guided tour', exact: true }).click();
   await expect(tour).toContainText('An investigation has its own space');
 });
 
@@ -244,7 +245,8 @@ test('renders the 150-input laboratory and runs, excludes, restores and clears a
   await expect(page.locator('.finding.excluded')).toHaveCount(1);
   await page.locator('.finding.excluded').getByRole('button', { name: 'Restore' }).click();
   await expect(page.locator('.finding.excluded')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Show all fixture paths', exact: true }).click();
+  await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Show all fixture paths', exact: true }).click();
   await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(3);
   await page.getByRole('button', { name: 'Clear all', exact: true }).click();
   await expect(page.locator('.finding')).toHaveCount(0);
@@ -428,7 +430,8 @@ test('about and connection navigation work and locked copies can be deliberately
 }) => {
   await mockBitcoin(page);
   await page.goto('/');
-  await page.getByRole('button', { name: 'About Chaingraph', exact: true }).click();
+  await page.getByRole('button', { name: 'Help and samples' }).click();
+  await page.getByRole('menuitem', { name: 'About Chaingraph', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('CHAINGRAPH 0.2.0');
   await expect(page.getByRole('dialog').getByRole('link', { name: 'MIT license' })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -547,4 +550,71 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   expect(evidenceMobile!.y).toBeGreaterThan(editorMobile!.y);
   await expect(save).toBeInViewport({ ratio: 1 });
   await expect(notes).toHaveValue('Draft that must survive evidence toggles.');
+});
+
+test('compact header keeps workspace tabs and lookup controls reachable with keyboard-accessible help and samples', async ({
+  page,
+}) => {
+  const calls = await mockBitcoin(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await createWorkspace(page, 'Compact public study');
+  await expect(page.getByRole('toolbar', { name: 'Graph navigation', exact: true })).toHaveCount(0);
+  const header = page.locator('.topbar');
+  const tabs = header.getByRole('navigation', { name: 'Open workspaces' });
+  await expect(tabs.getByRole('button', { name: /Compact public study/ })).toBeVisible();
+  const lookup = page.locator('.workbench-toolbar');
+  await expect(lookup.getByLabel('Prefetch previous levels')).toHaveValue('1');
+  const headerBounds = (await header.boundingBox())!;
+  const lookupBounds = (await lookup.boundingBox())!;
+  expect(headerBounds.height).toBeLessThan(76);
+  expect(lookupBounds.y - headerBounds.y - headerBounds.height).toBeLessThan(20);
+
+  const help = page.getByRole('button', { name: 'Help and samples', exact: true });
+  await help.focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu', { name: 'Help and samples' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Show guided tour', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(
+    menu.getByRole('menuitem', { name: 'Testnet4 examples', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(help).toBeFocused();
+  await help.click();
+  await menu.getByRole('menuitem', { name: 'Testnet4 examples', exact: true }).click();
+  const examples = page.getByRole('dialog', { name: 'Testnet4 tracing examples' });
+  await expect(examples).toBeVisible();
+  await expect(examples).toContainText('Open a testnet4 workspace');
+  await expect(examples.getByRole('button', { name: 'Load example output' })).toHaveCount(3);
+  for (const button of await examples.getByRole('button', { name: 'Load example output' }).all()) {
+    await expect(button).toBeDisabled();
+  }
+  await page.keyboard.press('Escape');
+  await expect(help).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(tabs.getByRole('button', { name: /Compact public study/ })).toBeInViewport();
+  await expect(lookup.getByLabel('Prefetch previous levels')).toBeInViewport({ ratio: 1 });
+  await expect(lookup.getByRole('button', { name: 'Add to graph', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+  ).toBeLessThanOrEqual(1);
+  await help.click();
+  await menu.getByRole('menuitem', { name: 'CoinJoin laboratory', exact: true }).click();
+  const laboratory = page.getByRole('dialog', { name: 'Open the CoinJoin laboratory' });
+  await expect(laboratory).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(help).toBeFocused();
+  await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Export encrypted workspace', exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await expect(
+    page.getByRole('button', { name: 'Undo workspace change', exact: true }),
+  ).toBeVisible();
+  expect(calls).toHaveLength(0);
 });

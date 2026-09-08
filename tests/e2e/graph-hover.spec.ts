@@ -55,7 +55,7 @@ window.fixture={setLoaded,setSelected,setShown,setHidden,setBusy};
 return <><input id="notes" aria-label="Notes editor"/><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="action">{action}</output><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="selected">{selected||'none'}</output>
 <div><button onClick={()=>setDimensions(d=>d===2?3:2)}>Toggle dimensions</button><button onClick={()=>setFit(n=>n+1)}>Fit graph</button><button onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Focus output</button><button onClick={()=>setLoaded(true)}>Load data</button></div>
 <div id="fixture-graph" style={{display:hidden?'none':undefined,position:'relative',height:'600px',width:'min(900px, 100%)','--color-paper':'#111a20','--color-muted':'#74818b','--color-accent':'#eab66b'}}>
-{shown && <Graph toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
+{shown && <Graph navigation={params.has('contract')||params.has('navigation')?<button style={{pointerEvents:'auto'}} onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Shared center</button>:undefined} toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
 busy={busy} onTrace={id=>setAction('trace:'+id)} onEdit={id=>{setAction('edit:'+id);document.getElementById('notes').focus();}}/>}
 </div></>};createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
 `,
@@ -165,10 +165,13 @@ async function hover(page: Page, point: { x: number; y: number }) {
   await expect(page.getByRole('dialog', { name: 'Graph item details' })).toBeVisible();
 }
 
-test('renders distinct silhouettes and supports actual node hover, card actions, and keyboard details', async ({
+test('floating navigation preserves distinct silhouettes, actual picking, card actions, and keyboard details', async ({
   page,
 }) => {
-  const errors = await render(page);
+  const errors = await render(page, '?navigation');
+  await page.getByRole('button', { name: 'Shared center' }).click();
+  await expect(page.getByTestId('selected')).toHaveText('none');
+  await page.waitForTimeout(800);
   const meshes = await visibleMeshes(page);
   expect(Object.keys(meshes).sort()).toEqual(['address', 'creating', 'output', 'spending']);
   expect(meshes.creating.taper).toBeGreaterThan(0.85);
@@ -238,6 +241,13 @@ test('shared GraphView handles a substitute adapter with identical semantic acti
   const toolbar = (await page.getByRole('button', { name: 'Shared fit' }).boundingBox())!;
   const canvas = (await page.locator('canvas').boundingBox())!;
   expect(canvas.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
+  const navigation = (await page.getByRole('button', { name: 'Shared center' }).boundingBox())!;
+  expect(navigation.y).toBeGreaterThanOrEqual(canvas.y);
+  expect(navigation.y + navigation.height).toBeLessThan(canvas.y + canvas.height);
+  await page.getByRole('button', { name: 'Shared center' }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).contract.calls.focus))
+    .toContain(outputId);
   await expect(page.getByText('Shared legend')).toBeVisible();
   const emit = (
     type: 'hover' | 'select',

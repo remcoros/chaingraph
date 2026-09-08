@@ -30,6 +30,7 @@ test('transaction rows retain spending context, load missing prevouts, label and
   await mockBitcoin(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await create(page);
+  await page.getByLabel('Prefetch previous levels').selectOption('0');
   await add(page, TX_SPENDING);
   const view = page.locator('.transaction-view');
   await expect(view).toBeVisible();

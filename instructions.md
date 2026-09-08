@@ -6,9 +6,9 @@ Chaingraph helps you investigate Bitcoin activity and keep your own observations
 
 Create a workspace, choose mainnet or testnet4, and give it a **Name (public)** and password. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. The workspace's network must match the connected backend for live lookups; choosing a different workspace network does not reconfigure Bitcoin Core or Fulcrum.
 
-You can open several workspaces and switch between their tabs. Each workspace has its own transactions, wallets, annotations, analysis results, and view settings. An unsaved indicator means the current changes have not yet reached encrypted browser storage. Autosave runs shortly after edits; heed a storage-error message and export a file if browser storage is full or unavailable.
+You can open several workspaces and switch between their tabs in the main header. The tab strip scrolls horizontally when needed. Each workspace has its own transactions, wallets, annotations, analysis results, and view settings. An unsaved indicator means the current changes have not yet reached encrypted browser storage. Autosave runs shortly after edits; heed a storage-error message and export a file if browser storage is full or unavailable.
 
-For a first look without loading your own wallet, open the **CoinJoin laboratory**. It starts with three generated 150-input/150-output transactions. Select one and use **Load previous transactions** or **Find spending transactions** to reveal paths from the offline fixture. **Show all fixture paths** loads the complete sample; **Reset practice paths** returns to the three starting transactions and clears analysis overlays while keeping annotations. Their IDs, confirmations, and activity are synthetic, not real testnet transactions. Do not use the laboratory as evidence about a real wallet.
+For a first look without loading your own wallet, choose **Help and samples → CoinJoin laboratory** (or open it from the welcome screen). It starts with three generated 150-input/150-output transactions. Select one and use **Load previous transactions** or **Find spending transactions** to reveal paths from the offline fixture. **Help and samples → Show all fixture paths** loads the complete sample; **Reset practice paths** in that menu returns to the three starting transactions and clears analysis overlays while keeping annotations. Their IDs, confirmations, and activity are synthetic, not real testnet transactions. Do not use the laboratory as evidence about a real wallet.
 
 Use Ctrl/Cmd+K to focus the quick input and Ctrl/Cmd+S to save an encrypted browser snapshot. The first-use tour introduces the main controls. It can be skipped and restarted from Help.
 
@@ -20,9 +20,9 @@ Use the quick input to load a transaction ID, an address, or an output reference
 
 **Find spending transactions** checks script histories for transactions consuming the selected output, or any output of a selected transaction. It checks exact outpoint references. The result reports matches and how many were newly added, so a repeated action with an already loaded path is distinguishable from no matches. Busy histories are checked in batches of 500; repeat the action when prompted to continue. This continuation is temporary and resets when switching workspaces. Changed histories can shift a batch boundary; this is a bounded investigation, not a completeness guarantee. Missing spend links never prove an output is unspent.
 
-Use **Prefetch previous** beside the quick input controls to choose **Off**, **1 level**, or **2 levels** when adding a transaction or output. The two levels share a 500-transaction download limit and reuse loaded transactions. Large or unavailable branches produce a partial-result message. Trace individual paths to continue. Address and wallet scans keep their own bounds.
+Use the **Previous** selector beside the quick input to choose **Off**, **1 level**, or **2 levels** when adding a transaction or output. It starts at **1 level**. On narrow screens, the selector shows just the depth. The two levels share a 500-transaction download limit and reuse loaded transactions. Large or unavailable branches produce a partial-result message. Trace individual paths to continue. Address and wallet scans keep their own bounds.
 
-**Testnet4 examples** offers three real outputs: a simple spent path, a two-input transaction with mixed scripts, and a 53-output fan-out. Load them in a testnet4 workspace connected to your node, then explore previous and spending paths. Explorer links are optional external references. These examples do not identify wallet owners.
+**Help and samples → Testnet4 examples** offers three real outputs: a simple spent path, a two-input transaction with mixed scripts, and a 53-output fan-out. Load them in a testnet4 workspace connected to your node, then explore previous and spending paths. Explorer links are optional external references. These examples do not identify wallet owners.
 
 The graph represents transaction creation and consumption of outputs. An output can already be spent; the presence of an output node does not mean it is an available UTXO. Unknown funding outputs may appear before their parent transaction has been loaded. Address nodes are an optional additional view of script destinations, not proof of a common owner.
 
@@ -51,11 +51,13 @@ Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize d
 
 Transactions are cubes, outputs are spheres, and optional addresses are diamonds. Hover a node or connection for identifiers, values, available details, and a small action toolbar. **Load previous level** expands that path; **Edit label / notes** opens and focuses the inspector. The inspector and entity list provide the same tracing workflow without hover.
 
-Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row palette with labeled symbols, keyboard arrow navigation, and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Remove a transaction from its inspector to reduce the graph; its saved annotations remain, and descendant inputs may still show output placeholders.
+Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row symbol palette with keyboard arrow navigation and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Remove a transaction from its inspector to reduce the graph; its saved annotations remain, and descendant inputs may still show output placeholders.
 
 ## Filter and navigate
 
 The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
+
+Navigation floats at the top of the graph canvas once transactions are loaded. On narrow screens, the center and focus controls use icons with accessible names and tooltips.
 
 **Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Focus graph** hides the side panels until you choose **Show panels**.
 
@@ -81,7 +83,7 @@ Exclude a finding to remove its overlay without deleting the result. Rerunning t
 
 Workspace autosave writes encrypted contents to this browser's storage. Lock the workspace to close its unlocked session. Reopening requires its password. On the Workspaces screen, search saved public names or use the trash button to delete a locked browser copy. The confirmation affects only that copy, not exported files; lock an open workspace first. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
 
-Export an encrypted workspace file for backup or transfer to another browser. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Current camera position and the temporary force layout are not saved.
+Export an encrypted workspace file for backup or transfer to another browser. On narrow screens, Export and Undo are in **Workspace menu** beside the lookup controls. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Current camera position and the temporary force layout are not saved.
 
 Saved workspace contents use authenticated encryption. The browser storage entry also includes the public workspace name, a workspace identifier, and save time outside the encrypted contents. File names and file sizes can reveal additional metadata. Encryption does not hide an unlocked workspace from someone using your browser or from untrusted browser extensions.
 
@@ -105,7 +107,7 @@ Encrypted workspace payloads have a 32 MiB limit, while browser storage may fill
 - **Encryption unavailable:** open the app on localhost or HTTPS in a browser supporting Web Crypto.
 - **Graph unavailable:** continue with the entity list, or reload in a browser with working WebGL. A flat 2D view also needs WebGL.
 
-Use **About** for the version, license and source/release links when configured. Click the connection indicator for network details and a fresh status check. Help contains workflow guidance, shortcuts and a restartable tour.
+Use **Help and samples → About Chaingraph** for the version, license and source/release links when configured. Click the connection indicator for network details and a fresh status check. The same menu offers **Show guided tour** for an open workspace, or **Getting started** from the welcome screen.
 
 For Docker setup, see [deployment](docs/deployment.md). For server setup and development commands, see [README.md](README.md).
 

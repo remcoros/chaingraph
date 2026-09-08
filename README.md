@@ -6,7 +6,7 @@ Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, bro
 
 Filter the graph by entity type, labels, notes, bookmarks, value and loaded funding/spending evidence. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. A synthetic laboratory contains three 150-input/150-output transactions with expandable paths. Three verified real testnet4 output examples are also available.
 
-![Real testnet4 transaction tracing, input/output inspection and tags in Chaingraph](docs/screenshots/foundation-live-desktop.png)
+![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)
 
 ## Docker and Compose
 
@@ -62,7 +62,7 @@ This is a trusted, single-user, fully self-hosted application. The backend has *
 - Wallet import accepts account-level public keys at depth 3: `xpub`/`ypub`/`zpub` on mainnet and `tpub`/`upub`/`vpub` on testnet4. Supported single-key scripts are legacy P2PKH, nested SegWit, native SegWit, and BIP86 Taproot. Descriptors, multisig, private keys, signing, and spending are unsupported.
 - Loaded transactions are a **history snapshot**. Status polling does not refresh every saved confirmation count or detect every reorganization. Scans have address, history, and transaction bounds; a partial result is not proof that no further activity exists.
 - CIOH produces a hypothesis. Skipping conspicuous equal-output transactions does not detect all collaborative spends or PayJoin. No tool identifies a person or proves wallet ownership.
-- Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node or connection for details and actions to trace one previous level or edit its context. Transaction/output lookups offer Off, 1 level, or 2 levels of previous-transaction prefetch, bounded to 500 downloads per action. The Flat graph layout still requires WebGL; the transaction inputs/outputs panel does not. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
+- Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node or connection for details and actions to trace one previous level or edit its context. The lookup toolbar defaults to one previous level, with Off and 2 levels also available, bounded to 500 downloads per action. Workspaces share the main header; Help and samples holds the tour, examples and About. Graph navigation floats over the canvas. The Flat graph layout still requires WebGL; the transaction inputs/outputs panel does not. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
 - Tools are extensible through [`src/domain/analysis.ts`](src/domain/analysis.ts). There is no custom-script IDE, Boltzmann implementation, service worker, or WebSocket live feed in this version. Boltzmann-related research and license compatibility remain research work.
 
 See [the curated testnet4 examples and verification sources](docs/research/testnet4-examples.md). Example outputs are real chain observations, not attributed wallets or proof of ownership.

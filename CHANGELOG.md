@@ -16,7 +16,8 @@ First testable release of the MIT-licensed, self-hosted Bitcoin analysis workben
 - Conventional collapsible transaction inputs/outputs and advanced script, opcode, witness and verified raw transaction inspection.
 - Encrypted workspace tags, imported-label grouping and separate wallet-script match highlights across graph cards and transaction rows.
 - Returning-wallet refresh, persistent new-activity review, cancellation and preservation of unchanged analysis evidence.
-- Compact annotation saving and icon controls, themed selects, and graph controls outside the picking area.
+- Compact header with workspace tabs, combined lookup/prefetch controls defaulting to one previous level, Help/sample menu, and floating graph navigation.
+- Compact annotation saving and icon controls, themed selects, and display controls outside the picking area.
 - Bounded recovery of stale read-only Bitcoin RPC connections, retaining request deadlines and cancellation.
 - Production container and local Compose deployment, plus a tag-gated multi-architecture GHCR release workflow.
 

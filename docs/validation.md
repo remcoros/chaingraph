@@ -1,5 +1,47 @@
 # Validation results
 
+## Compact main workbench, 2026-09-08
+
+Workspace tabs now share the main header. Lookup and previous-level prefetch share
+one row, with one previous level selected initially. Help holds the tour, curated
+testnet4 examples, offline laboratory and About. On phones, Undo and Export are
+available through Workspace menu. Selection history, centering, Paths and focus
+controls float over the actual graph viewport without changing renderer picking
+coordinates. Empty workspaces omit navigation until graph data is available.
+
+A fresh public-testnet4 walkthrough loaded a selected output, one previous level
+and its exact spender, saved a label/note and explicitly inspected raw data. It
+passed at desktop and phone sizes without uncaught browser errors or horizontal
+overflow. At 1440 × 900 the workbench starts roughly 150 pixels higher than the
+previous layout. At 390 × 844, the header and lookup measured 47 and 52 pixels.
+Selected transaction rows, phone graph and Help menu were visually inspected.
+
+- [Desktop workbench](screenshots/compact-main-desktop.png)
+- [Phone transaction view](screenshots/compact-main-phone.png)
+- [Phone graph with transaction view collapsed](screenshots/compact-main-phone-graph.png)
+- [Phone Help menu](screenshots/compact-main-help-phone.png)
+- [Empty phone workspace](screenshots/compact-main-empty-phone.png)
+
+TypeScript, production build, formatting and all 218 unit/backend tests passed.
+The browser smoke against freshly built assets and the real server CSP passed
+WebGL, transaction rows, annotations, tags and encrypted save/reload/unlock using
+synthetic chain requests. This check used a temporary host server, not a rebuilt
+container. All **49 distinct browser cases passed** across serial runs: the final
+37-case run covered entities, icons, labels/tags, wallet refresh, workspace/dialog
+workflows and transaction inspection; eight graph and four tracing cases had
+already passed and were unaffected by the final empty-state/focus correction.
+The new checks exercise Help arrows/Escape and modal focus return, mobile menu
+Undo/Export, one-level default prefetch and actual renderer picking beneath the
+floating navigation. The temporary production server exited cleanly; development
+preview 3001 remains running.
+
+Review caught and fixed two interaction defects: empty-graph navigation overlapped
+wrapped phone display controls by 22 pixels, and a dialog's child autoFocus caused
+focus restoration to target a removed input. Navigation now requires graph data;
+dialogs capture their invoker before children mount and restore only connected
+controls. Earlier browser attempts invalidated by development hot reload or a
+cached obsolete sample-menu selector are not counted as passing evidence.
+
 ## Final local proposals, 2026-09-08
 
 The [comparison report](experiments/comparison.md) identifies the three isolated

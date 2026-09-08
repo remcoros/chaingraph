@@ -179,5 +179,21 @@
 }
 
 .graph-viewport .demo-badge {
-  top: 12px;
+  top: auto;
+  bottom: 40px;
+}
+
+.graph-navigation-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 7;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+.graph-navigation-overlay > * {
+  pointer-events: auto;
+  max-width: 100%;
 }

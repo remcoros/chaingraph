@@ -19,6 +19,17 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
     .getByRole('button', { name: 'Skip tour' })
     .click();
   await expect(page.locator('canvas')).toBeVisible();
+  const checkFloatingNavigation = async () => {
+    const navigation = page.getByLabel('Graph navigation', { exact: true });
+    const canvas = (await page.locator('canvas').boundingBox())!;
+    const bounds = (await navigation.boundingBox())!;
+    expect(bounds.y).toBeGreaterThanOrEqual(canvas.y);
+    expect(bounds.y + bounds.height).toBeLessThan(canvas.y + canvas.height);
+    await expect(
+      navigation.getByRole('button', { name: 'Focus graph', exact: true }),
+    ).toBeInViewport({ ratio: 1 });
+  };
+  await checkFloatingNavigation();
   await page.getByRole('button', { name: 'Flat', exact: true }).click();
   await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
   await page.waitForTimeout(7000);
@@ -36,6 +47,7 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
   await page.waitForTimeout(800);
   await expect(page.getByLabel('Size nodes by')).toBeVisible();
+  await checkFloatingNavigation();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: test.info().outputPath('mobile-workbench.png') });

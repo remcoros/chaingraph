@@ -14,6 +14,8 @@ export interface GraphViewProps {
   adapterFactory?: GraphAdapterFactory;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
   toolbar?: ReactNode;
+  /** Shared controls floating over the viewport, outside the renderer event surface. */
+  navigation?: ReactNode;
   renderMetadata?: (nodeId: string) => ReactNode;
   legend?: ReactNode;
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
@@ -397,6 +399,15 @@ export default function GraphView(props: GraphViewProps) {
           <div className="graph-empty" aria-hidden="true">
             <span className="graph-empty-cross">+</span>
             <span>No visible graph nodes</span>
+          </div>
+        )}
+        {props.navigation && (
+          <div
+            className="graph-navigation-overlay"
+            onPointerEnter={() => dismissCard()}
+            onFocusCapture={() => dismissCard()}
+          >
+            {props.navigation}
           </div>
         )}
         {props.legend}

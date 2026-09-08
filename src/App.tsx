@@ -20,8 +20,6 @@ import {
   Crosshair,
   Maximize2,
   Minimize2,
-  Info,
-  CircleHelp,
   Download,
   Ellipsis,
   Eye,
@@ -50,6 +48,7 @@ import {
 } from './components/Dialogs';
 import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
+import { HelpMenu } from './components/HelpMenu';
 import { AboutDialog } from './components/AboutDialog';
 import { filterGraph, type GraphFilters } from './domain/graphFilters';
 import {
@@ -121,7 +120,7 @@ export default function App() {
   >({});
   const [rightTab, setRightTab] = useState<'inspect' | 'analysis'>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
-  const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
+  const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(1);
   const [editToken, setEditToken] = useState(0);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -144,6 +143,22 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
   const labelsInput = useRef<HTMLInputElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
+  const workspaceTabs = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const tabs = workspaceTabs.current;
+    const active = tabs?.querySelector<HTMLElement>('.active');
+    if (!tabs || !active) return;
+    const reveal = () => {
+      const bounds = tabs.getBoundingClientRect();
+      const item = active.getBoundingClientRect();
+      if (item.left < bounds.left) tabs.scrollLeft -= bounds.left - item.left;
+      else if (item.right > bounds.right) tabs.scrollLeft += item.right - bounds.right;
+    };
+    reveal();
+    const observer = new ResizeObserver(reveal);
+    observer.observe(tabs);
+    return () => observer.disconnect();
+  }, [w?.id, ws.sessions.length]);
   const wRef = useRef(w);
   wRef.current = w;
   useEffect(() => {
@@ -726,6 +741,101 @@ export default function App() {
       setError(error instanceof Error ? error.message : 'Analysis failed.');
     }
   }
+  const graphNavigation = w ? (
+    <div className="graph-navigation" role="toolbar" aria-label="Graph navigation">
+      <button
+        aria-label="Previous selection"
+        title="Previous selection"
+        disabled={navigation.index <= 0}
+        onClick={() => navigateSelection(-1)}
+      >
+        <ArrowLeft size={14} />
+      </button>
+      <button
+        aria-label="Next selection"
+        title="Next selection"
+        disabled={navigation.index >= navigation.ids.length - 1}
+        onClick={() => navigateSelection(1)}
+      >
+        <ArrowRight size={14} />
+      </button>
+      <button
+        aria-label="Center selection"
+        title="Center selection"
+        disabled={!selected}
+        onClick={() => centerNode()}
+      >
+        <Crosshair size={14} />
+        <span className="graph-nav-caption">Center selection</span>
+      </button>
+      <label>
+        <span className="graph-path-label">Paths</span>
+        <select
+          aria-label="Focus graph paths"
+          value={graphFilters.focus?.hops ?? 0}
+          disabled={!selected && !!graph.nodes.length}
+          onChange={(event) => {
+            const hops = Number(event.target.value);
+            updateFilters(
+              hops && selectedId
+                ? {
+                    ...graphFilters,
+                    focus: { id: selectedId, hops: hops as 1 | 2 },
+                    includeIds: undefined,
+                  }
+                : { ...graphFilters, focus: undefined, includeIds: undefined },
+            );
+          }}
+        >
+          <option value={0}>All paths</option>
+          <option value={1}>1 hop</option>
+          <option value={2}>2 hops</option>
+        </select>
+      </label>
+      <button onClick={() => updateFilters({})} disabled={!Object.keys(graphFilters).length}>
+        All paths
+      </button>
+      <button
+        aria-label={focusGraph ? 'Show panels' : 'Focus graph'}
+        title={focusGraph ? 'Show panels' : 'Focus graph'}
+        aria-pressed={focusGraph}
+        onClick={() => {
+          setFocusGraph(!focusGraph);
+          setMobilePanel('graph');
+        }}
+      >
+        {focusGraph ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        <span className="graph-nav-caption">{focusGraph ? 'Show panels' : 'Focus graph'}</span>
+      </button>
+      <span className="view-summary">
+        {visibleGraph.nodes.length.toLocaleString()} / {graph.nodes.length.toLocaleString()} nodes
+        visible
+        {visibleGraph.contextNodeIds.length
+          ? ` · ${visibleGraph.contextNodeIds.length} connected nodes`
+          : ''}
+        {graphFilters.walletId && (
+          <span className="group-filter">
+            Wallet:{' '}
+            {w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name ?? 'Removed'}
+            <button className="text-button" onClick={() => updateFilters({})}>
+              Clear
+            </button>
+          </span>
+        )}
+        {graphFilters.tagId && (
+          <span className="group-filter">
+            Tag: {w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name ?? 'Removed'}
+            <button className="text-button" onClick={() => updateFilters({})}>
+              Clear
+            </button>
+          </span>
+        )}
+        {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
+          ? ' · selection hidden by filters'
+          : ''}
+      </span>
+    </div>
+  ) : null;
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-workspace">
@@ -746,7 +856,47 @@ export default function App() {
             chaingraph<span className="wordmark-dot">.</span>
           </span>
         </a>
-        <div className="top-context">Wallet analysis workbench</div>
+        <nav
+          ref={workspaceTabs}
+          className="workspace-tabs"
+          data-tour="workspace-tabs"
+          aria-label="Open workspaces"
+        >
+          <button
+            aria-label="Workspaces"
+            className={!w ? 'home-tab active' : 'home-tab'}
+            onClick={() => ws.setActiveId(undefined)}
+          >
+            <FolderOpen size={15} />
+            <span>Workspaces</span>
+          </button>
+          {ws.sessions.map((s) => (
+            <button
+              className={`workspace-tab ${s.data.id === w?.id ? 'active' : ''}`}
+              key={s.data.id}
+              title={s.data.name}
+              aria-current={s.data.id === w?.id ? 'page' : undefined}
+              onClick={() => ws.setActiveId(s.data.id)}
+            >
+              <span className="tab-network">{s.data.network === 'mainnet' ? 'M' : 'T'}</span>
+              <span>{s.data.name}</span>
+              {s.revision !== s.savedRevision && (
+                <span aria-label="Unsaved changes" className="dirty-dot">
+                  ●
+                </span>
+              )}
+              <LockKeyhole size={12} />
+            </button>
+          ))}
+          <button
+            className="icon-button"
+            aria-label="New workspace"
+            title="New workspace"
+            onClick={() => setCreate('empty')}
+          >
+            <Plus size={16} />
+          </button>
+        </nav>
         <button
           onClick={() => setAboutOpen('connection')}
           aria-label="Connection details"
@@ -754,61 +904,50 @@ export default function App() {
           title={status?.error || statusError || 'Your self-hosted backend'}
         >
           <span className="status-dot" />
-          {connected
-            ? `${status?.network} · ${status?.height?.toLocaleString() ?? 'connected'}`
-            : 'Offline'}
-          <span className="connection-caption"> / own node</span>
+          <span className="connection-text">
+            {connected
+              ? `${status?.network} · ${status?.height?.toLocaleString() ?? 'connected'}`
+              : 'Offline'}
+          </span>
         </button>
-        <button
-          className="icon-button"
-          title="Guided tour"
-          aria-label="Help and guided tour"
-          onClick={() => (w ? setTour(0) : setAboutOpen('guide'))}
-        >
-          <CircleHelp size={18} />
-        </button>
-        <button
-          className="icon-button"
-          aria-label="About Chaingraph"
-          title={`Chaingraph ${__APP_VERSION__}`}
-          onClick={() => setAboutOpen('about')}
-        >
-          <Info size={18} />
-        </button>
+        <HelpMenu
+          actions={[
+            {
+              label: w ? 'Show guided tour' : 'Getting started',
+              onSelect: () => (w ? setTour(0) : setAboutOpen('guide')),
+            },
+            { label: 'Testnet4 examples', onSelect: () => setExamplesOpen(true) },
+            { label: 'CoinJoin laboratory', onSelect: () => setCreate('demo') },
+            ...(w?.demo
+              ? [
+                  {
+                    label: 'Show all fixture paths',
+                    disabled: !!operation,
+                    onSelect: () => {
+                      mergeTransactions(w.id, Object.values(fixture!));
+                      setFitToken((t) => t + 1);
+                    },
+                  },
+                  {
+                    label: 'Reset practice paths',
+                    disabled: !!operation,
+                    onSelect: () => {
+                      change((c) => ({
+                        ...c,
+                        transactions: demoWorkspace(false).transactions,
+                        findings: [],
+                      }));
+                      setSelectedId(undefined);
+                      setFitToken((t) => t + 1);
+                    },
+                  },
+                ]
+              : []),
+            { label: 'About Chaingraph', onSelect: () => setAboutOpen('about') },
+          ]}
+        />
       </header>
-      <nav className="workspace-tabs" data-tour="workspace-tabs" aria-label="Open workspaces">
-        <button
-          className={!w ? 'home-tab active' : 'home-tab'}
-          onClick={() => ws.setActiveId(undefined)}
-        >
-          <FolderOpen size={15} />
-          <span>Workspaces</span>
-        </button>
-        {ws.sessions.map((s) => (
-          <button
-            className={`workspace-tab ${s.data.id === w?.id ? 'active' : ''}`}
-            key={s.data.id}
-            onClick={() => ws.setActiveId(s.data.id)}
-          >
-            <span className="tab-network">{s.data.network === 'mainnet' ? 'M' : 'T'}</span>
-            <span>{s.data.name}</span>
-            {s.revision !== s.savedRevision && (
-              <span aria-label="Unsaved changes" className="dirty-dot">
-                ●
-              </span>
-            )}
-            <LockKeyhole size={12} />
-          </button>
-        ))}
-        <button
-          className="icon-button"
-          aria-label="New workspace"
-          title="New workspace"
-          onClick={() => setCreate('empty')}
-        >
-          <Plus size={16} />
-        </button>
-      </nav>
+
       {!w ? (
         <WorkspaceHome
           saved={ws.saved}
@@ -841,9 +980,26 @@ export default function App() {
                 Add to graph <Plus size={14} />
               </button>
             </form>
+            {!w.demo && (
+              <label
+                className="lookup-prefetch"
+                title="Previous transaction levels for transaction/output lookups. Up to 500 downloads per action."
+              >
+                <span>Previous</span>
+                <select
+                  aria-label="Prefetch previous levels"
+                  value={prefetchDepth}
+                  onChange={(e) => setPrefetchDepth(Number(e.target.value) as 0 | 1 | 2)}
+                >
+                  <option value={0}>Off</option>
+                  <option value={1}>1 level</option>
+                  <option value={2}>2 levels</option>
+                </select>
+              </label>
+            )}
             <div className="workspace-actions">
               <button
-                className="icon-button"
+                className="icon-button workspace-undo"
                 aria-label="Undo workspace change"
                 title="Undo label, analysis, or view change"
                 disabled={!ws.active?.history.length || !!operation}
@@ -868,6 +1024,17 @@ export default function App() {
               </button>
               {menu && (
                 <div className="dropdown">
+                  <button
+                    className="mobile-workspace-undo"
+                    aria-label="Undo workspace change"
+                    disabled={!ws.active?.history.length || !!operation}
+                    onClick={() => {
+                      setMenu(false);
+                      ws.undo(w.id);
+                    }}
+                  >
+                    <Undo2 size={15} /> Undo workspace change
+                  </button>
                   <button
                     onClick={() => {
                       setMenu(false);
@@ -920,55 +1087,6 @@ export default function App() {
               )}
             </div>
           </div>
-          <div className="trace-options">
-            {w.demo ? (
-              <>
-                <span>Practice tracing the synthetic CoinJoins:</span>
-                <button
-                  disabled={!!operation}
-                  onClick={() => {
-                    mergeTransactions(w.id, Object.values(fixture!));
-                    setFitToken((t) => t + 1);
-                  }}
-                >
-                  Show all fixture paths
-                </button>
-                <button
-                  disabled={!!operation}
-                  onClick={() => {
-                    change((c) => ({
-                      ...c,
-                      transactions: demoWorkspace(false).transactions,
-                      findings: [],
-                    }));
-                    setSelectedId(undefined);
-                    setFitToken((t) => t + 1);
-                  }}
-                >
-                  Reset practice paths
-                </button>
-              </>
-            ) : (
-              <>
-                <label>
-                  Prefetch previous
-                  <select
-                    aria-label="Prefetch previous levels"
-                    value={prefetchDepth}
-                    onChange={(e) => setPrefetchDepth(Number(e.target.value) as 0 | 1 | 2)}
-                  >
-                    <option value={0}>Off</option>
-                    <option value={1}>1 level</option>
-                    <option value={2}>2 levels</option>
-                  </select>
-                </label>
-                <span className="small muted">
-                  For transaction and output lookups · up to 500 previous transactions
-                </span>
-                <button onClick={() => setExamplesOpen(true)}>Testnet4 examples</button>
-              </>
-            )}
-          </div>
           <div className="mobile-switch">
             <button
               className={mobilePanel === 'left' ? 'active' : ''}
@@ -991,96 +1109,6 @@ export default function App() {
               <List size={15} />
               Inspector
             </button>
-          </div>
-          <div
-            className={`graph-navigation graph-nav-${mobilePanel}`}
-            aria-label="Graph navigation"
-          >
-            <button
-              aria-label="Previous selection"
-              title="Previous selection"
-              disabled={navigation.index <= 0}
-              onClick={() => navigateSelection(-1)}
-            >
-              <ArrowLeft size={14} />
-            </button>
-            <button
-              aria-label="Next selection"
-              title="Next selection"
-              disabled={navigation.index >= navigation.ids.length - 1}
-              onClick={() => navigateSelection(1)}
-            >
-              <ArrowRight size={14} />
-            </button>
-            <button disabled={!selected} onClick={() => centerNode()}>
-              <Crosshair size={14} />
-              Center selection
-            </button>
-            <label>
-              Paths
-              <select
-                aria-label="Focus graph paths"
-                value={graphFilters.focus?.hops ?? 0}
-                disabled={!selected && !!graph.nodes.length}
-                onChange={(event) => {
-                  const hops = Number(event.target.value);
-                  updateFilters(
-                    hops && selectedId
-                      ? {
-                          ...graphFilters,
-                          focus: { id: selectedId, hops: hops as 1 | 2 },
-                          includeIds: undefined,
-                        }
-                      : { ...graphFilters, focus: undefined, includeIds: undefined },
-                  );
-                }}
-              >
-                <option value={0}>All neighborhoods</option>
-                <option value={1}>1 connection from selection</option>
-                <option value={2}>2 connections from selection</option>
-              </select>
-            </label>
-            <button onClick={() => updateFilters({})} disabled={!Object.keys(graphFilters).length}>
-              All paths
-            </button>
-            <button
-              aria-pressed={focusGraph}
-              onClick={() => {
-                setFocusGraph(!focusGraph);
-                setMobilePanel('graph');
-              }}
-            >
-              {focusGraph ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              {focusGraph ? 'Show panels' : 'Focus graph'}
-            </button>
-            <span className="view-summary">
-              {visibleGraph.nodes.length.toLocaleString()} / {graph.nodes.length.toLocaleString()}{' '}
-              nodes visible
-              {visibleGraph.contextNodeIds.length
-                ? ` · ${visibleGraph.contextNodeIds.length} connected nodes`
-                : ''}
-              {graphFilters.walletId && (
-                <span className="group-filter">
-                  Wallet:{' '}
-                  {w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name ??
-                    'Removed'}
-                  <button className="text-button" onClick={() => updateFilters({})}>
-                    Clear
-                  </button>
-                </span>
-              )}
-              {graphFilters.tagId && (
-                <span className="group-filter">
-                  Tag: {w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name ?? 'Removed'}
-                  <button className="text-button" onClick={() => updateFilters({})}>
-                    Clear
-                  </button>
-                </span>
-              )}
-              {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
-                ? ' · selection hidden by filters'
-                : ''}
-            </span>
           </div>
           <main
             id="main-workspace"
@@ -1177,6 +1205,7 @@ export default function App() {
                       }
                     >
                       <GraphView
+                        navigation={graphNavigation}
                         legend={
                           <GraphLegend
                             dimensions={w.view.dimensions}
@@ -1428,13 +1457,13 @@ export default function App() {
           onSave={(name, description) => change((c) => ({ ...c, name, description }))}
         />
       )}
-      {w && examplesOpen && (
+      {examplesOpen && (
         <Modal title="Testnet4 tracing examples" onClose={() => setExamplesOpen(false)}>
           <p className="muted">
             Real on-chain outputs with verified incoming and spending paths. Load an output, then
             use the inspector to trace it. No wallet ownership is inferred.
           </p>
-          {(w.network !== 'testnet4' || !canQuery) && (
+          {(w?.network !== 'testnet4' || !canQuery) && (
             <p className="warning">
               Open a testnet4 workspace with a connected testnet4 backend to load these examples.
             </p>
@@ -1450,7 +1479,7 @@ export default function App() {
                 <div className="button-row">
                   <button
                     className="primary"
-                    disabled={w.network !== 'testnet4' || !canQuery || !!operation}
+                    disabled={w?.network !== 'testnet4' || !canQuery || !!operation}
                     onClick={() => {
                       setExamplesOpen(false);
                       void addQuery(`${example.txid}:${example.vout}`);

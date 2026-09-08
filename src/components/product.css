@@ -63,30 +63,52 @@ kbd {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 7px 20px;
-  background: var(--color-paper);
-  border-bottom: 1px solid var(--color-rule);
-  flex-shrink: 0;
+  gap: 5px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  box-shadow: 0 3px 14px #0003;
   font-size: 11px;
 }
 .graph-navigation button {
   min-height: 30px;
-  padding: 4px 8px;
+  padding: 4px 7px;
   font-size: 11px;
 }
 .graph-navigation label {
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 .graph-navigation select {
-  padding: 4px 26px 4px 8px;
+  width: 95px;
+  padding: 4px 24px 4px 8px;
+  font-size: 11px;
+}
+.graph-nav-caption {
+  display: none;
 }
 .graph-navigation .view-summary {
-  margin-left: auto;
+  flex-basis: 100%;
   color: var(--color-muted);
-  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  padding: 0 3px;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 1300px) {
+  .graph-nav-caption {
+    display: inline;
+  }
+}
+@media (max-width: 480px) {
+  .graph-navigation {
+    gap: 4px;
+    padding: 5px;
+  }
+  .graph-path-label {
+    display: none;
+  }
 }
 .workbench.focus-graph {
   grid-template-columns: minmax(0, 1fr);
@@ -149,26 +171,11 @@ a {
   touch-action: manipulation;
 }
 @media (max-width: 760px) {
-  .graph-navigation {
-    padding: 6px 12px;
-  }
-  .graph-navigation .view-summary {
-    width: 100%;
-    margin-left: 0;
-  }
   .workbench.focus-graph .graph-stage {
     display: block;
   }
   .help-tabs button {
     padding: 6px 8px;
-  }
-}
-@media (max-width: 999px) {
-  /* On single-panel widths the graph controls only apply to the graph view,
-     so reclaim their vertical space when inspecting or browsing wallets. */
-  .graph-nav-left,
-  .graph-nav-right {
-    display: none;
   }
 }
 

@@ -1,6 +1,6 @@
 # Local UI and renderer comparison
 
-Reviewed on 8 September 2026. The foundation is integrated on main; the three
+Reviewed on 8 September 2026. Subsequent UI work targets the main foundation, following user review; the Studio and custom renderer remain isolated proposals. The foundation is integrated on main; the three
 alternatives remain separate local branches. No branch was pushed or published.
 Each preview has a separate browser origin, so its saved workspaces are separate.
 Use an encrypted workspace export/import to compare the same saved data.

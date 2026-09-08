@@ -28,7 +28,7 @@ test('lookup prefetch hydrates previous outputs and the spending action follows 
 }) => {
   const calls = await mockBitcoin(page);
   await create(page);
-  await page.getByLabel('Prefetch previous levels').selectOption('1');
+  await expect(page.getByLabel('Prefetch previous levels')).toHaveValue('1');
   await add(page, TX_SPENDING);
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
@@ -53,6 +53,7 @@ test('an unresolved output can load its creating transaction without prefetch', 
 }) => {
   await mockBitcoin(page);
   await create(page);
+  await page.getByLabel('Prefetch previous levels').selectOption('0');
   await add(page, TX_SPENDING);
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();

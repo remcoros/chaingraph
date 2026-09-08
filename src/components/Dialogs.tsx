@@ -8,12 +8,14 @@ import { decryptWorkspace } from '../lib/crypto';
 import type { SavedWorkspace } from '../lib/useWorkspaces';
 export function useDialogFocus(onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
+  // Capture the invoker before children mount and React applies autoFocus.
+  const [previous] = useState(() => document.activeElement as HTMLElement | null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement;
     const el = ref.current;
-    el?.querySelector<HTMLElement>('input,button')?.focus();
+    if (!el?.contains(document.activeElement))
+      el?.querySelector<HTMLElement>('input,button')?.focus();
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -46,9 +48,9 @@ export function useDialogFocus(onClose: () => void) {
     document.addEventListener('keydown', key);
     return () => {
       document.removeEventListener('keydown', key);
-      previous?.focus();
+      if (previous?.isConnected) previous.focus();
     };
-  }, []);
+  }, [previous]);
   return ref;
 }
 export function Modal({
