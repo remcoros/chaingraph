@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import type { AnalysisUiRunReport, AnalysisUiState } from '../lib/useAnalysisUiState';
 import { Activity, Search } from 'lucide-react';
 import {
   analysisTools,
-  defaultsFor,
   type AnalysisOptions,
   type AnalysisRunReport,
   type AnalysisScope,
@@ -14,7 +14,10 @@ interface Props {
   hasNodes: boolean;
   busy: boolean;
   selectedTxids?: string[];
-  runReports?: Record<string, AnalysisRunReport>;
+  graphTxids?: string[];
+  runReports?: Record<string, AnalysisUiRunReport>;
+  uiState: AnalysisUiState;
+  onUiStateChange: (update: (state: AnalysisUiState) => AnalysisUiState) => void;
   onSelect: (id: string) => void;
   onRun: (id: string, options?: AnalysisOptions, scope?: AnalysisScope) => void;
   onClear: () => void;
@@ -31,7 +34,10 @@ export function AnalysisPanel({
   hasNodes,
   busy,
   selectedTxids = [],
+  graphTxids = [],
   runReports = {},
+  uiState,
+  onUiStateChange,
   onSelect,
   onRun,
   onClear,
@@ -39,16 +45,26 @@ export function AnalysisPanel({
   onToggle,
   onIsolate,
 }: Props) {
-  const [query, setQuery] = useState('');
-  const [scope, setScope] = useState<AnalysisScope>('graph');
-  const [options, setOptions] = useState<Record<string, AnalysisOptions>>(() =>
-    Object.fromEntries(analysisTools.map((tool) => [tool.id, defaultsFor(tool)])),
-  );
-  const [resultQuery, setResultQuery] = useState('');
-  const [kind, setKind] = useState('all');
-  const [state, setState] = useState('all');
-  const [resultTool, setResultTool] = useState('all');
-  const [limit, setLimit] = useState(30);
+  const {
+    query,
+    scope,
+    options,
+    resultQuery,
+    resultKind: kind,
+    resultState: state,
+    resultTool,
+    limit,
+  } = uiState;
+  function setField<K extends keyof AnalysisUiState>(key: K, value: AnalysisUiState[K]) {
+    onUiStateChange((current) => ({ ...current, [key]: value }));
+  }
+  const setQuery = (value: string) => setField('query', value);
+  const setScope = (value: AnalysisScope) => setField('scope', value);
+  const setResultQuery = (value: string) => setField('resultQuery', value);
+  const setKind = (value: string) => setField('resultKind', value);
+  const setState = (value: string) => setField('resultState', value);
+  const setResultTool = (value: string) => setField('resultTool', value);
+  const setLimit = (value: number) => setField('limit', value);
   const toolsSection = useRef<HTMLDivElement>(null);
   const findingsSection = useRef<HTMLDivElement>(null);
   const pendingRun = useRef<{ id: string; previous?: AnalysisRunReport } | undefined>(undefined);
@@ -65,7 +81,8 @@ export function AnalysisPanel({
       findingsSection.current?.scrollIntoView({ block: 'start' });
     }
   }, [runReports]);
-  const actualScope = scope === 'selection' && !selectedTxids.length ? 'graph' : scope;
+  const missingSelection = scope === 'selection' && !selectedTxids.length;
+  const currentScopeIds = new Set(scope === 'selection' ? selectedTxids : graphTxids);
   const visibleTools = analysisTools.filter((tool) =>
     `${tool.name} ${tool.description} ${tool.group}`.toLowerCase().includes(query.toLowerCase()),
   );
@@ -80,7 +97,10 @@ export function AnalysisPanel({
       `${f.title} ${f.description}`.toLowerCase().includes(resultQuery.toLowerCase()),
   );
   function setOption(toolId: string, key: string, value: number | string | boolean) {
-    setOptions((current) => ({ ...current, [toolId]: { ...current[toolId], [key]: value } }));
+    onUiStateChange((current) => ({
+      ...current,
+      options: { ...current.options, [toolId]: { ...current.options[toolId], [key]: value } },
+    }));
   }
   return (
     <div className="analysis-panel">
@@ -102,7 +122,7 @@ export function AnalysisPanel({
         <label className="analysis-field">
           Analysis scope
           <select
-            value={actualScope}
+            value={scope}
             aria-label="Analysis scope"
             onChange={(event) => setScope(event.target.value as AnalysisScope)}
           >
@@ -113,6 +133,11 @@ export function AnalysisPanel({
             </option>
           </select>
         </label>
+        {missingSelection && (
+          <p className="muted small" role="status">
+            Select a transaction to run this scope, or choose Visible graph.
+          </p>
+        )}
         <p className="muted small">
           Loaded parents can provide input evidence even when outside the chosen scope. No
           additional network requests are made.
@@ -142,7 +167,18 @@ export function AnalysisPanel({
                         <span className={`analysis-badge ${tool.kind}`}>{tool.kind}</span>
                       </div>
                       <p>{tool.description}</p>
-                      <details className="analysis-parameters">
+                      <details
+                        className="analysis-parameters"
+                        open={uiState.expandedTools[tool.id] ?? false}
+                        onToggle={(event) => {
+                          const open = event.currentTarget.open;
+                          if (open !== (uiState.expandedTools[tool.id] ?? false))
+                            onUiStateChange((current) => ({
+                              ...current,
+                              expandedTools: { ...current.expandedTools, [tool.id]: open },
+                            }));
+                        }}
+                      >
                         <summary>Parameters and method</summary>
                         {tool.parameters.map((parameter) => (
                           <label
@@ -208,10 +244,10 @@ export function AnalysisPanel({
                         </a>
                       </details>
                       <button
-                        disabled={!hasNodes || busy}
+                        disabled={busy || (scope === 'selection' ? missingSelection : !hasNodes)}
                         onClick={() => {
                           pendingRun.current = { id: tool.id, previous: runReports[tool.id] };
-                          onRun(tool.id, options[tool.id], actualScope);
+                          onRun(tool.id, options[tool.id], scope);
                         }}
                       >
                         <Activity size={14} />
@@ -228,6 +264,62 @@ export function AnalysisPanel({
                               ? report.summary
                               : (report.emptyReason ?? report.summary)}
                           </p>
+                          {report.inputScope && (
+                            <>
+                              <p className="muted small">
+                                Run scope:{' '}
+                                {report.inputScope === 'selection'
+                                  ? 'Selected transaction'
+                                  : 'Visible graph'}
+                                {report.runAt && (
+                                  <>
+                                    {' '}
+                                    ·{' '}
+                                    <time
+                                      dateTime={report.runAt}
+                                      title={new Date(report.runAt).toLocaleString()}
+                                    >
+                                      {new Date(report.runAt).toLocaleTimeString()}
+                                    </time>
+                                  </>
+                                )}
+                              </p>
+                              {(report.inputScope !== scope ||
+                                tool.parameters.some(
+                                  (parameter) =>
+                                    !Object.is(
+                                      report.inputOptions?.[parameter.id],
+                                      options[tool.id][parameter.id],
+                                    ),
+                                ) ||
+                                report.scopeTxids.length !== currentScopeIds.size ||
+                                report.scopeTxids.some((id) => !currentScopeIds.has(id))) && (
+                                <p className="small analysis-settings-changed">
+                                  Controls changed since this run. Rerun to update.
+                                </p>
+                              )}
+                              <details className="analysis-last-run-settings">
+                                <summary>Last-run parameters</summary>
+                                <dl>
+                                  {tool.parameters.map((parameter) => (
+                                    <div key={parameter.id}>
+                                      <dt>{parameter.label}</dt>
+                                      <dd>
+                                        {typeof report.inputOptions?.[parameter.id] === 'boolean'
+                                          ? report.inputOptions[parameter.id]
+                                            ? 'On'
+                                            : 'Off'
+                                          : String(
+                                              report.inputOptions?.[parameter.id] ??
+                                                parameter.defaultValue,
+                                            )}
+                                      </dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                              </details>
+                            </>
+                          )}
                           <details>
                             <summary>Coverage and skipped records</summary>
                             <dl>
@@ -401,9 +493,7 @@ export function AnalysisPanel({
             ))}
             {!results.length && <p className="muted small">No findings match these filters.</p>}
             {results.length > limit && (
-              <button onClick={() => setLimit((current) => current + 30)}>
-                Show more findings
-              </button>
+              <button onClick={() => setLimit(limit + 30)}>Show more findings</button>
             )}
           </>
         )}

@@ -28,11 +28,12 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import Graph from ${JSON.stringify(`/@fs${path.join(process.cwd(), 'src/components/GraphView.tsx')}`)};
 const a='a'.repeat(64), b='b'.repeat(64), address='bc1qfixture';
+const captionFit = new URLSearchParams(location.search).has('caption-fit');
 const nodes=Object.freeze([
  {id:'tx:'+a,kind:'transaction',txid:a,label:'Creating transaction',value:10000,x:-100,y:0,z:0,fx:-100,fy:0,fz:0},
- {id:'out:'+a+':0',kind:'output',txid:a,vout:0,label:'Fixture output',value:10000,address,x:0,y:0,z:0,fx:0,fy:0,fz:0},
+ {id:'out:'+a+':0',kind:'output',txid:a,vout:0,label:'Fixture output',value:10000,address,x:0,y:captionFit?80:0,z:0,fx:0,fy:captionFit?80:0,fz:0},
  {id:'tx:'+b,kind:'transaction',txid:b,label:'Spending transaction',value:9000,x:100,y:0,z:0,fx:100,fy:0,fz:0},
- {id:'addr:'+address,kind:'address',address,label:'Fixture address',x:0,y:80,z:0,fx:0,fy:80,fz:0},
+ {id:'addr:'+address,kind:'address',address,label:'Fixture address',x:0,y:captionFit?0:80,z:0,fx:0,fy:captionFit?0:80,fz:0},
 ].map(Object.freeze));
 const links=Object.freeze([
  {id:'create-edge',source:'tx:'+a,target:'out:'+a+':0',kind:'creates'},
@@ -51,14 +52,15 @@ function App(){const [selected,setSelected]=React.useState();const [action,setAc
 const [dimensions,setDimensions]=React.useState(2),[fit,setFit]=React.useState(0),[focus,setFocus]=React.useState();
 const [loaded,setLoaded]=React.useState(!params.has('empty'));
 const [shown,setShown]=React.useState(true),[hidden,setHidden]=React.useState(false),[busy,setBusy]=React.useState(false);
+const [caption,setCaption]=React.useState('Followed output');
 const [labels,setLabels]=React.useState(true),[tags,setTags]=React.useState(true),[icons,setIcons]=React.useState(true);
-window.fixture={setLoaded,setSelected,setShown,setHidden,setBusy,setLabels,setTags,setIcons};
+window.fixture={setCaption,setLoaded,setSelected,setShown,setHidden,setBusy,setLabels,setTags,setIcons};
 return <><input id="notes" aria-label="Notes editor"/><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="action">{action}</output><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="selected">{selected||'none'}</output>
 <div><button onClick={()=>setDimensions(d=>d===2?3:2)}>Toggle dimensions</button><button onClick={()=>setFit(n=>n+1)}>Fit graph</button><button onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Focus output</button><button onClick={()=>setLoaded(true)}>Load data</button></div>
 <div id="fixture-graph" style={{display:hidden?'none':undefined,position:'relative',height:'600px',width:'min(900px, 100%)','--color-paper':'#111a20','--color-muted':'#74818b','--color-accent':'#eab66b'}}>
-{shown && <Graph navigation={params.has('contract')||params.has('navigation')?<button style={{pointerEvents:'auto'}} onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Shared center</button>:undefined} toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
-showLabels={labels} showTags={tags} showIcons={icons} nodePresentation={params.has('captions')?new Map(nodes.map(node=>[node.id,{label:node.kind==='output'?'Deposit':'',icon:node.kind==='output'?'★':'',tags:node.kind==='output'?['Exchange']:[]}])):new Map(nodes.map(node=>[node.id,{label:''}]))}
-busy={busy} onTrace={id=>setAction('trace:'+id)} onEdit={id=>{setAction('edit:'+id);document.getElementById('notes').focus();}}/>}
+{shown && <Graph navigation={params.has('contract')||params.has('navigation')||captionFit?<button style={{pointerEvents:'auto',height:captionFit?64:undefined,width:captionFit?420:undefined}} onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Shared center</button>:undefined} toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
+showLabels={labels} showTags={tags} showIcons={icons} nodePresentation={captionFit?new Map(nodes.map(node=>[node.id,{label:node.kind==='output'?caption:''}])):params.has('captions')?new Map(nodes.map(node=>[node.id,{label:node.kind==='output'?'Deposit':'',icon:node.kind==='output'?'★':'',tags:node.kind==='output'?['Exchange']:[]}])):new Map(nodes.map(node=>[node.id,{label:''}]))}
+onSnapshot={snapshot=>{window.lastGraphSnapshot=snapshot}} busy={busy} onTrace={id=>setAction('trace:'+id)} onEdit={id=>{setAction('edit:'+id);document.getElementById('notes').focus();}}/>}
 </div></>};createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
 `,
   );
@@ -539,6 +541,81 @@ test('fit keeps nodes visible and selectable in a short transaction-panel canvas
   expect(errors).toEqual([]);
 });
 
+test('fit protects an upper label from floating navigation and reframes a resized flow area without undoing gestures', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const errors = await render(page, '?caption-fit');
+  await page.addStyleTag({ content: '.graph-view { min-height: 0; }' });
+  const canvas = page.locator('canvas');
+  const captionBounds = () =>
+    canvas.evaluate(
+      (canvas) =>
+        new Promise<{ top: number; pixels: number }>((resolve) =>
+          requestAnimationFrame(() => {
+            const gl = (canvas as HTMLCanvasElement).getContext('webgl2')!;
+            const width = gl.drawingBufferWidth,
+              height = gl.drawingBufferHeight;
+            const pixels = new Uint8Array(width * height * 4);
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            let top = height,
+              count = 0;
+            for (let y = 0; y < height; y++)
+              for (let x = 0; x < width; x++) {
+                const at = (y * width + x) * 4;
+                const colors = [pixels[at], pixels[at + 1], pixels[at + 2]];
+                if (Math.min(...colors) > 120 && Math.max(...colors) - Math.min(...colors) < 35) {
+                  top = Math.min(top, height - 1 - y);
+                  count++;
+                }
+              }
+            resolve({
+              top: canvas.getBoundingClientRect().top + (top / height) * canvas.clientHeight,
+              pixels: count,
+            });
+          }),
+        ),
+    );
+  const assertCaptionClear = async () => {
+    const navigation = (await page.getByRole('button', { name: 'Shared center' }).boundingBox())!;
+    await expect.poll(async () => (await captionBounds()).pixels).toBeGreaterThan(20);
+    await expect
+      .poll(async () => (await captionBounds()).top)
+      .toBeGreaterThan(navigation.y + navigation.height + 4);
+  };
+  await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
+  await assertCaptionClear();
+  await page.screenshot({ path: test.info().outputPath('fit-upper-caption.png') });
+  await page.locator('#fixture-graph').evaluate((element) => (element.style.height = '280px'));
+  await expect.poll(async () => (await canvas.boundingBox())?.height).toBe(280);
+  await assertCaptionClear();
+  await page.screenshot({ path: test.info().outputPath('fit-upper-caption-short-flow.png') });
+  // Fit uses the current annotation dimensions after an edit, without remounting.
+  await page.evaluate(() =>
+    (window as any).fixture.setCaption('Followed output with a longer annotation'),
+  );
+  await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
+  await assertCaptionClear();
+  const bounds = (await canvas.boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width * 0.8, bounds.y + bounds.height * 0.75);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * 0.8 + 35, bounds.y + bounds.height * 0.75 - 15, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await page.waitForTimeout(1600);
+  const camera = await page.evaluate(() =>
+    JSON.stringify((window as any).lastGraphSnapshot.camera),
+  );
+  await page.locator('#fixture-graph').evaluate((element) => (element.style.height = '420px'));
+  await expect.poll(async () => (await canvas.boundingBox())?.height).toBe(420);
+  await page.waitForTimeout(1600);
+  expect(await page.evaluate(() => JSON.stringify((window as any).lastGraphSnapshot.camera))).toBe(
+    camera,
+  );
+  expect(errors).toEqual([]);
+});
+
 test('annotation captions render on the real canvas and all three display toggles remove them', async ({
   page,
 }) => {
@@ -570,6 +647,7 @@ test('annotation captions render on the real canvas and all three display toggle
         ),
     );
   await expect.poll(captionPixels).toBeGreaterThan(40);
+  const visibleCaptionPixels = await captionPixels();
   await page.screenshot({ path: test.info().outputPath('graph-annotation-captions.png') });
   await page.evaluate(() => {
     const fixture = (window as any).fixture;
@@ -577,12 +655,16 @@ test('annotation captions render on the real canvas and all three display toggle
     fixture.setTags(false);
     fixture.setIcons(false);
   });
-  await expect.poll(captionPixels).toBe(0);
+  // Specular highlights on node meshes can also be nearly white. Measure the
+  // stable no-caption baseline, then require each independent toggle to add
+  // visible text and return to exactly that baseline.
+  await expect.poll(captionPixels).toBeLessThan(visibleCaptionPixels / 10);
+  const meshHighlights = await captionPixels();
   for (const setter of ['setLabels', 'setTags', 'setIcons']) {
     await page.evaluate((setter) => (window as any).fixture[setter](true), setter);
-    await expect.poll(captionPixels).toBeGreaterThan(5);
+    await expect.poll(captionPixels).toBeGreaterThan(meshHighlights + 5);
     await page.evaluate((setter) => (window as any).fixture[setter](false), setter);
-    await expect.poll(captionPixels).toBe(0);
+    await expect.poll(captionPixels).toBe(meshHighlights);
   }
   expect(errors).toEqual([]);
 });

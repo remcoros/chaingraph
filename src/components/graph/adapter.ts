@@ -55,7 +55,8 @@ export interface GraphAdapterEvents {
 export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;
   update(frame: GraphFrame): void;
-  resize(width: number, height: number): void;
+  /** topInset reserves overlaid navigation in CSS pixels, without reducing the canvas. */
+  resize(width: number, height: number, topInset?: number): void;
   focus(id: string): void;
   fit(): void;
   /** Synchronously publish the current view before an explicit save or workspace transition. */

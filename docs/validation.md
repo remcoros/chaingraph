@@ -582,3 +582,52 @@ errors occurred. Desktop focus, full Fit and a 390px Inspector were inspected:
 Focus intentionally frames local connections; unrelated branches can lie outside
 that view. Fit restores all displayed nodes. Physical-device performance was not
 benchmarked. The first MP4 was retained without re-recording it.
+
+## Findings from the second demo recording, 2026-09-08
+
+The second isolated recording completed the full four-card tour, labels and tags,
+one observed mainnet spending link, and a comparison of common-input heuristics.
+The 3:08 annotated MP4 is preserved locally under `artifacts/demo2/`, alongside
+captions, public case evidence and sources. Independent validation checked its
+H.264/yuv420p format, faststart, complete decode, HTTP range delivery and actual
+Chromium playback. Tour and analysis frames were visually reviewed. The
+[case research](research/demo-patterns-and-hypotheses.md) documents what the
+observations establish and why the optional toxic-change claim was not used.
+
+The recording reproduced an analysis scope reset after an Inspector visit.
+Temporary scope, parameters, searches, result filters and expanded parameter
+panels now survive navigation per unlocked workspace. Locking clears those
+temporary controls. Last-run settings are recorded independently and a notice
+identifies changes to parameters or the actual transaction scope. Browser tests
+cover Inspector revisits, missing selection, changed graph filters, independent
+workspaces and lock/reopen behavior.
+
+The second finding concerned graph labels underneath floating navigation.
+Framing now considers cached caption bounds and measured navigation height.
+The graph uses the remaining space below the toolbar instead of adding matching
+unused space at the bottom. Browser rendering checks cover an uppermost caption,
+a shorter flow/canvas, longer annotation text, caption toggles and preservation
+of a manually moved camera during resizing. These use actual WebGL rendering.
+
+Build, formatting and 431 unit/backend tests passed. Twelve targeted browser
+scenarios passed, including the two analysis journeys, five graph interaction
+cases, deferred saves with immediate export/lock flushing, worker failure,
+failed/partial trace preservation and workspace framing. The graph fixtures first
+exposed a fixture minimum height and antialiased edge pixels in the old caption
+probe; the final tests use a correctly sized viewport and measured no-caption
+baseline. These were distinguished from product failures.
+
+A fresh live mainnet browser loaded the demonstration's five-equal-output
+transaction, labeled an output, isolated its observed equal-output group and
+checked analysis settings across Inspector visits. The selected scope and a
+two-output threshold remained intact; changing the threshold visibly differed
+from the prior run's settings. No browser page errors occurred. This is functional
+Chromium/SwiftShader evidence, not a physical mobile performance benchmark.
+
+An early live screenshot caught a label overlapping navigation while layout was
+still moving. At settlement, the existing pending Fit correctly reframed it.
+A new moving-geometry regression verifies final framing and cancellation by a
+manual gesture without camera updates on every simulation tick. The settled
+live view was checked again with all six finding nodes visible:
+[caption clearance](screenshots/demo2-caption-fit.png) and
+[last-run settings](screenshots/demo2-analysis-settings.png).

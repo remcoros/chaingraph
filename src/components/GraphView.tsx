@@ -59,6 +59,8 @@ export default function GraphView(props: GraphViewProps) {
   const current = useRef(props);
   current.current = props;
   const cardRef = useRef<HTMLElement>(null);
+  const navigationRef = useRef<HTMLDivElement>(null);
+  const resizeGraph = useRef<(() => void) | undefined>(undefined);
   const pointer = useRef({ x: 0, y: 0, touch: false });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cardEntered = useRef(false);
@@ -238,8 +240,13 @@ export default function GraphView(props: GraphViewProps) {
       adapter.canvas.addEventListener('keydown', onKeyDown);
       const resize = () => {
         const { width, height } = element.getBoundingClientRect();
-        adapter?.resize(width, height);
+        const navigation = navigationRef.current?.getBoundingClientRect();
+        const topInset = navigation?.height
+          ? Math.max(0, navigation.bottom - element.getBoundingClientRect().top + 8)
+          : 0;
+        adapter?.resize(width, height, topInset);
       };
+      resizeGraph.current = resize;
       resize();
       observer = new ResizeObserver(resize);
       observer.observe(element);
@@ -250,6 +257,7 @@ export default function GraphView(props: GraphViewProps) {
     }
     return () => {
       observer?.disconnect();
+      resizeGraph.current = undefined;
       clearTimeout(closeTimer.current);
       cancelCardOpen();
       adapter?.canvas.removeEventListener('keydown', onKeyDown);
@@ -258,6 +266,16 @@ export default function GraphView(props: GraphViewProps) {
       graphRef.current = null;
     };
   }, [adapterFactory]);
+
+  const hasNavigation = Boolean(props.navigation);
+  useEffect(() => {
+    const navigation = navigationRef.current;
+    resizeGraph.current?.();
+    if (!navigation) return;
+    const observer = new ResizeObserver(() => resizeGraph.current?.());
+    observer.observe(navigation);
+    return () => observer.disconnect();
+  }, [hasNavigation, adapterFactory]);
 
   useEffect(() => {
     if (containerRef.current)
@@ -535,6 +553,7 @@ export default function GraphView(props: GraphViewProps) {
         )}
         {props.navigation && (
           <div
+            ref={navigationRef}
             className="graph-navigation-overlay"
             onPointerEnter={() => dismissCard()}
             onFocusCapture={() => dismissCard()}

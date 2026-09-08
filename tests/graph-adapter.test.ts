@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { MOUSE, Raycaster, Scene, TOUCH, Vector3 } from 'three';
+import { MOUSE, PerspectiveCamera, Raycaster, Scene, TOUCH, Vector3 } from 'three';
 import type { GraphFrame, GraphAdapterEvents } from '../src/components/graph/adapter';
 
 const harness = vi.hoisted(() => ({ graph: undefined as any }));
@@ -240,6 +240,45 @@ describe('force adapter contract', () => {
     expect(cameraMoves(requested.graph)).toHaveLength(2);
     expect(cameraMoves(requested.graph).at(-1)?.[2]).toBe(0);
     requested.adapter.dispose();
+  });
+  it('finishes an explicit fit against settled geometry but lets a manual gesture cancel that final move', () => {
+    for (const cancel of [false, true]) {
+      const { adapter, graph, callbacks, pointer } = setup();
+      const data = frame(3);
+      adapter.update({
+        ...data,
+        nodes: data.nodes.map((item, index) => ({ ...item, x: index * 30, y: index * 40, z: 0 })),
+      });
+      callbacks.onEngineStop();
+      // A topology change starts another layout. Fit must use its eventual
+      // coordinates, not only the positions visible at the time of the click.
+      adapter.update({ ...data, nodes: [...data.nodes, { ...data.nodes[0], id: 'arriving' }] });
+      adapter.resize(900, 350, 90);
+      adapter.fit();
+      const initial = cameraMoves(graph).at(-1)!;
+      const count = cameraMoves(graph).length;
+      const moving = graph.graphData().nodes[1];
+      moving.y = 450;
+      moving.z = 80;
+      for (let tick = 0; tick < 10; tick++) callbacks.onEngineTick();
+      expect(cameraMoves(graph)).toHaveLength(count);
+      if (cancel) pointer('wheel');
+      callbacks.onEngineStop();
+      expect(cameraMoves(graph)).toHaveLength(count + (cancel ? 0 : 1));
+      if (!cancel) {
+        const [position, target] = cameraMoves(graph).at(-1)!;
+        expect(position).not.toEqual(initial[0]);
+        const camera = new PerspectiveCamera(50, 900 / 350, 0.1, 1e8);
+        camera.position.set(position.x, position.y, position.z);
+        camera.lookAt(target.x, target.y, target.z);
+        camera.updateMatrixWorld();
+        const top = new Vector3(moving.x, moving.y + moving.radius, moving.z).project(camera);
+        expect(((1 - top.y) * 350) / 2).toBeGreaterThanOrEqual(90);
+      }
+      callbacks.onEngineStop();
+      expect(cameraMoves(graph)).toHaveLength(count + (cancel ? 0 : 1));
+      adapter.dispose();
+    }
   });
   it('cancels early framing on a gesture and preserves the pending fit while hidden', () => {
     const moved = setup();
@@ -540,6 +579,41 @@ describe('force adapter contract', () => {
     expect(cameraMoves(graph)).toHaveLength(1);
     adapter.fit();
     expect(cameraMoves(graph).at(-1)![1].x).toBeGreaterThan(400000);
+    adapter.dispose();
+  });
+  it('reframes a fitted viewport on resize but preserves gestures and restored camera positions', () => {
+    const { adapter, graph, pointer } = setup();
+    const data = frame(3);
+    adapter.update({
+      ...data,
+      nodes: data.nodes.map((item, index) => ({ ...item, x: index * 100, y: index * 80, z: 0 })),
+    });
+    adapter.fit();
+    const fitted = cameraMoves(graph).length;
+    adapter.resize(600, 250, 70);
+    expect(cameraMoves(graph)).toHaveLength(fitted + 1);
+    pointer('wheel');
+    graph.cameraPosition({ x: 50, y: 25, z: 600 }, { x: 50, y: 25, z: 0 }, 0);
+    const moved = cameraMoves(graph).length;
+    adapter.resize(900, 600, 50);
+    expect(cameraMoves(graph)).toHaveLength(moved);
+    expect(graph.cameraPosition()).toEqual({ x: 50, y: 25, z: 600 });
+    adapter.fit();
+    adapter.restoreSnapshot?.({
+      version: 1,
+      dimensions: 3,
+      camera: {
+        position: { x: 20, y: 10, z: 500 },
+        target: { x: 20, y: 10, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+      },
+      nodes: [],
+    });
+    adapter.update(data);
+    const restored = cameraMoves(graph).length;
+    adapter.resize(700, 500, 80);
+    expect(cameraMoves(graph)).toHaveLength(restored);
+    expect(graph.cameraPosition()).toEqual({ x: 20, y: 10, z: 500 });
     adapter.dispose();
   });
   it('keeps arrow bounds aligned with actual custom mesh sizes without moving the layout or camera', () => {

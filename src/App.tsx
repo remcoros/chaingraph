@@ -1,3 +1,4 @@
+import { useAnalysisUiState, type AnalysisUiRunReport } from './lib/useAnalysisUiState';
 import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
@@ -73,7 +74,7 @@ import {
   promoteInputContext,
 } from './domain/workspace';
 import { filterSmallAmounts, omitAmountOrphans } from './domain/smallAmounts';
-import { analysisTools, type AnalysisOptions } from './domain/analysis';
+import { defaultsFor, analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
   addressNodeId,
@@ -133,9 +134,27 @@ export default function App() {
     discoveryError ||
     (unsupportedNetwork ? `Backend does not support ${w!.network}.` : (status?.error ?? ''));
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
-  const [runReports, setRunReports] = useState<
-    Record<string, ReturnType<(typeof analysisTools)[number]['analyze']>>
-  >({});
+  const { state: analysisUiState, update: updateAnalysisUiState } = useAnalysisUiState(
+    w?.id,
+    ws.sessions.map((session) => session.data.id),
+  );
+  const [reportState, setReportState] = useState<{
+    workspaceId?: string;
+    reports: Record<string, AnalysisUiRunReport>;
+  }>({ reports: {} });
+  const runReports = reportState.workspaceId === w?.id ? reportState.reports : {};
+  const setRunReports = (
+    update:
+      | Record<string, AnalysisUiRunReport>
+      | ((current: Record<string, AnalysisUiRunReport>) => Record<string, AnalysisUiRunReport>),
+  ) =>
+    setReportState((current) => ({
+      workspaceId: w?.id,
+      reports:
+        typeof update === 'function'
+          ? update(current.workspaceId === w?.id ? current.reports : {})
+          : update,
+    }));
   const [rightTab, setRightTab] = useState<'inspect' | 'analysis'>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
@@ -991,6 +1010,16 @@ export default function App() {
       monitorOperation?.abort();
     };
   }, [live, canQuery, w?.id, gap, scanLimit]);
+  const visibleAnalysisTxids = useMemo(
+    () => [
+      ...new Set(
+        visibleGraph.nodes.flatMap((node) =>
+          node.txid && w?.transactions[node.txid] ? [node.txid] : [],
+        ),
+      ),
+    ],
+    [visibleGraph.nodes, w?.transactions],
+  );
   const entityNodes = entityGraph.matchedNodes;
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   const analysisEvidence = useRef<{ transactions?: Workspace['transactions']; wallets: Wallet[] }>({
@@ -1081,21 +1110,18 @@ export default function App() {
   ) {
     if (!w) return;
     const tool = analysisTools.find((t) => t.id === id)!;
-    const ids =
-      scope === 'selection'
-        ? tx
-          ? [tx.txid]
-          : []
-        : [
-            ...new Set(
-              visibleGraph.nodes.flatMap((node) =>
-                node.txid && w.transactions[node.txid] ? [node.txid] : [],
-              ),
-            ),
-          ];
+    const ids = scope === 'selection' ? (tx ? [tx.txid] : []) : visibleAnalysisTxids;
     try {
       const report = tool.analyze(w, ids, options);
-      setRunReports((current) => ({ ...current, [id]: report }));
+      setRunReports((current) => ({
+        ...current,
+        [id]: {
+          ...report,
+          inputScope: scope,
+          inputOptions: { ...defaultsFor(tool), ...options },
+          runAt: new Date().toISOString(),
+        },
+      }));
       change((c) => ({
         ...c,
         findings: [
@@ -1777,9 +1803,12 @@ export default function App() {
               <div className="inspector-scroll" ref={inspectorScroll}>
                 {rightTab === 'analysis' ? (
                   <AnalysisPanel
+                    uiState={analysisUiState}
+                    onUiStateChange={updateAnalysisUiState}
                     findings={w.findings}
                     hasNodes={!!visibleGraph.nodes.length}
                     selectedTxids={tx ? [tx.txid] : []}
+                    graphTxids={visibleAnalysisTxids}
                     runReports={runReports}
                     onIsolate={(ids) => {
                       updateFilters({ includeIds: ids, preserveContext: true });

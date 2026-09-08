@@ -101,6 +101,8 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let fitPadding = 40;
   let viewportWidth = 0;
   let viewportHeight = 0;
+  let navigationInset = 0;
+  let lastFraming: { nodeId?: string } | undefined;
   let settled = false;
   let earlyFitPending = false;
   let earlyFitTicks = 0;
@@ -135,6 +137,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   const beginInteraction = () => {
     if (dead) return;
     pendingFocus = undefined;
+    lastFraming = undefined;
     needsFit = false;
     earlyFitPending = false;
     cancelSnapshot();
@@ -307,6 +310,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     nodes: readonly SimNode[],
     transition: number,
     target?: { x: number; y: number; z: number },
+    focusId?: string,
   ) => {
     if (!dimensions) return;
     const camera = graph.camera() as PerspectiveCamera;
@@ -319,9 +323,30 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       width: viewportWidth,
       height: viewportHeight,
       padding: Math.max(fitPadding, Math.min(60, viewportHeight * 0.16)),
+      topInset: navigationInset,
+      captions: new Map(
+        nodes.flatMap((node) => {
+          const resource = node.text ? textMaterials.get(node.text) : undefined;
+          return resource
+            ? [
+                [
+                  node.id,
+                  {
+                    width: resource.width,
+                    height: resource.height,
+                    offsetY: 1.7 * node.radius + resource.height / 2,
+                  },
+                ] as const,
+              ]
+            : [];
+        }),
+      ),
       target,
     });
-    if (pose) graph.cameraPosition(pose.position, pose.target, transition);
+    if (pose) {
+      graph.cameraPosition(pose.position, pose.target, transition);
+      lastFraming = { nodeId: focusId };
+    }
   };
   const tryEarlyFit = () => {
     if (dead || !earlyFitPending || earlyFitTicks > 0 || !needsFit || !visible) return;
@@ -617,7 +642,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     dispose();
     throw error;
   }
-  function focus(id: string) {
+  function focus(id: string, transition = duration()) {
     if (dead) return;
     // An explicit request owns the next camera move even when its frame has not
     // arrived yet. Never substitute the origin for uninitialized coordinates.
@@ -644,8 +669,9 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     }
     frameNodes(
       graph.graphData().nodes.filter((item) => neighbors.has(item.id)),
-      duration(),
+      transition,
       target,
+      id,
     );
     scheduleSnapshot();
   }
@@ -657,6 +683,9 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       const parsed = graphSnapshotSchema.safeParse(snapshot);
       if (!parsed.success) return;
       initialSnapshot = parsed.data;
+      lastFraming = undefined;
+      pendingFocus = undefined;
+      earlyFitPending = false;
       for (const node of parsed.data.nodes) retainedPositions.set(node.id, node);
       needsFit = false;
     },
@@ -761,6 +790,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         const snapshot = initialSnapshot;
         initialSnapshot = undefined;
         if (snapshot.dimensions === dimensions) {
+          lastFraming = undefined;
           // Apply after dimensions, whose default camera reset must not overwrite restoration.
           graph.camera().up.set(snapshot.camera.up.x, snapshot.camera.up.y, snapshot.camera.up.z);
           graph.cameraPosition(snapshot.camera.position, snapshot.camera.target, 0);
@@ -769,22 +799,30 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       }
       if (pendingFocus) focus(pendingFocus);
     },
-    resize(width, height) {
+    resize(width, height, topInset = 0) {
       if (dead) return;
       visible = width > 0 && height > 0;
       if (!visible) return;
       // A fixed margin can exhaust a short canvas below the transaction panel.
       // Reserve at most 10% per side, including on narrow phone viewports.
       fitPadding = Math.min(40, width * 0.1, height * 0.1);
+      const changed =
+        width !== viewportWidth || height !== viewportHeight || topInset !== navigationInset;
       viewportWidth = width;
       viewportHeight = height;
+      navigationInset = Number.isFinite(topInset) ? Math.max(0, topInset) : 0;
       graph.width(width).height(height);
       halos.material.uniforms.viewportScale.value = height * graph.renderer().getPixelRatio();
+      const previousFraming = lastFraming;
       tryEarlyFit();
-      if (pendingFocus) focus(pendingFocus);
+      if (pendingFocus) focus(pendingFocus, 0);
       else if (needsFit && settled && graph.graphData().nodes.length) {
         needsFit = false;
         frameNodes(graph.graphData().nodes, duration());
+        scheduleSnapshot();
+      } else if (changed && lastFraming && lastFraming === previousFraming) {
+        if (lastFraming.nodeId) focus(lastFraming.nodeId, 0);
+        else frameNodes(graph.graphData().nodes, 0);
         scheduleSnapshot();
       }
     },

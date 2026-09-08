@@ -72,6 +72,12 @@ Navigation floats at the top of the graph canvas once transactions are loaded. O
 
 Open **Analysis**, choose **Visible graph** or **Selected transaction**, and find a tool by name. Open **Parameters and method** to inspect thresholds and the source reference. Loaded parent transactions can supply input evidence even when outside the selected scope; running analysis makes no additional network requests.
 
+Scope, parameters and searches stay with each unlocked workspace when you visit
+Inspector or switch workspace tabs. Locking a workspace clears these temporary
+controls; saved findings remain encrypted with its data. **Last run** describes
+the scope and parameters used for that result, separately from your current
+controls. Select a transaction before running a tool scoped to the selection.
+
 | Tool                          | What it explains                                                                                                                                                 |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Equal-output detection        | Exact groups of equal positive, spendable outputs, with only their members highlighted. A pattern is not a CoinJoin verdict or linkability probability.          |
@@ -234,6 +240,6 @@ restore manually hidden items. Changing this list mode does not remove chain dat
 
 
 **Center selection** frames the selected node with its immediate connections.
-**Fit graph** frames all displayed nodes. Both account for node sizes and the
-available canvas, while retaining the current viewing direction. Orbiting may
+**Fit graph** frames all displayed nodes. Both account for node sizes, displayed
+labels and the floating navigation toolbar, while retaining the current viewing direction. Orbiting may
 still bring nodes in front of each other; Flat and Fit provide alternate views.

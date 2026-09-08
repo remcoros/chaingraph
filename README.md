@@ -73,6 +73,12 @@ This is a trusted, single-user, fully self-hosted application. The backend has *
 
 See the curated [mainnet examples](docs/research/mainnet-examples.md) and [testnet4 examples](docs/research/testnet4-examples.md). The Help menu follows the active workspace network. Examples are real chain observations, not attributed wallets or proof of ownership.
 
+Analysis controls stay with each unlocked workspace across panel and workspace
+tab switches. Last-run scope and parameters remain distinguishable from current
+controls. The [demonstration case](docs/research/demo-patterns-and-hypotheses.md)
+follows an equal-output transaction into its spender and compares heuristic
+assumptions without attributing ownership.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for isolated worktrees, configurable browser-test ports, frontend-only previews and review expectations. Security reporting and deployment boundaries are in [SECURITY.md](SECURITY.md).

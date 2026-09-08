@@ -21,6 +21,8 @@ export function frameCamera(
     width: number;
     height: number;
     padding: number;
+    topInset?: number;
+    captions?: ReadonlyMap<string, { width: number; height: number; offsetY: number }>;
     target?: Point;
   },
 ): { position: Point; target: Point } | undefined {
@@ -58,30 +60,107 @@ export function frameCamera(
     up.set(Math.abs(backward.y) < 0.9 ? 0 : 1, Math.abs(backward.y) < 0.9 ? 1 : 0, 0);
   const right = new Vector3().crossVectors(up, backward).normalize();
   up.crossVectors(backward, right).normalize();
-  const fov =
-    Number.isFinite(options.fov) && options.fov > 0 && options.fov < 180 ? options.fov : 50;
-  const tanY = Math.tan((fov * Math.PI) / 360);
-  const usableY = tanY * Math.max(0.25, 1 - (2 * options.padding) / options.height);
-  const usableX =
-    ((tanY * options.width) / options.height) *
-    Math.max(0.25, 1 - (2 * options.padding) / options.width);
-  // A small local scene should still leave navigation context around its nodes.
-  let distance = 40;
+  // Project bodies and billboard captions into the current camera axes. Labels
+  // rise in world Y from their parent, then face the camera at their actual size.
+  const bounds: {
+    left: number;
+    right: number;
+    bottom: number;
+    top: number;
+    near: number;
+    far: number;
+  }[] = [];
   for (const node of positioned) {
     const offset = new Vector3(node.x!, node.y!, options.dimensions === 2 ? 0 : node.z!).sub(
       target,
     );
     const radius = nodeBoundsRadius(node);
+    const x = offset.dot(right),
+      y = offset.dot(up),
+      z = offset.dot(backward);
+    bounds.push({
+      left: x - radius,
+      right: x + radius,
+      bottom: y - radius,
+      top: y + radius,
+      near: z - radius,
+      far: z + radius,
+    });
+    const caption = options.captions?.get(node.id);
+    if (caption) {
+      offset.y += caption.offsetY;
+      const x = offset.dot(right),
+        y = offset.dot(up),
+        z = offset.dot(backward);
+      bounds.push({
+        left: x - caption.width / 2,
+        right: x + caption.width / 2,
+        bottom: y - caption.height / 2,
+        top: y + caption.height / 2,
+        near: z,
+        far: z,
+      });
+    }
+  }
+  if (!options.target) {
+    const limits = bounds.reduce(
+      (result, b) => ({
+        left: Math.min(result.left, b.left),
+        right: Math.max(result.right, b.right),
+        bottom: Math.min(result.bottom, b.bottom),
+        top: Math.max(result.top, b.top),
+        near: Math.min(result.near, b.near),
+        far: Math.max(result.far, b.far),
+      }),
+      {
+        left: Infinity,
+        right: -Infinity,
+        bottom: Infinity,
+        top: -Infinity,
+        near: Infinity,
+        far: -Infinity,
+      },
+    );
+    const x = (limits.left + limits.right) / 2,
+      y = (limits.bottom + limits.top) / 2,
+      z = (limits.near + limits.far) / 2;
+    target.addScaledVector(right, x).addScaledVector(up, y).addScaledVector(backward, z);
+    for (const b of bounds) {
+      b.left -= x;
+      b.right -= x;
+      b.bottom -= y;
+      b.top -= y;
+      b.near -= z;
+      b.far -= z;
+    }
+  }
+  const fov =
+    Number.isFinite(options.fov) && options.fov > 0 && options.fov < 180 ? options.fov : 50;
+  const tanY = Math.tan((fov * Math.PI) / 360);
+  const horizontalPadding = Math.min(options.padding, options.width * 0.375);
+  const bottomPadding = Math.min(options.padding, options.height * 0.25);
+  const topPadding = Math.min(
+    Math.max(options.padding, options.topInset ?? 0),
+    options.height * 0.5,
+  );
+  const usableX =
+    ((tanY * options.width) / options.height) * (1 - (2 * horizontalPadding) / options.width);
+  const topSlope = tanY * (1 - (2 * topPadding) / options.height);
+  const bottomSlope = tanY * (1 - (2 * bottomPadding) / options.height);
+  const verticalShift = (tanY * (topPadding - bottomPadding)) / options.height;
+  // Shift the framed scene into the free area below navigation instead of
+  // reserving that height on both sides and needlessly shrinking the graph.
+  let distance = 40;
+  for (const b of bounds) {
     distance = Math.max(
       distance,
-      offset.dot(backward) +
-        radius +
-        Math.max(
-          (Math.abs(offset.dot(right)) + radius) / usableX,
-          (Math.abs(offset.dot(up)) + radius) / usableY,
-        ),
+      b.far + Math.max(Math.abs(b.left), Math.abs(b.right)) / usableX,
+      (b.top + b.far * topSlope) / (topSlope + verticalShift),
+      (-b.bottom + b.far * bottomSlope) / (bottomSlope - verticalShift),
+      b.far + 1,
     );
   }
+  target.addScaledVector(up, distance * verticalShift);
   return {
     target: { x: target.x, y: target.y, z: target.z },
     position: {

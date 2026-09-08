@@ -97,6 +97,37 @@ describe('camera framing for real geometry', () => {
     const tilted = frameCamera(nodes, tiltedOptions)!;
     expectVisible(nodes, tiltedOptions, tilted);
   });
+  it('reserves navigation and actual caption bounds without wasting matching space below the graph', () => {
+    const nodes = [node('upper', 0, 70, 0, 3.2), node('lower', 0, -70, 0, 3.2)];
+    const captions = new Map([['upper', { width: 100, height: 20, offsetY: 15 }]]);
+    const baseline = frameCamera(nodes, options)!;
+    const pose = frameCamera(nodes, { ...options, topInset: 95, captions })!;
+    const camera = new PerspectiveCamera(options.fov, options.width / options.height, 0.1, 1e8);
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    camera.updateMatrixWorld();
+    for (const x of [-50, 50])
+      for (const y of [75, 95]) {
+        const projected = new Vector3(x, y, 0).project(camera);
+        const top = ((1 - projected.y) * options.height) / 2;
+        expect(top).toBeGreaterThanOrEqual(95 - 1e-8);
+        expect(top).toBeLessThan(options.height - options.padding);
+      }
+    expect(pose.position.z).toBeLessThan(baseline.position.z * 1.5);
+    // Removing the caption for the next Fit removes its framing allowance too.
+    expect(frameCamera(nodes, { ...options, topInset: 95 })!.position.z).toBeLessThan(
+      pose.position.z,
+    );
+    const tiny = frameCamera(nodes, {
+      ...options,
+      width: 120,
+      height: 90,
+      topInset: 200,
+      captions,
+    })!;
+    expect(Object.values(tiny.position).every(Number.isFinite)).toBe(true);
+    expect(tiny.position.z).toBeLessThan(5000);
+  });
   it('looks down the flat graph and safely defers missing geometry or zero-size viewports', () => {
     const flat = frameCamera([node('a', 10, 20, 400)], { ...options, dimensions: 2 })!;
     expect(flat.target).toEqual({ x: 10, y: 20, z: 0 });
