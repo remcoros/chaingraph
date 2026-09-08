@@ -91,20 +91,10 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  margin: 8px 0 12px;
+  margin: 10px 0 0;
 }
 .related-transactions > button {
   max-width: 100%;
   text-align: left;
   overflow-wrap: anywhere;
-}
-.node-path-action {
-  margin: 14px 0;
-}
-.node-path-action > button {
-  width: 100%;
-  justify-content: flex-start;
-}
-.node-path-action > p {
-  margin: 6px 0 0;
 }

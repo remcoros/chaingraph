@@ -910,7 +910,10 @@ export default function App() {
               Inspector
             </button>
           </div>
-          <div className="graph-navigation" aria-label="Graph navigation">
+          <div
+            className={`graph-navigation graph-nav-${mobilePanel}`}
+            aria-label="Graph navigation"
+          >
             <button
               aria-label="Previous selection"
               title="Previous selection"

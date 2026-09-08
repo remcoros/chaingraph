@@ -1,5 +1,14 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Bookmark, Check, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Bookmark,
+  Check,
+  ChevronDown,
+  Crosshair,
+  RefreshCw,
+  TriangleAlert,
+} from 'lucide-react';
 import {
   formatSats,
   short,
@@ -104,7 +113,7 @@ export function AnnotationEditor({
         Notes
         <textarea
           aria-label="Node notes"
-          rows={4}
+          rows={3}
           maxLength={10000}
           placeholder="What do you know about this?"
           value={draft.note}
@@ -114,7 +123,7 @@ export function AnnotationEditor({
           }}
         />
       </label>
-      <div className="annotation-options">
+      <div className="annotation-actions">
         <IconPicker
           value={draft.icon}
           onChange={(icon) => {
@@ -130,17 +139,17 @@ export function AnnotationEditor({
           />
           Bookmark
         </label>
+        <button type="submit" className="primary annotation-save">
+          {saved ? (
+            <>
+              <Check size={15} />
+              Saved
+            </>
+          ) : (
+            'Save context'
+          )}
+        </button>
       </div>
-      <button type="submit" className="primary">
-        {saved ? (
-          <>
-            <Check size={15} />
-            Saved
-          </>
-        ) : (
-          'Save context'
-        )}
-      </button>
     </form>
   );
 }
@@ -287,7 +296,7 @@ export function NodeInspector({
   onRemove,
   onSave,
 }: NodeInspectorProps) {
-  const descriptionId = useId();
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const unavailable = busy
     ? 'Wait for the current operation to finish.'
     : queryDisabledReason ||
@@ -328,22 +337,51 @@ export function NodeInspector({
   const spendingCount = spendingNodes.length;
   const selectedOutput =
     selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
+  const identifier = selected.id.replace(/^(tx|out|addr):/, '');
+  const previousHint = !tx
+    ? 'Load the transaction that created this output.'
+    : selected.kind === 'output'
+      ? "Load the inputs of this output's creating transaction."
+      : "Load the source transactions of this transaction's inputs.";
+  const spendingHint =
+    selected.kind === 'output'
+      ? 'Find transactions that spend this specific output.'
+      : 'Find transactions that spend any output of this transaction.';
+  const traceReasons = [...new Set([previousReason, spendingReason].filter(Boolean) as string[])];
+  const cautions: string[] = [];
+  if (tx) {
+    if ((tx.confirmations ?? 0) < 0) cautions.push('Conflicted at fetch');
+    const equal = equalOutputCount(tx);
+    if (equal >= 3) cautions.push(`${equal} equal outputs, inspect carefully`);
+  }
+  const relatedNav = !!onSelectNode && (spendingCount > 0 || (selected.kind === 'output' && !!tx));
+  const hasEvidence = selected.kind === 'output' || !!tx || !!selected.address;
+  const showRefresh = !!selected.txid && !!tx && !w.demo;
+  const showRemove = selected.kind === 'transaction' && !!tx;
   return (
     <>
       <div className="panel-section selection-heading">
-        <span className="eyebrow">
-          {selected.kind === 'output' ? 'TRANSACTION OUTPUT' : selected.kind.toUpperCase()}
-        </span>
+        <div className="selection-top">
+          <span className="eyebrow">
+            {selected.kind === 'output' ? 'TRANSACTION OUTPUT' : selected.kind.toUpperCase()}
+          </span>
+          {onCenter && (
+            <button
+              type="button"
+              className="icon-button"
+              title="Center this node in graph"
+              aria-label="Center this node in graph"
+              onClick={onCenter}
+            >
+              <Crosshair size={15} />
+            </button>
+          )}
+        </div>
         <h2>{w.annotations[selected.id]?.label || selected.label}</h2>
-        {onCenter && (
-          <button className="text-button" onClick={onCenter}>
-            Center this node in graph
-          </button>
-        )}
         <div className="identifier-row">
-          <code className="wrap">{selected.id.replace(/^(tx|out|addr):/, '')}</code>
+          <code className="wrap">{identifier}</code>
           <CopyButton
-            value={selected.id.replace(/^(tx|out|addr):/, '')}
+            value={identifier}
             label={
               selected.kind === 'output'
                 ? 'Copy outpoint'
@@ -354,80 +392,50 @@ export function NodeInspector({
           />
         </div>
         <div className="selection-value">{formatSats(selected.value)}</div>
-        {selected.address && (
-          <label className="detail-label">
-            Address
-            <code className="wrap">{selected.address}</code>
-          </label>
-        )}
-        {selected.kind === 'output' && (
-          <dl className="details">
-            <div>
-              <dt>Output index</dt>
-              <dd>{selected.vout ?? 'Unknown'}</dd>
-            </div>
-            <div>
-              <dt>Script type</dt>
-              <dd>{selectedOutput?.scriptPubKey.type ?? 'Unknown'}</dd>
-            </div>
-          </dl>
-        )}
-        {tx && (
-          <dl className="details">
-            <div>
-              <dt>Inputs / outputs</dt>
-              <dd>
-                {tx.vin.length} / {tx.vout.length}
-              </dd>
-            </div>
-            <div>
-              <dt>State at fetch</dt>
-              <dd>
-                {(tx.confirmations ?? 0) < 0
-                  ? 'Conflicted at fetch'
-                  : tx.confirmations
-                    ? `${tx.confirmations} confirmations`
-                    : 'Unconfirmed / unknown'}
-              </dd>
-            </div>
-            {tx.vsize && (
-              <div>
-                <dt>Virtual size</dt>
-                <dd>{tx.vsize.toLocaleString()} vB</dd>
-              </div>
-            )}
-            {equalOutputCount(tx) >= 3 && (
-              <div>
-                <dt>Equal outputs</dt>
-                <dd>{equalOutputCount(tx)} · inspect carefully</dd>
-              </div>
-            )}
-          </dl>
+        {cautions.length > 0 && (
+          <p className="selection-caution">
+            <TriangleAlert size={13} />
+            {cautions.join(' · ')}
+          </p>
         )}
         {selected.kind !== 'address' && (
-          <p className="small muted">
+          <p className="small muted spending-note">
             {spendingCount
               ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
               : 'No spending transaction is loaded. This does not establish that these coins are unspent.'}
           </p>
         )}
-      </div>
-      <AnnotationEditor
-        key={annotationKey}
-        annotation={w.annotations[selected.id] ?? emptyAnnotation}
-        editToken={editToken}
-        onEditHandled={onEditHandled}
-        onSave={onSave}
-      />
-      <div className="panel-section selection-actions">
-        {onSelectNode && (spendingCount > 0 || (selected.kind === 'output' && tx)) && (
+        <div className="selection-trace">
+          <button
+            disabled={!!previousReason}
+            title={previousReason || previousHint}
+            onClick={() => onExpand('funding')}
+          >
+            <ArrowDownLeft size={14} />
+            Load previous transactions
+          </button>
+          <button
+            disabled={!!spendingReason}
+            title={spendingReason || spendingHint}
+            onClick={() => onExpand('spending')}
+          >
+            <ArrowUpRight size={14} />
+            Find spending transactions
+          </button>
+        </div>
+        {traceReasons.map((reason) => (
+          <p key={reason} className="small muted trace-reason">
+            {reason}
+          </p>
+        ))}
+        {relatedNav && (
           <div className="related-transactions">
             {selected.kind === 'output' && tx && (
               <button
                 type="button"
                 className="text-button mono"
                 title={tx.txid}
-                onClick={() => onSelectNode(txNodeId(tx.txid))}
+                onClick={() => onSelectNode?.(txNodeId(tx.txid))}
               >
                 Creating transaction: {short(tx.txid, 6)}
               </button>
@@ -438,7 +446,7 @@ export function NodeInspector({
                 type="button"
                 className="text-button mono"
                 title={id.slice(3)}
-                onClick={() => onSelectNode(id)}
+                onClick={() => onSelectNode?.(id)}
               >
                 Spending transaction: {short(id.slice(3), 6)}
               </button>
@@ -450,59 +458,98 @@ export function NodeInspector({
             )}
           </div>
         )}
-        <div className="node-path-action">
-          <button
-            disabled={!!previousReason}
-            title={previousReason}
-            aria-describedby={`${descriptionId}-previous`}
-            onClick={() => onExpand('funding')}
-          >
-            <ArrowDownLeft size={14} />
-            Load previous transactions
-          </button>
-          <p id={`${descriptionId}-previous`} className="small muted">
-            {previousReason ||
-              (!tx
-                ? 'Load the transaction that created this output.'
-                : selected.kind === 'output'
-                  ? "Load the transactions referenced by the inputs of this output's creating transaction."
-                  : 'Load the transactions referenced by the inputs of this transaction.')}
-          </p>
-        </div>
-        <div className="node-path-action">
-          <button
-            disabled={!!spendingReason}
-            title={spendingReason}
-            aria-describedby={`${descriptionId}-spending`}
-            onClick={() => onExpand('spending')}
-          >
-            <ArrowUpRight size={14} />
-            Find spending transactions
-          </button>
-          <p id={`${descriptionId}-spending`} className="small muted">
-            {spendingReason ||
-              (selected.kind === 'output'
-                ? 'Check script history for transactions that spend this specific output.'
-                : 'Check script history for transactions that spend any output of this transaction.')}
-          </p>
-        </div>
-        {selected.txid && tx && !w.demo && (
-          <button
-            className="text-button"
-            disabled={!!unavailable}
-            title={unavailable}
-            onClick={onRefresh}
-          >
-            <RefreshCw size={13} />
-            Refresh transaction
-          </button>
-        )}
-        {selected.kind === 'transaction' && tx && (
-          <button className="text-button danger" disabled={busy} onClick={onRemove}>
-            Remove transaction from graph
-          </button>
-        )}
       </div>
+      <AnnotationEditor
+        key={annotationKey}
+        annotation={w.annotations[selected.id] ?? emptyAnnotation}
+        editToken={editToken}
+        onEditHandled={onEditHandled}
+        onSave={onSave}
+      />
+      {hasEvidence && (
+        <details
+          className="panel-section selection-evidence"
+          open={evidenceOpen}
+          onToggle={(event) => setEvidenceOpen((event.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary>
+            <span>Chain evidence</span>
+            <ChevronDown size={15} aria-hidden="true" />
+          </summary>
+          <div className="evidence-body">
+            {selected.address && (
+              <label className="detail-label">
+                Address
+                <code className="wrap">{selected.address}</code>
+              </label>
+            )}
+            {selected.kind === 'output' && (
+              <dl className="details">
+                <div>
+                  <dt>Output index</dt>
+                  <dd>{selected.vout ?? 'Unknown'}</dd>
+                </div>
+                <div>
+                  <dt>Script type</dt>
+                  <dd>{selectedOutput?.scriptPubKey.type ?? 'Unknown'}</dd>
+                </div>
+              </dl>
+            )}
+            {tx && (
+              <dl className="details">
+                <div>
+                  <dt>Inputs / outputs</dt>
+                  <dd>
+                    {tx.vin.length} / {tx.vout.length}
+                  </dd>
+                </div>
+                <div>
+                  <dt>State at fetch</dt>
+                  <dd>
+                    {(tx.confirmations ?? 0) < 0
+                      ? 'Conflicted at fetch'
+                      : tx.confirmations
+                        ? `${tx.confirmations} confirmations`
+                        : 'Unconfirmed / unknown'}
+                  </dd>
+                </div>
+                {tx.vsize && (
+                  <div>
+                    <dt>Virtual size</dt>
+                    <dd>{tx.vsize.toLocaleString()} vB</dd>
+                  </div>
+                )}
+                {equalOutputCount(tx) >= 3 && (
+                  <div>
+                    <dt>Equal outputs</dt>
+                    <dd>{equalOutputCount(tx)} · inspect carefully</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </div>
+        </details>
+      )}
+      {(showRefresh || showRemove) && (
+        <div className="panel-section selection-footer">
+          {showRefresh && (
+            <button
+              className="text-button"
+              disabled={!!unavailable}
+              title={unavailable}
+              onClick={onRefresh}
+            >
+              <RefreshCw size={13} />
+              Refresh transaction
+            </button>
+          )}
+          {showRemove && (
+            <button className="text-button danger" disabled={busy} onClick={onRemove}>
+              Remove transaction from graph
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }

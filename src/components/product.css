@@ -163,6 +163,14 @@ a {
     padding: 6px 8px;
   }
 }
+@media (max-width: 999px) {
+  /* On single-panel widths the graph controls only apply to the graph view,
+     so reclaim their vertical space when inspecting or browsing wallets. */
+  .graph-nav-left,
+  .graph-nav-right {
+    display: none;
+  }
+}
 
 .filtered-graph-empty {
   position: absolute;

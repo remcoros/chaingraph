@@ -474,3 +474,77 @@ test('selection history preserves path depth and skips removed transaction nodes
     page.getByRole('button', { name: 'Previous selection', exact: true }),
   ).toBeDisabled();
 });
+
+test('inspector keeps trace actions and label editing reachable on a 150-output selection', async ({
+  page,
+}) => {
+  await mockBitcoin(page, false);
+  await page.goto('/');
+  await createWorkspace(page, 'Layout laboratory', true);
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await page.locator('.entity-list .entity-row').first().click();
+  await expect(page.locator('.selection-heading h2')).toHaveText('Synthetic CoinJoin 1');
+  // The laboratory transaction really carries 150 inputs and 150 equal outputs.
+  await expect(page.locator('.selection-heading')).toContainText('150 equal outputs');
+
+  const loadPrevious = page.getByRole('button', {
+    name: 'Load previous transactions',
+    exact: true,
+  });
+  const findSpending = page.getByRole('button', {
+    name: 'Find spending transactions',
+    exact: true,
+  });
+  const label = page.getByLabel('Node label');
+  const notes = page.getByLabel('Node notes');
+  const save = page.getByRole('button', { name: /Save context/ });
+  const editor = page.locator('.annotation-editor');
+  const evidence = page.locator('.selection-evidence');
+
+  // --- 1440x900: trace actions near the summary and Save above the fold ---
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(loadPrevious).toBeVisible();
+  await expect(findSpending).toBeVisible();
+  await expect(label).toBeVisible();
+  await expect(notes).toBeVisible();
+  await expect(save).toBeVisible();
+  const traceBox = await loadPrevious.boundingBox();
+  const editorBox = await editor.boundingBox();
+  const saveBox = await save.boundingBox();
+  const evidenceBox = await evidence.boundingBox();
+  // Common trace actions precede the editor; the evidence block stays below it.
+  expect(traceBox!.y).toBeLessThan(editorBox!.y);
+  expect(evidenceBox!.y).toBeGreaterThanOrEqual(editorBox!.y + editorBox!.height);
+  // Save is fully reachable without scrolling the sidebar at this viewport.
+  expect(saveBox!.y + saveBox!.height).toBeLessThanOrEqual(900);
+
+  // Editing survives toggling the collapsible chain evidence.
+  await notes.fill('Draft that must survive evidence toggles.');
+  await evidence.locator('summary').click();
+  await expect(evidence).toContainText('Inputs / outputs');
+  await evidence.locator('summary').click();
+  await expect(notes).toHaveValue('Draft that must survive evidence toggles.');
+
+  // Keyboard: label is focusable and Tab advances to the notes field.
+  await label.focus();
+  await expect(label).toBeFocused();
+  await page.keyboard.type(' via keyboard');
+  await expect(label).toHaveValue('Synthetic CoinJoin 1 via keyboard');
+  await page.keyboard.press('Tab');
+  await expect(notes).toBeFocused();
+
+  // --- 390x844: editing stays above the evidence and Save is scroll-reachable ---
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Inspector' }).click();
+  await expect(page.locator('.graph-navigation')).toBeHidden();
+  await expect(loadPrevious).toBeVisible();
+  await expect(label).toBeVisible();
+  await expect(notes).toBeVisible();
+  const editorMobile = await editor.boundingBox();
+  const evidenceMobile = await evidence.boundingBox();
+  expect(evidenceMobile!.y).toBeGreaterThan(editorMobile!.y);
+  await save.scrollIntoViewIfNeeded();
+  await expect(save).toBeVisible();
+  await expect(notes).toHaveValue('Draft that must survive evidence toggles.');
+});
