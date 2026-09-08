@@ -47,6 +47,19 @@ describe('display-only raw transaction inspection', () => {
     };
     expect(decodeRawTransaction(raw.toHex(), tx).wtxid).toBe(raw.getId());
   });
+  it('rejects a coinbase-shaped raw input bound to a claimed regular prevout', () => {
+    // The all-zero hash is the coinbase sentinel, never a real transaction ID.
+    // A crafted record must not present a coinbase input as spending it.
+    const raw = new BitcoinTransaction();
+    raw.addInput(new Uint8Array(32), 0xffffffff, 0xffffffff, Uint8Array.of(0x51));
+    raw.addOutput(Uint8Array.of(0x51), 5000000000n);
+    const crafted: Transaction = {
+      txid: raw.getId(),
+      vin: [{ txid: '00'.repeat(32), vout: 0xffffffff }],
+      vout: [{ n: 0, value: 50, scriptPubKey: { hex: '51' } }],
+    };
+    expect(() => decodeRawTransaction(raw.toHex(), crafted)).toThrow(/disagrees/);
+  });
   it('rejects mismatched IDs, inconsistent observations and malformed/oversized data', () => {
     const { raw, transaction } = fixture();
     expect(() =>

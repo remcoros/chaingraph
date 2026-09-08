@@ -166,15 +166,19 @@ export class WorkspaceSessionStore {
     const current = this.state.sessions.find((s) => s.data.id === id);
     if (!current) return;
     let data = fn(current.data);
-    if (
+    // An identical result (for example a scan for a deleted wallet) is not an
+    // edit: keep the revision, undo history and autosave state untouched.
+    if (data === current.data) return;
+    const evidenceChanged =
       data.transactions !== current.data.transactions ||
-      walletEvidenceChanged(current.data.wallets, data.wallets)
-    ) {
+      walletEvidenceChanged(current.data.wallets, data.wallets);
+    if (evidenceChanged) {
       data = { ...data, findings: data.findings.map((finding) => ({ ...finding, stale: true })) };
     }
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
-    // Chain refreshes are not undoable and invalidate older full-workspace snapshots.
+    // Chain refreshes are not undoable. Older snapshots are invalidated only when
+    // evidence changed; a quiet check must not discard the user's undo history.
     this.patch({
       sessions: this.state.sessions.map((s) =>
         s !== current
@@ -183,7 +187,7 @@ export class WorkspaceSessionStore {
               ...s,
               data,
               revision: s.revision + 1,
-              history: undo ? [...s.history.slice(-14), s.data] : [],
+              history: undo ? [...s.history.slice(-14), s.data] : evidenceChanged ? [] : s.history,
             },
       ),
     });

@@ -95,7 +95,9 @@ export function decodeRawTransaction(raw: unknown, expected: Transaction): RawIn
         ? BitcoinTransaction.isCoinbaseHash(input.hash) &&
             input.index === 0xffffffff &&
             bytesToHex(input.script) === saved.coinbase.toLowerCase()
-        : bytesToHex(Uint8Array.from(input.hash).reverse()) === saved.txid &&
+        : // The all-zero hash is the coinbase sentinel, never a real prevout txid.
+          !BitcoinTransaction.isCoinbaseHash(input.hash) &&
+            bytesToHex(Uint8Array.from(input.hash).reverse()) === saved.txid &&
             input.index === saved.vout;
     });
   const sameOutputs =
