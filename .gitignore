@@ -12,3 +12,6 @@ coverage/
 
 # Dedicated runtime network files and optional mounted cookie/CA material.
 /config/
+
+# Local recordings and browser artifacts are not release assets.
+artifacts/

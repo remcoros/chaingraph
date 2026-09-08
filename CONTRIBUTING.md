@@ -57,3 +57,18 @@ Describe the user-visible problem, what changes, and the checks actually perform
 Independent reviews can start with skills, memory and repository instructions disabled when explicitly requested. Give those sessions the product, privacy and file-ownership constraints in their task. Keep alternative designs in separate branches; compare working previews before adopting a wholesale redesign. Review all generated diffs before integration.
 
 Keep local experiments and review reports separate from the release claim. Do not publish or push just because a local check passed. The [release guide](docs/deployment.md#release-process) describes the tag workflow and its verification boundaries.
+
+## Portable repository content
+
+Use repository-relative file references in committed documentation. Resolve local
+home directories at runtime in tools; do not commit a developer's absolute home
+path, private hostname or temporary handoff filename. Required upstream license
+attribution and documented public Bitcoin fixtures are retained intentionally.
+Local recordings and browser artifacts belong in the ignored `artifacts/` directory.
+
+`npm run check:portability` checks tracked text for hardcoded user-home paths and
+rejects tracked environment files other than `.env.example`. It reports filenames
+and line numbers without echoing matched contents, and never opens environment
+files containing runtime credentials. The check runs as part of `npm run check`
+in CI. It is a narrow portability check, not an exhaustive secret scanner or an
+inspection of Git history; review new screenshots and configuration separately.

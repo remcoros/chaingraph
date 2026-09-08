@@ -50,4 +50,4 @@ These establish functional behavior under desktop Chromium and mobile emulation 
 
 ## Handoff
 
-The integration interface was announced in `/tmp/chaingraph-review-sessions/graph-boundary-interface.md`. The completed commit and final test results are handed off in `/tmp/chaingraph-review-sessions/graph-boundary-ready.md`. Experimental branches `experiment/custom-three-graph` at `0d58cf5` and `experiment/studio-three` at `403c8c9` have only been read as committed source/reports. They will not be rebased until root supplies the final integrated main base. Nothing is pushed or published.
+The integration contract is defined in [the adapter interface](../../src/components/graph/adapter.ts); the ownership and validation sections above preserve the handoff details. Experimental branches `experiment/custom-three-graph` at `0d58cf5` and `experiment/studio-three` at `403c8c9` have only been read as committed source/reports. They will not be rebased until root supplies the final integrated main base. Nothing is pushed or published.

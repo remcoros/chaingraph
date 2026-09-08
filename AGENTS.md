@@ -22,6 +22,13 @@ not when scaffolding this upstream application.
 
 ## Working safely
 
+- Keep committed code, documentation and screenshots free of personal account names,
+  absolute user-home paths, private hostnames and machine-specific handoff locations.
+  Use repository-relative references, runtime home-directory discovery or explicit
+  placeholders. Preserve required upstream attribution and documented public fixtures.
+  Run `npm run check:portability` before committing; this narrow check does not replace
+  a credential review. Keep local recordings and browser artifacts under `artifacts/`.
+
 - Never open, display, copy, or commit real `.env.live`, `.env.mainnet`, or `.env.testnet4` files.
   Test processes may load them directly without logging credentials, URLs, headers,
   or raw upstream exception messages. Public synthetic fixtures are allowed.
