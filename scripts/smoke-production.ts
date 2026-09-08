@@ -45,7 +45,7 @@ try {
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await expect(page.locator('canvas')).toBeVisible();
   await page.getByLabel('Node label').fill('Production saved label');
-  await page.getByRole('button', { name: 'Save context', exact: true }).click();
+  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
   await page.getByRole('button', { name: 'Workspace menu' }).click();
   await page.getByRole('button', { name: 'Save and lock workspace' }).click();

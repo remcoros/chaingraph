@@ -76,8 +76,8 @@ export function AnnotationEditor({
       {conflict && (
         <div className="annotation-conflict" role="status">
           <p>
-            Saved context changed while you were editing. Your draft is preserved. Saving replaces
-            the saved context.
+            Saved annotation changed while you were editing. Your draft is preserved. Saving
+            replaces the saved annotation.
           </p>
           <button
             type="button"
@@ -87,13 +87,22 @@ export function AnnotationEditor({
               setSaved(false);
             }}
           >
-            Reload saved context
+            Reload saved annotation
           </button>
         </div>
       )}
       <div className="section-title">
         <h3>Label and notes</h3>
-        <Bookmark size={15} />
+        <button type="submit" className="primary annotation-save">
+          {saved ? (
+            <>
+              <Check size={15} />
+              Saved
+            </>
+          ) : (
+            'Save annotation'
+          )}
+        </button>
       </div>
       <label>
         Label
@@ -135,20 +144,13 @@ export function AnnotationEditor({
           <input
             type="checkbox"
             checked={draft.bookmarked}
-            onChange={(e) => setDraft({ ...draft, bookmarked: e.target.checked })}
+            onChange={(e) => {
+              setDraft({ ...draft, bookmarked: e.target.checked });
+              setSaved(false);
+            }}
           />
           Bookmark
         </label>
-        <button type="submit" className="primary annotation-save">
-          {saved ? (
-            <>
-              <Check size={15} />
-              Saved
-            </>
-          ) : (
-            'Save context'
-          )}
-        </button>
       </div>
     </form>
   );
