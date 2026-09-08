@@ -20,6 +20,12 @@ test('selection lock and display options persist, and mobile panels ignore deskt
   await expect(page.locator('.workspace-tab svg')).toHaveCount(0);
   await page.getByLabel('Transaction, output, or address').fill(TX_SPENDING);
   await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  // Load the selected input's creator explicitly before exercising selection lock.
+  await page
+    .locator('.transaction-view')
+    .getByRole('button', { name: /^Input 0:/ })
+    .click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await expect(page.locator('canvas')).toBeVisible();
   await page.waitForTimeout(6500);

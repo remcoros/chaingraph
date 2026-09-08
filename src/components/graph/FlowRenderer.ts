@@ -34,7 +34,7 @@ import {
 } from '../../domain/graphSnapshot';
 import { frameCamera } from './cameraFraming';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
-import { layoutGraph } from './compactLayout';
+import { compactLayout } from './compactLayout';
 import { makeFlowEdges } from './flowEdges';
 import './flowRenderer.css';
 
@@ -75,13 +75,11 @@ export class FlowRenderer implements GraphAdapter {
   private worker?: Worker;
   private pending?: LayoutRequest;
   private dimensions: 2 | 3 = 3;
-  private layout: 'compact' | 'directed' | 'saved' = 'compact';
-  private layouts = new Map<
-    string,
+  private modes = new Map<
+    number,
     { positions: Map<string, Position>; camera: GraphSnapshot['camera'] }
   >();
-  private layoutControl: HTMLLabelElement;
-  private layoutSelect: HTMLSelectElement;
+  private workerRevision?: number;
   private width = 0;
   private height = 0;
   private inset = 0;
@@ -118,25 +116,6 @@ export class FlowRenderer implements GraphAdapter {
     this.labels.className = 'flow-renderer-labels';
     this.labels.setAttribute('aria-hidden', 'true');
     container.append(this.labels);
-    this.layoutControl = document.createElement('label');
-    this.layoutControl.className = 'flow-layout-control';
-    this.layoutControl.append('Layout ');
-    this.layoutSelect = document.createElement('select');
-    this.layoutSelect.setAttribute('aria-label', 'Graph layout');
-    this.layoutSelect.title =
-      'Compact gathers connected nodes into rounded groups. Directed arranges input → transaction → output stages.';
-    for (const [value, text] of [
-      ['compact', 'Compact'],
-      ['directed', 'Directed'],
-      ['saved', 'Saved view'],
-    ]) {
-      const option = new Option(text, value);
-      option.hidden = value === 'saved';
-      this.layoutSelect.add(option);
-    }
-    this.layoutSelect.addEventListener('change', this.changeLayout);
-    this.layoutControl.append(this.layoutSelect);
-    container.append(this.layoutControl);
     this.camera.position.set(260, 140, 1000);
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.enableDamping = !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -156,12 +135,17 @@ export class FlowRenderer implements GraphAdapter {
       this.worker = new Worker(new URL('./flowLayout.worker.ts', import.meta.url), {
         type: 'module',
       });
-      this.worker.onmessage = (e: MessageEvent<LayoutResult>) => this.accept(e.data);
+      this.worker.onmessage = (e: MessageEvent<LayoutResult>) => {
+        this.workerRevision = undefined;
+        this.accept(e.data);
+        this.dispatchLayout();
+      };
       this.worker.onerror = (e) => {
         e.preventDefault();
         this.worker?.terminate();
         this.worker = undefined;
-        if (this.pending) this.accept(layoutGraph(this.pending));
+        this.workerRevision = undefined;
+        if (this.pending) this.accept(compactLayout(this.pending));
       };
     } catch {
       /* Bounded synchronous fallback uses the same layout. */
@@ -323,7 +307,7 @@ export class FlowRenderer implements GraphAdapter {
       if (this.pointers.size) return;
       const publish = () => {
         this.idle = undefined;
-        if (this.dead || this.pointers.size) return;
+        if (this.dead || this.pointers.size || this.pending) return;
         this.flushSnapshot();
       };
       if (window.requestIdleCallback)
@@ -367,7 +351,7 @@ export class FlowRenderer implements GraphAdapter {
     if (this.dead) return;
     this.stopDamping();
     // Explicit workspace transitions cannot wait on a layout worker reply.
-    if (this.pending) this.accept(layoutGraph(this.pending));
+    if (this.pending) this.accept(compactLayout(this.pending));
     this.cancelQuiet();
     if (this.positions.size && !this.pending) {
       if (!this.snapshotNodes) {
@@ -393,10 +377,7 @@ export class FlowRenderer implements GraphAdapter {
   restoreSnapshot(snapshot: GraphSnapshot) {
     const parsed = graphSnapshotSchema.safeParse(snapshot);
     if (!parsed.success) return;
-    this.layout = 'saved';
-    this.layoutSelect.options[2].hidden = false;
-    this.layoutSelect.value = 'saved';
-    this.layouts.clear();
+    this.modes.clear();
     this.topology = '';
     this.dimensions = parsed.data.dimensions;
     this.cache = new Map(parsed.data.nodes.map(({ id, ...p }) => [id, p]));
@@ -420,29 +401,23 @@ export class FlowRenderer implements GraphAdapter {
     this.controls.touches.ONE = this.dimensions === 2 ? TOUCH.PAN : TOUCH.ROTATE;
     this.controls.touches.TWO = TOUCH.DOLLY_PAN;
   }
-  private layoutKey() {
-    return `${this.layout}:${this.dimensions}`;
-  }
-  private rememberLayout() {
+  private rememberMode() {
     if (!this.pending)
-      this.layouts.set(this.layoutKey(), {
+      this.modes.set(this.dimensions, {
         positions: new Map(this.cache),
         camera: this.cameraRecord(),
       });
   }
-  private changeLayout = () => {
+  repack = () => {
     if (this.dead) return;
     this.stopDamping();
-    this.rememberLayout();
-    this.layout = this.layoutSelect.value as typeof this.layout;
-    const saved = this.layouts.get(this.layoutKey());
-    this.cache = new Map(saved?.positions);
+    this.cache.clear();
+    this.modes.clear();
     this.topology = '';
     this.firstFit = false;
     this.pendingFocus = undefined;
     this.lastFrame = undefined;
-    this.pendingFit = !saved;
-    if (saved) this.restoreCamera(saved.camera);
+    this.pendingFit = true;
     this.events.dismiss();
     this.hovered = undefined;
     this.update({
@@ -452,6 +427,33 @@ export class FlowRenderer implements GraphAdapter {
       background: `#${this.renderer.getClearColor(new Color()).getHexString()}`,
     });
   };
+  zoom = (factor: number) => {
+    if (this.dead || !Number.isFinite(factor) || factor <= 0) return;
+    this.begin();
+    this.stopDamping();
+    const distance = this.camera.position.distanceTo(this.controls.target);
+    const next = Math.max(
+      this.controls.minDistance,
+      Math.min(this.controls.maxDistance, distance * factor),
+    );
+    this.camera.position
+      .sub(this.controls.target)
+      .multiplyScalar(next / Math.max(distance, 0.001))
+      .add(this.controls.target);
+    this.controls.update();
+    this.changed();
+  };
+  private dispatchLayout() {
+    if (this.dead || !this.pending) return;
+    if (!this.worker) {
+      this.accept(compactLayout(this.pending));
+      return;
+    }
+    // One running request and one latest replacement, never a queue of obsolete layouts.
+    if (this.workerRevision !== undefined) return;
+    this.workerRevision = this.pending.revision;
+    this.worker.postMessage(this.pending);
+  }
   update(frame: GraphFrame) {
     if (this.dead) return;
     this.nodes = frame.nodes.map((n) => ({ ...n }));
@@ -462,20 +464,18 @@ export class FlowRenderer implements GraphAdapter {
     this.renderer.setClearColor(frame.background);
     if (this.dimensions !== frame.dimensions) {
       this.stopDamping();
-      this.rememberLayout();
+      this.rememberMode();
       this.dimensions = frame.dimensions;
       this.configureDimensions();
-      const saved = this.layouts.get(this.layoutKey());
+      const saved = this.modes.get(this.dimensions);
       if (saved) {
         this.cache = new Map(saved.positions);
         this.topology = '';
         this.restoreCamera(saved.camera);
       } else {
-        if (this.layout === 'compact') {
-          this.cache.clear();
-          this.topology = '';
-          this.pendingFit = true;
-        }
+        this.cache.clear();
+        this.topology = '';
+        this.pendingFit = true;
         const distance = this.camera.position.distanceTo(this.controls.target);
         const target = point(this.controls.target);
         target.z = 0;
@@ -500,7 +500,6 @@ export class FlowRenderer implements GraphAdapter {
     this.topology = signature;
     const request: LayoutRequest = {
       revision: ++this.revision,
-      strategy: this.layout === 'directed' ? 'directed' : 'compact',
       dimensions: this.dimensions,
       nodes: this.nodes.map(({ id, shape, radius, x, y, z, fx, fy, fz }) => ({
         id,
@@ -517,14 +516,13 @@ export class FlowRenderer implements GraphAdapter {
       previous: [...this.cache],
     };
     this.pending = request;
-    this.layoutSelect.setAttribute('aria-busy', 'true');
-    if (this.worker) this.worker.postMessage(request);
-    else this.accept(layoutGraph(request));
+    this.canvas.setAttribute('aria-busy', 'true');
+    this.dispatchLayout();
   }
   private accept(result: LayoutResult) {
     if (this.dead || !this.pending || result.revision !== this.revision) return;
     this.pending = undefined;
-    this.layoutSelect.setAttribute('aria-busy', 'false');
+    this.canvas.setAttribute('aria-busy', 'false');
     this.positions = new Map(result.positions);
     this.snapshotNodes = undefined;
     for (const [id, p] of result.positions) {
@@ -533,14 +531,20 @@ export class FlowRenderer implements GraphAdapter {
     }
     while (this.cache.size > GRAPH_SNAPSHOT_NODE_LIMIT)
       this.cache.delete(this.cache.keys().next().value!);
-    for (const { mesh } of this.batches) {
-      this.scene.remove(mesh);
-      mesh.dispose();
-    }
-    this.batches = shapes.map((shape) => {
+    this.batches = shapes.map((shape, index) => {
       const nodes = this.nodes.filter((n) => n.shape === shape);
-      const mesh = new InstancedMesh(this.geometries[shape], this.material, nodes.length);
-      this.scene.add(mesh);
+      let mesh = this.batches[index]?.mesh;
+      const capacity = mesh?.instanceMatrix.count ?? 0;
+      if (!mesh || nodes.length > capacity || (capacity > 4 && nodes.length < capacity / 4)) {
+        if (mesh) {
+          this.scene.remove(mesh);
+          mesh.dispose();
+        }
+        const size = Math.max(4, 2 ** Math.ceil(Math.log2(Math.max(1, nodes.length))));
+        mesh = new InstancedMesh(this.geometries[shape], this.material, size);
+        this.scene.add(mesh);
+      }
+      mesh.count = nodes.length;
       return { mesh, nodes };
     });
     this.refresh();
@@ -591,6 +595,9 @@ export class FlowRenderer implements GraphAdapter {
   private fulfillCamera() {
     if (this.pending || !this.width || !this.height || !this.positions.size) return;
     if (this.pendingFocus) {
+      // Selection may arrive before the frame containing a new watched address.
+      // Retain that intent until final geometry exists; begin() cancels it on input.
+      if (!this.positions.has(this.pendingFocus)) return;
       const id = this.pendingFocus;
       this.pendingFocus = undefined;
       this.firstFit = false;
@@ -808,9 +815,7 @@ export class FlowRenderer implements GraphAdapter {
     this.renderer.forceContextLoss();
     this.canvas.remove();
     this.labels.remove();
-    this.layoutSelect.removeEventListener('change', this.changeLayout);
-    this.layoutControl.remove();
-    this.layouts.clear();
+    this.modes.clear();
     this.cache.clear();
     this.positions.clear();
     this.setActive(false);

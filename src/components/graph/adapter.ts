@@ -61,6 +61,10 @@ export interface GraphAdapter {
   resize(width: number, height: number, topInset?: number): void;
   focus(id: string): void;
   fit(): void;
+  /** Optional viewport zoom: factor < 1 moves closer, > 1 moves away. */
+  zoom?(factor: number): void;
+  /** Explicitly recompute visible node positions; never changes underlying data. */
+  repack?(): void;
   /** Synchronously publish the current view before an explicit save or workspace transition. */
   flushSnapshot?(): void;
   /** Optional initial view restoration; adapters without persistence remain valid. */

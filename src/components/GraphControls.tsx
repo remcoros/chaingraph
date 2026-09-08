@@ -1,17 +1,15 @@
 import { SmallAmountControl } from './SmallAmountControl';
-import { Expand, Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
+import { Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
 import type { Workspace } from '../domain/types';
 export function GraphControls({
   view,
   onChange,
-  onFit,
   focusGraph,
   onToggleFocus,
   smallAmountHiddenCount,
 }: {
   view: Workspace['view'];
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
-  onFit: () => void;
   smallAmountHiddenCount?: number;
   focusGraph?: boolean;
   onToggleFocus?: () => void;
@@ -126,14 +124,6 @@ export function GraphControls({
         }
       >
         <Layers size={16} />
-      </button>
-      <button
-        className="icon-button"
-        title="Fit graph"
-        aria-label="Fit graph"
-        onClick={() => onFit()}
-      >
-        <Expand size={16} />
       </button>
     </div>
   );

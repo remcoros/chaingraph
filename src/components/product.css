@@ -59,7 +59,8 @@ kbd {
   gap: 5px;
   font-size: 12px;
 }
-.graph-navigation {
+.graph-navigation,
+.graph-navigation-shell {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -71,7 +72,8 @@ kbd {
   box-shadow: 0 3px 14px #0003;
   font-size: 11px;
 }
-.graph-navigation button {
+.graph-navigation button,
+.graph-camera-controls button {
   min-height: 30px;
   padding: 4px 7px;
   font-size: 11px;
@@ -309,4 +311,43 @@ a {
   color: var(--color-accent);
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+}
+
+.graph-navigation-shell .graph-navigation {
+  display: contents;
+}
+.graph-camera-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-left: 1px solid var(--color-rule);
+  padding-left: 5px;
+}
+.graph-navigation-shell .view-summary:empty {
+  display: none;
+}
+
+.graph-navigation-shell {
+  flex-direction: column;
+  align-items: stretch;
+}
+.graph-navigation-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.graph-navigation-status {
+  min-width: 0;
+  border-top: 1px solid var(--color-rule);
+  padding: 5px 3px 1px;
+  color: var(--color-muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.graph-navigation-status .view-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }

@@ -306,15 +306,23 @@ address selections appear immediately.
 
 ### Isolated flow renderer v2 experiment
 
-On this experiment branch, `graph/defaultAdapter.ts` selects `FlowRenderer`. A
-layout worker owns a bounded, static d3-force-3d Compact strategy and stable
-Directed shelves; instanced shapes and GPU-projected edges own drawing. Only the
-renderer owns the small layout selector. Existing coordinates anchor additions,
-while explicit strategy changes can rearrange nodes. Compact has separate 2D/3D
-positions. In-memory strategy/dimension caches preserve return views. Version-1
-snapshots retain positions/camera without adding strategy metadata; restored
-coordinates appear as Saved view and use anchored Compact placement for additions.
-Pooled captions are visual only. `RenderNode.selected` is an
-optional presentation hint independent of glow. Shared GraphView still owns every
-entity action, and version-1 graph snapshots and persistence scheduling retain
-their existing boundary. See the [decision and limitations](experiments/flow-renderer-v2.md).
+On this experiment branch, `graph/defaultAdapter.ts` selects `FlowRenderer`.
+Fresh layouts use a stopped d3-force-3d simulation. Incremental layouts simulate
+only new nodes: fixed links act as tethers, and a static spatial grid resolves
+nearby fixed-node collisions. Existing coordinates never receive simulation ticks.
+One worker job runs at a time, with at most one latest replacement request.
+Automatic quiet-period snapshots wait for layout completion; explicit flush still
+resolves pending geometry. Instanced node/edge buffers reuse geometric capacity
+between expansions and release resources when resized or disposed.
+
+GraphView owns floating Fit/zoom/Repack controls and the separate status footer.
+Optional adapter `zoom(factor)` and `repack()` methods expose only renderer actions;
+other adapters can omit them. The `navigationStatus` React slot keeps filter and
+visibility context after every control group in DOM and visual order. Shared
+selection, hover actions, annotations and visibility logic remain unchanged.
+Selected-address focus waits for final geometry even if selection precedes its
+graph frame; subsequent manual camera input cancels that deferred focus.
+Version-1 snapshots restore exact geometry and cameras. Compact has separate
+in-memory 3D/Flat views; explicit Repack clears layout caches and fits visible
+nodes. No layout-strategy schema or picker remains. See the
+[decision and limitations](experiments/flow-renderer-v2.md).

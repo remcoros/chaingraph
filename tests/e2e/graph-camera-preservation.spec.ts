@@ -105,7 +105,7 @@ test('empty, partial and failed spending searches retain the manually positioned
   }
 });
 
-test('a failed trace and restarted input hydration preserve the manually positioned camera', async ({
+test('selected input hydration preserves the manually positioned camera when data arrives', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -144,11 +144,6 @@ test('a failed trace and restarted input hydration preserve the manually positio
       await route.fulfill({ json: { result: transactions[TX_FUNDING] } }).catch(() => {});
       return;
     }
-    if (request.method === 'blockchain.scripthash.get_history')
-      return route.fulfill({
-        status: 413,
-        json: { error: 'Address history exceeds the configured limit.' },
-      });
     return route.fallback();
   });
   await page.goto('/');
@@ -158,6 +153,11 @@ test('a failed trace and restarted input hydration preserve the manually positio
   await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   const canvas = page.locator('.graph-canvas canvas');
   await expect(canvas).toBeVisible();
+  // Main scopes input loading to a selected outpoint; transaction selection is inert.
+  await page
+    .locator('.transaction-view')
+    .getByRole('button', { name: /^Input 0:/ })
+    .click();
   await expect.poll(() => parentRequests).toBeGreaterThan(0);
   await page.waitForTimeout(7000);
   await canvas.evaluate((element) =>
@@ -173,15 +173,8 @@ test('a failed trace and restarted input hydration preserve the manually positio
   await page.mouse.up();
   await expect.poll(() => savedCamera(page)).not.toEqual(initial);
   const before = await savedCamera(page);
-  const startedRequests = parentRequests;
-  await page
-    .locator('.transaction-view')
-    .getByRole('button', { name: 'Check output 0 for spends', exact: true })
-    .click();
-  await expect(
-    page.getByRole('alert').filter({ hasText: 'Address history exceeds' }),
-  ).toBeVisible();
-  await expect.poll(() => parentRequests).toBeGreaterThan(startedRequests);
+  // Keep the input selected while its creator arrives. Main correctly cancels
+  // scoped hydration when selection changes; failed requests are covered above.
   releaseParents();
   await expect(
     page.locator('.transaction-view').getByRole('button', { name: /^Input 0:/ }),

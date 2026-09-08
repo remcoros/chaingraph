@@ -1,5 +1,14 @@
 import { transactionStatus } from '../domain/transactionStatus';
-import { ArrowLeftFromLine, Crosshair, Pencil, X } from 'lucide-react';
+import {
+  ArrowLeftFromLine,
+  Crosshair,
+  Pencil,
+  X,
+  Expand,
+  Plus,
+  Minus,
+  RotateCw,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
@@ -29,6 +38,8 @@ export interface GraphViewProps extends VisibilityProps {
   toolbar?: ReactNode;
   /** Shared controls floating over the viewport, outside the renderer event surface. */
   navigation?: ReactNode;
+  /** Filter/visibility context below every floating control group. */
+  navigationStatus?: ReactNode;
   renderMetadata?: (nodeId: string) => ReactNode;
   legend?: ReactNode;
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
@@ -70,6 +81,7 @@ export default function GraphView(props: GraphViewProps) {
   const visibleNode = useRef<string | undefined>(undefined);
   const [hover, setHover] = useState<HoverCard>();
   const [error, setError] = useState(false);
+  const [rendererActions, setRendererActions] = useState({ zoom: false, repack: false });
   const savedSnapshot = useRef(props.snapshot);
   const lastFitToken = useRef(props.fitToken);
   const immutableNodeSource = useRef<GraphSnapshot['nodes'] | undefined>(undefined);
@@ -229,6 +241,7 @@ export default function GraphView(props: GraphViewProps) {
       });
       if (savedSnapshot.current) adapter.restoreSnapshot?.(savedSnapshot.current);
       graphRef.current = adapter;
+      setRendererActions({ zoom: !!adapter.zoom, repack: !!adapter.repack });
       current.current.onRegisterSnapshotFlush?.(
         adapter.flushSnapshot ? () => adapter?.flushSnapshot?.() : undefined,
       );
@@ -571,7 +584,58 @@ export default function GraphView(props: GraphViewProps) {
             onPointerEnter={() => dismissCard()}
             onFocusCapture={() => dismissCard()}
           >
-            {props.navigation}
+            <div className="graph-navigation-shell" role="toolbar" aria-label="Graph navigation">
+              <div className="graph-navigation-row">
+                {props.navigation}
+                <div
+                  className="graph-camera-controls"
+                  role="group"
+                  aria-label="Graph camera and layout"
+                >
+                  <button
+                    aria-label="Fit graph"
+                    title="Fit all visible nodes"
+                    onClick={() => graphRef.current?.fit()}
+                    disabled={!props.nodes.length}
+                  >
+                    <Expand size={14} />
+                  </button>
+                  {rendererActions.zoom && (
+                    <>
+                      <button
+                        aria-label="Zoom out"
+                        title="Zoom out"
+                        onClick={() => graphRef.current?.zoom?.(1.25)}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <button
+                        aria-label="Zoom in"
+                        title="Zoom in"
+                        onClick={() => graphRef.current?.zoom?.(0.8)}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </>
+                  )}
+                  {rendererActions.repack && (
+                    <button
+                      aria-label="Repack graph"
+                      title="Repack visible nodes into a compact layout. This moves nodes and fits the view."
+                      disabled={!props.nodes.length}
+                      onClick={() => graphRef.current?.repack?.()}
+                    >
+                      <RotateCw size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {props.navigationStatus && (
+                <div className="graph-navigation-status" role="status">
+                  {props.navigationStatus}
+                </div>
+              )}
+            </div>
           </div>
         )}
         {props.legend}

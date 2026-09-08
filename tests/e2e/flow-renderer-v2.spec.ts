@@ -491,35 +491,22 @@ test('an immediate checkpoint completes pending layout and rejects its later wor
   expect(errors).toEqual([]);
 });
 
-test('layout choices are reversible, dimension-specific, keyboard accessible and snapshot compatible', async ({
+test('repack removes old arrangements explicitly while dimensions and snapshots preserve return views', async ({
   page,
 }) => {
   const errors = await open(page);
+  await expect(page.getByLabel('Graph layout', { exact: true })).toHaveCount(0);
+  const original = await geometry(page);
   await page.evaluate(() => {
     const f = (window as any).fixture;
     f.update({ ...f.frame, nodes: f.frame.nodes.map(({ x, y, z, ...n }: RenderNode) => n) });
+    f.graph.repack();
   });
-  const select = page.getByLabel('Graph layout', { exact: true });
-  await expect(select).toHaveValue('compact');
-  await select.selectOption('directed');
-  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
-  const directed = await geometry(page);
-  await drag(page);
-  const directedCamera = await camera(page);
-  await select.focus();
-  await page.keyboard.press('ArrowUp');
-  await expect(select).toHaveValue('compact');
   await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
   const compact = await geometry(page);
-  expect(compact).not.toEqual(directed);
+  expect(compact).not.toEqual(original);
   await drag(page, 'right');
   const compactCamera = await camera(page);
-  await select.selectOption('directed');
-  await expect.poll(() => geometry(page)).toEqual(directed);
-  expect(await camera(page)).toEqual(directedCamera);
-  await select.selectOption('compact');
-  await expect.poll(() => geometry(page)).toEqual(compact);
-  expect(await camera(page)).toEqual(compactCamera);
   await page.evaluate(() => {
     const f = (window as any).fixture;
     f.update({ ...f.frame, dimensions: 2 });
@@ -545,46 +532,222 @@ test('layout choices are reversible, dimension-specific, keyboard accessible and
     return { before: snapshot, after: f.snapshots.at(-1) };
   });
   expect(restored.after).toEqual(restored.before);
-  await expect(select).toHaveValue('saved');
-  await select.selectOption('directed');
-  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
-  await select.selectOption('saved');
-  await expect.poll(() => geometry(page)).toEqual(compact);
-  expect(await camera(page)).toEqual(compactCamera);
+  const beforeZoom = await camera(page);
+  await page.evaluate(() => (window as any).fixture.graph.zoom(0.8));
+  expect((await camera(page)).target).toEqual(beforeZoom.target);
+  expect((await camera(page)).position).not.toEqual(beforeZoom.position);
+  expect(await geometry(page)).toEqual(compact);
   expect(errors).toEqual([]);
 });
 
-test('rapid layout changes checkpoint the latest choice and discard obsolete worker results', async ({
+test('rapid expansions coalesce worker jobs, checkpoint the latest graph and retain GPU capacity', async ({
   page,
 }) => {
   const errors = await open(page);
   const result = await page.evaluate(() => {
     const f = (window as any).fixture;
-    f.graph.worker.terminate();
+    const g = f.graph;
+    g.worker.terminate();
+    const receive = g.worker.onmessage;
     const requests: any[] = [];
-    f.graph.worker = { postMessage: (r: any) => requests.push(r), terminate() {} };
-    const select = document.querySelector<HTMLSelectElement>('[aria-label="Graph layout"]')!;
-    select.value = 'directed';
-    select.dispatchEvent(new Event('change'));
-    select.value = 'compact';
-    select.dispatchEvent(new Event('change'));
-    f.graph.accept({
-      revision: requests[0].revision,
-      positions: [['obsolete', { x: 0, y: 0, z: 0 }]],
+    g.worker = { postMessage: (r: any) => requests.push(r), terminate() {} };
+    const buffers = g.batches.map((b: any) => b.mesh);
+    const edges = g.edges.mesh.geometry.getAttribute('start');
+    for (let i = 0; i < 3; i++)
+      f.update({
+        ...f.frame,
+        nodes: [
+          ...f.frame.nodes,
+          { id: `new-${i}`, shape: 'sphere', radius: 5, color: '#84c2ae', highlight: false },
+        ],
+        links: [
+          ...f.frame.links,
+          {
+            id: `edge-${i}`,
+            source: 'output',
+            target: `new-${i}`,
+            color: '#74818b',
+            width: 0,
+            arrowLength: 3.6,
+          },
+        ],
+      });
+    const started = requests.length;
+    receive({
+      data: { revision: requests[0].revision, positions: [['obsolete', { x: 0, y: 0, z: 0 }]] },
     });
-    const pending = f.graph.pending.strategy;
-    f.graph.flushSnapshot();
+    const replacements = requests.length;
+    const latest = requests.at(-1).nodes.length;
+    g.flushSnapshot();
     const snapshot = f.snapshots.at(-1);
-    f.graph.accept({ revision: requests[1].revision, positions: [['late', { x: 0, y: 0, z: 0 }]] });
-    return { pending, snapshot, positions: [...f.graph.positions] };
+    receive({
+      data: { revision: requests.at(-1).revision, positions: [['late', { x: 0, y: 0, z: 0 }]] },
+    });
+    return {
+      started,
+      replacements,
+      latest,
+      snapshot,
+      positions: [...g.positions],
+      stableNodes: buffers.every((b: any, i: number) => g.batches[i].mesh === b),
+      // This fixture crosses the 4 -> 8 connection capacity once.
+      edgeCapacity: g.edges.mesh.geometry.getAttribute('start').count,
+      oldEdgeCapacity: edges.count,
+    };
   });
-  expect(result.pending).toBe('compact');
-  expect(result.snapshot.nodes).toHaveLength(4);
-  expect(result.positions.map(([id]: [string]) => id).sort()).toEqual([
-    'address',
-    'creating',
-    'output',
-    'spending',
-  ]);
+  expect(result.started).toBe(1);
+  expect(result.replacements).toBe(2);
+  expect(result.latest).toBe(7);
+  expect(result.snapshot.nodes).toHaveLength(7);
+  expect(result.positions.some(([id]: [string]) => id === 'late' || id === 'obsolete')).toBe(false);
+  expect(result.stableNodes).toBe(true);
+  expect(result.oldEdgeCapacity).toBe(4);
+  expect(result.edgeCapacity).toBe(8);
   expect(errors).toEqual([]);
 });
+
+test('dense incremental expansion keeps the camera, fixed nodes and allocated GPU buffers', async ({
+  page,
+}, info) => {
+  const errors = await open(page);
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    const nodes = Array.from({ length: 1500 }, (_, i) => ({
+      id: `dense-${i}`,
+      shape: i % 4 ? 'sphere' : 'box',
+      radius: 3.2,
+      color: '#84c2ae',
+      highlight: false,
+      x: (i % 25) * 18,
+      y: (Math.floor(i / 25) % 20) * 18,
+      z: Math.floor(i / 500) * 18,
+    }));
+    const links = nodes.slice(1).map((n, i) => ({
+      id: `dense-edge-${i}`,
+      source: nodes[i].id,
+      target: n.id,
+      color: '#74818b',
+      width: 0,
+      arrowLength: 3.6,
+    }));
+    f.update({ ...f.frame, nodes, links });
+  });
+  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
+  const before = await camera(page);
+  const measurement = await page.evaluate(async () => {
+    const f = (window as any).fixture,
+      g = f.graph;
+    const meshes = g.batches.map((b: any) => b.mesh),
+      edges = g.edges.mesh.geometry.getAttribute('start');
+    const fixed = new Map(g.positions),
+      start = performance.now();
+    f.update({
+      ...f.frame,
+      nodes: [
+        ...f.frame.nodes,
+        ...Array.from({ length: 12 }, (_, i) => ({
+          id: `added-${i}`,
+          shape: 'sphere',
+          radius: 3.2,
+          color: '#e3a54f',
+          highlight: false,
+        })),
+      ],
+      links: [
+        ...f.frame.links,
+        ...Array.from({ length: 12 }, (_, i) => ({
+          id: `added-edge-${i}`,
+          source: `dense-${i}`,
+          target: `added-${i}`,
+          color: '#74818b',
+          width: 0,
+          arrowLength: 3.6,
+        })),
+      ],
+    });
+    await new Promise<void>((resolve) => {
+      const ready = () => (g.pending ? requestAnimationFrame(ready) : resolve());
+      ready();
+    });
+    const elapsed = performance.now() - start;
+    f.render();
+    return {
+      elapsed,
+      nodes: g.positions.size,
+      links: g.links.length,
+      fixed: [...fixed].every(
+        ([id, p]) => JSON.stringify(g.positions.get(id)) === JSON.stringify(p),
+      ),
+      meshes: meshes.every((mesh: any, i: number) => mesh === g.batches[i].mesh),
+      edges: edges === g.edges.mesh.geometry.getAttribute('start'),
+      draws: g.renderer.info.render.calls,
+    };
+  });
+  expect(measurement.nodes).toBe(1512);
+  expect(measurement.links).toBe(1511);
+  expect(measurement.fixed && measurement.meshes && measurement.edges).toBe(true);
+  expect(await camera(page)).toEqual(before);
+  const observationPath = info.outputPath('incremental-browser-observation.json');
+  await writeFile(observationPath, JSON.stringify(measurement, null, 2));
+  await info.attach('incremental-browser-observation.json', {
+    path: observationPath,
+    contentType: 'application/json',
+  });
+  expect(errors).toEqual([]);
+});
+
+for (const manual of [false, true])
+  test(`isolated address focus waits for its frame and final layout, manual gesture=${manual}`, async ({
+    page,
+  }) => {
+    const errors = await open(page);
+    const originalCamera = await camera(page);
+    await page.evaluate(() => {
+      const f = (window as any).fixture,
+        g = f.graph;
+      // Hold the reply until after focus, frame arrival, and optional manual input.
+      g.worker.terminate();
+      g.worker = { postMessage() {}, terminate() {} };
+      g.focus('isolated');
+      f.update({
+        ...f.frame,
+        nodes: [
+          ...f.frame.nodes,
+          {
+            id: 'isolated',
+            shape: 'octahedron',
+            radius: 5,
+            color: '#919fd1',
+            highlight: false,
+            selected: true,
+          },
+        ],
+      });
+    });
+    if (manual) await drag(page);
+    const pose = await page.evaluate(() => {
+      const f = (window as any).fixture,
+        g = f.graph;
+      const cameraBefore = g.cameraRecord();
+      g.accept({
+        revision: g.pending.revision,
+        positions: [...g.positions, ['isolated', { x: 5000, y: 2000, z: -500 }]],
+      });
+      g.flushSnapshot();
+      return { before: cameraBefore, after: f.snapshots.at(-1).camera };
+    });
+    if (manual) expect(pose.after).toEqual(pose.before);
+    else {
+      expect(pose.after).not.toEqual(originalCamera);
+      const p = await project(page, 'isolated'),
+        b = (await page.locator('canvas').boundingBox())!;
+      expect(p.x).toBeGreaterThan(b.x + 20);
+      expect(p.x).toBeLessThan(b.x + b.width - 20);
+      expect(p.y).toBeGreaterThan(b.y + 30);
+      expect(p.y).toBeLessThan(b.y + b.height - 20);
+      await page.waitForTimeout(1600);
+      expect(await camera(page)).toEqual(pose.after);
+      expect(await project(page, 'isolated')).toEqual(p);
+    }
+    expect(errors).toEqual([]);
+  });

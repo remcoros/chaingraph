@@ -6,8 +6,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-const output = process.argv.includes('--layouts')
-  ? 'artifacts/flow-renderer-v2/layouts'
+const output = process.argv.includes('--compact')
+  ? 'artifacts/flow-renderer-v2/compact'
   : 'artifacts/flow-renderer-v2';
 await mkdir(output, { recursive: true });
 const baseline = process.argv.includes('--baseline');
@@ -78,27 +78,22 @@ try {
     await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 30000 });
     if (id === 'mainnet-large-value-path')
       await page.getByLabel('Size nodes by').selectOption('value');
-    if (process.argv.includes('--layouts') && !baseline) {
-      await page.getByLabel('Graph layout', { exact: true }).selectOption('compact');
-      await expect(page.getByLabel('Graph layout', { exact: true })).toHaveAttribute(
-        'aria-busy',
-        'false',
-      );
+    if (!baseline) {
+      await expect(page.getByLabel('Graph layout', { exact: true })).toHaveCount(0);
+      const cameraControls = page.getByRole('group', { name: 'Graph camera and layout' });
+      await expect(
+        cameraControls.getByRole('button', { name: 'Fit graph', exact: true }),
+      ).toBeVisible();
+      await cameraControls.getByRole('button', { name: 'Zoom in', exact: true }).click();
+      await cameraControls.getByRole('button', { name: 'Zoom out', exact: true }).click();
+      await cameraControls.getByRole('button', { name: 'Repack graph', exact: true }).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('canvas')).toHaveAttribute('aria-busy', 'false');
     }
     await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
     await page.waitForTimeout(baseline ? 700 : 200);
     const prefix = `${output}/${baseline ? 'main' : 'flow'}-${id}`;
     await page.screenshot({ path: `${prefix}-3d.png` });
-    if (process.argv.includes('--layouts') && !baseline) {
-      await page.getByLabel('Graph layout', { exact: true }).selectOption('directed');
-      await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', {
-        timeout: 30000,
-      });
-      await page.waitForTimeout(500);
-      await page.screenshot({ path: `${prefix}-directed.png` });
-      await page.getByLabel('Graph layout', { exact: true }).selectOption('compact');
-      await page.waitForTimeout(500);
-    }
     const gpu = await page.locator('canvas').evaluate((canvas) => {
       const gl = canvas.getContext('webgl2'),
         ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -137,6 +132,9 @@ try {
       );
       const card = page.getByRole('dialog', { name: 'Graph item details' });
       await expect(card).toBeVisible();
+      await expect(
+        card.getByRole('button', { name: 'Open creating transaction', exact: true }),
+      ).toBeEnabled();
       await page.screenshot({ path: `${prefix}-hover-edit.png` });
       await card.getByRole('button', { name: 'Edit label and notes', exact: true }).click();
       await page.getByLabel('Node label', { exact: true }).fill(`Reviewed ${id}`);
@@ -210,8 +208,7 @@ try {
         'Public renderer review: follow this exact outpoint.',
       );
       await expect(page.locator('canvas')).toBeVisible();
-      if (process.argv.includes('--layouts'))
-        await expect(page.getByLabel('Graph layout', { exact: true })).toHaveValue('saved');
+      await expect(page.getByLabel('Graph layout', { exact: true })).toHaveCount(0);
       if (id === 'testnet4-spent-output') {
         const hops = page.locator('.transaction-flow button[aria-label^="Go to"]');
         const names = await hops.evaluateAll((es) => es.map((e) => e.getAttribute('aria-label')));
@@ -235,13 +232,13 @@ try {
     expect(errors).toEqual([]);
     await context.close();
   }
-  if (process.argv.includes('--layouts') && !baseline) {
+  if (process.argv.includes('--compact') && !baseline) {
     const sections = cases
       .map(
         ([id, name]) =>
           `<section><h2>${name}</h2><div class="compare">${[
             ['Compact', `flow-${id}-3d.png`],
-            ['Directed', `flow-${id}-directed.png`],
+            ['Previous Compact', `../layouts/flow-${id}-3d.png`],
             ['Main force baseline', `../main-${id}-3d.png`],
           ]
             .map(
@@ -255,7 +252,7 @@ try {
       .join('');
     await writeFile(
       `${output}/index.html`,
-      `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chaingraph layout review</title><style>body{background:#131b20;color:#dce7e2;font:15px system-ui;margin:24px}a{color:#a9d878}h1{font-size:24px}.compare{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}figure{margin:0}figcaption{padding:8px 0}img{width:100%}section{margin:30px 0}@media(max-width:850px){.compare{grid-template-columns:1fr}}</style><h1>Compact and Directed layouts</h1><p>Public bundled snapshots. Main baseline captured during the initial renderer review. Chromium software WebGL; no physical GPU performance claim. Click images to inspect full size.</p>${sections}</html>`,
+      `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chaingraph layout review</title><style>body{background:#131b20;color:#dce7e2;font:15px system-ui;margin:24px}a{color:#a9d878}h1{font-size:24px}.compare{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}figure{margin:0}figcaption{padding:8px 0}img{width:100%}section{margin:30px 0}@media(max-width:850px){.compare{grid-template-columns:1fr}}</style><h1>Compact graph and navigation</h1><p>Public bundled snapshots. Previous Compact and main baselines were captured during earlier renderer reviews. Chromium software WebGL; no physical GPU performance claim. Click images to inspect full size.</p>${sections}</html>`,
     );
   }
   await writeFile(

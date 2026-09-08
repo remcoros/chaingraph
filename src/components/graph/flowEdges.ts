@@ -57,6 +57,7 @@ export function makeFlowEdges() {
   const mesh = new Mesh(geometry, material);
   mesh.frustumCulled = false;
   mesh.raycast = () => {};
+  let capacity = 0;
   const update = (
     links: readonly RenderLink[],
     nodes: ReadonlyMap<string, RenderNode>,
@@ -91,11 +92,12 @@ export function makeFlowEdges() {
         l.arrowLength,
       );
     }
-    if (
-      geometry.getAttribute('start') &&
-      geometry.getAttribute('start').array.length !== start.length
-    )
+    const count = start.length / 3;
+    const resize = count > capacity || (capacity > 4 && count < capacity / 4);
+    if (resize) {
       geometry.dispose();
+      capacity = Math.max(4, 2 ** Math.ceil(Math.log2(Math.max(1, count))));
+    }
     for (const [name, values, size] of [
       ['start', start, 3],
       ['end', end, 3],
@@ -103,12 +105,16 @@ export function makeFlowEdges() {
       ['style', style, 4],
       ['progress', progress, 1],
     ] as const) {
-      const old = geometry.getAttribute(name);
-      if (old && old.array.length === values.length) {
-        old.array.set(values);
-        old.needsUpdate = true;
-      } else
-        geometry.setAttribute(name, new InstancedBufferAttribute(new Float32Array(values), size));
+      if (resize || !geometry.getAttribute(name))
+        geometry.setAttribute(
+          name,
+          new InstancedBufferAttribute(new Float32Array(capacity * size), size),
+        );
+      const attribute = geometry.getAttribute(name) as InstancedBufferAttribute;
+      attribute.array.set(values);
+      attribute.clearUpdateRanges();
+      if (values.length) attribute.addUpdateRange(0, values.length);
+      attribute.needsUpdate = true;
     }
     geometry.instanceCount = start.length / 3;
   };

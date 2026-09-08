@@ -1239,7 +1239,7 @@ export default function App() {
     }
   }
   const graphNavigation = w ? (
-    <div className="graph-navigation" role="toolbar" aria-label="Graph navigation">
+    <div className="graph-navigation">
       <button
         aria-label="Previous selection"
         title="Previous selection"
@@ -1312,6 +1312,13 @@ export default function App() {
           All paths
         </button>
       )}
+    </div>
+  ) : null;
+  const graphNavigationStatus =
+    w &&
+    (graphFilters.walletId ||
+      graphFilters.tagId ||
+      (selected && !visibleGraph.nodes.some((node) => node.id === selected.id))) ? (
       <span className="view-summary">
         {graphFilters.walletId && (
           <span className="group-filter">
@@ -1332,12 +1339,11 @@ export default function App() {
         )}
         {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
           ? hiddenIds.has(selected.id)
-            ? ' · selection hidden from graph'
-            : ' · selection hidden by filters'
+            ? 'selection hidden from graph'
+            : 'selection hidden by filters'
           : ''}
       </span>
-    </div>
-  ) : null;
+    ) : null;
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-workspace">
@@ -1737,7 +1743,6 @@ export default function App() {
                       onChange={(update) =>
                         change((current) => ({ ...current, view: update(current.view) }), false)
                       }
-                      onFit={() => setFitToken((token) => token + 1)}
                     />
                   )}
                   {graph.nodes.length && viewOwner === w.id ? (
@@ -1774,6 +1779,7 @@ export default function App() {
                           )
                         }
                         navigation={graphNavigation}
+                        navigationStatus={graphNavigationStatus}
                         legend={
                           <GraphLegend
                             dimensions={w.view.dimensions}
@@ -1793,7 +1799,6 @@ export default function App() {
                                 false,
                               )
                             }
-                            onFit={() => setFitToken((token) => token + 1)}
                           />
                         }
                         nodePresentation={nodePresentation}

@@ -251,3 +251,66 @@ test('stopping an annotated address watch preserves loaded transactions and is u
   expect(restored.annotations[`addr:${address}`].note).toBe('Watch annotation');
   expect(restored.tags?.[0].nodeIds).toEqual([`addr:${address}`, output]);
 });
+
+for (const width of [1440, 390])
+  test(`floating toolbar keeps hidden-selection status below all controls at ${width}px`, async ({
+    page,
+  }) => {
+    await seed(page);
+    await page.getByLabel('Entity type', { exact: true }).selectOption('transaction');
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    if (width === 390)
+      await page
+        .locator('.mobile-switch')
+        .getByRole('button', { name: 'Graph', exact: true })
+        .click();
+    const status = page.locator('.graph-navigation-status');
+    const row = page.locator('.graph-navigation-row');
+    const camera = page.getByRole('group', { name: 'Graph camera and layout' });
+    await expect(status).toHaveText('selection hidden by filters');
+    const assertOrder = async () => {
+      const message = (await status.boundingBox())!,
+        controls = (await row.boundingBox())!,
+        canvas = (await page.locator('canvas').boundingBox())!;
+      expect(message.y).toBeGreaterThanOrEqual(controls.y + controls.height);
+      expect(controls.x).toBeGreaterThanOrEqual(canvas.x);
+      expect(controls.x + controls.width).toBeLessThanOrEqual(canvas.x + canvas.width);
+      await expect(camera.getByRole('button', { name: 'Fit graph', exact: true })).toBeInViewport();
+      await expect(
+        camera.getByRole('button', { name: 'Repack graph', exact: true }),
+      ).toBeInViewport();
+      expect(
+        await camera.evaluate((el) =>
+          Boolean(
+            el.compareDocumentPosition(document.querySelector('.graph-navigation-status')!) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+          ),
+        ),
+      ).toBe(true);
+    };
+    await assertOrder();
+    await page.screenshot({
+      path: `artifacts/flow-renderer-v2/compact/hidden-by-filters-${width}.png`,
+    });
+    await row.getByRole('button', { name: 'All paths', exact: true }).click();
+    await expect(status).toHaveCount(0);
+    if (width === 390)
+      await page
+        .locator('.mobile-switch')
+        .getByRole('button', { name: 'Inspector', exact: true })
+        .click();
+    await page
+      .locator('.right-panel')
+      .getByRole('button', { name: 'Hide entity from graph', exact: true })
+      .click();
+    if (width === 390)
+      await page
+        .locator('.mobile-switch')
+        .getByRole('button', { name: 'Graph', exact: true })
+        .click();
+    await expect(status).toHaveText('selection hidden from graph');
+    await assertOrder();
+    await page.screenshot({
+      path: `artifacts/flow-renderer-v2/compact/hidden-from-graph-${width}.png`,
+    });
+  });

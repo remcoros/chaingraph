@@ -34,3 +34,15 @@ Decision: use 180 manual ticks with link distance, charge, radius-aware collisio
 and weak centering. This recovers rounded hubs and compact sparse paths without a
 continuously moving force graph. Anchors prevent edits/filtering/expansion from
 shuffling the investigation. There is no global layout-quality or FPS claim.
+
+## Incremental Compact follow-up
+
+Rechecked 2026-09-08: [D3 simulation and custom forces](https://d3js.org/d3-force/simulation)
+and [Three.js InstancedMesh count/capacity](https://threejs.org/docs/pages/InstancedMesh.html).
+Only additions are integrated. Original MIT application code supplies fixed-link
+tethers and a static collision grid; all visible fixed obstacles remain in that
+index, and all nodes/connections remain in drawing. No external spatial-index
+implementation was copied. The stopped 180-tick fresh layout remains unchanged.
+Node and edge capacity grows geometrically, with explicit disposal when replacing
+GPU buffers. These mechanisms motivated measured CPU/browser checks; documentation
+alone does not establish speed. Directed was removed after usability review.

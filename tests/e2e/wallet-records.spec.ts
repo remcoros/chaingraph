@@ -139,6 +139,21 @@ test('wallet addresses show loaded output counts and remain selectable without l
   await rightTab(page, 'Addresses').click();
   expect(calls).toEqual([]);
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  // Renderer integration: the selected zero-output address must remain visible
+  // after layout/save quiet periods, not only during the initial focus request.
+  const selected = page.locator('.flow-node-ring.selected');
+  await expect(selected).toBeVisible();
+  const assertAddressVisible = async () => {
+    const ring = (await selected.boundingBox())!,
+      canvas = (await page.locator('canvas').boundingBox())!;
+    expect(ring.x).toBeGreaterThanOrEqual(canvas.x);
+    expect(ring.y).toBeGreaterThanOrEqual(canvas.y);
+    expect(ring.x + ring.width).toBeLessThanOrEqual(canvas.x + canvas.width);
+    expect(ring.y + ring.height).toBeLessThanOrEqual(canvas.y + canvas.height);
+  };
+  await assertAddressVisible();
+  await page.waitForTimeout(1800);
+  await assertAddressVisible();
   await page.screenshot({ path: testInfo.outputPath('wallet-addresses-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page

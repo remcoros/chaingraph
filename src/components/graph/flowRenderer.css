@@ -39,33 +39,3 @@
 .flow-node-ring.glow {
   box-shadow: 0 0 10px 2px color-mix(in srgb, var(--node-tint) 24%, transparent);
 }
-.flow-layout-control {
-  position: absolute;
-  z-index: 3;
-  bottom: 35px;
-  right: 12px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 7px;
-  border: 1px solid var(--color-rule, #33434b);
-  border-radius: 5px;
-  background: var(--color-paper, #111a20);
-  color: var(--color-muted, #9caaa8);
-  font: 11px/18px var(--font-mono, monospace);
-}
-.flow-layout-control select {
-  width: auto;
-  min-height: 28px;
-  padding: 2px 4px;
-  border: 0;
-  background: var(--color-paper, #111a20);
-  color: var(--color-ink, #e7eeeb);
-  font: inherit;
-  cursor: pointer;
-}
-.flow-layout-control select:focus-visible {
-  outline: 2px solid var(--color-accent, #84c2ae);
-  outline-offset: 2px;
-}

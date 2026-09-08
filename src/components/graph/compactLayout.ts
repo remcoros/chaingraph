@@ -6,12 +6,11 @@ import {
   forceX,
   forceY,
   forceZ,
-  type SimulationNode,
   type SimulationLink,
 } from 'd3-force-3d';
-import { flowLayout, type LayoutRequest, type LayoutResult, type Position } from './flowLayout';
+import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
+import { anchoredForces, type Particle } from './anchoredForces';
 
-type Particle = SimulationNode & { radius: number; center: Position };
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const hash = (id: string) => {
   let value = 2166136261;
@@ -60,40 +59,33 @@ export function compactLayout(request: LayoutRequest): LayoutResult {
       centers.set(id, centers.get(queue[i])!);
       queue.push(id);
     }
-  const particles: Particle[] = nodes.map((n) => {
-    const fixed = anchors.get(n.id),
-      center = centers.get(n.id) ?? { x: 0, y: 0, z: 0 };
-    const radius = Math.max(2.4, n.radius ?? 5);
-    if (fixed)
+  const particles: Particle[] = nodes
+    .filter((n) => !anchors.has(n.id))
+    .map((n) => {
+      const center = centers.get(n.id) ?? { x: 0, y: 0, z: 0 };
+      const radius = Math.max(2.4, n.radius ?? 5);
+      if (!centers.has(n.id)) return { id: n.id, radius, center };
+      const angle = hash(n.id) * Math.PI * 2,
+        height = hash(`${n.id}:z`) * 2 - 1;
+      const span = radius + 24;
       return {
         id: n.id,
         radius,
         center,
-        x: fixed.x,
-        y: fixed.y,
-        z: fixed.z,
-        fx: fixed.x,
-        fy: fixed.y,
-        fz: fixed.z,
+        x: center.x + Math.cos(angle) * span,
+        y: center.y + Math.sin(angle) * span,
+        z: dimensions === 3 ? center.z + height * span : 0,
       };
-    if (!centers.has(n.id)) return { id: n.id, radius, center };
-    const angle = hash(n.id) * Math.PI * 2,
-      height = hash(`${n.id}:z`) * 2 - 1;
-    const span = radius + 24;
-    return {
-      id: n.id,
-      radius,
-      center,
-      x: center.x + Math.cos(angle) * span,
-      y: center.y + Math.sin(angle) * span,
-      z: dimensions === 3 ? center.z + height * span : 0,
-    };
-  });
+    });
   const simulation = forceSimulation(particles, dimensions)
     .stop()
     .force(
       'links',
-      forceLink<Particle>(links as SimulationLink<Particle>[])
+      forceLink<Particle>(
+        links.filter(
+          (l) => !anchors.has(l.source) && !anchors.has(l.target),
+        ) as SimulationLink<Particle>[],
+      )
         .id((n) => n.id)
         .distance((l) => (l.source as Particle).radius + (l.target as Particle).radius + 22),
     )
@@ -105,18 +97,25 @@ export function compactLayout(request: LayoutRequest): LayoutResult {
     .force('x', forceX<Particle>((n) => n.center.x).strength(0.018))
     .force('y', forceY<Particle>((n) => n.center.y).strength(0.018));
   if (dimensions === 3) simulation.force('z', forceZ<Particle>((n) => n.center.z).strength(0.018));
+  const fixed = new Map(
+    nodes
+      .filter((n) => anchors.has(n.id))
+      .map((n) => [n.id, { ...anchors.get(n.id)!, radius: Math.max(2.4, n.radius ?? 5) }]),
+  );
+  if (fixed.size) {
+    const forces = anchoredForces(particles, fixed, links, dimensions);
+    simulation.force('tethers', forces.tethers).force('obstacles', forces.obstacles);
+  }
   simulation.tick(180);
+  const placed = new Map(
+    particles.map((n) => [n.id, { x: n.x!, y: n.y!, z: dimensions === 3 ? n.z! : 0 }]),
+  );
   return {
     revision: request.revision,
-    positions: particles.map((n) => [
+    positions: nodes.map((n) => [
       n.id,
       // Retain exact supplied/saved coordinates, even the hidden depth in Flat mode.
-      anchors.get(n.id)
-        ? { ...anchors.get(n.id)! }
-        : { x: n.x!, y: n.y!, z: dimensions === 3 ? n.z! : 0 },
+      anchors.get(n.id) ? { ...anchors.get(n.id)! } : placed.get(n.id)!,
     ]),
   };
-}
-export function layoutGraph(request: LayoutRequest): LayoutResult {
-  return request.strategy === 'directed' ? flowLayout(request) : compactLayout(request);
 }

@@ -85,11 +85,13 @@ assumptions without attributing ownership.
 
 ## Renderer experiment
 
-This isolated branch uses a purpose-built Three.js adapter with a small Compact /
-Directed layout selector. Compact creates rounded force neighborhoods; Directed
-separates input, transaction and output stages. Both settle once, preserve edits
-and support cursor zoom and decluttered captions. Existing snapshots open as Saved
-view; choose a layout to rearrange them. The rest of the workbench remains shared.
+This isolated branch uses a purpose-built Three.js adapter with a compact, static
+force layout. Only additions are simulated when extending an investigation; saved
+nodes remain anchored. The floating toolbar brings Fit, zoom and an explicit
+Repack action beside selection history, selection lock and the existing path
+filter. Repack rearranges visible nodes, including older saved layouts. There is
+no layout picker. Filters and hidden-selection status sit below the controls.
+The rest of the workbench remains shared.
 See the [scope, review and limitations](docs/experiments/flow-renderer-v2.md).
 
 ## Development
