@@ -1,8 +1,7 @@
 import express, { type ErrorRequestHandler } from 'express';
 import path from 'node:path';
 import type { ServerConfig } from './config';
-import { CoreClient } from './core';
-import { ElectrumClient } from './electrum';
+import { NetworkRegistry } from './networks';
 import { errorMessage, SafeError } from './errors';
 import { parseRpc } from './rpc-schema';
 
@@ -11,8 +10,7 @@ export function createApp(
   options: { staticDirectory?: string | false } = {},
 ) {
   const app = express();
-  const core = new CoreClient(config),
-    electrum = new ElectrumClient(config);
+  const networks = new NetworkRegistry(config);
   app.disable('x-powered-by');
   app.set('trust proxy', false);
   app.use((_req, res, next) => {
@@ -82,16 +80,16 @@ export function createApp(
     next();
   });
   app.use('/api', express.json({ limit: '16kb', strict: true }));
-  const requestSignal = (res: express.Response, status = false) => {
+  const requestSignal = (res: express.Response, statusNetwork?: string) => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
       if (!res.headersSent)
         res
-          .status(status ? 200 : 504)
+          .status(statusNetwork ? 200 : 504)
           .json(
-            status
-              ? { network: config.network, connected: false, error: 'Request timed out' }
+            statusNetwork
+              ? { network: statusNetwork, connected: false, error: 'Request timed out' }
               : { error: 'Request timed out' },
           );
     }, config.handlerTimeoutMs);
@@ -101,30 +99,30 @@ export function createApp(
     });
     return controller.signal;
   };
-  // The genesis hash is immutable for a chain; chainInfo still revalidates the
-  // configured network on every request. Caching halves Core round-trips while
-  // scanning. A failed lookup is never cached, so the next request retries.
-  let cachedGenesis: string | undefined;
-  async function genesis(signal: AbortSignal) {
-    if (cachedGenesis) return cachedGenesis;
-    const result = await core.call('getblockhash', [0], signal);
-    if (typeof result !== 'string' || !/^[0-9a-f]{64}$/i.test(result))
-      throw new SafeError('Invalid Bitcoin genesis block');
-    cachedGenesis = result;
-    return result;
-  }
-  app.get('/api/status', async (_req, res) => {
-    const signal = requestSignal(res, true);
+  // Discovery is independent of health: an unavailable pair cannot hide another.
+  app.get('/api/networks', (_req, res) => res.json({ networks: networks.configured() }));
+  app.get('/api/status', async (req, res) => {
+    let pair: ReturnType<NetworkRegistry['get']>;
     try {
-      const info = await core.chainInfo(signal);
+      pair = networks.get(req.query.network);
+    } catch (error) {
+      res.status(error instanceof SafeError ? error.status : 400).json({
+        error: errorMessage(error),
+        ...(error instanceof SafeError && error.code ? { code: error.code } : {}),
+      });
+      return;
+    }
+    const signal = requestSignal(res, pair.config.network);
+    try {
+      const info = await pair.core.chainInfo(signal);
       // Negotiated version is connection metadata; a fresh ping checks that the
       // server still answers after handshake, rather than reporting a stale socket.
-      await electrum.call('server.ping', [], await genesis(signal), signal);
+      await pair.electrum.call('server.ping', [], await pair.genesis(signal), signal);
       if (!res.headersSent)
-        res.json({ network: config.network, connected: true, height: info.blocks });
+        res.json({ network: pair.config.network, connected: true, height: info.blocks });
     } catch (error) {
       if (!res.headersSent)
-        res.json({ network: config.network, connected: false, error: errorMessage(error) });
+        res.json({ network: pair.config.network, connected: false, error: errorMessage(error) });
     }
   });
   app.post('/api/rpc', async (req, res) => {
@@ -132,25 +130,29 @@ export function createApp(
     try {
       if (!req.is('application/json'))
         throw new SafeError('Content-Type must be application/json', 415);
-      const { target, method, params } = parseRpc(req.body);
-      const info = await core.chainInfo(signal);
+      const { network, target, method, params } = parseRpc(req.body);
+      const pair = networks.get(network);
+      const info = await pair.core.chainInfo(signal);
       const result =
         target === 'core'
           ? method === 'getblockchaininfo'
             ? info
-            : await core.call(method, params, signal)
-          : await electrum.call(method, params, await genesis(signal), signal);
+            : await pair.core.call(method, params, signal)
+          : await pair.electrum.call(method, params, await pair.genesis(signal), signal);
       if (!res.headersSent) {
         const body = JSON.stringify({ result });
-        if (Buffer.byteLength(body) > config.maxResponseBytes)
+        if (
+          Buffer.byteLength(body) > Math.min(config.maxResponseBytes, pair.config.maxResponseBytes)
+        )
           throw new SafeError('Response exceeds configured size limit', 413);
         res.type('json').send(body);
       }
     } catch (error) {
       if (!res.headersSent)
-        res
-          .status(error instanceof SafeError ? error.status : 502)
-          .json({ error: errorMessage(error) });
+        res.status(error instanceof SafeError ? error.status : 502).json({
+          error: errorMessage(error),
+          ...(error instanceof SafeError && error.code ? { code: error.code } : {}),
+        });
     }
   });
   app.use('/api', (_req, res) => {
@@ -184,9 +186,6 @@ export function createApp(
   app.use(errors);
   return {
     app,
-    close: () => {
-      core.close();
-      electrum.close();
-    },
+    close: () => networks.close(),
   };
 }

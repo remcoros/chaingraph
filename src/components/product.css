@@ -282,3 +282,19 @@ a {
 .outpoint-identity > span:last-child {
   flex-shrink: 0;
 }
+
+.network-connections {
+  margin: 16px 0;
+}
+.network-connection-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.network-connection-row span {
+  color: var(--muted);
+  text-align: right;
+}

@@ -2,6 +2,7 @@ export class SafeError extends Error {
   constructor(
     message: string,
     public status = 502,
+    public code?: 'network_not_configured',
   ) {
     super(message);
   }

@@ -9,7 +9,7 @@ import {
 } from '../src/lib/api';
 import { deriveAddresses } from '../src/lib/wallet';
 import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { Transaction, Wallet } from '../src/domain/types';
+import type { Network, Transaction, Wallet } from '../src/domain/types';
 
 const zpub =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
@@ -28,7 +28,7 @@ const transaction = (id: string, confirmations = 1): Transaction => ({
   vin: [{ coinbase: '0101' }],
   vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
 });
-type Request = { target: string; method: string; params: unknown[] };
+type Request = { network: Network; target: string; method: string; params: unknown[] };
 function mockRpc(
   handler: (request: Request, signal?: AbortSignal | null) => unknown | Promise<unknown>,
 ) {
@@ -47,7 +47,9 @@ describe('browser-side wallet scanner', () => {
   it('rejects history heights that would make the encrypted workspace invalid', async () => {
     for (const height of [-2, 0x80000000, 1.5]) {
       mockRpc(() => [{ tx_hash: txid(1), height }]);
-      await expect(fetchHistory(txid(2))).rejects.toThrow('Invalid or oversized address history');
+      await expect(fetchHistory('mainnet', txid(2))).rejects.toThrow(
+        'Invalid or oversized address history',
+      );
     }
   });
   it('scans both branches, extends after activity, deduplicates transactions and uses bounded concurrency', async () => {
@@ -74,6 +76,7 @@ describe('browser-side wallet scanner', () => {
     expect(requested.filter((r) => r.method === 'getrawtransaction')).toHaveLength(1);
     expect(peak).toBeLessThanOrEqual(4);
     expect(JSON.stringify(requested)).not.toContain(zpub);
+    expect(new Set(requested.map((request) => request.network))).toEqual(new Set(['mainnet']));
   });
 
   it('reports incomplete discovery when the address cap is reached before the gap', async () => {
@@ -356,9 +359,9 @@ describe('browser-side wallet scanner', () => {
       if (request.target === 'core') throw new Error('No txindex');
       return transaction(txid(10));
     });
-    expect((await fetchTransaction(txid(10))).txid).toBe(txid(10));
+    expect((await fetchTransaction('mainnet', txid(10))).txid).toBe(txid(10));
     expect(methods).toEqual(['getrawtransaction', 'blockchain.transaction.get']);
-    await expect(fetchTransaction(txid(11))).rejects.toThrow('different transaction');
+    await expect(fetchTransaction('mainnet', txid(11))).rejects.toThrow('different transaction');
   });
 
   it('does not fall back to another upstream after a cancelled Core request', async () => {
@@ -369,7 +372,9 @@ describe('browser-side wallet scanner', () => {
       controller.abort();
       throw new DOMException('Aborted', 'AbortError');
     });
-    await expect(fetchTransaction(txid(10), controller.signal)).rejects.toThrow('Aborted');
+    await expect(fetchTransaction('mainnet', txid(10), controller.signal)).rejects.toThrow(
+      'Aborted',
+    );
     expect(methods).toEqual(['getrawtransaction']);
   });
 

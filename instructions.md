@@ -4,13 +4,13 @@ Chaingraph helps you investigate Bitcoin activity and keep your own observations
 
 ## Start a workspace
 
-Create a workspace, choose mainnet or testnet4, and give it a **Name (public)** and password. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. The workspace's network must match the connected backend for live lookups; choosing a different workspace network does not reconfigure Bitcoin Core or Fulcrum.
+Create a workspace and give it a **Name (public)** and password. Its network is shown automatically when the backend supports one network; choose mainnet or testnet4 when both are configured. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. One backend can connect to both networks at once. Every lookup uses the selected workspace's matching Core/Fulcrum pair, so switching workspaces never redirects an in-flight request to another chain. Creation lists configured networks even when their upstreams are temporarily offline; a connection is needed for live lookups.
 
 You can open several workspaces and switch between their tabs in the main header. The tab strip scrolls horizontally when needed. Each workspace has its own transactions, wallets, annotations, analysis results, and view settings. An unsaved indicator means the current changes have not yet reached encrypted browser storage. Autosave runs shortly after edits; heed a storage-error message and export a file if browser storage is full or unavailable.
 
 For a first look without loading your own wallet, choose **Help and samples → CoinJoin laboratory** (or open it from the welcome screen). It starts with three generated 150-input/150-output transactions. Select one and use **Load previous transactions** or **Find spending transactions** to reveal paths from the offline fixture. **Help and samples → Show all fixture paths** loads the complete sample; **Reset practice paths** in that menu returns to the three starting transactions and clears analysis overlays while keeping annotations. Their IDs, confirmations, and activity are synthetic, not real testnet transactions. Do not use the laboratory as evidence about a real wallet.
 
-Use Ctrl/Cmd+K to focus the quick input and Ctrl/Cmd+S to save an encrypted browser snapshot. The first-use tour introduces the main controls. It can be skipped and restarted from Help.
+Use Ctrl/Cmd+K to focus the quick input. Changes save automatically; Ctrl/Cmd+S also finishes any pending encrypted save. The first-use tour introduces the main controls. It can be skipped and restarted from Help.
 
 ## Find activity
 
@@ -83,7 +83,7 @@ Exclude a finding to remove its overlay without deleting the result. Rerunning t
 
 Workspace autosave writes encrypted contents to this browser's storage. Lock the workspace to close its unlocked session. Reopening requires its password. On the Workspaces screen, search saved public names or use the trash button to delete a locked browser copy. The confirmation affects only that copy, not exported files; lock an open workspace first. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
 
-Export an encrypted workspace file for backup or transfer to another browser. On narrow screens, Export and Undo are in **Workspace menu** beside the lookup controls. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Camera position and node coordinates are included with your view settings.
+Export an encrypted workspace file for backup or transfer to another browser. On narrow screens, Export and Undo are in **Workspace menu** beside the lookup controls. Import it and supply the password to reopen it. If its network is not configured on this backend, the workspace still opens for offline inspection and editing. A clear backend-network error appears and live queries stay disabled until the matching pair is configured. The same applies when unlocking an existing browser workspace. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Camera position and node coordinates are included with your view settings.
 
 Saved workspace contents use authenticated encryption. The browser storage entry also includes the public workspace name, a workspace identifier, and save time outside the encrypted contents. File names and file sizes can reveal additional metadata. Encryption does not hide an unlocked workspace from someone using your browser or from untrusted browser extensions.
 
@@ -99,8 +99,8 @@ Encrypted workspace payloads have a 32 MiB limit, while browser storage may fill
 
 ## When something fails
 
-- **Backend disconnected:** check the local backend process and its configured network, Bitcoin RPC authentication, and Fulcrum connection. No workspace password is needed by the backend.
-- **Network mismatch:** connect to an instance configured for the workspace's network. Testnet4 requires matching Bitcoin Core and Fulcrum services.
+- **Backend disconnected:** check the selected network’s Bitcoin RPC authentication and Fulcrum connection. Connection details lists each configured network independently. No workspace password is needed by the backend.
+- **Network not configured:** add `.env.mainnet` or `.env.testnet4` to the backend’s configuration directory and restart it. Each file needs matching Bitcoin Core and Fulcrum services. A pair that reports the wrong chain is rejected.
 - **Transaction unavailable:** the node may not have that transaction or its raw transaction index. Chaingraph tries Fulcrum's transaction lookup after Bitcoin Core; both can still be unavailable.
 - **Incomplete history:** review scan limits and backend history limits. Do not infer no activity from data that could not be loaded.
 - **Autosave failed:** export the unlocked workspace immediately. Clearing site data deletes local saved workspaces.

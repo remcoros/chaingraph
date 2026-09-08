@@ -1,5 +1,5 @@
 import type { Transaction } from '../domain/types';
-import { fetchTransaction, mapLimit, MAX_SCAN_TRANSACTIONS } from './api';
+import { mapLimit, MAX_SCAN_TRANSACTIONS } from './api';
 
 /** Breadth-first ancestry, bounded across the entire action, including both levels. */
 export async function loadAncestors(
@@ -8,9 +8,10 @@ export async function loadAncestors(
   depth: 1 | 2,
   options: {
     signal?: AbortSignal;
-    fetch?: typeof fetchTransaction;
+    /** Bound to the initiating workspace network, or an offline fixture. */
+    fetch: (txid: string, signal?: AbortSignal) => Promise<Transaction>;
     onProgress?: (message: string) => void;
-  } = {},
+  },
 ) {
   if (depth !== 1 && depth !== 2) throw new Error('Choose one or two previous levels.');
   const known = new Map(Object.entries(existing));
@@ -35,7 +36,7 @@ export async function loadAncestors(
     await mapLimit(batch, 4, async (id) => {
       options.signal?.throwIfAborted();
       try {
-        const tx = await (options.fetch ?? fetchTransaction)(id, options.signal);
+        const tx = await options.fetch(id, options.signal);
         options.signal?.throwIfAborted();
         known.set(id, tx);
         transactions.push(tx);

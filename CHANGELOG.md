@@ -8,12 +8,14 @@ First testable release of the MIT-licensed, self-hosted Bitcoin analysis workben
 - Searchable and paginated graph entities, filters for value and loaded evidence, graph context and focused findings.
 - Multiple encrypted workspaces and wallets, public workspace names, optional encrypted descriptions, local browser persistence and encrypted file import/export.
 - Browser-side public-key address derivation and bounded wallet scanning on mainnet and testnet4 through a stateless Bitcoin RPC and Fulcrum proxy.
+- Simultaneous mainnet/testnet4 backends with independent configuration, transports and request queues; discovered network choices and explicit offline handling for unsupported workspaces.
 - Seven scoped analysis tools with adjustable thresholds, coverage reports, exact evidence highlighting, persistent exclusions and stale-result handling.
 - Synthetic laboratory, guided tour, responsive layouts and regression coverage for wallet cryptography, persistence, proxy behavior and browser flows.
 - Help/about, connection details, selection history, graph focus and deliberate deletion of locked browser copies.
 - Import validation binds saved addresses to their wallet key; long BIP329 wallet labels reopen correctly and scans preserve newer labels.
 - Shared graph interaction surface with replaceable rendering adapters, mouse/touch tracing and framing fixes.
 - Conventional collapsible transaction inputs/outputs and advanced script, opcode, witness and verified raw transaction inspection.
+- Compact transaction flow with exact-output navigation, decoded OP_RETURN previews, inline tag creation and automatic encrypted persistence of annotations, filters and graph layout.
 - Encrypted workspace tags, imported-label grouping and separate wallet-script match highlights across graph cards and transaction rows.
 - Returning-wallet refresh, persistent new-activity review, cancellation and preservation of unchanged analysis evidence.
 - Compact header with workspace tabs, combined lookup/prefetch controls defaulting to one previous level, Help/sample menu, and floating graph navigation.

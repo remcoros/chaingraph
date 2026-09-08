@@ -11,7 +11,8 @@ not when scaffolding this upstream application.
 - Workspaces own multiple watch-only wallets. The browser owns derivation, discovery,
   loaded chain data, annotations, analysis, and encrypted persistence.
 - The backend only provides bounded read-only Core/Electrum access. No server database,
-  wallet storage, scan jobs, indexes, or workspace cache. One network per backend pair.
+  wallet storage, scan jobs, indexes, or workspace cache. Each configured network has
+  an isolated Core/Electrum pair; mainnet and testnet4 may run simultaneously.
 - Support mainnet and testnet4; validate the network at all import and RPC boundaries.
 - Keep observations, human annotations, and heuristic hypotheses distinct. Never call
   a cluster proof of common ownership; preserve evidence and allow removal.
@@ -21,8 +22,9 @@ not when scaffolding this upstream application.
 
 ## Working safely
 
-- Never open, display, copy, or commit `.env.live`. Test processes may load it directly
-  without logging credentials, URLs, headers, or raw upstream exception messages.
+- Never open, display, copy, or commit real `.env.live`, `.env.mainnet`, or `.env.testnet4` files.
+  Test processes may load them directly without logging credentials, URLs, headers,
+  or raw upstream exception messages. Public synthetic fixtures are allowed.
 - No private keys, seed import, signing, spending, or wallet-mutating RPC methods.
 - Workspace names are intentionally public in the saved index. Descriptions, xpubs,
   graph data and notes belong inside the encrypted envelope.
@@ -37,8 +39,8 @@ not when scaffolding this upstream application.
 ## Development
 
 - Node 24+, TypeScript, React/Vite, Three.js/3d-force-graph, Node HTTP proxy.
-- `npm run dev` starts the app and proxy; `npm run dev:live` loads existing credentials
-  into the backend process only. Production: `npm run build && npm start`.
+- `npm run dev` starts the app and proxy; `npm run dev:live` uses the same isolated per-network file discovery as `dev`;
+  `.env.live` is not a runtime fallback. Production: `npm run build && npm start`.
 - `npm run build`, `npm test`, `npm run test:e2e` are the verification gates.
 - Test complex domain/security logic and end-to-end user workflows; avoid tests that
   merely repeat implementation. Exercise real services read-only when available.

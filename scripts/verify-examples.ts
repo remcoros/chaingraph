@@ -18,7 +18,7 @@ async function rpc(
   const response = await fetch(`${base}/api/rpc`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ target, method, params }),
+    body: JSON.stringify({ network: 'testnet4', target, method, params }),
     signal: AbortSignal.timeout(45000),
   });
   const body = await response.json();
@@ -36,7 +36,7 @@ async function transaction(id: string) {
 }
 try {
   const status = await (
-    await fetch(`${base}/api/status`, { signal: AbortSignal.timeout(45000) })
+    await fetch(`${base}/api/status?network=testnet4`, { signal: AbortSignal.timeout(45000) })
   ).json();
   if (!status.connected || status.network !== 'testnet4')
     throw new Error('Matching backend required');

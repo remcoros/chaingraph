@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
-import type { ServerConfig } from './config';
+import type { NetworkConfig } from './config';
 import { SafeError } from './errors';
 import { Limiter } from './limit';
 
@@ -19,7 +19,7 @@ export class CoreClient {
    * including fresh non-pooled retry sockets that the agent does not own. */
   private lifetime = new AbortController();
   private closed = false;
-  constructor(private config: ServerConfig) {
+  constructor(private readonly config: NetworkConfig) {
     this.limiter = new Limiter(config.coreConcurrency, config.corePending, config.queueTimeoutMs);
     const options = {
       keepAlive: true,

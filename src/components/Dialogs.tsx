@@ -83,19 +83,22 @@ export function Modal({
   );
 }
 export function CreateDialog({
-  network,
+  networks,
   demo,
   onCreate,
   onClose,
 }: {
-  network: Network;
+  networks?: Network[];
   demo: boolean;
   onCreate: (w: Workspace, p: string) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(demo ? 'CoinJoin laboratory' : 'My investigation');
   const [description, setDescription] = useState('');
-  const [net, setNet] = useState(network);
+  const [net, setNet] = useState<Network | undefined>(networks?.[0]);
+  useEffect(() => {
+    if (!net || !networks?.includes(net)) setNet(networks?.[0]);
+  }, [networks, net]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -117,7 +120,11 @@ export function CreateDialog({
       setError('Encryption needs a secure browser context. Use localhost or HTTPS.');
       return;
     }
-    const w = demo ? demoWorkspace(false) : newWorkspace(name.trim(), net);
+    if (!demo && (!net || !networks?.includes(net))) {
+      setError('Cannot discover supported networks. Check the backend connection.');
+      return;
+    }
+    const w = demo ? demoWorkspace(false) : newWorkspace(name.trim(), net!);
     w.name = name.trim();
     w.description = description.trim();
     onCreate(w, password);
@@ -157,10 +164,19 @@ export function CreateDialog({
         {!demo && (
           <label>
             Bitcoin network
-            <select value={net} onChange={(e) => setNet(e.target.value as Network)}>
-              <option value="testnet4">Testnet4</option>
-              <option value="mainnet">Mainnet</option>
-            </select>
+            {networks?.length === 1 ? (
+              <input readOnly value={networks[0]} />
+            ) : networks?.length ? (
+              <select value={net ?? ''} onChange={(e) => setNet(e.target.value as Network)}>
+                {networks.map((network) => (
+                  <option key={network} value={network}>
+                    {network === 'mainnet' ? 'Mainnet' : 'Testnet4'}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input readOnly value="Unavailable" />
+            )}
           </label>
         )}
         <label>
@@ -194,7 +210,16 @@ export function CreateDialog({
             {error}
           </p>
         )}
-        <button className="primary" type="submit">
+        {!demo && !networks?.length && (
+          <p role="alert" className="error-text">
+            Cannot discover supported networks. Check the backend connection.
+          </p>
+        )}
+        <button
+          className="primary"
+          type="submit"
+          disabled={!demo && (!net || !networks?.includes(net))}
+        >
           Create workspace <ArrowRight size={16} />
         </button>
       </form>

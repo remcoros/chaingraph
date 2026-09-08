@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
 import { loadEnvironment } from '../server/config';
 
-// Node loads .env.live directly when requested. Only the backend child inherits
-// upstream credentials; Vite receives a small explicit environment.
+// The backend discovers each named network file separately. Vite receives only
+// a small explicit environment and cannot inherit upstream credentials.
 try {
   const config = loadEnvironment();
   const webPort = 3001;

@@ -20,7 +20,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-ENV NODE_ENV=production SERVER_HOST=0.0.0.0 SERVER_PORT=3000
+ENV NODE_ENV=production SERVER_HOST=0.0.0.0 SERVER_PORT=3000 CHAINGRAPH_NETWORK_CONFIG_DIR=/run/chaingraph
 ARG CHAINGRAPH_SOURCE_URL=""
 ARG VCS_REF=""
 LABEL org.opencontainers.image.title="Chaingraph" \

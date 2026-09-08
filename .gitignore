@@ -9,3 +9,6 @@ playwright-report/
 coverage/
 *.chaingraph
 .DS_Store
+
+# Dedicated runtime network files and optional mounted cookie/CA material.
+/config/

@@ -87,6 +87,8 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let visible = false;
   let fitPadding = 40;
   let settled = false;
+  let earlyFitPending = false;
+  let earlyFitTicks = 0;
   let pendingFocus: string | undefined;
   let dead = false;
   let initialSnapshot: GraphSnapshot | undefined;
@@ -102,7 +104,9 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   const cleanups: (() => void)[] = [];
   const emitSnapshot = () => {
     clearTimeout(snapshotTimer);
-    if (dead || !settled || !dimensions || !events.snapshot) return;
+    // A completed gesture owns the camera immediately, even while physics runs.
+    // Capture it before a quick lock/switch; automatic initial framing waits.
+    if (dead || (!settled && needsFit) || !dimensions || !events.snapshot) return;
     const data = graph.graphData().nodes;
     if (!data.length) return;
     const round = (value: number) => Math.round(value * 1000) / 1000;
@@ -169,6 +173,24 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       positions.setXYZ(index, node.x || 0, node.y || 0, node.z || 0),
     );
     positions.needsUpdate = true;
+  };
+  const tryEarlyFit = () => {
+    if (dead || !earlyFitPending || earlyFitTicks > 0 || !needsFit || !visible) return;
+    const nodes = graph.graphData().nodes;
+    if (
+      !nodes.length ||
+      nodes.some(
+        (node) =>
+          !Number.isFinite(node.x) ||
+          !Number.isFinite(node.y) ||
+          (dimensions === 3 && !Number.isFinite(node.z)),
+      )
+    )
+      return;
+    earlyFitPending = false;
+    // Give new graphs a useful frame after three simulation ticks. Keep needsFit
+    // until settlement, unless a gesture or explicit focus takes over the camera.
+    graph.zoomToFit(0, fitPadding);
   };
   const refreshStyle = () => {
     const nodes = graph.graphData().nodes;
@@ -314,11 +336,16 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .onNodeClick((node, event) => select({ type: 'node', id: node.id }, event))
       .onLinkClick((link, event) => select({ type: 'link', id: link.id }, event))
       .onBackgroundClick((event) => select(undefined, event))
-      .onEngineTick(positionHalos)
+      .onEngineTick(() => {
+        positionHalos();
+        if (earlyFitTicks > 0) earlyFitTicks--;
+        tryEarlyFit();
+      })
       .onEngineStop(() => {
         if (dead) return;
         positionHalos();
         settled = true;
+        earlyFitPending = false;
         if (visible && needsFit && graph.graphData().nodes.length) {
           needsFit = false;
           graph.zoomToFit(duration(), fitPadding);
@@ -479,7 +506,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           !previous.size &&
           initialSnapshot?.dimensions === frame.dimensions &&
           nodes.every((node) => retainedPositions.has(node.id));
-        if (!previous.size && nodes.length && !initialSnapshot) needsFit = true;
+        if (!previous.size && nodes.length && !initialSnapshot) {
+          needsFit = true;
+          earlyFitPending = true;
+          earlyFitTicks = 3;
+        }
         topology = signature;
         settled = false;
         graph.cooldownTicks(restoredLayout ? 0 : 120);
@@ -557,6 +588,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       fitPadding = Math.min(40, width * 0.1, height * 0.1);
       graph.width(width).height(height);
       halos.material.uniforms.viewportScale.value = height * graph.renderer().getPixelRatio();
+      tryEarlyFit();
       if (pendingFocus) focus(pendingFocus);
       else if (needsFit && settled && graph.graphData().nodes.length) {
         needsFit = false;

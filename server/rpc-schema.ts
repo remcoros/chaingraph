@@ -25,6 +25,7 @@ const methods: Record<string, z.ZodType> = {
   'electrum:blockchain.headers.subscribe': empty,
 };
 const envelope = z.strictObject({
+  network: z.enum(['mainnet', 'testnet4']),
   target: z.enum(['core', 'electrum']),
   method: z.string().max(80),
   params: z.array(z.unknown()).max(3),

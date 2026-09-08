@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
+import { hexToBytes } from '@noble/hashes/utils.js';
 import { graphSnapshotSchema } from './graphSnapshot';
-import type { Workspace, Transaction, GraphData, GraphNode } from './types';
+import type { Workspace, Transaction, GraphData, GraphNode, Network } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
 import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
 import {
@@ -300,6 +302,38 @@ export function assertWorkspaceBudget(data: unknown) {
   }
 }
 
+/** Validate decoded metadata without treating network-neutral transaction bytes as chain proof. */
+export function validateTransactionAddresses(transaction: Transaction, network: Network): void {
+  for (const output of transaction.vout) {
+    const { address, addresses, hex } = output.scriptPubKey;
+    const reported = [...new Set([...(address ? [address] : []), ...(addresses ?? [])])];
+    if (!reported.length) continue;
+    const hashes = reported.map((value) => {
+      try {
+        return addressToScriptHash(value, network);
+      } catch {
+        throw new Error(`Transaction output ${output.n} has an invalid address for ${network}.`);
+      }
+    });
+    if (hex === undefined) continue;
+    let canonical: string;
+    try {
+      canonical = bitcoinAddress.fromOutputScript(
+        hexToBytes(hex),
+        network === 'mainnet' ? bitcoinNetworks.bitcoin : bitcoinNetworks.testnet,
+      );
+    } catch {
+      // Bare multisig/P2PK can report participant addresses that do not encode
+      // the whole output script. Keep their network checks without imposing a
+      // single-address script model on them or on nonstandard scripts.
+      continue;
+    }
+    const expected = addressToScriptHash(canonical, network);
+    if (hashes.some((hash) => hash !== expected))
+      throw new Error(`Transaction output ${output.n} address does not match its script.`);
+  }
+}
+
 export function parseTransaction(data: unknown): Transaction {
   return transactionSchema.parse(data);
 }
@@ -309,6 +343,8 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
   if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
   if (Object.entries(parsed.transactions).some(([id, transaction]) => id !== transaction.txid))
     throw new Error('Workspace has invalid transaction records.');
+  for (const transaction of Object.values(parsed.transactions))
+    validateTransactionAddresses(transaction, parsed.network);
   const walletIds = new Set<string>();
   for (const wallet of parsed.wallets) {
     if (walletIds.has(wallet.id))

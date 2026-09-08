@@ -76,6 +76,7 @@ describe('spending expansion', () => {
     expect(result.transactions.map((t) => t.txid)).toEqual([id(1)]);
     expect(result.truncated).toBe(false);
     expect(requests[0]).toEqual({
+      network: 'testnet4',
       target: 'electrum',
       method: 'blockchain.scripthash.get_history',
       params: [scriptHash('51')],

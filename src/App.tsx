@@ -69,14 +69,8 @@ import {
   type Wallet,
   type Workspace,
 } from './domain/types';
-import {
-  backendStatus,
-  fetchTransaction,
-  loadAddress,
-  loadSpending,
-  scanWallet,
-  type BackendStatus,
-} from './lib/api';
+import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/api';
+import { useBackendNetworks } from './lib/useBackendNetworks';
 import { loadAncestors } from './lib/tracing';
 import { demoWorkspace } from './domain/demo';
 import { TESTNET4_EXAMPLES } from './domain/examples';
@@ -95,8 +89,6 @@ function download(name: string, content: string, type = 'application/json') {
 export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
-  const [status, setStatus] = useState<BackendStatus>();
-  const [statusError, setStatusError] = useState('');
   const [create, setCreate] = useState<'empty' | 'demo'>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [walletDialog, setWalletDialog] = useState(false);
@@ -115,6 +107,14 @@ export default function App() {
   const [focusRequest, setFocusRequest] = useState<{ id: string; token: number }>();
   const [aboutOpen, setAboutOpen] = useState<false | 'guide' | 'about' | 'connection'>(false);
   const [connectionCheck, setConnectionCheck] = useState(0);
+  const { networks, statuses, discoveryError } = useBackendNetworks(connectionCheck);
+  const displayNetwork = w?.network ?? networks?.[0];
+  const status = displayNetwork ? statuses[displayNetwork] : undefined;
+  const unsupportedNetwork =
+    !!w && !w.demo && !!networks && !networks.includes(w.network) && !discoveryError;
+  const statusError =
+    discoveryError ||
+    (unsupportedNetwork ? `Backend does not support ${w!.network}.` : (status?.error ?? ''));
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
   const [runReports, setRunReports] = useState<
     Record<string, ReturnType<(typeof analysisTools)[number]['analyze']>>
@@ -273,28 +273,6 @@ export default function App() {
     setRightTab('inspect');
   }, []);
   useEffect(() => {
-    let disposed = false;
-    const controller = new AbortController();
-    const refresh = () =>
-      backendStatus(controller.signal)
-        .then((s) => {
-          if (!disposed) {
-            setStatus(s);
-            setStatusError('');
-          }
-        })
-        .catch(() => {
-          if (!disposed) setStatusError('Backend unavailable');
-        });
-    void refresh();
-    const timer = setInterval(refresh, 15000);
-    return () => {
-      disposed = true;
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [connectionCheck]);
-  useEffect(() => {
     operationRef.current?.abort();
     setOperation('');
     setSelectedId(w?.view.selectionId);
@@ -395,19 +373,27 @@ export default function App() {
     }
   };
   const connected = !!status?.connected && !statusError;
-  const canQuery = connected && w?.network === status?.network && !w?.demo;
+  const canQuery = connected && !!w && !!networks?.includes(w.network) && !w.demo;
   const queryDisabledReason = w?.demo
     ? undefined
-    : !connected
-      ? 'Connect your backend to load chain data.'
-      : w?.network !== status?.network
-        ? `This workspace uses ${w?.network}; the backend serves ${status?.network}.`
-        : undefined;
+    : unsupportedNetwork
+      ? `Backend does not support ${w!.network}.`
+      : discoveryError ||
+        (!networks
+          ? 'Discovering supported networks…'
+          : !status
+            ? `Checking ${w?.network ?? displayNetwork ?? 'Bitcoin'} connection…`
+            : !connected
+              ? `${w?.network ?? displayNetwork ?? 'Bitcoin'} backend is unavailable.`
+              : undefined);
   const canTrace = !!w?.demo || canQuery;
   const fixture = useMemo(() => (w?.demo ? demoWorkspace().transactions : undefined), [w?.demo]);
   const getTransaction = async (id: string, signal?: AbortSignal) => {
     signal?.throwIfAborted();
-    if (!fixture) return fetchTransaction(id, signal);
+    if (!fixture) {
+      if (!w) throw new Error('Open a workspace first.');
+      return fetchTransaction(w.network, id, signal);
+    }
     const transaction = fixture[id];
     if (!transaction)
       throw new Error('This transaction is outside the synthetic laboratory fixture.');
@@ -466,7 +452,7 @@ export default function App() {
       if (/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
         const [id, index] = text.split(':');
         setOperation('Loading transaction…');
-        const t = await fetchTransaction(id, signal);
+        const t = await fetchTransaction(w.network, id, signal);
         if (index !== undefined && !t.vout.some((o) => o.n === Number(index)))
           throw new Error('This output index does not exist in the transaction.');
         signal.throwIfAborted();
@@ -475,6 +461,7 @@ export default function App() {
         setLeftTab('entities');
         if (prefetchDepth) {
           const result = await loadAncestors([t], w.transactions, prefetchDepth, {
+            fetch: getTransaction,
             signal,
             onProgress: setOperation,
           });
@@ -1597,6 +1584,8 @@ export default function App() {
           onClose={() => setAboutOpen(false)}
           onTour={w ? () => setTour(0) : undefined}
           status={status}
+          networks={networks}
+          statuses={statuses}
           statusError={statusError}
           onReconnect={() => setConnectionCheck((value) => value + 1)}
         />
@@ -1648,10 +1637,11 @@ export default function App() {
         </div>
       )}
       {w && !w.demo && !canQuery && (
-        <div className="connection-banner">
-          {connected
-            ? `This workspace uses ${w.network}; the backend serves ${status?.network}. Connect a matching backend to load chain data.`
-            : 'Backend offline. Saved workspaces remain available; configure your node connection to load chain data.'}
+        <div
+          className="connection-banner"
+          role={unsupportedNetwork || discoveryError || (status && !connected) ? 'alert' : 'status'}
+        >
+          {queryDisabledReason} Saved data remains available for offline analysis.
         </div>
       )}
       <input
@@ -1706,7 +1696,7 @@ export default function App() {
       />
       {create && (
         <CreateDialog
-          network={status?.network ?? 'testnet4'}
+          networks={discoveryError ? undefined : networks}
           demo={create === 'demo'}
           onCreate={ws.open}
           onClose={() => setCreate(undefined)}

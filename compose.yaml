@@ -7,16 +7,23 @@ services:
       args:
         CHAINGRAPH_SOURCE_URL: ${CHAINGRAPH_SOURCE_URL:-}
         VCS_REF: ${CHAINGRAPH_REVISION:-}
-    # Compose 2.30+: raw preserves literal dollar signs in RPC passwords.
-    # Use unquoted KEY=value lines in this explicitly selected runtime file.
-    env_file:
-      - path: ${CHAINGRAPH_ENV_FILE:-./.env.container}
-        required: true
-        format: raw
     environment:
       NODE_ENV: production
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: '3000'
+      CHAINGRAPH_NETWORK_CONFIG_DIR: /run/chaingraph
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+      SERVER_HANDLER_TIMEOUT_MS: ${SERVER_HANDLER_TIMEOUT_MS:-120000}
+      MAX_RESPONSE_BYTES: ${MAX_RESPONSE_BYTES:-5242880}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-0}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+    volumes:
+      - type: bind
+        source: ${CHAINGRAPH_CONFIG_DIR:-./config}
+        target: /run/chaingraph
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - '${CHAINGRAPH_BIND:-127.0.0.1}:${CHAINGRAPH_PORT:-3000}:3000'
     read_only: true

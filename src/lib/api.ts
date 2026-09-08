@@ -1,7 +1,8 @@
+import { z } from 'zod';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
-import { parseTransaction, outputAddress } from '../domain/workspace';
+import { parseTransaction, outputAddress, validateTransactionAddresses } from '../domain/workspace';
 import { addressToScriptHash, deriveAddresses } from './wallet';
 export interface BackendStatus {
   network: Network;
@@ -14,45 +15,98 @@ export interface HistoryEntry {
   height: number;
 }
 export async function rpc<T>(
+  network: Network,
   target: 'core' | 'electrum',
   method: string,
   params: unknown[],
   signal?: AbortSignal,
 ): Promise<T> {
+  assertNetwork(network);
   const response = await fetch('/api/rpc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target, method, params }),
+    body: JSON.stringify({ network, target, method, params }),
     signal,
   });
   const payload = await response.json();
+  signal?.throwIfAborted();
+  if (!payload || typeof payload !== 'object') throw new Error('Invalid upstream response.');
   if (!response.ok || payload.error)
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Upstream request failed.');
   return payload.result as T;
 }
-export async function backendStatus(signal?: AbortSignal): Promise<BackendStatus> {
-  const r = await fetch('/api/status', { signal });
-  if (!r.ok) throw new Error('Backend unavailable');
-  return r.json();
+const networkSchema = z.enum(['mainnet', 'testnet4']);
+const capabilitiesSchema = z.object({
+  networks: z
+    .array(networkSchema)
+    .max(2)
+    .refine((networks) => new Set(networks).size === networks.length),
+});
+const statusSchema = z.object({
+  network: networkSchema,
+  connected: z.boolean(),
+  height: z.number().int().min(0).max(0x7fffffff).optional(),
+  error: z.string().max(1000).optional(),
+});
+function assertNetwork(network: Network): void {
+  if (!networkSchema.safeParse(network).success)
+    throw new Error('Choose mainnet or testnet4 for this request.');
 }
-export async function fetchTransaction(txid: string, signal?: AbortSignal): Promise<Transaction> {
+
+/** Configured capabilities remain available when one upstream pair is offline. */
+export async function backendNetworks(signal?: AbortSignal): Promise<Network[]> {
+  const response = await fetch('/api/networks', { signal });
+  if (!response.ok) throw new Error('Could not discover configured Bitcoin networks.');
+  const parsed = capabilitiesSchema.safeParse(await response.json());
+  signal?.throwIfAborted();
+  if (!parsed.success) throw new Error('Backend returned invalid network capabilities.');
+  return parsed.data.networks;
+}
+export async function backendStatus(
+  network: Network,
+  signal?: AbortSignal,
+): Promise<BackendStatus> {
+  assertNetwork(network);
+  const response = await fetch(`/api/status?network=${network}`, { signal });
+  if (!response.ok) throw new Error('Backend unavailable');
+  const parsed = statusSchema.safeParse(await response.json());
+  signal?.throwIfAborted();
+  if (!parsed.success) throw new Error('Backend returned invalid network status.');
+  if (parsed.data.network !== network)
+    throw new Error('Backend status belongs to a different Bitcoin network.');
+  return parsed.data;
+}
+export async function fetchTransaction(
+  network: Network,
+  txid: string,
+  signal?: AbortSignal,
+): Promise<Transaction> {
   if (!/^[0-9a-f]{64}$/i.test(txid)) throw new Error('Enter a 64-character transaction ID.');
   let data: unknown;
   try {
-    data = await rpc('core', 'getrawtransaction', [txid.toLowerCase(), 1], signal);
+    data = await rpc(network, 'core', 'getrawtransaction', [txid.toLowerCase(), 1], signal);
   } catch (e) {
     if (signal?.aborted) throw e;
-    data = await rpc('electrum', 'blockchain.transaction.get', [txid.toLowerCase(), true], signal);
+    data = await rpc(
+      network,
+      'electrum',
+      'blockchain.transaction.get',
+      [txid.toLowerCase(), true],
+      signal,
+    );
   }
   const tx = parseTransaction(data);
   if (tx.txid !== txid.toLowerCase()) throw new Error('Upstream returned a different transaction.');
+  validateTransactionAddresses(tx, network);
   return tx;
 }
 export async function fetchHistory(
+  network: Network,
   scripthash: string,
   signal?: AbortSignal,
 ): Promise<HistoryEntry[]> {
   const data = await rpc<HistoryEntry[]>(
+    network,
     'electrum',
     'blockchain.scripthash.get_history',
     [scripthash],
@@ -147,7 +201,7 @@ export async function scanWallet(
       const size = Math.min(10, options.maxIndex - index);
       const derived = deriveAddresses(wallet.key, network, wallet.scriptType, branch, index, size);
       const histories = await mapLimit(derived, 4, (d) =>
-        fetchHistory(d.scripthash, options.signal),
+        fetchHistory(network, d.scripthash, options.signal),
       );
       for (let i = 0; i < derived.length; i++) {
         const history = histories[i];
@@ -205,7 +259,7 @@ export async function scanWallet(
   const toLoad = pending.slice(0, MAX_SCAN_TRANSACTIONS);
   let loaded = 0;
   const transactions = await mapLimit(toLoad, 4, async (id) => {
-    const tx = await fetchTransaction(id, options.signal);
+    const tx = await fetchTransaction(network, id, options.signal);
     options.onProgress?.({
       done: checked,
       message: `${wallet.name}: loading transactions ${++loaded}/${toLoad.length}`,
@@ -246,7 +300,7 @@ export async function loadAddress(
   signal?: AbortSignal,
   onProgress?: (p: ScanProgress) => void,
 ): Promise<{ transactions: Transaction[]; truncated: boolean }> {
-  const history = await fetchHistory(addressToScriptHash(address, network), signal);
+  const history = await fetchHistory(network, addressToScriptHash(address, network), signal);
   const allIds = [...new Set(history.map((h) => h.tx_hash))];
   const heights = new Map(history.map((h) => [h.tx_hash, h.height]));
   const ids = [
@@ -262,11 +316,12 @@ export async function loadAddress(
       done: loaded,
       message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
     });
-    return fetchTransaction(id, signal);
+    return fetchTransaction(network, id, signal);
   });
   return { transactions, truncated: ids.length > MAX_SCAN_TRANSACTIONS };
 }
 export async function loadFunding(
+  network: Network,
   tx: Transaction,
   existing: Record<string, Transaction>,
   signal?: AbortSignal,
@@ -274,7 +329,7 @@ export async function loadFunding(
   const ids = [...new Set(tx.vin.flatMap((i) => (i.txid && !existing[i.txid] ? [i.txid] : [])))];
   if (ids.length > 500)
     throw new Error('Funding expansion is limited to 500 transactions at a time.');
-  return mapLimit(ids, 4, (id) => fetchTransaction(id, signal));
+  return mapLimit(ids, 4, (id) => fetchTransaction(network, id, signal));
 }
 export async function loadSpending(
   tx: Transaction,
@@ -297,14 +352,16 @@ export async function loadSpending(
     throw new Error(
       'Load the creating transaction first: these outputs have no script data to search.',
     );
-  const histories = await mapLimit(scripts, 4, (hash) => fetchHistory(hash, signal));
+  const histories = await mapLimit(scripts, 4, (hash) => fetchHistory(w.network, hash, signal));
   const ids = [...new Set(histories.flatMap((h) => h.map((e) => e.tx_hash)))]
     .filter((id) => id !== tx.txid)
     .sort();
   const wanted = new Set(outputs.map((o) => o.n));
   const nextOffset = offset + 500 < ids.length ? offset + 500 : undefined;
   const candidates = await mapLimit(ids.slice(offset, offset + 500), 4, (id) =>
-    w.transactions[id] ? Promise.resolve(w.transactions[id]) : fetchTransaction(id, signal),
+    w.transactions[id]
+      ? Promise.resolve(w.transactions[id])
+      : fetchTransaction(w.network, id, signal),
   );
   return {
     transactions: candidates.filter((t) =>

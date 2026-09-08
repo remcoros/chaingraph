@@ -173,6 +173,84 @@ afterEach(() => {
 });
 
 describe('force adapter contract', () => {
+  it('captures a manual camera before settlement for quick lock/switch, while automatic framing waits', () => {
+    const untouched = setup();
+    untouched.adapter.update(frame(3));
+    for (let tick = 0; tick < 3; tick++) untouched.callbacks.onEngineTick();
+    untouched.controls.dispatchEvent(new Event('end'));
+    expect(untouched.events.snapshot).not.toHaveBeenCalled();
+    untouched.adapter.dispose();
+    expect(untouched.events.snapshot).not.toHaveBeenCalled();
+
+    const manual = setup();
+    manual.adapter.update(frame(3));
+    for (let tick = 0; tick < 3; tick++) manual.callbacks.onEngineTick();
+    manual.pointer('pointerdown');
+    manual.graph.cameraPosition({ x: 80, y: -15, z: 250 }, { x: 30, y: -15, z: 0 }, 0);
+    manual.pointer('pointerup');
+    manual.controls.dispatchEvent(new Event('end'));
+    expect(manual.events.snapshot).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(manual.events.snapshot!).mock.calls[0][0].camera).toMatchObject({
+      position: { x: 80, y: -15, z: 250 },
+      target: { x: 30, y: -15, z: 0 },
+    });
+    // Neither path has received onEngineStop. A switch still flushes the latest
+    // visible camera; a lock already has the completed gesture's earlier snapshot.
+    manual.graph.cameraPosition({ x: 90, y: -25, z: 240 }, { x: 40, y: -25, z: 0 }, 0);
+    manual.adapter.dispose();
+    expect(manual.events.snapshot).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(manual.events.snapshot!).mock.calls[1][0].camera.position).toEqual({
+      x: 90,
+      y: -25,
+      z: 240,
+    });
+  });
+  it('frames new geometry early and finally at settlement unless a gesture takes over', () => {
+    const { adapter, callbacks, graph, pointer } = setup();
+    adapter.update(frame(3));
+    callbacks.onEngineTick();
+    callbacks.onEngineTick();
+    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    callbacks.onEngineTick();
+    expect(graph.zoomToFit).toHaveBeenLastCalledWith(0, 40);
+    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    callbacks.onEngineTick();
+    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    pointer('wheel');
+    callbacks.onEngineStop();
+    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    adapter.dispose();
+    const untouched = setup();
+    untouched.adapter.update(frame(3));
+    for (let tick = 0; tick < 3; tick++) untouched.callbacks.onEngineTick();
+    untouched.callbacks.onEngineStop();
+    expect(untouched.graph.zoomToFit).toHaveBeenCalledTimes(2);
+    untouched.adapter.dispose();
+    const requested = setup();
+    requested.adapter.update(frame(3));
+    requested.adapter.fit();
+    for (let tick = 0; tick < 3; tick++) requested.callbacks.onEngineTick();
+    expect(requested.graph.zoomToFit).toHaveBeenCalledTimes(2);
+    expect(requested.graph.zoomToFit).toHaveBeenLastCalledWith(0, 40);
+    requested.adapter.dispose();
+  });
+  it('cancels early framing on a gesture and preserves the pending fit while hidden', () => {
+    const moved = setup();
+    moved.adapter.update(frame(3));
+    moved.pointer('pointerdown');
+    for (let tick = 0; tick < 3; tick++) moved.callbacks.onEngineTick();
+    moved.callbacks.onEngineStop();
+    expect(moved.graph.zoomToFit).not.toHaveBeenCalled();
+    moved.adapter.dispose();
+    const hidden = setup();
+    hidden.adapter.resize(0, 0);
+    hidden.adapter.update(frame(3));
+    for (let tick = 0; tick < 3; tick++) hidden.callbacks.onEngineTick();
+    expect(hidden.graph.zoomToFit).not.toHaveBeenCalled();
+    hidden.adapter.resize(900, 600);
+    expect(hidden.graph.zoomToFit).toHaveBeenLastCalledWith(0, 40);
+    hidden.adapter.dispose();
+  });
   it('restores positions and camera without first-data fit or a conflicting flat-view tween', () => {
     const { adapter, graph, callbacks } = setup();
     const snapshot = {
@@ -198,6 +276,8 @@ describe('force adapter contract', () => {
     expect(graph.cameraPosition.mock.calls.filter((args: any[]) => args.length)).toEqual([
       [snapshot.camera.position, snapshot.camera.target, 0],
     ]);
+    for (let tick = 0; tick < 5; tick++) callbacks.onEngineTick();
+    expect(graph.zoomToFit).not.toHaveBeenCalled();
     callbacks.onEngineStop();
     expect(graph.zoomToFit).not.toHaveBeenCalled();
     adapter.dispose();

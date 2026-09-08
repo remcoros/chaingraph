@@ -38,14 +38,23 @@ jobs:
           VCS_REF: ${{ github.sha }}
         run: |
           docker build --load --build-arg CHAINGRAPH_SOURCE_URL="$SOURCE_URL" --build-arg VCS_REF="$VCS_REF" --tag chaingraph:release-check .
-          container=$(docker run --detach --read-only --cap-drop ALL --security-opt no-new-privileges:true --publish 127.0.0.1:4300:3000 chaingraph:release-check)
-          trap 'docker rm --force "$container" >/dev/null' EXIT
+          config_dir=$(mktemp -d)
+          cp .env.example "$config_dir/.env.testnet4"
+          cp .env.example "$config_dir/.env.mainnet"
+          # Public synthetic settings only. Match the read-only runtime group contract.
+          chmod 750 "$config_dir"
+          chmod 640 "$config_dir/.env.testnet4" "$config_dir/.env.mainnet"
+          sudo chgrp 1000 "$config_dir" "$config_dir/.env.testnet4" "$config_dir/.env.mainnet"
+          container=''
+          trap 'if [ -n "$container" ]; then docker rm --force "$container" >/dev/null; fi; rm -rf "$config_dir"' EXIT
+          container=$(docker run --detach --read-only --cap-drop ALL --security-opt no-new-privileges:true --mount "type=bind,src=$config_dir,dst=/run/chaingraph,readonly" --publish 127.0.0.1:4300:3000 chaingraph:release-check)
           for attempt in {1..20}; do
             if curl --fail --silent http://127.0.0.1:4300/ >/dev/null; then break; fi
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:4300/ >/dev/null
           docker exec "$container" node -e 'if (process.getuid() !== 1000) process.exit(1)'
+          node -e 'fetch("http://127.0.0.1:4300/api/networks").then(r=>r.json()).then(x=>{if(JSON.stringify(x.networks)!==JSON.stringify(["mainnet","testnet4"]))process.exit(1)})'
           npm run test:production
       - name: Retain failed browser diagnostics
         if: failure()

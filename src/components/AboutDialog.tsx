@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Modal } from './Dialogs';
 import type { BackendStatus } from '../lib/api';
+import type { Network } from '../domain/types';
 import './product.css';
 
 export function AboutDialog({
@@ -18,6 +19,8 @@ export function AboutDialog({
   onTour,
   status,
   statusError,
+  networks,
+  statuses = {},
   onReconnect,
 }: {
   initialTab?: 'guide' | 'about' | 'connection';
@@ -25,6 +28,8 @@ export function AboutDialog({
   onTour?: () => void;
   status?: BackendStatus;
   statusError?: string;
+  networks?: Network[];
+  statuses?: Partial<Record<Network, BackendStatus>>;
   onReconnect: () => void;
 }) {
   const [tab, setTab] = useState<'guide' | 'about' | 'connection'>(initialTab);
@@ -123,8 +128,8 @@ export function AboutDialog({
             </div>
           </dl>
           <p className="small muted">
-            Flat view and the entity list provide alternatives to 3D navigation. Selection history
-            and filters stay in this session.
+            Flat view and the entity list provide alternatives to 3D navigation. Filters and view
+            settings are saved in your encrypted workspace. Selection history stays in this session.
           </p>
         </div>
       ) : tab === 'connection' ? (
@@ -147,14 +152,31 @@ export function AboutDialog({
           {(statusError || status?.error) && (
             <p className="error-text">{statusError || status?.error}</p>
           )}
+          {!!networks?.length && (
+            <section aria-label="Configured backend networks" className="network-connections">
+              <h3>Configured networks</h3>
+              {networks.map((network) => (
+                <div key={network} className="network-connection-row" data-network={network}>
+                  <strong>{network}</strong>
+                  <span>
+                    {statuses[network]?.connected
+                      ? `Connected · ${statuses[network]?.height?.toLocaleString() ?? 'height unavailable'}`
+                      : statuses[network]
+                        ? 'Unavailable'
+                        : 'Checking connection…'}
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
           <button onClick={onReconnect}>
             <RefreshCw size={15} />
             Check connection again
           </button>
           <p>
-            Each backend connects to one Bitcoin and Fulcrum pair. Match your workspace network to
-            that pair. Check the configured RPC credentials, network and TLS trust if it is
-            unavailable.
+            Each network has separate Bitcoin and Fulcrum connections. Every workspace stays on its
+            own network. Check that network’s RPC credentials, upstream availability and TLS trust
+            if it is unavailable.
           </p>
           <p className="small muted">
             Saved workspaces and the laboratory work offline. Loaded transactions are snapshots;

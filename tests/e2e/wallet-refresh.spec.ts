@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   PUBLIC_ZPUB,
+  mockNetworkDiscovery,
   TX_FUNDING,
   TX_SPENDING,
   transactions,
@@ -48,12 +49,11 @@ async function phaseFixture(page: Page) {
   let waiting = false;
   const releases: (() => void)[] = [];
   const calls: MockCall[] = [];
-  await page.route('**/api/status', (route) =>
-    route.fulfill({ json: { network: 'mainnet', connected: true, height: 900000 } }),
-  );
+  await mockNetworkDiscovery(page);
   await page.route('**/api/rpc', async (route) => {
     const call = route.request().postDataJSON() as MockCall;
     calls.push(call);
+    expect(call.network, 'wallet requests retain their workspace network').toBe('mainnet');
     if (pause && call.method === 'blockchain.scripthash.get_history') {
       waiting = true;
       await new Promise<void>((resolve) => {

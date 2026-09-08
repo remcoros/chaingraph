@@ -1,5 +1,59 @@
 # Validation results
 
+## Isolated simultaneous networks, 2026-09-08
+
+The backend discovers one or both named network files, with separate immutable
+configuration, Core/Electrum clients, sockets, queues, limits and chain identity.
+Network discovery is independent of upstream health. Every request declares its
+network; the frontend captures the workspace network through scanning, fallback,
+tracing and raw inspection. Unsupported workspaces open with a clear error and
+remain editable offline. A single configured network is read-only during creation;
+two configured networks offer a choice.
+
+The complete **63-case browser suite passed** after the integration, covering
+single/dual network creation, unsupported imports and unlocks, independent offline
+status, late responses during switching, wallet refresh and encrypted restoration.
+The earlier integration run exposed an ambiguous alert selector in the tag test;
+it now targets the tag validation message alongside the separate offline banner.
+Transaction address checks reject foreign-network metadata and recognized
+address/script mismatches while preserving legacy multisig participant metadata.
+
+The final TypeScript/build, formatting and **285 unit/backend tests passed**.
+Visual review also caught small new graphs remaining tiny until simulation settled.
+They now receive an early fit after valid initial ticks, while the final fit still
+respects user gestures and restored snapshots. Completed manual camera gestures
+save even before layout settlement, preventing a quick switch or lock from losing
+that view; untouched automatic layouts still wait for settlement before capture.
+After this final camera refinement, all **12 affected browser cases passed**,
+including real first-load pixels, returning views, manual pan, touch picking,
+hidden/short canvases and encrypted camera/mode restoration.
+
+Both real upstream pairs passed concurrent read-only checks, including matching
+raw transaction bytes from Core and Electrum. A fresh live browser walkthrough
+created mainnet and testnet4 workspaces, loaded separate public transactions,
+switched between saved labels, and inspected both connection states on desktop and
+phone. No uncaught browser errors or horizontal overflow were observed. The main
+preview was restarted using named-file discovery and both pairs rechecked healthy;
+the retired `.env.live` was then removed without reading or copying it.
+
+- [Both live networks on desktop](screenshots/networks-desktop.png)
+- [Both live networks on phone](screenshots/networks-phone.png)
+- [Mainnet transaction flow and early graph framing](screenshots/networks-mainnet-flow.png)
+
+The local amd64 image built and ran through Compose with two public synthetic
+configuration files in a dedicated read-only mount. Capability discovery returned
+both networks and offline upstream status stayed separated. The container reported
+healthy, ran as the node user and used a read-only root filesystem. Production
+browser checks exercised built WebGL, the real server CSP, transaction inspection,
+inline tags and encrypted save/reload/unlock. Live upstream checks used the native
+host process; this container check did not claim real upstream connectivity.
+The final rebuilt container and live dual-network browser walkthrough both passed
+again after the camera refinement. The temporary test container was stopped; the
+main development preview remains available on port 3001.
+
+Workflow actionlint, release metadata and configuration checks passed. No image,
+tag or GitHub Release was published; native ARM runtime remains unverified.
+
 ## Compact flow and automatic workspace state, 2026-09-08
 
 The main transaction sits between input/output lanes, with exact-outpoint arrows

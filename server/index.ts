@@ -5,7 +5,9 @@ try {
   const config = loadEnvironment();
   const { app, close } = createApp(config);
   const server = app.listen(config.port, config.host, () => {
-    console.log(`ChainGraph listening on port ${config.port} (${config.network})`);
+    console.log(
+      `ChainGraph listening on port ${config.port} (${Object.keys(config.networks).join(', ')})`,
+    );
   });
   server.on('error', () => {
     console.error('Unable to start ChainGraph HTTP server');

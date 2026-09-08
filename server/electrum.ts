@@ -1,6 +1,6 @@
 import net from 'node:net';
 import tls from 'node:tls';
-import type { ServerConfig } from './config';
+import type { NetworkConfig } from './config';
 import { SafeError } from './errors';
 import { Limiter } from './limit';
 
@@ -21,7 +21,7 @@ export class ElectrumClient {
   private genesis?: string;
   private version: unknown;
   private limiter: Limiter;
-  constructor(private config: ServerConfig) {
+  constructor(private readonly config: NetworkConfig) {
     this.limiter = new Limiter(
       config.electrumConcurrency,
       config.electrumPending,

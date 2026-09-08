@@ -152,15 +152,50 @@ it('falls back to Electrum and does not continue after cancellation', async () =
     .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Not available' }) })
     .mockResolvedValueOnce({ ok: true, json: async () => ({ result: raw.toHex() }) });
   vi.stubGlobal('fetch', fetch);
-  expect((await fetchRawInspection(transaction, new AbortController().signal)).txid).toBe(
-    transaction.txid,
-  );
+  expect(
+    (await fetchRawInspection('testnet4', transaction, new AbortController().signal)).txid,
+  ).toBe(transaction.txid);
   expect(JSON.parse(fetch.mock.calls[1][1].body).target).toBe('electrum');
+  expect(fetch.mock.calls.map((call) => JSON.parse(call[1].body).network)).toEqual([
+    'testnet4',
+    'testnet4',
+  ]);
   const controller = new AbortController();
   fetch.mockReset().mockImplementation(async () => {
     controller.abort();
     throw new DOMException('Aborted', 'AbortError');
   });
-  await expect(fetchRawInspection(transaction, controller.signal)).rejects.toThrow();
+  await expect(fetchRawInspection('testnet4', transaction, controller.signal)).rejects.toThrow();
   expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it('keeps delayed raw-transaction fallback on its original network while another inspection completes', async () => {
+  const { raw, transaction } = fixture();
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const calls: { network: string; target: string }[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const request = JSON.parse(init.body as string);
+      calls.push({ network: request.network, target: request.target });
+      if (request.network === 'mainnet' && request.target === 'core') {
+        await waiting;
+        return { ok: false, json: async () => ({ error: 'Not available' }) };
+      }
+      return { ok: true, json: async () => ({ result: raw.toHex() }) };
+    }),
+  );
+  const mainnet = fetchRawInspection('mainnet', transaction, new AbortController().signal);
+  const testnet = await fetchRawInspection('testnet4', transaction, new AbortController().signal);
+  expect(testnet.txid).toBe(transaction.txid);
+  release();
+  expect((await mainnet).txid).toBe(transaction.txid);
+  expect(calls).toEqual([
+    { network: 'mainnet', target: 'core' },
+    { network: 'testnet4', target: 'core' },
+    { network: 'mainnet', target: 'electrum' },
+  ]);
 });

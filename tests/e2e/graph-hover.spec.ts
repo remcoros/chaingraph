@@ -165,6 +165,50 @@ async function hover(page: Page, point: { x: number; y: number }) {
   await expect(page.getByRole('dialog', { name: 'Graph item details' })).toBeVisible();
 }
 
+test('frames a returning small graph promptly and preserves a manual pan through final settlement', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(origin);
+  await expect(page.locator('canvas')).toBeVisible();
+  // Returning before the initial layout settles remounts GraphView without a
+  // saved snapshot, as switching between newly populated workspaces does.
+  await page.evaluate(() => (window as any).fixture.setShown(false));
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await page.evaluate(() => (window as any).fixture.setShown(true));
+  await expect(page.locator('canvas')).toBeVisible();
+  await expect
+    .poll(
+      async () => {
+        const meshes = await visibleMeshes(page);
+        return meshes.creating && meshes.spending ? meshes.spending.x - meshes.creating.x : 0;
+      },
+      { timeout: 1500, intervals: [50, 100] },
+    )
+    .toBeGreaterThan(250);
+
+  const framed = await visibleMeshes(page);
+  const bounds = (await page.locator('canvas').boundingBox())!;
+  const start = { x: bounds.x + bounds.width * 0.8, y: bounds.y + bounds.height * 0.8 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 45, start.y - 25, { steps: 6 });
+  await page.mouse.up();
+  const panned = await visibleMeshes(page);
+  expect(
+    Math.hypot(panned.output.x - framed.output.x, panned.output.y - framed.output.y),
+  ).toBeGreaterThan(20);
+  // Covers the full 6s engine deadline: automatic final fit must not undo the pan.
+  await page.waitForTimeout(6500);
+  const settled = await visibleMeshes(page);
+  expect(
+    Math.hypot(settled.output.x - panned.output.x, settled.output.y - panned.output.y),
+  ).toBeLessThan(3);
+  expect(errors).toEqual([]);
+});
+
 test('floating navigation preserves distinct silhouettes, actual picking, card actions, and keyboard details', async ({
   page,
 }) => {

@@ -72,7 +72,7 @@ export function ScriptInspector({
     setInputIndex(Math.max(0, input));
     setOutputIndex(transaction?.txid === selected.txid ? (selected.vout ?? 0) : 0);
     return () => request.current?.abort();
-  }, [transaction, selected.id]);
+  }, [workspace.id, workspace.network, transaction, selected.id]);
   async function load() {
     if (!transaction || !canQuery || workspace.demo) return;
     request.current?.abort();
@@ -81,7 +81,7 @@ export function ScriptInspector({
     setLoading(true);
     setError('');
     try {
-      const result = await fetchRawInspection(transaction, controller.signal);
+      const result = await fetchRawInspection(workspace.network, transaction, controller.signal);
       if (!controller.signal.aborted) setRaw(result);
     } catch (failure) {
       if (!controller.signal.aborted)

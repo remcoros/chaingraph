@@ -5,7 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app';
-import { loadConfig } from './config';
+import { loadConfig, loadNetworkConfig } from './config';
+const networkConfig = (env: NodeJS.ProcessEnv = {}) =>
+  loadNetworkConfig('testnet4', {
+    BITCOIN_RPC_URL: 'http://127.0.0.1:48332',
+    FULCRUM_HOST: '127.0.0.1',
+    FULCRUM_PORT: '51001',
+    ...env,
+  });
 import { CoreClient } from './core';
 import { ElectrumClient } from './electrum';
 import { Limiter } from './limit';
@@ -91,7 +98,7 @@ async function fixture(
   cleanups.push(() => {
     for (const socket of sockets) socket.destroy();
   });
-  const config = loadConfig({
+  const config = networkConfig({
     BITCOIN_RPC_USER: 'test',
     BITCOIN_RPC_PASSWORD: 'secret',
     BITCOIN_RPC_URL: `http://127.0.0.1:${corePort}`,
@@ -99,7 +106,9 @@ async function fixture(
     UPSTREAM_REQUEST_TIMEOUT_MS: '300',
     ...options.env,
   });
-  const created = createApp(config, { staticDirectory: false });
+  const created = createApp(loadConfig(options.env ?? {}, { testnet4: config }), {
+    staticDirectory: false,
+  });
   const server = http.createServer(created.app);
   const port = await listen(server);
   cleanups.push(() => {
@@ -116,7 +125,7 @@ async function fixture(
     fetch(`${base}/api/rpc`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ target, method, params }),
+      body: JSON.stringify({ network: 'testnet4', target, method, params }),
     });
   return { base, rpc, config, coreCalls, electrumCalls };
 }
@@ -124,7 +133,7 @@ async function fixture(
 describe('read-only proxy', () => {
   it('reports matching upstream status and negotiates Electrum first', async () => {
     const f = await fixture();
-    expect(await (await fetch(`${f.base}/api/status`)).json()).toEqual({
+    expect(await (await fetch(`${f.base}/api/status?network=testnet4`)).json()).toEqual({
       network: 'testnet4',
       connected: true,
       height: 123,
@@ -169,14 +178,22 @@ describe('read-only proxy', () => {
       (await f.rpc('getblockchaininfo', [], 'core', { origin: 'https://evil.invalid' })).status,
     ).toBe(403);
     const reboundStatus = await new Promise<number | undefined>((resolve) => {
-      http.get(`${f.base}/api/status`, { headers: { host: 'evil.invalid' } }, (response) => {
-        response.resume();
-        resolve(response.statusCode);
-      });
+      http.get(
+        `${f.base}/api/status?network=testnet4`,
+        { headers: { host: 'evil.invalid' } },
+        (response) => {
+          response.resume();
+          resolve(response.statusCode);
+        },
+      );
     });
     expect(reboundStatus).toBe(403);
     expect(
-      (await fetch(`${f.base}/api/status`, { headers: { 'sec-fetch-site': 'cross-site' } })).status,
+      (
+        await fetch(`${f.base}/api/status?network=testnet4`, {
+          headers: { 'sec-fetch-site': 'cross-site' },
+        })
+      ).status,
     ).toBe(403);
     const good = await f.rpc('getblockchaininfo', [], 'core', { origin: 'http://127.0.0.1:3001' });
     expect(good.status).toBe(200);
@@ -188,7 +205,7 @@ describe('read-only proxy', () => {
     expect((await f.rpc('getrawtransaction', [hash], 'core')).status).toBe(503);
     expect(f.coreCalls.map((x) => x.method)).toEqual(['getblockchaininfo']);
     expect(f.electrumCalls).toHaveLength(0);
-    expect(await (await fetch(`${f.base}/api/status`)).json()).toMatchObject({
+    expect(await (await fetch(`${f.base}/api/status?network=testnet4`)).json()).toMatchObject({
       connected: false,
       network: 'testnet4',
     });
@@ -248,9 +265,11 @@ describe('read-only proxy', () => {
   it('checks current Electrum responsiveness instead of only cached handshake metadata', async () => {
     let stalled = false;
     const f = await fixture({ electrum: (rpc) => stalled && rpc.method === 'server.ping' });
-    expect(await (await fetch(`${f.base}/api/status`)).json()).toMatchObject({ connected: true });
+    expect(await (await fetch(`${f.base}/api/status?network=testnet4`)).json()).toMatchObject({
+      connected: true,
+    });
     stalled = true;
-    expect(await (await fetch(`${f.base}/api/status`)).json()).toMatchObject({
+    expect(await (await fetch(`${f.base}/api/status?network=testnet4`)).json()).toMatchObject({
       connected: false,
       error: 'Electrum request timed out',
     });
@@ -404,24 +423,16 @@ describe('read-only proxy', () => {
       env: { SERVER_HANDLER_TIMEOUT_MS: '20' },
       core: (rpc) => rpc.method === 'getblockchaininfo',
     });
-    expect(await (await fetch(`${f.base}/api/status`)).json()).toEqual({
+    expect(await (await fetch(`${f.base}/api/status?network=testnet4`)).json()).toEqual({
       network: 'testnet4',
       connected: false,
       error: 'Request timed out',
     });
   });
-  it('serves disconnected status without credentials and rejects RPC without contacting upstreams', async () => {
-    const f = await fixture({
-      env: { BITCOIN_RPC_USER: undefined, BITCOIN_RPC_PASSWORD: undefined },
-    });
-    expect(await (await fetch(`${f.base}/api/status`)).json()).toEqual({
-      network: 'testnet4',
-      connected: false,
-      error: 'Bitcoin RPC is not configured; demo workspaces remain available',
-    });
-    expect((await f.rpc('getblockchaininfo', [], 'core')).status).toBe(503);
-    expect(f.coreCalls).toHaveLength(0);
-    expect(f.electrumCalls).toHaveLength(0);
+  it('rejects a configured network without credentials before creating its clients', async () => {
+    await expect(
+      fixture({ env: { BITCOIN_RPC_USER: undefined, BITCOIN_RPC_PASSWORD: undefined } }),
+    ).rejects.toThrow('authentication mode');
   });
   it('disconnects on malformed Electrum frames and recovers for the next request', async () => {
     let first = true;
@@ -442,24 +453,24 @@ describe('read-only proxy', () => {
 
 describe('configuration and resource bounds', () => {
   it('rejects invalid authentication modes and unbounded settings', () => {
-    expect(loadConfig({}).coreUser).toBeUndefined();
-    expect(() => loadConfig({ BITCOIN_RPC_USER: 'u' })).toThrow('authentication mode');
+    expect(() => networkConfig({})).toThrow('authentication mode');
+    expect(() => networkConfig({ BITCOIN_RPC_USER: 'u' })).toThrow('authentication mode');
     expect(() =>
-      loadConfig({
+      networkConfig({
         BITCOIN_RPC_USER: 'u',
         BITCOIN_RPC_PASSWORD: 'p',
         BITCOIN_RPC_COOKIE_FILE: '/cookie',
       }),
     ).toThrow('authentication mode');
     expect(() =>
-      loadConfig({
+      networkConfig({
         BITCOIN_RPC_USER: 'u',
         BITCOIN_RPC_PASSWORD: 'p',
         CORE_RPC_MAX_CONCURRENCY: '-1',
       }),
     ).toThrow('CORE_RPC_MAX_CONCURRENCY');
     expect(() =>
-      loadConfig({
+      networkConfig({
         BITCOIN_RPC_USER: 'u',
         BITCOIN_RPC_PASSWORD: 'p',
         BITCOIN_RPC_URL: 'http://u:p@localhost',
@@ -502,7 +513,7 @@ describe('configuration and resource bounds', () => {
     cleanups.push(() => {
       for (const socket of sockets) socket.destroy();
     });
-    const config = loadConfig({
+    const config = networkConfig({
       BITCOIN_RPC_USER: 'test',
       BITCOIN_RPC_PASSWORD: 'secret',
       FULCRUM_PORT: String(port),
@@ -591,7 +602,7 @@ describe('Core stale keep-alive transport', () => {
     cleanups.push(() => {
       for (const socket of sockets) socket.destroy();
     });
-    const config = loadConfig({
+    const config = networkConfig({
       BITCOIN_RPC_USER: 'test',
       BITCOIN_RPC_PASSWORD: 'secret',
       BITCOIN_RPC_URL: `http://127.0.0.1:${port}`,

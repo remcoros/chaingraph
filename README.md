@@ -11,28 +11,34 @@ Filter the graph by entity type, labels, notes, bookmarks, value and loaded fund
 ## Docker and Compose
 
 ```sh
-cp .env.example .env.container
-chmod 600 .env.container
-# Set upstream connection details reachable from the container.
-CHAINGRAPH_ENV_FILE=./.env.container docker compose --env-file /dev/null up --build -d
+mkdir -p config
+cp -n .env.example config/.env.testnet4
+chmod 750 config
+chmod 640 config/.env.testnet4
+sudo chgrp 1000 config config/.env.testnet4
+# Set testnet4 upstreams reachable from the container; add .env.mainnet for mainnet.
+docker compose --env-file /dev/null up --build -d
 ```
 
 Open **http://127.0.0.1:3000**. The container runs without root privileges and Compose restricts the published port to loopback. See [deployment and release instructions](docs/deployment.md) for HTTPS, private CAs, cookie authentication, backups and the GitHub container release workflow. No GitHub repository or published image is assumed yet.
 
 ## Run locally
 
-Use Node.js 24 or newer and npm. Configure your own Bitcoin Core RPC and Fulcrum instance for the same network. Each backend process serves **one network**, either mainnet or testnet4.
+Use Node.js 24 or newer and npm. One backend can serve **mainnet, testnet4, or both simultaneously**, using an isolated Bitcoin Core/Fulcrum pair for each configured network.
 
 ```sh
 npm ci
-cp -n .env.example .env
-# Set your upstream connection details in .env.
+cp -n .env.example .env.testnet4
+chmod 600 .env.testnet4
+# Set testnet4 upstream connection details. Add .env.mainnet for mainnet support.
 npm run dev
 ```
 
 Open **http://127.0.0.1:3001**. The development launcher reads the configured backend port and proxies API calls to it; the browser UI stays on port 3001. Vite receives no upstream credentials. The laboratory can be explored without a working chain connection; live lookups need both upstream services.
 
-If credentials are already in `.env.live`, use `npm run dev:live`. This loads the file directly into the backend process through Node's environment-file option. Environment files are local secrets and must not be committed. RPC accepts either a user/password pair or a cookie file, as shown in [.env.example](.env.example).
+The backend discovers `.env.mainnet` and `.env.testnet4` in the working directory, or in `CHAINGRAPH_NETWORK_CONFIG_DIR` when set. At least one valid file is required. Each file is parsed independently, and its filename selects its network; upstream credentials are never merged into the process environment. `.env` and `.env.live` are not loaded. `dev:live` and `start:live` are aliases for the same discovery-based launchers. RPC accepts either a user/password pair or a cookie file, as shown in [.env.example](.env.example).
+
+The frontend discovers configured networks before creating a workspace and routes every lookup through that workspace’s network. A disconnected upstream does not remove its configured network or disable another pair. Importing or unlocking a workspace for an unconfigured network still opens its saved data for offline inspection and editing. A clear backend-network error explains why live queries are disabled.
 
 To serve the built application from one local origin:
 
@@ -76,13 +82,13 @@ npm run build     # TypeScript check and frontend build
 npm test          # Unit and integration tests
 npm run test:e2e  # Browser tests; requires Playwright Chromium
 npm run check    # Build and unit/integration tests
-npm run test:live # Read-only testnet4/mainnet smoke using .env.live
+npm run test:live # Read-only smoke for configured network pairs
 npm run test:production # Browser smoke against built server on port 4300
 ```
 
 Use `npx playwright install chromium` if the browser required by the installed Playwright version is missing. Test commands are separate from claims about a live node or mobile performance.
 
-See [verified results and limits](docs/validation.md) for automated, live testnet4, and production-browser evidence.
+See [verified results and limits](docs/validation.md) for automated, live mainnet/testnet4, and production-browser evidence.
 
 The dependency license notices are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); regenerate them with `npm run licenses` after dependency updates.
 

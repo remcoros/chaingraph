@@ -110,7 +110,9 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await shop.getByRole('button', { name: 'Edit tag Shop', exact: true }).click();
   await shop.getByLabel('Tag description').fill('Counterparty description saves as it changes.');
   await shop.getByLabel('Tag name').fill('Exchange');
-  await expect(page.getByRole('alert')).toContainText('A tag with this name already exists.');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'A tag with this name already exists.' }),
+  ).toBeVisible();
   await shop.getByLabel('Tag name').fill('Shop');
   await shop.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(shop).toContainText('Counterparty description saves as it changes.');

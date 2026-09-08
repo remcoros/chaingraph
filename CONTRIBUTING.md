@@ -8,8 +8,9 @@ Use Node 24+, npm and a modern WebGL browser. From a checkout:
 
 ```sh
 npm ci
-cp .env.example .env
-# Configure your Bitcoin RPC and Fulcrum pair in .env.
+cp -n .env.example .env.testnet4
+chmod 600 .env.testnet4
+# Configure this testnet4 pair; add .env.mainnet for mainnet support.
 npm run dev
 ```
 

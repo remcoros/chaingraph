@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import type { Network } from '../../src/domain/types';
 
 // The key and three addresses are public BIP84 test vectors (CC0):
 // https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki
@@ -59,19 +60,61 @@ export const transactions = {
 };
 
 export interface MockCall {
+  network: Network;
   target: string;
   method: string;
   params: unknown[];
 }
+export interface MockNetworkOptions {
+  networks?: Network[];
+  connected?: boolean | Partial<Record<Network, boolean>>;
+}
+
+/** Discovery describes configuration independently from upstream availability. */
+export async function mockNetworkDiscovery(page: Page, options: MockNetworkOptions = {}) {
+  const networks = options.networks ?? ['mainnet', 'testnet4'];
+  const statusCalls: Network[] = [];
+  await page.route('**/api/networks', (route) => route.fulfill({ json: { networks } }));
+  await page.route('**/api/status?*', (route) => {
+    const network = new URL(route.request().url()).searchParams.get('network') as Network;
+    if (!networks.includes(network))
+      return route.fulfill({ status: 400, json: { error: 'Network is not configured.' } });
+    statusCalls.push(network);
+    const connected =
+      typeof options.connected === 'object'
+        ? (options.connected[network] ?? true)
+        : (options.connected ?? true);
+    return route.fulfill({
+      json: {
+        network,
+        connected,
+        ...(connected ? { height: network === 'mainnet' ? 900000 : 151500 } : {}),
+      },
+    });
+  });
+  return statusCalls;
+}
+
 /** Browser API interception keeps end-to-end tests isolated from real wallets/nodes. */
-export async function mockBitcoin(page: Page, connected = true) {
+export async function mockBitcoin(
+  page: Page,
+  connectedOrOptions: boolean | MockNetworkOptions = true,
+) {
+  const options =
+    typeof connectedOrOptions === 'boolean'
+      ? { connected: connectedOrOptions }
+      : connectedOrOptions;
+  const networks = options.networks ?? ['mainnet', 'testnet4'];
   const calls: MockCall[] = [];
-  await page.route('**/api/status', (route) =>
-    route.fulfill({ json: { network: 'mainnet', connected, height: 900000 } }),
-  );
+  await mockNetworkDiscovery(page, options);
   await page.route('**/api/rpc', async (route) => {
     const call = route.request().postDataJSON() as MockCall;
     calls.push(call);
+    if (!networks.includes(call.network))
+      return route.fulfill({
+        status: 400,
+        json: { error: 'RPC requests require a configured network.' },
+      });
     let result: unknown;
     if (call.target === 'electrum' && call.method === 'blockchain.scripthash.get_history') {
       const found = addresses.findIndex((a) => a.hash === call.params[0]);
