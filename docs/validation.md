@@ -1,5 +1,38 @@
 # Validation results
 
+## Release polish, version 0.2.0, 2026-09-08
+
+| Check | Result |
+| --- | --- |
+| Full unit/integration suite | 145 passed, 0 failed |
+| Final serial browser suite | 29 passed, 0 failed, 2.2 minutes |
+| TypeScript, production build, formatting, release metadata, diff whitespace | Passed |
+| Dependency audit | 0 known vulnerabilities at check time |
+| Native Docker build and hardened runtime | Passed on linux/amd64 |
+| Docker Compose startup and shutdown | Healthy startup, clean shutdown |
+| Final production-container Chromium smoke | Passed with actual built assets and CSP |
+| GitHub workflows | Both passed actionlint 1.7.12 |
+
+The [independent review](reviews/2026-09-08-independent.md) ran in a new Codex session without skills, memory, user configuration or inherited conversation. The [response matrix](reviews/2026-09-08-response.md) records fixes. Regression coverage includes imported wallet address/key binding, 200-character wallet labels surviving concurrent scan completion and encrypted reopening, annotation drafts surviving view changes and conflicting undo, preserved exclusions, stale findings, entity pagination beyond 200 records, shared canvas filters, locked-copy deletion, and selection history after graph removal.
+
+Browser tests exercised actual WebGL node/link picking and viewports from 320 to 768 pixels. A separate manual analysis review ran all seven tools, selected/visible scopes, parameters, coverage reports, result filters and graph isolation, including a 375-pixel viewport with zero page errors. Screenshot review caught clipped mobile pagination and long scrolling between tools/results; both were fixed. Pending graph fitting now follows layout settling and yields to manual camera interaction. Selection history preserves path depth and skips removed nodes. Workspace switching clears pending queries and focus requests; unavailable tour storage cannot crash the workspace.
+
+The final end-user walkthrough used a fresh browser context with a real public testnet4 example through the configured Core/Fulcrum proxy. It loaded two previous levels, found the selected output's spender, inspected graph details with the keyboard, chose an icon, saved a label/note, ran fee analysis and opened About. The result contained four transactions and 13 graph nodes; fee analysis distinguished three reconciled transactions from one with missing input data. Encrypted autosave completed, the 390-pixel layout had no horizontal overflow, and there were no uncaught page errors. No environment-file contents were read or captured.
+
+Reviewed release screenshots:
+
+- [Real testnet4 tracing and fee findings](screenshots/release-analysis.png)
+- [Graph tracing and entity inspection](screenshots/release-tracing.png)
+- [About, version and acknowledgements](screenshots/release-about.png)
+- [Mobile findings](screenshots/release-mobile.png)
+- [Mobile entity filters and accessible pagination](screenshots/release-entity-mobile.png)
+
+Container checks used actual HTTP and TCP fixture servers to exercise Bitcoin RPC authentication/chain status, the Electrum handshake and history protocol, request allowlists and Origin rejection. The image ran as UID 1000 with system CAs, a read-only root, dropped capabilities and no environment files or node_modules; graceful SIGTERM exited successfully. The final rebuilt image also passed a production browser round trip covering WebGL, CSP, annotations, encrypted save, reload and unlock. Compose itself was started, reached healthy and stopped. These protocol fixtures do not replace the separately verified real testnet4 checks.
+
+An earlier browser run passed 27 tests and failed one because a navigation assertion became ambiguous after accessible pagination was added. The selector was corrected to target workspace navigation, and the final 29-test run passed. One initial manual dev-page attempt encountered an empty module cached during concurrent file editing; invalidating that development cache restored the module, and the walkthrough passed. Fresh test servers and the production build did not exhibit that development-cache issue.
+
+No release was tagged or published: this checkout has no configured GitHub remote. Source/issues/releases links are enabled by the public build-time repository URL; the release workflow supplies its actual GitHub repository. Multi-platform publication is configured for amd64/arm64, but native ARM runtime and a real GitHub publication remain unverified. Software WebGL is functional browser evidence, not a native mobile GPU or frame-rate benchmark. Existing wallet-discovery and history-completeness limits remain documented.
+
 ## Tracing and workspace refinement, 2026-09-08
 
 | Check | Passed | Failed |

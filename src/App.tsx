@@ -10,6 +10,12 @@ import {
 } from 'react';
 import {
   ChevronRight,
+  ArrowLeft,
+  ArrowRight,
+  Crosshair,
+  Maximize2,
+  Minimize2,
+  Info,
   CircleHelp,
   Download,
   Ellipsis,
@@ -41,12 +47,14 @@ import {
   Modal,
 } from './components/Dialogs';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
+import { AboutDialog } from './components/AboutDialog';
+import { filterGraph, type GraphFilters } from './domain/graphFilters';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { GuidedTour } from './components/GuidedTour';
-import { buildGraph } from './domain/workspace';
-import { analysisTools } from './domain/analysis';
+import { buildGraph, parseWorkspace } from './domain/workspace';
+import { analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
   txNodeId,
@@ -90,8 +98,19 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedWallet, setSelectedWallet] = useState<string>();
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks'>('wallets');
-  const [entityFilter, setEntityFilter] = useState('');
-  const [entityKind, setEntityKind] = useState('all');
+  const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
+  const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
+    ids: [],
+    index: -1,
+  });
+  const [focusGraph, setFocusGraph] = useState(false);
+  const [focusRequest, setFocusRequest] = useState<{ id: string; token: number }>();
+  const [aboutOpen, setAboutOpen] = useState<false | 'guide' | 'about' | 'connection'>(false);
+  const [connectionCheck, setConnectionCheck] = useState(0);
+  const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
+  const [runReports, setRunReports] = useState<
+    Record<string, ReturnType<(typeof analysisTools)[number]['analyze']>>
+  >({});
   const [rightTab, setRightTab] = useState<'inspect' | 'analysis'>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
@@ -143,11 +162,38 @@ export default function App() {
     return () => window.removeEventListener('keydown', keydown);
   }, [ws.persist]);
   const graph = useMemo(() => (w ? buildGraph(w) : { nodes: [], links: [] }), [w]);
+  const visibleGraph = useMemo(
+    () =>
+      filterGraph(graph, { ...graphFilters, showAddresses: w?.view.showAddresses }, w?.annotations),
+    [graph, graphFilters, w?.view.showAddresses, w?.annotations],
+  );
+  useEffect(() => {
+    const available = new Set(graph.nodes.map((node) => node.id));
+    setNavigation((current) => {
+      const ids = current.ids.filter((id) => available.has(id));
+      if (ids.length === current.ids.length) return current;
+      const index =
+        current.ids.slice(0, current.index + 1).filter((id) => available.has(id)).length - 1;
+      return { ids, index };
+    });
+    if (selectedId && !available.has(selectedId)) setSelectedId(undefined);
+  }, [graph.nodes, selectedId]);
   const selected = graph.nodes.find((n) => n.id === selectedId);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback((id: string) => {
     setSelectedId(id);
+    setGraphFilters((filters) =>
+      filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
+    );
+    setNavigation((current) =>
+      current.ids[current.index] === id
+        ? current
+        : {
+            ids: [...current.ids.slice(0, current.index + 1), id].slice(-100),
+            index: Math.min(99, current.index + 1),
+          },
+    );
     setSelectedWallet(undefined);
     setRightTab('inspect');
   }, []);
@@ -172,7 +218,7 @@ export default function App() {
       controller.abort();
       clearInterval(timer);
     };
-  }, []);
+  }, [connectionCheck]);
   useEffect(() => {
     operationRef.current?.abort();
     setOperation('');
@@ -184,13 +230,25 @@ export default function App() {
     setSettingsOpen(false);
     setExamplesOpen(false);
     setEditToken(0);
+    setQuery('');
+    setFocusRequest(undefined);
+    setGraphFilters({});
+    setNavigation({ ids: [], index: -1 });
+    setFocusGraph(false);
+    setRunReports({});
     spendingOffsets.current.clear();
     setFitToken((t) => t + 1);
   }, [ws.activeId]);
   useEffect(() => {
-    if (w && !localStorage.getItem('chaingraph.tour.seen')) {
+    if (!w) return;
+    try {
+      if (!localStorage.getItem('chaingraph.tour.seen')) {
+        setTour(0);
+        localStorage.setItem('chaingraph.tour.seen', '1');
+      }
+    } catch {
+      // A denied/full store must not crash an unlocked workspace or block export.
       setTour(0);
-      localStorage.setItem('chaingraph.tour.seen', '1');
     }
   }, [w?.id]);
   useEffect(() => {
@@ -236,6 +294,7 @@ export default function App() {
   const run = async (task: (signal: AbortSignal) => Promise<void>) => {
     if (operationRef.current) return;
     const controller = new AbortController();
+    const workspaceId = wRef.current?.id;
     operationRef.current = controller;
     setOperation('Working…');
     setError('');
@@ -243,6 +302,7 @@ export default function App() {
     try {
       await task(controller.signal);
     } catch (e) {
+      if (wRef.current?.id !== workspaceId || operationRef.current !== controller) return;
       if (!controller.signal.aborted)
         setError(e instanceof Error ? e.message : 'Operation failed.');
       else setNotice('Operation cancelled. Completed data from earlier actions is preserved.');
@@ -254,6 +314,7 @@ export default function App() {
     }
   };
   const mergeTransactions = (id: string, transactions: Transaction[]) => {
+    if (!transactions.length) return;
     ws.update(
       id,
       (current) => ({
@@ -283,6 +344,7 @@ export default function App() {
         signal.throwIfAborted();
         mergeTransactions(w.id, [t]);
         select(index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index)));
+        setLeftTab('entities');
         if (prefetchDepth) {
           const result = await loadAncestors([t], w.transactions, prefetchDepth, {
             signal,
@@ -335,7 +397,18 @@ export default function App() {
         w.id,
         (c) => ({
           ...c,
-          wallets: c.wallets.map((x) => (x.id === target.id ? result.wallet : x)),
+          wallets: c.wallets.map((x) =>
+            x.id === target.id
+              ? {
+                  ...x,
+                  addresses: result.wallet.addresses,
+                  scannedAt: result.wallet.scannedAt,
+                  scanComplete: result.wallet.scanComplete,
+                  scanLimit: result.wallet.scanLimit,
+                  pendingTransactionIds: result.wallet.pendingTransactionIds,
+                }
+              : x,
+          ),
           transactions: {
             ...c.transactions,
             ...Object.fromEntries(result.transactions.map((t) => [t.txid, t])),
@@ -422,6 +495,7 @@ export default function App() {
     if (!ws.active) return;
     await run(async () => {
       setOperation('Encrypting workspace export…');
+      parseWorkspace(ws.active!.data, false);
       const envelope = await encryptWorkspace(ws.active!.data, ws.active!.password);
       download(
         `${ws.active!.data.name.replace(/[^a-z0-9_-]/gi, '-')}.chaingraph`,
@@ -452,7 +526,18 @@ export default function App() {
             current.id,
             (c) => ({
               ...c,
-              wallets: c.wallets.map((x) => (x.id === target.id ? result.wallet : x)),
+              wallets: c.wallets.map((x) =>
+                x.id === target.id
+                  ? {
+                      ...x,
+                      addresses: result.wallet.addresses,
+                      scannedAt: result.wallet.scannedAt,
+                      scanComplete: result.wallet.scanComplete,
+                      scanLimit: result.wallet.scanLimit,
+                      pendingTransactionIds: result.wallet.pendingTransactionIds,
+                    }
+                  : x,
+              ),
               transactions: {
                 ...c.transactions,
                 ...Object.fromEntries(result.transactions.map((t) => [t.txid, t])),
@@ -477,31 +562,93 @@ export default function App() {
     }, 30000);
     return () => clearInterval(timer);
   }, [live, canQuery, w?.id, gap, scanLimit]);
-  const entityNodes = useMemo(
-    () =>
-      graph.nodes.filter(
-        (n) =>
-          (entityKind === 'all' || n.kind === entityKind) &&
-          (!entityFilter ||
-            `${n.label} ${n.id} ${n.address ?? ''}`
-              .toLowerCase()
-              .includes(entityFilter.toLowerCase())),
-      ),
-    [graph, entityKind, entityFilter],
-  );
+  const entityNodes = visibleGraph.matchedNodes;
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
-  function findingRun(id: string) {
+  useEffect(() => setRunReports({}), [w?.transactions, w?.wallets]);
+  function centerNode(id = selectedId, filters?: GraphFilters) {
+    if (!id) return;
+    const rendered = filters
+      ? filterGraph(graph, { ...filters, showAddresses: w?.view.showAddresses }, w?.annotations)
+      : visibleGraph;
+    if (!rendered.nodes.some((node) => node.id === id)) {
+      setGraphFilters({});
+      if (id.startsWith('addr:'))
+        change((current) => ({ ...current, view: { ...current.view, showAddresses: true } }));
+      setNotice('View filters cleared to reveal this selection.');
+    }
+    setMobilePanel('graph');
+    setFocusRequest({ id, token: Date.now() });
+  }
+  function navigateSelection(delta: number) {
+    const index = navigation.index + delta;
+    const id = navigation.ids[index];
+    if (!id) return;
+    const filters: GraphFilters = graphFilters.focus
+      ? { focus: { ...graphFilters.focus, id } }
+      : {};
+    setGraphFilters(filters);
+    setNavigation({ ...navigation, index });
+    setSelectedId(id);
+    setSelectedWallet(undefined);
+    setRightTab('inspect');
+    centerNode(id, filters);
+  }
+  function updateFilters(filters: GraphFilters) {
+    setGraphFilters(filters);
+    setFitToken((token) => token + 1);
+  }
+  function findingRun(
+    id: string,
+    options: AnalysisOptions = {},
+    scope: 'graph' | 'selection' = 'graph',
+  ) {
     if (!w) return;
     const tool = analysisTools.find((t) => t.id === id)!;
-    const results = tool.run(w);
-    change((c) => ({
-      ...c,
-      findings: [...c.findings.filter((f) => !f.algorithm.startsWith(id)), ...results],
-    }));
-    setNotice(`${tool.name}: ${results.length} findings in loaded history.`);
+    const ids =
+      scope === 'selection'
+        ? tx
+          ? [tx.txid]
+          : []
+        : [
+            ...new Set(
+              visibleGraph.nodes.flatMap((node) =>
+                node.txid && w.transactions[node.txid] ? [node.txid] : [],
+              ),
+            ),
+          ];
+    try {
+      const report = tool.analyze(w, ids, options);
+      setRunReports((current) => ({ ...current, [id]: report }));
+      change((c) => ({
+        ...c,
+        findings: [
+          ...c.findings.filter((finding) => !finding.algorithm.startsWith(id)),
+          ...report.findings.map((finding) => {
+            const previous = c.findings.find(
+              (old) => old.id === finding.id && old.algorithm === finding.algorithm,
+            );
+            const sameEvidence =
+              previous &&
+              JSON.stringify([...previous.nodeIds].sort()) ===
+                JSON.stringify([...finding.nodeIds].sort()) &&
+              JSON.stringify([...previous.txids].sort()) ===
+                JSON.stringify([...finding.txids].sort());
+            return sameEvidence ? { ...finding, excluded: previous.excluded } : finding;
+          }),
+        ],
+      }));
+      setNotice(
+        `${tool.name}: ${report.findings.length} findings. ${report.emptyReason ?? report.summary}`,
+      );
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Analysis failed.');
+    }
   }
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-workspace">
+        Skip to workspace
+      </a>
       <header className="topbar">
         <a
           className="wordmark"
@@ -518,8 +665,10 @@ export default function App() {
           </span>
         </a>
         <div className="top-context">Wallet analysis workbench</div>
-        <div
-          className={`connection ${connected ? 'online' : ''}`}
+        <button
+          onClick={() => setAboutOpen('connection')}
+          aria-label="Connection details"
+          className={`connection connection-action ${connected ? 'online' : ''}`}
           title={status?.error || statusError || 'Your self-hosted backend'}
         >
           <span className="status-dot" />
@@ -527,14 +676,22 @@ export default function App() {
             ? `${status?.network} · ${status?.height?.toLocaleString() ?? 'connected'}`
             : 'Offline'}
           <span className="connection-caption"> / own node</span>
-        </div>
+        </button>
         <button
           className="icon-button"
           title="Guided tour"
           aria-label="Help and guided tour"
-          onClick={() => setTour(0)}
+          onClick={() => (w ? setTour(0) : setAboutOpen('guide'))}
         >
           <CircleHelp size={18} />
+        </button>
+        <button
+          className="icon-button"
+          aria-label="About Chaingraph"
+          title={`Chaingraph ${__APP_VERSION__}`}
+          onClick={() => setAboutOpen('about')}
+        >
+          <Info size={18} />
         </button>
       </header>
       <nav className="workspace-tabs" data-tour="workspace-tabs" aria-label="Open workspaces">
@@ -579,6 +736,7 @@ export default function App() {
           onOpenFile={() => fileInput.current?.click()}
           onActivate={ws.setActiveId}
           onUnlock={setUnlock}
+          onDelete={setDeleteEntry}
         />
       ) : (
         <>
@@ -752,7 +910,80 @@ export default function App() {
               Inspector
             </button>
           </div>
-          <main className={`workbench show-${mobilePanel}`}>
+          <div className="graph-navigation" aria-label="Graph navigation">
+            <button
+              aria-label="Previous selection"
+              title="Previous selection"
+              disabled={navigation.index <= 0}
+              onClick={() => navigateSelection(-1)}
+            >
+              <ArrowLeft size={14} />
+            </button>
+            <button
+              aria-label="Next selection"
+              title="Next selection"
+              disabled={navigation.index >= navigation.ids.length - 1}
+              onClick={() => navigateSelection(1)}
+            >
+              <ArrowRight size={14} />
+            </button>
+            <button disabled={!selected} onClick={() => centerNode()}>
+              <Crosshair size={14} />
+              Center selection
+            </button>
+            <label>
+              Paths
+              <select
+                aria-label="Focus graph paths"
+                value={graphFilters.focus?.hops ?? 0}
+                disabled={!selected && !!graph.nodes.length}
+                onChange={(event) => {
+                  const hops = Number(event.target.value);
+                  updateFilters(
+                    hops && selectedId
+                      ? {
+                          ...graphFilters,
+                          focus: { id: selectedId, hops: hops as 1 | 2 },
+                          includeIds: undefined,
+                        }
+                      : { ...graphFilters, focus: undefined, includeIds: undefined },
+                  );
+                }}
+              >
+                <option value={0}>All neighborhoods</option>
+                <option value={1}>1 connection from selection</option>
+                <option value={2}>2 connections from selection</option>
+              </select>
+            </label>
+            <button onClick={() => updateFilters({})} disabled={!Object.keys(graphFilters).length}>
+              All paths
+            </button>
+            <button
+              aria-pressed={focusGraph}
+              onClick={() => {
+                setFocusGraph(!focusGraph);
+                setMobilePanel('graph');
+              }}
+            >
+              {focusGraph ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {focusGraph ? 'Show panels' : 'Focus graph'}
+            </button>
+            <span className="view-summary">
+              {visibleGraph.nodes.length.toLocaleString()} / {graph.nodes.length.toLocaleString()}{' '}
+              nodes visible
+              {visibleGraph.contextNodeIds.length
+                ? ` · ${visibleGraph.contextNodeIds.length} context`
+                : ''}
+              {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
+                ? ' · selection hidden by filters'
+                : ''}
+            </span>
+          </div>
+          <main
+            id="main-workspace"
+            tabIndex={-1}
+            className={`workbench show-${mobilePanel} ${focusGraph ? 'focus-graph' : ''}`}
+          >
             <WorkspacePanel
               w={w}
               leftTab={leftTab}
@@ -777,10 +1008,16 @@ export default function App() {
               live={live}
               setLive={setLive}
               canQuery={canQuery}
-              entityFilter={entityFilter}
-              setEntityFilter={setEntityFilter}
-              entityKind={entityKind}
-              setEntityKind={setEntityKind}
+              entityFilter={graphFilters.query ?? ''}
+              setEntityFilter={(query) => updateFilters({ ...graphFilters, query })}
+              entityKind={graphFilters.kind ?? 'all'}
+              setEntityKind={(kind) =>
+                updateFilters({ ...graphFilters, kind: kind as GraphFilters['kind'] })
+              }
+              graphFilters={graphFilters}
+              onGraphFiltersChange={updateFilters}
+              entityTotalCount={graph.nodes.length}
+              contextCount={visibleGraph.contextNodeIds.length}
               entityNodes={entityNodes}
               bookmarks={bookmarks}
             />
@@ -875,8 +1112,9 @@ export default function App() {
                   }
                 >
                   <GraphView
-                    nodes={graph.nodes}
-                    links={graph.links}
+                    nodes={visibleGraph.nodes}
+                    links={visibleGraph.links}
+                    focusRequest={focusRequest}
                     selectedId={selectedId}
                     onSelect={select}
                     dimensions={w.view.dimensions}
@@ -912,6 +1150,13 @@ export default function App() {
                   {!connected && (
                     <p className="small">Backend offline. You can still work with saved data.</p>
                   )}
+                </div>
+              )}
+              {!!graph.nodes.length && !visibleGraph.nodes.length && (
+                <div className="filtered-graph-empty">
+                  <h3>No nodes match these filters</h3>
+                  <p>Adjust the entity filters or restore the complete loaded graph.</p>
+                  <button onClick={() => updateFilters({})}>Show all loaded paths</button>
                 </div>
               )}
               {w.demo && (
@@ -960,7 +1205,13 @@ export default function App() {
                 {rightTab === 'analysis' ? (
                   <AnalysisPanel
                     findings={w.findings}
-                    hasNodes={!!graph.nodes.length}
+                    hasNodes={!!visibleGraph.nodes.length}
+                    selectedTxids={tx ? [tx.txid] : []}
+                    runReports={runReports}
+                    onIsolate={(ids) => {
+                      updateFilters({ includeIds: ids, preserveContext: true });
+                      setMobilePanel('graph');
+                    }}
                     busy={!!operation}
                     onRun={findingRun}
                     onSelect={select}
@@ -968,6 +1219,7 @@ export default function App() {
                     onFocus={(id) => {
                       select(id);
                       setRightTab('analysis');
+                      centerNode(id);
                     }}
                     onToggle={(id) =>
                       change((c) => ({
@@ -1005,7 +1257,8 @@ export default function App() {
                     editToken={editToken}
                     onEditHandled={() => setEditToken(0)}
                     onSelectNode={select}
-                    annotationKey={`${w.id}:${selected.id}:${ws.active?.history.length}`}
+                    onCenter={() => centerNode()}
+                    annotationKey={`${w.id}:${selected.id}`}
                     onExpand={(direction) => void expand(direction)}
                     onRefresh={() =>
                       void run(async (signal) => {
@@ -1135,6 +1388,42 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {aboutOpen && (
+        <AboutDialog
+          initialTab={aboutOpen}
+          onClose={() => setAboutOpen(false)}
+          onTour={w ? () => setTour(0) : undefined}
+          status={status}
+          statusError={statusError}
+          onReconnect={() => setConnectionCheck((value) => value + 1)}
+        />
+      )}
+      {deleteEntry && (
+        <Modal title="Delete saved workspace?" onClose={() => setDeleteEntry(undefined)}>
+          <p>
+            Delete <strong>{deleteEntry.publicName ?? 'this encrypted workspace'}</strong> from this
+            browser? Keep an encrypted export if you may need it again. This deletion cannot be
+            undone.
+          </p>
+          <div className="button-row">
+            <button onClick={() => setDeleteEntry(undefined)}>Keep workspace</button>
+            <button
+              className="danger"
+              onClick={() =>
+                void ws
+                  .removeSaved(deleteEntry.id)
+                  .then(() => {
+                    setDeleteEntry(undefined);
+                    setNotice('Saved workspace deleted from this browser.');
+                  })
+                  .catch((error) => setError(error.message))
+              }
+            >
+              Delete from this browser
+            </button>
+          </div>
+        </Modal>
+      )}
       {(error || ws.storageError || notice) && (
         <div
           className={`toast ${error || ws.storageError ? 'error' : ''}`}
@@ -1200,7 +1489,7 @@ export default function App() {
                 annotations,
                 wallets: c.wallets.map((wallet) => ({
                   ...wallet,
-                  name: result.annotations[`xpub:${wallet.key}`]?.label || wallet.name,
+                  name: result.annotations[`xpub:${wallet.key}`]?.label.trim() || wallet.name,
                 })),
               };
             });

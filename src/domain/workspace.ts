@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import type { Workspace, Transaction, GraphData, GraphNode } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
-import { addressToScriptHash, inspectExtendedPublicKey } from '../lib/wallet';
+import {
+  addressToScriptHash,
+  inspectExtendedPublicKey,
+  verifyWalletAddresses,
+} from '../lib/wallet';
 const MAX_MONEY = 21_000_000;
 const MAX_MONEY_SATS = MAX_MONEY * 100_000_000;
 export const MAX_GRAPH_RECORDS = 50_000;
@@ -114,7 +118,7 @@ const transactionSchema = z
   });
 const walletSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
   key: z.string().max(150),
   scriptType: z.enum(['p2pkh', 'p2sh-p2wpkh', 'p2wpkh', 'p2tr']),
   color: z.string().regex(/^#[0-9a-f]{6}$/i),
@@ -168,6 +172,9 @@ const workspaceSchema = z.object({
         txids: z.array(txid).max(10000),
         createdAt: timestamp,
         excluded: z.boolean().optional(),
+        kind: z.enum(['observation', 'hypothesis', 'incomplete']).optional(),
+        scopeTxids: z.array(txid).max(10000).optional(),
+        stale: z.boolean().optional(),
       }),
     )
     .max(10000),
@@ -245,7 +252,7 @@ export function assertWorkspaceBudget(data: unknown) {
 export function parseTransaction(data: unknown): Transaction {
   return transactionSchema.parse(data);
 }
-export function parseWorkspace(data: unknown): Workspace {
+export function parseWorkspace(data: unknown, verifyDerivation = true): Workspace {
   assertWorkspaceBudget(data);
   const parsed = workspaceSchema.parse(data);
   if (Object.entries(parsed.transactions).some(([id, transaction]) => id !== transaction.txid))
@@ -284,6 +291,8 @@ export function parseWorkspace(data: unknown): Workspace {
           'Wallet address does not match its script hash.',
         );
     }
+    if (verifyDerivation)
+      verifyWalletAddresses(wallet.key, parsed.network, wallet.scriptType, wallet.addresses);
   }
   for (const address of parsed.watchedAddresses) addressToScriptHash(address, parsed.network);
   return parsed;
@@ -315,7 +324,8 @@ export function buildGraph(workspace: Workspace): GraphData {
   const links = new Map<string, GraphData['links'][number]>();
   const clusters = new Map<string, string>();
   for (const finding of workspace.findings)
-    if (!finding.excluded) for (const id of finding.nodeIds) clusters.set(id, finding.id);
+    if (!finding.excluded && !finding.stale)
+      for (const id of finding.nodeIds) clusters.set(id, finding.id);
   const add = (node: GraphNode) => {
     const old = nodes.get(node.id);
     const annotation = workspace.annotations[node.id];

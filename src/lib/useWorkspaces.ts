@@ -164,7 +164,10 @@ export class WorkspaceSessionStore {
     if (this.locking.has(id)) return;
     const current = this.state.sessions.find((s) => s.data.id === id);
     if (!current) return;
-    const data = fn(current.data);
+    let data = fn(current.data);
+    if (data.transactions !== current.data.transactions || data.wallets !== current.data.wallets) {
+      data = { ...data, findings: data.findings.map((finding) => ({ ...finding, stale: true })) };
+    }
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
     // Chain refreshes are not undoable and invalidate older full-workspace snapshots.
@@ -219,6 +222,9 @@ export class WorkspaceSessionStore {
               session.data.description.length > 10000)
           )
             throw new Error('Workspace description must contain at most 10,000 characters.');
+          // Full shape/semantic validation keeps a save readable. Imported wallet bindings
+          // are cryptographically verified at unlock/import; local derivation owns scan writes.
+          parseWorkspace(session.data, false);
           const envelope = await (this.options.encrypt ?? encryptWorkspace)(
             session.data,
             session.password,
@@ -262,6 +268,28 @@ export class WorkspaceSessionStore {
         } finally {
           this.patch({ saving: false });
         }
+      });
+    this.writing = operation;
+    return operation;
+  };
+
+  removeSaved = (id: string): Promise<void> => {
+    const operation = this.writing
+      .catch(() => {})
+      .then(async () => {
+        const commit = () => {
+          this.assertStorageUnchanged();
+          if (this.state.sessions.some((session) => session.data.id === id))
+            throw new Error('Lock this workspace before deleting its saved copy.');
+          const saved = this.state.saved.filter((entry) => entry.id !== id);
+          const raw = JSON.stringify(saved);
+          this.storage().setItem(STORAGE_KEY, raw);
+          this.storedRaw = raw;
+          this.patch({ saved, storageError: '' });
+        };
+        if (typeof navigator !== 'undefined' && navigator.locks)
+          await navigator.locks.request(STORAGE_KEY, async () => commit());
+        else commit();
       });
     this.writing = operation;
     return operation;
@@ -323,5 +351,6 @@ export function useWorkspaces() {
     undo: store.undo,
     lock: store.lock,
     persist: store.persist,
+    removeSaved: store.removeSaved,
   };
 }

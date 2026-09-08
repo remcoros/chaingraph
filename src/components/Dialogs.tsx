@@ -214,8 +214,8 @@ export function UnlockDialog({
   return (
     <Modal title="Unlock workspace" onClose={onClose}>
       <p className="muted">
-        Saved {new Date(entry.savedAt).toLocaleString()}. Names and wallet data stay encrypted until
-        unlocked.
+        Saved {new Date(entry.savedAt).toLocaleString()}. Workspace names are public. Descriptions,
+        wallet names and contents stay encrypted until unlocked.
       </p>
       <form
         className="stack"

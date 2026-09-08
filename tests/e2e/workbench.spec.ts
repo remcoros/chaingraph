@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { mockBitcoin, PUBLIC_ZPUB, RECEIVE_ADDRESS, TX_FUNDING } from '../fixtures/bitcoin';
+import {
+  mockBitcoin,
+  PUBLIC_ZPUB,
+  RECEIVE_ADDRESS,
+  TX_FUNDING,
+  TX_SPENDING,
+} from '../fixtures/bitcoin';
 
 const PASSWORD = 'public-test-only-passphrase';
 const STORAGE = 'chaingraph.encrypted-workspaces.v1';
@@ -131,7 +137,9 @@ test('locks, rejects the wrong password, and restores a saved workspace after re
   await page.getByRole('button', { name: 'Save and lock workspace' }).click();
   await expect(page.locator('.saved-row')).toHaveCount(1);
   await expect(page.locator('.saved-row')).toContainText('Secret study');
-  await expect(page.getByRole('navigation')).not.toContainText('Secret study');
+  await expect(page.getByRole('navigation', { name: 'Open workspaces' })).not.toContainText(
+    'Secret study',
+  );
   await page.reload();
   await page.locator('.saved-row').click();
   const dialog = page.getByRole('dialog', { name: 'Unlock workspace' });
@@ -141,14 +149,18 @@ test('locks, rejects the wrong password, and restores a saved workspace after re
   await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole('navigation')).toContainText('Secret study');
+  await expect(page.getByRole('navigation', { name: 'Open workspaces' })).toContainText(
+    'Secret study',
+  );
 });
 
 test('maintains independent multiple workspace tabs', async ({ page }) => {
   await mockBitcoin(page);
   await page.goto('/');
   await createWorkspace(page, 'First investigation');
+  await page.getByLabel('Transaction, output, or address').fill('private unsent lookup');
   await createWorkspace(page, 'Second investigation');
+  await expect(page.getByLabel('Transaction, output, or address')).toHaveValue('');
   const tabs = page.getByRole('navigation', { name: 'Open workspaces' });
   await expect(tabs.getByRole('button', { name: /First investigation/ })).toBeVisible();
   await expect(tabs.getByRole('button', { name: /Second investigation/ })).toHaveClass(/active/);
@@ -187,7 +199,9 @@ test('exports encrypted data and reimports a copy with annotations intact', asyn
   const dialog = page.getByRole('dialog', { name: 'Open encrypted workspace' });
   await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await dialog.getByRole('button', { name: 'Open workspace', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Export study (copy)');
+  await expect(page.getByRole('navigation', { name: 'Open workspaces' })).toContainText(
+    'Export study (copy)',
+  );
   await selectTransaction(page);
   await expect(page.getByLabel('Node label')).toHaveValue('A portable label');
 });
@@ -209,6 +223,7 @@ test('renders the 150-input laboratory and runs, excludes, restores and clears a
   await page.getByLabel('Size nodes by').selectOption('value');
   await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
   await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page.getByRole('button', { name: 'All paths', exact: true }).click();
   await page
     .locator('.right-panel')
     .getByRole('button', { name: /^Analysis/ })
@@ -221,8 +236,16 @@ test('renders the 150-input laboratory and runs, excludes, restores and clears a
   await expect(page.locator('.finding')).toHaveCount(3);
   await page.locator('.finding').first().getByRole('button', { name: 'Exclude' }).click();
   await expect(page.locator('.finding.excluded')).toHaveCount(1);
+  await page
+    .locator('.analysis-tool')
+    .filter({ has: page.getByRole('heading', { name: 'Equal-output detection', exact: true }) })
+    .getByRole('button', { name: 'Run analysis' })
+    .click();
+  await expect(page.locator('.finding.excluded')).toHaveCount(1);
   await page.locator('.finding.excluded').getByRole('button', { name: 'Restore' }).click();
   await expect(page.locator('.finding.excluded')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show all fixture paths', exact: true }).click();
+  await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(3);
   await page.getByRole('button', { name: 'Clear all', exact: true }).click();
   await expect(page.locator('.finding')).toHaveCount(0);
   for (const name of ['Common-input ownership', 'Address reuse']) {
@@ -231,7 +254,13 @@ test('renders the 150-input laboratory and runs, excludes, restores and clears a
       .filter({ has: page.getByRole('heading', { name, exact: true }) })
       .getByRole('button')
       .click();
-    await expect(page.getByRole('status').filter({ hasText: `${name}: 0 findings` })).toBeVisible();
+    await expect(
+      page
+        .locator('.analysis-tool')
+        .filter({ has: page.getByRole('heading', { name, exact: true }) })
+        .getByRole('status'),
+    ).toBeVisible();
+    await expect(page.locator('.finding')).toHaveCount(0);
   }
 });
 
@@ -321,4 +350,127 @@ test('keeps multiple wallets independent inside one encrypted workspace', async 
   await expect(page.locator('.wallet-row')).toHaveCount(1);
   await expect(page.locator('.wallet-row')).toContainText('My private BIP84 wallet');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
+});
+
+test('keeps annotation drafts through view changes and reconciles an undo while editing', async ({
+  page,
+}) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page);
+  await page.getByLabel('Transaction, output, or address').fill(TX_FUNDING);
+  await page.getByRole('button', { name: 'Add to graph' }).click();
+  const label = page.getByLabel('Node label');
+  await label.fill('First saved context');
+  await page.getByRole('button', { name: 'Save context', exact: true }).click();
+  await label.fill('Unsaved second draft');
+  await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
+  await page.getByLabel('Size nodes by').selectOption('value');
+  await expect(label).toHaveValue('Unsaved second draft');
+  await page.getByRole('button', { name: 'Save context', exact: true }).click();
+  await label.fill('Third draft survives undo');
+  await page.getByRole('button', { name: 'Undo workspace change' }).click();
+  await expect(label).toHaveValue('Third draft survives undo');
+  await expect(page.locator('.annotation-conflict')).toBeVisible();
+  await page.getByRole('button', { name: 'Reload saved context' }).click();
+  await expect(label).toHaveValue('First saved context');
+});
+
+test('imports a long wallet label during scanning and reopens it intact', async ({ page }) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page);
+  await page.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  const add = page.getByRole('dialog', { name: 'Add a wallet' });
+  await add.getByLabel('Wallet name').fill('Original wallet name');
+  await add.getByLabel('Extended public key').fill(PUBLIC_ZPUB);
+  await add.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let waiting = false;
+  await page.route('**/api/rpc', async (route) => {
+    if (route.request().postDataJSON().method === 'blockchain.scripthash.get_history') {
+      waiting = true;
+      await barrier;
+    }
+    await route.fallback();
+  });
+  await page.getByRole('button', { name: 'Scan wallet', exact: true }).click();
+  await expect.poll(() => waiting).toBe(true);
+  const longName = 'Wallet label survives scan completion and encrypted reopening. '.repeat(3);
+  try {
+    await page.locator('input[type=file][accept=".jsonl,.json,.txt"]').setInputFiles({
+      name: 'public-vector-labels.jsonl',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ type: 'xpub', ref: PUBLIC_ZPUB, label: longName })),
+    });
+    await expect(page.locator('.wallet-row')).toContainText(longName.trim());
+  } finally {
+    release();
+  }
+  await expect(
+    page.getByText('Gap limit reached on both branches.', { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator('.wallet-row')).toContainText(longName.trim());
+  await saved(page);
+  await page.reload();
+  await page.locator('.saved-row').click();
+  const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
+  await unlock.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(page.locator('.wallet-row')).toContainText(longName.trim());
+});
+
+test('about and connection navigation work and locked copies can be deliberately deleted', async ({
+  page,
+}) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'About Chaingraph', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('CHAINGRAPH 0.2.0');
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'MIT license' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Connection details', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Your node is connected');
+  await page.keyboard.press('Escape');
+  await createWorkspace(page, 'Disposable browser study');
+  await page.getByRole('button', { name: 'Workspace menu' }).click();
+  await page.getByRole('button', { name: 'Save and lock workspace' }).click();
+  const remove = page.getByRole('button', {
+    name: 'Delete saved workspace Disposable browser study',
+  });
+  await remove.click();
+  await page.getByRole('button', { name: 'Keep workspace', exact: true }).click();
+  await expect(page.locator('.saved-row')).toHaveCount(1);
+  await remove.click();
+  await page.getByRole('button', { name: 'Delete from this browser', exact: true }).click();
+  await expect(page.locator('.saved-row')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.saved-row')).toHaveCount(0);
+});
+
+test('selection history preserves path depth and skips removed transaction nodes', async ({
+  page,
+}) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  await createWorkspace(page);
+  for (const id of [TX_FUNDING, TX_SPENDING]) {
+    await page.getByLabel('Transaction, output, or address').fill(id);
+    await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
+    await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(id);
+  }
+  await page.getByLabel('Focus graph paths').selectOption('1');
+  await page.getByRole('button', { name: 'Previous selection', exact: true }).click();
+  await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(TX_FUNDING);
+  await expect(page.getByLabel('Focus graph paths')).toHaveValue('1');
+  await page.getByRole('button', { name: 'Remove transaction from graph', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  await page.getByRole('button', { name: 'Next selection', exact: true }).click();
+  await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(TX_SPENDING);
+  await expect(
+    page.getByRole('button', { name: 'Previous selection', exact: true }),
+  ).toBeDisabled();
 });

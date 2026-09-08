@@ -1,0 +1,37 @@
+name: chaingraph
+services:
+  chaingraph:
+    image: ${CHAINGRAPH_IMAGE:-chaingraph:local}
+    build:
+      context: .
+      args:
+        CHAINGRAPH_SOURCE_URL: ${CHAINGRAPH_SOURCE_URL:-}
+        VCS_REF: ${CHAINGRAPH_REVISION:-}
+    # Compose 2.30+: raw preserves literal dollar signs in RPC passwords.
+    # Use unquoted KEY=value lines in this explicitly selected runtime file.
+    env_file:
+      - path: ${CHAINGRAPH_ENV_FILE:-./.env}
+        required: true
+        format: raw
+    environment:
+      NODE_ENV: production
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: '3000'
+    ports:
+      - '${CHAINGRAPH_BIND:-127.0.0.1}:${CHAINGRAPH_PORT:-3000}:3000'
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'

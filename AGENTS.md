@@ -42,3 +42,8 @@ not when scaffolding this upstream application.
   merely repeat implementation. Exercise real services read-only when available.
 - State exactly what was validated. A build or mocked RPC test is not live validation.
 - Keep README and user instructions in sync with changes. Preserve unrelated files.
+
+For substantial UI work, use the local review checklist in
+`.agents/skills/chaingraph-ui-review/SKILL.md`, inspect fresh-context screenshots,
+and run browser suites serially. Release commands and validation are documented
+in `docs/deployment.md`; do not assume a publication destination.

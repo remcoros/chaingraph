@@ -1,0 +1,129 @@
+.entity-browser {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.entity-browser .entity-filters {
+  flex-shrink: 0;
+  max-height: 60%;
+  overflow: auto;
+}
+.entity-filter-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.entity-browser input,
+.entity-browser select {
+  width: 100%;
+  min-width: 0;
+}
+.entity-advanced {
+  font-size: var(--text-xs);
+}
+.entity-advanced summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--color-muted);
+}
+.entity-advanced summary::after {
+  content: '+';
+  margin-left: auto;
+}
+.entity-advanced[open] summary::after {
+  content: '−';
+}
+.entity-advanced-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 8px 0;
+}
+.entity-advanced-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.entity-advanced-fields .entity-bookmark-filter {
+  flex-direction: row;
+  align-items: center;
+}
+.entity-bookmark-filter input {
+  width: auto;
+}
+.entity-advanced-fields p,
+.entity-context-note {
+  font-size: 10px;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+.entity-result-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--color-muted);
+}
+.entity-result-count button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 4px 5px;
+}
+.entity-filter-error {
+  color: var(--color-accent);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+}
+.entity-browser .entity-list {
+  min-height: 0;
+}
+.entity-browser .entity-row small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.entity-pagination {
+  border-top: 1px solid var(--color-rule);
+  padding: 9px 12px;
+  font-size: 10px;
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+.entity-pagination > div,
+.entity-pagination nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.entity-pagination label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.entity-pagination select {
+  width: auto;
+  padding: 3px;
+  font-size: 10px;
+}
+.entity-pagination nav {
+  margin-top: 8px;
+}
+.entity-pagination button {
+  padding: 5px 9px;
+  display: flex;
+}

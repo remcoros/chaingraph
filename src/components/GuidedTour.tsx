@@ -15,12 +15,12 @@ const tourSteps = [
   {
     target: 'graph-stage',
     title: 'Follow the coins',
-    text: 'Select nodes to inspect them. Drag empty space to orbit, scroll to zoom, and right-drag to pan. Use Flat for a 2D view. Funding and spending actions expand the selected path.',
+    text: 'Select nodes to inspect them. Drag empty space to orbit, scroll to zoom, and right-drag to pan. Use Flat for a 2D view. Hover for tracing actions. Filter in Entities, focus a neighborhood, and use All paths to restore the view.',
   },
   {
     target: 'analysis-panel',
     title: 'Build an interpretation',
-    text: 'Run analysis tools, inspect their assumptions, and remove findings whenever you want. Labels and notes stay yours. Export an encrypted workspace before clearing browser data.',
+    text: 'Choose an analysis tool and scope, inspect its evidence, and exclude findings whenever you want. Stale results need a rerun after loading new data. Labels and notes stay yours. Export an encrypted workspace before clearing browser data.',
   },
 ];
 export function GuidedTour({

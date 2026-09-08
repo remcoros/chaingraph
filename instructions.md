@@ -53,19 +53,33 @@ Transactions are cubes, outputs are spheres, and optional addresses are diamonds
 
 Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row palette with labeled symbols, keyboard arrow navigation, and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Remove a transaction from its inspector to reduce the graph; its saved annotations remain, and descendant inputs may still show output placeholders.
 
+## Filter and navigate
+
+The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
+
+**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Focus graph** hides the side panels until you choose **Show panels**.
+
 ## Run analysis
 
-Analysis uses the transactions already loaded in this workspace:
+Open **Analysis**, choose **Visible graph** or **Selected transaction**, and find a tool by name. Open **Parameters and method** to inspect thresholds and the source reference. Loaded parent transactions can supply input evidence even when outside the selected scope; running analysis makes no additional network requests.
 
-- **Equal-output detection** highlights repeated positive output amounts in multi-input transactions. The pattern can occur in collaborative transactions and other activity; it is not a CoinJoin verdict.
-- **Common-input ownership** creates tentative input groups and skips transactions with three or more equal outputs. PayJoin, other collaborative spends, and missing history can invalidate the inference. Treat cluster membership as a hypothesis to inspect.
-- **Address reuse** identifies addresses appearing on more than one loaded output. It describes the loaded snapshot, not necessarily the address's complete history.
+| Tool | What it explains |
+| --- | --- |
+| Equal-output detection | Exact groups of equal positive, spendable outputs, with only their members highlighted. A pattern is not a CoinJoin verdict or linkability probability. |
+| Common-input ownership | Tentative input groups, with explicit skipped equal-output candidates and missing evidence. PayJoin and other collaborative transactions remain counterexamples. |
+| Address reuse | Repeated destinations in the selected loaded history, optionally requiring different transactions. |
+| Value flow and fees | Input/output reconciliation and fees when all input amounts are known, or explicit missing/inconsistent data. |
+| Consolidation and fan-out | Transaction shapes matching your input/output thresholds, without assigning ownership or intent. |
+| Script-type comparisons | Observed input/output script patterns and optionally change-like hypotheses, with their limitations. |
+| Imported-wallet intersections | Transactions touching multiple imported wallet records, distinguishing overlapping imports from independent coverage. |
 
-Review each finding's explanation and supporting transaction references before applying a conclusion. Loading more history can change what an algorithm would find; rerun analysis when the investigation changes. User annotations and algorithm results are stored separately.
+The **Tools** and **Findings** controls jump between configuration and results. Each run reports its coverage and skipped records, including when it has no findings. Search findings or filter by tool, observation/hypothesis/incomplete evidence, and active/excluded/stale status. **Show on graph** isolates a finding's evidence with connected context; **Focus** centers its first node. **All paths** returns to the complete graph.
+
+Exclude a finding to remove its overlay without deleting the result. Rerunning the same tool preserves exclusions when the finding's node and transaction evidence is unchanged. Loading or changing wallet/transaction data marks prior results **Needs rerun** and removes stale overlays. User annotations stay separate from algorithm results.
 
 ## Save, lock, and exchange data
 
-Workspace autosave writes encrypted contents to this browser's storage. Lock the workspace to close its unlocked session. Reopening requires its password. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
+Workspace autosave writes encrypted contents to this browser's storage. Lock the workspace to close its unlocked session. Reopening requires its password. On the Workspaces screen, search saved public names or use the trash button to delete a locked browser copy. The confirmation affects only that copy, not exported files; lock an open workspace first. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
 
 Export an encrypted workspace file for backup or transfer to another browser. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Current camera position and the temporary force layout are not saved.
 
@@ -91,4 +105,6 @@ Encrypted workspace payloads have a 32 MiB limit, while browser storage may fill
 - **Encryption unavailable:** open the app on localhost or HTTPS in a browser supporting Web Crypto.
 - **Graph unavailable:** continue with the entity list, or reload in a browser with working WebGL. A flat 2D view also needs WebGL.
 
-For server setup and development commands, see [README.md](README.md).
+Use **About** for the version, license and source/release links when configured. Click the connection indicator for network details and a fresh status check. Help contains workflow guidance, shortcuts and a restartable tour.
+
+For Docker setup, see [deployment](docs/deployment.md). For server setup and development commands, see [README.md](README.md).

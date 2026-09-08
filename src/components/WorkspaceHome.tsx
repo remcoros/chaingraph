@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowUpRight,
   ChevronRight,
@@ -6,6 +7,7 @@ import {
   Plus,
   ShieldCheck,
   Upload,
+  Trash2,
 } from 'lucide-react';
 import type { SavedWorkspace, Session } from '../lib/useWorkspaces';
 interface Props {
@@ -16,6 +18,7 @@ interface Props {
   onOpenFile: () => void;
   onActivate: (id: string) => void;
   onUnlock: (entry: SavedWorkspace) => void;
+  onDelete?: (entry: SavedWorkspace) => void;
 }
 export function WorkspaceHome({
   saved,
@@ -25,9 +28,20 @@ export function WorkspaceHome({
   onOpenFile,
   onActivate,
   onUnlock,
+  onDelete,
 }: Props) {
+  const [filter, setFilter] = useState('');
+  const shown = saved.filter((entry) =>
+    (
+      sessions.find((session) => session.data.id === entry.id)?.data.name ??
+      entry.publicName ??
+      'Encrypted workspace'
+    )
+      .toLowerCase()
+      .includes(filter.toLowerCase()),
+  );
   return (
-    <main className="welcome">
+    <main id="main-workspace" tabIndex={-1} className="welcome">
       <div className="welcome-copy">
         <span className="eyebrow">YOUR COINS. YOUR CONTEXT.</span>
         <h1>
@@ -67,6 +81,15 @@ export function WorkspaceHome({
           <h2>Saved in this browser</h2>
           <span>{saved.length}</span>
         </div>
+        {saved.length > 1 && (
+          <input
+            className="saved-search"
+            aria-label="Find saved workspace"
+            placeholder="Find a workspace…"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+        )}
         {saved.length === 0 ? (
           <div className="saved-empty">
             <FolderOpen size={32} />
@@ -77,37 +100,54 @@ export function WorkspaceHome({
           </div>
         ) : (
           <div className="saved-list">
-            {saved.map((entry, i) => (
-              <button
-                key={entry.id}
-                className="saved-row"
-                onClick={() => {
-                  const open = sessions.find((s) => s.data.id === entry.id);
-                  if (open) onActivate(entry.id);
-                  else onUnlock(entry);
-                }}
-              >
-                <LockKeyhole size={19} />
-                <span>
-                  <strong>
-                    {sessions.find((s) => s.data.id === entry.id)?.data.name ??
-                      entry.publicName ??
-                      `Encrypted workspace ${saved.length - i}`}
-                  </strong>
-                  <small>{new Date(entry.savedAt).toLocaleString()}</small>
-                  {sessions.find((session) => session.data.id === entry.id)?.data.description && (
-                    <small className="workspace-description">
-                      {sessions.find((session) => session.data.id === entry.id)?.data.description}
-                    </small>
-                  )}
-                  {!entry.publicName &&
-                    !sessions.some((session) => session.data.id === entry.id) && (
-                      <small>Unlock once to reveal and save its public name.</small>
+            {shown.map((entry, i) => (
+              <div className="saved-entry" key={entry.id}>
+                <button
+                  className="saved-row"
+                  onClick={() => {
+                    const open = sessions.find((s) => s.data.id === entry.id);
+                    if (open) onActivate(entry.id);
+                    else onUnlock(entry);
+                  }}
+                >
+                  <LockKeyhole size={19} />
+                  <span>
+                    <strong>
+                      {sessions.find((s) => s.data.id === entry.id)?.data.name ??
+                        entry.publicName ??
+                        `Encrypted workspace ${saved.length - i}`}
+                    </strong>
+                    <small>{new Date(entry.savedAt).toLocaleString()}</small>
+                    {sessions.find((session) => session.data.id === entry.id)?.data.description && (
+                      <small className="workspace-description">
+                        {sessions.find((session) => session.data.id === entry.id)?.data.description}
+                      </small>
                     )}
-                </span>
-                <ChevronRight size={17} />
-              </button>
+                    {!entry.publicName &&
+                      !sessions.some((session) => session.data.id === entry.id) && (
+                        <small>Unlock once to reveal and save its public name.</small>
+                      )}
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+                {onDelete && (
+                  <button
+                    className="icon-button saved-delete"
+                    aria-label={`Delete saved workspace ${entry.publicName ?? saved.length - i}`}
+                    title={
+                      sessions.some((session) => session.data.id === entry.id)
+                        ? 'Lock the workspace before deleting its saved copy'
+                        : 'Delete saved browser copy'
+                    }
+                    disabled={sessions.some((session) => session.data.id === entry.id)}
+                    onClick={() => onDelete(entry)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
             ))}
+            {!shown.length && <p className="small muted">No saved workspaces match this name.</p>}
           </div>
         )}
         <div className="welcome-note">

@@ -25,6 +25,7 @@ interface Props {
   sizeBy: 'uniform' | 'value' | 'degree';
   glow: boolean;
   fitToken: number;
+  focusRequest?: { id: string; token: number };
   transactions?: Record<string, Transaction>;
   onTrace?: (id: string) => void;
   onEdit?: (id: string) => void;
@@ -299,7 +300,10 @@ export default function GraphView(props: Props) {
           positionHalos();
           if (needsFit.current && graph && graph.graphData().nodes.length) {
             needsFit.current = false;
-            graph.zoomToFit(450, 65);
+            graph.zoomToFit(
+              window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450,
+              65,
+            );
           }
         });
       graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -330,9 +334,16 @@ export default function GraphView(props: Props) {
           showCard('node', current.current.selectedId, true);
         }
       };
+      const cancelPendingFit = () => {
+        needsFit.current = false;
+      };
+      canvas.addEventListener('pointerdown', cancelPendingFit);
+      canvas.addEventListener('wheel', cancelPendingFit, { passive: true });
       canvas.addEventListener('webglcontextlost', onContextLost);
       canvas.addEventListener('keydown', onKeyDown);
       removeContextListener = () => {
+        canvas.removeEventListener('pointerdown', cancelPendingFit);
+        canvas.removeEventListener('wheel', cancelPendingFit);
         canvas.removeEventListener('webglcontextlost', onContextLost);
         canvas.removeEventListener('keydown', onKeyDown);
       };
@@ -442,8 +453,42 @@ export default function GraphView(props: Props) {
   }, [props.dimensions]);
 
   useEffect(() => {
-    if (props.fitToken) graphRef.current?.zoomToFit(450, 65);
+    if (props.fitToken) {
+      needsFit.current = true;
+      graphRef.current?.zoomToFit(
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450,
+        65,
+      );
+    }
   }, [props.fitToken]);
+
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph || !props.focusRequest) return;
+    const node = graph.graphData().nodes.find((node) => node.id === props.focusRequest!.id);
+    if (!node) return;
+    needsFit.current = false;
+    const target = { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 };
+    const camera = graph.cameraPosition();
+    const dx = camera.x - target.x,
+      dy = camera.y - target.y,
+      dz = camera.z - target.z;
+    const length = Math.hypot(dx, dy, dz) || 1;
+    const distance = 180;
+    const position =
+      props.dimensions === 2
+        ? { x: target.x, y: target.y, z: distance }
+        : {
+            x: target.x + (dx / length) * distance,
+            y: target.y + (dy / length) * distance,
+            z: target.z + (dz / length) * distance,
+          };
+    graph.cameraPosition(
+      position,
+      target,
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450,
+    );
+  }, [props.focusRequest, props.dimensions]);
 
   const hoveredLink =
     hover?.type === 'link' ? props.links.find((link) => link.id === hover.id) : undefined;
@@ -680,7 +725,7 @@ export default function GraphView(props: Props) {
       {!error && !props.nodes.length && (
         <div className="graph-empty" aria-hidden="true">
           <span className="graph-empty-cross">+</span>
-          <span>Add a transaction or address to begin</span>
+          <span>No visible graph nodes</span>
         </div>
       )}
     </div>

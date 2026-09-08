@@ -1,0 +1,26 @@
+# Deny by default: credentials, local workspaces, Git metadata and test output
+# never enter the build context, including when untracked in the repository.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!index.html
+!tokens.css
+!tsconfig.json
+!vite.config.ts
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!src/
+!src/**
+!server/
+!server/**
+!public/
+!public/**
+!scripts/
+!scripts/licenses.mjs
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.test.ts

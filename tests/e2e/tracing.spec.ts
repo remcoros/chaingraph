@@ -46,7 +46,7 @@ test('lookup prefetch hydrates previous outputs and the spending action follows 
   ).toBeVisible();
   await page.getByRole('button', { name: /^Spending transaction:/ }).click();
   await expect(page.locator('.selection-heading .eyebrow')).toHaveText('TRANSACTION');
-  await expect(page.locator('.selection-heading > code')).toHaveText(TX_SPENDING);
+  await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(TX_SPENDING);
 });
 test('an unresolved output can load its creating transaction without prefetch', async ({
   page,

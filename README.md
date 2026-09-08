@@ -2,9 +2,22 @@
 
 A self-hosted Bitcoin analysis workbench for personal wallets and on-chain investigations. Explore transactions and outputs in an interactive 3D graph, follow funding and spending paths, annotate what you find, and compare tentative ownership hypotheses. Workspaces and wallet data live in your browser.
 
-This first slice includes multiple encrypted workspaces, multiple watch-only wallets per workspace, address and transaction loading, receive/change scanning, labels, notes, icons, bookmarks, BIP329 label exchange, and three analysis tools: equal-output detection, common-input ownership, and address reuse. The graph supports a 2D view, value/degree sizing, cluster colors, and optional glow. A synthetic laboratory starts with three 150-input/150-output transactions and lets you reveal incoming and outgoing fixture paths without a node connection. Three verified real testnet4 output examples are also available from the workbench.
+Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, browser-side receive/change scanning, labels, notes, a searchable icon palette, bookmarks, and BIP329 label exchange. Seven analysis tools cover equal outputs, common-input ownership, address reuse, value flow and fees, consolidation and fan-out, script types, and imported-wallet intersections. Each tool exposes its scope, parameters, assumptions and coverage.
 
-![Real testnet4 output with previous and spending paths in Chaingraph](docs/screenshots/trace-workbench.png)
+Filter the graph by entity type, labels, notes, bookmarks, value and loaded funding/spending evidence. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. A synthetic laboratory contains three 150-input/150-output transactions with expandable paths. Three verified real testnet4 output examples are also available.
+
+![Real testnet4 tracing and fee findings in Chaingraph](docs/screenshots/release-analysis.png)
+
+## Docker and Compose
+
+```sh
+cp .env.example .env.container
+chmod 600 .env.container
+# Set upstream connection details reachable from the container.
+CHAINGRAPH_ENV_FILE=./.env.container docker compose --env-file /dev/null up --build -d
+```
+
+Open **http://127.0.0.1:3000**. The container runs without root privileges and Compose restricts the published port to loopback. See [deployment and release instructions](docs/deployment.md) for HTTPS, private CAs, cookie authentication, backups and the GitHub container release workflow. No GitHub repository or published image is assumed yet.
 
 ## Run locally
 
@@ -50,7 +63,7 @@ This is a trusted, single-user, fully self-hosted application. The backend has *
 - Loaded transactions are a **history snapshot**. Status polling does not refresh every saved confirmation count or detect every reorganization. Scans have address, history, and transaction bounds; a partial result is not proof that no further activity exists.
 - CIOH produces a hypothesis. Skipping conspicuous equal-output transactions does not detect all collaborative spends or PayJoin. No tool identifies a person or proves wallet ownership.
 - Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node or connection for details and actions to trace one previous level or edit its context. Transaction/output lookups offer Off, 1 level, or 2 levels of previous-transaction prefetch, bounded to 500 downloads per action. The 2D view still requires WebGL. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
-- Tools are extensible through [`src/domain/analysis.ts`](src/domain/analysis.ts). There is no custom-script IDE, Boltzmann implementation, service worker, or WebSocket live feed in this slice. Boltzmann-related research and license compatibility remain research work.
+- Tools are extensible through [`src/domain/analysis.ts`](src/domain/analysis.ts). There is no custom-script IDE, Boltzmann implementation, service worker, or WebSocket live feed in this version. Boltzmann-related research and license compatibility remain research work.
 
 See [the curated testnet4 examples and verification sources](docs/research/testnet4-examples.md). Example outputs are real chain observations, not attributed wallets or proof of ownership.
 
@@ -62,6 +75,7 @@ npm test          # Unit and integration tests
 npm run test:e2e  # Browser tests; requires Playwright Chromium
 npm run check    # Build and unit/integration tests
 npm run test:live # Read-only testnet4/mainnet smoke using .env.live
+npm run test:production # Browser smoke against built server on port 4300
 ```
 
 Use `npx playwright install chromium` if the browser required by the installed Playwright version is missing. Test commands are separate from claims about a live node or mobile performance.
@@ -69,5 +83,7 @@ Use `npx playwright install chromium` if the browser required by the installed P
 See [verified results and limits](docs/validation.md) for automated, live testnet4, and production-browser evidence.
 
 The dependency license notices are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); regenerate them with `npm run licenses` after dependency updates.
+
+The [independent review and resolved findings](docs/reviews/2026-09-08-response.md) record the release review performed in a clean Codex session without skills or memory.
 
 Read [architecture and extension points](docs/architecture.md), [user instructions](instructions.md), and the [research log](docs/research/2026-09-08-discovery.md). Research notes credit upstream specifications, papers, and libraries; third-party code retains its own license. Chaingraph is MIT-licensed.

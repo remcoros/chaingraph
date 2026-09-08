@@ -1,11 +1,7 @@
 import { Bookmark, ChevronRight, Plus, ShieldCheck, Wallet as WalletIcon } from 'lucide-react';
-import {
-  formatSats,
-  short,
-  type Annotation,
-  type GraphNode,
-  type Workspace,
-} from '../domain/types';
+import { short, type Annotation, type GraphNode, type Workspace } from '../domain/types';
+import type { GraphFilters } from '../domain/graphFilters';
+import EntityBrowser from './EntityBrowser';
 interface Props {
   w: Workspace;
   leftTab: 'wallets' | 'entities' | 'bookmarks';
@@ -28,6 +24,10 @@ interface Props {
   setEntityKind: (kind: string) => void;
   entityNodes: GraphNode[];
   bookmarks: [string, Annotation][];
+  graphFilters?: GraphFilters;
+  onGraphFiltersChange?: (filters: GraphFilters) => void;
+  entityTotalCount?: number;
+  contextCount?: number;
 }
 export function WorkspacePanel({
   w,
@@ -51,6 +51,10 @@ export function WorkspacePanel({
   setEntityKind,
   entityNodes,
   bookmarks,
+  graphFilters,
+  onGraphFiltersChange,
+  entityTotalCount,
+  contextCount,
 }: Props) {
   return (
     <aside className="left-panel" data-tour="wallet-panel">
@@ -147,49 +151,25 @@ export function WorkspacePanel({
           </div>
         </>
       ) : leftTab === 'entities' ? (
-        <>
-          <div className="entity-filters">
-            <input
-              aria-label="Filter graph entities"
-              placeholder="Filter loaded entities…"
-              value={entityFilter}
-              onChange={(e) => setEntityFilter(e.target.value)}
-            />
-            <select
-              aria-label="Entity type"
-              value={entityKind}
-              onChange={(e) => setEntityKind(e.target.value)}
-            >
-              <option value="all">All types</option>
-              <option value="transaction">Transactions</option>
-              <option value="output">Outputs</option>
-              <option value="address">Addresses</option>
-            </select>
-          </div>
-          <div className="entity-list">
-            {entityNodes.slice(0, 200).map((n) => (
-              <button
-                key={n.id}
-                className={`entity-row ${selectedId === n.id ? 'selected' : ''}`}
-                onClick={() => onSelectNode(n.id)}
-              >
-                <span className={`entity-dot ${n.kind}`} />
-                <span>
-                  <strong>{n.label}</strong>
-                  <small>
-                    {n.kind} · {formatSats(n.value)}
-                  </small>
-                </span>
-              </button>
-            ))}
-            {entityNodes.length > 200 && (
-              <p className="small muted inset">
-                Showing 200 of {entityNodes.length}. Filter to narrow the list.
-              </p>
-            )}
-            {!entityNodes.length && <p className="empty-panel">No matching entities.</p>}
-          </div>
-        </>
+        <EntityBrowser
+          key={w.id}
+          nodes={entityNodes}
+          annotations={w.annotations}
+          filters={
+            graphFilters ?? { query: entityFilter, kind: entityKind as GraphFilters['kind'] }
+          }
+          onFiltersChange={
+            onGraphFiltersChange ??
+            ((filters) => {
+              setEntityFilter(filters.query ?? '');
+              setEntityKind(filters.kind ?? 'all');
+            })
+          }
+          selectedId={selectedId}
+          onSelect={onSelectNode}
+          totalCount={entityTotalCount}
+          contextCount={contextCount}
+        />
       ) : (
         <div className="entity-list">
           {bookmarks.map(([id, a]) => (

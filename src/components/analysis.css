@@ -1,0 +1,165 @@
+.analysis-panel {
+  min-width: 0;
+}
+.analysis-panel .analysis-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.analysis-panel .analysis-field select,
+.analysis-panel .analysis-field input:not([type='checkbox']),
+.analysis-panel .analysis-result-search {
+  width: 100%;
+  min-width: 0;
+}
+.analysis-panel .analysis-field small {
+  font-weight: 400;
+  line-height: 1.5;
+}
+.analysis-panel .analysis-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0;
+}
+.analysis-panel .analysis-search input {
+  width: 100%;
+  min-width: 0;
+}
+.analysis-panel .analysis-group-title {
+  color: var(--muted, #99a8b4);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 24px 0 12px;
+}
+.analysis-panel .analysis-card-heading {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.analysis-panel .analysis-card-heading h3 {
+  flex: 1 1 160px;
+  margin: 0;
+}
+.analysis-panel .analysis-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: #20353e;
+  color: #b6c9d1;
+  border: 1px solid #35515d;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.analysis-panel .analysis-badge.observation {
+  background: #173731;
+  border-color: #2c5b4e;
+  color: #a2dfc6;
+}
+.analysis-panel .analysis-badge.hypothesis {
+  background: #342e48;
+  border-color: #655185;
+  color: #d2bee9;
+}
+.analysis-panel .analysis-badge.incomplete {
+  background: #3c3220;
+  border-color: #73603c;
+  color: #ecd398;
+}
+.analysis-panel .analysis-parameters {
+  margin: 13px 0;
+  font-size: 12px;
+}
+.analysis-panel summary {
+  cursor: pointer;
+  color: var(--muted, #a6b3bd);
+  font-size: 12px;
+  padding: 5px 0;
+}
+.analysis-panel .analysis-parameters a {
+  display: inline-block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  margin: 8px 0;
+}
+.analysis-panel .analysis-checkbox {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.analysis-panel .analysis-checkbox small {
+  flex-basis: 100%;
+}
+.analysis-panel .analysis-run-report {
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 6px;
+  background: #0d2028;
+  border: 1px solid #29414a;
+  font-size: 11px;
+}
+.analysis-panel .analysis-run-report p {
+  font-size: 11px;
+  margin: 6px 0;
+}
+.analysis-panel .analysis-run-report dl {
+  margin: 8px 0 0;
+}
+.analysis-panel .analysis-run-report dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+.analysis-panel .analysis-run-report dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.analysis-panel .analysis-result-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 8px;
+}
+.analysis-panel .analysis-result-filters > :first-child {
+  grid-column: 1 / -1;
+}
+.analysis-panel .analysis-result-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.analysis-panel .analysis-stale-note {
+  color: #ecd398;
+}
+.analysis-panel .finding {
+  overflow-wrap: anywhere;
+}
+.analysis-panel .finding .button-row {
+  flex-wrap: wrap;
+}
+.analysis-panel .analysis-jump-nav {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #0f1d25;
+  border-bottom: 1px solid #29414a;
+}
+.analysis-panel .analysis-jump-nav button {
+  flex: 1;
+  justify-content: center;
+}
+.analysis-panel > .panel-section {
+  scroll-margin-top: 62px;
+}

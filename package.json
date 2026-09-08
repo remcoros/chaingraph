@@ -1,6 +1,6 @@
 {
   "name": "chaingraph",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -19,7 +19,8 @@
     "test:live": "node --use-system-ca --env-file=.env.live --import tsx scripts/smoke-live.ts",
     "licenses": "node scripts/licenses.mjs",
     "format": "prettier --write src server scripts tests *.ts *.css *.json",
-    "format:check": "prettier --check src server scripts tests *.ts *.css *.json"
+    "format:check": "prettier --check src server scripts tests *.ts *.css *.json",
+    "test:production": "node --use-system-ca --import tsx scripts/smoke-production.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
@@ -46,6 +47,7 @@
     "@types/react-dom": "^19.2.7",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.6",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",

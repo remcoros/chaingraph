@@ -62,6 +62,9 @@ export interface AnalysisFinding {
   txids: string[];
   createdAt: string;
   excluded?: boolean;
+  kind?: 'observation' | 'hypothesis' | 'incomplete';
+  scopeTxids?: string[];
+  stale?: boolean;
 }
 export interface Workspace {
   version: 1;

@@ -18,7 +18,8 @@ flowchart LR
 | --- | --- |
 | `src/domain/types.ts` | Workspace, transaction, wallet, annotation, finding, and graph contracts |
 | `src/domain/workspace.ts` | Input schema validation and derivation of graph nodes/links from loaded transactions |
-| `src/domain/analysis.ts` | Local analysis-tool registry and structured findings |
+| `src/domain/analysis.ts`, `src/domain/analysis/` | Local analysis registry, parameter contracts, scoped evidence and run reports |
+| `src/domain/graphFilters.ts` | Shared list/canvas filtering, bounded neighborhoods and explicit connected context |
 | `src/domain/demo.ts` | Clearly identified synthetic laboratory fixture |
 | `src/lib/wallet.ts` | Account-key validation, receive/change derivation, script construction, and Electrum script hashes |
 | `src/lib/api.ts` | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion |
@@ -35,7 +36,7 @@ flowchart LR
 
 An unlocked session holds its workspace and password in browser memory. Mutations increment a revision; autosave serializes an encrypted snapshot after a short debounce and records which revision reached storage. Saves are serialized to avoid races. Locking freezes edits immediately, waits for a current encrypted save, then removes the unlocked session. Failed saves leave the session open. Chain-data refreshes clear snapshot undo history so an old undo cannot discard newly fetched transactions. It is not a guarantee of secure erasure from JavaScript memory.
 
-Encrypted envelopes hold private workspace contents in `localStorage`; the outer saved-entry public name, identifier, and timestamp remain visible. The optional description remains inside the encrypted payload. Old saved entries without a public name are accepted and acquire one after unlock and save. The existing encrypted-file envelope stays compatible; its filename uses the public name. Workspaces are portable through encrypted-file export/import. Imports must pass both envelope validation and domain schema validation. Passwords and plaintext workspaces are not sent to the backend. Plaintext BIP329 export is an explicit separate operation and can include extended public keys.
+Encrypted envelopes hold private workspace contents in `localStorage`; the outer saved-entry public name, identifier, and timestamp remain visible. The optional description remains inside the encrypted payload. Old saved entries without a public name are accepted and acquire one after unlock and save. The existing encrypted-file envelope stays compatible; its filename uses the public name. Workspaces are portable through encrypted-file export/import. Imports and unlocks must pass envelope/domain validation and derive every supplied wallet address from its account key, script type, branch and index. Sparse paths derive only supplied indexes. Saving and exporting validate the complete workspace shape before encryption; scanner-produced addresses already pass the derivation boundary. Passwords and plaintext workspaces are not sent to the backend. Plaintext BIP329 export is an explicit separate operation and can include extended public keys.
 
 The version-1 envelope fixes AES-256-GCM, PBKDF2-SHA256 with 600,000 iterations, a fresh 16-byte salt, and a fresh 12-byte IV per encryption. Metadata participates in authenticated additional data. Import cannot request arbitrary KDF work. The plaintext workspace limit is 32 MiB; browser quotas are a separate and usually tighter constraint. See [wallet and encryption research](research/wallet-security.md).
 
@@ -55,7 +56,7 @@ Transaction loading tries Bitcoin Core and then Fulcrum. Spending discovery quer
 
 The fundamental flow is `transaction → output → spending transaction`. Outputs persist as entities after spending. A missing funding transaction can still have an output placeholder referenced by a loaded input. Optional address nodes describe destinations; they do not imply a wallet or person.
 
-The graph is derived from workspace transactions and annotations. Analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
+The graph is derived from workspace transactions and annotations. Only active, non-stale analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
 
 The renderer clones caller data because the force engine mutates positions and link endpoints. It reuses simulation objects and coordinates across ordinary updates and avoids recreating the WebGL instance on selection. Shared low-poly geometries distinguish transactions (cubes), outputs (spheres), and addresses (octahedra). Hover cards resolve node and link actions to entity IDs; parent callbacks own fetching and annotations. A single points layer draws glow for highlighted entities. Ordinary links use thin lines, with directional arrows on selected incident transaction/output links. Panel resize is observed, pixel density is capped, and simulation work cools after bounded ticks/time.
 
@@ -63,9 +64,11 @@ The renderer clones caller data because the force engine mutates positions and l
 
 ## Analysis extension point
 
-`analysisTools` in `src/domain/analysis.ts` is the current extension point. A tool has an ID, name, description, and synchronous `run(workspace, optionalTransactionIds)` function returning structured findings. Findings record the algorithm/version label, explanation, affected node IDs, supporting transaction IDs, and creation time. Keep algorithm output separate from user annotations and explain assumptions and exclusions in the finding.
+`analysisTools` in `src/domain/analysis.ts` is the extension point. Shared contracts and tool definitions live in `src/domain/analysis/`. A tool declares metadata, an evidence category, source reference and typed parameter descriptors. `analyze(workspace, optionalTransactionIds, options)` returns findings, scope IDs, summary, coverage statistics and a no-match explanation. `run` remains a convenience wrapper returning findings only. Pure tools make no network requests.
 
-The initial tools detect repeated output amounts, apply a guarded common-input ownership heuristic, and find address reuse among loaded outputs. CIOH's equal-output exclusion is deliberately incomplete: PayJoin and other collaborative spends remain counterexamples. Analysis operates on a snapshot, and findings must be rerun to reflect later imports.
+The seven built-in tools cover privacy patterns, value/structure and imported wallet intersections. Each finding records stable identity, algorithm version, explanation, affected nodes and supporting transactions. Exact equal-value groups control highlighting. CIOH exclusions are deliberately incomplete; missing input data is explicit, and change-like script patterns remain hypotheses. See [analysis methods and research](research/analysis-tools.md).
+
+The browser passes the visible graph's loaded transaction IDs or the selected transaction as scope. Loaded parents may supply evidence without becoming analysis targets. Reruns replace that tool's results and preserve exclusions only for unchanged node/transaction evidence. Wallet/transaction mutations mark findings stale and remove their overlays. Labels remain independent. Scan completion merges only scan-owned fields into the current wallet, preserving newer user labels. Annotation editor identity is stable across unrelated view/data changes and dirty conflicts require explicit reconciliation.
 
 There is no runtime plugin loader, user-script execution, custom IDE, or Boltzmann computation in this implementation. Any future Boltzmann integration needs algorithm/performance work and a license-compatible implementation decision. Research references are catalogued separately from shipped code in [the discovery log](research/2026-09-08-discovery.md).
 

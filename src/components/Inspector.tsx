@@ -13,6 +13,7 @@ import {
 } from '../domain/types';
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
+import { CopyButton } from './CopyButton';
 import { IconPicker } from './IconPicker';
 
 export function AnnotationEditor({
@@ -28,6 +29,8 @@ export function AnnotationEditor({
 }) {
   const [draft, setDraft] = useState(annotation);
   const [saved, setSaved] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const baseline = useRef(annotation);
   const labelRef = useRef<HTMLInputElement>(null);
   const previousEditToken = useRef<number | undefined>(undefined);
   useEffect(() => {
@@ -38,7 +41,18 @@ export function AnnotationEditor({
     previousEditToken.current = editToken;
   }, [editToken]);
   useEffect(() => {
+    if (JSON.stringify(annotation) === JSON.stringify(baseline.current)) return;
+    if (
+      JSON.stringify(draft) !== JSON.stringify(baseline.current) &&
+      JSON.stringify(draft) !== JSON.stringify(annotation)
+    ) {
+      baseline.current = annotation;
+      setConflict(true);
+      return;
+    }
+    baseline.current = annotation;
     setDraft(annotation);
+    setConflict(false);
   }, [annotation]);
   return (
     <form
@@ -47,8 +61,27 @@ export function AnnotationEditor({
         e.preventDefault();
         onSave(draft);
         setSaved(true);
+        setConflict(false);
       }}
     >
+      {conflict && (
+        <div className="annotation-conflict" role="status">
+          <p>
+            Saved context changed while you were editing. Your draft is preserved. Saving replaces
+            the saved context.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(annotation);
+              setConflict(false);
+              setSaved(false);
+            }}
+          >
+            Reload saved context
+          </button>
+        </div>
+      )}
       <div className="section-title">
         <h3>Your context</h3>
         <Bookmark size={15} />
@@ -231,6 +264,7 @@ interface NodeInspectorProps {
   onEditHandled?: () => void;
   onExpand: (direction: 'funding' | 'spending') => void;
   onSelectNode?: (id: string) => void;
+  onCenter?: () => void;
   onRefresh: () => void;
   onRemove: () => void;
   onSave: (annotation: Annotation) => void;
@@ -248,6 +282,7 @@ export function NodeInspector({
   onEditHandled,
   onExpand,
   onSelectNode,
+  onCenter,
   onRefresh,
   onRemove,
   onSave,
@@ -300,7 +335,24 @@ export function NodeInspector({
           {selected.kind === 'output' ? 'TRANSACTION OUTPUT' : selected.kind.toUpperCase()}
         </span>
         <h2>{w.annotations[selected.id]?.label || selected.label}</h2>
-        <code className="wrap">{selected.id.replace(/^(tx|out|addr):/, '')}</code>
+        {onCenter && (
+          <button className="text-button" onClick={onCenter}>
+            Center this node in graph
+          </button>
+        )}
+        <div className="identifier-row">
+          <code className="wrap">{selected.id.replace(/^(tx|out|addr):/, '')}</code>
+          <CopyButton
+            value={selected.id.replace(/^(tx|out|addr):/, '')}
+            label={
+              selected.kind === 'output'
+                ? 'Copy outpoint'
+                : selected.kind === 'address'
+                  ? 'Copy address'
+                  : 'Copy transaction ID'
+            }
+          />
+        </div>
         <div className="selection-value">{formatSats(selected.value)}</div>
         {selected.address && (
           <label className="detail-label">
