@@ -140,3 +140,116 @@ test('raw inspection is explicit, verified, and displays witness bytes without p
     page.getByRole('button', { name: 'Load raw transaction', exact: true }),
   ).toBeVisible();
 });
+
+test('keeps selected rows visible through tag wrapping and resize, preserves manual scrolling, and shows transaction labels', async ({
+  page,
+}) => {
+  const { newWorkspace } = await import('../../src/domain/workspace');
+  const { encryptWorkspace } = await import('../../src/lib/crypto');
+  const { transactions } = await import('../fixtures/bitcoin');
+  const workspace = newWorkspace('Public transaction geometry fixture', 'mainnet');
+  workspace.transactions = transactions;
+  workspace.annotations[`tx:${TX_FUNDING}`] = {
+    label: 'Known funding transaction',
+    note: '',
+    icon: '',
+    bookmarked: false,
+  };
+  workspace.tags = [
+    {
+      id: crypto.randomUUID(),
+      name: 'Funding source',
+      color: '#68d4b7',
+      nodeIds: [`tx:${TX_FUNDING}`],
+    },
+  ];
+  const password = 'public-transaction-geometry';
+  const envelope = await encryptWorkspace(workspace, password);
+  await page.addInitScript(
+    ({ id, envelope }) => {
+      localStorage.setItem('chaingraph.tour.seen', '1');
+      localStorage.setItem(
+        'chaingraph.encrypted-workspaces.v1',
+        JSON.stringify([
+          {
+            id,
+            publicName: 'Public transaction geometry fixture',
+            savedAt: new Date().toISOString(),
+            envelope,
+          },
+        ]),
+      );
+    },
+    { id: workspace.id, envelope },
+  );
+  await mockBitcoin(page, false);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.locator('.saved-row').click();
+  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Entity type').selectOption('output');
+  await page.getByLabel('Filter graph entities').fill(TX_FUNDING);
+  await page.locator('.entity-row').nth(1).click();
+  const panel = page.locator('.transaction-view');
+  await expect(panel.locator('.transaction-view-identity')).toContainText(
+    'Known funding transaction',
+  );
+  await expect(panel.locator('.transaction-view-identity .entity-badges')).toContainText(
+    'Funding source',
+  );
+  await expect(
+    panel.getByLabel('Displayed transaction', { exact: true }).locator('option:checked'),
+  ).toContainText('Known funding transaction');
+  const geometry = () =>
+    panel.evaluate((element) => {
+      const row = element.querySelector('.transaction-row.is-selected')!.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      const heading = element.querySelector('summary')!.getBoundingClientRect();
+      return {
+        scroll: element.scrollTop,
+        clipped:
+          Math.max(0, row.bottom - bounds.bottom + 8) + Math.max(0, heading.bottom + 4 - row.top),
+      };
+    });
+  await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
+  const initialScroll = (await geometry()).scroll;
+  await page.getByRole('button', { name: 'Tags', exact: true }).click();
+  await page.getByRole('button', { name: 'New tag', exact: true }).click();
+  await page.getByLabel('Tag name', { exact: true }).fill('A long public example exchange tag');
+  await page.getByRole('button', { name: 'Create tag', exact: true }).click();
+  await expect(panel.locator('.transaction-row.is-selected')).toContainText(
+    'A long public example exchange tag',
+  );
+  await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
+  expect((await geometry()).scroll).toBeGreaterThan(initialScroll);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
+  await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
+  await expect(
+    page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }),
+  ).toBeFocused();
+  const badge = panel.locator('.transaction-row.is-selected .entity-badges > span');
+  const badgeGeometry = await badge.evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    overflow: element.scrollWidth - element.clientWidth,
+  }));
+  expect(badgeGeometry.height).toBeGreaterThan(35);
+  expect(badgeGeometry.overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: test.info().outputPath('selected-tag-after-resize.png') });
+  await panel.hover();
+  await page.mouse.wheel(0, -1500);
+  await expect.poll(async () => (await geometry()).scroll).toBe(0);
+  expect((await geometry()).clipped).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 420, height: 800 });
+  // Wait for actual layout observation, then confirm it respects deliberate browsing away.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect((await geometry()).scroll).toBe(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});

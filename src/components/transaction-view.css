@@ -221,3 +221,22 @@
     font-size: 10px;
   }
 }
+
+.transaction-view-metadata {
+  flex-basis: 100%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.transaction-view-metadata > strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.transaction-view-metadata:empty {
+  display: none;
+}
+.transaction-view .entity-badges {
+  white-space: normal;
+}
