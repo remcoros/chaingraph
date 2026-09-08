@@ -1,26 +1,17 @@
+import { openLaboratoryFixture } from '../fixtures/open-workspace';
 import { expect, test, type Page } from '@playwright/test';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
-async function laboratory(page: Page) {
+async function openFlowFixture(page: Page) {
   await mockBitcoin(page, false);
-  await page.goto('/');
-  await page
-    .getByRole('button', { name: /Explore the CoinJoin laboratory/ })
-    .last()
-    .click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Name (public)', { exact: true }).fill('Flow interaction review');
-  await dialog.getByLabel('Password', { exact: true }).fill('flow-interaction-review');
-  await dialog.getByLabel('Confirm password').fill('flow-interaction-review');
-  await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip tour', exact: true }).click();
+  await openLaboratoryFixture(page, 'Flow interaction review', 'flow-interaction-review');
 }
 
 test('transaction card and its annotation toolbar have separate keyboard actions', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await laboratory(page);
+  await openFlowFixture(page);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
@@ -52,7 +43,7 @@ test('expanded output controls remain at the top while browsing a large transact
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await laboratory(page);
+  await openFlowFixture(page);
   await page.getByRole('button', { name: 'Browse', exact: true }).click();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
@@ -80,7 +71,7 @@ test('long transaction labels stay inside the junction card on desktop and phone
   page,
 }) => {
   await page.setViewportSize({ width: 1024, height: 900 });
-  await laboratory(page);
+  await openFlowFixture(page);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();

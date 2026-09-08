@@ -9,7 +9,7 @@ import {
 } from '../src/domain/workspace';
 import { analysisTools } from '../src/domain/analysis';
 import { outputNodeId, txNodeId, type Transaction, type Wallet } from '../src/domain/types';
-import { demoWorkspace } from '../src/domain/demo';
+import { laboratoryWorkspace } from './fixtures/laboratory';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 function tx(
@@ -165,10 +165,14 @@ describe('workspace graph and analysis', () => {
     expect(findTool('address-reuse').run(w)).toEqual([]);
   });
 
-  it('preserves the synthetic laboratory through validated workspace import', () => {
-    const demo = demoWorkspace();
-    expect(parseWorkspace(JSON.parse(JSON.stringify(demo)))).toEqual(demo);
-  });
+  it.each([false, true])(
+    'preserves dense test data and the legacy demo flag %s through import',
+    (demo) => {
+      const fixture = laboratoryWorkspace();
+      fixture.demo = demo;
+      expect(parseWorkspace(JSON.parse(JSON.stringify(fixture)))).toEqual(fixture);
+    },
+  );
 });
 
 describe('transaction import boundary', () => {

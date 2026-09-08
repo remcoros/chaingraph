@@ -1,19 +1,21 @@
+import { openFixtureWorkspace, openLaboratoryFixture } from '../fixtures/open-workspace';
+import { laboratoryWorkspace } from '../fixtures/laboratory';
 import { expect, test, type Page } from '@playwright/test';
 import { mockBitcoin, TX_FUNDING, TX_SPENDING } from '../fixtures/bitcoin';
 const password = 'tracing-test-passphrase';
-async function create(page: Page, demo = false) {
+async function create(page: Page) {
   await page.goto('/');
   await page
     .getByRole('button', {
-      name: demo ? /Explore the CoinJoin laboratory/ : 'New workspace',
-      exact: !demo,
+      name: 'New workspace',
+      exact: true,
     })
     .last()
     .click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Name (public)', { exact: true }).fill('Public tracing study');
   await dialog.getByLabel('Workspace description').fill('Private investigation details');
-  if (!demo) await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
+  await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
   await dialog.getByLabel('Password', { exact: true }).fill(password);
   await dialog.getByLabel('Confirm password').fill(password);
   await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
@@ -75,28 +77,69 @@ test('automatically loaded input outputs expose their value without a manual fet
   ).toHaveText('100,000,000 sats');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });
-test('laboratory reveals incoming and outgoing fixture paths while offline', async ({ page }) => {
+test('saved incoming and outgoing paths remain navigable offline and survive locking', async ({
+  page,
+}) => {
   const calls = await mockBitcoin(page, false);
-  await create(page, true);
+  await openLaboratoryFixture(page, 'Saved path study', password);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
-  await page.getByRole('button', { name: 'Load previous transactions', exact: true }).click();
-  await expect(page.locator('.statusbar')).toContainText('153 transactions');
-  await page.getByRole('button', { name: 'Find spending transactions', exact: true }).click();
-  await expect(page.locator('.statusbar')).toContainText('183 transactions');
-  expect(calls).toHaveLength(0);
-  await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Reset practice paths', exact: true }).click();
-  await expect(page.locator('.statusbar')).toContainText('3 transactions');
-  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  const view = page.locator('.transaction-view');
+  const parent = (2000).toString(16).padStart(64, '0');
+  const join = (1000).toString(16).padStart(64, '0');
+  const child = (4000).toString(16).padStart(64, '0');
+  await view.getByRole('button', { name: /^Input 0:/ }).click();
+  await view
+    .getByRole('button', { name: `Go to previous transaction ${parent}`, exact: true })
+    .click();
+  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(parent);
+  await view
+    .getByRole('button', { name: `Go to spending transaction ${join}`, exact: true })
+    .click();
+  await view.getByRole('button', { name: /^Output 0:/ }).click();
+  await view
+    .getByRole('button', { name: `Go to spending transaction ${child}`, exact: true })
+    .click();
+  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(child);
+  await expect(page.locator('.statusbar')).toContainText('543 transactions');
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await expect(page.locator('.saved-row')).toBeVisible();
+  await page.reload();
   await page.locator('.saved-row').click();
   await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
-  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+  await expect(page.locator('.statusbar')).toContainText('543 transactions');
+  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(child);
+  expect(calls).toHaveLength(0);
+});
+test('previously saved synthetic workspaces keep live queries disabled on a connected backend', async ({
+  page,
+}) => {
+  const calls = await mockBitcoin(page);
+  const legacy = laboratoryWorkspace();
+  legacy.demo = true;
+  // Retain an old initial laboratory snapshot with missing input transactions.
+  legacy.transactions = Object.fromEntries(
+    Object.entries(legacy.transactions).filter(([, transaction]) => transaction.vin.length === 150),
+  );
+  await openFixtureWorkspace(page, legacy, password);
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await page.locator('.entity-row').click();
+  await expect(page.locator('.details')).toContainText('150 / 150');
+  await page
+    .getByLabel('Transaction, output, or address')
+    .fill((1000).toString(16).padStart(64, '0'));
+  await expect(page.getByRole('button', { name: 'Add to graph', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Load previous transactions', exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Find spending transactions', exact: true }),
+  ).toBeDisabled();
+  expect(calls).toHaveLength(0);
 });
 test('public workspace names survive locking while descriptions remain encrypted and editable', async ({
   page,

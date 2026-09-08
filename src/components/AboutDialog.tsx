@@ -55,7 +55,7 @@ export function AboutDialog({
           <ol className="workflow-guide">
             <li>
               <strong>Start with an output or wallet.</strong> Paste a transaction, txid:vout or
-              address. The Testnet4 examples and offline laboratory are useful practice material.
+              address. Example workspaces contain real transactions with starter labels and tags.
             </li>
             <li>
               <strong>Follow one path at a time.</strong> Cubes are transactions; spheres are
@@ -179,7 +179,7 @@ export function AboutDialog({
             if it is unavailable.
           </p>
           <p className="small muted">
-            Saved workspaces and the laboratory work offline. Loaded transactions are snapshots;
+            Saved workspaces can be explored offline. Loaded transactions are snapshots;
             reconnecting does not automatically refresh every saved confirmation count.
           </p>
           <p className="small muted">

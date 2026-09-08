@@ -148,7 +148,7 @@ export function ScriptInspector({
             </button>
             <p className="small muted">
               {workspace.demo
-                ? 'Synthetic fixture: raw transaction and witness data are unavailable.'
+                ? 'Legacy synthetic data: raw transaction and witness data are unavailable.'
                 : !canQuery
                   ? 'Connect to this workspace network to load raw data.'
                   : 'Loads scriptSig, witness, version, locktime and raw hex from your node. Held only while inspecting this selection.'}

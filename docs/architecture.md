@@ -20,7 +20,7 @@ flowchart LR
 | `src/domain/workspace.ts`                                | Input schema validation and derivation of graph nodes/links from loaded transactions                              |
 | `src/domain/analysis.ts`, `src/domain/analysis/`         | Local analysis registry, parameter contracts, scoped evidence and run reports                                     |
 | `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods and explicit connected context                                |
-| `src/domain/demo.ts`                                     | Clearly identified synthetic laboratory fixture                                                                   |
+| `src/domain/workspaceTemplates.ts`                                     | Supported-network catalog and lazy real-chain template snapshots                                                                   |
 | `src/lib/wallet.ts`                                      | Account-key validation, receive/change derivation, script construction, and Electrum script hashes                |
 | `src/lib/api.ts`                                         | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion                          |
 | `src/lib/crypto.ts`                                      | Versioned authenticated-encryption envelope and strict envelope decoding                                          |
@@ -111,7 +111,7 @@ Tests focus on protocol/security boundaries, derivation and encryption, domain b
 
 The graph received an isolated Chromium/SwiftShader smoke check with 3,001 frozen synthetic nodes and 3,000 links, React StrictMode, live controls, node picking, and context-loss fallback. This is functional rendering evidence, not a mobile-device or frame-rate benchmark. Overall automated and live-node validation belongs in the implementation report and persistent test suite.
 
-Browser ancestry traversal in `src/lib/tracing.ts` is breadth-first, deduplicates cached transactions, accepts only one or two levels, and shares a 500-download budget across levels. Individual unavailable branches retain successful results and report a partial result. Spending-history continuation is temporary per workspace/outpoint; sorted candidate IDs support bounded next batches, but changes to history can shift boundaries. The laboratory uses the same controls with local fixture data and never sends synthetic transaction IDs upstream.
+Browser ancestry traversal in `src/lib/tracing.ts` is breadth-first, deduplicates cached transactions, accepts only one or two levels, and shares a 500-download budget across levels. Individual unavailable branches retain successful results and report a partial result. Spending-history continuation is temporary per workspace/outpoint; sorted candidate IDs support bounded next batches, but changes to history can shift boundaries. New example workspaces use ordinary live tracing. A legacy `demo` flag is retained only to prevent previously saved synthetic IDs from reaching upstream services; no synthetic generator ships with the application.
 
 ## Renderer-independent transaction inspection
 
@@ -215,7 +215,7 @@ accent lines. Address associations remain arrowless.
 
 New workspace names select their initial suggestion on focus. Pointer-down keeps
 that replacement selection intact until the user edits the field; subsequent
-editing retains ordinary caret behavior. This applies to live and laboratory
+editing retains ordinary caret behavior. This applies to empty and example
 workspace creation.
 
 `view.entityVisibility = 'graph'` makes the Entities list consume exactly the
@@ -237,3 +237,9 @@ all displayed nodes and centers their bounds rather than world origin. Field of
 view, aspect ratio, shape dimensions and padding determine distance. Explicit
 framing preserves viewing direction. It retains existing pending-focus, gesture
 cancellation, snapshot flush and autosave scheduling behavior.
+
+### Example workspace creation
+
+`workspaceTemplates.ts` exposes a small catalog filtered by the backend's configured networks. Home and Help share the same template cards and ordinary creation dialog. The template fixes its network; users choose a public name, encrypted description and password. `templateWorkspace.worker.ts` lazily loads the selected bundled snapshot, adds starter annotations and validates the resulting workspace off the UI thread. Closing the dialog cancels the worker, and supported networks are checked again before opening its result.
+
+Every copy receives a fresh workspace ID and tag IDs; parsed data is independent of the cached snapshot. Templates are normal workspaces (`demo: false`) with the usual encryption, autosave, export, wallet and tracing behavior. There is no template storage mode or server-side workspace state. Initial direct parents are included, with unrelated parent outputs scoped out of the graph using existing input-context state. Snapshot dates, public references, verification and interpretation limits are recorded in [workspace template research](research/workspace-templates.md). The old synthetic generator now lives only in `tests/fixtures/laboratory.ts`.

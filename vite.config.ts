@@ -8,6 +8,7 @@ if (source && !/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/.te
 export default defineConfig({
   plugins: [react()],
   envDir: false,
+  worker: { format: 'es' },
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __SOURCE_URL__: JSON.stringify(source.replace(/\/$/, '')),

@@ -191,7 +191,7 @@ test('an imported unsupported workspace remains editable offline and reopens wit
   expect(calls).toHaveLength(0);
 });
 
-test('failed network discovery prevents an unconfigured workspace but preserves the offline laboratory', async ({
+test('failed network discovery prevents workspace creation and hides unavailable templates', async ({
   page,
 }) => {
   const calls = await mockBitcoin(page, false);
@@ -208,13 +208,8 @@ test('failed network discovery prevents an unconfigured workspace but preserves 
     dialog.getByRole('button', { name: 'Create workspace', exact: true }),
   ).toBeDisabled();
   await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
-  await page.getByRole('button', { name: /Explore the CoinJoin laboratory/ }).click();
-  const lab = page.getByRole('dialog', { name: 'Open the CoinJoin laboratory' });
-  await lab.getByLabel('Password', { exact: true }).fill(password);
-  await lab.getByLabel('Confirm password').fill(password);
-  await lab.getByRole('button', { name: 'Create workspace', exact: true }).click();
-  await expect(page.locator('.statusbar')).toContainText('3 transactions');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Create .+ workspace$/ })).toHaveCount(0);
+  await expect(page.locator('.saved-row')).toHaveCount(0);
   expect(calls).toHaveLength(0);
 });
 

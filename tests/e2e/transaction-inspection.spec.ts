@@ -1,19 +1,24 @@
+import { openLaboratoryFixture } from '../fixtures/open-workspace';
 import { test, expect, type Page } from '@playwright/test';
 import { Transaction as BitcoinTransaction } from 'bitcoinjs-lib';
 import { mockBitcoin, TX_SPENDING, TX_FUNDING } from '../fixtures/bitcoin';
 
-async function create(page: Page, demo = false) {
+async function create(page: Page, fixture = false) {
+  if (fixture) {
+    await openLaboratoryFixture(page, 'Transaction inspection QA', 'transaction-inspection-test');
+    return;
+  }
   await page.goto('/');
   await page
     .getByRole('button', {
-      name: demo ? /Explore the CoinJoin laboratory/ : 'New workspace',
-      exact: !demo,
+      name: 'New workspace',
+      exact: true,
     })
     .last()
     .click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Name (public)', { exact: true }).fill('Transaction inspection QA');
-  if (!demo) await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
+  await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
   await dialog.getByLabel('Password', { exact: true }).fill('transaction-inspection-test');
   await dialog.getByLabel('Confirm password').fill('transaction-inspection-test');
   await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
@@ -65,7 +70,7 @@ test('transaction rows retain spending context while automatically loading prevo
   await page.locator('.script-inspector > summary').click();
   await expect(page.locator('.script-inspector')).toContainText('OP_0');
   await page.screenshot({ path: 'test-results/transaction-inspection-desktop.png' });
-  await view.locator(':scope > summary').click();
+  await view.locator(':scope > summary').getByText('Transaction flow', { exact: true }).click();
   await expect(view.locator('.transaction-columns')).not.toBeVisible();
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
@@ -77,7 +82,7 @@ test('transaction rows retain spending context while automatically loading prevo
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(view).toBeVisible();
   await expect(view).not.toHaveAttribute('open');
-  await view.locator(':scope > summary').click();
+  await view.locator(':scope > summary').getByText('Transaction flow', { exact: true }).click();
   await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(TX_FUNDING);
   await expect(view.locator('.transaction-row[data-selected="true"]')).toContainText(
     'Exchange withdrawal',
@@ -118,9 +123,9 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   await page.getByRole('button', { name: 'Inspector', exact: true }).first().click();
   await page.locator('.script-inspector > summary').click();
-  await expect(page.locator('.script-inspector')).toContainText(
-    'Synthetic fixture: raw transaction and witness data are unavailable.',
-  );
+  await expect(
+    page.getByRole('button', { name: 'Load raw transaction', exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   // Lock completes only after the current encrypted revision reaches storage.

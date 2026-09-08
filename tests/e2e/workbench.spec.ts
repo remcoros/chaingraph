@@ -1,3 +1,4 @@
+import { openLaboratoryFixture } from '../fixtures/open-workspace';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import {
@@ -20,14 +21,17 @@ test.afterEach(({ page }) => {
   expect(browserErrors.get(page) ?? [], 'uncaught browser errors').toEqual([]);
 });
 
-async function createWorkspace(page: Page, name = 'Private investigation', demo = false) {
-  if (demo) await page.getByRole('button', { name: /Explore the CoinJoin laboratory/ }).click();
-  else await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
+async function createWorkspace(page: Page, name = 'Private investigation', fixture = false) {
+  if (fixture) {
+    await openLaboratoryFixture(page, name, PASSWORD);
+    return;
+  }
+  await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
   const dialog = page.getByRole('dialog', {
-    name: demo ? 'Open the CoinJoin laboratory' : 'Create a workspace',
+    name: 'Create a workspace',
   });
   await dialog.getByLabel('Name (public)', { exact: true }).fill(name);
-  if (!demo) await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
+  await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
   await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await dialog.getByLabel('Confirm password').fill(PASSWORD);
   await dialog.getByRole('button', { name: 'Create workspace' }).click();
@@ -72,9 +76,8 @@ test('suggested workspace names are selected for replacement without disrupting 
 }) => {
   await mockBitcoin(page);
   await page.goto('/');
-  for (const demo of [false, true]) {
-    if (demo) await page.getByRole('button', { name: /Explore the CoinJoin laboratory/ }).click();
-    else await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
+  for (const clickSuggestion of [false, true]) {
+    await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
     const dialog = page.getByRole('dialog');
     const name = dialog.getByLabel('Name (public)', { exact: true });
     await expect(name).toBeFocused();
@@ -85,7 +88,7 @@ test('suggested workspace names are selected for replacement without disrupting 
       )
       .toEqual([0, suggestion.length]);
     // Also preserve replacement when clicking an already autofocused suggestion.
-    if (demo) await name.click();
+    if (clickSuggestion) await name.click();
     await name.pressSequentially('My trace');
     await expect(name).toHaveValue('My trace');
     await name.press('Tab');
@@ -235,14 +238,29 @@ test('exports encrypted data and reimports a copy with annotations intact', asyn
   await expect(page.getByLabel('Node label')).toHaveValue('A portable label');
 });
 
-test('renders the 150-input laboratory and runs, excludes, restores and clears analysis overlays', async ({
+test('renders a saved 150-input fixture and runs, excludes, restores and clears analysis overlays', async ({
   page,
 }) => {
-  await mockBitcoin(page, false);
+  await mockBitcoin(page);
+  const addedTransaction = 'ff'.repeat(32);
+  await page.route('**/api/rpc', async (route) => {
+    const call = route.request().postDataJSON();
+    if (call.method !== 'getrawtransaction' || call.params[0] !== addedTransaction)
+      return route.fallback();
+    await route.fulfill({
+      json: {
+        result: {
+          txid: addedTransaction,
+          vin: [{ coinbase: '00' }],
+          vout: [{ n: 0, value: 0.02, scriptPubKey: {} }],
+        },
+      },
+    });
+  });
   await page.goto('/');
-  await createWorkspace(page, 'CoinJoin laboratory', true);
+  await createWorkspace(page, 'Dense transaction study', true);
   await expect(page.getByTestId('graph-view').locator('canvas')).toBeVisible();
-  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+  await expect(page.locator('.statusbar')).toContainText('543 transactions');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
@@ -273,8 +291,14 @@ test('renders the 150-input laboratory and runs, excludes, restores and clears a
   await expect(page.locator('.finding.excluded')).toHaveCount(1);
   await page.locator('.finding.excluded').getByRole('button', { name: 'Restore' }).click();
   await expect(page.locator('.finding.excluded')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Show all fixture paths', exact: true }).click();
+  // An ordinary chain-data addition invalidates prior analysis evidence.
+  await page.getByLabel('Transaction, output, or address').fill(addedTransaction);
+  await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('544 transactions');
+  await page
+    .locator('.right-panel')
+    .getByRole('button', { name: /^Analysis/ })
+    .click();
   await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(3);
   await page.getByRole('button', { name: 'Clear all', exact: true }).click();
   await expect(page.locator('.finding')).toHaveCount(0);
@@ -520,14 +544,14 @@ test('selection history preserves path depth and skips removed transaction nodes
 test('inspector keeps trace actions and label editing reachable on a 150-output selection', async ({
   page,
 }) => {
-  await mockBitcoin(page, false);
+  await mockBitcoin(page);
   await page.goto('/');
-  await createWorkspace(page, 'Layout laboratory', true);
+  await createWorkspace(page, 'Dense layout study', true);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-list .entity-row').first().click();
   await expect(page.locator('.selection-heading h2')).toHaveText('Synthetic CoinJoin 1');
-  // The laboratory transaction really carries 150 inputs and 150 equal outputs.
+  // The synthetic test transaction carries 150 inputs and 150 equal outputs.
   await expect(page.locator('.selection-heading')).toContainText('150 equal outputs');
 
   const loadPrevious = page.getByRole('button', {
@@ -614,16 +638,20 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Show guided tour', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitem', { name: 'Mainnet examples', exact: true })).toBeFocused();
+  await expect(
+    menu.getByRole('menuitem', { name: 'Example workspaces', exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(help).toBeFocused();
   await help.click();
-  await menu.getByRole('menuitem', { name: 'Mainnet examples', exact: true }).click();
-  const examples = page.getByRole('dialog', { name: 'Mainnet tracing examples' });
+  await menu.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
+  const examples = page.getByRole('dialog', { name: 'Example workspaces' });
   await expect(examples).toBeVisible();
-  await expect(examples.getByRole('button', { name: /^Load example / })).toHaveCount(4);
-  for (const button of await examples.getByRole('button', { name: /^Load example / }).all()) {
+  await expect(examples.getByRole('button', { name: /^Create .+ workspace$/ })).toHaveCount(4);
+  for (const button of await examples
+    .getByRole('button', { name: /^Create .+ workspace$/ })
+    .all()) {
     await expect(button).toBeEnabled();
   }
   await page.keyboard.press('Escape');
@@ -638,9 +666,8 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
     await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
   ).toBeLessThanOrEqual(1);
   await help.click();
-  await menu.getByRole('menuitem', { name: 'CoinJoin laboratory', exact: true }).click();
-  const laboratory = page.getByRole('dialog', { name: 'Open the CoinJoin laboratory' });
-  await expect(laboratory).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
+  await expect(examples).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(help).toBeFocused();
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();

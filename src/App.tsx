@@ -87,7 +87,7 @@ import {
 import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/api';
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { ancestryNotice, loadAncestors, traceSourceExists } from './lib/tracing';
-import { demoWorkspace } from './domain/demo';
+import { WORKSPACE_TEMPLATES } from './domain/workspaceTemplates';
 import { MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
 import { useWorkspaces, type SavedWorkspace } from './lib/useWorkspaces';
@@ -105,7 +105,7 @@ function download(name: string, content: string, type = 'application/json') {
 export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
-  const [create, setCreate] = useState<'empty' | 'demo'>();
+  const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
   const [walletDialog, setWalletDialog] = useState(false);
@@ -633,7 +633,7 @@ export default function App() {
   const connected = !!status?.connected && !statusError;
   const canQuery = connected && !!w && !!networks?.includes(w.network) && !w.demo;
   const queryDisabledReason = w?.demo
-    ? undefined
+    ? 'Legacy synthetic workspace. Live lookups are disabled; create an example workspace to explore real transactions.'
     : unsupportedNetwork
       ? `Backend does not support ${w!.network}.`
       : discoveryError ||
@@ -644,18 +644,12 @@ export default function App() {
             : !connected
               ? `${w?.network ?? displayNetwork ?? 'Bitcoin'} backend is unavailable.`
               : undefined);
-  const canTrace = !!w?.demo || canQuery;
-  const fixture = useMemo(() => (w?.demo ? demoWorkspace().transactions : undefined), [w?.demo]);
+  const canTrace = canQuery;
   const getTransaction = async (id: string, signal?: AbortSignal) => {
     signal?.throwIfAborted();
-    if (!fixture) {
-      if (!w) throw new Error('Open a workspace first.');
-      return fetchTransaction(w.network, id, signal);
-    }
-    const transaction = fixture[id];
-    if (!transaction)
-      throw new Error('This transaction is outside the synthetic laboratory fixture.');
-    return transaction;
+    if (!w) throw new Error('Open a workspace first.');
+    if (w.demo) throw new Error('Live lookups are disabled for legacy synthetic workspaces.');
+    return fetchTransaction(w.network, id, signal);
   };
   const flowInputs = useFlowInputs({
     workspace: w,
@@ -915,24 +909,13 @@ export default function App() {
       } else {
         const outputIndex = node.kind === 'output' ? node.vout : undefined;
         const searchKey = `${transaction.txid}:${outputIndex ?? 'all'}`;
-        const result = fixture
-          ? {
-              transactions: Object.values(fixture).filter((t) =>
-                t.vin.some(
-                  (input) =>
-                    input.txid === transaction.txid &&
-                    (outputIndex === undefined || input.vout === outputIndex),
-                ),
-              ),
-              truncated: false,
-            }
-          : await loadSpending(
-              transaction,
-              w,
-              outputIndex,
-              signal,
-              spendingOffsets.current.get(searchKey) ?? 0,
-            );
+        const result = await loadSpending(
+          transaction,
+          w,
+          outputIndex,
+          signal,
+          spendingOffsets.current.get(searchKey) ?? 0,
+        );
         signal.throwIfAborted();
         const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
         if (
@@ -950,7 +933,7 @@ export default function App() {
         else spendingOffsets.current.delete(searchKey);
 
         setNotice(
-          `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts could not be searched.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked history; this does not prove the output is unspent.' : ''}${fixture ? ' Searched the synthetic fixture only.' : ''}`,
+          `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts could not be searched.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked history; this does not prove the output is unspent.' : ''}`,
         );
       }
       // Tracing extends the investigation without taking over its camera.
@@ -1327,37 +1310,10 @@ export default function App() {
               onSelect: () => (w ? setTour(0) : setAboutOpen('guide')),
             },
             {
-              label: `${(w?.network ?? networks?.[0]) === 'mainnet' ? 'Mainnet' : 'Testnet4'} examples`,
+              label: 'Example workspaces',
+              disabled: !!discoveryError || !networks?.length,
               onSelect: () => setExamplesOpen(true),
             },
-            { label: 'CoinJoin laboratory', onSelect: () => setCreate('demo') },
-            ...(w?.demo
-              ? [
-                  {
-                    label: 'Show all fixture paths',
-                    disabled: !!operation,
-                    onSelect: () => {
-                      mergeTransactions(w.id, Object.values(fixture!));
-                      setFitToken((t) => t + 1);
-                    },
-                  },
-                  {
-                    label: 'Reset practice paths',
-                    disabled: !!operation,
-                    onSelect: () => {
-                      change((c) => ({
-                        ...c,
-                        transactions: demoWorkspace(false).transactions,
-                        inputContext: undefined,
-                        contextTransactionIds: undefined,
-                        findings: [],
-                      }));
-                      setSelectedId(undefined);
-                      setFitToken((t) => t + 1);
-                    },
-                  },
-                ]
-              : []),
             { label: 'About Chaingraph', onSelect: () => setAboutOpen('about') },
           ]}
         />
@@ -1368,7 +1324,9 @@ export default function App() {
           saved={ws.saved}
           sessions={ws.sessions}
           onCreate={() => setCreate('empty')}
-          onDemo={() => setCreate('demo')}
+          networks={discoveryError ? undefined : networks}
+          onTemplate={setCreate}
+          onExamples={() => setExamplesOpen(true)}
           onOpenFile={() => fileInput.current?.click()}
           onActivate={activateWorkspace}
           onUnlock={setUnlock}
@@ -1891,11 +1849,7 @@ export default function App() {
                         const transaction = await getTransaction(selected.txid!, signal);
                         signal.throwIfAborted();
                         mergeTransactions(w.id, [transaction]);
-                        setNotice(
-                          w.demo
-                            ? 'Transaction restored from the synthetic fixture.'
-                            : 'Transaction refreshed from your node.',
-                        );
+                        setNotice('Transaction refreshed from your node.');
                       })
                     }
                     canRemove={!!selectedRemovalPlan}
@@ -1990,12 +1944,11 @@ export default function App() {
       )}
       {examplesOpen && (
         <ExamplesDialog
-          network={w?.network ?? networks?.[0] ?? 'testnet4'}
-          canLoad={!!w && canQuery && !operation}
+          networks={discoveryError ? undefined : networks}
           onClose={() => setExamplesOpen(false)}
-          onLoad={(query) => {
+          onTemplate={(id) => {
             setExamplesOpen(false);
-            void addQuery(query);
+            setCreate(id);
           }}
         />
       )}
@@ -2180,7 +2133,8 @@ export default function App() {
       {create && (
         <CreateDialog
           networks={discoveryError ? undefined : networks}
-          demo={create === 'demo'}
+          key={create}
+          template={WORKSPACE_TEMPLATES.find((template) => template.id === create)}
           onCreate={openWorkspace}
           onClose={() => setCreate(undefined)}
         />

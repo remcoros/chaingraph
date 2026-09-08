@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { encryptWorkspace } from '../../src/lib/crypto';
-import { demoWorkspace } from '../../src/domain/demo';
+import { openFixtureWorkspace } from '../fixtures/open-workspace';
+import { laboratoryWorkspace } from '../fixtures/laboratory';
 import { buildGraph } from '../../src/domain/workspace';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
@@ -15,7 +15,7 @@ test.beforeEach(({ page }) => {
 test.afterEach(({ page }) => expect(browserErrors.get(page) ?? []).toEqual([]));
 
 async function openEntities(page: Page) {
-  const workspace = demoWorkspace();
+  const workspace = laboratoryWorkspace();
   workspace.name = 'Entity browser fixture';
   workspace.annotations[targetId] = {
     label: 'Pinned output',
@@ -24,23 +24,8 @@ async function openEntities(page: Page) {
     bookmarked: true,
   };
   const total = buildGraph(workspace).nodes.length;
-  const envelope = await encryptWorkspace(workspace, password);
-  await page.addInitScript(
-    ({ id, envelope, name }) => {
-      localStorage.setItem('chaingraph.tour.seen', '1');
-      localStorage.setItem(
-        'chaingraph.encrypted-workspaces.v1',
-        JSON.stringify([{ id, name, savedAt: new Date().toISOString(), envelope }]),
-      );
-    },
-    { id: workspace.id, envelope, name: workspace.name },
-  );
   await mockBitcoin(page);
-  await page.goto('/');
-  await page.locator('.saved-row').click();
-  const dialog = page.getByRole('dialog', { name: 'Unlock workspace' });
-  await dialog.getByLabel('Password').fill(password);
-  await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await openFixtureWorkspace(page, workspace, password);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await expect(page.locator('.entity-result-count')).toContainText(
     `${total.toLocaleString()} matches`,

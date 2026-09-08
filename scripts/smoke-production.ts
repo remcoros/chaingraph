@@ -93,9 +93,27 @@ try {
   await page.getByRole('button', { name: 'Tags', exact: true }).click();
   await expect(page.locator('.tag-card')).toContainText('Production saved tag');
   await expect(page.locator('.tag-card')).toContainText(/1 loaded entit(?:y|ies)/);
+  await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Create An on-chain message workspace', exact: true })
+    .click();
+  const example = page.getByRole('dialog', { name: 'Create a workspace' });
+  await expect(example.getByLabel('Bitcoin network')).toHaveValue('mainnet');
+  await example.getByLabel('Password', { exact: true }).fill('public-production-test-passphrase');
+  await example.getByLabel('Confirm password').fill('public-production-test-passphrase');
+  await example.getByRole('button', { name: 'Create workspace', exact: true }).click();
+  await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('OP_RETURN text');
+  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  expect(
+    workerUrls.some((url) =>
+      /\/assets\/templateWorkspace\.worker-[^/]+\.js$/.test(new URL(url).pathname),
+    ),
+    'production template snapshot loads and validates in its bundled worker under CSP',
+  ).toBe(true);
   expect(errors, 'production browser errors').toEqual([]);
   console.log(
-    'Production browser smoke passed: built WebGL, CSP, bundled encryption worker, transaction view, annotation, tags, encrypted save and reload/unlock.',
+    'Production browser smoke passed: built WebGL, CSP, bundled encryption worker, transaction view, annotation, tags, encrypted save and reload/unlock, real template creation.',
   );
 } finally {
   await browser.close();

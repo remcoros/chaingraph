@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'rea
 import { X, LockKeyhole, ArrowRight } from 'lucide-react';
 import type { Network, ScriptType, Wallet, Workspace } from '../domain/types';
 import { newWorkspace, parseWorkspace } from '../domain/workspace';
-import { demoWorkspace } from '../domain/demo';
+import type { WorkspaceTemplate } from '../domain/workspaceTemplates';
+import { loadTemplateWorkspace } from '../lib/templateWorkspace';
 import { inspectExtendedPublicKey, deriveAddresses } from '../lib/wallet';
 import { decryptWorkspace } from '../lib/crypto';
 import type { SavedWorkspace } from '../lib/useWorkspaces';
-export function useDialogFocus(onClose: () => void) {
+export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: string) {
   const ref = useRef<HTMLDivElement>(null);
   // Capture the invoker before children mount and React applies autoFocus.
   const [previous] = useState(() => document.activeElement as HTMLElement | null);
@@ -51,21 +52,30 @@ export function useDialogFocus(onClose: () => void) {
     document.addEventListener('keydown', key);
     return () => {
       document.removeEventListener('keydown', key);
-      if (previous?.isConnected) previous.focus();
+      const target = previous?.isConnected
+        ? previous
+        : fallbackFocusSelector
+          ? document.querySelector<HTMLElement>(fallbackFocusSelector)
+          : null;
+      target?.focus();
     };
-  }, [previous]);
+  }, [previous, fallbackFocusSelector]);
   return ref;
 }
 export function Modal({
   title,
   children,
   onClose,
+  className,
+  fallbackFocusSelector,
 }: {
+  fallbackFocusSelector?: string;
+  className?: string;
   title: string;
   children: ReactNode;
   onClose: () => void;
 }) {
-  const ref = useDialogFocus(onClose);
+  const ref = useDialogFocus(onClose, fallbackFocusSelector);
   return (
     <div
       className="modal-backdrop"
@@ -73,7 +83,13 @@ export function Modal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={ref} className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div
+        ref={ref}
+        className={`modal ${className ?? ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <div className="modal-heading">
           <h2>{title}</h2>
           <button className="icon-button" aria-label="Close dialog" onClick={onClose}>
@@ -87,27 +103,37 @@ export function Modal({
 }
 export function CreateDialog({
   networks,
-  demo,
+  template,
   onCreate,
   onClose,
 }: {
   networks?: Network[];
-  demo: boolean;
+  template?: WorkspaceTemplate;
   onCreate: (w: Workspace, p: string) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(demo ? 'CoinJoin laboratory' : 'My investigation');
+  const [name, setName] = useState(template?.name ?? 'My investigation');
   const suggestedName = useRef(true);
-  const [description, setDescription] = useState('');
-  const [net, setNet] = useState<Network | undefined>(networks?.[0]);
+  const [description, setDescription] = useState(template?.description ?? '');
+  const [net, setNet] = useState<Network | undefined>(template?.network ?? networks?.[0]);
   useEffect(() => {
-    if (!net || !networks?.includes(net)) setNet(networks?.[0]);
-  }, [networks, net]);
+    if (!template && (!net || !networks?.includes(net))) setNet(networks?.[0]);
+  }, [networks, net, template]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
-  function submit(e: FormEvent) {
+  const [busy, setBusy] = useState(false);
+  const pending = useRef<AbortController | undefined>(undefined);
+  const supported = useRef(networks);
+  supported.current = networks;
+  const close = () => {
+    pending.current?.abort();
+    onClose();
+  };
+  useEffect(() => () => pending.current?.abort(), []);
+  async function submit(e: FormEvent) {
     e.preventDefault();
+    if (pending.current) return;
     if (!name.trim()) {
       setError('Enter a workspace name.');
       return;
@@ -124,27 +150,54 @@ export function CreateDialog({
       setError('Encryption needs a secure browser context. Use localhost or HTTPS.');
       return;
     }
-    if (!demo && (!net || !networks?.includes(net))) {
+    if (!net || !networks?.includes(net)) {
       setError('Cannot discover supported networks. Check the backend connection.');
       return;
     }
-    const w = demo ? demoWorkspace(false) : newWorkspace(name.trim(), net!);
-    w.name = name.trim();
-    w.description = description.trim();
-    onCreate(w, password);
-    onClose();
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError('');
+    try {
+      const w = template
+        ? await loadTemplateWorkspace(
+            template.id,
+            name.trim(),
+            description.trim(),
+            controller.signal,
+          )
+        : { ...newWorkspace(name.trim(), net), description: description.trim() };
+      controller.signal.throwIfAborted();
+      if (!supported.current?.includes(w.network))
+        throw new Error(`Backend does not support ${w.network}. Check the backend connection.`);
+      onCreate(w, password);
+      onClose();
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Could not create the workspace. Please try again.',
+        );
+    } finally {
+      if (!controller.signal.aborted) {
+        pending.current = undefined;
+        setBusy(false);
+      }
+    }
   }
   return (
-    <Modal title={demo ? 'Open the CoinJoin laboratory' : 'Create a workspace'} onClose={onClose}>
+    <Modal title="Create a workspace" onClose={close} fallbackFocusSelector=".help-menu > button">
       <p className="muted">
-        {demo
-          ? 'Explore three synthetic 150-input / 150-output transactions and their paths. No chain connection needed.'
+        {template
+          ? 'Start with real transactions, labels and tags. This is your own editable copy, saved like any other workspace.'
           : 'A private space for your wallets, transactions, labels, and investigations.'}
       </p>
       <form onSubmit={submit} className="stack">
         <label>
           Name (public)
           <input
+            disabled={busy}
             autoFocus
             data-autofocus
             required
@@ -173,6 +226,7 @@ export function CreateDialog({
         <label>
           Description (encrypted, optional)
           <textarea
+            disabled={busy}
             aria-label="Workspace description"
             maxLength={10000}
             rows={3}
@@ -180,27 +234,36 @@ export function CreateDialog({
             onChange={(e) => setDescription(e.target.value)}
           />
         </label>
-        {!demo && (
-          <label>
-            Bitcoin network
-            {networks?.length === 1 ? (
-              <input readOnly value={networks[0]} />
-            ) : networks?.length ? (
-              <select value={net ?? ''} onChange={(e) => setNet(e.target.value as Network)}>
-                {networks.map((network) => (
-                  <option key={network} value={network}>
-                    {network === 'mainnet' ? 'Mainnet' : 'Testnet4'}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input readOnly value="Unavailable" />
-            )}
-          </label>
+        <label>
+          Bitcoin network
+          {template || networks?.length === 1 ? (
+            <input disabled={busy} readOnly value={template?.network ?? networks?.[0]} />
+          ) : networks?.length ? (
+            <select
+              disabled={busy}
+              value={net ?? ''}
+              onChange={(e) => setNet(e.target.value as Network)}
+            >
+              {networks.map((network) => (
+                <option key={network} value={network}>
+                  {network === 'mainnet' ? 'Mainnet' : 'Testnet4'}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input disabled={busy} readOnly value="Unavailable" />
+          )}
+        </label>
+        {template && (
+          <p className="small muted">
+            The example uses {template.network}. Bundled chain data is a snapshot; refresh or trace
+            further through your backend.
+          </p>
         )}
         <label>
           Password
           <input
+            disabled={busy}
             type="password"
             autoComplete="new-password"
             required
@@ -213,6 +276,7 @@ export function CreateDialog({
         <label>
           Confirm password
           <input
+            disabled={busy}
             type="password"
             autoComplete="new-password"
             required
@@ -229,7 +293,7 @@ export function CreateDialog({
             {error}
           </p>
         )}
-        {!demo && !networks?.length && (
+        {!networks?.length && (
           <p role="alert" className="error-text">
             Cannot discover supported networks. Check the backend connection.
           </p>
@@ -237,9 +301,9 @@ export function CreateDialog({
         <button
           className="primary"
           type="submit"
-          disabled={!demo && (!net || !networks?.includes(net))}
+          disabled={busy || !net || !networks?.includes(net)}
         >
-          Create workspace <ArrowRight size={16} />
+          {busy ? 'Preparing workspace…' : 'Create workspace'} <ArrowRight size={16} />
         </button>
       </form>
     </Modal>

@@ -1,9 +1,9 @@
-import { newWorkspace } from './workspace';
-import type { Transaction, Workspace } from './types';
+import { newWorkspace } from '../../src/domain/workspace';
+import type { Transaction, Workspace } from '../../src/domain/types';
 // Deliberately synthetic, deterministic fixture; never presented as chain data.
-export function demoWorkspace(allPaths = true): Workspace {
-  const w = newWorkspace('CoinJoin laboratory', 'testnet4');
-  w.demo = true;
+export function laboratoryWorkspace(): Workspace {
+  const w = newWorkspace('Synthetic graph fixture', 'testnet4');
+  w.demo = false;
   const id = (n: number) => n.toString(16).padStart(64, '0');
   for (let group = 0; group < 3; group++) {
     const joinid = id(1000 + group);
@@ -54,9 +54,5 @@ export function demoWorkspace(allPaths = true): Workspace {
       };
     }
   }
-  if (!allPaths)
-    w.transactions = Object.fromEntries(
-      Object.entries(w.transactions).filter(([, tx]) => tx.vin.length === 150),
-    );
   return w;
 }

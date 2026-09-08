@@ -1,0 +1,80 @@
+{
+  "network": "mainnet",
+  "retrievedAt": "2026-09-08T18:35:21.230Z",
+  "roots": ["8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684"],
+  "transactions": {
+    "8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684": {
+      "txid": "8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684",
+      "vin": [
+        {
+          "txid": "8e40bb1db9029dd648432c56c295788221c1dd97fe1dbee52f767d605fba58c8",
+          "vout": 1,
+          "sequence": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "n": 0,
+          "value": 0,
+          "scriptPubKey": {
+            "hex": "6a13636861726c6579206c6f766573206865696469",
+            "type": "nulldata"
+          }
+        },
+        {
+          "n": 1,
+          "value": 0.002,
+          "scriptPubKey": {
+            "hex": "76a914b8268ce4d481413c4e848ff353cd16104291c45b88ac",
+            "address": "1HnhWpkMHMjgt167kvgcPyurMmsCQ2WPgg",
+            "type": "pubkeyhash"
+          }
+        }
+      ],
+      "confirmations": 657532,
+      "blocktime": 1404107109,
+      "time": 1404107109,
+      "size": 254,
+      "vsize": 254,
+      "blockhash": "000000000000000004c31376d7619bf0f0d65af6fb028d3b4a410ea39d22554c",
+      "blockHeight": 308570
+    },
+    "8e40bb1db9029dd648432c56c295788221c1dd97fe1dbee52f767d605fba58c8": {
+      "txid": "8e40bb1db9029dd648432c56c295788221c1dd97fe1dbee52f767d605fba58c8",
+      "vin": [
+        {
+          "txid": "de703b5738595132792e57c261394e098664704b02d0f68aa9e36999f2d3e8b0",
+          "vout": 1,
+          "sequence": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "n": 0,
+          "value": 0.0001,
+          "scriptPubKey": {
+            "hex": "76a914bde09d05eb507148e97bb034f1ad0545c484a7cb88ac",
+            "address": "1JJynffTaq3bWcWTXnC4P68VMeNNHdVmMy",
+            "type": "pubkeyhash"
+          }
+        },
+        {
+          "n": 1,
+          "value": 0.0022,
+          "scriptPubKey": {
+            "hex": "76a914b8268ce4d481413c4e848ff353cd16104291c45b88ac",
+            "address": "1HnhWpkMHMjgt167kvgcPyurMmsCQ2WPgg",
+            "type": "pubkeyhash"
+          }
+        }
+      ],
+      "confirmations": 657576,
+      "blocktime": 1404075234,
+      "time": 1404075234,
+      "size": 258,
+      "vsize": 258,
+      "blockhash": "00000000000000001ffbf15f6da03b9b70c91c04b1f65227fd4f3e6a8d20e558",
+      "blockHeight": 308526
+    }
+  }
+}

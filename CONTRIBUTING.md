@@ -14,7 +14,7 @@ chmod 600 .env.testnet4
 npm run dev
 ```
 
-The synthetic laboratory works without an upstream connection. Use public key vectors or synthetic data for reproducible tests, and never commit environment files, wallet exports, credentials or personal browser artifacts.
+Example workspaces bundle verified real-chain snapshots; creation requires supported-network discovery. Synthetic dense graphs live only in test fixtures. Use public key vectors or synthetic data for reproducible tests, and never commit environment files, wallet exports, credentials or personal browser artifacts.
 
 ```sh
 npm run format:check

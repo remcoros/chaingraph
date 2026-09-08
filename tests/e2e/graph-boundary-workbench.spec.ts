@@ -1,3 +1,4 @@
+import { openLaboratoryFixture } from '../fixtures/open-workspace';
 import { expect, test } from '@playwright/test';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
@@ -7,17 +8,7 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mockBitcoin(page, false);
-  await page.goto('/');
-  await page.getByRole('button', { name: /Explore the CoinJoin laboratory/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Open the CoinJoin laboratory' });
-  await dialog.getByLabel('Name (public)', { exact: true }).fill('Graph boundary laboratory');
-  await dialog.getByLabel('Password', { exact: true }).fill('public-test-only-passphrase');
-  await dialog.getByLabel('Confirm password').fill('public-test-only-passphrase');
-  await dialog.getByRole('button', { name: 'Create workspace' }).click();
-  await page
-    .getByRole('dialog', { name: 'Guided tour' })
-    .getByRole('button', { name: 'Skip tour' })
-    .click();
+  await openLaboratoryFixture(page, 'Graph boundary fixture', 'public-test-only-passphrase');
   await expect(page.locator('canvas')).toBeVisible();
   const checkFloatingNavigation = async () => {
     const navigation = page.getByLabel('Graph navigation', { exact: true });

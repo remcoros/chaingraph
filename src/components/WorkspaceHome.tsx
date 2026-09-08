@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ArrowUpRight,
   ChevronRight,
   FolderOpen,
   LockKeyhole,
@@ -9,12 +8,16 @@ import {
   Upload,
   Trash2,
 } from 'lucide-react';
+import type { Network } from '../domain/types';
+import { WorkspaceTemplateCards } from './WorkspaceTemplateCards';
 import type { SavedWorkspace, Session } from '../lib/useWorkspaces';
 interface Props {
   saved: SavedWorkspace[];
   sessions: Session[];
   onCreate: () => void;
-  onDemo: () => void;
+  onExamples: () => void;
+  networks?: Network[];
+  onTemplate: (id: string) => void;
   onOpenFile: () => void;
   onActivate: (id: string) => void;
   onUnlock: (entry: SavedWorkspace) => void;
@@ -24,7 +27,9 @@ export function WorkspaceHome({
   saved,
   sessions,
   onCreate,
-  onDemo,
+  onExamples,
+  networks,
+  onTemplate,
   onOpenFile,
   onActivate,
   onUnlock,
@@ -62,13 +67,8 @@ export function WorkspaceHome({
             <Upload size={16} />
             Open file
           </button>
+          {!!networks?.length && <button onClick={onExamples}>Example workspaces</button>}
         </div>
-        <button className="demo-link" onClick={onDemo}>
-          Explore the CoinJoin laboratory <ArrowUpRight size={17} />
-        </button>
-        <p className="small muted">
-          A synthetic graph with three 150-input / 150-output transactions.
-        </p>
         <div className="welcome-trust">
           <LockKeyhole size={15} />
           <span>Encrypted workspaces</span>
@@ -158,6 +158,18 @@ export function WorkspaceHome({
           </p>
         </div>
       </div>
+      {!!networks?.length && (
+        <section className="welcome-examples" aria-label="Example workspaces">
+          <div className="section-title">
+            <h2>Start with an example</h2>
+          </div>
+          <p className="small muted">
+            Real transactions, ready to explore. Each opens a new editable workspace with labels,
+            tags and a starting path.
+          </p>
+          <WorkspaceTemplateCards networks={networks} onTemplate={onTemplate} />
+        </section>
+      )}
     </main>
   );
 }

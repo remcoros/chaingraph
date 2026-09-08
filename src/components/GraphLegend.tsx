@@ -11,7 +11,7 @@ export function GraphLegend({
     <>
       {demo && (
         <div className="demo-badge">
-          LABORATORY <span>Synthetic CoinJoin fixture</span>
+          LEGACY <span>Synthetic data · live lookups disabled</span>
         </div>
       )}
       <div className="graph-legend">

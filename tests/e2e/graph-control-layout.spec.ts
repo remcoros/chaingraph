@@ -1,3 +1,4 @@
+import { openLaboratoryFixture } from '../fixtures/open-workspace';
 import { expect, test } from '@playwright/test';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
@@ -6,17 +7,7 @@ test('focus controls follow the side-panel breakpoint and selection lock shows i
 }) => {
   await mockBitcoin(page, false);
   await page.setViewportSize({ width: 1000, height: 900 });
-  await page.goto('/');
-  await page
-    .getByRole('button', { name: /Explore the CoinJoin laboratory/ })
-    .last()
-    .click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Name (public)', { exact: true }).fill('Graph control layout');
-  await dialog.getByLabel('Password', { exact: true }).fill('graph-control-layout');
-  await dialog.getByLabel('Confirm password').fill('graph-control-layout');
-  await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip tour', exact: true }).click();
+  await openLaboratoryFixture(page, 'Graph control layout', 'graph-control-layout');
   const focus = page.getByRole('button', { name: 'Focus graph', exact: true });
   await expect(page.locator('.left-panel')).toBeVisible();
   await expect(page.locator('.right-panel')).toBeVisible();
@@ -46,7 +37,9 @@ test('focus controls follow the side-panel breakpoint and selection lock shows i
   const off = await lock.evaluate((element) => getComputedStyle(element).borderColor);
   await lock.click();
   await expect(lock).toHaveAttribute('aria-pressed', 'true');
-  expect(await lock.evaluate((element) => getComputedStyle(element).borderColor)).not.toBe(off);
+  await expect
+    .poll(() => lock.evaluate((element) => getComputedStyle(element).borderColor))
+    .not.toBe(off);
   await page.setViewportSize({ width: 1000, height: 900 });
   await expect(showPanels).toBeVisible();
   await showPanels.click();

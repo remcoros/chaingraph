@@ -329,7 +329,7 @@ export function NodeInspector({
     : queryDisabledReason ||
       (!canQuery
         ? w.demo
-          ? 'Live node queries are unavailable for synthetic laboratory data.'
+          ? 'Live lookups are disabled for this legacy synthetic workspace.'
           : 'Connect to a node on this workspace network to expand its paths.'
         : undefined);
   const hasPrevious = !tx || tx.vin.some((input) => !!input.txid);

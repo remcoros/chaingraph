@@ -631,3 +631,47 @@ manual gesture without camera updates on every simulation tick. The settled
 live view was checked again with all six finding nodes visible:
 [caption clearance](screenshots/demo2-caption-fit.png) and
 [last-run settings](screenshots/demo2-analysis-settings.png).
+
+## Real example workspaces (2026-09-08)
+
+The shipped synthetic laboratory was replaced by four annotated real-chain
+workspace templates. Synthetic dense graphs now live only under test fixtures;
+old encrypted `demo: true` workspaces retain an explicit offline boundary.
+The [template research](research/workspace-templates.md) records snapshot sources,
+retrieval times and independent raw-byte verification of all 22 saved records.
+
+Build, formatting and 446 unit/backend tests passed. All 45 migrated browser
+scenarios passed across the initial run and targeted reruns. Early failures
+included a development-server reload, a CSS transition assertion, and navigation
+selectors that depended on the retired laboratory workflow. Ten new browser
+scenarios cover every template, no initial RPC calls, independent copies,
+edited names/descriptions, annotation persistence across locking, supported-network
+filtering, disconnected configured networks, unavailable discovery, cancellation,
+retry, disabled fields during loading and mobile keyboard focus.
+
+The production smoke passed with real built assets and security headers, including
+the existing WebGL/encryption/save/unlock workflow and new template creation in its
+bundled worker. Production output contains four separate snapshot chunks, from
+1.6 kB to 68.6 kB, loaded by an ES module worker. UI fields are disabled during
+preparation so an edited password cannot diverge from the captured creation request.
+
+Fresh live Chromium sessions on the main preview verified the mainnet equal-output
+example starts with zero RPC calls, refreshes through the mainnet backend, navigates
+the known spending hop and autosaves an edited note. The refresh used
+`getrawtransaction` and `getblockheader`; no other network was queried and no page
+errors occurred. A 390×844 viewport verified the direct example shortcut,
+scrollable picker, selected suggested name and no horizontal overflow. Screenshot
+review caught a close button scrolling out of view; the example dialog now keeps
+its heading visible. Cancelling creation after leaving the picker restores focus
+to Help. A disconnected 53-output testnet4 template at 1440×900 kept its notes fully
+visible (intersection ratio 1).
+
+Reviewed screenshots: [welcome](screenshots/workspace-templates-home.png),
+[desktop picker](screenshots/workspace-templates-picker.png),
+[mobile picker](screenshots/workspace-templates-mobile.png), and
+[live tracing](screenshots/workspace-template-tracing.png).
+These are functional Chromium/SwiftShader checks, not physical mobile benchmarks.
+The full unrelated browser suite was not rerun. The test migration also observed
+minor notes clipping in a disconnected 543-record synthetic fixture; the connected
+dense baseline and the real disconnected template both passed their visibility
+checks. That larger offline layout remains a separate Inspector refinement.
