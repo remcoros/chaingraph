@@ -1,7 +1,11 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { listWalletTransactions, verifyWalletUtxo } from '../src/domain/walletRecords';
+import {
+  listWalletAddresses,
+  listWalletTransactions,
+  verifyWalletUtxo,
+} from '../src/domain/walletRecords';
 import { newWorkspace } from '../src/domain/workspace';
 import type { Transaction, Wallet } from '../src/domain/types';
 import { addressToScriptHash } from '../src/lib/wallet';
@@ -22,6 +26,82 @@ const transaction = (n: number): Transaction => ({
   txid: id(n),
   vin: [{ coinbase: '00' }],
   vout: [{ n: 0, value: 1, scriptPubKey: { hex: script } }],
+});
+
+describe('wallet address records', () => {
+  it('counts loaded received outputs including spent ones, without trusting history counts', () => {
+    const parent = transaction(1);
+    parent.vout.push({ ...parent.vout[0], n: 1 });
+    const spend = {
+      ...transaction(2),
+      vin: [{ txid: id(1), vout: 0 }],
+      vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
+    };
+    const another = transaction(3);
+    const workspace = {
+      ...newWorkspace('Addresses', 'mainnet'),
+      transactions: Object.fromEntries([parent, spend, another].map((tx) => [tx.txid, tx])),
+    };
+    const withHistory = {
+      ...wallet,
+      addresses: [{ ...wallet.addresses[0], history: [{ tx_hash: id(99), height: 1 }] }],
+    };
+    expect(listWalletAddresses(workspace, withHistory)).toEqual([
+      { ...withHistory.addresses[0], loadedOutputCount: 3 },
+    ]);
+    expect(
+      listWalletAddresses(newWorkspace('Empty', 'mainnet'), withHistory)[0].loadedOutputCount,
+    ).toBe(0);
+    expect(wallet.addresses[0]).not.toHaveProperty('loadedOutputCount');
+  });
+
+  it('verifies address claims and uses the raw output script ahead of decoded address text', () => {
+    const outputs = [
+      { n: 0, value: 1, scriptPubKey: { hex: '51', address } },
+      { n: 1, value: 1, scriptPubKey: { hex: 'zz', address } },
+      { n: 2, value: 1, scriptPubKey: { address } },
+    ];
+    const workspace = {
+      ...newWorkspace('Addresses', 'mainnet'),
+      transactions: { [id(1)]: { ...transaction(1), vout: outputs } },
+    };
+    expect(listWalletAddresses(workspace, wallet)[0].loadedOutputCount).toBe(1);
+    expect(listWalletAddresses({ ...workspace, network: 'testnet4' }, wallet)).toEqual([]);
+    expect(
+      listWalletAddresses(workspace, {
+        ...wallet,
+        addresses: [{ ...wallet.addresses[0], scripthash: id(100) }],
+      }),
+    ).toEqual([]);
+  });
+
+  it('deduplicates scripts and orders receive addresses before change addresses by index', () => {
+    const entries = [
+      { branch: 1 as const, index: 1 },
+      { branch: 0 as const, index: 9 },
+      { branch: 0 as const, index: 2 },
+      { branch: 1 as const, index: 0 },
+    ].map((entry, i) => {
+      const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(i + 2), 0, 'bc');
+      return {
+        ...entry,
+        address,
+        scripthash: addressToScriptHash(address, 'mainnet'),
+        path: `account/${entry.branch}/${entry.index}`,
+      };
+    });
+    const records = listWalletAddresses(newWorkspace('Addresses', 'mainnet'), {
+      ...wallet,
+      addresses: [...entries, entries[1]],
+    });
+    expect(records.map((record) => record.path)).toEqual([
+      'account/0/2',
+      'account/0/9',
+      'account/1/0',
+      'account/1/1',
+    ]);
+    expect(records.every((record) => record.loadedOutputCount === 0)).toBe(true);
+  });
 });
 
 describe('wallet transaction history', () => {

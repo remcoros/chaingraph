@@ -1,5 +1,16 @@
 # Validation results
 
+## Wallet address browsing, 2026-09-08
+
+Addresses appears before Transactions in the wallet tabs. It lists verified,
+deduplicated receive/change addresses and counts all matching loaded outputs,
+including spent outputs, without RPC. Selection reveals an address node even with
+no loaded outputs and retains wallet navigation for annotation editing.
+The 69 focused wallet-record, workspace, visibility and filter tests passed.
+All five wallet browser scenarios passed across the initial and focused follow-up
+runs, including address filtering, metadata editing, zero-output selection, tab
+order and desktop/phone hit targets. Screenshots were inspected at both widths.
+
 ## Wallet record tabs and targeted input navigation, 2026-09-08
 
 Wallet selection exposes Transactions and UTXOs while keeping the wallet context

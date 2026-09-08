@@ -77,7 +77,7 @@ const rightTab = (page: Page, name: string) =>
 
 async function expectWalletTabsReachable(page: Page) {
   const tabs = page.locator('.right-panel .panel-tabs');
-  await expect(tabs.getByRole('button')).toHaveCount(4);
+  await expect(tabs.getByRole('button')).toHaveCount(5);
   // A wrapped tab header must contain both rows so panel content cannot cover them.
   await expect
     .poll(() =>
@@ -92,6 +92,66 @@ async function expectWalletTabsReachable(page: Page) {
     )
     .toBe(true);
 }
+
+test('wallet addresses show loaded output counts and remain selectable without loaded outputs', async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const calls = await fixtureRpc(page);
+  const workspace = workspaceFixture();
+  const unused = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 1, 0, 1)[0];
+  workspace.wallets[0].addresses.push({ ...unused, history: [] });
+  await openFixtureWorkspace(page, workspace, PASSWORD);
+  await expectWalletTabsReachable(page);
+  await rightTab(page, 'Addresses').click();
+  const tabs = page.locator('.right-panel .panel-tabs');
+  await expect(tabs.getByRole('button')).toHaveText([
+    'Inspector',
+    'Analysis 0',
+    'Addresses',
+    'Transactions',
+    'UTXOs',
+  ]);
+  const panel = page.getByRole('region', { name: 'Wallet addresses', exact: true });
+  await expect(panel.locator('.wallet-record-row')).toHaveCount(3);
+  const receive = panel.getByRole('button', {
+    name: `Select wallet address ${addresses[0].address}`,
+    exact: true,
+  });
+  await expect(receive).toContainText('1 loaded output');
+  await receive.click();
+  await expect(receive).toHaveAttribute('aria-pressed', 'true');
+  await rightTab(page, 'Inspector').click();
+  await page.getByLabel('Node label', { exact: true }).fill('My receive address');
+  await rightTab(page, 'Addresses').click();
+  await expect(receive).toContainText('My receive address');
+  await panel.getByLabel('Filter wallet addresses').fill('change');
+  const row = panel.getByRole('button', {
+    name: `Select wallet address ${unused.address}`,
+    exact: true,
+  });
+  await expect(panel.locator('.wallet-record-row')).toHaveCount(1);
+  await expect(row).toContainText('0 loaded outputs');
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+  await rightTab(page, 'Inspector').click();
+  await expect(page.getByLabel('Node label', { exact: true })).toBeVisible();
+  await rightTab(page, 'Addresses').click();
+  expect(calls).toEqual([]);
+  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  await page.screenshot({ path: testInfo.outputPath('wallet-addresses-desktop.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .locator('.mobile-switch')
+    .getByRole('button', { name: 'Addresses', exact: true })
+    .click();
+  await expectWalletTabsReachable(page);
+  await expect(panel.locator('.wallet-record-row').first()).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: testInfo.outputPath('wallet-addresses-mobile.png') });
+  await rightTab(page, 'Transactions').click();
+  await rightTab(page, 'Addresses').click();
+  await expect(panel).toBeVisible();
+});
 
 test('wallet history deduplicates addresses, orders newest first and keeps wallet navigation after loading and editing a transaction', async ({
   page,

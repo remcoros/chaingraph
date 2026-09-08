@@ -176,7 +176,7 @@ associations remain undirected.
 
 ### Browse a wallet
 
-Select a wallet to reveal **Transactions** and **UTXOs** beside the Inspector.
+Select a wallet to reveal **Addresses**, **Transactions** and **UTXOs** beside the Inspector.
 Transactions includes known history, newest first, including entries whose details
 are not loaded yet. Select a row to load it if needed and focus it on the graph,
 then switch to Inspector to edit labels, notes, tags or icons. The wallet context
@@ -188,3 +188,10 @@ addresses never imply an empty wallet. Refresh to recheck, or check the next bat
 for larger address sets. These observations are temporary and do not delete saved
 transactions when an output is spent. The old discovered-address list has been
 removed from the wallet inspector.
+
+Wallet **Addresses** lists discovered receive and change addresses with their derivation
+index and the number of outputs in loaded transactions. Counts include spent outputs
+and are not a complete history or current UTXO count. Filter by address, label or
+derivation path. Select a row to show the address on the graph, then use Inspector
+to edit its metadata. Addresses with no loaded outputs remain selectable; opening
+this list does not scan or download transaction history.

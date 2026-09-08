@@ -1,3 +1,4 @@
+import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
 import {
@@ -16,7 +17,7 @@ import {
 import { fetchWalletUtxos } from '../lib/walletUtxos';
 import './wallet-records.css';
 
-export type WalletRecordsTab = 'transactions' | 'utxos';
+export type WalletRecordsTab = 'addresses' | 'transactions' | 'utxos';
 const PAGE_SIZE = 40;
 interface UtxoView {
   records: WalletUtxoRecord[];
@@ -49,8 +50,8 @@ export function WalletRecordsPanel({
     () => listWalletTransactions(workspace, wallet),
     [workspace.transactions, wallet],
   );
-  const [queries, setQueries] = useState({ transactions: '', utxos: '' });
-  const [pages, setPages] = useState({ transactions: 0, utxos: 0 });
+  const [queries, setQueries] = useState({ addresses: '', transactions: '', utxos: '' });
+  const [pages, setPages] = useState({ addresses: 0, transactions: 0, utxos: 0 });
   const [utxos, setUtxos] = useState<UtxoView>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +136,16 @@ export function WalletRecordsPanel({
   }, [active, canQuery, wallet.addresses, wallet.scannedAt]);
 
   if (!active) return null;
+  if (active === 'addresses')
+    return (
+      <WalletAddressesPanel
+        workspace={workspace}
+        wallet={wallet}
+        selectedId={selectedId}
+        busy={busy}
+        onSelect={onSelect}
+      />
+    );
   const invalidUtxos = new Set(
     (utxos?.records ?? [])
       .filter(

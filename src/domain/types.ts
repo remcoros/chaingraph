@@ -132,7 +132,7 @@ export interface Workspace {
     selectionId?: string;
     filters?: GraphFilters;
     leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
-    rightTab?: 'inspect' | 'analysis' | 'transactions' | 'utxos';
+    rightTab?: 'inspect' | 'analysis' | 'addresses' | 'transactions' | 'utxos';
     focusGraph?: boolean;
     prefetchDepth?: 0 | 1 | 2;
     selectedWallet?: string;

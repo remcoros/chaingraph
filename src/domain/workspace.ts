@@ -257,7 +257,7 @@ const workspaceSchema = z.object({
       })
       .optional(),
     leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
-    rightTab: z.enum(['inspect', 'analysis', 'transactions', 'utxos']).optional(),
+    rightTab: z.enum(['inspect', 'analysis', 'addresses', 'transactions', 'utxos']).optional(),
     focusGraph: z.boolean().optional(),
     prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
     selectedWallet: z.string().max(200).optional(),
@@ -616,6 +616,12 @@ export function buildGraph(workspace: Workspace): GraphData {
           label: `${short(input.txid, 5)}:${input.vout}`,
         });
       link(id, txNodeId(tx.txid), 'spends');
+    }
+  }
+  if (workspace.view.showAddresses) {
+    for (const address of workspace.watchedAddresses) {
+      const id = addressNodeId(address);
+      if (!nodes.has(id)) add({ id, kind: 'address', label: short(address), address });
     }
   }
   return { nodes: [...nodes.values()], links: [...links.values()] };

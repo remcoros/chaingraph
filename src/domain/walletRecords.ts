@@ -21,6 +21,10 @@ export interface WalletUtxoRecord {
   scripthash: string;
 }
 
+export interface WalletAddressRecord extends WalletAddress {
+  loadedOutputCount: number;
+}
+
 /** An address claim must agree with its network and recorded Electrum hash. */
 export function verifiedWalletAddresses(wallet: Wallet, network: Network): WalletAddress[] {
   const unique = new Map<string, WalletAddress>();
@@ -46,6 +50,26 @@ function outputScriptHash(output: TxOutput, network: Network): string | undefine
   } catch {
     return undefined;
   }
+}
+
+/** Count received outputs in the local transaction snapshot, including spent
+ * outputs. This is neither a complete history count nor an unspent balance.
+ */
+export function listWalletAddresses(workspace: Workspace, wallet: Wallet): WalletAddressRecord[] {
+  const records = verifiedWalletAddresses(wallet, workspace.network).map((address) => ({
+    ...address,
+    loadedOutputCount: 0,
+  }));
+  const byScript = new Map(records.map((record) => [record.scripthash, record]));
+  for (const tx of Object.values(workspace.transactions)) {
+    for (const output of tx.vout) {
+      const record = byScript.get(outputScriptHash(output, workspace.network) ?? '');
+      if (record) record.loadedOutputCount++;
+    }
+  }
+  return records.sort(
+    (a, b) => a.branch - b.branch || a.index - b.index || a.address.localeCompare(b.address),
+  );
 }
 
 /** Historical association is separate from ownership and current unspent status.

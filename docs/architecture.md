@@ -279,7 +279,7 @@ and selection are not changed by stepping through the tour.
 ### Wallet record navigation
 
 The encrypted selected-wallet context remains set while entity selection changes.
-Optional `view.rightTab` values `transactions` and `utxos` expose the wallet's
+Optional `view.rightTab` values `addresses`, `transactions` and `utxos` expose the wallet's
 read-only record panels. The Inspector prioritizes an actual entity selection;
 selecting the wallet row returns to wallet settings. Historical records union
 known address histories and verified loaded script matches, without requiring all
@@ -297,3 +297,9 @@ Flow input hydration now loads only the creating transaction of a selected
 outpoint. Selecting a transaction performs no automatic parent fan-out. The
 flow panel's explicit bulk action loads up to 500 missing parents with four
 concurrent requests; progress, partial errors and continuation remain visible.
+
+Wallet address records reuse verified script claims and count matching outputs in one
+pass over loaded transactions, without RPC. Selecting an address enables address
+display and adds it to the watched-address set, allowing an isolated node even when
+no matching transaction is loaded. The graph memo includes that set so subsequent
+address selections appear immediately.

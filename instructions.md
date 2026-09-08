@@ -248,7 +248,7 @@ still bring nodes in front of each other; Flat and Fit provide alternate views.
 
 ## Wallet transactions and UTXOs
 
-Select a wallet, then open **Transactions** or **UTXOs** in the right panel.
+Select a wallet, then open **Addresses**, **Transactions** or **UTXOs** in the right panel.
 Transactions lists known history once per transaction, with unconfirmed activity
 first and confirmed history newest first. Unloaded entries can be selected to
 fetch their details. Rows focus the graph even when selection locking is off;
@@ -263,3 +263,10 @@ wallet discovery are shown explicitly. Returning after locking requires a fresh
 UTXO check; this list is not a persisted balance. Selecting a UTXO loads and verifies
 its creating transaction when necessary. An output leaving this list does not
 remove its transaction, labels or notes from the workspace.
+
+Wallet **Addresses** lists discovered receive and change addresses with their derivation
+index and the number of outputs in loaded transactions. Counts include spent outputs
+and are not a complete history or current UTXO count. Filter by address, label or
+derivation path. Select a row to show the address on the graph, then use Inspector
+to edit its metadata. Addresses with no loaded outputs remain selectable; opening
+this list does not scan or download transaction history.

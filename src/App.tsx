@@ -1,5 +1,9 @@
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
-import { verifyWalletUtxo, type WalletUtxoRecord } from './domain/walletRecords';
+import {
+  verifiedWalletAddresses,
+  verifyWalletUtxo,
+  type WalletUtxoRecord,
+} from './domain/walletRecords';
 import { useAnalysisUiState, type AnalysisUiRunReport } from './lib/useAnalysisUiState';
 import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
@@ -188,7 +192,7 @@ export default function App() {
   const shownLeftTab = tourStep?.view?.leftTab ?? leftTab;
   const shownRightTab =
     tourStep?.view?.rightTab ??
-    ((rightTab === 'transactions' || rightTab === 'utxos') &&
+    ((rightTab === 'addresses' || rightTab === 'transactions' || rightTab === 'utxos') &&
     !w?.wallets.some((item) => item.id === selectedWallet)
       ? 'inspect'
       : rightTab);
@@ -277,7 +281,15 @@ export default function App() {
   }, [ws.persist, flushActiveGraph]);
   const graph = useMemo(
     () => (w ? buildGraph(w) : { nodes: [], links: [] }),
-    [w?.id, w?.transactions, w?.inputContext, w?.annotations, w?.findings, w?.view.showAddresses],
+    [
+      w?.id,
+      w?.transactions,
+      w?.inputContext,
+      w?.annotations,
+      w?.findings,
+      w?.watchedAddresses,
+      w?.view.showAddresses,
+    ],
   );
   const walletMatches = useMemo(
     () => (w ? buildWalletMatches(w, graph) : new Map()),
@@ -742,6 +754,29 @@ export default function App() {
     const ownerId = w.id;
     const walletId = wallet.id;
     const tab = shownRightTab;
+    if (nodeId.startsWith('addr:')) {
+      const address = nodeId.slice(5);
+      if (!verifiedWalletAddresses(wallet, w.network).some((item) => item.address === address))
+        return;
+      ws.update(
+        ownerId,
+        (current) => ({
+          ...setNodesHidden(current, [nodeId], false),
+          watchedAddresses: [...new Set([...current.watchedAddresses, address])],
+          view: {
+            ...current.view,
+            hiddenNodeIds: current.view.hiddenNodeIds?.filter((id) => id !== nodeId),
+            showAddresses: true,
+          },
+        }),
+        false,
+      );
+      select(nodeId);
+      setRightTab(tab);
+      setGraphFilters({});
+      setFocusRequest({ id: nodeId, token: Date.now() });
+      return;
+    }
     const transactionId = nodeId.split(':')[1];
     const generation = selectionGeneration.current;
     void run(async (signal) => {
@@ -1558,11 +1593,13 @@ export default function App() {
               <List size={15} />
               {shownRightTab === 'analysis'
                 ? 'Analysis'
-                : shownRightTab === 'transactions'
-                  ? 'Transactions'
-                  : shownRightTab === 'utxos'
-                    ? 'UTXOs'
-                    : 'Inspector'}
+                : shownRightTab === 'addresses'
+                  ? 'Addresses'
+                  : shownRightTab === 'transactions'
+                    ? 'Transactions'
+                    : shownRightTab === 'utxos'
+                      ? 'UTXOs'
+                      : 'Inspector'}
             </button>
           </div>
           <main
@@ -1846,6 +1883,13 @@ export default function App() {
                 {wallet && (
                   <>
                     <button
+                      className={shownRightTab === 'addresses' ? 'active' : ''}
+                      aria-pressed={shownRightTab === 'addresses'}
+                      onClick={() => setRightTab('addresses')}
+                    >
+                      Addresses
+                    </button>
+                    <button
                       className={shownRightTab === 'transactions' ? 'active' : ''}
                       aria-pressed={shownRightTab === 'transactions'}
                       onClick={() => setRightTab('transactions')}
@@ -1869,7 +1913,9 @@ export default function App() {
                     workspace={w}
                     wallet={wallet}
                     active={
-                      shownRightTab === 'transactions' || shownRightTab === 'utxos'
+                      shownRightTab === 'addresses' ||
+                      shownRightTab === 'transactions' ||
+                      shownRightTab === 'utxos'
                         ? shownRightTab
                         : undefined
                     }
@@ -1879,7 +1925,8 @@ export default function App() {
                     onSelect={selectWalletRecord}
                   />
                 )}
-                {shownRightTab === 'transactions' ||
+                {shownRightTab === 'addresses' ||
+                shownRightTab === 'transactions' ||
                 shownRightTab === 'utxos' ? null : shownRightTab === 'analysis' ? (
                   <AnalysisPanel
                     uiState={analysisUiState}
