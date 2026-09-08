@@ -15,6 +15,9 @@ export class CoreClient {
   private limiter: Limiter;
   private id = 0;
   private agent: http.Agent | https.Agent;
+  /** Aborted by close() so every in-flight attempt is cancelled promptly,
+   * including fresh non-pooled retry sockets that the agent does not own. */
+  private lifetime = new AbortController();
   private closed = false;
   constructor(private config: ServerConfig) {
     this.limiter = new Limiter(config.coreConcurrency, config.corePending, config.queueTimeoutMs);
@@ -33,7 +36,9 @@ export class CoreClient {
       if (!this.config.coreCookieFile && (!this.config.coreUser || !this.config.corePassword))
         throw new SafeError('Bitcoin RPC is not configured; demo workspaces remain available', 503);
       const timeout = AbortSignal.timeout(this.config.requestTimeoutMs);
-      const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+      const combined = AbortSignal.any(
+        signal ? [signal, timeout, this.lifetime.signal] : [timeout, this.lifetime.signal],
+      );
       let auth: string;
       try {
         auth = this.config.coreCookieFile
@@ -166,6 +171,7 @@ export class CoreClient {
   }
   close() {
     this.closed = true;
+    this.lifetime.abort();
     this.agent.destroy();
   }
 }

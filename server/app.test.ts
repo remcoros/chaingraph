@@ -544,7 +544,10 @@ describe('Core stale keep-alive transport', () => {
     socket: net.Socket;
   }
   /** Minimal HTTP/1.1 Core stub over raw TCP so tests control socket resets. */
-  async function rawCore(behavior: (request: StubRequest) => 'respond' | 'reset' | 'hold' | 401) {
+  async function rawCore(
+    behavior: (request: StubRequest) => 'respond' | 'reset' | 'hold' | 401,
+    env: NodeJS.ProcessEnv = {},
+  ) {
     const sockets = new Set<net.Socket>();
     const requests: StubRequest[] = [];
     let connections = 0;
@@ -592,10 +595,11 @@ describe('Core stale keep-alive transport', () => {
       BITCOIN_RPC_USER: 'test',
       BITCOIN_RPC_PASSWORD: 'secret',
       BITCOIN_RPC_URL: `http://127.0.0.1:${port}`,
+      ...env,
     });
     const client = new CoreClient(config);
     cleanups.push(() => client.close());
-    return { client, requests, connections: () => connections };
+    return { client, requests, sockets, connections: () => connections };
   }
 
   it('retries a stale pooled socket reset once on a fresh connection', async () => {
@@ -663,5 +667,67 @@ describe('Core stale keep-alive transport', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(stub.connections()).toBe(1);
     expect(stub.requests).toHaveLength(2);
+  });
+
+  it('close promptly cancels a held fresh retry without further attempts', async () => {
+    const stub = await rawCore((r) =>
+      r.onConnection === 2 ? 'reset' : r.connection === 2 ? 'hold' : 'respond',
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const pending = stub.client.call('getblockhash', [1]);
+    const failed = expect(pending).rejects.toThrow('timed out or was cancelled');
+    // Wait until the retry is actually held on its fresh non-pooled socket.
+    await vi.waitFor(() => expect(stub.requests).toHaveLength(3));
+    const retrySocket = stub.requests[2].socket;
+    const started = Date.now();
+    stub.client.close();
+    await failed;
+    // The default request deadline is 30s; close must release far sooner.
+    expect(Date.now() - started).toBeLessThan(5000);
+    await vi.waitFor(() => expect(retrySocket.destroyed).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stub.requests).toHaveLength(3);
+    expect(stub.connections()).toBe(2);
+  });
+
+  it('aborting during the fresh retry cancels it promptly', async () => {
+    const stub = await rawCore((r) =>
+      r.onConnection === 2 ? 'reset' : r.connection === 2 ? 'hold' : 'respond',
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const controller = new AbortController();
+    const pending = stub.client.call('getblockhash', [1], controller.signal);
+    const cancelled = expect(pending).rejects.toThrow('timed out or was cancelled');
+    await vi.waitFor(() => expect(stub.requests).toHaveLength(3));
+    const retrySocket = stub.requests[2].socket;
+    const started = Date.now();
+    controller.abort();
+    await cancelled;
+    expect(Date.now() - started).toBeLessThan(5000);
+    await vi.waitFor(() => expect(retrySocket.destroyed).toBe(true));
+    expect(stub.requests).toHaveLength(3);
+  });
+
+  it('a delayed stale reset followed by a held retry keeps the original deadline', async () => {
+    const stub = await rawCore(
+      (r) => {
+        if (r.onConnection === 2) {
+          // The peer closes the idle pooled socket only after a delay.
+          setTimeout(() => r.socket.destroy(), 600);
+          return 'hold';
+        }
+        return r.connection === 2 ? 'hold' : 'respond';
+      },
+      { UPSTREAM_REQUEST_TIMEOUT_MS: '1000' },
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const started = Date.now();
+    await expect(stub.client.call('getblockhash', [1])).rejects.toThrow(
+      'timed out or was cancelled',
+    );
+    // One 1000ms deadline covers both attempts; the retry starts its own
+    // connect timer but never extends the overall request budget.
+    expect(Date.now() - started).toBeLessThan(1400);
+    expect(stub.requests).toHaveLength(3);
   });
 });

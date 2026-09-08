@@ -64,13 +64,24 @@ verification, or network publication are involved.
    Node http documentation for `request.reusedSocket` and `agent: false`,
    logged in `docs/research/backend.md`.
 
+   Review correction: the fresh retry socket is not owned by the pooling
+   agent, so `close()` destroying only the agent could leave a held retry
+   running until the request deadline. A client-lifetime `AbortController`
+   is now composed into every call's combined signal and aborted by
+   `close()`, cancelling all active attempts (pooled and fresh) promptly
+   while preserving the single overall deadline and limiter slot.
+
    Deterministic regressions in `server/app.test.ts` drive a raw-TCP HTTP/1.1
    stub so the real transport and agent pooling are exercised: a reset of the
    reused pooled socket retries once over a new connection and succeeds;
    a reset on a fresh socket is not retried; a retry that also fails surfaces
    the error after exactly one retry; a 401 on a reused socket, a mid-response
    failure, and an aborted request are not retried (attempt and connection
-   counts asserted).
+   counts asserted). Shutdown regressions: `close()` during a held fresh
+   retry rejects promptly, destroys the retry socket, and opens no further
+   attempt; aborting during the fresh retry cancels it promptly; a delayed
+   stale reset followed by a held retry still honors the original overall
+   deadline (observed rejection at the deadline, not a per-attempt one).
 
 ## Verified with no findings
 
@@ -106,11 +117,12 @@ verification, or network publication are involved.
 
 ## Test scope
 
-- Independent `npm ci`; full unit suite after the transport fix: 215 passed
-  (209 before, plus 6 new Core transport regressions). `npm run build` and
-  `npm run format:check` passed. Transport-only change: browser suite not
-  re-run for this fix; root's live idle probe and container rebuild verify
-  the live path.
+- Independent `npm ci`; full unit suite after the transport fix and its
+  shutdown correction: 218 passed (209 before, plus 9 Core transport
+  regressions). `npm run build` and `npm run format:check` passed.
+  Transport-only change: browser suite not re-run for this fix. Root's live
+  idle probe and container checks against the rebuilt image are pending
+  coordinator validation and are not claimed here.
 - Focused browser suite on ports 4207/4208
   (`CHAINGRAPH_E2E_PORT`/`CHAINGRAPH_GRAPH_TEST_PORT`): all 6
   `wallet-refresh` tests passed after the corrections (cancellation,
