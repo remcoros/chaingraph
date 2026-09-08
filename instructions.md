@@ -188,3 +188,22 @@ Create or choose a tag directly in the inspector. Scope it to one output or to a
 and its outputs. The transaction flow arrows follow the selected outpoint to its creating
 or loaded spending transaction. Expand OP_RETURN data to select or copy the decoded text
 (or hex for binary data).
+
+### Follow larger transfers with less noise
+
+Use **All amounts** in either the graph toolbar or the transaction flow to hide
+outputs below 546, 1,000, 10,000 or 100,000 sats. Both controls share one saved
+setting. These are display thresholds, not a classification of dust attacks or
+Bitcoin relay policy. Unknown values and the selected output stay visible. A
+**filtered · Show** control restores omitted flow rows. You can also choose a
+filtered output from Entities without resetting the threshold.
+
+**Size by → Value** makes large outputs more prominent using a bounded logarithmic
+scale. New lookups focus the requested transaction, output or address automatically.
+Lock to selection additionally follows selections made throughout the workbench.
+
+**Load previous** can reveal a cached parent's full inputs and outputs without
+another download. The notice now says when that happens. Removing the original
+transaction cleans up unused input context too. Shared, independently added,
+annotated or wallet-related transactions remain; Undo restores the removed branch.
+Older saved data without recorded ancestry provenance is retained conservatively.

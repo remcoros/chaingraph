@@ -132,3 +132,17 @@ entities without losing their annotations. **Hidden** lists them for quick resto
 addresses also offer removal. Removing annotated or tagged data asks for confirmation,
 and Undo restores a removal. Stopping an address watch retains shared transaction data.
 Individual inputs and outputs can be hidden, while complete transaction records stay intact.
+
+**All amounts** in the graph toolbar and transaction flow switches the same saved
+filter. Choose a satoshi threshold to omit known smaller inputs and outputs; the
+selected output and unknown values remain visible. The flow reports omitted rows
+and offers **Show** to restore them. The entity list stays available for selecting
+filtered outputs. **Size by Value** uses a bounded logarithmic radius so small
+outputs remain selectable while large transfers stand out.
+
+Successful transaction, output and address lookups focus their target even with
+Lock to selection off. **Load previous** distinguishes new downloads from expanding
+already cached input context. Removing a transaction also removes its unused input
+context, including previously expanded context. Shared, independently
+added, annotated and wallet-related context is retained. Older saved workspaces
+without ancestry provenance are handled conservatively.

@@ -418,3 +418,53 @@ computation have not been validated or implemented beyond the documented slice.
 A subsequent two-wallet browser regression caught an on-blur preview changing button position during a click. Preview is now explicit; key encoding is detected during input without inserting layout content. The corrected two-wallet import/scan/reload/removal test and the existing BIP84 annotation test both passed on rerun.
 
 A final numeric regression verifies that large valid eight-decimal BTC values are accepted despite binary floating-point scaling residue, while fractional-satoshi values remain rejected.
+
+## Mainnet tracing, amount filtering and unlock focus, 2026-09-08
+
+Reproduced the reported mainnet transaction
+`1d690f3b96b878067f3a445b74dfb8fab4201c0455d88ac98cc14a927e7858d7`
+from an empty workspace. On baseline `8cd1c27`, automatic flow hydration produced
+6 nodes; Load previous expanded cached data to 18 nodes while reporting zero new
+transactions. No RPC error occurred. Removing the root left its expanded parent.
+The notice and ancestry cleanup now distinguish these cases correctly.
+
+Verified with 402 unit/backend tests, TypeScript/build and formatting checks.
+Thirty-four distinct targeted browser scenarios passed across serial batches:
+tracing and late-result removal, amount filters, keyboard unlock focus, flow-input
+loading, row actions, camera preservation/framing, hover/picking, save transitions,
+and dense-graph deferred autosave. This was targeted regression coverage, not a
+rerun of every browser test in the repository. New harness checks were corrected
+to await completed locking, inspect entity rows while the status bar shows an
+active operation, and expect Undo to restore the actual pre-download snapshot.
+All corrected cases passed.
+
+An independent Herdr browser review used the live mainnet backend from an isolated
+preview. It reproduced the original report and exercised cached expansion,
+removal/Undo, previous-output traversal, selection recovery, individual hide/show,
+amount filtering, Value sizing and desktop/mobile rendering. Screenshots were
+inspected and led to pruning automatic parent nodes isolated by the amount filter,
+and correcting arrow endpoints for actual node geometry. The UI now isolates the
+large parent input while reporting nine omitted small inputs. See the recorded
+[fund-flow observations](research/mainnet-tracing-refinement.md),
+[desktop view](screenshots/mainnet-funding-filter-desktop.png) and
+[phone view](screenshots/mainnet-funding-filter-phone.png).
+
+An independent source review found and verified fixes for late manual-trace results
+restoring removed branches, retained output placeholders admitting such results,
+laboratory reset retaining dangling provenance, and quiet wallet discovery losing
+independent provenance through Undo. Targeted browser/store regressions cover them.
+Camera-only updates retain an identity fast path through context propagation.
+
+The value-radius scale is bounded and stable when filters change. It is not a
+linear-value or volume representation. Existing node overlaps and occlusion can
+still occur in 3D. No mobile-device frame-rate guarantee or Docker release claim
+is made by this iteration; this pass used Chromium software WebGL and the native
+read-only network bridge. The development preview remains on port 3001.
+
+Final live acceptance also confirmed desktop/phone password autofocus and direct
+keyboard unlock, actual 3D orbit/pan/zoom, phone touch orbit, no horizontal overflow
+at 390px, and completed encrypted autosave. No browser runtime errors were observed.
+The final wording pass renamed the manual visibility options to **Not hidden**,
+**Hidden**, and **All entities**, with a tooltip explaining that amount-filtered
+outputs stay listed. Compact phone targets and tight framing around a single
+focused node remain presentation tradeoffs; Fit restores the wider path.

@@ -48,6 +48,15 @@ export function resolveGraphHit(
   if (hit.type === 'link' && !link) return undefined;
   return nodes.find((node) => node.id === (link ? linkActionId(link) : hit.id));
 }
+const DEFAULT_NODE_RADIUS = 3.2;
+function valueRadius(satoshis: number | undefined): number {
+  if (satoshis === undefined || !Number.isFinite(satoshis) || satoshis < 0)
+    return DEFAULT_NODE_RADIUS;
+  // Apply logarithmic compression to the radius itself. A further cube root
+  // made dust and hundreds of BTC look nearly identical. Keep small outputs
+  // pickable and cap large ones so they do not overwhelm adjacent branches.
+  return Math.min(14.4, 2.4 + 1.4 * Math.log10(1 + satoshis / 1000));
+}
 export function presentGraph(
   input: {
     nodes: readonly GraphNode[];
@@ -75,12 +84,15 @@ export function presentGraph(
     nodes: input.nodes.map((node) => {
       const override = input.nodePresentation?.get(node.id);
       const selected = node.id === input.selectedId;
-      const value =
-        input.sizeBy === 'degree'
-          ? Math.min(14, 1 + Math.sqrt(degrees.get(node.id) || 0))
-          : input.sizeBy === 'value'
-            ? Math.min(16, 1 + Math.log10(1 + Math.max(0, node.value || 0)))
-            : 1;
+      const radius =
+        input.sizeBy === 'value'
+          ? valueRadius(node.value)
+          : DEFAULT_NODE_RADIUS *
+            Math.cbrt(
+              input.sizeBy === 'degree'
+                ? Math.min(14, 1 + Math.sqrt(degrees.get(node.id) || 0))
+                : 1,
+            );
       const scale = override?.scale;
       // Explicit coordinates are transient layout hints, never renderer-owned state.
       const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
@@ -104,10 +116,7 @@ export function presentGraph(
         color: selected
           ? palette.accent
           : (override?.color ?? (node.cluster ? clusterColor(node.cluster) : palette[node.kind])),
-        radius:
-          3.2 *
-          Math.cbrt(value) *
-          (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
+        radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
         highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
         x: node.x,
         y: node.y,
@@ -125,7 +134,7 @@ export function presentGraph(
         target: link.target,
         color: selected ? palette.accent : palette.muted,
         width: selected ? 0.65 : 0,
-        arrowLength: selected && link.kind !== 'address' ? 3 : 0,
+        arrowLength: selected && link.kind !== 'address' ? 3.6 : 0,
       };
     }),
   };

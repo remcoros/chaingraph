@@ -26,7 +26,11 @@ export function mergeFlowInputs(
   selected: GraphNode | undefined,
   loaded: Transaction[],
 ) {
+  // A removal may complete while its input requests are in flight. Never restore
+  // the removed investigation branch when those requests finally arrive.
+  if (transactionId && !workspace.transactions[transactionId]) return workspace;
   const context = { ...workspace.inputContext };
+  const provenance = new Set([...(workspace.contextTransactionIds ?? []), ...Object.keys(context)]);
   const current = transactionId ? workspace.transactions[transactionId] : undefined;
   const references =
     current?.vin.flatMap((input) =>
@@ -42,6 +46,7 @@ export function mergeFlowInputs(
         (a, b) => a - b,
       );
   }
+  for (const tx of loaded) if (!workspace.transactions[tx.txid]) provenance.add(tx.txid);
   if (transactionId) delete context[transactionId];
   const inputContext = Object.keys(context).length ? context : undefined;
   if (!loaded.length && JSON.stringify(inputContext) === JSON.stringify(workspace.inputContext))
@@ -49,6 +54,7 @@ export function mergeFlowInputs(
   return {
     ...workspace,
     inputContext,
+    contextTransactionIds: provenance.size ? [...provenance] : undefined,
     transactions: {
       ...workspace.transactions,
       ...Object.fromEntries(loaded.map((tx) => [tx.txid, tx])),

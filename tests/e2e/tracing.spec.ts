@@ -86,6 +86,17 @@ test('laboratory reveals incoming and outgoing fixture paths while offline', asy
   await page.getByRole('button', { name: 'Find spending transactions', exact: true }).click();
   await expect(page.locator('.statusbar')).toContainText('183 transactions');
   expect(calls).toHaveLength(0);
+  await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Reset practice paths', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
+  await expect(page.locator('.saved-row')).toBeVisible();
+  await page.locator('.saved-row').click();
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
 });
 test('public workspace names survive locking while descriptions remain encrypted and editable', async ({
   page,

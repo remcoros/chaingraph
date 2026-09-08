@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Workspace } from '../domain/types';
 import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
 import { carryScanMetadata, walletEvidenceChanged } from '../domain/walletActivity';
+import { carryObservationContext } from '../domain/observationContext';
 import {
   encryptWorkspace,
   decryptWorkspace,
@@ -346,7 +347,11 @@ export class WorkspaceSessionStore {
                 : evidenceChanged
                   ? []
                   : s.history.map((snapshot) => ({
-                      ...carryScanMetadata(snapshot, data),
+                      ...carryObservationContext(
+                        carryScanMetadata(snapshot, data),
+                        current.data,
+                        data,
+                      ),
                       view: { ...data.view, hiddenNodeIds: snapshot.view.hiddenNodeIds },
                     })),
             },

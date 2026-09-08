@@ -191,6 +191,7 @@ const workspaceSchema = z.object({
   wallets: z.array(walletSchema).max(100),
   transactions: z.record(txid, transactionSchema),
   inputContext: z.record(txid, z.array(uint32).min(1).max(10000)).optional(),
+  contextTransactionIds: z.array(txid).max(10000).optional(),
   annotations: z.record(
     z.string().max(200),
     z.object({
@@ -226,6 +227,7 @@ const workspaceSchema = z.object({
     showAddresses: z.boolean(),
     hiddenNodeIds: hiddenNodeIdsSchema.optional(),
     entityVisibility: z.enum(['visible', 'hidden', 'all']).optional(),
+    smallAmountThreshold: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
     showLabels: z.boolean().optional(),
     showTags: z.boolean().optional(),
     showIcons: z.boolean().optional(),
@@ -294,7 +296,13 @@ export function assertWorkspaceBudget(data: unknown) {
     wallets?: unknown;
     tags?: unknown;
     inputContext?: unknown;
+    contextTransactionIds?: unknown;
   };
+  if (Array.isArray(raw.contextTransactionIds) && raw.contextTransactionIds.length > 10000)
+    throw new WorkspaceValidationError(
+      'input-context-limit',
+      'Workspace exceeds the 10,000 context transaction limit.',
+    );
   if (
     raw.inputContext &&
     typeof raw.inputContext === 'object' &&
@@ -406,6 +414,12 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
   if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
   if (Object.entries(parsed.transactions).some(([id, transaction]) => id !== transaction.txid))
     throw new Error('Workspace has invalid transaction records.');
+  if (
+    new Set(parsed.contextTransactionIds ?? []).size !== (parsed.contextTransactionIds?.length ?? 0)
+  )
+    throw new Error('Automatic context contains duplicate transaction references.');
+  if (parsed.contextTransactionIds?.some((id) => !parsed.transactions[id]))
+    throw new Error('Automatic context must reference a loaded transaction.');
   for (const [id, outputs] of Object.entries(parsed.inputContext ?? {})) {
     const transaction = parsed.transactions[id];
     if (!transaction) throw new Error('Input context must reference a loaded transaction.');
@@ -485,17 +499,44 @@ export function promoteInputContext(
 ): Workspace {
   if (!workspace.inputContext) return workspace;
   let context = workspace.inputContext;
+  const provenance = new Set(workspace.contextTransactionIds ?? []);
   for (const id of transactionIds) {
     if (!context[id]) continue;
     if (context === workspace.inputContext) context = { ...context };
     delete context[id];
+    provenance.add(id);
   }
   return context === workspace.inputContext
     ? workspace
     : {
         ...workspace,
         inputContext: Object.keys(context).length ? context : undefined,
+        contextTransactionIds: [...provenance],
       };
+}
+
+/** Call only for observations newly fetched as ancestry, never an independent lookup. */
+export function markContextTransactions(
+  workspace: Workspace,
+  transactionIds: Iterable<string>,
+): Workspace {
+  const ids = new Set(workspace.contextTransactionIds ?? []);
+  for (const id of transactionIds) if (workspace.transactions[id]) ids.add(id);
+  return ids.size === (workspace.contextTransactionIds?.length ?? 0)
+    ? workspace
+    : { ...workspace, contextTransactionIds: [...ids] };
+}
+
+/** Direct lookup or wallet/address discovery gives the observations independent lifetime. */
+export function clearContextProvenance(
+  workspace: Workspace,
+  transactionIds: Iterable<string>,
+): Workspace {
+  const ids = new Set(transactionIds);
+  const promoted = promoteInputContext(workspace, ids);
+  if (!promoted.contextTransactionIds?.some((id) => ids.has(id))) return promoted;
+  const remaining = promoted.contextTransactionIds.filter((id) => !ids.has(id));
+  return { ...promoted, contextTransactionIds: remaining.length ? remaining : undefined };
 }
 
 export function buildGraph(workspace: Workspace): GraphData {

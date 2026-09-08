@@ -130,6 +130,9 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   };
   const beginInteraction = () => {
     if (dead) return;
+    pendingFocus = undefined;
+    needsFit = false;
+    earlyFitPending = false;
     cancelSnapshot();
     if (!interactionActive) events.dismiss();
     setActivity(true);
@@ -448,9 +451,16 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .showNavInfo(false)
       .enableNodeDrag(false)
       .nodeRelSize(3.2)
+      // Arrow placement still uses the engine's sphere bounds even with custom
+      // meshes. Match their bounding radii so arrows do not end inside a whale.
+      .nodeVal((node) => {
+        const geometryRadius =
+          node.shape === 'box' ? Math.sqrt(3) * 0.8 : node.shape === 'octahedron' ? 1.4 : 1;
+        return Math.pow((node.radius * geometryRadius) / 3.2, 3);
+      })
       .nodeResolution(8)
       .nodeOpacity(0.95)
-      .linkOpacity(0.32)
+      .linkOpacity(0.46)
       .linkDirectionalArrowRelPos(0.7)
       .cooldownTicks(120)
       .cooldownTime(6000)
@@ -479,6 +489,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .onEngineTick(() => {
         positionsDirty = true;
         positionHalos();
+        if (pendingFocus) focus(pendingFocus);
         if (earlyFitTicks > 0) earlyFitTicks--;
         tryEarlyFit();
       })
@@ -486,6 +497,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         if (dead) return;
         positionHalos();
         settled = true;
+        if (pendingFocus) focus(pendingFocus);
         earlyFitPending = false;
         if (visible && needsFit && graph.graphData().nodes.length) {
           needsFit = false;
@@ -583,18 +595,24 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     dispose();
     throw error;
   }
-  const focus = (id: string) => {
+  function focus(id: string) {
     if (dead) return;
-    if (!visible) {
-      pendingFocus = id;
-      needsFit = false;
-      return;
-    }
-    pendingFocus = undefined;
-    const node = graph.graphData().nodes.find((node) => node.id === id);
-    if (!node) return;
+    // An explicit request owns the next camera move even when its frame has not
+    // arrived yet. Never substitute the origin for uninitialized coordinates.
+    pendingFocus = id;
     needsFit = false;
-    const target = { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 };
+    earlyFitPending = false;
+    if (!visible) return;
+    const node = graph.graphData().nodes.find((node) => node.id === id);
+    if (
+      !node ||
+      !Number.isFinite(node.x) ||
+      !Number.isFinite(node.y) ||
+      (dimensions === 3 && !Number.isFinite(node.z))
+    )
+      return;
+    pendingFocus = undefined;
+    const target = { x: node.x!, y: node.y!, z: dimensions === 2 ? 0 : node.z! };
     const camera = graph.cameraPosition();
     const dx = camera.x - target.x,
       dy = camera.y - target.y,
@@ -610,7 +628,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           };
     graph.cameraPosition(position, target, duration());
     scheduleSnapshot();
-  };
+  }
   return {
     canvas,
     flushSnapshot,
@@ -655,7 +673,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           !previous.size &&
           initialSnapshot?.dimensions === frame.dimensions &&
           nodes.every((node) => retainedPositions.has(node.id));
-        if (!previous.size && nodes.length && !initialSnapshot) {
+        if (!previous.size && nodes.length && !initialSnapshot && !pendingFocus) {
           needsFit = true;
           earlyFitPending = true;
           earlyFitTicks = 3;
@@ -729,6 +747,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           needsFit = false;
         }
       }
+      if (pendingFocus) focus(pendingFocus);
     },
     resize(width, height) {
       if (dead) return;

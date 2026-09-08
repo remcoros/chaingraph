@@ -152,3 +152,28 @@ browser map reuses immutable blockhash-to-height coordinates per network, never 
 status. History changes clear unrelated stale block metadata. Missing or unavailable metadata
 retains the transaction with an unknown or height-unavailable status. See
 [provenance and limits](research/transaction-status.md).
+
+### Input context lifetime and value filtering
+
+Optional encrypted `contextTransactionIds` records ancestry lifetime independently
+from `inputContext`, which only controls graph projection. Rendering promotion
+retains provenance; direct lookup and address/wallet discovery clear it.
+Automatically loaded and explicitly prefetched ancestors are eligible for removal
+only when they belong to the removed branch and no retained observation, human
+metadata or wallet evidence needs them. Remaining transaction records are never
+partially edited. Legacy scoped context supplies provenance when expanded; already
+expanded legacy data without that evidence stays independent. Hydration discards
+late parent results after its displayed transaction was removed.
+
+`domain/smallAmounts.ts` filters known output values before normal graph context
+expansion. It preserves unknown values, selected outputs and outputs associated
+with the selected address. It never modifies cached observations, manual hidden
+IDs or analysis inputs. The entity list remains available for recovery. The flow
+uses the same encrypted `view.smallAmountThreshold`, reports omitted rows, and
+keeps selected rows visible even beyond the collapsed window.
+
+New successful lookups issue an explicit adapter focus request, independently of
+selection locking. Requests wait for finite node coordinates and run once; manual
+navigation or Fit cancels pending focus. Input loading and failed tracing do not
+refit the camera. Value sizing uses an absolute bounded logarithmic radius, stable
+across filtering and later additions, with slightly larger selected flow arrows.

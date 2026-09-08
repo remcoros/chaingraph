@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { deriveAddresses } from '../src/lib/wallet';
+import type { Wallet } from '../src/domain/types';
 import { planEntityRemoval, removeWorkspaceEntity } from '../src/domain/entityRemoval';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import {
+  buildGraph,
+  newWorkspace,
+  parseWorkspace,
+  promoteInputContext,
+  markContextTransactions,
+  clearContextProvenance,
+} from '../src/domain/workspace';
+import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 
 const parent = 'a'.repeat(64),
   child = 'b'.repeat(64);
@@ -88,5 +98,219 @@ describe('workspace entity removal', () => {
     expect(next.tags?.[0].nodeIds).toEqual([`tx:${child}`]);
     expect(planEntityRemoval(next, `addr:${address}`)).toBeUndefined();
     expect(() => parseWorkspace(next)).not.toThrow();
+  });
+});
+
+const grandparent = 'c'.repeat(64),
+  other = 'd'.repeat(64);
+function automaticBranch() {
+  const w = fixture();
+  w.transactions[grandparent] = {
+    txid: grandparent,
+    vin: [{ coinbase: '00' }],
+    vout: [{ n: 0, value: 2, scriptPubKey: { hex: '51' } }],
+  };
+  w.transactions[parent] = {
+    ...w.transactions[parent],
+    vin: [{ txid: grandparent, vout: 0 }],
+    vout: [...w.transactions[parent].vout, { n: 1, value: 0.5, scriptPubKey: { hex: '51' } }],
+  };
+  w.inputContext = { [parent]: [0], [grandparent]: [0] };
+  return w;
+}
+
+describe('automatic ancestor cleanup after transaction removal', () => {
+  it('removes an isolated explicit transaction and its multilevel automatic input branch', () => {
+    const w = automaticBranch();
+    w.view.hiddenNodeIds = [`out:${parent}:0`, `tx:${child}`];
+    w.view.selectionId = `tx:${parent}`;
+    w.view.transactionFlow = { open: true, transactionId: parent };
+    w.view.filters = {
+      includeIds: [`tx:${child}`, `tx:${parent}`],
+      focus: { id: `tx:${parent}`, hops: 1 },
+    };
+    const plan = planEntityRemoval(w, `tx:${child}`)!;
+    expect(new Set(plan.removedTransactionIds)).toEqual(new Set([child, parent, grandparent]));
+    expect(plan.automaticContextCount).toBe(2);
+    expect(plan.requiresConfirmation).toBe(false);
+    const next = removeWorkspaceEntity(w, `tx:${child}`);
+    expect(next.transactions).toEqual({});
+    expect(next.inputContext).toBeUndefined();
+    expect(buildGraph(next)).toEqual({ nodes: [], links: [] });
+    expect(next.view.hiddenNodeIds).toEqual([]);
+    expect(next.view.selectionId).toBeUndefined();
+    expect(next.view.transactionFlow?.transactionId).toBeUndefined();
+    expect(next.view.filters).toMatchObject({ includeIds: [], focus: undefined });
+    expect(Object.keys(w.transactions)).toHaveLength(3);
+    expect(() => parseWorkspace(next)).not.toThrow();
+  });
+
+  it('retains a shared parent and its ancestry but removes the abandoned output scope', () => {
+    const w = automaticBranch();
+    w.transactions[other] = {
+      ...w.transactions[child],
+      txid: other,
+      vin: [{ txid: parent, vout: 1 }],
+    };
+    w.inputContext![parent] = [0, 1];
+    const next = removeWorkspaceEntity(w, `tx:${child}`);
+    expect(planEntityRemoval(w, `tx:${child}`)?.automaticContextCount).toBe(0);
+    expect(Object.keys(next.transactions).sort()).toEqual([parent, grandparent, other].sort());
+    expect(next.inputContext).toEqual({ [parent]: [1], [grandparent]: [0] });
+    const ids = buildGraph(next).nodes.map((node) => node.id);
+    expect(ids).toContain(`out:${parent}:1`);
+    expect(ids).not.toContain(`out:${parent}:0`);
+    expect(() => parseWorkspace(next)).not.toThrow();
+  });
+
+  it('preserves an independently loaded parent and its automatic dependencies', () => {
+    const w = automaticBranch();
+    delete w.inputContext![parent];
+    const next = removeWorkspaceEntity(w, `tx:${child}`);
+    expect(next.transactions[parent]).toBe(w.transactions[parent]);
+    expect(next.transactions[grandparent]).toBe(w.transactions[grandparent]);
+    expect(next.inputContext).toEqual({ [grandparent]: [0] });
+  });
+
+  for (const protection of ['note', 'bookmark', 'tag'] as const)
+    it(`retains annotated orphan context protected by ${protection}`, () => {
+      const w = automaticBranch();
+      if (protection === 'tag')
+        w.tags = [
+          {
+            id: crypto.randomUUID(),
+            name: 'Retain evidence',
+            color: '#339988',
+            nodeIds: [`out:${parent}:0`],
+          },
+        ];
+      else
+        w.annotations[`out:${parent}:0`] =
+          protection === 'bookmark' ? { ...note, note: '', bookmarked: true } : note;
+      const next = removeWorkspaceEntity(w, `tx:${child}`);
+      expect(next.transactions[parent]).toBe(w.transactions[parent]);
+      expect(next.transactions[grandparent]).toBe(w.transactions[grandparent]);
+      expect(next.annotations).toEqual(w.annotations);
+      expect(next.tags).toEqual(w.tags);
+      expect(planEntityRemoval(w, `tx:${child}`)?.annotationCount).toBe(0);
+      expect(() => parseWorkspace(next)).not.toThrow();
+    });
+
+  it('retains annotated address provenance and watched-address observations in automatic context', () => {
+    for (const watched of [true, false]) {
+      const w = automaticBranch();
+      w.transactions[parent].vout[0].scriptPubKey = { address };
+      if (watched) w.watchedAddresses = [address];
+      else w.annotations[`addr:${address}`] = note;
+      const next = removeWorkspaceEntity(w, `tx:${child}`);
+      expect(next.transactions[parent]).toBeDefined();
+      expect(next.transactions[grandparent]).toBeDefined();
+      expect(next.annotations).toEqual(w.annotations);
+      expect(next.watchedAddresses).toEqual(w.watchedAddresses);
+      expect(() => parseWorkspace(next)).not.toThrow();
+    }
+  });
+
+  it('retains wallet history and activity references without modifying wallet metadata', () => {
+    const key =
+      'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
+    const derived = deriveAddresses(key, 'mainnet', 'p2wpkh', 0, 0, 1);
+    for (const source of ['history', 'activity', 'owned-output', 'owned-script'] as const) {
+      const w = automaticBranch();
+      const wallet: Wallet = {
+        id: crypto.randomUUID(),
+        name: 'Public BIP84 fixture',
+        key,
+        scriptType: 'p2wpkh',
+        color: '#339988',
+        addresses: derived.map((entry) => ({
+          ...entry,
+          history: source === 'history' ? [{ tx_hash: parent, height: 100 }] : [],
+        })),
+      };
+      if (source === 'activity') wallet.unreviewedTransactionIds = [parent];
+      if (source === 'owned-output')
+        w.transactions[parent].vout[0].scriptPubKey = { address: derived[0].address };
+      if (source === 'owned-script')
+        w.transactions[parent].vout[0].scriptPubKey = {
+          hex: Buffer.from(
+            bitcoinAddress.toOutputScript(derived[0].address, networks.bitcoin),
+          ).toString('hex'),
+        };
+      w.wallets = [wallet];
+      const next = removeWorkspaceEntity(w, `tx:${child}`);
+      expect(next.transactions[parent]).toBe(w.transactions[parent]);
+      expect(next.transactions[grandparent]).toBe(w.transactions[grandparent]);
+      expect(next.wallets).toBe(w.wallets);
+      expect(() => parseWorkspace(next)).not.toThrow();
+    }
+  });
+
+  it('does not clean up or shrink unrelated automatic context', () => {
+    const w = automaticBranch();
+    const unrelated = 'e'.repeat(64),
+      consumer = 'f'.repeat(64);
+    w.transactions[unrelated] = {
+      ...w.transactions[parent],
+      txid: unrelated,
+      vin: [{ coinbase: '00' }],
+    };
+    w.transactions[consumer] = {
+      ...w.transactions[child],
+      txid: consumer,
+      vin: [{ txid: unrelated, vout: 0 }],
+    };
+    w.inputContext![unrelated] = [0, 1];
+    const next = removeWorkspaceEntity(w, `tx:${child}`);
+    expect(Object.keys(next.transactions).sort()).toEqual([unrelated, consumer].sort());
+    expect(next.inputContext).toEqual({ [unrelated]: [0, 1] });
+  });
+});
+
+describe('automatic ancestry provenance independent of render scope', () => {
+  it('keeps promoted automatic ancestry removable with the original branch', () => {
+    const original = automaticBranch();
+    const expanded = promoteInputContext(original, [parent, grandparent]);
+    expect(expanded.inputContext).toBeUndefined();
+    expect(new Set(expanded.contextTransactionIds)).toEqual(new Set([parent, grandparent]));
+    expect(planEntityRemoval(expanded, `tx:${child}`)?.automaticContextCount).toBe(2);
+    const next = removeWorkspaceEntity(expanded, `tx:${child}`);
+    expect(buildGraph(next).nodes).toHaveLength(0);
+    expect(next.contextTransactionIds ?? []).toEqual([]);
+    expect(() => parseWorkspace(next)).not.toThrow();
+  });
+
+  it('marks newly fetched ancestry and gives explicit observations independent lifetime', () => {
+    const original = automaticBranch();
+    delete original.inputContext;
+    const marked = markContextTransactions(original, [parent, grandparent, parent, 'f'.repeat(64)]);
+    expect(marked.contextTransactionIds).toEqual([parent, grandparent]);
+    expect(markContextTransactions(marked, [parent])).toBe(marked);
+    const independent = clearContextProvenance(marked, [parent]);
+    expect(independent.contextTransactionIds).toEqual([grandparent]);
+    expect(clearContextProvenance(independent, [parent])).toBe(independent);
+    const next = removeWorkspaceEntity(independent, `tx:${child}`);
+    expect(next.transactions[parent]).toBe(original.transactions[parent]);
+    expect(next.transactions[grandparent]).toBe(original.transactions[grandparent]);
+    expect(() => parseWorkspace(next)).not.toThrow();
+    const legacy = clearContextProvenance(automaticBranch(), [parent]);
+    expect(legacy.inputContext).toEqual({ [grandparent]: [0] });
+    expect(legacy.contextTransactionIds).toBeUndefined();
+  });
+
+  it('rejects duplicate, missing and excessive provenance records at import/save validation', () => {
+    const w = automaticBranch();
+    expect(() => parseWorkspace({ ...w, contextTransactionIds: [parent, parent] })).toThrow(
+      'duplicate',
+    );
+    expect(() => parseWorkspace({ ...w, contextTransactionIds: ['f'.repeat(64)] })).toThrow(
+      'loaded transaction',
+    );
+    expect(() =>
+      parseWorkspace({ ...w, contextTransactionIds: Array(10001).fill(parent) }),
+    ).toThrow('10,000 context transaction limit');
+    expect(parseWorkspace({ ...w, contextTransactionIds: [parent] }).contextTransactionIds).toEqual(
+      [parent],
+    );
   });
 });

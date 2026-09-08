@@ -66,7 +66,13 @@ import { AnalysisPanel } from './components/AnalysisPanel';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { GuidedTour } from './components/GuidedTour';
-import { buildGraph, promoteInputContext } from './domain/workspace';
+import {
+  buildGraph,
+  clearContextProvenance,
+  markContextTransactions,
+  promoteInputContext,
+} from './domain/workspace';
+import { filterSmallAmounts } from './domain/smallAmounts';
 import { analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
@@ -79,7 +85,7 @@ import {
 } from './domain/types';
 import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/api';
 import { useBackendNetworks } from './lib/useBackendNetworks';
-import { loadAncestors } from './lib/tracing';
+import { ancestryNotice, loadAncestors, traceSourceExists } from './lib/tracing';
 import { demoWorkspace } from './domain/demo';
 import { MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
@@ -273,15 +279,25 @@ export default function App() {
     const tag = w?.tags?.find((tag) => tag.id === graphFilters.tagId);
     return { ...graphFilters, includeIds: tag ? tagNodeIds(tag, graph) : [] };
   }, [graphFilters, w?.tags, graph, walletMatches]);
+  const automaticContextIds = useMemo(
+    () => [
+      ...new Set([...(w?.contextTransactionIds ?? []), ...Object.keys(w?.inputContext ?? {})]),
+    ],
+    [w?.contextTransactionIds, w?.inputContext],
+  );
+  const amountGraph = useMemo(
+    () => filterSmallAmounts(graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds),
+    [graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds],
+  );
   const visibleGraph = useMemo(
     () =>
       filterGraph(
-        graph,
+        amountGraph,
         { ...effectiveFilters, showAddresses: w?.view.showAddresses },
         w?.annotations,
         { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
       ),
-    [graph, effectiveFilters, w?.view.showAddresses, w?.view.hiddenNodeIds, w?.annotations],
+    [amountGraph, effectiveFilters, w?.view.showAddresses, w?.view.hiddenNodeIds, w?.annotations],
   );
   const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
   // Address visibility is a canvas preference. Manually hidden addresses must
@@ -559,7 +575,7 @@ export default function App() {
     }
     setNotice(
       plan.kind === 'transaction'
-        ? 'Transaction removed from this workspace. Undo restores its data and annotations.'
+        ? `Transaction removed${plan.automaticContextCount ? ` with ${plan.automaticContextCount} unused input context transaction${plan.automaticContextCount === 1 ? '' : 's'}` : ''}. Shared, independently added or annotated context is retained. Undo restores the removed data.`
         : 'Address is no longer watched. Loaded transactions remain. Undo restores the watch and annotations.',
     );
   };
@@ -649,13 +665,23 @@ export default function App() {
     id: string,
     transactions: Transaction[],
     promotionIds = transactions.map((transaction) => transaction.txid),
+    contextIds?: string[],
+    requiredSourceId?: string,
   ) => {
-    if (!transactions.length && !promotionIds.length) return;
+    if (!transactions.length && !promotionIds.length) {
+      const current = ws.getSession(id)?.data;
+      return !!current && (!requiredSourceId || traceSourceExists(current, requiredSourceId));
+    }
+    let accepted = false;
     ws.update(
       id,
       (current) => {
-        const promoted = promoteInputContext(current, promotionIds);
-        return !transactions.length
+        if (requiredSourceId && !traceSourceExists(current, requiredSourceId)) return current;
+        accepted = true;
+        const promoted = contextIds
+          ? promoteInputContext(current, promotionIds)
+          : clearContextProvenance(current, promotionIds);
+        const merged = !transactions.length
           ? promoted
           : {
               ...promoted,
@@ -666,9 +692,11 @@ export default function App() {
                 ),
               },
             };
+        return contextIds ? markContextTransactions(merged, contextIds) : merged;
       },
       false,
     );
+    return accepted;
   };
   async function search(e: FormEvent) {
     e.preventDefault();
@@ -690,16 +718,27 @@ export default function App() {
           index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index));
         ws.update(w.id, (current) => setNodesHidden(current, [requestedId], false));
         select(requestedId);
+        setGraphFilters({});
+        setFocusRequest({ id: requestedId, token: Date.now() });
         setLeftTab('entities');
         if (prefetchDepth) {
-          const result = await loadAncestors([t], w.transactions, prefetchDepth, {
+          const before = ws.getSession(w.id)!.data;
+          const result = await loadAncestors([t], before.transactions, prefetchDepth, {
             fetch: getTransaction,
             signal,
             onProgress: setOperation,
           });
           signal.throwIfAborted();
-          mergeTransactions(w.id, result.transactions, result.resolvedTransactionIds);
-          setNotice(ancestryNotice(result));
+          if (
+            mergeTransactions(
+              w.id,
+              result.transactions,
+              result.resolvedTransactionIds,
+              result.transactions.map((tx) => tx.txid),
+              txNodeId(t.txid),
+            )
+          )
+            setNotice(ancestryNotice(result, before));
         }
       } else {
         setOperation('Discovering address history…');
@@ -710,7 +749,7 @@ export default function App() {
         ws.update(
           w.id,
           (c) => ({
-            ...promoteInputContext(c, result.observedTransactionIds),
+            ...clearContextProvenance(c, result.observedTransactionIds),
             watchedAddresses: [...new Set([...c.watchedAddresses, text])],
             transactions: {
               ...c.transactions,
@@ -720,6 +759,15 @@ export default function App() {
           false,
         );
         ws.update(w.id, (current) => setNodesHidden(current, [addressNodeId(text)], false));
+        ws.update(
+          w.id,
+          (current) => ({ ...current, view: { ...current.view, showAddresses: true } }),
+          false,
+        );
+        select(addressNodeId(text));
+        setGraphFilters({});
+        setFocusRequest({ id: addressNodeId(text), token: Date.now() });
+        setLeftTab('entities');
         setNotice(
           result.truncated
             ? 'Partial address history: 500-transaction limit reached. Search again to load more.'
@@ -727,7 +775,6 @@ export default function App() {
         );
       }
       setQuery('');
-      setFitToken((t) => t + 1);
     });
   }
   async function refreshWallets(targets: Wallet[], initial: Workspace, signal: AbortSignal) {
@@ -792,9 +839,6 @@ export default function App() {
       false,
     );
   }
-  function ancestryNotice(result: Awaited<ReturnType<typeof loadAncestors>>) {
-    return `${result.transactions.length} previous transactions added.${result.truncated ? ' Partial expansion: 500-transaction limit reached. Trace individual paths to continue.' : ''}${result.failed ? ` ${result.failed} transactions could not be loaded. Retry the path to continue.` : ''}${!result.transactions.length && !result.failed && !result.truncated ? ' Previous transactions are already loaded, or this is a coinbase transaction with no previous inputs.' : ''}`;
-  }
   async function expand(direction: 'funding' | 'spending', nodeId = selectedId) {
     if (!w || !canTrace) return;
     const node = graph.nodes.find((n) => n.id === nodeId);
@@ -806,7 +850,10 @@ export default function App() {
           : 'Checking outputs for spending transactions…',
       );
       const loaded = w.transactions[node.txid!];
+      const traceSourceId = loaded ? txNodeId(node.txid!) : node.id;
       const transaction = loaded ?? (await getTransaction(node.txid!, signal));
+      signal.throwIfAborted();
+      if (!traceSourceExists(ws.getSession(w.id)!.data, traceSourceId)) return;
       if (direction === 'funding') {
         if (!loaded) {
           signal.throwIfAborted();
@@ -815,14 +862,23 @@ export default function App() {
             'Creating transaction loaded. The output now has its value and script details. Trace again to load its previous inputs.',
           );
         } else {
-          const result = await loadAncestors([transaction], w.transactions, 1, {
+          const before = ws.getSession(w.id)!.data;
+          const result = await loadAncestors([transaction], before.transactions, 1, {
             signal,
             fetch: getTransaction,
             onProgress: setOperation,
           });
           signal.throwIfAborted();
-          mergeTransactions(w.id, result.transactions, result.resolvedTransactionIds);
-          setNotice(ancestryNotice(result));
+          if (
+            mergeTransactions(
+              w.id,
+              result.transactions,
+              result.resolvedTransactionIds,
+              result.transactions.map((tx) => tx.txid),
+              traceSourceId,
+            )
+          )
+            setNotice(ancestryNotice(result, before));
         }
       } else {
         const outputIndex = node.kind === 'output' ? node.vout : undefined;
@@ -847,7 +903,16 @@ export default function App() {
             );
         signal.throwIfAborted();
         const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
-        mergeTransactions(w.id, [...(!loaded ? [transaction] : []), ...result.transactions]);
+        if (
+          !mergeTransactions(
+            w.id,
+            [...(!loaded ? [transaction] : []), ...result.transactions],
+            result.transactions.map((tx) => tx.txid),
+            undefined,
+            traceSourceId,
+          )
+        )
+          return;
         if ('nextOffset' in result && result.nextOffset !== undefined)
           spendingOffsets.current.set(searchKey, result.nextOffset);
         else spendingOffsets.current.delete(searchKey);
@@ -893,7 +958,7 @@ export default function App() {
           added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
           refreshed += result.transactions.filter((tx) => !!snapshot.transactions[tx.txid]).length;
           snapshot = {
-            ...promoteInputContext(snapshot, result.observedTransactionIds),
+            ...clearContextProvenance(snapshot, result.observedTransactionIds),
             transactions: {
               ...snapshot.transactions,
               ...Object.fromEntries(result.transactions.map((tx) => [tx.txid, tx])),
@@ -1245,6 +1310,7 @@ export default function App() {
                         ...c,
                         transactions: demoWorkspace(false).transactions,
                         inputContext: undefined,
+                        contextTransactionIds: undefined,
                         findings: [],
                       }));
                       setSelectedId(undefined);
@@ -1519,6 +1585,15 @@ export default function App() {
                       )
                     }
                     renderMetadata={renderEntityMetadata}
+                    onSmallAmountThresholdChange={(smallAmountThreshold) =>
+                      change(
+                        (current) => ({
+                          ...current,
+                          view: { ...current.view, smallAmountThreshold },
+                        }),
+                        false,
+                      )
+                    }
                     workspace={w}
                     selected={selected}
                     hiddenNodeIds={w.view.hiddenNodeIds}
@@ -1535,6 +1610,7 @@ export default function App() {
                 <div className="graph-renderer-region">
                   {!graph.nodes.length && (
                     <GraphControls
+                      smallAmountHiddenCount={amountGraph.hiddenCount}
                       view={w.view}
                       focusGraph={focusGraph}
                       onToggleFocus={() => setFocusGraph((value) => !value)}
@@ -1587,6 +1663,7 @@ export default function App() {
                         }
                         toolbar={
                           <GraphControls
+                            smallAmountHiddenCount={amountGraph.hiddenCount}
                             view={w.view}
                             focusGraph={focusGraph}
                             onToggleFocus={() => setFocusGraph((value) => !value)}
@@ -2037,7 +2114,7 @@ export default function App() {
           </div>
           <p>
             {removalPlan.kind === 'transaction'
-              ? 'Remove the cached transaction and its transaction/output annotations and tag memberships from this workspace. Outputs referenced by other loaded transactions may remain as placeholders.'
+              ? 'Remove the cached transaction and its transaction/output annotations and tag memberships from this workspace. Unused input context is removed too; shared, independently added or annotated context is retained. Outputs referenced by retained transactions may remain as placeholders.'
               : 'Stop watching this address and clear its annotation and tag memberships. Loaded transaction data remains in the workspace.'}
           </p>
           <p>

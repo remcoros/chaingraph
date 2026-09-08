@@ -55,6 +55,7 @@ function setup() {
     'showNavInfo',
     'enableNodeDrag',
     'nodeRelSize',
+    'nodeVal',
     'nodeResolution',
     'nodeOpacity',
     'linkOpacity',
@@ -447,6 +448,100 @@ describe('force adapter contract', () => {
     adapter.resize(390, 600);
     expect(graph.cameraPosition.mock.calls.length).toBeGreaterThan(count);
     expect(graph.cameraPosition.mock.calls.at(-1)?.[1]).toEqual({ x: 20, y: 30, z: 0 });
+    adapter.dispose();
+  });
+  it('focuses a newly arriving node once and never fits or refocuses after parent merges and settlement', () => {
+    const { adapter, graph, callbacks } = setup();
+    adapter.focus('a');
+    expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
+      0,
+    );
+    adapter.update(frame(3));
+    const focused = graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length);
+    expect(focused).toHaveLength(1);
+    expect(focused[0][1]).toEqual({ x: 20, y: 30, z: 40 });
+    const original = frame(3);
+    adapter.update({
+      ...original,
+      nodes: [...original.nodes, { ...original.nodes[0], id: 'parent' }],
+    });
+    for (let tick = 0; tick < 4; tick++) callbacks.onEngineTick();
+    callbacks.onEngineStop();
+    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
+      1,
+    );
+    adapter.dispose();
+  });
+  it('waits for finite coordinates and cancels initial fitting while a focus is pending', () => {
+    const { adapter, graph, callbacks } = setup();
+    adapter.update(frame(3));
+    const target = graph.graphData().nodes[0];
+    target.x = undefined;
+    target.z = NaN;
+    adapter.focus('a');
+    for (let tick = 0; tick < 4; tick++) callbacks.onEngineTick();
+    expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
+      0,
+    );
+    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    target.x = 123;
+    target.z = -456;
+    callbacks.onEngineTick();
+    expect(graph.cameraPosition.mock.calls.at(-1)?.[1]).toEqual({ x: 123, y: 30, z: -456 });
+    callbacks.onEngineStop();
+    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
+      1,
+    );
+    adapter.dispose();
+  });
+  it('lets a manual gesture or explicit fit cancel a focus waiting for its node', () => {
+    for (const cancel of ['gesture', 'fit']) {
+      const { adapter, graph, callbacks, pointer } = setup();
+      adapter.update(frame(3));
+      adapter.focus('later');
+      if (cancel === 'gesture') pointer('wheel');
+      else adapter.fit();
+      const original = frame(3);
+      adapter.update({
+        ...original,
+        nodes: [...original.nodes, { ...original.nodes[0], id: 'later' }],
+      });
+      callbacks.onEngineTick();
+      callbacks.onEngineStop();
+      expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
+        0,
+      );
+      if (cancel === 'gesture') expect(graph.zoomToFit).not.toHaveBeenCalled();
+      else expect(graph.zoomToFit).toHaveBeenCalled();
+      adapter.dispose();
+    }
+  });
+  it('keeps arrow bounds aligned with actual custom mesh sizes without moving the layout or camera', () => {
+    const { adapter, graph } = setup();
+    adapter.update(frame(3));
+    const radius = (node: GraphFrame['nodes'][number]) =>
+      Math.cbrt(graph.nodeVal.mock.calls[0][0](node)) * 3.2;
+    expect(radius({ ...frame(3).nodes[0], radius: 10 })).toBeCloseTo(Math.sqrt(3) * 8);
+    expect(radius({ ...frame(3).nodes[1], radius: 10 })).toBeCloseTo(10);
+    expect(radius({ ...frame(3).nodes[0], shape: 'octahedron', radius: 10 })).toBeCloseTo(14);
+    const node = graph.graphData().nodes[1];
+    const originalPosition = { x: node.x, y: node.y, z: node.z };
+    const originalCamera = graph.cameraPosition();
+    const graphWrites = graph.graphData.mock.calls.filter((args: unknown[]) => args.length).length;
+    adapter.update({
+      ...frame(3),
+      nodes: frame(3).nodes.map((item) => ({ ...item, radius: 13.3 })),
+    });
+    expect(graph.graphData().nodes[1]).toBe(node);
+    expect(radius(node)).toBeCloseTo(13.3);
+    expect(node).toMatchObject(originalPosition);
+    expect(graph.cameraPosition()).toEqual(originalCamera);
+    expect(graph.graphData.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
+      graphWrites,
+    );
+    expect(graph.linkOpacity).toHaveBeenCalledWith(0.46);
     adapter.dispose();
   });
   it('preserves 2D pan and 3D orbit mappings, resize, focus and explicit fit', () => {

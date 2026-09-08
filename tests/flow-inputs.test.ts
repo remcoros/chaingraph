@@ -40,6 +40,12 @@ describe('displayed transaction input hydration scope', () => {
 });
 
 describe('flow input merge and explicit promotion', () => {
+  it('does not re-add automatic input context after the displayed transaction was removed', () => {
+    const w = newWorkspace('Removed during hydration', 'mainnet');
+    const merged = mergeFlowInputs(w, child, undefined, [tx(parent, grandparent)]);
+    expect(merged).toBe(w);
+    expect(buildGraph(merged).nodes).toHaveLength(0);
+  });
   it('adds full previous transaction metadata while limiting its graph to the requested outputs', () => {
     const w = newWorkspace('Focused flow', 'mainnet');
     w.transactions[child] = tx(child, parent);

@@ -165,14 +165,15 @@ export default function EntityBrowser({
           <div className="entity-visibility-filter">
             <select
               aria-label="Entity visibility"
+              title="Manual hide/show state. Amount-filtered outputs remain listed for inspection."
               value={visibility}
               onChange={(event) =>
                 onVisibilityChange(event.target.value as 'visible' | 'hidden' | 'all')
               }
             >
-              <option value="visible">Visible in graph</option>
-              <option value="hidden">Hidden from graph</option>
-              <option value="all">Visible and hidden</option>
+              <option value="visible">Not hidden</option>
+              <option value="hidden">Hidden</option>
+              <option value="all">All entities</option>
             </select>
             {hiddenCount > 0 && (
               <button

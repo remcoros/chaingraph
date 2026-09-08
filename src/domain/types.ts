@@ -105,6 +105,8 @@ export interface Workspace {
   transactions: Record<string, Transaction>;
   /** Automatically fetched input parents show only these outputs until explicitly opened. */
   inputContext?: Record<string, number[]>;
+  /** Automatically fetched ancestry, retained after expanding its graph presentation. */
+  contextTransactionIds?: string[];
   annotations: Record<string, Annotation>;
   tags?: WorkspaceTag[];
   findings: AnalysisFinding[];
@@ -118,6 +120,7 @@ export interface Workspace {
     /** Manual canvas visibility, independent of filters and cached Bitcoin observations. */
     hiddenNodeIds?: string[];
     entityVisibility?: 'visible' | 'hidden' | 'all';
+    smallAmountThreshold?: number;
     showLabels?: boolean;
     showTags?: boolean;
     showIcons?: boolean;

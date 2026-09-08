@@ -1,3 +1,5 @@
+import { SmallAmountControl } from './SmallAmountControl';
+import { isSmallAmount } from '../domain/smallAmounts';
 import { transactionStatus } from '../domain/transactionStatus';
 import { useMemo, useState, useRef, useLayoutEffect, type ReactNode } from 'react';
 import { Pencil, ArrowLeft, ArrowRight, Box, Tags, Smile, Eye, EyeOff } from 'lucide-react';
@@ -32,6 +34,7 @@ interface Props extends VisibilityProps {
   inputLoading?: boolean;
   inputError?: string;
   onRetryInputs?: () => void;
+  onSmallAmountThresholdChange?: (threshold: number) => void;
   renderMetadata?: (nodeId: string) => ReactNode;
   state?: TransactionFlowState;
   onStateChange?: (state: TransactionFlowState) => void;
@@ -53,6 +56,7 @@ function TransactionRows({
   onTrace,
   disabledReason,
   inputLoading,
+  onSmallAmountThresholdChange,
   hiddenNodeIds = [],
   onSetHidden,
   renderMetadata,
@@ -158,7 +162,7 @@ function TransactionRows({
       observer.disconnect();
       panel.removeEventListener('scroll', rememberScroll);
     };
-  }, [selected?.id, expandedInputs, expandedOutputs]);
+  }, [selected?.id, expandedInputs, expandedOutputs, workspace.view.smallAmountThreshold]);
   const inputRows: Row[] = tx.vin.map((input, index) => ({
     id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
     index,
@@ -188,8 +192,17 @@ function TransactionRows({
           (selected?.kind === 'address' &&
             !!row.output &&
             outputAddress(row.output) === selected.address);
-        // The selected outpoint remains present even beyond the collapsed window.
-        const shown = expanded ? rows : rows.filter((row, index) => index < 3 || matches(row));
+        const belowThreshold = (row: Row) =>
+          isSmallAmount(
+            row.output ? sats(row.output.value) : undefined,
+            workspace.view.smallAmountThreshold,
+          );
+        const retained = rows.filter((row) => matches(row) || !belowThreshold(row));
+        const filteredCount = rows.length - retained.length;
+        // The selected outpoint remains present even below the threshold or beyond the collapsed window.
+        const shown = expanded
+          ? retained
+          : retained.filter((row, index) => index < 3 || matches(row));
         return (
           <section
             key={name}
@@ -202,7 +215,7 @@ function TransactionRows({
                 {rows.length}{' '}
                 {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
               </h4>
-              {rows.length > 3 && (
+              {retained.length > 3 && (
                 <button
                   type="button"
                   className="text-button transaction-expand"
@@ -211,10 +224,20 @@ function TransactionRows({
                 >
                   {expanded
                     ? `Collapse ${name.toLowerCase()}`
-                    : `Show all ${rows.length} ${name.toLowerCase()}`}
+                    : `Show all ${retained.length} ${name.toLowerCase()}`}
                 </button>
               )}
             </div>
+            {filteredCount > 0 && (
+              <button
+                type="button"
+                className="text-button transaction-amount-recovery"
+                aria-label={`Show ${filteredCount} amount-filtered ${name.toLowerCase()}`}
+                onClick={() => onSmallAmountThresholdChange?.(0)}
+              >
+                {filteredCount} filtered · Show
+              </button>
+            )}
             <div className="transaction-rows">
               {shown.map((row) => {
                 const address = row.output && outputAddress(row.output);
@@ -285,6 +308,14 @@ function TransactionRows({
                               ? 'Newly created coins'
                               : formatSats(row.output ? sats(row.output.value) : undefined)}
                           </span>
+                          {matches(row) && belowThreshold(row) && (
+                            <span
+                              className="amount-selection-badge"
+                              title="The selected output stays visible below the amount filter."
+                            >
+                              Selected · below filter
+                            </span>
+                          )}
                           {row.id && hidden.has(row.id) && (
                             <span className="entity-hidden-badge">
                               <EyeOff size={10} /> Hidden
@@ -479,10 +510,19 @@ export function TransactionView(props: Props) {
       }}
     >
       <summary>
-        <span>Transaction flow</span>
-        <small title={current ? transactionStatus(current.tx).title : undefined}>
-          {current ? transactionStatus(current.tx).label : 'Not loaded'}
-        </small>
+        <span className="transaction-summary-content">
+          <span>Transaction flow</span>
+          {props.onSmallAmountThresholdChange && (
+            <SmallAmountControl
+              context="flow"
+              threshold={workspace.view.smallAmountThreshold}
+              onChange={props.onSmallAmountThresholdChange}
+            />
+          )}
+          <small title={current ? transactionStatus(current.tx).title : undefined}>
+            {current ? transactionStatus(current.tx).label : 'Not loaded'}
+          </small>
+        </span>
       </summary>
       <div className="transaction-view-body">
         {current ? (

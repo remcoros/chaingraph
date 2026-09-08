@@ -1768,3 +1768,75 @@ small,
     display: flex;
   }
 }
+
+/* Amount filtering is shared by the canvas and transaction flow. */
+.small-amount-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.small-amount-control select {
+  width: auto;
+  min-width: 108px;
+  min-height: 32px;
+  padding: 4px 23px 4px 7px;
+  font-size: 11px;
+}
+.small-amount-control.is-active select {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.small-amount-restore {
+  min-height: 32px;
+  padding: 3px;
+  font-size: 11px;
+}
+.entity-browser .entity-row small {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.entity-browser .entity-row strong {
+  font-size: 12px;
+}
+.entity-browser .entity-chain-status {
+  font-size: 11px;
+}
+.transaction-view > summary {
+  min-height: 38px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.transaction-summary-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  width: calc(100% - 14px);
+  vertical-align: middle;
+}
+.transaction-summary-content > small {
+  float: none;
+  font-size: 11px;
+  text-align: right;
+}
+.transaction-summary-content .small-amount-control select {
+  min-width: 100px;
+  min-height: 32px;
+  font-size: 11px;
+}
+.transaction-view .transaction-lane-header {
+  top: 38px;
+}
+.transaction-amount-recovery {
+  font-size: 11px;
+  min-height: 32px;
+  width: 100%;
+  white-space: normal;
+  padding: 3px 1px;
+}
+.amount-selection-badge {
+  color: var(--color-accent);
+  font-size: 11px;
+  white-space: normal;
+}

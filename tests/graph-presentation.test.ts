@@ -64,7 +64,7 @@ describe('shared graph semantics and presentation', () => {
       palette,
     );
     expect(selected.nodes[1]).toMatchObject({ color: palette.accent, highlight: true });
-    expect(selected.links.map((link) => link.arrowLength)).toEqual([3, 3, 0]);
+    expect(selected.links.map((link) => link.arrowLength)).toEqual([3.6, 3.6, 0]);
     expect(selected.links.every((link) => link.width === 0.65)).toBe(true);
     expect(
       presentGraph({ ...input, glow: false }, palette).nodes.every((node) => !node.highlight),
@@ -85,6 +85,49 @@ describe('shared graph semantics and presentation', () => {
     expect(
       render({ showLabels: false, showTags: false, showIcons: false }).every((node) => !node.text),
     ).toBe(true);
+  });
+  it('makes dust and large values visibly distinct while keeping broad Bitcoin ranges bounded', () => {
+    const values = [
+      0, 1, 300, 1000, 10000, 100000, 1000000, 100000000, 59849987177, 2100000000000000,
+    ];
+    const valueNodes: GraphNode[] = values.map((value, index) => ({
+      id: String(index),
+      kind: 'output',
+      label: 'Output',
+      value,
+    }));
+    const render = (items: GraphNode[]) =>
+      presentGraph({ ...input, nodes: items, links: [], sizeBy: 'value' }, palette).nodes;
+    const radii = render(valueNodes).map((node) => node.radius);
+    expect(
+      radii.every((radius) => Number.isFinite(radius) && radius >= 2.4 && radius <= 14.4),
+    ).toBe(true);
+    for (let index = 1; index < radii.length; index++)
+      expect(radii[index]).toBeGreaterThan(radii[index - 1]);
+    expect(radii[8] / radii[2]).toBeGreaterThan(5);
+    expect(radii[8] / radii[2]).toBeLessThan(6);
+    // Filtering or adding an unrelated whale must not resize existing values.
+    expect(render([valueNodes[2], valueNodes[8]]).map((node) => node.radius)).toEqual([
+      radii[2],
+      radii[8],
+    ]);
+    expect(render([{ ...valueNodes[0], value: Number.MAX_VALUE }])[0].radius).toBe(14.4);
+  });
+  it('keeps missing and malformed values renderable and preserves intentional visual scale overrides', () => {
+    for (const value of [undefined, NaN, Infinity, -1]) {
+      const frame = presentGraph(
+        { ...input, nodes: [{ ...nodes[0], value }], sizeBy: 'value' },
+        palette,
+      );
+      expect(frame.nodes[0].radius).toBe(3.2);
+    }
+    const base = presentGraph({ ...input, sizeBy: 'value' }, palette).nodes[0].radius;
+    const overridden = presentGraph(
+      { ...input, sizeBy: 'value', nodePresentation: new Map([['tx', { scale: 1.5 }]]) },
+      palette,
+    );
+    expect(overridden.nodes[0].radius).toBeCloseTo(base * 1.5);
+    expect(presentGraph(input, palette).links.every((link) => link.arrowLength === 0)).toBe(true);
   });
   it('filters missing endpoints before degree sizing and restores defaults when overrides disappear', () => {
     const frame = presentGraph({ ...input, nodes: nodes.slice(0, 2), sizeBy: 'degree' }, palette);

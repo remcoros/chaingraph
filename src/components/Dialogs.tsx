@@ -15,7 +15,10 @@ export function useDialogFocus(onClose: () => void) {
   useEffect(() => {
     const el = ref.current;
     if (!el?.contains(document.activeElement))
-      el?.querySelector<HTMLElement>('input,button')?.focus();
+      (
+        el?.querySelector<HTMLElement>('[data-autofocus]:not(:disabled)') ??
+        el?.querySelector<HTMLElement>('input:not(:disabled),button:not(:disabled)')
+      )?.focus();
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -142,6 +145,7 @@ export function CreateDialog({
           Name (public)
           <input
             autoFocus
+            data-autofocus
             required
             maxLength={100}
             value={name}
@@ -267,6 +271,7 @@ export function UnlockDialog({
             type="password"
             autoComplete="current-password"
             autoFocus
+            data-autofocus
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}

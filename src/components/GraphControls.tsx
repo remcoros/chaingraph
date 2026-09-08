@@ -1,3 +1,4 @@
+import { SmallAmountControl } from './SmallAmountControl';
 import { Expand, Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
 import type { Workspace } from '../domain/types';
 export function GraphControls({
@@ -6,10 +7,12 @@ export function GraphControls({
   onFit,
   focusGraph,
   onToggleFocus,
+  smallAmountHiddenCount,
 }: {
   view: Workspace['view'];
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
   onFit: () => void;
+  smallAmountHiddenCount?: number;
   focusGraph?: boolean;
   onToggleFocus?: () => void;
 }) {
@@ -58,6 +61,14 @@ export function GraphControls({
           <option value="degree">Connections</option>
         </select>
       </label>
+      <SmallAmountControl
+        context="graph"
+        threshold={view.smallAmountThreshold}
+        hiddenCount={smallAmountHiddenCount}
+        onChange={(smallAmountThreshold) =>
+          onChange((current) => ({ ...current, smallAmountThreshold }))
+        }
+      />
       <label className="highlight-control">
         <select
           aria-label="Highlight entities"
