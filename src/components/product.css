@@ -110,11 +110,13 @@ kbd {
     display: none;
   }
 }
-.workbench.focus-graph {
-  grid-template-columns: minmax(0, 1fr);
-}
-.workbench.focus-graph > aside {
-  display: none;
+@media (min-width: 1000px) {
+  .workbench.focus-graph {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workbench.focus-graph > aside {
+    display: none;
+  }
 }
 .skip-link {
   position: fixed;
@@ -171,9 +173,6 @@ a {
   touch-action: manipulation;
 }
 @media (max-width: 760px) {
-  .workbench.focus-graph .graph-stage {
-    display: block;
-  }
   .help-tabs button {
     padding: 6px 8px;
   }
@@ -297,4 +296,17 @@ a {
 .network-connection-row span {
   color: var(--muted);
   text-align: right;
+}
+
+.graph-navigation .view-summary:empty {
+  display: none;
+}
+
+.graph-navigation .graph-lock-selection .graph-nav-caption {
+  display: inline;
+}
+.graph-navigation .graph-lock-selection.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
 }

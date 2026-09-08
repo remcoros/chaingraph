@@ -24,21 +24,20 @@ async function add(page: Page, txid: string) {
   await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
 }
 
-test('transaction rows retain spending context, load missing prevouts, label and inspect scripts', async ({
+test('transaction rows retain spending context while automatically loading prevouts, labeling and inspecting scripts', async ({
   page,
 }) => {
   await mockBitcoin(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await create(page);
-  await page.getByLabel('Prefetch previous levels').selectOption('0');
+  await expect(page.getByLabel('Prefetch previous levels')).toHaveValue('0');
   await add(page, TX_SPENDING);
   const view = page.locator('.transaction-view');
   await expect(view).toBeVisible();
   await view.getByRole('button', { name: /^Input 0:/ }).click();
-  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveCount(0);
   await expect(view.locator('.transaction-view-identity')).toContainText('Spending transaction');
   await expect(view.locator('.transaction-row[data-selected="true"]')).toHaveCount(1);
-  await view.getByRole('button', { name: 'Load creating transaction', exact: true }).click();
+  await expect(view.getByRole('button', { name: /^Input 0:/ })).toContainText('100,000,000 sats');
   await expect(view.getByLabel('Displayed transaction', { exact: true })).toBeVisible();
   await view
     .getByRole('button', { name: `Go to previous transaction ${TX_FUNDING}`, exact: true })
@@ -89,7 +88,7 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   const calls = await mockBitcoin(page, false);
   await page.setViewportSize({ width: 390, height: 844 });
   await create(page, true);
-  await page.getByRole('button', { name: 'Wallets', exact: true }).click();
+  await page.getByRole('button', { name: 'Browse', exact: true }).click();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();

@@ -102,6 +102,8 @@
 }
 .tag-assignment {
   display: flex;
+  flex-direction: row;
+  text-align: left;
   align-items: center;
   gap: 8px;
   padding: 6px 0;
@@ -230,8 +232,8 @@
   margin: 7px 0;
 }
 .tag-picker .tag-assignment {
-  min-height: 35px;
-  padding: 5px 4px;
+  min-height: 38px;
+  padding: 7px 6px;
   border-radius: 4px;
 }
 .tag-picker .tag-assignment:hover,
@@ -239,6 +241,7 @@
   background: color-mix(in srgb, var(--color-output) 8%, transparent);
 }
 .tag-picker .tag-assignment > span:last-child {
+  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -276,4 +279,21 @@
 }
 .tag-picker-footer .text-button {
   padding: 3px;
+}
+
+@media (max-width: 700px) {
+  .tag-picker .tag-assignment {
+    min-height: 44px;
+  }
+}
+
+.tag-card-actions {
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+.tag-card-actions button {
+  flex: 1 1 auto;
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 11px;
 }

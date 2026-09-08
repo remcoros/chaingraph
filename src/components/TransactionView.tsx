@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useLayoutEffect, type ReactNode } from 'react';
-import { Pencil, ArrowLeft, ArrowRight, Box } from 'lucide-react';
+import { Pencil, ArrowLeft, ArrowRight, Box, Tags, Smile } from 'lucide-react';
 import {
   type GraphNode,
   type Transaction,
@@ -24,9 +24,12 @@ interface Props {
   workspace: Workspace;
   selected?: GraphNode;
   onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit: (id: string, target?: 'label' | 'tags' | 'icon') => void;
   onTrace: (direction: 'funding' | 'spending', id: string) => void;
   disabledReason?: string;
+  inputLoading?: boolean;
+  inputError?: string;
+  onRetryInputs?: () => void;
   renderMetadata?: (nodeId: string) => ReactNode;
   state?: TransactionFlowState;
   onStateChange?: (state: TransactionFlowState) => void;
@@ -47,6 +50,7 @@ function TransactionRows({
   onEdit,
   onTrace,
   disabledReason,
+  inputLoading,
   renderMetadata,
   state,
   onStateChange,
@@ -63,6 +67,7 @@ function TransactionRows({
   previous: ReactNode;
   next: ReactNode;
 }) {
+  const flow = useRef<HTMLDivElement>(null);
   const selectedRow = useRef<HTMLDivElement>(null);
   const [localInputs, setLocalInputs] = useState(false);
   const [localOutputs, setLocalOutputs] = useState(false);
@@ -88,6 +93,13 @@ function TransactionRows({
     });
   };
   useLayoutEffect(() => {
+    if (expandedInputs || expandedOutputs) return;
+    const panel = flow.current?.closest<HTMLDetailsElement>('.transaction-view');
+    // Return compact lists to their start; the selection visibility effect below
+    // then brings an explicitly selected outpoint back into view when necessary.
+    if (panel) panel.scrollTop = 0;
+  }, [expandedInputs, expandedOutputs]);
+  useLayoutEffect(() => {
     const row = selectedRow.current;
     const panel = row?.closest<HTMLDetailsElement>('.transaction-view');
     if (!row || !panel) return;
@@ -97,8 +109,10 @@ function TransactionRows({
       if (!panel.open || !panel.getClientRects().length) return;
       const bounds = panel.getBoundingClientRect();
       const heading = panel.querySelector(':scope > summary')?.getBoundingClientRect();
+      const laneHeading = row.closest('section')?.querySelector('.transaction-lane-header');
       return {
-        top: (heading?.bottom ?? bounds.top) + 4,
+        top:
+          (heading?.bottom ?? bounds.top) + (laneHeading?.getBoundingClientRect().height ?? 0) + 4,
         bottom: bounds.bottom - 8,
         row: row.getBoundingClientRect(),
       };
@@ -158,7 +172,7 @@ function TransactionRows({
     { name: 'Outputs', rows: outputRows, expanded: expandedOutputs, toggle: setExpandedOutputs },
   ];
   return (
-    <div className="transaction-columns transaction-flow">
+    <div ref={flow} className="transaction-columns transaction-flow">
       <div className="transaction-flow-previous">{previous}</div>
       {identity}
       <div className="transaction-flow-next">{next}</div>
@@ -176,10 +190,25 @@ function TransactionRows({
             key={name}
             className={`transaction-flow-${name.toLowerCase()}`}
             aria-label={`${name} of displayed transaction`}
+            aria-busy={inputs && inputLoading ? true : undefined}
           >
-            <h4>
-              {rows.length} {name.toLowerCase()}
-            </h4>
+            <div className="transaction-lane-header">
+              <h4>
+                {rows.length} {name.toLowerCase()}
+              </h4>
+              {rows.length > 3 && (
+                <button
+                  type="button"
+                  className="text-button transaction-expand"
+                  aria-expanded={expanded}
+                  onClick={() => toggle(!expanded)}
+                >
+                  {expanded
+                    ? `Collapse ${name.toLowerCase()}`
+                    : `Show all ${rows.length} ${name.toLowerCase()}`}
+                </button>
+              )}
+            </div>
             <div className="transaction-rows">
               {shown.map((row) => {
                 const address = row.output && outputAddress(row.output);
@@ -240,7 +269,9 @@ function TransactionRows({
                                   : address
                                     ? short(address, 8)
                                     : !row.output
-                                      ? 'Previous output not loaded'
+                                      ? inputLoading
+                                        ? 'Loading previous output…'
+                                        : 'Previous output unavailable'
                                       : 'Script output')}
                           </strong>
                           <span>
@@ -269,7 +300,7 @@ function TransactionRows({
                             className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
                             aria-label={navigationLabel}
                             title={!loaded && disabledReason ? disabledReason : navigationLabel}
-                            disabled={!loaded && !!disabledReason}
+                            disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
                             onClick={navigate}
                           >
                             {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
@@ -281,18 +312,6 @@ function TransactionRows({
                 );
               })}
             </div>
-            {rows.length > 3 && (
-              <button
-                type="button"
-                className="text-button transaction-expand"
-                aria-expanded={expanded}
-                onClick={() => toggle(!expanded)}
-              >
-                {expanded
-                  ? `Collapse ${name.toLowerCase()}`
-                  : `Show all ${rows.length} ${name.toLowerCase()}`}
-              </button>
-            )}
           </section>
         );
       })}
@@ -301,7 +320,18 @@ function TransactionRows({
 }
 
 export function TransactionView(props: Props) {
-  const { workspace, selected, onSelect, onTrace, disabledReason, state, onStateChange } = props;
+  const {
+    workspace,
+    selected,
+    onSelect,
+    onTrace,
+    disabledReason,
+    state,
+    onStateChange,
+    inputLoading,
+    inputError,
+    onRetryInputs,
+  } = props;
   const related = useMemo(
     () => (selected ? relatedTransactions(workspace.transactions, selected) : []),
     [workspace.transactions, selected?.id],
@@ -381,28 +411,34 @@ export function TransactionView(props: Props) {
             className="transaction-neighbor-card is-missing"
             aria-label={
               direction === 'previous'
-                ? 'Load creating transaction'
+                ? inputLoading
+                  ? 'Loading creating transaction'
+                  : 'Retry creating transaction'
                 : 'Check this output for spends'
             }
-            disabled={!!disabledReason}
+            disabled={!!disabledReason || (direction === 'previous' && inputLoading)}
             title={
               disabledReason ||
               (direction === 'next'
                 ? 'No spending transaction loaded. Query this exact output’s script history.'
                 : 'Load this input’s creating transaction.')
             }
-            onClick={() => onTrace(direction === 'previous' ? 'funding' : 'spending', selected.id)}
+            onClick={() =>
+              direction === 'previous' && onRetryInputs
+                ? onRetryInputs()
+                : onTrace(direction === 'previous' ? 'funding' : 'spending', selected.id)
+            }
           >
             {direction === 'previous' && <ArrowLeft size={15} />}
             <span>
               <small>
-                {direction === 'previous'
-                  ? 'Previous transaction not loaded'
-                  : 'Spend status unknown'}
+                {direction === 'previous' ? 'Previous transaction' : 'Spend status unknown'}
               </small>
               <strong>
                 {direction === 'previous'
-                  ? 'Load creating transaction'
+                  ? inputLoading
+                    ? 'Loading…'
+                    : 'Retry loading'
                   : 'Check this output for spends'}
               </strong>
             </span>
@@ -442,33 +478,63 @@ export function TransactionView(props: Props) {
             previous={preview('previous')}
             next={preview('next')}
             identity={
-              <div className="transaction-view-identity">
-                <Box size={23} aria-hidden="true" />
+              <div
+                className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
+              >
                 <button
                   type="button"
-                  className="text-button transaction-identity-select"
+                  className="transaction-identity-select"
+                  aria-label={`Select displayed transaction ${current.tx.txid}`}
+                  aria-pressed={selected.id === txNodeId(current.tx.txid)}
                   title={current.tx.txid}
                   onClick={() => onSelect(txNodeId(current.tx.txid))}
                 >
+                  <Box size={25} aria-hidden="true" />
                   <span>{current.role} transaction</span>
-                  <strong className="mono">{short(current.tx.txid, 5)}</strong>
+                  <strong className="mono">{short(current.tx.txid, 7)}</strong>
+                  {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
+                    <strong
+                      className="transaction-identity-label"
+                      title={workspace.annotations[txNodeId(current.tx.txid)].label}
+                    >
+                      {workspace.annotations[txNodeId(current.tx.txid)].label}
+                    </strong>
+                  )}
+                  {props.renderMetadata?.(txNodeId(current.tx.txid))}
                 </button>
-                {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
-                  <strong className="transaction-identity-label">
-                    {workspace.annotations[txNodeId(current.tx.txid)].label}
-                  </strong>
-                )}
-                {props.renderMetadata?.(txNodeId(current.tx.txid))}
-                <div className="transaction-identity-tools">
-                  <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
+                <div
+                  className="transaction-identity-tools"
+                  role="group"
+                  aria-label="Transaction annotation tools"
+                >
                   <button
                     type="button"
                     className="icon-button"
                     aria-label="Edit displayed transaction annotation"
-                    onClick={() => props.onEdit(txNodeId(current.tx.txid))}
+                    title="Edit transaction label"
+                    onClick={() => props.onEdit(txNodeId(current.tx.txid), 'label')}
                   >
                     <Pencil size={13} />
                   </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Edit displayed transaction tags"
+                    title="Choose transaction tags"
+                    onClick={() => props.onEdit(txNodeId(current.tx.txid), 'tags')}
+                  >
+                    <Tags size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Edit displayed transaction icon"
+                    title="Choose transaction icon"
+                    onClick={() => props.onEdit(txNodeId(current.tx.txid), 'icon')}
+                  >
+                    <Smile size={13} />
+                  </button>
+                  <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
                 </div>
                 {related.length > 1 && (
                   <select
@@ -492,30 +558,31 @@ export function TransactionView(props: Props) {
             }
           />
         ) : (
-          <p className="small">
-            Creating transaction not loaded.{' '}
-            <button
-              type="button"
-              className="text-button"
-              disabled={!!disabledReason}
-              title={disabledReason}
-              onClick={() => onTrace('funding', selected.id)}
-            >
-              Load creating transaction
-            </button>
+          <p className="small" role="status">
+            {inputLoading ? 'Loading creating transaction…' : 'Creating transaction unavailable.'}
           </p>
         )}
         <div className="transaction-view-actions">
-          {current?.tx.vin.some((i) => i.txid && !workspace.transactions[i.txid]) && (
-            <button
-              type="button"
-              className="text-button"
-              disabled={!!disabledReason}
-              title={disabledReason}
-              onClick={() => onTrace('funding', txNodeId(current.tx.txid))}
-            >
-              Load previous outputs (1 level)
-            </button>
+          {inputLoading && (
+            <small className="transaction-input-status" role="status">
+              Loading previous outputs…
+            </small>
+          )}
+          {inputError && (
+            <div className="transaction-input-error" role="alert">
+              <span>{inputError}</span>
+              {onRetryInputs && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!!disabledReason || inputLoading}
+                  title={disabledReason}
+                  onClick={onRetryInputs}
+                >
+                  Retry previous outputs
+                </button>
+              )}
+            </div>
           )}
           {selected.kind === 'output' && !missingCreating && !selectedUnspendable && (
             <small

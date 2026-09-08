@@ -31,10 +31,12 @@ export function AnnotationEditor({
   annotation,
   onSave,
   editToken,
+  editTarget,
   onEditHandled,
 }: {
   annotation: Annotation;
   editToken?: number;
+  editTarget?: 'label' | 'icon';
   onEditHandled?: () => void;
   onSave: (a: Annotation, group?: string) => void;
 }) {
@@ -42,7 +44,7 @@ export function AnnotationEditor({
   const labelRef = useRef<HTMLInputElement>(null);
   const previousEditToken = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (editToken && editToken !== previousEditToken.current) {
+    if (editTarget !== 'icon' && editToken && editToken !== previousEditToken.current) {
       labelRef.current?.focus();
       onEditHandled?.();
     }
@@ -89,6 +91,8 @@ export function AnnotationEditor({
       <div className="annotation-actions">
         <IconPicker
           value={annotation.icon}
+          openToken={editTarget === 'icon' ? editToken : undefined}
+          onOpenHandled={onEditHandled}
           onChange={(icon) => {
             onSave({ ...annotation, icon }, editGroup.current);
           }}
@@ -278,6 +282,7 @@ interface NodeInspectorProps {
   annotationKey: string;
   queryDisabledReason?: string;
   editToken?: number;
+  editTarget?: 'label' | 'icon';
   onEditHandled?: () => void;
   onExpand: (direction: 'funding' | 'spending') => void;
   onSelectNode?: (id: string) => void;
@@ -297,6 +302,7 @@ export function NodeInspector({
   annotationKey,
   queryDisabledReason,
   editToken,
+  editTarget,
   onEditHandled,
   onExpand,
   onSelectNode,
@@ -512,6 +518,7 @@ export function NodeInspector({
         key={annotationKey}
         annotation={w.annotations[selected.id] ?? emptyAnnotation}
         editToken={editToken}
+        editTarget={editTarget}
         onEditHandled={onEditHandled}
         onSave={onSave}
       />

@@ -1,13 +1,17 @@
-import { Expand, Layers, Sparkles } from 'lucide-react';
+import { Expand, Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
 import type { Workspace } from '../domain/types';
 export function GraphControls({
   view,
   onChange,
   onFit,
+  focusGraph,
+  onToggleFocus,
 }: {
   view: Workspace['view'];
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
   onFit: () => void;
+  focusGraph?: boolean;
+  onToggleFocus?: () => void;
 }) {
   return (
     <div className="graph-controls">
@@ -25,6 +29,18 @@ export function GraphControls({
           Flat
         </button>
       </div>
+      {onToggleFocus && (
+        <button
+          className={`icon-button graph-focus-toggle ${focusGraph ? 'active' : ''}`}
+          aria-label={focusGraph ? 'Show panels' : 'Focus graph'}
+          title={focusGraph ? 'Show panels' : 'Focus graph'}
+          aria-pressed={Boolean(focusGraph)}
+          onClick={onToggleFocus}
+        >
+          {focusGraph ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          <span>{focusGraph ? 'Show panels' : 'Focus graph'}</span>
+        </button>
+      )}
       <label className="size-control">
         <span>Size by</span>
         <select
@@ -59,8 +75,29 @@ export function GraphControls({
           <option value="none">Types + findings</option>
         </select>
       </label>
+      <div className="graph-annotation-toggles" role="group" aria-label="Graph annotations">
+        {(
+          [
+            ['showLabels', 'Show labels', Type],
+            ['showTags', 'Show tags', Tags],
+            ['showIcons', 'Show icons', Smile],
+          ] as const
+        ).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            className={`icon-button ${view[key] !== false ? 'active' : ''}`}
+            aria-label={label}
+            title={label}
+            aria-pressed={view[key] !== false}
+            onClick={() => onChange((current) => ({ ...current, [key]: current[key] === false }))}
+          >
+            <Icon size={16} />
+          </button>
+        ))}
+      </div>
       <button
         className={`icon-button ${view.glow ? 'active' : ''}`}
+        aria-pressed={view.glow}
         title="Toggle highlight glow"
         aria-label="Toggle highlight glow"
         onClick={() => onChange((current) => ({ ...current, glow: !current.glow }))}
@@ -69,6 +106,7 @@ export function GraphControls({
       </button>
       <button
         className={`icon-button ${view.showAddresses ? 'active' : ''}`}
+        aria-pressed={view.showAddresses}
         title="Show address nodes"
         aria-label="Show address nodes"
         onClick={() =>

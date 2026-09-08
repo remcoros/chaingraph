@@ -57,11 +57,19 @@ const icons = [
 
 interface Props {
   value: string;
+  openToken?: number;
+  onOpenHandled?: () => void;
   onChange: (value: string) => void;
 }
-export function IconPicker({ value, onChange }: Props) {
+export function IconPicker({ value, onChange, openToken, onOpenHandled }: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!openToken) return;
+    trigger.current?.focus();
+    setOpen(true);
+    onOpenHandled?.();
+  }, [openToken]);
   const id = useId();
   const label =
     icons.find(([symbol]) => symbol === value)?.[1] ?? (value ? 'Imported icon' : 'None');
@@ -177,7 +185,7 @@ function IconPalette({
             <X size={16} />
           </button>
         </div>
-        <p className="small muted">Use the arrow keys to browse. Escape closes this picker.</p>
+        <p className="small muted">Choose a symbol, or clear the current icon.</p>
         <div className="icon-palette-grid" role="group" aria-label="Icon choices">
           {options.map(([symbol, label], index) => (
             <button

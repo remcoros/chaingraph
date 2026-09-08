@@ -16,10 +16,27 @@ describe('bounded previous transaction tracing', () => {
     const fetch = vi.fn(async (key: string) => records.find((t) => t.txid === key)!);
     const one = await loadAncestors([root], { [parent.txid]: parent }, 1, { fetch });
     expect(one.transactions.map((t) => t.txid)).toEqual([id(3)]);
+    expect(one.resolvedTransactionIds).toEqual([id(1), id(2), id(3)]);
     fetch.mockClear();
     const two = await loadAncestors([root], { [parent.txid]: parent }, 2, { fetch });
     expect(new Set(two.transactions.map((t) => t.txid))).toEqual(new Set([id(3), id(4)]));
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(two.resolvedTransactionIds).toEqual([id(1), id(2), id(3), id(4)]);
+  });
+  it('reports cached roots and direct parents for explicit promotion without revealing grandchildren', async () => {
+    const root = tx(1, [2]),
+      parent = tx(2, [3]),
+      grandparent = tx(3);
+    const fetch = vi.fn();
+    const result = await loadAncestors(
+      [root],
+      { [parent.txid]: parent, [grandparent.txid]: grandparent },
+      1,
+      { fetch },
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.transactions).toEqual([]);
+    expect(result.resolvedTransactionIds).toEqual([root.txid, parent.txid]);
   });
   it('limits both levels together to 500 lookups and reports partial expansion', async () => {
     const roots = [
@@ -51,6 +68,7 @@ describe('bounded previous transaction tracing', () => {
       },
     });
     expect(result.failed).toBe(1);
+    expect(result.resolvedTransactionIds).toEqual([id(1), id(3)]);
     expect(result.transactions.map((t) => t.txid)).toEqual([id(3)]);
   });
   it('does not begin work after cancellation', async () => {

@@ -166,6 +166,7 @@ const workspaceSchema = z.object({
   demo: z.boolean(),
   wallets: z.array(walletSchema).max(100),
   transactions: z.record(txid, transactionSchema),
+  inputContext: z.record(txid, z.array(uint32).min(1).max(10000)).optional(),
   annotations: z.record(
     z.string().max(200),
     z.object({
@@ -199,6 +200,10 @@ const workspaceSchema = z.object({
     sizeBy: z.enum(['uniform', 'value', 'degree']),
     glow: z.boolean(),
     showAddresses: z.boolean(),
+    showLabels: z.boolean().optional(),
+    showTags: z.boolean().optional(),
+    showIcons: z.boolean().optional(),
+    lockToSelection: z.boolean().optional(),
     highlightMode: z.enum(['all', 'wallets', 'tags', 'none']).optional(),
     graphSnapshot: graphSnapshotSchema.optional(),
     selectionId: z.string().max(300).optional(),
@@ -245,6 +250,7 @@ export class WorkspaceValidationError extends Error {
       | 'graph-limit'
       | 'wallet-address-limit'
       | 'transaction-limit'
+      | 'input-context-limit'
       | 'wallet-identity'
       | 'wallet-address',
     message: string,
@@ -257,7 +263,33 @@ export class WorkspaceValidationError extends Error {
 // Count cheap structural records before parsing/allocating every imported node.
 export function assertWorkspaceBudget(data: unknown) {
   if (!data || typeof data !== 'object') return;
-  const raw = data as { transactions?: unknown; wallets?: unknown; tags?: unknown };
+  const raw = data as {
+    transactions?: unknown;
+    wallets?: unknown;
+    tags?: unknown;
+    inputContext?: unknown;
+  };
+  if (
+    raw.inputContext &&
+    typeof raw.inputContext === 'object' &&
+    !Array.isArray(raw.inputContext)
+  ) {
+    const scopes = Object.values(raw.inputContext);
+    if (scopes.length > 10000)
+      throw new WorkspaceValidationError(
+        'input-context-limit',
+        'Workspace exceeds the 10,000 input-context transaction limit.',
+      );
+    let outputs = 0;
+    for (const scope of scopes) {
+      outputs += Array.isArray(scope) ? scope.length : 0;
+      if (outputs > MAX_GRAPH_RECORDS)
+        throw new WorkspaceValidationError(
+          'input-context-limit',
+          'Workspace exceeds the 50,000 input-context output limit.',
+        );
+    }
+  }
   assertTagBudget(raw.tags);
   if (
     raw.transactions &&
@@ -343,6 +375,14 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
   if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
   if (Object.entries(parsed.transactions).some(([id, transaction]) => id !== transaction.txid))
     throw new Error('Workspace has invalid transaction records.');
+  for (const [id, outputs] of Object.entries(parsed.inputContext ?? {})) {
+    const transaction = parsed.transactions[id];
+    if (!transaction) throw new Error('Input context must reference a loaded transaction.');
+    if (new Set(outputs).size !== outputs.length)
+      throw new Error('Input context contains duplicate output indexes.');
+    if (outputs.some((index) => index >= transaction.vout.length))
+      throw new Error('Input context references an output outside its transaction.');
+  }
   for (const transaction of Object.values(parsed.transactions))
     validateTransactionAddresses(transaction, parsed.network);
   const walletIds = new Set<string>();
@@ -407,9 +447,39 @@ export function outputAddress(output: Transaction['vout'][number]) {
     (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined)
   );
 }
+/** Explicitly opened or discovered transactions acquire their complete graph. */
+export function promoteInputContext(
+  workspace: Workspace,
+  transactionIds: Iterable<string>,
+): Workspace {
+  if (!workspace.inputContext) return workspace;
+  let context = workspace.inputContext;
+  for (const id of transactionIds) {
+    if (!context[id]) continue;
+    if (context === workspace.inputContext) context = { ...context };
+    delete context[id];
+  }
+  return context === workspace.inputContext
+    ? workspace
+    : {
+        ...workspace,
+        inputContext: Object.keys(context).length ? context : undefined,
+      };
+}
+
 export function buildGraph(workspace: Workspace): GraphData {
   const nodes = new Map<string, GraphNode>();
   const links = new Map<string, GraphData['links'][number]>();
+  const contextOutputs = new Map(
+    Object.entries(workspace.inputContext ?? {}).map(([id, indexes]) => [id, new Set(indexes)]),
+  );
+  // Every input of a fully displayed transaction stays visible with loaded metadata,
+  // including when several displayed transactions share the same funding parent.
+  for (const tx of Object.values(workspace.transactions)) {
+    if (contextOutputs.has(tx.txid)) continue;
+    for (const input of tx.vin)
+      if (input.txid && input.vout !== undefined) contextOutputs.get(input.txid)?.add(input.vout);
+  }
   const clusters = new Map<string, string>();
   for (const finding of workspace.findings)
     if (!finding.excluded && !finding.stale)
@@ -438,6 +508,8 @@ export function buildGraph(workspace: Workspace): GraphData {
       value: tx.vout.reduce((s, o) => s + sats(o.value), 0),
     });
     for (const output of tx.vout) {
+      const scope = contextOutputs.get(tx.txid);
+      if (scope && !scope.has(output.n)) continue;
       const id = outputNodeId(tx.txid, output.n);
       const address = outputAddress(output);
       add({
@@ -457,7 +529,8 @@ export function buildGraph(workspace: Workspace): GraphData {
       }
     }
   }
-  for (const tx of Object.values(workspace.transactions))
+  for (const tx of Object.values(workspace.transactions)) {
+    if (contextOutputs.has(tx.txid)) continue;
     for (const input of tx.vin) {
       if (!input.txid || input.vout === undefined) continue;
       const id = outputNodeId(input.txid, input.vout);
@@ -471,5 +544,6 @@ export function buildGraph(workspace: Workspace): GraphData {
         });
       link(id, txNodeId(tx.txid), 'spends');
     }
+  }
   return { nodes: [...nodes.values()], links: [...links.values()] };
 }

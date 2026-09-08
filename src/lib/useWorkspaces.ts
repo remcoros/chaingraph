@@ -9,13 +9,17 @@ import {
   type EncryptedEnvelope,
 } from './crypto';
 
+import { indexedEnvelopeStorage, type EnvelopeStorage } from './envelopeStorage';
+
+export const INLINE_INDEX_LIMIT = 1024 * 1024;
 export const STORAGE_KEY = 'chaingraph.encrypted-workspaces.v1';
 export interface SavedWorkspace {
   id: string;
   /** Deliberately public display name. Details remain inside the encrypted envelope. */
   publicName?: string;
   savedAt: string;
-  envelope: EncryptedEnvelope;
+  envelope?: EncryptedEnvelope;
+  envelopeRef?: string;
 }
 export interface Session {
   data: Workspace;
@@ -35,6 +39,30 @@ interface StoreOptions {
   storage?: Pick<Storage, 'getItem' | 'setItem'>;
   encrypt?: typeof encryptWorkspace;
   decrypt?: typeof decryptWorkspace;
+  envelopes?: EnvelopeStorage;
+}
+
+function validEnvelope(e: unknown): e is EncryptedEnvelope {
+  if (!e || typeof e !== 'object') return false;
+  const value = e as EncryptedEnvelope;
+  return !(
+    Object.keys(value).sort().join(',') !==
+      'cipher,ciphertext,format,iterations,iv,kdf,salt,version' ||
+    value.format !== 'chaingraph-workspace' ||
+    value.version !== 1 ||
+    value.cipher !== 'AES-256-GCM' ||
+    value.kdf !== 'PBKDF2-SHA256' ||
+    value.iterations !== 600000 ||
+    typeof value.salt !== 'string' ||
+    !/^[A-Za-z0-9+/]{22}==$/.test(value.salt) ||
+    typeof value.iv !== 'string' ||
+    !/^[A-Za-z0-9+/]{16}$/.test(value.iv) ||
+    typeof value.ciphertext !== 'string' ||
+    value.ciphertext.length < 24 ||
+    value.ciphertext.length > MAX_ENCRYPTED_FILE_BYTES ||
+    value.ciphertext.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(value.ciphertext)
+  );
 }
 
 function parseSaved(raw: string | null): SavedWorkspace[] {
@@ -56,23 +84,11 @@ function parseSaved(raw: string | null): SavedWorkspace[] {
           record.publicName.length > 100)) ||
       typeof record.savedAt !== 'string' ||
       !Number.isFinite(Date.parse(record.savedAt)) ||
-      !e ||
-      Object.keys(e).sort().join(',') !==
-        'cipher,ciphertext,format,iterations,iv,kdf,salt,version' ||
-      e.format !== 'chaingraph-workspace' ||
-      e.version !== 1 ||
-      e.cipher !== 'AES-256-GCM' ||
-      e.kdf !== 'PBKDF2-SHA256' ||
-      e.iterations !== 600000 ||
-      typeof e.salt !== 'string' ||
-      !/^[A-Za-z0-9+/]{22}==$/.test(e.salt) ||
-      typeof e.iv !== 'string' ||
-      !/^[A-Za-z0-9+/]{16}$/.test(e.iv) ||
-      typeof e.ciphertext !== 'string' ||
-      e.ciphertext.length < 24 ||
-      e.ciphertext.length > MAX_ENCRYPTED_FILE_BYTES ||
-      e.ciphertext.length % 4 !== 0 ||
-      !/^[A-Za-z0-9+/]*={0,2}$/.test(e.ciphertext)
+      (record.envelopeRef !== undefined
+        ? typeof record.envelopeRef !== 'string' ||
+          !/^indexeddb:[0-9a-f-]{36}$/i.test(record.envelopeRef) ||
+          e !== undefined
+        : !validEnvelope(e))
     ) {
       throw new Error('Invalid saved workspace index or encrypted envelope.');
     }
@@ -83,7 +99,12 @@ function parseSaved(raw: string | null): SavedWorkspace[] {
 
 /** Synchronous state transitions keep async encryption independent of React render timing. */
 export class WorkspaceSessionStore {
-  private state: StoreState = { saved: [], sessions: [], storageError: '', saving: false };
+  private state: StoreState = {
+    saved: [],
+    sessions: [],
+    storageError: '',
+    saving: false,
+  };
   private listeners = new Set<() => void>();
   private writing: Promise<void> = Promise.resolve();
   private locking = new Map<string, Promise<void>>();
@@ -91,9 +112,18 @@ export class WorkspaceSessionStore {
   private storedRaw: string | null = null;
   private storageInvalid = false;
   private options: StoreOptions;
+  private envelopes?: EnvelopeStorage;
 
   constructor(options: StoreOptions = {}) {
     this.options = options;
+    this.envelopes = options.envelopes;
+    if (!this.envelopes) {
+      try {
+        if (globalThis.indexedDB) this.envelopes = indexedEnvelopeStorage(globalThis.indexedDB);
+      } catch {
+        // Some restricted browser contexts disallow IndexedDB while allowing localStorage.
+      }
+    }
     try {
       this.storedRaw = this.storage().getItem(STORAGE_KEY);
       this.state.saved = parseSaved(this.storedRaw);
@@ -127,6 +157,79 @@ export class WorkspaceSessionStore {
       );
   }
 
+  private async commitIndex(raw: string, hasWebLock: boolean, precondition?: () => void) {
+    let published = false;
+    const publish = () => {
+      this.assertStorageUnchanged();
+      precondition?.();
+      this.storage().setItem(STORAGE_KEY, raw);
+      this.storedRaw = raw;
+      published = true;
+    };
+    if (this.envelopes?.commitIndex) {
+      // Use the same coordinator even when Web Locks is present, so a context
+      // without Web Locks cannot race a context that has it.
+      try {
+        await this.envelopes.commitIndex(publish);
+      } catch (error) {
+        // localStorage publication is the commit point. An IDB mutex abort after
+        // that point must not cause removal of ciphertext the index now references.
+        if (!published) throw error;
+      }
+    } else if (hasWebLock) publish();
+    else
+      throw new Error(
+        'This browser cannot coordinate encrypted saves. Enable browser storage or use a browser with Web Locks or IndexedDB support.',
+      );
+  }
+  private async publish(saved: SavedWorkspace[], hasWebLock: boolean): Promise<SavedWorkspace[]> {
+    this.assertStorageUnchanged();
+    const raw = JSON.stringify(saved);
+    const alreadyExternal = this.state.saved.some((entry) => entry.envelopeRef);
+    if (!this.envelopes || (raw.length <= INLINE_INDEX_LIMIT && !alreadyExternal)) {
+      try {
+        await this.commitIndex(raw, hasWebLock);
+        return saved;
+      } catch (error) {
+        if (
+          !this.envelopes ||
+          !(error instanceof DOMException) ||
+          error.name !== 'QuotaExceededError'
+        )
+          throw error;
+      }
+    }
+    const blobs: { reference: string; envelope: EncryptedEnvelope }[] = [];
+    const external = saved.map((entry) => {
+      if (!entry.envelope) return entry;
+      const reference = `indexeddb:${crypto.randomUUID()}`;
+      blobs.push({ reference, envelope: entry.envelope });
+      return {
+        id: entry.id,
+        publicName: entry.publicName,
+        savedAt: entry.savedAt,
+        envelopeRef: reference,
+      };
+    });
+    try {
+      await this.envelopes!.write(blobs);
+      // The index is the commit point. Immutable new blobs cannot replace another tab's data.
+      const externalRaw = JSON.stringify(external);
+      await this.commitIndex(externalRaw, hasWebLock);
+      return external;
+    } catch (error) {
+      await this.envelopes!.remove(blobs.map((blob) => blob.reference)).catch(() => {});
+      throw error;
+    }
+  }
+  private async cleanReplaced(previous: SavedWorkspace[], next: SavedWorkspace[]) {
+    const retained = new Set(next.map((entry) => entry.envelopeRef));
+    const removed = previous.flatMap((entry) =>
+      entry.envelopeRef && !retained.has(entry.envelopeRef) ? [entry.envelopeRef] : [],
+    );
+    if (removed.length) await this.envelopes?.remove(removed).catch(() => {});
+  }
+
   setActiveId = (activeId: string | undefined) => {
     this.patch({ activeId });
   };
@@ -141,7 +244,13 @@ export class WorkspaceSessionStore {
     this.patch({
       sessions: [
         ...this.state.sessions,
-        { data, password, revision: 0, savedRevision: alreadySaved ? 0 : -1, history: [] },
+        {
+          data,
+          password,
+          revision: 0,
+          savedRevision: alreadySaved ? 0 : -1,
+          history: [],
+        },
       ],
       activeId: data.id,
     });
@@ -151,15 +260,23 @@ export class WorkspaceSessionStore {
   };
   unlock = async (entry: SavedWorkspace, password: string) => {
     this.assertStorageUnchanged();
+    const indexAtStart = this.storedRaw;
+    if (!this.state.saved.includes(entry))
+      throw new Error('Saved workspace changed; reload before unlocking.');
+    const envelope = entry.envelopeRef
+      ? await this.envelopes?.read(entry.envelopeRef)
+      : entry.envelope;
+    if (!validEnvelope(envelope))
+      throw new Error(
+        'Encrypted workspace data is missing or malformed. Restore an exported backup.',
+      );
     const data = parseWorkspace(
-      await (this.options.decrypt ?? decryptWorkspace)(entry.envelope, password),
+      await (this.options.decrypt ?? decryptWorkspace)(envelope, password),
     );
     if (data.id !== entry.id)
       throw new Error('Workspace identity does not match its encrypted contents.');
     this.assertStorageUnchanged();
-    if (
-      !this.state.saved.some((saved) => saved.id === entry.id && saved.envelope === entry.envelope)
-    )
+    if (this.storedRaw !== indexAtStart || !this.state.saved.includes(entry))
       throw new Error('Saved workspace changed; reload before unlocking.');
     // Legacy or stale index labels are migrated from the authenticated workspace on save.
     this.add(data, password, entry.publicName === data.name);
@@ -176,7 +293,10 @@ export class WorkspaceSessionStore {
       data.transactions !== current.data.transactions ||
       walletEvidenceChanged(current.data.wallets, data.wallets);
     if (evidenceChanged) {
-      data = { ...data, findings: data.findings.map((finding) => ({ ...finding, stale: true })) };
+      data = {
+        ...data,
+        findings: data.findings.map((finding) => ({ ...finding, stale: true })),
+      };
     }
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
@@ -256,7 +376,7 @@ export class WorkspaceSessionStore {
             session.data,
             session.password,
           );
-          const commit = () => {
+          const commit = async (hasWebLock: boolean) => {
             this.assertStorageUnchanged();
             const entry = {
               id,
@@ -264,14 +384,13 @@ export class WorkspaceSessionStore {
               savedAt: new Date().toISOString(),
               envelope,
             };
-            const saved = [entry, ...this.state.saved.filter((e) => e.id !== id)];
+            let saved = [entry, ...this.state.saved.filter((e) => e.id !== id)];
+            const previous = this.state.saved;
             if (saved.length > 100)
               throw new Error(
                 'Browser storage supports at most 100 saved workspaces. Export this workspace to a file.',
               );
-            const raw = JSON.stringify(saved);
-            this.storage().setItem(STORAGE_KEY, raw);
-            this.storedRaw = raw;
+            saved = await this.publish(saved, hasWebLock);
             this.patch({
               saved,
               sessions: this.state.sessions.map((s) =>
@@ -279,13 +398,14 @@ export class WorkspaceSessionStore {
               ),
               storageError: '',
             });
+            await this.cleanReplaced(previous, saved);
           };
           // Serialize cross-tab check/write where the browser provides Web Locks.
           if (typeof navigator !== 'undefined' && navigator.locks)
             await navigator.locks.request(STORAGE_KEY, async () => {
-              commit();
+              await commit(true);
             });
-          else commit();
+          else await commit(false);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Encrypted save failed.';
           this.patch({
@@ -304,19 +424,23 @@ export class WorkspaceSessionStore {
     const operation = this.writing
       .catch(() => {})
       .then(async () => {
-        const commit = () => {
+        const commit = async (hasWebLock: boolean) => {
           this.assertStorageUnchanged();
           if (this.state.sessions.some((session) => session.data.id === id))
             throw new Error('Lock this workspace before deleting its saved copy.');
+          const previous = this.state.saved;
           const saved = this.state.saved.filter((entry) => entry.id !== id);
           const raw = JSON.stringify(saved);
-          this.storage().setItem(STORAGE_KEY, raw);
-          this.storedRaw = raw;
+          await this.commitIndex(raw, hasWebLock, () => {
+            if (this.state.sessions.some((session) => session.data.id === id))
+              throw new Error('Lock this workspace before deleting its saved copy.');
+          });
           this.patch({ saved, storageError: '' });
+          await this.cleanReplaced(previous, saved);
         };
         if (typeof navigator !== 'undefined' && navigator.locks)
-          await navigator.locks.request(STORAGE_KEY, async () => commit());
-        else commit();
+          await navigator.locks.request(STORAGE_KEY, async () => commit(true));
+        else await commit(false);
       });
     this.writing = operation;
     return operation;

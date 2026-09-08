@@ -4,7 +4,9 @@ import {
   BufferAttribute,
   BufferGeometry,
   BoxGeometry,
+  CanvasTexture,
   Color,
+  LinearFilter,
   Mesh,
   MeshLambertMaterial,
   MOUSE,
@@ -15,6 +17,9 @@ import {
   Vector3,
   ShaderMaterial,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
   TOUCH,
 } from 'three';
 import type {
@@ -79,6 +84,12 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   const materials = new Map<string, MeshLambertMaterial>();
   const meshes = new Map<string, Mesh<BufferGeometry, MeshLambertMaterial>>();
   const savedDepth = new Map<string, number>();
+  // Textures are shared for repeated tags/labels and released when their last node disappears.
+  const textMaterials = new Map<
+    string,
+    { material: SpriteMaterial; width: number; height: number }
+  >();
+  const nodeText = new Map<string, { sprite: Sprite; text: string }>();
   const halos = makeHalos();
   let haloNodes: SimNode[] = [];
   let topology = '';
@@ -161,10 +172,71 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     }
     return material;
   };
+  const textMaterialFor = (text: string) => {
+    const cached = textMaterials.get(text);
+    if (cached) return cached;
+    const surface = document.createElement('canvas');
+    const context = surface.getContext('2d');
+    if (!context) return undefined;
+    const lines = text
+      .split('\n')
+      .slice(0, 2)
+      .map((line) => {
+        const points = [...line];
+        return points.length > 54 ? `${points.slice(0, 53).join('')}…` : line;
+      });
+    context.font = '500 22px sans-serif';
+    const width = Math.min(
+      640,
+      Math.ceil(Math.max(...lines.map((line) => context.measureText(line).width))) + 20,
+    );
+    surface.width = width;
+    surface.height = lines.length * 30 + 12;
+    context.font = '500 22px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    // A small opaque backing keeps the caption legible over crossing links.
+    context.fillStyle = '#111a20e8';
+    context.beginPath();
+    context.roundRect(0, 0, width, surface.height, 8);
+    context.fill();
+    lines.forEach((line, index) => {
+      context.fillStyle = index === 0 ? '#e7eeeb' : '#aabbb6';
+      context.fillText(line, width / 2, 21 + index * 30, width - 16);
+    });
+    const texture = new CanvasTexture(surface);
+    texture.colorSpace = SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = LinearFilter;
+    const material = new SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+    const entry = { material, width: width / 5, height: surface.height / 5 };
+    textMaterials.set(text, entry);
+    return entry;
+  };
   const updateMesh = (mesh: Mesh<BufferGeometry, MeshLambertMaterial>, node: SimNode) => {
     mesh.geometry = geometries[node.shape];
     mesh.material = materialFor(node.color);
     mesh.scale.setScalar(node.radius);
+    const existing = nodeText.get(node.id);
+    if (existing && (existing.text !== node.text || existing.sprite.parent !== mesh)) {
+      existing.sprite.removeFromParent();
+      nodeText.delete(node.id);
+    }
+    if (!node.text) return;
+    let caption = nodeText.get(node.id);
+    if (!caption) {
+      const resource = textMaterialFor(node.text);
+      if (!resource) return;
+      const sprite = new Sprite(resource.material);
+      // Caption pixels are visual only. Only the node's geometric body is selectable.
+      sprite.raycast = () => {};
+      mesh.add(sprite);
+      caption = { sprite, text: node.text };
+      nodeText.set(node.id, caption);
+    }
+    const resource = textMaterials.get(node.text)!;
+    caption.sprite.scale.set(resource.width / node.radius, resource.height / node.radius, 1);
+    caption.sprite.position.set(0, 1.7 + resource.height / node.radius / 2, 0);
   };
   const positionHalos = () => {
     const positions = halos.geometry.getAttribute('position');
@@ -195,7 +267,12 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   const refreshStyle = () => {
     const nodes = graph.graphData().nodes;
     const ids = new Set(nodes.map((node) => node.id));
-    for (const id of meshes.keys()) if (!ids.has(id)) meshes.delete(id);
+    for (const id of meshes.keys())
+      if (!ids.has(id)) {
+        nodeText.get(id)?.sprite.removeFromParent();
+        nodeText.delete(id);
+        meshes.delete(id);
+      }
     for (const node of nodes) {
       const mesh = meshes.get(node.id);
       if (mesh) updateMesh(mesh, node);
@@ -222,6 +299,13 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     halos.geometry.dispose();
     halos.geometry = geometry;
     positionHalos();
+    const usedTexts = new Set(nodes.map((node) => node.text));
+    for (const [text, resource] of textMaterials)
+      if (!usedTexts.has(text)) {
+        resource.material.map?.dispose();
+        resource.material.dispose();
+        textMaterials.delete(text);
+      }
     const usedColors = new Set(nodes.map((node) => node.color));
     for (const [color, material] of materials)
       if (!usedColors.has(color)) {
@@ -239,7 +323,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   };
   const emitHover = () => {
     if (!dead && !pointers.size && point.pointerType !== 'touch')
-      events.hover({ hit, point: { ...point } });
+      events.hover({ hit: hit?.type === 'node' ? hit : undefined, point: { ...point } });
   };
   const pickTouch = (): GraphHit | undefined => {
     const width = canvas.clientWidth,
@@ -299,6 +383,12 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     materials.clear();
     meshes.clear();
     savedDepth.clear();
+    for (const resource of textMaterials.values()) {
+      resource.material.map?.dispose();
+      resource.material.dispose();
+    }
+    textMaterials.clear();
+    nodeText.clear();
     element.replaceChildren();
   };
   try {
@@ -329,8 +419,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         emitHover();
       })
       .onLinkHover((link) => {
-        if (link) hit = { type: 'link', id: link.id };
-        else if (hit?.type === 'link') hit = undefined;
+        if (link) hit = undefined;
         emitHover();
       })
       .onNodeClick((node, event) => select({ type: 'node', id: node.id }, event))
@@ -490,7 +579,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           return { ...node, ...position, z: frame.dimensions === 2 ? 0 : (position?.z ?? node.z) };
         }
         const { x, y, z } = existing;
-        return Object.assign(existing, node, { x, y, z });
+        return Object.assign(existing, node, { x, y, z, text: node.text });
       });
       const ids = new Set(nodes.map((node) => node.id));
       for (const id of savedDepth.keys()) if (!ids.has(id)) savedDepth.delete(id);

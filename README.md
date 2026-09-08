@@ -4,7 +4,7 @@ A self-hosted Bitcoin analysis workbench for personal wallets and on-chain inves
 
 Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, browser-side receive/change scanning, labels, notes, a searchable icon palette, bookmarks, and BIP329 label exchange. Workspace tags group counterparties independently from labels and notes, while separate wallet-match highlights identify derived addresses and their loaded outputs. Seven analysis tools cover equal outputs, common-input ownership, address reuse, value flow and fees, consolidation and fan-out, script types, and imported-wallet intersections. Each tool exposes its scope, parameters, assumptions and coverage.
 
-Filter the graph by entity type, labels, notes, bookmarks, value and loaded funding/spending evidence. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. A synthetic laboratory contains three 150-input/150-output transactions with expandable paths. Three verified real testnet4 output examples are also available.
+Filter the graph by entity type, labels, notes, bookmarks, value and loaded funding/spending evidence. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. A synthetic laboratory contains three 150-input/150-output transactions with expandable paths. Four verified mainnet transactions and three testnet4 output examples offer real-chain tracing practice.
 
 ![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)
 
@@ -59,7 +59,7 @@ TLS certificate and hostname checks are never disabled.
 
 The backend is a bounded, read-only RPC/Electrum proxy. It stores no workspaces, wallet indexes, labels, or chain-data cache. Address derivation, scan orchestration, analysis, and encryption run in the browser. The proxy and upstreams still see the requested script hashes and transaction IDs.
 
-Workspace names are public so locked workspaces remain identifiable. Optional descriptions, wallets, graph data, and annotations are encrypted before browser `localStorage` persistence and encrypted-file export, using AES-256-GCM and PBKDF2-SHA256. Workspace passwords stay in the unlocked browser session; there is no password recovery. Browser storage is origin-specific and subject to quota and deletion, so keep exported backups. **BIP329 label exports are plaintext** and can contain extended public keys. See [the user workflow](instructions.md) for the distinction.
+Workspace names are public so locked workspaces remain identifiable. Optional descriptions, wallets, graph data, and annotations are encrypted before browser persistence and encrypted-file export, using AES-256-GCM and PBKDF2-SHA256. Workspace passwords stay in the unlocked browser session; there is no password recovery. Small encrypted saves use localStorage; larger saves use IndexedDB with a compact public index. Browser storage is origin-specific and subject to quota and deletion, so keep exported backups. **BIP329 label exports are plaintext** and can contain extended public keys. See [the user workflow](instructions.md) for the distinction.
 
 This is a trusted, single-user, fully self-hosted application. The backend has **no user authentication** and binds to loopback by default. Public or shared hosting is unsupported. Browser-origin checks and upstream request limits do not provide a user authorization system. Workspace encryption protects saved data, not an unlocked session or untrusted code served to the browser. Web Crypto requires localhost or HTTPS.
 
@@ -68,10 +68,10 @@ This is a trusted, single-user, fully self-hosted application. The backend has *
 - Wallet import accepts account-level public keys at depth 3: `xpub`/`ypub`/`zpub` on mainnet and `tpub`/`upub`/`vpub` on testnet4. Supported single-key scripts are legacy P2PKH, nested SegWit, native SegWit, and BIP86 Taproot. Descriptors, multisig, private keys, signing, and spending are unsupported.
 - Loaded transactions are a **history snapshot**. Status polling does not refresh every saved confirmation count or detect every reorganization. Scans have address, history, and transaction bounds; a partial result is not proof that no further activity exists.
 - CIOH produces a hypothesis. Skipping conspicuous equal-output transactions does not detect all collaborative spends or PayJoin. No tool identifies a person or proves wallet ownership.
-- Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node or connection for details and actions to trace one previous level or edit its context. The lookup toolbar defaults to one previous level, with Off and 2 levels also available, bounded to 500 downloads per action. Workspaces share the main header; Help and samples holds the tour, examples and About. Graph navigation floats over the canvas. The Flat graph layout still requires WebGL; the transaction inputs/outputs panel does not. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
+- Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node for details and compact tracing/editing actions; connection lines do not open hover cards. The lookup toolbar defaults to Previous Off, with 1 and 2 levels available, bounded to 500 downloads per action. The displayed transaction separately loads its direct input data automatically. Automatically fetched parents initially show only relevant outputs in the graph, keeping unrelated branches out of the current view. Workspaces share the main header; Help and samples holds the tour, examples and About. Graph navigation floats over the canvas. The Flat graph layout still requires WebGL; the transaction inputs/outputs panel does not. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
 - Tools are extensible through [`src/domain/analysis.ts`](src/domain/analysis.ts). There is no custom-script IDE, Boltzmann implementation, service worker, or WebSocket live feed in this version. Boltzmann-related research and license compatibility remain research work.
 
-See [the curated testnet4 examples and verification sources](docs/research/testnet4-examples.md). Example outputs are real chain observations, not attributed wallets or proof of ownership.
+See the curated [mainnet examples](docs/research/mainnet-examples.md) and [testnet4 examples](docs/research/testnet4-examples.md). The Help menu follows the active workspace network. Examples are real chain observations, not attributed wallets or proof of ownership.
 
 ## Development
 
@@ -98,7 +98,7 @@ Read [architecture and extension points](docs/architecture.md), [user instructio
 
 ## Transaction and script inspection
 
-Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, and the selected row remains visible. Use a row’s pencil to edit its annotation, or load missing previous outputs one level at a time. Missing spending data does not prove an output is unspent.
+Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, with expand/collapse controls above the rows and the selected row kept visible. Direct input transactions load automatically while the flow panel is open, with explicit retry or continuation for unavailable or bounded results. Click the central transaction block to select it, or use its label, tag and icon controls to edit it. Missing spending data does not prove an output is unspent.
 
 The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. The laboratory has no serialized raw data. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).
 
@@ -110,7 +110,12 @@ for keeping a portable backup.
 
 The compact transaction flow places inputs and outputs around the current transaction.
 Select an output to see adjacent creating/spending transactions and use its arrows to
-follow the exact outpoint. Missing transactions can be loaded from the same view.
+follow the exact outpoint. Direct input data loads automatically; explicit navigation opens the corresponding parent transaction and its wider context.
 OP_RETURN outputs show decoded text when possible, with a short preview and expandable,
 selectable, copyable full data. Binary data stays hex; script decoding never executes it.
 Tags can be searched, created and assigned from **Add or choose tags** in the inspector.
+
+**Lock to selection** keeps the graph centered as you select items anywhere in the
+workbench. Graph controls independently show or hide labels, tags and icons. On
+desktop, **Focus graph** sits beside the 3D/Flat toggle and temporarily hides the
+side panels; it is hidden on mobile, where panels already have separate views.

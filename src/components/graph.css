@@ -197,3 +197,106 @@
   pointer-events: auto;
   max-width: 100%;
 }
+
+/* Node details stay near the pointer, with all actions in the first row. */
+.graph-hover-card {
+  width: 304px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px #0007;
+}
+.graph-card-heading {
+  gap: 5px;
+  margin-bottom: 7px;
+}
+.graph-card-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+}
+.graph-card-kind::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--color-tx);
+  border-radius: 1px;
+}
+.graph-card-kind-output::before {
+  background: var(--color-output);
+  border-radius: 50%;
+}
+.graph-card-kind-address::before {
+  background: var(--color-address);
+  transform: rotate(45deg);
+}
+.graph-card-actions {
+  margin: 0;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+.graph-card-actions button,
+.graph-card-heading .graph-card-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 28px;
+  width: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-muted);
+}
+.graph-card-actions button:hover,
+.graph-card-heading .graph-card-close:hover {
+  color: var(--color-ink);
+  background: var(--color-wash);
+}
+.graph-card-label {
+  font-size: 13px;
+  line-height: 1.4;
+  margin-bottom: 5px;
+}
+.graph-card-facts {
+  gap: 5px;
+  margin: 8px 0 0;
+}
+.graph-card-facts div {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+}
+.graph-card-facts dd {
+  text-align: right;
+}
+.graph-card-identifier {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.graph-card-explanation {
+  margin-top: 8px;
+  line-height: 1.4;
+}
+.graph-annotation-toggles {
+  display: inline-flex;
+  align-items: center;
+  border-left: 1px solid var(--color-rule);
+  padding-left: 5px;
+  gap: 2px;
+}
+.graph-controls .graph-focus-toggle {
+  display: none;
+  gap: 5px;
+  width: auto;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+/* Keep this breakpoint aligned with the desktop side panels in styles.css. */
+@media (min-width: 1000px) {
+  .graph-controls .graph-focus-toggle {
+    display: inline-flex;
+  }
+}

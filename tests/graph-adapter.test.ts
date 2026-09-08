@@ -520,6 +520,64 @@ describe('force adapter contract', () => {
     });
     adapter.dispose();
   });
+  it('suppresses connection hover while preserving deliberate connection selection', () => {
+    const { adapter, events, pointer, callbacks } = setup();
+    adapter.update(frame());
+    pointer('pointermove');
+    callbacks.onNodeHover({ id: 'a' });
+    callbacks.onNodeHover(undefined);
+    callbacks.onLinkHover({ id: 'edge' });
+    expect(events.hover).toHaveBeenLastCalledWith({
+      hit: undefined,
+      point: { x: 50, y: 50, pointerType: 'mouse' },
+    });
+    pointer('pointerdown');
+    pointer('pointerup');
+    callbacks.onLinkClick({ id: 'edge' }, { button: 0 });
+    expect(events.select).toHaveBeenLastCalledWith(
+      expect.objectContaining({ hit: { type: 'link', id: 'edge' } }),
+    );
+    adapter.dispose();
+  });
+  it('shares caption resources, changes text without resetting positions, and disposes hidden text', () => {
+    const drawing = {
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      fillStyle: '',
+      measureText: (text: string) => ({ width: text.length * 12 }),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+    };
+    const createElement = vi.fn(() => ({ getContext: () => drawing, width: 0, height: 0 }));
+    vi.stubGlobal('document', { createElement });
+    const { adapter, graph, callbacks } = setup();
+    const annotated = {
+      ...frame(),
+      nodes: frame().nodes.map((node) => ({ ...node, text: '🏦 Deposit\n#Exchange' })),
+    };
+    adapter.update(annotated);
+    expect(createElement).toHaveBeenCalledTimes(1);
+    const firstNode = graph.graphData().nodes[0];
+    firstNode.x = 125;
+    const mesh = callbacks.nodeThreeObject(firstNode) as any;
+    const sprite = mesh.children[0];
+    expect(sprite.isSprite).toBe(true);
+    const hits: any[] = [];
+    sprite.raycast(new Raycaster(), hits);
+    expect(hits).toEqual([]);
+    const textureDispose = vi.spyOn(sprite.material.map, 'dispose');
+    const materialDispose = vi.spyOn(sprite.material, 'dispose');
+    adapter.update(frame());
+    expect(mesh.children).toHaveLength(0);
+    expect(firstNode.x).toBe(125);
+    expect(textureDispose).toHaveBeenCalledTimes(1);
+    expect(materialDispose).toHaveBeenCalledTimes(1);
+    adapter.dispose();
+    expect(textureDispose).toHaveBeenCalledTimes(1);
+  });
   it('releases resources/listeners once, reports context loss and ignores methods after disposal', () => {
     const { adapter, graph, events, pointer, scene, container, callbacks } = setup();
     adapter.update(frame());

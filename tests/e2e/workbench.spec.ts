@@ -302,12 +302,12 @@ for (const width of [320, 375, 414, 768])
     expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
     const switcher = page.locator('.mobile-switch');
     if (await switcher.isVisible())
-      await switcher.getByRole('button', { name: 'Wallets', exact: true }).click();
+      await switcher.getByRole('button', { name: 'Browse', exact: true }).click();
     await addAndScanWallet(page);
     dimensions = await overflow();
     expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
     if (await switcher.isVisible()) {
-      for (const name of ['Wallets', 'Inspector', 'Graph']) {
+      for (const name of ['Browse', 'Inspector', 'Graph']) {
         await switcher.getByRole('button', { name, exact: true }).click();
         dimensions = await overflow();
         expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
@@ -569,7 +569,7 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   const tabs = header.getByRole('navigation', { name: 'Open workspaces' });
   await expect(tabs.getByRole('button', { name: /Compact public study/ })).toBeVisible();
   const lookup = page.locator('.workbench-toolbar');
-  await expect(lookup.getByLabel('Prefetch previous levels')).toHaveValue('1');
+  await expect(lookup.getByLabel('Prefetch previous levels')).toHaveValue('0');
   const headerBounds = (await header.boundingBox())!;
   const lookupBounds = (await lookup.boundingBox())!;
   expect(headerBounds.height).toBeLessThan(76);
@@ -582,20 +582,17 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Show guided tour', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(
-    menu.getByRole('menuitem', { name: 'Testnet4 examples', exact: true }),
-  ).toBeFocused();
+  await expect(menu.getByRole('menuitem', { name: 'Mainnet examples', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(help).toBeFocused();
   await help.click();
-  await menu.getByRole('menuitem', { name: 'Testnet4 examples', exact: true }).click();
-  const examples = page.getByRole('dialog', { name: 'Testnet4 tracing examples' });
+  await menu.getByRole('menuitem', { name: 'Mainnet examples', exact: true }).click();
+  const examples = page.getByRole('dialog', { name: 'Mainnet tracing examples' });
   await expect(examples).toBeVisible();
-  await expect(examples).toContainText('Open a testnet4 workspace');
-  await expect(examples.getByRole('button', { name: 'Load example output' })).toHaveCount(3);
-  for (const button of await examples.getByRole('button', { name: 'Load example output' }).all()) {
-    await expect(button).toBeDisabled();
+  await expect(examples.getByRole('button', { name: /^Load example / })).toHaveCount(4);
+  for (const button of await examples.getByRole('button', { name: /^Load example / }).all()) {
+    await expect(button).toBeEnabled();
   }
   await page.keyboard.press('Escape');
   await expect(help).toBeFocused();

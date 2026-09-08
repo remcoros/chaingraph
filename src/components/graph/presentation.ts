@@ -6,6 +6,10 @@ export interface NodePresentation {
   color?: string;
   highlight?: boolean;
   scale?: number;
+  /** Human annotation text. An empty string suppresses generated entity labels. */
+  label?: string;
+  icon?: string;
+  tags?: readonly string[];
 }
 export interface GraphPalette {
   transaction: string;
@@ -52,6 +56,9 @@ export function presentGraph(
     selectedId?: string;
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
+    showLabels?: boolean;
+    showTags?: boolean;
+    showIcons?: boolean;
     nodePresentation?: ReadonlyMap<string, NodePresentation>;
   },
   palette: GraphPalette,
@@ -79,7 +86,20 @@ export function presentGraph(
       const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
       return {
         id: node.id,
-        text: node.label,
+        text:
+          [
+            [
+              input.showIcons !== false ? override?.icon : undefined,
+              input.showLabels !== false ? (override?.label ?? node.label) : undefined,
+            ]
+              .filter(Boolean)
+              .join(' '),
+            input.showTags !== false && override?.tags?.length
+              ? override.tags.map((tag) => `#${tag}`).join(' · ')
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join('\n') || undefined,
         shape: shapes[node.kind],
         color: selected
           ? palette.accent

@@ -255,6 +255,24 @@ describe('browser-side wallet scanner', () => {
     expect(result.truncated).toBe(true);
   });
 
+  it('reports confirmed cached address history for promotion without repeating transaction RPC', async () => {
+    const address = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+    const owned = txid(99),
+      unrelated = txid(100);
+    const requests: string[] = [];
+    mockRpc((request) => {
+      requests.push(request.method);
+      return [{ tx_hash: owned, height: 100 }];
+    });
+    const result = await loadAddress(address, 'mainnet', {
+      [owned]: transaction(owned, 10),
+      [unrelated]: transaction(unrelated, 10),
+    });
+    expect(result.transactions).toEqual([]);
+    expect(result.observedTransactionIds).toEqual([owned]);
+    expect(requests).toEqual(['blockchain.scripthash.get_history']);
+  });
+
   it('aborts before sending any requests when cancelled', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);

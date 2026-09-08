@@ -1,3 +1,6 @@
+import { useFlowInputs } from './lib/useFlowInputs';
+import { ExamplesDialog } from './components/ExamplesDialog';
+import type { NodePresentation } from './components/graph/presentation';
 import { GraphLegend } from './components/GraphLegend';
 import { GraphControls } from './components/GraphControls';
 import { EntityBadges } from './components/EntityBadges';
@@ -8,6 +11,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,8 +22,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Crosshair,
-  Maximize2,
-  Minimize2,
+  Focus,
   Download,
   Ellipsis,
   Eye,
@@ -60,7 +63,7 @@ import { AnalysisPanel } from './components/AnalysisPanel';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { GuidedTour } from './components/GuidedTour';
-import { buildGraph, parseWorkspace } from './domain/workspace';
+import { buildGraph, parseWorkspace, promoteInputContext } from './domain/workspace';
 import { analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
@@ -68,12 +71,12 @@ import {
   type Transaction,
   type Wallet,
   type Workspace,
+  type WorkspaceTag,
 } from './domain/types';
 import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/api';
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { loadAncestors } from './lib/tracing';
 import { demoWorkspace } from './domain/demo';
-import { TESTNET4_EXAMPLES } from './domain/examples';
 import { encryptWorkspace, MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
 import { useWorkspaces, type SavedWorkspace } from './lib/useWorkspaces';
@@ -95,6 +98,7 @@ export default function App() {
   const [fileDialog, setFileDialog] = useState<File>();
   const [menu, setMenu] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
+  const inspectorScroll = useRef<HTMLDivElement>(null);
   const [viewOwner, setViewOwner] = useState<string>();
   const [selectedWallet, setSelectedWallet] = useState<string>();
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
@@ -121,8 +125,9 @@ export default function App() {
   >({});
   const [rightTab, setRightTab] = useState<'inspect' | 'analysis'>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
-  const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(1);
+  const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [editToken, setEditToken] = useState(0);
+  const [editTarget, setEditTarget] = useState<'label' | 'tags' | 'icon'>('label');
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -187,12 +192,15 @@ export default function App() {
   }, [ws.persist]);
   const graph = useMemo(
     () => (w ? buildGraph(w) : { nodes: [], links: [] }),
-    [w?.id, w?.transactions, w?.annotations, w?.findings, w?.view.showAddresses],
+    [w?.id, w?.transactions, w?.inputContext, w?.annotations, w?.findings, w?.view.showAddresses],
   );
   const walletMatches = useMemo(() => (w ? buildWalletMatches(w, graph) : new Map()), [w, graph]);
-  const tagIndex = useMemo(() => (w ? buildTagIndex(w, graph) : new Map()), [w, graph]);
+  const tagIndex = useMemo(
+    () => (w ? buildTagIndex(w, graph) : new Map<string, WorkspaceTag[]>()),
+    [w, graph],
+  );
   const nodePresentation = useMemo(() => {
-    const presentation = new Map<string, { color?: string; highlight?: boolean }>();
+    const presentation = new Map<string, NodePresentation>();
     if (!w) return presentation;
     const mode = w.view.highlightMode ?? 'all';
     for (const node of graph.nodes) {
@@ -201,8 +209,13 @@ export default function App() {
       const walletColor = match
         ? w.wallets.find((wallet) => match.walletIds.includes(wallet.id))?.color
         : undefined;
-      if (tags.length || match)
-        presentation.set(node.id, { color: tags[0]?.color ?? walletColor, highlight: true });
+      presentation.set(node.id, {
+        color: tags.length || match ? (tags[0]?.color ?? walletColor) : undefined,
+        highlight: tags.length || match ? true : undefined,
+        tags: (tagIndex.get(node.id) ?? []).map((tag) => tag.name),
+        label: w.annotations[node.id]?.label ?? '',
+        icon: w.annotations[node.id]?.icon ?? '',
+      });
     }
     return presentation;
   }, [w, graph, walletMatches, tagIndex]);
@@ -254,24 +267,37 @@ export default function App() {
     );
   };
   const selected = graph.nodes.find((n) => n.id === selectedId);
+  useLayoutEffect(() => {
+    if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
+  }, [w?.id, selectedId, selectedWallet, rightTab]);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
-  const select = useCallback((id: string) => {
-    setSelectedId(id);
-    setGraphFilters((filters) =>
-      filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
-    );
-    setNavigation((current) =>
-      current.ids[current.index] === id
-        ? current
-        : {
-            ids: [...current.ids.slice(0, current.index + 1), id].slice(-100),
-            index: Math.min(99, current.index + 1),
-          },
-    );
-    setSelectedWallet(undefined);
-    setRightTab('inspect');
-  }, []);
+  const select = useCallback(
+    (id: string) => {
+      const active = wRef.current;
+      const target = /^(tx|out):([0-9a-f]{64})(?::([0-9]+))?$/.exec(id);
+      const scope = target && active?.inputContext?.[target[2]];
+      // An already visible input output stays compact. Opening its transaction or
+      // a hidden sibling explicitly reveals the complete parent before selecting.
+      if (active && target && scope && (target[1] === 'tx' || !scope.includes(Number(target[3]))))
+        ws.update(active.id, (current) => promoteInputContext(current, [target[2]]), false);
+      setSelectedId(id);
+      setGraphFilters((filters) =>
+        filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
+      );
+      setNavigation((current) =>
+        current.ids[current.index] === id
+          ? current
+          : {
+              ids: [...current.ids.slice(0, current.index + 1), id].slice(-100),
+              index: Math.min(99, current.index + 1),
+            },
+      );
+      setSelectedWallet(undefined);
+      setRightTab('inspect');
+    },
+    [ws.update],
+  );
   useEffect(() => {
     operationRef.current?.abort();
     setOperation('');
@@ -280,7 +306,7 @@ export default function App() {
     setLeftTab(w?.view.leftTab ?? 'wallets');
     setRightTab(w?.view.rightTab ?? 'inspect');
     setMobilePanel(w?.view.mobilePanel ?? 'graph');
-    setPrefetchDepth(w?.view.prefetchDepth ?? 1);
+    setPrefetchDepth(w?.view.prefetchDepth ?? 0);
     setViewOwner(w?.id);
     setError('');
     setNotice('');
@@ -399,7 +425,15 @@ export default function App() {
       throw new Error('This transaction is outside the synthetic laboratory fixture.');
     return transaction;
   };
-  const editNode = (id: string) => {
+  const flowInputs = useFlowInputs({
+    workspace: w,
+    selected,
+    enabled: canTrace && !operation,
+    fetch: getTransaction,
+    update: ws.update,
+  });
+  const editNode = (id: string, target: 'label' | 'tags' | 'icon' = 'label') => {
+    setEditTarget(target);
     setNotice('');
     select(id);
     setMobilePanel('right');
@@ -427,17 +461,28 @@ export default function App() {
       }
     }
   };
-  const mergeTransactions = (id: string, transactions: Transaction[]) => {
-    if (!transactions.length) return;
+  const mergeTransactions = (
+    id: string,
+    transactions: Transaction[],
+    promotionIds = transactions.map((transaction) => transaction.txid),
+  ) => {
+    if (!transactions.length && !promotionIds.length) return;
     ws.update(
       id,
-      (current) => ({
-        ...current,
-        transactions: {
-          ...current.transactions,
-          ...Object.fromEntries(transactions.map((t) => [t.txid, t])),
-        },
-      }),
+      (current) => {
+        const promoted = promoteInputContext(current, promotionIds);
+        return !transactions.length
+          ? promoted
+          : {
+              ...promoted,
+              transactions: {
+                ...current.transactions,
+                ...Object.fromEntries(
+                  transactions.map((transaction) => [transaction.txid, transaction]),
+                ),
+              },
+            };
+      },
       false,
     );
   };
@@ -466,7 +511,7 @@ export default function App() {
             onProgress: setOperation,
           });
           signal.throwIfAborted();
-          mergeTransactions(w.id, result.transactions);
+          mergeTransactions(w.id, result.transactions, result.resolvedTransactionIds);
           setNotice(ancestryNotice(result));
         }
       } else {
@@ -478,7 +523,7 @@ export default function App() {
         ws.update(
           w.id,
           (c) => ({
-            ...c,
+            ...promoteInputContext(c, result.observedTransactionIds),
             watchedAddresses: [...new Set([...c.watchedAddresses, text])],
             transactions: {
               ...c.transactions,
@@ -588,7 +633,7 @@ export default function App() {
             onProgress: setOperation,
           });
           signal.throwIfAborted();
-          mergeTransactions(w.id, result.transactions);
+          mergeTransactions(w.id, result.transactions, result.resolvedTransactionIds);
           setNotice(ancestryNotice(result));
         }
       } else {
@@ -623,7 +668,8 @@ export default function App() {
           `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts could not be searched.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked history; this does not prove the output is unspent.' : ''}${fixture ? ' Searched the synthetic fixture only.' : ''}`,
         );
       }
-      setFitToken((t) => t + 1);
+      // Tracing extends the investigation without taking over its camera.
+      // Initial framing, explicit Fit and Lock to selection own camera changes.
     });
   }
   async function exportWorkspace() {
@@ -658,11 +704,11 @@ export default function App() {
         for (const address of current.watchedAddresses) {
           const result = await loadAddress(address, current.network, snapshot.transactions, signal);
           signal.throwIfAborted();
-          mergeTransactions(current.id, result.transactions);
+          mergeTransactions(current.id, result.transactions, result.observedTransactionIds);
           added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
           refreshed += result.transactions.filter((tx) => !!snapshot.transactions[tx.txid]).length;
           snapshot = {
-            ...snapshot,
+            ...promoteInputContext(snapshot, result.observedTransactionIds),
             transactions: {
               ...snapshot.transactions,
               ...Object.fromEntries(result.transactions.map((tx) => [tx.txid, tx])),
@@ -697,6 +743,19 @@ export default function App() {
       setRunReports({});
     analysisEvidence.current = next;
   }, [w?.transactions, w?.wallets]);
+  useEffect(() => {
+    if (!w || viewOwner !== w.id || !w.view.lockToSelection || !selectedId) return;
+    if (!visibleGraph.nodes.some((node) => node.id === selectedId)) {
+      setGraphFilters({});
+      if (selectedId.startsWith('addr:') && !w.view.showAddresses)
+        ws.update(
+          w.id,
+          (current) => ({ ...current, view: { ...current.view, showAddresses: true } }),
+          false,
+        );
+    }
+    setFocusRequest({ id: selectedId, token: Date.now() });
+  }, [w?.id, viewOwner, w?.view.lockToSelection, selectedId]);
   function centerNode(id = selectedId, filters?: GraphFilters) {
     if (!id) return;
     const rendered = filters
@@ -803,6 +862,24 @@ export default function App() {
         <Crosshair size={14} />
         <span className="graph-nav-caption">Center selection</span>
       </button>
+      <button
+        aria-label="Lock to selection"
+        title="Keep the graph centered on selections from any panel"
+        aria-pressed={w.view.lockToSelection ?? false}
+        className={`graph-lock-selection ${w.view.lockToSelection ? 'active' : ''}`}
+        onClick={() =>
+          change(
+            (current) => ({
+              ...current,
+              view: { ...current.view, lockToSelection: !current.view.lockToSelection },
+            }),
+            false,
+          )
+        }
+      >
+        <Focus size={14} />
+        <span className="graph-nav-caption">Lock to selection</span>
+      </button>
       <label>
         <span className="graph-path-label">Paths</span>
         <select
@@ -830,24 +907,7 @@ export default function App() {
       <button onClick={() => updateFilters({})} disabled={!Object.keys(graphFilters).length}>
         All paths
       </button>
-      <button
-        aria-label={focusGraph ? 'Show panels' : 'Focus graph'}
-        title={focusGraph ? 'Show panels' : 'Focus graph'}
-        aria-pressed={focusGraph}
-        onClick={() => {
-          setFocusGraph(!focusGraph);
-          setMobilePanel('graph');
-        }}
-      >
-        {focusGraph ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        <span className="graph-nav-caption">{focusGraph ? 'Show panels' : 'Focus graph'}</span>
-      </button>
       <span className="view-summary">
-        {visibleGraph.nodes.length.toLocaleString()} / {graph.nodes.length.toLocaleString()} nodes
-        visible
-        {visibleGraph.contextNodeIds.length
-          ? ` · ${visibleGraph.contextNodeIds.length} connected nodes`
-          : ''}
         {graphFilters.walletId && (
           <span className="group-filter">
             Wallet:{' '}
@@ -920,7 +980,6 @@ export default function App() {
                   ●
                 </span>
               )}
-              <LockKeyhole size={12} />
             </button>
           ))}
           <button
@@ -951,7 +1010,10 @@ export default function App() {
               label: w ? 'Show guided tour' : 'Getting started',
               onSelect: () => (w ? setTour(0) : setAboutOpen('guide')),
             },
-            { label: 'Testnet4 examples', onSelect: () => setExamplesOpen(true) },
+            {
+              label: `${(w?.network ?? networks?.[0]) === 'mainnet' ? 'Mainnet' : 'Testnet4'} examples`,
+              onSelect: () => setExamplesOpen(true),
+            },
             { label: 'CoinJoin laboratory', onSelect: () => setCreate('demo') },
             ...(w?.demo
               ? [
@@ -970,6 +1032,7 @@ export default function App() {
                       change((c) => ({
                         ...c,
                         transactions: demoWorkspace(false).transactions,
+                        inputContext: undefined,
                         findings: [],
                       }));
                       setSelectedId(undefined);
@@ -997,41 +1060,43 @@ export default function App() {
       ) : (
         <>
           <div className="workbench-toolbar">
-            <form className="search-form" onSubmit={search}>
-              <Search size={17} />
-              <input
-                ref={searchInput}
-                aria-label="Transaction, output, or address"
-                placeholder="Transaction ID, txid:vout, or Bitcoin address"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                spellCheck={false}
-              />
-              <button
-                type="submit"
-                className="search-go"
-                disabled={!canQuery || !!operation || !query.trim()}
-              >
-                Add to graph <Plus size={14} />
-              </button>
-            </form>
-            {!w.demo && (
-              <label
-                className="lookup-prefetch"
-                title="Previous transaction levels for transaction/output lookups. Up to 500 downloads per action."
-              >
-                <span>Previous</span>
-                <select
-                  aria-label="Prefetch previous levels"
-                  value={prefetchDepth}
-                  onChange={(e) => setPrefetchDepth(Number(e.target.value) as 0 | 1 | 2)}
+            <div className="lookup-controls">
+              <form className="search-form" onSubmit={search}>
+                <Search size={17} />
+                <input
+                  ref={searchInput}
+                  aria-label="Transaction, output, or address"
+                  placeholder="Transaction ID, txid:vout, or Bitcoin address"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  spellCheck={false}
+                />
+                <button
+                  type="submit"
+                  className="search-go"
+                  disabled={!canQuery || !!operation || !query.trim()}
                 >
-                  <option value={0}>Off</option>
-                  <option value={1}>1 level</option>
-                  <option value={2}>2 levels</option>
-                </select>
-              </label>
-            )}
+                  Add to graph <Plus size={14} />
+                </button>
+              </form>
+              {!w.demo && (
+                <label
+                  className="lookup-prefetch"
+                  title="Previous transaction levels for transaction/output lookups. Up to 500 downloads per action."
+                >
+                  <span>Previous</span>
+                  <select
+                    aria-label="Prefetch previous levels"
+                    value={prefetchDepth}
+                    onChange={(e) => setPrefetchDepth(Number(e.target.value) as 0 | 1 | 2)}
+                  >
+                    <option value={0}>Off</option>
+                    <option value={1}>1 level</option>
+                    <option value={2}>2 levels</option>
+                  </select>
+                </label>
+              )}
+            </div>
             <div className="workspace-actions">
               <button
                 className="icon-button workspace-undo"
@@ -1128,7 +1193,7 @@ export default function App() {
               onClick={() => setMobilePanel('left')}
             >
               <WalletIcon size={15} />
-              Wallets
+              Browse
             </button>
             <button
               className={mobilePanel === 'graph' ? 'active' : ''}
@@ -1142,7 +1207,7 @@ export default function App() {
               onClick={() => setMobilePanel('right')}
             >
               <List size={15} />
-              Inspector
+              {rightTab === 'analysis' ? 'Analysis' : 'Inspector'}
             </button>
           </div>
           <main
@@ -1223,6 +1288,7 @@ export default function App() {
                     renderMetadata={renderEntityMetadata}
                     workspace={w}
                     selected={selected}
+                    {...flowInputs}
                     onSelect={select}
                     onEdit={editNode}
                     onTrace={(direction, id) => void expand(direction, id)}
@@ -1235,6 +1301,8 @@ export default function App() {
                   {!graph.nodes.length && (
                     <GraphControls
                       view={w.view}
+                      focusGraph={focusGraph}
+                      onToggleFocus={() => setFocusGraph((value) => !value)}
                       onChange={(update) =>
                         change((current) => ({ ...current, view: update(current.view) }), false)
                       }
@@ -1274,6 +1342,8 @@ export default function App() {
                         toolbar={
                           <GraphControls
                             view={w.view}
+                            focusGraph={focusGraph}
+                            onToggleFocus={() => setFocusGraph((value) => !value)}
                             onChange={(update) =>
                               change(
                                 (current) => ({ ...current, view: update(current.view) }),
@@ -1293,6 +1363,9 @@ export default function App() {
                         dimensions={w.view.dimensions}
                         sizeBy={w.view.sizeBy}
                         glow={w.view.glow}
+                        showLabels={w.view.showLabels ?? true}
+                        showTags={w.view.showTags ?? true}
+                        showIcons={w.view.showIcons ?? true}
                         fitToken={fitToken}
                         transactions={w.transactions}
                         onTrace={(id) => void expand('funding', id)}
@@ -1352,7 +1425,7 @@ export default function App() {
                   Analysis <span>{w.findings.length}</span>
                 </button>
               </div>
-              <div className="inspector-scroll">
+              <div className="inspector-scroll" ref={inspectorScroll}>
                 {rightTab === 'analysis' ? (
                   <AnalysisPanel
                     findings={w.findings}
@@ -1408,6 +1481,8 @@ export default function App() {
                         key={selected.id}
                         workspace={w}
                         selected={selected}
+                        openToken={editTarget === 'tags' ? editToken : 0}
+                        onOpenHandled={() => setEditToken(0)}
                         graph={graph}
                         onChange={changeTags}
                         onManage={() => {
@@ -1423,7 +1498,8 @@ export default function App() {
                     busy={!!operation}
                     canQuery={canTrace}
                     queryDisabledReason={queryDisabledReason}
-                    editToken={editToken}
+                    editToken={editTarget === 'tags' ? undefined : editToken}
+                    editTarget={editTarget === 'icon' ? 'icon' : 'label'}
                     onEditHandled={() => setEditToken(0)}
                     onSelectNode={select}
                     onCenter={() => centerNode()}
@@ -1446,7 +1522,7 @@ export default function App() {
                         const transactions = { ...current.transactions };
                         delete transactions[tx!.txid];
                         return {
-                          ...current,
+                          ...promoteInputContext(current, [tx!.txid]),
                           transactions,
                           findings: current.findings.filter((f) => !f.txids.includes(tx!.txid)),
                         };
@@ -1540,43 +1616,15 @@ export default function App() {
         />
       )}
       {examplesOpen && (
-        <Modal title="Testnet4 tracing examples" onClose={() => setExamplesOpen(false)}>
-          <p className="muted">
-            Real on-chain outputs with verified incoming and spending paths. Load an output, then
-            use the inspector to trace it. No wallet ownership is inferred.
-          </p>
-          {(w?.network !== 'testnet4' || !canQuery) && (
-            <p className="warning">
-              Open a testnet4 workspace with a connected testnet4 backend to load these examples.
-            </p>
-          )}
-          <div className="example-list">
-            {TESTNET4_EXAMPLES.map((example) => (
-              <article key={example.id}>
-                <h3>{example.title}</h3>
-                <p>{example.description}</p>
-                <p className="mono small wrap">
-                  {example.txid}:{example.vout}
-                </p>
-                <div className="button-row">
-                  <button
-                    className="primary"
-                    disabled={w?.network !== 'testnet4' || !canQuery || !!operation}
-                    onClick={() => {
-                      setExamplesOpen(false);
-                      void addQuery(`${example.txid}:${example.vout}`);
-                    }}
-                  >
-                    Load example output
-                  </button>
-                  <a href={example.sources[0].url} target="_blank" rel="noreferrer">
-                    Explorer reference
-                  </a>
-                </div>
-              </article>
-            ))}
-          </div>
-        </Modal>
+        <ExamplesDialog
+          network={w?.network ?? networks?.[0] ?? 'testnet4'}
+          canLoad={!!w && canQuery && !operation}
+          onClose={() => setExamplesOpen(false)}
+          onLoad={(query) => {
+            setExamplesOpen(false);
+            void addQuery(query);
+          }}
+        />
       )}
       {aboutOpen && (
         <AboutDialog

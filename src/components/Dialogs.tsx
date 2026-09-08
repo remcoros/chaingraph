@@ -254,7 +254,7 @@ export function UnlockDialog({
             onClose();
           } catch {
             setError(
-              'Could not unlock. Check your password and that the file is a valid Chaingraph workspace.',
+              'Could not unlock. Check your password. If browser data was cleared or is unavailable, restore an exported workspace backup.',
             );
           } finally {
             setBusy(false);

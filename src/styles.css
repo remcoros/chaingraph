@@ -1736,3 +1736,35 @@ small,
     display: flex;
   }
 }
+
+/* Keep lookup centered while workspace actions retain their right edge. */
+.lookup-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+@media (min-width: 1200px) {
+  .workbench-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 720px) minmax(0, 1fr);
+  }
+  .lookup-controls {
+    grid-column: 2;
+    width: 100%;
+  }
+  .workbench-toolbar .workspace-actions {
+    grid-column: 3;
+    justify-self: end;
+  }
+}
+@media (max-width: 760px) {
+  .lookup-controls {
+    gap: 5px;
+  }
+  .workbench.focus-graph.show-left > .left-panel,
+  .workbench.focus-graph.show-right > .right-panel {
+    display: flex;
+  }
+}

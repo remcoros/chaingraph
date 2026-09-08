@@ -117,18 +117,28 @@ export function SelectedTags({
   graph,
   onChange,
   onManage,
+  openToken,
+  onOpenHandled,
 }: {
   workspace: Workspace;
   selected: GraphNode;
   graph: GraphData;
   onChange: Change;
   onManage: () => void;
+  openToken?: number;
+  onOpenHandled?: () => void;
 }) {
   const effective = listTagsForNode(workspace, selected);
   const matches = useMemo(() => buildWalletMatches(workspace, graph), [workspace, graph]);
   const match = matches.get(selected.id);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!openToken) return;
+    trigger.current?.focus();
+    setOpen(true);
+    onOpenHandled?.();
+  }, [openToken]);
   const id = useId();
   return (
     <section className="panel-section selected-tags" aria-label="Tags and wallet matches">
@@ -703,7 +713,7 @@ export default function TagsPanel({
                       {tag.nodeIds.length} assigned{' '}
                       {tag.nodeIds.length === 1 ? 'reference' : 'references'}
                     </p>
-                    <div className="tag-form-actions">
+                    <div className="tag-form-actions tag-card-actions">
                       <button disabled={!ids.length} onClick={() => onShow(tag)}>
                         Show on graph
                       </button>

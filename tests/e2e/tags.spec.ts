@@ -54,6 +54,14 @@ test('inline tags group imported labels and addresses without disrupting notes, 
     .locator('.tag-card')
     .filter({ has: page.getByRole('heading', { name: 'Exchange', exact: true }) });
   await expect(exchange).toContainText('2 loaded entities');
+  const showTagBounds = await exchange.getByRole('button', { name: 'Show on graph' }).boundingBox();
+  const addTagBounds = await exchange
+    .getByRole('button', { name: 'Add selection', exact: true })
+    .boundingBox();
+  expect(Math.abs(showTagBounds!.y - addTagBounds!.y)).toBeLessThan(1);
+  expect(showTagBounds!.height).toBeLessThanOrEqual(30);
+  expect(addTagBounds!.height).toBeLessThanOrEqual(30);
+
   await exchange.getByRole('button', { name: 'Show on graph' }).click();
   await expect(page.locator('.group-filter')).toContainText('Exchange');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
@@ -66,6 +74,23 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
   const picker = page.getByRole('dialog', { name: 'Choose tags' });
   await expect(picker.getByLabel('Find or create tag')).toBeFocused();
+  const assignmentGeometry = () =>
+    picker
+      .locator('.tag-assignment')
+      .first()
+      .evaluate((row) => {
+        const checkbox = row.querySelector('input')!.getBoundingClientRect();
+        const dot = row.querySelector('.tag-dot')!.getBoundingClientRect();
+        const text = row.querySelector('span:last-child')!.getBoundingClientRect();
+        return {
+          ordered: checkbox.right < dot.left && dot.right < text.left,
+          aligned: Math.abs((checkbox.top + checkbox.bottom) / 2 - (dot.top + dot.bottom) / 2) < 2,
+          height: row.getBoundingClientRect().height,
+        };
+      });
+  expect(await assignmentGeometry()).toMatchObject({ ordered: true, aligned: true });
+  expect((await assignmentGeometry()).height).toBeLessThan(60);
+
   await picker.getByRole('button', { name: 'Address + outputs', exact: true }).click();
   await picker.getByLabel('Find or create tag').fill('Shop');
   await picker.getByRole('button', { name: 'Color 3', exact: true }).click();
@@ -121,7 +146,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await expect(page.locator('.graph-stage canvas')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('tags-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.mobile-switch').getByRole('button', { name: 'Wallets' }).click();
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Browse' }).click();
   await expect(page.getByRole('button', { name: 'New tag', exact: true })).toBeInViewport({
     ratio: 1,
   });
@@ -132,6 +157,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await page.locator('.mobile-switch').getByRole('button', { name: 'Inspector' }).click();
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
   await expect(picker).toBeInViewport({ ratio: 1 });
+  expect(await assignmentGeometry()).toMatchObject({ ordered: true, aligned: true });
   const inheritedShop = picker.getByRole('checkbox', { name: /Shop/ });
   await expect(inheritedShop).not.toBeChecked();
   await expect(picker).toContainText('Applied to address too');

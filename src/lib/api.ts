@@ -299,7 +299,7 @@ export async function loadAddress(
   existing: Record<string, Transaction>,
   signal?: AbortSignal,
   onProgress?: (p: ScanProgress) => void,
-): Promise<{ transactions: Transaction[]; truncated: boolean }> {
+): Promise<{ transactions: Transaction[]; truncated: boolean; observedTransactionIds: string[] }> {
   const history = await fetchHistory(network, addressToScriptHash(address, network), signal);
   const allIds = [...new Set(history.map((h) => h.tx_hash))];
   const heights = new Map(history.map((h) => [h.tx_hash, h.height]));
@@ -318,7 +318,11 @@ export async function loadAddress(
     });
     return fetchTransaction(network, id, signal);
   });
-  return { transactions, truncated: ids.length > MAX_SCAN_TRANSACTIONS };
+  return {
+    transactions,
+    truncated: ids.length > MAX_SCAN_TRANSACTIONS,
+    observedTransactionIds: allIds,
+  };
 }
 export async function loadFunding(
   network: Network,

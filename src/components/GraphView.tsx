@@ -1,3 +1,4 @@
+import { ArrowLeftFromLine, Crosshair, Pencil, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
@@ -34,6 +35,9 @@ export interface GraphViewProps {
   dimensions: 2 | 3;
   sizeBy: 'uniform' | 'value' | 'degree';
   glow: boolean;
+  showLabels?: boolean;
+  showTags?: boolean;
+  showIcons?: boolean;
   fitToken: number;
   focusRequest?: { id: string; token: number };
   transactions?: Record<string, Transaction>;
@@ -43,7 +47,7 @@ export interface GraphViewProps {
   busy?: boolean;
 }
 
-type HoverCard = { type: 'node' | 'link'; id: string; x: number; y: number };
+type HoverCard = { type: 'node'; id: string; x: number; y: number };
 
 export default function GraphView(props: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +58,9 @@ export default function GraphView(props: GraphViewProps) {
   const pointer = useRef({ x: 0, y: 0, touch: false });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cardEntered = useRef(false);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingNode = useRef<string | undefined>(undefined);
+  const visibleNode = useRef<string | undefined>(undefined);
   const [hover, setHover] = useState<HoverCard>();
   const [error, setError] = useState(false);
   const savedSnapshot = useRef(props.snapshot);
@@ -63,12 +70,19 @@ export default function GraphView(props: GraphViewProps) {
   function keepCardOpen() {
     clearTimeout(closeTimer.current);
   }
+  function cancelCardOpen() {
+    clearTimeout(openTimer.current);
+    pendingNode.current = undefined;
+  }
   function scheduleCardClose() {
+    cancelCardOpen();
     keepCardOpen();
     closeTimer.current = setTimeout(() => {
-      if (!cardEntered.current && !cardRef.current?.contains(document.activeElement))
+      if (!cardEntered.current && !cardRef.current?.contains(document.activeElement)) {
+        visibleNode.current = undefined;
         setHover(undefined);
-    }, 650);
+      }
+    }, 450);
   }
   function showCard(type: HoverCard['type'], id: string, keyboard = false) {
     if (
@@ -79,12 +93,13 @@ export default function GraphView(props: GraphViewProps) {
     )
       return;
     keepCardOpen();
+    visibleNode.current = id;
     const element = containerRef.current;
     if (!element) return;
     const { width, height } = element.getBoundingClientRect();
-    const widthOfCard = Math.min(320, Math.max(200, width - 24));
-    const x = keyboard ? (width - widthOfCard) / 2 : pointer.current.x + 18;
-    const y = keyboard ? 40 : pointer.current.y + 18;
+    const widthOfCard = Math.min(304, Math.max(200, width - 24));
+    const x = keyboard ? (width - widthOfCard) / 2 : pointer.current.x + 12;
+    const y = keyboard ? 40 : pointer.current.y + 12;
     setHover((previous) =>
       !keyboard && previous?.type === type && previous.id === id
         ? previous
@@ -92,13 +107,31 @@ export default function GraphView(props: GraphViewProps) {
             type,
             id,
             x: Math.max(12, Math.min(x, width - widthOfCard - 12)),
-            y: Math.max(12, Math.min(y, height - 320)),
+            y: Math.max(12, Math.min(y, height - 280)),
           },
     );
     if (keyboard) requestAnimationFrame(() => cardRef.current?.focus());
   }
-  function dismissCard(returnFocus = false) {
+  function requestCard(id: string) {
+    if (
+      pointer.current.touch ||
+      cardEntered.current ||
+      cardRef.current?.contains(document.activeElement)
+    )
+      return;
     keepCardOpen();
+    if (visibleNode.current === id || pendingNode.current === id) return;
+    cancelCardOpen();
+    pendingNode.current = id;
+    openTimer.current = setTimeout(() => {
+      pendingNode.current = undefined;
+      showCard('node', id);
+    }, 320);
+  }
+  function dismissCard(returnFocus = false) {
+    cancelCardOpen();
+    keepCardOpen();
+    visibleNode.current = undefined;
     cardEntered.current = false;
     setHover(undefined);
     if (returnFocus) graphRef.current?.canvas.focus();
@@ -123,7 +156,7 @@ export default function GraphView(props: GraphViewProps) {
       adapter = adapterFactory(element, {
         hover: ({ hit, point }) => {
           pointer.current = { x: point.x, y: point.y, touch: point.pointerType === 'touch' };
-          if (hit) showCard(hit.type, hit.id);
+          if (hit?.type === 'node') requestCard(hit.id);
           else scheduleCardClose();
         },
         select: ({ hit }) => {
@@ -171,6 +204,7 @@ export default function GraphView(props: GraphViewProps) {
     return () => {
       observer?.disconnect();
       clearTimeout(closeTimer.current);
+      cancelCardOpen();
       adapter?.canvas.removeEventListener('keydown', onKeyDown);
       adapter?.dispose();
       graphRef.current = null;
@@ -188,6 +222,9 @@ export default function GraphView(props: GraphViewProps) {
     props.selectedId,
     props.sizeBy,
     props.glow,
+    props.showLabels,
+    props.showTags,
+    props.showIcons,
     props.nodePresentation,
   ]);
 
@@ -201,26 +238,25 @@ export default function GraphView(props: GraphViewProps) {
     if (props.focusRequest) graphRef.current?.focus(props.focusRequest.id);
   }, [adapterFactory, props.focusRequest, props.dimensions]);
 
-  const hoveredLink =
-    hover?.type === 'link' ? props.links.find((link) => link.id === hover.id) : undefined;
-  const hoveredNode = hover ? resolveGraphHit(hover, props.nodes, props.links) : undefined;
-  const linkedOutput = hoveredLink
-    ? props.nodes.find(
-        (node) =>
-          node.kind === 'output' &&
-          (node.id === hoveredLink.source || node.id === hoveredLink.target),
-      )
-    : undefined;
+  const hoveredNode = hover ? props.nodes.find((node) => node.id === hover.id) : undefined;
   const transaction = hoveredNode?.txid ? props.transactions?.[hoveredNode.txid] : undefined;
   const missingFunding =
     hoveredNode?.kind === 'output' &&
     (hoveredNode.value === undefined ||
       Boolean(props.transactions && hoveredNode.txid && !transaction));
-  const cardTitle = hoveredLink
-    ? { creates: 'Creates output', spends: 'Spends output', address: 'Address association' }[
-        hoveredLink.kind
-      ]
-    : hoveredNode?.kind;
+  const loadedSpendingCount =
+    hoveredNode?.kind === 'output'
+      ? Object.values(props.transactions ?? {}).reduce(
+          (count, transaction) =>
+            count +
+            Number(
+              transaction.vin.some(
+                (input) => input.txid === hoveredNode.txid && input.vout === hoveredNode.vout,
+              ),
+            ),
+          0,
+        )
+      : 0;
   const traceReason = props.busy ? 'Another operation is running.' : props.traceDisabledReason;
 
   useEffect(() => {
@@ -278,20 +314,62 @@ export default function GraphView(props: GraphViewProps) {
             }}
           >
             <div className="graph-card-heading">
-              <span>{cardTitle}</span>
+              <span className={`graph-card-kind graph-card-kind-${hoveredNode.kind}`}>
+                {hoveredNode.kind}
+              </span>
+              <div className="graph-card-actions" role="group" aria-label="Graph item actions">
+                <button
+                  type="button"
+                  aria-label="Select graph item"
+                  title="Select in transaction view and Inspector"
+                  onClick={() => {
+                    props.onSelect(hoveredNode.id);
+                    dismissCard();
+                  }}
+                >
+                  <Crosshair size={15} />
+                </button>
+                {props.onTrace && hoveredNode.kind !== 'address' && (
+                  <button
+                    type="button"
+                    disabled={Boolean(traceReason)}
+                    aria-label="Load previous level"
+                    title={traceReason || 'Load one previous level of funding transactions'}
+                    onClick={() => {
+                      props.onTrace?.(hoveredNode.id);
+                      dismissCard();
+                    }}
+                  >
+                    <ArrowLeftFromLine size={15} />
+                  </button>
+                )}
+                {props.onEdit && (
+                  <button
+                    type="button"
+                    aria-label="Edit label and notes"
+                    title="Edit label, tags, icon and notes"
+                    onClick={() => {
+                      props.onEdit?.(hoveredNode.id);
+                      dismissCard();
+                    }}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 className="graph-card-close"
                 aria-label="Close graph details"
                 onClick={() => dismissCard(true)}
               >
-                ×
+                <X size={15} />
               </button>
             </div>
             <button
               type="button"
               className="graph-card-label"
-              aria-label="Select graph item"
+              aria-label="Select this graph item"
               title="Select this item in the transaction view and Inspector"
               onClick={() => {
                 props.onSelect(hoveredNode.id);
@@ -301,18 +379,6 @@ export default function GraphView(props: GraphViewProps) {
               {hoveredNode.label}
             </button>
             {props.renderMetadata?.(hoveredNode.id)}
-            {hoveredLink && (
-              <p className="graph-card-explanation">
-                {
-                  {
-                    creates: 'The transaction creates this output.',
-                    spends: 'This output is consumed by the linked spending transaction.',
-                    address:
-                      'This output pays to the address. An address association does not establish common ownership.',
-                  }[hoveredLink.kind]
-                }
-              </p>
-            )}
             <dl className="graph-card-facts">
               <div>
                 <dt>
@@ -322,43 +388,39 @@ export default function GraphView(props: GraphViewProps) {
                       ? 'Outpoint'
                       : 'Address'}
                 </dt>
-                <dd className="graph-card-identifier">
+                <dd
+                  className="graph-card-identifier"
+                  title={
+                    hoveredNode.kind === 'output' && hoveredNode.txid
+                      ? `${hoveredNode.txid}:${hoveredNode.vout}`
+                      : hoveredNode.txid || hoveredNode.address || hoveredNode.id
+                  }
+                >
                   {hoveredNode.kind === 'output' && hoveredNode.txid
                     ? `${hoveredNode.txid}:${hoveredNode.vout}`
                     : hoveredNode.txid || hoveredNode.address || hoveredNode.id}
                 </dd>
               </div>
-              {hoveredLink?.kind === 'spends' && (
-                <div>
-                  <dt>Spending transaction</dt>
-                  <dd className="graph-card-identifier">
-                    {hoveredLink.target.replace(/^tx:/, '')}
-                  </dd>
-                </div>
-              )}
-              {hoveredLink?.kind === 'address' && linkedOutput && (
-                <div>
-                  <dt>Output</dt>
-                  <dd className="graph-card-identifier">{linkedOutput.id.replace(/^out:/, '')}</dd>
-                </div>
-              )}
-              {(hoveredNode.value !== undefined || linkedOutput?.value !== undefined) && (
+              {hoveredNode.value !== undefined && (
                 <div>
                   <dt>{hoveredNode.kind === 'transaction' ? 'Total outputs' : 'Output value'}</dt>
-                  <dd>{formatSats(hoveredNode.value ?? linkedOutput?.value)}</dd>
+                  <dd>{formatSats(hoveredNode.value)}</dd>
                 </div>
               )}
               {hoveredNode.address && hoveredNode.kind !== 'address' && (
                 <div>
                   <dt>Address</dt>
-                  <dd className="graph-card-identifier">{hoveredNode.address}</dd>
+                  <dd className="graph-card-identifier" title={hoveredNode.address}>
+                    {hoveredNode.address}
+                  </dd>
                 </div>
               )}
               {transaction && hoveredNode.kind === 'transaction' && (
                 <div>
                   <dt>Structure</dt>
                   <dd>
-                    {transaction.vin.length} inputs · {transaction.vout.length} outputs
+                    {transaction.vin.length} {transaction.vin.length === 1 ? 'input' : 'inputs'} ·{' '}
+                    {transaction.vout.length} {transaction.vout.length === 1 ? 'output' : 'outputs'}
                   </dd>
                 </div>
               )}
@@ -376,35 +438,11 @@ export default function GraphView(props: GraphViewProps) {
             )}
             {hoveredNode.kind === 'output' && !missingFunding && (
               <p className="graph-card-explanation">
-                An output node may already be spent. Inspect its spending links to investigate.
+                {loadedSpendingCount
+                  ? `${loadedSpendingCount} spending transaction${loadedSpendingCount === 1 ? '' : 's'} loaded.`
+                  : 'No spending transaction loaded.'}
               </p>
             )}
-            <div className="graph-card-actions">
-              {props.onTrace && hoveredNode.kind !== 'address' && (
-                <button
-                  type="button"
-                  disabled={Boolean(traceReason)}
-                  title={traceReason || 'Load one previous level of funding transactions'}
-                  onClick={() => {
-                    props.onTrace?.(hoveredNode.id);
-                    dismissCard();
-                  }}
-                >
-                  Load previous level
-                </button>
-              )}
-              {props.onEdit && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    props.onEdit?.(hoveredNode.id);
-                    dismissCard();
-                  }}
-                >
-                  Edit label and notes
-                </button>
-              )}
-            </div>
             {traceReason && props.onTrace && hoveredNode.kind !== 'address' && (
               <p className="graph-card-explanation">{traceReason}</p>
             )}

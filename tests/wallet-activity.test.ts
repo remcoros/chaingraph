@@ -53,6 +53,62 @@ describe('wallet refresh merging', () => {
     expect(applyWalletScan(removed, scanned, [tx])).toBe(removed);
   });
 
+  it('promotes a scoped input transaction discovered by wallet refresh even when its metadata is unchanged', () => {
+    const tx = {
+      txid,
+      vin: [{ coinbase: '00' }],
+      vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: { hex: '51' } })),
+    };
+    const current = {
+      ...newWorkspace('Wallet discovery', 'mainnet'),
+      wallets: [wallet],
+      transactions: { [txid]: tx },
+      inputContext: { [txid]: [0] },
+    };
+    const scanned = { ...wallet, scannedAt: '2026-09-08T10:00:00.000Z' };
+    const merged = applyWalletScan(current, scanned, [structuredClone(tx)]);
+    expect(merged.inputContext).toBeUndefined();
+    expect(merged.transactions).toBe(current.transactions);
+    expect(current.inputContext).toEqual({ [txid]: [0] });
+    expect(applyWalletScan(current, scanned, []).inputContext).toBe(current.inputContext);
+  });
+
+  it('promotes cached wallet history during a quiet scan while retaining unrelated input context', () => {
+    const other = 'b'.repeat(64);
+    const tx = {
+      txid,
+      confirmations: 10,
+      vin: [{ coinbase: '00' }],
+      vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: {} })),
+    };
+    const current = {
+      ...newWorkspace('Quiet wallet scan', 'mainnet'),
+      wallets: [wallet],
+      transactions: { [txid]: tx, [other]: { ...tx, txid: other } },
+      inputContext: { [txid]: [0], [other]: [0] },
+    };
+    const scanned = {
+      ...wallet,
+      addresses: [
+        {
+          address: 'fixture',
+          scripthash: txid,
+          path: 'account/0/0',
+          branch: 0 as const,
+          index: 0,
+          history: [{ tx_hash: txid, height: 100 }],
+        },
+      ],
+    };
+    const merged = applyWalletScan(current, scanned, []);
+    expect(merged.inputContext).toEqual({ [other]: [0] });
+    expect(merged.transactions).toBe(current.transactions);
+    expect(current.inputContext).toEqual({ [txid]: [0], [other]: [0] });
+    expect(applyWalletScan({ ...current, wallets: [] }, scanned, [])).toMatchObject({
+      inputContext: current.inputContext,
+    });
+  });
+
   it('retains unreviewed activity across quiet checks and respects acknowledgment during I/O', () => {
     const current = {
       ...newWorkspace('Activity', 'mainnet'),

@@ -18,8 +18,13 @@ First testable release of the MIT-licensed, self-hosted Bitcoin analysis workben
 - Compact transaction flow with exact-output navigation, decoded OP_RETURN previews, inline tag creation and automatic encrypted persistence of annotations, filters and graph layout.
 - Encrypted workspace tags, imported-label grouping and separate wallet-script match highlights across graph cards and transaction rows.
 - Returning-wallet refresh, persistent new-activity review, cancellation and preservation of unchanged analysis evidence.
-- Compact header with workspace tabs, combined lookup/prefetch controls defaulting to one previous level, Help/sample menu, and floating graph navigation.
+- Compact header with workspace tabs, centered lookup/prefetch controls defaulting to Previous Off, Help/sample menu, and floating graph navigation.
 - Compact annotation saving and icon controls, themed selects, and display controls outside the picking area.
+- Node-only hover cards with compact header actions, saved selection locking, independent label/tag/icon captions and desktop-only focus beside 3D/Flat.
+- Direct input data loads automatically for the transaction flow, with bounded parent context that avoids displaying unrelated branches until navigated.
+- Transaction cards select across the whole block and expose label/tag/icon shortcuts; input/output expand controls remain above their rows.
+- Network-aware curated samples: four independently verified mainnet transactions and three testnet4 output paths.
+- Encrypted IndexedDB backing for large workspaces and localStorage quota recovery, preserving small-save behavior and portable encrypted exports.
 - Bounded recovery of stale read-only Bitcoin RPC connections, retaining request deadlines and cancellation.
 - Production container and local Compose deployment, plus a tag-gated multi-architecture GHCR release workflow.
 

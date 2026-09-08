@@ -51,11 +51,13 @@ function App(){const [selected,setSelected]=React.useState();const [action,setAc
 const [dimensions,setDimensions]=React.useState(2),[fit,setFit]=React.useState(0),[focus,setFocus]=React.useState();
 const [loaded,setLoaded]=React.useState(!params.has('empty'));
 const [shown,setShown]=React.useState(true),[hidden,setHidden]=React.useState(false),[busy,setBusy]=React.useState(false);
-window.fixture={setLoaded,setSelected,setShown,setHidden,setBusy};
+const [labels,setLabels]=React.useState(true),[tags,setTags]=React.useState(true),[icons,setIcons]=React.useState(true);
+window.fixture={setLoaded,setSelected,setShown,setHidden,setBusy,setLabels,setTags,setIcons};
 return <><input id="notes" aria-label="Notes editor"/><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="action">{action}</output><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="selected">{selected||'none'}</output>
 <div><button onClick={()=>setDimensions(d=>d===2?3:2)}>Toggle dimensions</button><button onClick={()=>setFit(n=>n+1)}>Fit graph</button><button onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Focus output</button><button onClick={()=>setLoaded(true)}>Load data</button></div>
 <div id="fixture-graph" style={{display:hidden?'none':undefined,position:'relative',height:'600px',width:'min(900px, 100%)','--color-paper':'#111a20','--color-muted':'#74818b','--color-accent':'#eab66b'}}>
 {shown && <Graph navigation={params.has('contract')||params.has('navigation')?<button style={{pointerEvents:'auto'}} onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Shared center</button>:undefined} toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
+showLabels={labels} showTags={tags} showIcons={icons} nodePresentation={params.has('captions')?new Map(nodes.map(node=>[node.id,{label:node.kind==='output'?'Deposit':'',icon:node.kind==='output'?'★':'',tags:node.kind==='output'?['Exchange']:[]}])):new Map(nodes.map(node=>[node.id,{label:''}]))}
 busy={busy} onTrace={id=>setAction('trace:'+id)} onEdit={id=>{setAction('edit:'+id);document.getElementById('notes').focus();}}/>}
 </div></>};createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
 `,
@@ -224,6 +226,14 @@ test('floating navigation preserves distinct silhouettes, actual picking, card a
   const card = page.getByRole('dialog', { name: 'Graph item details' });
   await expect(card).toContainText('10,000 sats');
   await expect(card).toContainText('Saved confirmations');
+  const toolbar = card.getByRole('group', { name: 'Graph item actions' });
+  const toolbarBounds = (await toolbar.boundingBox())!;
+  const factsBounds = (await card.locator('.graph-card-facts').boundingBox())!;
+  expect(toolbarBounds.y + toolbarBounds.height).toBeLessThan(factsBounds.y);
+  expect(
+    (await toolbar.getByRole('button', { name: 'Edit label and notes' }).boundingBox())!.height,
+  ).toBeLessThanOrEqual(30);
+  await page.screenshot({ path: test.info().outputPath('compact-node-card.png') });
   await card.getByRole('button', { name: 'Load previous level' }).hover();
   await page.waitForTimeout(800);
   await expect(card).toBeVisible();
@@ -247,7 +257,7 @@ test('floating navigation preserves distinct silhouettes, actual picking, card a
   expect(errors).toEqual([]);
 });
 
-test('picks creation, spending, and address links and routes actions to their relevant entity', async ({
+test('connection hover stays quiet while deliberate connection clicks select the relevant entity', async ({
   page,
 }) => {
   const errors = await render(page);
@@ -257,24 +267,18 @@ test('picks creation, spending, and address links and routes actions to their re
     y: (a.y + b.y) / 2,
   });
   const card = page.getByRole('dialog', { name: 'Graph item details' });
-  for (const [kind, point] of [
-    ['Creates output', midpoint(meshes.creating, meshes.output)],
-    ['Spends output', midpoint(meshes.spending, meshes.output)],
+  for (const [point, entity] of [
+    [midpoint(meshes.creating, meshes.output), outputId],
+    [midpoint(meshes.spending, meshes.output), outputId],
+    [midpoint(meshes.address, meshes.output), 'addr:bc1qfixture'],
   ] as const) {
     await page.mouse.move(10, 10);
-    await hover(page, point);
-    await expect(card.locator('.graph-card-heading')).toContainText(kind);
-    await card.getByRole('button', { name: 'Load previous level' }).click();
-    await expect(page.getByTestId('action')).toHaveText(`trace:${outputId}`);
+    await page.mouse.move(point.x, point.y);
+    await page.waitForTimeout(700);
+    await expect(card).toBeHidden();
+    await page.mouse.click(point.x, point.y);
+    await expect(page.getByTestId('selected')).toHaveText(entity);
   }
-  await page.mouse.move(10, 10);
-  await hover(page, midpoint(meshes.address, meshes.output));
-  await expect(card.locator('.graph-card-heading')).toContainText('Address association');
-  await expect(card).toContainText('does not establish common ownership');
-  await expect(card.getByRole('button', { name: 'Load previous level' })).toHaveCount(0);
-  await card.getByRole('button', { name: 'Edit label and notes' }).click();
-  await expect(page.getByTestId('action')).toHaveText('edit:addr:bc1qfixture');
-  await expect(page.getByLabel('Notes editor')).toBeFocused();
   expect(errors).toEqual([]);
 });
 
@@ -312,19 +316,22 @@ test('shared GraphView handles a substitute adapter with identical semantic acti
   await expect(card).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('canvas')).toBeFocused();
-  for (const [id, title, entity] of [
-    ['create-edge', 'Creates output', outputId],
-    ['spend-edge', 'Spends output', outputId],
-    ['address-edge', 'Address association', 'addr:bc1qfixture'],
+  for (const [id, entity] of [
+    ['create-edge', outputId],
+    ['spend-edge', outputId],
+    ['address-edge', 'addr:bc1qfixture'],
   ]) {
     await emit('select', { type: 'link', id });
     await expect(page.getByTestId('selected')).toHaveText(entity);
     await emit('hover', { type: 'link', id });
-    await expect(card).toContainText(title);
+    await page.waitForTimeout(450);
+    await expect(card).toBeHidden();
+    await emit('hover', { type: 'node', id: entity });
+    await expect(card).toBeVisible();
     if (id !== 'address-edge') {
       await card.getByRole('button', { name: 'Load previous level' }).click();
       await expect(page.getByTestId('action')).toHaveText(`trace:${entity}`);
-      await emit('hover', { type: 'link', id });
+      await emit('hover', { type: 'node', id: entity });
     }
     await card.getByRole('button', { name: 'Edit label and notes' }).click();
     await expect(page.getByTestId('action')).toHaveText(`edit:${entity}`);
@@ -527,5 +534,91 @@ test('fit keeps nodes visible and selectable in a short transaction-panel canvas
   await expect(select).toBeInViewport({ ratio: 1 });
   await select.click();
   await expect(page.getByTestId('selected')).toHaveText(outputId);
+  expect(errors).toEqual([]);
+});
+
+test('annotation captions render on the real canvas and all three display toggles remove them', async ({
+  page,
+}) => {
+  const errors = await render(page, '?captions');
+  const captionPixels = () =>
+    page.locator('canvas').evaluate(
+      (canvas) =>
+        new Promise<number>((resolve) =>
+          requestAnimationFrame(() => {
+            const gl = (canvas as HTMLCanvasElement).getContext('webgl2')!;
+            const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+            gl.readPixels(
+              0,
+              0,
+              gl.drawingBufferWidth,
+              gl.drawingBufferHeight,
+              gl.RGBA,
+              gl.UNSIGNED_BYTE,
+              pixels,
+            );
+            let count = 0;
+            for (let offset = 0; offset < pixels.length; offset += 4) {
+              const colors = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
+              if (Math.min(...colors) > 120 && Math.max(...colors) - Math.min(...colors) < 35)
+                count++;
+            }
+            resolve(count);
+          }),
+        ),
+    );
+  await expect.poll(captionPixels).toBeGreaterThan(40);
+  await page.screenshot({ path: test.info().outputPath('graph-annotation-captions.png') });
+  await page.evaluate(() => {
+    const fixture = (window as any).fixture;
+    fixture.setLabels(false);
+    fixture.setTags(false);
+    fixture.setIcons(false);
+  });
+  await expect.poll(captionPixels).toBe(0);
+  for (const setter of ['setLabels', 'setTags', 'setIcons']) {
+    await page.evaluate((setter) => (window as any).fixture[setter](true), setter);
+    await expect.poll(captionPixels).toBeGreaterThan(5);
+    await page.evaluate((setter) => (window as any).fixture[setter](false), setter);
+    await expect.poll(captionPixels).toBe(0);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('hover dwell ignores passing nodes and the compact card stays usable at a narrow viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await render(page, '?contract');
+  const emit = (hit?: { type: 'node' | 'link'; id: string }) =>
+    page.evaluate((hit) => {
+      (window as any).contract.events.hover({
+        hit,
+        point: { x: 360, y: 510, pointerType: 'mouse' },
+      });
+    }, hit);
+  const card = page.getByRole('dialog', { name: 'Graph item details' });
+  for (let index = 0; index < 8; index++) {
+    await emit({ type: 'node', id: index % 2 ? outputId : `tx:${'a'.repeat(64)}` });
+    await page.waitForTimeout(20);
+    await emit({ type: 'link', id: 'create-edge' });
+  }
+  await expect(card).toBeHidden();
+  await emit({ type: 'node', id: outputId });
+  await expect(card).toBeVisible();
+  const bounds = (await card.boundingBox())!;
+  const canvas = (await page.locator('canvas').boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(canvas.x);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(canvas.x + canvas.width);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(canvas.y + canvas.height);
+  const edit = card.getByRole('button', { name: 'Edit label and notes' });
+  await edit.hover();
+  await emit({ type: 'node', id: `tx:${'b'.repeat(64)}` });
+  await page.waitForTimeout(700);
+  await expect(card).toContainText('Fixture output');
+  await page.screenshot({ path: test.info().outputPath('narrow-node-card.png') });
+  await edit.click();
+  await expect(page.getByLabel('Notes editor')).toBeFocused();
+  await expect(card).toBeHidden();
   expect(errors).toEqual([]);
 });

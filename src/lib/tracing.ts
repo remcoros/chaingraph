@@ -50,5 +50,11 @@ export async function loadAncestors(
     });
     frontier = ids.flatMap((id) => (known.has(id) ? [known.get(id)!] : []));
   }
-  return { transactions, failed, truncated };
+  return {
+    transactions,
+    failed,
+    truncated,
+    // Explicit traversal reveals cached ancestors too, without downloading them again.
+    resolvedTransactionIds: [...visited].filter((id) => known.has(id)),
+  };
 }

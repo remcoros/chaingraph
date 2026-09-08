@@ -23,12 +23,12 @@ async function add(page: Page, value: string) {
   await page.getByLabel('Transaction, output, or address').fill(value);
   await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
 }
-test('lookup prefetch hydrates previous outputs and the spending action follows exact outputs', async ({
+test('flow hydrates previous outputs with lookup prefetch off and follows exact spends', async ({
   page,
 }) => {
   const calls = await mockBitcoin(page);
   await create(page);
-  await expect(page.getByLabel('Prefetch previous levels')).toHaveValue('1');
+  await expect(page.getByLabel('Prefetch previous levels')).toHaveValue('0');
   await add(page, TX_SPENDING);
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
@@ -55,25 +55,18 @@ test('lookup prefetch hydrates previous outputs and the spending action follows 
     page.locator(`.selection-heading .selection-facts code[title="${TX_SPENDING}"]`),
   ).toBeVisible();
 });
-test('an unresolved output can load its creating transaction without prefetch', async ({
+test('automatically loaded input outputs expose their value without a manual fetch', async ({
   page,
 }) => {
   await mockBitcoin(page);
   await create(page);
   await page.getByLabel('Prefetch previous levels').selectOption('0');
   await add(page, TX_SPENDING);
-  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('output');
   await page.getByLabel('Filter graph entities').fill(TX_FUNDING);
   await page.locator('.entity-row').first().click();
-  await expect(
-    page
-      .locator('.selection-facts > div')
-      .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
-      .locator('dd'),
-  ).toHaveText('Unknown value');
-  await page.getByRole('button', { name: 'Load previous transactions', exact: true }).click();
   await expect(
     page
       .locator('.selection-facts > div')

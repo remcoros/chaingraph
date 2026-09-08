@@ -1,4 +1,5 @@
 import type { Transaction, Wallet, Workspace } from './types';
+import { promoteInputContext } from './workspace';
 
 /** Immutable wallet evidence used by analyses, excluding refresh/UI bookkeeping. */
 export function walletEvidenceChanged(previous: Wallet[], next: Wallet[]): boolean {
@@ -35,8 +36,15 @@ export function applyWalletScan(
       mergedTransactions = { ...current.transactions };
     mergedTransactions[transaction.txid] = transaction;
   }
+  // Quiet checks may reuse confirmed transactions without returning downloads.
+  // Promote only records observed in this wallet's histories, never unrelated parents.
+  const discoveredIds = new Set(transactions.map((transaction) => transaction.txid));
+  if (current.inputContext)
+    for (const address of scanned.addresses)
+      for (const item of address.history ?? [])
+        if (current.inputContext[item.tx_hash]) discoveredIds.add(item.tx_hash);
   return {
-    ...current,
+    ...promoteInputContext(current, discoveredIds),
     wallets: current.wallets.map((wallet) => {
       if (wallet.id !== scanned.id) return wallet;
       const unreviewed = [

@@ -47,9 +47,9 @@
 }
 .transaction-flow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 106px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) clamp(136px, 19%, 184px) minmax(0, 1fr);
   grid-template-areas: 'previous identity next' 'inputs identity outputs';
-  column-gap: 13px;
+  column-gap: 20px;
   align-items: start;
 }
 .transaction-flow-previous {
@@ -125,68 +125,121 @@
   border-style: dashed;
   background: none;
 }
+/* The transaction is the junction. Selection occupies the complete card face;
+   annotation controls are sibling buttons, so keyboard and pointer actions agree. */
 .transaction-view-identity {
   grid-area: identity;
   position: sticky;
-  top: 44px;
+  top: 66px;
   align-self: start;
+  min-width: 0;
+  margin-top: 38px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-rule));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper));
+  text-align: center;
+  box-shadow: 0 2px 5px #00000006;
+}
+.transaction-view-identity.is-selected {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 11%, var(--color-paper));
+}
+.transaction-view-identity::before,
+.transaction-view-identity::after {
+  content: '';
+  position: absolute;
+  top: 47px;
+  width: 20px;
+  height: 1px;
+  background: var(--color-accent);
+  opacity: 0.65;
+  pointer-events: none;
+}
+.transaction-view-identity::before {
+  right: 100%;
+}
+.transaction-view-identity::after {
+  left: 100%;
+}
+.transaction-identity-select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  width: 100%;
   min-width: 0;
-  margin-top: 24px;
-  padding: 10px 5px;
-  border: 1px solid var(--color-rule);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-paper));
+  min-height: 110px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 12px 8px;
+  background: transparent;
+  font-size: 11px;
   text-align: center;
 }
-.transaction-view-identity > svg {
+.transaction-identity-select > svg {
   color: var(--color-accent);
 }
-.transaction-identity-select {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
+.transaction-identity-select > span {
   font-size: 10px;
-  text-align: center;
-}
-.transaction-identity-select span {
-  font-size: 9px;
   white-space: normal;
+  color: var(--color-muted);
 }
 .transaction-identity-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  min-width: 0;
+  white-space: normal;
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 10px;
+  font-size: 11px;
 }
 .transaction-identity-tools {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
+  padding: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-rule));
 }
 .transaction-identity-tools .icon-button {
-  min-height: 24px;
-  padding: 4px;
+  min-height: 27px;
+  min-width: 27px;
+  padding: 5px;
 }
 .transaction-choice {
-  width: 100%;
+  width: calc(100% - 8px);
+  margin: 0 4px 4px;
   min-width: 0;
   font-size: 9px;
   padding: 4px 14px 4px 3px;
 }
 .transaction-flow section {
   min-width: 0;
+  /* Keep both sticky lane headers inside the same full-height grid row. */
+  align-self: stretch;
+}
+.transaction-lane-header {
+  position: sticky;
+  top: 29px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1px 6px;
+  min-height: 29px;
+  padding: 3px 0;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-rule);
+  margin-bottom: 4px;
 }
 .transaction-flow h4 {
-  margin: 5px 0;
+  margin: 0;
   color: var(--color-muted);
   font-size: 10px;
   font-weight: 500;
-}
-.transaction-flow-outputs h4 {
-  text-align: right;
 }
 .transaction-rows {
   display: grid;
@@ -205,7 +258,7 @@
   content: '';
   position: absolute;
   top: 50%;
-  width: 12px;
+  width: 19px;
   height: 1px;
   background: var(--color-rule);
 }
@@ -277,7 +330,8 @@
   color: var(--color-accent);
 }
 .transaction-expand {
-  margin: 5px 0 0;
+  margin: 0;
+  padding: 2px 0;
   font-size: 10px;
 }
 .transaction-view-actions {
@@ -318,33 +372,72 @@
     padding: 0 5px 7px;
   }
   .transaction-flow {
-    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr);
     column-gap: 7px;
   }
   .transaction-view-identity {
-    padding: 7px 3px;
+    top: 78px;
+    margin-top: 48px;
   }
+  .transaction-view-identity::before,
+  .transaction-view-identity::after {
+    width: 7px;
+  }
+  .transaction-identity-select {
+    padding: 9px 3px;
+  }
+  .transaction-identity-tools .icon-button {
+    min-width: 38px;
+    min-height: 34px;
+  }
+  .transaction-lane-header {
+    min-height: 43px;
+    align-content: center;
+  }
+  .transaction-expand {
+    font-size: 9px;
+  }
+
   .transaction-identity-select strong {
     font-size: 8px;
   }
+  .transaction-row {
+    flex-direction: column;
+  }
   .transaction-row-select {
-    padding: 5px 3px;
+    padding: 7px 4px;
     gap: 3px;
+    min-height: 48px;
+  }
+  .transaction-row-tools {
+    flex-direction: row;
+    justify-content: flex-end;
+    border-top: 1px solid var(--color-rule);
   }
   .transaction-row-main strong,
   .transaction-row-main > span {
     font-size: 10px;
   }
   .transaction-row-tools .icon-button {
-    min-width: 24px;
-    min-height: 24px;
+    flex: 1;
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .transaction-row-tools .icon-button + .icon-button {
+    border-left: 1px solid var(--color-rule);
+    border-radius: 0;
   }
   .transaction-row::after {
     width: 6px;
   }
   .transaction-neighbor-card {
-    padding: 5px 3px;
-    gap: 2px;
+    padding: 7px 4px;
+    gap: 4px;
+    min-height: 48px;
+  }
+  .transaction-neighbor-card strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .transaction-neighbor-card small {
     font-size: 8px;
@@ -407,7 +500,7 @@
   border-left: 4px solid var(--color-rule);
 }
 .transaction-flow-inputs .transaction-row::before {
-  left: calc(100% + 8px);
+  left: calc(100% + 15px);
 }
 .transaction-flow-outputs .transaction-row::before {
   right: 100%;
@@ -433,5 +526,20 @@
 }
 .transaction-row .op-return-data {
   margin: 0 5px;
+  font-size: 10px;
+}
+
+.transaction-input-status {
+  color: var(--color-muted);
+}
+.transaction-input-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 10px;
+  color: var(--color-muted);
+}
+.transaction-input-error > button {
   font-size: 10px;
 }

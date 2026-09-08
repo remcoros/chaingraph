@@ -99,6 +99,8 @@ export interface Workspace {
   createdAt: string;
   wallets: Wallet[];
   transactions: Record<string, Transaction>;
+  /** Automatically fetched input parents show only these outputs until explicitly opened. */
+  inputContext?: Record<string, number[]>;
   annotations: Record<string, Annotation>;
   tags?: WorkspaceTag[];
   findings: AnalysisFinding[];
@@ -109,6 +111,10 @@ export interface Workspace {
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
     showAddresses: boolean;
+    showLabels?: boolean;
+    showTags?: boolean;
+    showIcons?: boolean;
+    lockToSelection?: boolean;
     highlightMode?: 'all' | 'wallets' | 'tags' | 'none';
     graphSnapshot?: GraphSnapshot;
     selectionId?: string;

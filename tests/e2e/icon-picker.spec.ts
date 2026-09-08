@@ -77,7 +77,7 @@ test('an arbitrary imported icon stays selected until explicitly replaced or cle
   await expect(trigger).toContainText('🪐');
 });
 
-test('a missing funding output can load its previous transaction and does not claim unspent status', async ({
+test('automatically resolved funding exposes its loaded spend and stops at coinbase', async ({
   page,
 }) => {
   await openWorkspace(page);
@@ -87,10 +87,9 @@ test('a missing funding output can load its previous transaction and does not cl
   await page.locator('.entity-list .entity-row').first().click();
   await expect(
     page.getByRole('button', { name: 'Load previous transactions', exact: true }),
-  ).toBeEnabled();
+  ).toBeDisabled();
   await expect(page.locator('.selection-heading')).toContainText(
     '1 spending transaction is loaded for this output',
   );
-  await page.getByRole('button', { name: 'Load previous transactions', exact: true }).click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });

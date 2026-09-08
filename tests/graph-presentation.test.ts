@@ -70,6 +70,22 @@ describe('shared graph semantics and presentation', () => {
       presentGraph({ ...input, glow: false }, palette).nodes.every((node) => !node.highlight),
     ).toBe(true);
   });
+  it('independently projects annotation labels, tags and icons without generated IDs leaking through', () => {
+    const nodePresentation = new Map([
+      ['tx', { label: 'Exchange deposit', icon: '🏦', tags: ['Exchange', 'Savings'] }],
+      ['out', { label: '', icon: '🔒', tags: ['Cold wallet'] }],
+    ]);
+    const render = (flags = {}) =>
+      presentGraph({ ...input, nodePresentation, ...flags }, palette).nodes;
+    expect(render()[0].text).toBe('🏦 Exchange deposit\n#Exchange · #Savings');
+    expect(render({ showLabels: false })[0].text).toBe('🏦\n#Exchange · #Savings');
+    expect(render({ showTags: false })[0].text).toBe('🏦 Exchange deposit');
+    expect(render({ showIcons: false })[0].text).toBe('Exchange deposit\n#Exchange · #Savings');
+    expect(render({ showIcons: false, showTags: false })[1].text).toBeUndefined();
+    expect(
+      render({ showLabels: false, showTags: false, showIcons: false }).every((node) => !node.text),
+    ).toBe(true);
+  });
   it('filters missing endpoints before degree sizing and restores defaults when overrides disappear', () => {
     const frame = presentGraph({ ...input, nodes: nodes.slice(0, 2), sizeBy: 'degree' }, palette);
     expect(frame.links).toHaveLength(1);

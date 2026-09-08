@@ -1,6 +1,8 @@
+import type { Network } from './types';
+
 export interface CuratedExample {
   id: string;
-  network: 'testnet4';
+  network: Network;
   title: string;
   description: string;
   txid: string;
@@ -10,8 +12,8 @@ export interface CuratedExample {
   evidence: {
     inputCount: number;
     outputCount: number;
-    address: string;
-    historyCount: number;
+    address?: string;
+    historyCount?: number;
     funding: readonly { txid: string; vout: number }[];
     spending: readonly { txid: string; vin: number }[];
   };
@@ -121,3 +123,132 @@ export const TESTNET4_EXAMPLES: readonly CuratedExample[] = [
     },
   },
 ];
+
+/** Public transaction references, independently verified; pattern names do not attribute wallets. */
+export const MAINNET_EXAMPLES: readonly CuratedExample[] = [
+  {
+    id: 'five-equal-outputs',
+    network: 'mainnet',
+    title: 'Compare five equal outputs',
+    description:
+      'Five inputs and five 0.05 BTC outputs. Explore an equal-output CoinJoin pattern and the limits of common-input ownership heuristics.',
+    txid: '323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2',
+    verifiedAt: '2026-09-08',
+    sources: [
+      {
+        title: 'Transaction on mempool.space',
+        url: 'https://mempool.space/tx/323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2',
+      },
+      {
+        title: 'Public am-i-exposed example',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/3dd81a0dcf9fb4fedd6db6871e5e74315a50531f/src/lib/analysis/heuristics/__tests__/fixtures/api-responses/whirlpool-coinjoin.json',
+      },
+    ],
+    evidence: {
+      inputCount: 5,
+      outputCount: 5,
+      funding: [
+        {
+          txid: '333f45431e47b9543772013ac83a9b33cc58dc3245ccfd48b972107bb8405c13',
+          vout: 8,
+        },
+      ],
+      spending: [],
+    },
+  },
+  {
+    id: 'large-equal-output-pattern',
+    network: 'mainnet',
+    title: 'Explore a large CoinJoin pattern',
+    description:
+      '327 inputs and 279 outputs, with several equal-value groups. Useful for testing large graphs, filtering and tracing individual paths.',
+    txid: 'fb596c9f675471019c60e984b569f9020dac3b2822b16396042b50c890b45e5e',
+    verifiedAt: '2026-09-08',
+    sources: [
+      {
+        title: 'Transaction on mempool.space',
+        url: 'https://mempool.space/tx/fb596c9f675471019c60e984b569f9020dac3b2822b16396042b50c890b45e5e',
+      },
+      {
+        title: 'Public am-i-exposed example',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/3dd81a0dcf9fb4fedd6db6871e5e74315a50531f/src/lib/analysis/heuristics/__tests__/fixtures/api-responses/wabisabi-coinjoin.json',
+      },
+    ],
+    evidence: {
+      inputCount: 327,
+      outputCount: 279,
+      funding: [
+        {
+          txid: '4d32661cfca1e95aec9cc1ac72a05cb34a8b48bdf0f02915d36a722aea8a0e00',
+          vout: 0,
+        },
+      ],
+      spending: [],
+    },
+  },
+  {
+    id: 'op-return-message',
+    network: 'mainnet',
+    title: 'Read an OP_RETURN message',
+    description:
+      'One input and two outputs. Select the data output to inspect its decoded text and raw script.',
+    txid: '8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684',
+    verifiedAt: '2026-09-08',
+    sources: [
+      {
+        title: 'Transaction on mempool.space',
+        url: 'https://mempool.space/tx/8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684',
+      },
+      {
+        title: 'Public am-i-exposed example',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/3dd81a0dcf9fb4fedd6db6871e5e74315a50531f/src/lib/analysis/heuristics/__tests__/fixtures/api-responses/op-return-charley.json',
+      },
+    ],
+    evidence: {
+      inputCount: 1,
+      outputCount: 2,
+      funding: [
+        {
+          txid: '8e40bb1db9029dd648432c56c295788221c1dd97fe1dbee52f767d605fba58c8',
+          vout: 1,
+        },
+      ],
+      spending: [],
+    },
+    vout: 0,
+  },
+  {
+    id: 'legacy-payment',
+    network: 'mainnet',
+    title: 'Trace a legacy transaction',
+    description:
+      'One input and two P2PKH outputs. Follow individual outputs without assuming which is payment or change.',
+    txid: '0b6461de422c46a221db99608fcbe0326e4f2325ebf2a47c9faf660ed61ee6a4',
+    verifiedAt: '2026-09-08',
+    sources: [
+      {
+        title: 'Transaction on mempool.space',
+        url: 'https://mempool.space/tx/0b6461de422c46a221db99608fcbe0326e4f2325ebf2a47c9faf660ed61ee6a4',
+      },
+      {
+        title: 'Public am-i-exposed example',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/3dd81a0dcf9fb4fedd6db6871e5e74315a50531f/src/lib/analysis/heuristics/__tests__/fixtures/api-responses/simple-legacy-p2pkh.json',
+      },
+    ],
+    evidence: {
+      inputCount: 1,
+      outputCount: 2,
+      funding: [
+        {
+          txid: '09dc22bb36e520e4e1120a1d5659dbb3d07bdc29ee42850b539eddecd4e036e6',
+          vout: 1,
+        },
+      ],
+      spending: [],
+    },
+  },
+];
+
+export function examplesForNetwork(network: Network): readonly CuratedExample[] {
+  return network === 'mainnet' ? MAINNET_EXAMPLES : TESTNET4_EXAMPLES;
+}

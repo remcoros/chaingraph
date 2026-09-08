@@ -1,5 +1,58 @@
 # Validation results
 
+## Tracing interaction and dense workspace refinement, 2026-09-08
+
+Two independent Codex sessions in Herdr reviewed the application in separate
+worktrees, using desktop and phone Chromium contexts and public transactions.
+Their reports drove fixes to Inspector scroll restoration, horizontal tag choices,
+long transaction labels, uneven lane collapse controls, and mobile touch targets.
+The node hover card measured about 304 x 204 pixels for an annotated transaction,
+compared with roughly 320 x 404 before this pass. Connections no longer open cards;
+deliberate connection clicks still select their associated entity.
+
+The public mainnet example with 327 inputs and 279 outputs initially expanded to
+34,552 graph nodes and exceeded localStorage quota. Automatic input context now
+retains full cached parent transactions while displaying their relevant outputs.
+Live acceptance loaded 114 transactions into 720 graph nodes, populated all 327
+input rows, saved successfully, and restored the data after reload and unlock.
+Explicit navigation or discovery promotes a cached parent to its complete graph.
+
+Large encrypted workspaces now use IndexedDB behind the public saved-workspace
+index. Review found and reproduced a cross-tab publication/deletion race without
+Web Locks, then a pending-unlock/deletion race. The final coordinator serializes
+index publication across contexts, preserves committed ciphertext after a late
+coordinator abort, and checks deletion/unlock preconditions at the commit boundary.
+The independent reviewer reran both unlock/delete orderings and nine native
+IndexedDB concurrency scenarios without remaining confirmed storage findings.
+
+Empty, partial and failed spending searches retain the camera. A second regression
+covers a failed trace interrupting and restarting automatic input hydration after
+a manual pan. Focus graph has a visible label and shares the side-panel breakpoint;
+Lock to selection has a persistent, visible pressed state. The lookup defaults to
+Off for optional ancestry while the displayed transaction resolves its direct inputs.
+
+A fresh live testnet4 journey exercised central transaction label/tag editing,
+selection lock and compact tag actions at desktop and phone sizes, with no page
+errors or horizontal overflow. Read-only mainnet and testnet4 service checks passed.
+
+- [Final desktop controls and tags](screenshots/interaction-final-desktop.png)
+- [Final phone controls](screenshots/interaction-final-phone.png)
+- [Dense mainnet acceptance](screenshots/interaction-large-mainnet.png)
+- [Compact node hover](screenshots/interaction-node-hover.png)
+- [Phone Inspector after selection](screenshots/interaction-mobile-inspector.png)
+- [Phone tag picker](screenshots/interaction-mobile-tags.png)
+
+The complete 80-case browser suite passed after the final corrections, along with
+328 unit/backend tests, TypeScript, production build and formatting. The rebuilt
+amd64 image ran through Compose with public synthetic network configuration,
+read-only root filesystem and the node user. Built WebGL, the real server CSP,
+transaction inspection, tags and encrypted save/reload/unlock passed the production
+browser smoke. Live upstream checks used the native host process; the container
+smoke isolated chain requests with public synthetic fixtures.
+
+Physical-device testing and native ARM runtime remain outside this validation.
+No image, tag or GitHub Release was published.
+
 ## Isolated simultaneous networks, 2026-09-08
 
 The backend discovers one or both named network files, with separate immutable
