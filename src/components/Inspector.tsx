@@ -1,3 +1,5 @@
+import { useUtxoStatus } from '../lib/useUtxoStatus';
+import './utxo-status.css';
 import { transactionStatus } from '../domain/transactionStatus';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -340,6 +342,13 @@ export function NodeInspector({
         : undefined);
   const selectedOutput =
     selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
+  const utxo = useUtxoStatus(
+    w.id,
+    w.network,
+    selected.kind === 'output' ? selected.txid : undefined,
+    selected.kind === 'output' ? selected.vout : undefined,
+    selectedOutput,
+  );
   const opReturn = decodeOpReturn(selectedOutput?.scriptPubKey.hex);
   const spendingReason =
     unavailable ||
@@ -499,6 +508,57 @@ export function NodeInspector({
                 ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
                 : 'Spend status unknown. No spending transaction loaded.'}
           </p>
+        )}
+        {selected.kind === 'output' && selected.txid && selected.vout !== undefined && (
+          <section className="utxo-status" aria-label="Current UTXO status">
+            <button
+              type="button"
+              className="text-button utxo-check"
+              disabled={!!unavailable || utxo.loading}
+              title={
+                unavailable || 'Check this output against your node, including mempool spends.'
+              }
+              onClick={() => void utxo.check()}
+            >
+              <RefreshCw size={12} className={utxo.loading ? 'spin' : undefined} />
+              {utxo.loading
+                ? 'Checking UTXO status…'
+                : utxo.error
+                  ? 'Retry UTXO status check'
+                  : utxo.observation
+                    ? 'Check UTXO status again'
+                    : 'Check current UTXO status'}
+            </button>
+            {utxo.error && (
+              <p className="warning" role="alert">
+                {utxo.error}
+              </p>
+            )}
+            {utxo.observation && (
+              <div role="status">
+                <strong>
+                  {utxo.observation.status === 'unspent'
+                    ? 'Unspent at check'
+                    : 'Not in current UTXO set'}
+                </strong>
+                <small>
+                  Checked{' '}
+                  <time
+                    dateTime={utxo.observation.checkedAt}
+                    title={new Date(utxo.observation.checkedAt).toLocaleString()}
+                  >
+                    {new Date(utxo.observation.checkedAt).toLocaleTimeString()}
+                  </time>{' '}
+                  · Mempool included
+                </small>
+                <small>
+                  {utxo.observation.status === 'unspent'
+                    ? 'Snapshot from your node; status can change.'
+                    : 'May be spent or absent from this node’s chain and mempool. This does not identify a spending transaction.'}
+                </small>
+              </div>
+            )}
+          </section>
         )}
         <div className="selection-trace">
           <button

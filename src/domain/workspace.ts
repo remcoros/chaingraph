@@ -226,7 +226,7 @@ const workspaceSchema = z.object({
     glow: z.boolean(),
     showAddresses: z.boolean(),
     hiddenNodeIds: hiddenNodeIdsSchema.optional(),
-    entityVisibility: z.enum(['visible', 'hidden', 'all']).optional(),
+    entityVisibility: z.enum(['visible', 'hidden', 'all', 'graph']).optional(),
     smallAmountThreshold: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
     flowAmountThreshold: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
     showLabels: z.boolean().optional(),

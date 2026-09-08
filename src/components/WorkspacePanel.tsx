@@ -51,8 +51,8 @@ interface Props {
   contextCount?: number;
   hiddenNodeIds?: readonly string[];
   onSetHidden?: (ids: string[], hidden: boolean) => void;
-  visibility?: 'visible' | 'hidden' | 'all';
-  onVisibilityChange?: (visibility: 'visible' | 'hidden' | 'all') => void;
+  visibility?: 'visible' | 'hidden' | 'all' | 'graph';
+  onVisibilityChange?: (visibility: 'visible' | 'hidden' | 'all' | 'graph') => void;
   hiddenCount?: number;
   onShowAllHidden?: () => void;
   transactions?: Record<string, Transaction>;

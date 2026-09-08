@@ -126,6 +126,11 @@ workbench. Graph controls independently show or hide labels, tags and icons. On
 desktop, **Focus graph** sits beside the 3D/Flat toggle and temporarily hides the
 side panels; it is hidden on mobile, where panels already have separate views.
 
+Choose **Entities → Match graph** to keep the list aligned with the filtered
+canvas. The existing visibility modes remain available to recover hidden and
+amount-filtered observations. Workspace-name suggestions select automatically
+so typing replaces the default.
+
 Use the eye buttons in **Entities**, the Inspector or graph cards to hide individual
 entities without losing their annotations. **Hidden** lists them for quick restoration;
 **Show all hidden** restores manual visibility. Transactions and explicitly watched
@@ -143,6 +148,10 @@ and offers **Show** to restore them. The entity list stays available for selecti
 filtered outputs. **Size by Value** uses a bounded square-root curve so small
 outputs remain selectable while large transfers stand out. Sizes stay stable
 when filtering or adding data.
+
+The Inspector offers **Check current UTXO status** for outputs. It queries Core
+with mempool spends included and shows a timestamped, temporary observation.
+A missing UTXO result is not treated as proof of spending.
 
 Successful transaction, output and address lookups focus their target even with
 Lock to selection off. **Load previous** distinguishes new downloads from expanding

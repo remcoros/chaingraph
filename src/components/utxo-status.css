@@ -1,0 +1,28 @@
+.utxo-status {
+  margin: 6px 0 10px;
+  font-size: 11px;
+}
+.utxo-status .utxo-check {
+  min-height: 32px;
+  padding: 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: normal;
+  text-align: left;
+  font-size: 11px;
+}
+.utxo-status [role='status'] {
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--color-rule);
+  line-height: 1.45;
+}
+.utxo-status small {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.utxo-status p {
+  margin: 3px 0;
+}

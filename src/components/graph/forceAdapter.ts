@@ -12,6 +12,7 @@ import {
   MOUSE,
   OctahedronGeometry,
   Points,
+  type PerspectiveCamera,
   Raycaster,
   Vector2,
   Vector3,
@@ -22,6 +23,7 @@ import {
   SRGBColorSpace,
   TOUCH,
 } from 'three';
+import { frameCamera, nodeBoundsRadius } from './cameraFraming';
 import type {
   GraphAdapterFactory,
   GraphFrame,
@@ -97,6 +99,8 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let needsFit = true;
   let visible = false;
   let fitPadding = 40;
+  let viewportWidth = 0;
+  let viewportHeight = 0;
   let settled = false;
   let earlyFitPending = false;
   let earlyFitTicks = 0;
@@ -299,6 +303,26 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     );
     positions.needsUpdate = true;
   };
+  const frameNodes = (
+    nodes: readonly SimNode[],
+    transition: number,
+    target?: { x: number; y: number; z: number },
+  ) => {
+    if (!dimensions) return;
+    const camera = graph.camera() as PerspectiveCamera;
+    const pose = frameCamera(nodes, {
+      dimensions,
+      position: graph.cameraPosition(),
+      orbitTarget: (graph.controls() as { target: Vector3 }).target,
+      up: camera.up,
+      fov: camera.getEffectiveFOV(),
+      width: viewportWidth,
+      height: viewportHeight,
+      padding: Math.max(fitPadding, Math.min(60, viewportHeight * 0.16)),
+      target,
+    });
+    if (pose) graph.cameraPosition(pose.position, pose.target, transition);
+  };
   const tryEarlyFit = () => {
     if (dead || !earlyFitPending || earlyFitTicks > 0 || !needsFit || !visible) return;
     const nodes = graph.graphData().nodes;
@@ -315,7 +339,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     earlyFitPending = false;
     // Give new graphs a useful frame after three simulation ticks. Keep needsFit
     // until settlement, unless a gesture or explicit focus takes over the camera.
-    graph.zoomToFit(0, fitPadding);
+    frameNodes(graph.graphData().nodes, 0);
   };
   const refreshStyle = () => {
     const nodes = graph.graphData().nodes;
@@ -371,7 +395,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     // Keep a pending request while empty. Engine stop must not consume it.
     needsFit = true;
     pendingFocus = undefined;
-    if (visible && graph.graphData().nodes.length) graph.zoomToFit(duration(), fitPadding);
+    if (visible && graph.graphData().nodes.length) frameNodes(graph.graphData().nodes, duration());
     scheduleSnapshot();
   };
   const emitHover = () => {
@@ -453,11 +477,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .nodeRelSize(3.2)
       // Arrow placement still uses the engine's sphere bounds even with custom
       // meshes. Match their bounding radii so arrows do not end inside a whale.
-      .nodeVal((node) => {
-        const geometryRadius =
-          node.shape === 'box' ? Math.sqrt(3) * 0.8 : node.shape === 'octahedron' ? 1.4 : 1;
-        return Math.pow((node.radius * geometryRadius) / 3.2, 3);
-      })
+      .nodeVal((node) => Math.pow(nodeBoundsRadius(node) / 3.2, 3))
       .nodeResolution(8)
       .nodeOpacity(0.95)
       .linkOpacity(0.46)
@@ -503,7 +523,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         earlyFitPending = false;
         if (visible && needsFit && graph.graphData().nodes.length) {
           needsFit = false;
-          graph.zoomToFit(duration(), fitPadding);
+          frameNodes(graph.graphData().nodes, duration());
         }
         scheduleSnapshot();
       });
@@ -615,20 +635,18 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       return;
     pendingFocus = undefined;
     const target = { x: node.x!, y: node.y!, z: dimensions === 2 ? 0 : node.z! };
-    const camera = graph.cameraPosition();
-    const dx = camera.x - target.x,
-      dy = camera.y - target.y,
-      dz = camera.z - target.z;
-    const length = Math.hypot(dx, dy, dz) || 1;
-    const position =
-      dimensions === 2
-        ? { x: target.x, y: target.y, z: 180 }
-        : {
-            x: target.x + (dx / length) * 180,
-            y: target.y + (dy / length) * 180,
-            z: target.z + (dz / length) * 180,
-          };
-    graph.cameraPosition(position, target, duration());
+    const neighbors = new Set([id]);
+    for (const link of graph.graphData().links) {
+      const source = typeof link.source === 'string' ? link.source : link.source.id;
+      const destination = typeof link.target === 'string' ? link.target : link.target.id;
+      if (source === id) neighbors.add(destination);
+      if (destination === id) neighbors.add(source);
+    }
+    frameNodes(
+      graph.graphData().nodes.filter((item) => neighbors.has(item.id)),
+      duration(),
+      target,
+    );
     scheduleSnapshot();
   }
   return {
@@ -758,13 +776,15 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       // A fixed margin can exhaust a short canvas below the transaction panel.
       // Reserve at most 10% per side, including on narrow phone viewports.
       fitPadding = Math.min(40, width * 0.1, height * 0.1);
+      viewportWidth = width;
+      viewportHeight = height;
       graph.width(width).height(height);
       halos.material.uniforms.viewportScale.value = height * graph.renderer().getPixelRatio();
       tryEarlyFit();
       if (pendingFocus) focus(pendingFocus);
       else if (needsFit && settled && graph.graphData().nodes.length) {
         needsFit = false;
-        graph.zoomToFit(duration(), fitPadding);
+        frameNodes(graph.graphData().nodes, duration());
         scheduleSnapshot();
       }
     },

@@ -24,8 +24,8 @@ interface Props extends VisibilityProps {
   transactions?: Record<string, Transaction>;
   removableNodeIds?: readonly string[];
   onRemoveNode?: (id: string) => void;
-  visibility?: 'visible' | 'hidden' | 'all';
-  onVisibilityChange?: (visibility: 'visible' | 'hidden' | 'all') => void;
+  visibility?: 'visible' | 'hidden' | 'all' | 'graph';
+  onVisibilityChange?: (visibility: 'visible' | 'hidden' | 'all' | 'graph') => void;
   hiddenCount?: number;
   onShowAllHidden?: () => void;
   nodes: GraphNode[];
@@ -165,12 +165,13 @@ export default function EntityBrowser({
           <div className="entity-visibility-filter">
             <select
               aria-label="Entity visibility"
-              title="Manual hide/show state. Amount-filtered outputs remain listed for inspection."
+              title="Match graph lists the nodes currently on the canvas. Other modes keep amount-filtered outputs available for inspection."
               value={visibility}
               onChange={(event) =>
-                onVisibilityChange(event.target.value as 'visible' | 'hidden' | 'all')
+                onVisibilityChange(event.target.value as 'visible' | 'hidden' | 'all' | 'graph')
               }
             >
+              <option value="graph">Match graph</option>
               <option value="visible">Not hidden</option>
               <option value="hidden">Hidden</option>
               <option value="all">All entities</option>
@@ -284,7 +285,8 @@ export default function EntityBrowser({
         )}
         <div className="entity-result-count">
           <span role="status">
-            {nodes.length.toLocaleString()} matches / {totalCount.toLocaleString()} loaded
+            {nodes.length.toLocaleString()} {visibility === 'graph' ? 'on graph' : 'matches'} /{' '}
+            {totalCount.toLocaleString()} loaded
           </span>
           {activeFilters && (
             <button

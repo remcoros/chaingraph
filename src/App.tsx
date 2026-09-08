@@ -336,6 +336,7 @@ export default function App() {
   );
   const entityVisibility = w?.view.entityVisibility ?? 'visible';
   const entityGraph = useMemo(() => {
+    if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
     const source = entityVisibility === 'visible' ? graph : recoveryGraph;
     let filters = effectiveFilters;
     if (source !== graph && graphFilters.walletId && w) {
@@ -367,6 +368,7 @@ export default function App() {
     w?.view.showAddresses,
     w?.view.hiddenNodeIds,
     entityVisibility,
+    visibleGraph,
   ]);
   const graphIds = useMemo(
     () => recoveryGraph.nodes.map((node) => node.id).join('|'),

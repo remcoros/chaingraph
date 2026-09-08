@@ -67,6 +67,36 @@ async function saved(page: Page) {
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
 }
 
+test('suggested workspace names are selected for replacement without disrupting later edits', async ({
+  page,
+}) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  for (const demo of [false, true]) {
+    if (demo) await page.getByRole('button', { name: /Explore the CoinJoin laboratory/ }).click();
+    else await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
+    const dialog = page.getByRole('dialog');
+    const name = dialog.getByLabel('Name (public)', { exact: true });
+    await expect(name).toBeFocused();
+    const suggestion = await name.inputValue();
+    await expect
+      .poll(() =>
+        name.evaluate((input: HTMLInputElement) => [input.selectionStart, input.selectionEnd]),
+      )
+      .toEqual([0, suggestion.length]);
+    // Also preserve replacement when clicking an already autofocused suggestion.
+    if (demo) await name.click();
+    await name.pressSequentially('My trace');
+    await expect(name).toHaveValue('My trace');
+    await name.press('Tab');
+    await name.click();
+    await name.press('End');
+    await name.pressSequentially(' revised');
+    await expect(name).toHaveValue('My trace revised');
+    await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  }
+});
+
 test('requires password confirmation and offers a restartable guided tour', async ({ page }) => {
   await mockBitcoin(page);
   await page.goto('/');

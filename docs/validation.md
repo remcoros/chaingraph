@@ -532,3 +532,53 @@ encryption-worker failure recovery, and real node picking/card/keyboard actions.
 The renderer tests cover the reported high-value pair, monotonic growth, invalid
 values, and stable sizes when unrelated nodes are filtered away. Browser rendering
 was checked in Chromium with software WebGL, not benchmarked on physical phones.
+
+## Findings from the first demo recording, 2026-09-08
+
+The isolated recorder reported four user-facing issues: workspace suggestions
+required manual clearing, framing alternated between clipped and tiny graphs,
+automatic input context crowded Entities, and the Inspector could not explicitly
+check whether an output remained in the current UTXO set. Recording-tool timeouts,
+Python selection and clicking the embedded amount selector were distinguished
+from application defects.
+
+The workspace suggestion now selects on focus and preserves that selection on
+pointer-down until edited. A browser regression reproduced native click placement
+collapsing the initial selection; the final fix covers keyboard replacement,
+clicking an already focused field, and normal caret editing after replacement in
+both live and laboratory creation dialogs.
+
+Entities adds an optional, saved Match graph mode, consuming exactly the canvas
+projection. Loaded observations remain recoverable in the existing visibility
+modes. Browser checks cover amount filtering, independent flow thresholds, recovery
+and locking/reopening this preference.
+
+The Inspector's explicit Core UTXO check validates response metadata against the
+loaded output, includes mempool spends and shows the check time. Null, network
+failure and non-null observations remain distinct. Selection changes cancel and
+clear observations; delayed responses cannot leak into another selected output.
+Browser regressions cover retry, error sanitization, annotations and graph
+preservation, loaded-spender independence, and switching away and back.
+
+The camera now frames actual mesh bounds in the current viewing direction. Tests
+cover translated graphs, large foreground neighbors, narrow viewports, field of
+view, tilted cameras, exclusion of distant branches from focus and stable camera
+state during presentation edits. The implementation replaces the pinned renderer's
+origin-centered fit behavior with original local framing code.
+
+Validation passed: build, formatting, 428 unit/backend tests and 15 targeted
+browser scenarios, including camera preservation, actual picking, short canvases,
+mobile touch, deferred autosaves, export/lock flushing and worker-failure recovery.
+The new name test first exposed a native pointer-selection regression; it passed
+after preserving the suggestion on pointer-down rather than click.
+
+A fresh live mainnet workspace loaded `a6d697a25266ce3c78774fd1d75f896b7af522ada209b0f6228ea497bc49a46d`,
+used Match graph with amount filtering (5 displayed nodes from 33 loaded), focused
+its 3,400 BTC output and confirmed Unspent at check through the new UI. No page
+errors occurred. Desktop focus, full Fit and a 390px Inspector were inspected:
+[Inspector and selection](screenshots/recorder-feedback-inspector.png),
+[full framing](screenshots/recorder-feedback-framing.png), and
+[phone Inspector](screenshots/recorder-feedback-mobile.png).
+Focus intentionally frames local connections; unrelated branches can lie outside
+that view. Fit restores all displayed nodes. Physical-device performance was not
+benchmarked. The first MP4 was retained without re-recording it.

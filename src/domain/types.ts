@@ -119,7 +119,7 @@ export interface Workspace {
     showAddresses: boolean;
     /** Manual canvas visibility, independent of filters and cached Bitcoin observations. */
     hiddenNodeIds?: string[];
-    entityVisibility?: 'visible' | 'hidden' | 'all';
+    entityVisibility?: 'visible' | 'hidden' | 'all' | 'graph';
     /** Independent canvas and transaction-flow amount preferences. */
     smallAmountThreshold?: number;
     flowAmountThreshold?: number;

@@ -4,7 +4,7 @@ Chaingraph helps you investigate Bitcoin activity and keep your own observations
 
 ## Start a workspace
 
-Create a workspace and give it a **Name (public)** and password. Its network is shown automatically when the backend supports one network; choose mainnet or testnet4 when both are configured. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. One backend can connect to both networks at once. Every lookup uses the selected workspace's matching Core/Fulcrum pair, so switching workspaces never redirects an in-flight request to another chain. Creation lists configured networks even when their upstreams are temporarily offline; a connection is needed for live lookups.
+Create a workspace and give it a **Name (public)** and password. The suggested name is selected automatically, including when clicked, so typing replaces it. Once edited, the name behaves like a normal text field. Its network is shown automatically when the backend supports one network; choose mainnet or testnet4 when both are configured. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. One backend can connect to both networks at once. Every lookup uses the selected workspace's matching Core/Fulcrum pair, so switching workspaces never redirects an in-flight request to another chain. Creation lists configured networks even when their upstreams are temporarily offline; a connection is needed for live lookups.
 
 You can open several workspaces and switch between their tabs in the main header. The tab strip scrolls horizontally when needed. Each workspace has its own transactions, wallets, annotations, analysis results, and view settings. Open workspace tabs do not show a locked icon; locked copies are listed on the Workspaces screen. An unsaved indicator means the current changes have not yet reached encrypted browser storage. Autosave runs shortly after edits; heed a storage-error message and export a file if browser storage is full or unavailable.
 
@@ -17,6 +17,13 @@ Use Ctrl/Cmd+K to focus the quick input. Changes save automatically; Ctrl/Cmd+S 
 Use the quick input to load a transaction ID, an address, or an output reference written as `transaction-id:output-index`. Select an item in the graph or entity list to inspect its details and available actions.
 
 **Load previous transactions** adds one earlier level. For an output whose creating transaction is missing, it loads that transaction and fills in the output value and script. Once the creating transaction is loaded, the action follows its inputs. A coinbase transaction has no earlier inputs.
+
+For an output's current availability, use **Check current UTXO status** in the
+Inspector. This queries Core with mempool spends included and timestamps the result.
+A positive result means **Unspent at check**. **Not in current UTXO set** does not
+by itself prove a spend, since an output may also belong to a transaction outside
+the active chain. Checks stay in memory for the current selection and can be
+repeated. Loaded spending links and tracing actions remain available independently.
 
 **Find spending transactions** checks script histories for transactions consuming the selected output, or any output of a selected transaction. It checks exact outpoint references. The result reports matches and how many were newly added, so a repeated action with an already loaded path is distinguishable from no matches. Busy histories are checked in batches of 500; repeat the action when prompted to continue. This continuation is temporary and resets when switching workspaces. Changed histories can shift a batch boundary; this is a bounded investigation, not a completeness guarantee. Missing spend links never prove an output is unspent.
 
@@ -216,3 +223,17 @@ that lose their connection to the investigation. **All amounts** restores them;
 Entities still lets you select a filtered item. Separately added investigations
 and the current selection remain available. Direction arrows appear throughout
 the transaction/output graph, with bolder connections around your selection.
+
+### Keep the entity list aligned with a trace
+
+Choose **Entities → Match graph** to list only nodes currently displayed on the
+canvas, including retained context. This follows graph amount filters and manual
+visibility, and is saved per workspace. Choose **Not hidden** or **All entities**
+to inspect observations omitted by the graph amount filter, or **Hidden** to
+restore manually hidden items. Changing this list mode does not remove chain data.
+
+
+**Center selection** frames the selected node with its immediate connections.
+**Fit graph** frames all displayed nodes. Both account for node sizes and the
+available canvas, while retaining the current viewing direction. Orbiting may
+still bring nodes in front of each other; Flat and Fit provide alternate views.

@@ -97,6 +97,7 @@ export function CreateDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState(demo ? 'CoinJoin laboratory' : 'My investigation');
+  const suggestedName = useRef(true);
   const [description, setDescription] = useState('');
   const [net, setNet] = useState<Network | undefined>(networks?.[0]);
   useEffect(() => {
@@ -149,7 +150,21 @@ export function CreateDialog({
             required
             maxLength={100}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onFocus={(e) => {
+              if (suggestedName.current) e.currentTarget.select();
+            }}
+            onMouseDown={(e) => {
+              if (!suggestedName.current) return;
+              // Preserve replacement when the suggested field is already focused.
+              // Native pointer placement would otherwise collapse its selection.
+              e.preventDefault();
+              e.currentTarget.focus();
+              e.currentTarget.select();
+            }}
+            onChange={(e) => {
+              suggestedName.current = false;
+              setName(e.target.value);
+            }}
           />
         </label>
         <p className="small muted">

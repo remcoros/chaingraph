@@ -193,3 +193,31 @@ while amount filters are active, including legacy records without provenance.
 These passes never mutate cached data, annotations or manual visibility. All flow
 links have low-poly arrows; selected incident links have larger arrows and thicker
 accent lines. Address associations remain arrowless.
+
+
+## Recording-driven interaction refinements
+
+New workspace names select their initial suggestion on focus. Pointer-down keeps
+that replacement selection intact until the user edits the field; subsequent
+editing retains ordinary caret behavior. This applies to live and laboratory
+workspace creation.
+
+`view.entityVisibility = 'graph'` makes the Entities list consume exactly the
+canvas projection, including retained context. Other visibility modes continue
+to use loaded observations for recovery. This optional encrypted preference does
+not change the graph, data ownership or stored transaction provenance.
+
+The Inspector's current UTXO check uses a validated `gettxout` response through the
+existing network-specific RPC proxy. `useUtxoStatus` binds an abortable request to
+workspace, network, outpoint and expected output facts. Results are timestamped,
+include mempool scope, and are cleared on selection changes. Neither a result nor
+a failed check mutates workspace data or graph state. Null is described as absence
+from the queried UTXO set, not proof of a spending transaction. See the
+[Core reference and validation scope](research/current-utxo-status.md).
+
+`graph/cameraFraming.ts` projects actual mesh bounds into the current camera's
+viewing axes. Focus includes the selected node and immediate neighbors; Fit uses
+all displayed nodes and centers their bounds rather than world origin. Field of
+view, aspect ratio, shape dimensions and padding determine distance. Explicit
+framing preserves viewing direction. It retains existing pending-focus, gesture
+cancellation, snapshot flush and autosave scheduling behavior.

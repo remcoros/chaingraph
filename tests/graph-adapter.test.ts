@@ -20,7 +20,7 @@ function setup() {
   let data: any = { nodes: [], links: [] };
   let camera = { x: 0, y: 0, z: 300 };
   const controls = Object.assign(new EventTarget(), { target: new Vector3() });
-  const cameraObject = { up: new Vector3(0, 1, 0) };
+  const cameraObject = { up: new Vector3(0, 1, 0), getEffectiveFOV: () => 50 };
   const callbacks: Record<string, (...args: any[]) => void> = {};
   const scene = new Scene();
   const graph: any = {
@@ -135,6 +135,8 @@ function setup() {
     scene,
   };
 }
+const cameraMoves = (graph: any) =>
+  graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length);
 const frame = (dimensions: 2 | 3 = 2): GraphFrame =>
   Object.freeze({
     dimensions,
@@ -215,28 +217,28 @@ describe('force adapter contract', () => {
     adapter.update(frame(3));
     callbacks.onEngineTick();
     callbacks.onEngineTick();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(0);
     callbacks.onEngineTick();
-    expect(graph.zoomToFit).toHaveBeenLastCalledWith(0, 40);
-    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(graph).at(-1)?.[2]).toBe(0);
+    expect(cameraMoves(graph)).toHaveLength(1);
     callbacks.onEngineTick();
-    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(graph)).toHaveLength(1);
     pointer('wheel');
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(graph)).toHaveLength(1);
     adapter.dispose();
     const untouched = setup();
     untouched.adapter.update(frame(3));
     for (let tick = 0; tick < 3; tick++) untouched.callbacks.onEngineTick();
     untouched.callbacks.onEngineStop();
-    expect(untouched.graph.zoomToFit).toHaveBeenCalledTimes(2);
+    expect(cameraMoves(untouched.graph)).toHaveLength(2);
     untouched.adapter.dispose();
     const requested = setup();
     requested.adapter.update(frame(3));
     requested.adapter.fit();
     for (let tick = 0; tick < 3; tick++) requested.callbacks.onEngineTick();
-    expect(requested.graph.zoomToFit).toHaveBeenCalledTimes(2);
-    expect(requested.graph.zoomToFit).toHaveBeenLastCalledWith(0, 40);
+    expect(cameraMoves(requested.graph)).toHaveLength(2);
+    expect(cameraMoves(requested.graph).at(-1)?.[2]).toBe(0);
     requested.adapter.dispose();
   });
   it('cancels early framing on a gesture and preserves the pending fit while hidden', () => {
@@ -245,15 +247,15 @@ describe('force adapter contract', () => {
     moved.pointer('pointerdown');
     for (let tick = 0; tick < 3; tick++) moved.callbacks.onEngineTick();
     moved.callbacks.onEngineStop();
-    expect(moved.graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(moved.graph)).toHaveLength(0);
     moved.adapter.dispose();
     const hidden = setup();
     hidden.adapter.resize(0, 0);
     hidden.adapter.update(frame(3));
     for (let tick = 0; tick < 3; tick++) hidden.callbacks.onEngineTick();
-    expect(hidden.graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(hidden.graph)).toHaveLength(0);
     hidden.adapter.resize(900, 600);
-    expect(hidden.graph.zoomToFit).toHaveBeenLastCalledWith(0, 40);
+    expect(cameraMoves(hidden.graph).at(-1)?.[2]).toBe(0);
     hidden.adapter.dispose();
   });
   it('restores positions and camera without first-data fit or a conflicting flat-view tween', () => {
@@ -282,9 +284,9 @@ describe('force adapter contract', () => {
       [snapshot.camera.position, snapshot.camera.target, 0],
     ]);
     for (let tick = 0; tick < 5; tick++) callbacks.onEngineTick();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(1);
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(1);
     adapter.dispose();
   });
   it('emits settled snapshots once, debounces camera motion, and releases pending work', () => {
@@ -362,7 +364,7 @@ describe('force adapter contract', () => {
     mismatch.adapter.restoreSnapshot?.(saved);
     mismatch.adapter.update(frame(2));
     mismatch.callbacks.onEngineStop();
-    expect(mismatch.graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(mismatch.graph)).toHaveLength(2);
     expect(mismatch.graph.graphData().nodes[0].x).toBe(20);
     mismatch.adapter.dispose();
     const matching = setup();
@@ -425,13 +427,13 @@ describe('force adapter contract', () => {
     adapter.update({ ...frame(), nodes: [], links: [] });
     expect(graph.cameraPosition.mock.calls.at(-1)?.[2]).toBe(0);
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(1);
     adapter.fit();
     adapter.update(frame());
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(graph)).toHaveLength(2);
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(graph)).toHaveLength(2);
     adapter.dispose();
   });
   it('defers first-data fit and focus while hidden and keeps the last real viewport', () => {
@@ -439,10 +441,10 @@ describe('force adapter contract', () => {
     adapter.resize(0, 0);
     adapter.update(frame());
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(1);
     expect(graph.width).toHaveBeenLastCalledWith(900);
     adapter.resize(390, 600);
-    expect(graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(cameraMoves(graph)).toHaveLength(2);
     adapter.resize(0, 0);
     adapter.focus('a');
     const count = graph.cameraPosition.mock.calls.length;
@@ -468,7 +470,7 @@ describe('force adapter contract', () => {
     });
     for (let tick = 0; tick < 4; tick++) callbacks.onEngineTick();
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(1);
     expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
       1,
     );
@@ -485,13 +487,13 @@ describe('force adapter contract', () => {
     expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
       0,
     );
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(0);
     target.x = 123;
     target.z = -456;
     callbacks.onEngineTick();
     expect(graph.cameraPosition.mock.calls.at(-1)?.[1]).toEqual({ x: 123, y: 30, z: -456 });
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(1);
     expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
       1,
     );
@@ -511,13 +513,34 @@ describe('force adapter contract', () => {
       });
       callbacks.onEngineTick();
       callbacks.onEngineStop();
-      expect(graph.cameraPosition.mock.calls.filter((args: unknown[]) => args.length)).toHaveLength(
-        0,
-      );
-      if (cancel === 'gesture') expect(graph.zoomToFit).not.toHaveBeenCalled();
-      else expect(graph.zoomToFit).toHaveBeenCalled();
+      expect(cameraMoves(graph)).toHaveLength(cancel === 'gesture' ? 0 : 2);
+      if (cancel === 'gesture') expect(cameraMoves(graph)).toHaveLength(0);
+      else expect(cameraMoves(graph).length).toBeGreaterThan(0);
       adapter.dispose();
     }
+  });
+  it('focuses the immediate neighborhood without including distant branches or moving again during edits', () => {
+    const { adapter, graph, callbacks } = setup();
+    const data = frame(3);
+    const nodes = [
+      { ...data.nodes[0], x: 1000, y: 500, z: 100, radius: 12 },
+      { ...data.nodes[1], x: 1020, y: 500, z: 250, radius: 20 },
+      { ...data.nodes[0], id: 'distant', x: 1000000, y: 0, z: 0 },
+    ];
+    adapter.update({ ...data, nodes });
+    adapter.focus('a');
+    const [position, target] = cameraMoves(graph).at(-1)!;
+    expect(target).toEqual({ x: 1000, y: 500, z: 100 });
+    expect(position.x).toBe(target.x);
+    expect(position.y).toBe(target.y);
+    expect(position.z - target.z).toBeGreaterThan(200);
+    expect(position.z - target.z).toBeLessThan(1000);
+    adapter.update({ ...data, nodes: nodes.map((item) => ({ ...item, color: '#abc123' })) });
+    callbacks.onEngineStop();
+    expect(cameraMoves(graph)).toHaveLength(1);
+    adapter.fit();
+    expect(cameraMoves(graph).at(-1)![1].x).toBeGreaterThan(400000);
+    adapter.dispose();
   });
   it('keeps arrow bounds aligned with actual custom mesh sizes without moving the layout or camera', () => {
     const { adapter, graph } = setup();
@@ -553,9 +576,9 @@ describe('force adapter contract', () => {
     expect(controls.mouseButtons.LEFT).toBe(MOUSE.PAN);
     expect(controls.touches).toEqual({ ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_PAN });
     adapter.focus('a');
-    expect(graph.cameraPosition.mock.calls.at(-1)?.[0]).toEqual({ x: 20, y: 30, z: 180 });
+    expect(graph.cameraPosition.mock.calls.at(-1)?.[0]).toEqual({ x: 20, y: 30, z: 40 });
     callbacks.onEngineStop();
-    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    expect(cameraMoves(graph)).toHaveLength(2);
     adapter.update(frame(3));
     expect(controls.enableRotate).toBe(true);
     expect(controls.mouseButtons.LEFT).toBe(MOUSE.ROTATE);
@@ -563,13 +586,13 @@ describe('force adapter contract', () => {
     adapter.focus('b');
     const [camera, target] = graph.cameraPosition.mock.calls.at(-1)!;
     expect(Math.hypot(camera.x - target.x, camera.y - target.y, camera.z - target.z)).toBeCloseTo(
-      180,
+      40,
     );
     adapter.resize(900, 600);
     expect(graph.width).toHaveBeenLastCalledWith(900);
     expect(graph.height).toHaveBeenLastCalledWith(600);
     adapter.fit();
-    expect(graph.zoomToFit).toHaveBeenCalled();
+    expect(cameraMoves(graph).length).toBeGreaterThan(0);
     adapter.dispose();
   });
   it('emits stable node/link IDs and local pointers, suppresses touch hover and gesture selections', () => {
