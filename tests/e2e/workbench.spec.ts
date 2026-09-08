@@ -20,7 +20,7 @@ async function createWorkspace(page: Page, name = 'Private investigation', demo 
   const dialog = page.getByRole('dialog', {
     name: demo ? 'Open the CoinJoin laboratory' : 'Create a workspace',
   });
-  await dialog.getByLabel('Workspace name').fill(name);
+  await dialog.getByLabel('Name (public)', { exact: true }).fill(name);
   if (!demo) await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
   await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await dialog.getByLabel('Confirm password').fill(PASSWORD);
@@ -92,7 +92,8 @@ test('public BIP84 wallet scans both branches, annotates and bookmarks graph ent
   await selectTransaction(page);
   await page.getByLabel('Node label').fill('Salary origin');
   await page.getByLabel('Node notes').fill('Public fixture, personal note retained privately.');
-  await page.getByLabel('Node icon').selectOption('★');
+  await page.getByRole('button', { name: 'Node icon', exact: true }).click();
+  await page.getByRole('button', { name: 'Star', exact: true }).click();
   await page.getByLabel('Bookmark', { exact: true }).check();
   await page.getByRole('button', { name: 'Save context' }).click();
   await expect(page.locator('.selection-heading h2')).toHaveText('Salary origin');
@@ -107,7 +108,6 @@ test('public BIP84 wallet scans both branches, annotates and bookmarks graph ent
   expect(storage).toContain('ciphertext');
   for (const secret of [
     PUBLIC_ZPUB,
-    'Private investigation',
     'My private BIP84 wallet',
     'Salary origin',
     'personal note',
@@ -130,7 +130,7 @@ test('locks, rejects the wrong password, and restores a saved workspace after re
   await page.getByRole('button', { name: 'Workspace menu' }).click();
   await page.getByRole('button', { name: 'Save and lock workspace' }).click();
   await expect(page.locator('.saved-row')).toHaveCount(1);
-  await expect(page.locator('.saved-row')).toContainText('Encrypted workspace');
+  await expect(page.locator('.saved-row')).toContainText('Secret study');
   await expect(page.getByRole('navigation')).not.toContainText('Secret study');
   await page.reload();
   await page.locator('.saved-row').click();
@@ -199,7 +199,7 @@ test('renders the 150-input laboratory and runs, excludes, restores and clears a
   await page.goto('/');
   await createWorkspace(page, 'CoinJoin laboratory', true);
   await expect(page.getByTestId('graph-view').locator('canvas')).toBeVisible();
-  await expect(page.locator('.statusbar')).toContainText('543 transactions');
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();

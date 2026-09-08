@@ -1485,3 +1485,74 @@ small,
   display: flex;
   width: 100%;
 }
+
+.trace-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 7px 20px;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.trace-options label {
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+}
+.trace-options select {
+  padding: 5px 8px;
+}
+.trace-options button {
+  font-size: 11px;
+  padding: 4px 9px;
+  min-height: 30px;
+}
+.graph-legend .entity-dot.transaction,
+.entity-row .entity-dot.transaction {
+  border-radius: 1px;
+}
+.graph-legend .entity-dot.address,
+.entity-row .entity-dot.address {
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+.example-list {
+  display: grid;
+  gap: 16px;
+}
+.example-list article {
+  padding: 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+}
+.example-list h3 {
+  margin: 0;
+}
+.example-list p {
+  margin: 8px 0;
+}
+.example-list a {
+  font-size: 11px;
+}
+.workspace-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 150px;
+  overflow: auto;
+}
+@media (max-width: 760px) {
+  .trace-options {
+    padding: 6px 12px;
+    gap: 6px 10px;
+  }
+  .trace-options > .muted {
+    display: none;
+  }
+  .trace-options .button-row {
+    flex-wrap: wrap;
+  }
+}

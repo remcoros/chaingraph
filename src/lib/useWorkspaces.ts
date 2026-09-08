@@ -11,6 +11,8 @@ import {
 export const STORAGE_KEY = 'chaingraph.encrypted-workspaces.v1';
 export interface SavedWorkspace {
   id: string;
+  /** Deliberately public display name. Details remain inside the encrypted envelope. */
+  publicName?: string;
   savedAt: string;
   envelope: EncryptedEnvelope;
 }
@@ -47,6 +49,10 @@ function parseSaved(raw: string | null): SavedWorkspace[] {
       typeof record.id !== 'string' ||
       !/^[0-9a-f-]{36}$/i.test(record.id) ||
       ids.has(record.id) ||
+      (record.publicName !== undefined &&
+        (typeof record.publicName !== 'string' ||
+          !record.publicName.trim() ||
+          record.publicName.length > 100)) ||
       typeof record.savedAt !== 'string' ||
       !Number.isFinite(Date.parse(record.savedAt)) ||
       !e ||
@@ -151,7 +157,8 @@ export class WorkspaceSessionStore {
       !this.state.saved.some((saved) => saved.id === entry.id && saved.envelope === entry.envelope)
     )
       throw new Error('Saved workspace changed; reload before unlocking.');
-    this.add(data, password, true);
+    // Legacy or stale index labels are migrated from the authenticated workspace on save.
+    this.add(data, password, entry.publicName === data.name);
   };
   update = (id: string, fn: (w: Workspace) => Workspace, undo = true) => {
     if (this.locking.has(id)) return;
@@ -200,13 +207,30 @@ export class WorkspaceSessionStore {
         try {
           this.assertStorageUnchanged();
           if (session.savedRevision === session.revision) return;
+          if (
+            typeof session.data.name !== 'string' ||
+            !session.data.name.trim() ||
+            session.data.name.length > 100
+          )
+            throw new Error('Workspace name must contain 1 to 100 characters.');
+          if (
+            session.data.description !== undefined &&
+            (typeof session.data.description !== 'string' ||
+              session.data.description.length > 10000)
+          )
+            throw new Error('Workspace description must contain at most 10,000 characters.');
           const envelope = await (this.options.encrypt ?? encryptWorkspace)(
             session.data,
             session.password,
           );
           const commit = () => {
             this.assertStorageUnchanged();
-            const entry = { id, savedAt: new Date().toISOString(), envelope };
+            const entry = {
+              id,
+              publicName: session.data.name,
+              savedAt: new Date().toISOString(),
+              envelope,
+            };
             const saved = [entry, ...this.state.saved.filter((e) => e.id !== id)];
             if (saved.length > 100)
               throw new Error(

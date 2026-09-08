@@ -1,5 +1,43 @@
 # Validation results
 
+## Tracing and workspace refinement, 2026-09-08
+
+| Check | Passed | Failed |
+| --- | ---: | ---: |
+| Unit/integration suite, including ancestry, spending continuation and public-name migration | 112 | 0 |
+| Final isolated browser suite, including actual WebGL picking and responsive workflows | 21 | 0 |
+| Live browser example loading and previous/spending expansion, across three testnet4 examples | 9 | 0 |
+| Curated example verification through the configured Core/Fulcrum proxy | 3 | 0 |
+| Actual frontend funding/spending helper checks against the live proxy | 6 | 0 |
+
+TypeScript, production build, formatting, and `git diff --check` passed. The final browser suite took 1.6 minutes and used isolated synthetic API fixtures except for its renderer tests, which exercise actual canvas picking. Its viewport coverage includes 320, 375, 414 and 768 pixels. The live example browser used three separate fresh workspaces, loaded each selected output, and added its verified parents and spender. No uncaught browser errors or horizontal overflow were observed.
+
+A separate end-user walkthrough exercised the first real testnet4 output with two previous levels, found its spender, opened graph details using the keyboard, jumped directly into label editing, selected an icon, saved encrypted data and inspected the layout at 390 pixels. The same walkthrough passed against the built application served by the production server, including its real content-security policy: zero page or console errors, one working WebGL canvas, and encrypted autosave completed. Temporary production and test servers were stopped; the development app remains on port 3001.
+
+### Screenshot review and finishing changes
+
+The review identified and fixed:
+
+- The icon palette could place Clear below the viewport. Its heading and footer now stay visible while the icon grid scrolls.
+- Returning to the same node after using its toolbar did not always reopen details. Canvas re-entry now waits for actual pointer movement and the renderer update, avoiding stale node/link cards.
+- Loaded spending evidence was only a count. The inspector now links to creating and spending transactions and shows an output's script type and index.
+- Routine success messages lingered over small-screen editing. They now dismiss after eight seconds; partial-result and error messages remain available.
+- Busy spending histories repeatedly inspected the first 500 candidates. A continuation offset now advances to later candidates, with the changing-history limitation documented.
+
+Reviewed screenshots contain only public testnet4 examples and disposable review annotations:
+
+- [Tracing workbench](screenshots/trace-workbench.png)
+- [Graph detail card and related transactions](screenshots/trace-details.png)
+- [Icon palette with visible Clear action](screenshots/icon-picker.png)
+- [390-pixel inspector](screenshots/mobile-tracing.png)
+- [53-output fan-out with incoming and spending paths](screenshots/testnet4-fanout.png)
+
+Earlier browser attempts exposed the picker and hover defects above. Overlapping test runners also collided in their shared artifact directory and stopped a shared test server; those runs were not treated as passing. The final 21-test run ran alone and passed. Two ad hoc live review assertions initially expected outdated transaction counts/pluralization; after correcting the review scripts, the actual flows passed. No wallet secrets or environment-file contents were read or included in screenshots.
+
+The 3,001-node renderer smoke remains functional evidence using software WebGL, not a native mobile GPU or frame-rate benchmark. Mainnet live behavior, exhaustive wallet discovery, and complete spending-history scans remain outside these checks. See [example provenance and limits](research/testnet4-examples.md) and [rendering references](research/graph.md).
+
+## Initial version validation
+
 | Check | Passed | Failed |
 | --- | ---: | ---: |
 | Unit/integration suite (protocol, crypto, wallet, scanner, domain, persistence) | 95 | 0 |

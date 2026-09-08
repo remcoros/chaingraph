@@ -67,6 +67,7 @@ export interface Workspace {
   version: 1;
   id: string;
   name: string;
+  description?: string;
   network: Network;
   createdAt: string;
   wallets: Wallet[];

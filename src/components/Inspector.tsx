@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Bookmark, Check, RefreshCw } from 'lucide-react';
 import {
   formatSats,
   short,
+  txNodeId,
   type Annotation,
   type Wallet,
   type Workspace,
@@ -12,16 +13,30 @@ import {
 } from '../domain/types';
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
+import { IconPicker } from './IconPicker';
 
 export function AnnotationEditor({
   annotation,
   onSave,
+  editToken,
+  onEditHandled,
 }: {
   annotation: Annotation;
+  editToken?: number;
+  onEditHandled?: () => void;
   onSave: (a: Annotation) => void;
 }) {
   const [draft, setDraft] = useState(annotation);
   const [saved, setSaved] = useState(false);
+  const labelRef = useRef<HTMLInputElement>(null);
+  const previousEditToken = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (editToken && editToken !== previousEditToken.current) {
+      labelRef.current?.focus();
+      onEditHandled?.();
+    }
+    previousEditToken.current = editToken;
+  }, [editToken]);
   useEffect(() => {
     setDraft(annotation);
   }, [annotation]);
@@ -41,6 +56,7 @@ export function AnnotationEditor({
       <label>
         Label
         <input
+          ref={labelRef}
           aria-label="Node label"
           maxLength={200}
           placeholder="Give this a meaningful name"
@@ -66,20 +82,13 @@ export function AnnotationEditor({
         />
       </label>
       <div className="annotation-options">
-        <label>
-          Icon
-          <select
-            aria-label="Node icon"
-            value={draft.icon}
-            onChange={(e) => setDraft({ ...draft, icon: e.target.value })}
-          >
-            <option value="">None</option>
-            <option value="★">★ Star</option>
-            <option value="◇">◇ Diamond</option>
-            <option value="⚑">⚑ Flag</option>
-            <option value="?">? Question</option>
-          </select>
-        </label>
+        <IconPicker
+          value={draft.icon}
+          onChange={(icon) => {
+            setDraft({ ...draft, icon });
+            setSaved(false);
+          }}
+        />
         <label className="switch-label">
           <input
             type="checkbox"
@@ -159,7 +168,7 @@ export function WalletInspector({
         <p className={`scan-result ${wallet.scanComplete ? '' : 'warning'}`}>
           {wallet.scanComplete
             ? 'Gap limit reached on both branches.'
-            : 'Partial scan — increase limits or continue scanning.'}
+            : 'Partial scan: increase limits or continue scanning.'}
           <small>Last scan {new Date(wallet.scannedAt).toLocaleString()}</small>
         </p>
       )}
@@ -217,7 +226,11 @@ interface NodeInspectorProps {
   busy: boolean;
   canQuery: boolean;
   annotationKey: string;
+  queryDisabledReason?: string;
+  editToken?: number;
+  onEditHandled?: () => void;
   onExpand: (direction: 'funding' | 'spending') => void;
+  onSelectNode?: (id: string) => void;
   onRefresh: () => void;
   onRemove: () => void;
   onSave: (annotation: Annotation) => void;
@@ -230,11 +243,56 @@ export function NodeInspector({
   busy,
   canQuery,
   annotationKey,
+  queryDisabledReason,
+  editToken,
+  onEditHandled,
   onExpand,
+  onSelectNode,
   onRefresh,
   onRemove,
   onSave,
 }: NodeInspectorProps) {
+  const descriptionId = useId();
+  const unavailable = busy
+    ? 'Wait for the current operation to finish.'
+    : queryDisabledReason ||
+      (!canQuery
+        ? w.demo
+          ? 'Live node queries are unavailable for synthetic laboratory data.'
+          : 'Connect to a node on this workspace network to expand its paths.'
+        : undefined);
+  const hasPrevious = !tx || tx.vin.some((input) => !!input.txid);
+  const previousReason =
+    unavailable ||
+    (selected.kind === 'address' || !selected.txid
+      ? 'Select a transaction or output to load its previous transactions.'
+      : !hasPrevious
+        ? 'Coinbase transactions do not have previous transactions.'
+        : undefined);
+  const spendingReason =
+    unavailable ||
+    (selected.kind === 'address'
+      ? 'Select a transaction or output to find spending transactions.'
+      : !tx
+        ? 'Load the transaction that created this output before finding its spends.'
+        : undefined);
+  const sources = new Set(
+    selected.kind === 'output'
+      ? [selected.id]
+      : graph.nodes
+          .filter((node) => node.kind === 'output' && node.txid === selected.txid)
+          .map((node) => node.id),
+  );
+  const spendingNodes = [
+    ...new Set(
+      graph.links
+        .filter((link) => link.kind === 'spends' && sources.has(link.source))
+        .map((link) => link.target),
+    ),
+  ].filter((id) => id.startsWith('tx:') && !!w.transactions[id.slice(3)]);
+  const spendingCount = spendingNodes.length;
+  const selectedOutput =
+    selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
   return (
     <>
       <div className="panel-section selection-heading">
@@ -249,6 +307,18 @@ export function NodeInspector({
             Address
             <code className="wrap">{selected.address}</code>
           </label>
+        )}
+        {selected.kind === 'output' && (
+          <dl className="details">
+            <div>
+              <dt>Output index</dt>
+              <dd>{selected.vout ?? 'Unknown'}</dd>
+            </div>
+            <div>
+              <dt>Script type</dt>
+              <dd>{selectedOutput?.scriptPubKey.type ?? 'Unknown'}</dd>
+            </div>
+          </dl>
         )}
         {tx && (
           <dl className="details">
@@ -282,33 +352,88 @@ export function NodeInspector({
             )}
           </dl>
         )}
-        {selected.kind === 'output' && (
+        {selected.kind !== 'address' && (
           <p className="small muted">
-            {graph.links.some((l) => l.source === selected.id && l.kind === 'spends')
-              ? 'Spending transaction is loaded.'
-              : 'Spend status unknown until spending history is checked.'}
+            {spendingCount
+              ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
+              : 'No spending transaction is loaded. This does not establish that these coins are unspent.'}
           </p>
         )}
-        <div className="button-row">
+        {onSelectNode && (spendingCount > 0 || (selected.kind === 'output' && tx)) && (
+          <div className="related-transactions">
+            {selected.kind === 'output' && tx && (
+              <button
+                type="button"
+                className="text-button mono"
+                title={tx.txid}
+                onClick={() => onSelectNode(txNodeId(tx.txid))}
+              >
+                Creating transaction: {short(tx.txid, 6)}
+              </button>
+            )}
+            {spendingNodes.slice(0, 5).map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="text-button mono"
+                title={id.slice(3)}
+                onClick={() => onSelectNode(id)}
+              >
+                Spending transaction: {short(id.slice(3), 6)}
+              </button>
+            ))}
+            {spendingCount > 5 && (
+              <small className="muted">
+                Showing 5 of {spendingCount} loaded spending transactions.
+              </small>
+            )}
+          </div>
+        )}
+        <div className="node-path-action">
           <button
-            disabled={!canQuery || busy || !tx || selected.kind === 'address'}
+            disabled={!!previousReason}
+            title={previousReason}
+            aria-describedby={`${descriptionId}-previous`}
             onClick={() => onExpand('funding')}
           >
             <ArrowDownLeft size={14} />
-            Funding
+            Load previous transactions
           </button>
+          <p id={`${descriptionId}-previous`} className="small muted">
+            {previousReason ||
+              (!tx
+                ? 'Load the transaction that created this output.'
+                : selected.kind === 'output'
+                  ? "Load the transactions referenced by the inputs of this output's creating transaction."
+                  : 'Load the transactions referenced by the inputs of this transaction.')}
+          </p>
+        </div>
+        <div className="node-path-action">
           <button
-            disabled={!canQuery || busy || !tx || selected.kind === 'address'}
+            disabled={!!spendingReason}
+            title={spendingReason}
+            aria-describedby={`${descriptionId}-spending`}
             onClick={() => onExpand('spending')}
           >
             <ArrowUpRight size={14} />
-            Spending
+            Find spending transactions
           </button>
+          <p id={`${descriptionId}-spending`} className="small muted">
+            {spendingReason ||
+              (selected.kind === 'output'
+                ? 'Check script history for transactions that spend this specific output.'
+                : 'Check script history for transactions that spend any output of this transaction.')}
+          </p>
         </div>
-        {selected.txid && (
-          <button className="text-button" disabled={!canQuery || busy} onClick={onRefresh}>
+        {selected.txid && tx && !w.demo && (
+          <button
+            className="text-button"
+            disabled={!!unavailable}
+            title={unavailable}
+            onClick={onRefresh}
+          >
             <RefreshCw size={13} />
-            {tx ? 'Refresh transaction' : 'Load funding transaction'}
+            Refresh transaction
           </button>
         )}
         {selected.kind === 'transaction' && tx && (
@@ -320,6 +445,8 @@ export function NodeInspector({
       <AnnotationEditor
         key={annotationKey}
         annotation={w.annotations[selected.id] ?? emptyAnnotation}
+        editToken={editToken}
+        onEditHandled={onEditHandled}
         onSave={onSave}
       />
     </>

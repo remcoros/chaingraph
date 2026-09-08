@@ -46,3 +46,7 @@ Browser storage quota may be substantially smaller than the format's 32 MiB payl
 Unit tests exercise published BIP32/49/84/86 and SLIP132 vectors, Electrum hash byte order, mainnet/testnet rejection, private/root key rejection, SLIP132 script mismatches, and bounded derivation. Encryption tests exercise round trips, fresh randomness, wrong passwords, ciphertext/salt/nonce tampering, invalid envelope structure and KDF parameters, size limits, and a payload exceeding 1 MiB. Browser integration and live chain scanning are separate end-to-end checks; these module tests do not establish those outcomes.
 
 Persistence tests exercise same-turn edit/lock, edits arriving during an earlier encryption, immediate undo/update freeze, fresh-store unlock, quota failure and retry, malformed-index preservation, concurrent saves, and external storage changes while saving or locking. These use real encryption with controlled asynchronous gates.
+
+## Public name update (2026-09-08)
+
+At the user's request, saved browser entries now expose the workspace name so locked entries remain recognizable. Earlier references here to encrypting all names describe the initial design. Descriptions, wallet names, xpubs and annotations remain encrypted. The envelope format is unchanged; legacy saved entries gain public names after successful unlock and save.

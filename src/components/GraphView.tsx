@@ -4,11 +4,16 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
+  BoxGeometry,
   Color,
+  Mesh,
+  MeshLambertMaterial,
+  OctahedronGeometry,
   Points,
   ShaderMaterial,
+  SphereGeometry,
 } from 'three';
-import type { GraphLink, GraphNode } from '../domain/types';
+import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
 
 interface Props {
@@ -20,6 +25,11 @@ interface Props {
   sizeBy: 'uniform' | 'value' | 'degree';
   glow: boolean;
   fitToken: number;
+  transactions?: Record<string, Transaction>;
+  onTrace?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  traceDisabledReason?: string;
+  busy?: boolean;
 }
 
 type SimNode = GraphNode & NodeObject;
@@ -34,6 +44,9 @@ const GraphConstructor = ForceGraph3D as unknown as new (
 ) => Graph;
 const endpointId = (endpoint: string | SimNode) =>
   typeof endpoint === 'string' ? endpoint : endpoint.id;
+const linkActionId = (link: GraphLink | SimLink) =>
+  endpointId(link.kind === 'spends' ? link.source : link.target);
+type HoverCard = { type: 'node' | 'link'; id: string; x: number; y: number };
 
 function clusterColor(id: string) {
   let hash = 0;
@@ -77,7 +90,53 @@ export default function GraphView(props: Props) {
   const needsFit = useRef(true);
   const savedDepth = useRef(new Map<string, number>());
   const refreshStyle = useRef<() => void>(() => {});
+  const cardRef = useRef<HTMLElement>(null);
+  const pointer = useRef({ x: 0, y: 0, touch: false });
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cardEntered = useRef(false);
+  const lastHit = useRef<{ type: HoverCard['type']; id: string } | undefined>(undefined);
+  const [hover, setHover] = useState<HoverCard>();
   const [error, setError] = useState(false);
+
+  function keepCardOpen() {
+    clearTimeout(closeTimer.current);
+  }
+  function scheduleCardClose() {
+    keepCardOpen();
+    closeTimer.current = setTimeout(() => {
+      if (!cardEntered.current && !cardRef.current?.contains(document.activeElement))
+        setHover(undefined);
+    }, 650);
+  }
+  function showCard(type: HoverCard['type'], id: string, keyboard = false) {
+    if (
+      !keyboard &&
+      (pointer.current.touch ||
+        cardEntered.current ||
+        cardRef.current?.contains(document.activeElement))
+    )
+      return;
+    keepCardOpen();
+    const element = containerRef.current;
+    if (!element) return;
+    const { width, height } = element.getBoundingClientRect();
+    const widthOfCard = Math.min(320, Math.max(200, width - 24));
+    const x = keyboard ? (width - widthOfCard) / 2 : pointer.current.x + 18;
+    const y = keyboard ? 40 : pointer.current.y + 18;
+    setHover({
+      type,
+      id,
+      x: Math.max(12, Math.min(x, width - widthOfCard - 12)),
+      y: Math.max(12, Math.min(y, height - 320)),
+    });
+    if (keyboard) requestAnimationFrame(() => cardRef.current?.focus());
+  }
+  function dismissCard(returnFocus = false) {
+    keepCardOpen();
+    cardEntered.current = false;
+    setHover(undefined);
+    if (returnFocus) graphRef.current?.renderer().domElement.focus();
+  }
 
   useEffect(() => {
     const element = containerRef.current;
@@ -85,6 +144,7 @@ export default function GraphView(props: Props) {
     let graph: Graph | undefined;
     let observer: ResizeObserver | undefined;
     let removeContextListener = () => {};
+    let releaseMeshes = () => {};
     try {
       graph = new GraphConstructor(element, { controlType: 'orbit' });
       graphRef.current = graph;
@@ -112,6 +172,32 @@ export default function GraphView(props: Props) {
           return Math.min(16, 1 + Math.log10(1 + Math.max(0, node.value || 0)));
         return 1;
       };
+      const geometries = {
+        transaction: new BoxGeometry(1.6, 1.6, 1.6),
+        output: new SphereGeometry(1, 8, 8),
+        address: new OctahedronGeometry(1.4),
+      };
+      const materials = new Map<string, MeshLambertMaterial>();
+      const meshes = new Map<string, Mesh<BufferGeometry, MeshLambertMaterial>>();
+      const materialFor = (color: string) => {
+        let material = materials.get(color);
+        if (!material) {
+          material = new MeshLambertMaterial({ color });
+          materials.set(color, material);
+        }
+        return material;
+      };
+      const updateMesh = (mesh: Mesh<BufferGeometry, MeshLambertMaterial>, node: SimNode) => {
+        mesh.geometry = geometries[node.kind];
+        mesh.material = materialFor(nodeColor(node));
+        mesh.scale.setScalar(3.2 * Math.cbrt(nodeValue(node)));
+      };
+      releaseMeshes = () => {
+        meshes.clear();
+        Object.values(geometries).forEach((geometry) => geometry.dispose());
+        materials.forEach((material) => material.dispose());
+        materials.clear();
+      };
       const isSelectedLink = (link: SimLink) =>
         endpointId(link.source) === current.current.selectedId ||
         endpointId(link.target) === current.current.selectedId;
@@ -127,9 +213,13 @@ export default function GraphView(props: Props) {
       };
       refreshStyle.current = () => {
         if (!graph) return;
+        const ids = new Set(graph.graphData().nodes.map((node) => node.id));
+        for (const id of meshes.keys()) if (!ids.has(id)) meshes.delete(id);
+        for (const node of graph.graphData().nodes) {
+          const mesh = meshes.get(node.id);
+          if (mesh) updateMesh(mesh, node);
+        }
         graph
-          .nodeColor((node) => nodeColor(node))
-          .nodeVal((node) => nodeValue(node))
           .linkColor((link) => (isSelectedLink(link) ? colors.accent : colors.muted))
           .linkWidth((link) => (isSelectedLink(link) ? 0.65 : 0))
           .linkDirectionalArrowLength((link) =>
@@ -173,13 +263,36 @@ export default function GraphView(props: Props) {
         .cooldownTicks(120)
         .cooldownTime(6000)
         .d3AlphaDecay(0.035)
-        .nodeLabel((node) => {
-          const tooltip = document.createElement('div');
-          tooltip.className = 'graph-node-tooltip';
-          tooltip.textContent = `${node.kind} · ${node.label || node.id}`;
-          return tooltip;
+        .nodeThreeObject((node) => {
+          const mesh = new Mesh(geometries[node.kind], materialFor(nodeColor(node)));
+          updateMesh(mesh, node);
+          meshes.set(node.id, mesh);
+          return mesh;
+        })
+        .nodeLabel('')
+        .linkLabel('')
+        .linkHoverPrecision(2)
+        .onNodeHover((node) => {
+          if (node) {
+            lastHit.current = { type: 'node', id: node.id };
+            showCard('node', node.id);
+          } else {
+            if (lastHit.current?.type === 'node') lastHit.current = undefined;
+            scheduleCardClose();
+          }
+        })
+        .onLinkHover((link) => {
+          if (link) {
+            lastHit.current = { type: 'link', id: link.id };
+            showCard('link', link.id);
+          } else {
+            if (lastHit.current?.type === 'link') lastHit.current = undefined;
+            scheduleCardClose();
+          }
         })
         .onNodeClick((node) => current.current.onSelect(node.id))
+        .onLinkClick((link) => current.current.onSelect(linkActionId(link)))
+        .onBackgroundClick(() => dismissCard())
         .onNodeDrag(positionHalos)
         .onEngineTick(positionHalos)
         .onEngineStop(() => {
@@ -205,28 +318,44 @@ export default function GraphView(props: Props) {
         setError(true);
       };
       const canvas = graph.renderer().domElement;
+      canvas.tabIndex = 0;
       canvas.setAttribute(
         'aria-label',
-        'Interactive transaction graph. Use the entity list to select nodes with a keyboard.',
+        'Interactive transaction graph. Select an item using the entity list, then press Enter here for its details.',
       );
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') dismissCard();
+        if ((event.key === 'Enter' || event.key === ' ') && current.current.selectedId) {
+          event.preventDefault();
+          showCard('node', current.current.selectedId, true);
+        }
+      };
       canvas.addEventListener('webglcontextlost', onContextLost);
-      removeContextListener = () => canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.addEventListener('keydown', onKeyDown);
+      removeContextListener = () => {
+        canvas.removeEventListener('webglcontextlost', onContextLost);
+        canvas.removeEventListener('keydown', onKeyDown);
+      };
     } catch {
       graph?._destructor();
+      releaseMeshes();
       graph = undefined;
       graphRef.current = null;
       setError(true);
     }
     return () => {
       observer?.disconnect();
+      clearTimeout(closeTimer.current);
       removeContextListener();
       graphRef.current = null;
       refreshStyle.current = () => {};
       topology.current = '';
       needsFit.current = true;
       haloNodes.current = [];
+      lastHit.current = undefined;
       savedDepth.current.clear();
       graph?._destructor();
+      releaseMeshes();
       element.replaceChildren();
     };
   }, []);
@@ -316,9 +445,229 @@ export default function GraphView(props: Props) {
     if (props.fitToken) graphRef.current?.zoomToFit(450, 65);
   }, [props.fitToken]);
 
+  const hoveredLink =
+    hover?.type === 'link' ? props.links.find((link) => link.id === hover.id) : undefined;
+  const hoveredNode = hover
+    ? props.nodes.find((node) => node.id === (hoveredLink ? linkActionId(hoveredLink) : hover.id))
+    : undefined;
+  const linkedOutput = hoveredLink
+    ? props.nodes.find(
+        (node) =>
+          node.kind === 'output' &&
+          (node.id === hoveredLink.source || node.id === hoveredLink.target),
+      )
+    : undefined;
+  const transaction = hoveredNode?.txid ? props.transactions?.[hoveredNode.txid] : undefined;
+  const missingFunding =
+    hoveredNode?.kind === 'output' &&
+    (hoveredNode.value === undefined ||
+      Boolean(props.transactions && hoveredNode.txid && !transaction));
+  const cardTitle = hoveredLink
+    ? { creates: 'Creates output', spends: 'Spends output', address: 'Address association' }[
+        hoveredLink.kind
+      ]
+    : hoveredNode?.kind;
+  const traceReason = props.busy ? 'Another operation is running.' : props.traceDisabledReason;
+
+  useEffect(() => {
+    if (hover && !hoveredNode) dismissCard();
+    const card = cardRef.current;
+    const container = containerRef.current;
+    if (!card || !container) return;
+    const clamp = () => {
+      const bounds = container.getBoundingClientRect();
+      const size = card.getBoundingClientRect();
+      setHover((previous) => {
+        if (!previous) return previous;
+        const x = Math.max(12, Math.min(previous.x, bounds.width - size.width - 12));
+        const y = Math.max(12, Math.min(previous.y, bounds.height - size.height - 12));
+        return x === previous.x && y === previous.y ? previous : { ...previous, x, y };
+      });
+    };
+    clamp();
+    const observer = new ResizeObserver(clamp);
+    observer.observe(card);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [hover?.id, hover?.type, Boolean(hoveredNode)]);
+
   return (
-    <div className="graph-view" data-testid="graph-view">
-      <div ref={containerRef} className="graph-canvas" aria-hidden={error} />
+    <div
+      className="graph-view"
+      data-testid="graph-view"
+      onPointerMove={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        pointer.current = {
+          x: event.clientX - box.left,
+          y: event.clientY - box.top,
+          touch: event.pointerType === 'touch',
+        };
+      }}
+      onPointerLeave={scheduleCardClose}
+    >
+      <div
+        ref={containerRef}
+        className="graph-canvas"
+        aria-hidden={error}
+        onPointerMove={() => {
+          // The renderer keeps its last hit while the pointer is over a sibling
+          // HTML card. Actual movement back to the same mesh must reopen details,
+          // but removing the card alone must not reopen the previous hit.
+          if (cardRef.current) return;
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              const hit = lastHit.current;
+              if (hit && !cardRef.current) showCard(hit.type, hit.id);
+            }),
+          );
+        }}
+      />
+      {!error && hover && hoveredNode && (
+        <section
+          ref={cardRef}
+          className="graph-hover-card"
+          role="dialog"
+          aria-label="Graph item details"
+          tabIndex={-1}
+          style={{ left: hover.x, top: hover.y }}
+          onPointerEnter={() => {
+            cardEntered.current = true;
+            keepCardOpen();
+          }}
+          onPointerLeave={() => {
+            cardEntered.current = false;
+            scheduleCardClose();
+          }}
+          onFocus={keepCardOpen}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) scheduleCardClose();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.stopPropagation();
+              dismissCard(true);
+            }
+          }}
+        >
+          <div className="graph-card-heading">
+            <span>{cardTitle}</span>
+            <button
+              type="button"
+              className="graph-card-close"
+              aria-label="Close graph details"
+              onClick={() => dismissCard(true)}
+            >
+              ×
+            </button>
+          </div>
+          <strong className="graph-card-label">{hoveredNode.label}</strong>
+          {hoveredLink && (
+            <p className="graph-card-explanation">
+              {
+                {
+                  creates: 'The transaction creates this output.',
+                  spends: 'This output is consumed by the linked spending transaction.',
+                  address:
+                    'This output pays to the address. An address association does not establish common ownership.',
+                }[hoveredLink.kind]
+              }
+            </p>
+          )}
+          <dl className="graph-card-facts">
+            <div>
+              <dt>
+                {hoveredNode.kind === 'transaction'
+                  ? 'Transaction ID'
+                  : hoveredNode.kind === 'output'
+                    ? 'Outpoint'
+                    : 'Address'}
+              </dt>
+              <dd className="graph-card-identifier">
+                {hoveredNode.kind === 'output' && hoveredNode.txid
+                  ? `${hoveredNode.txid}:${hoveredNode.vout}`
+                  : hoveredNode.txid || hoveredNode.address || hoveredNode.id}
+              </dd>
+            </div>
+            {hoveredLink?.kind === 'spends' && (
+              <div>
+                <dt>Spending transaction</dt>
+                <dd className="graph-card-identifier">{hoveredLink.target.replace(/^tx:/, '')}</dd>
+              </div>
+            )}
+            {hoveredLink?.kind === 'address' && linkedOutput && (
+              <div>
+                <dt>Output</dt>
+                <dd className="graph-card-identifier">{linkedOutput.id.replace(/^out:/, '')}</dd>
+              </div>
+            )}
+            {(hoveredNode.value !== undefined || linkedOutput?.value !== undefined) && (
+              <div>
+                <dt>{hoveredNode.kind === 'transaction' ? 'Total outputs' : 'Output value'}</dt>
+                <dd>{formatSats(hoveredNode.value ?? linkedOutput?.value)}</dd>
+              </div>
+            )}
+            {hoveredNode.address && hoveredNode.kind !== 'address' && (
+              <div>
+                <dt>Address</dt>
+                <dd className="graph-card-identifier">{hoveredNode.address}</dd>
+              </div>
+            )}
+            {transaction && hoveredNode.kind === 'transaction' && (
+              <div>
+                <dt>Structure</dt>
+                <dd>
+                  {transaction.vin.length} inputs · {transaction.vout.length} outputs
+                </dd>
+              </div>
+            )}
+            {transaction?.confirmations !== undefined && (
+              <div>
+                <dt>Saved confirmations</dt>
+                <dd>{transaction.confirmations.toLocaleString()}</dd>
+              </div>
+            )}
+          </dl>
+          {missingFunding && (
+            <p className="graph-card-explanation graph-card-missing">
+              Funding transaction is not loaded. Value and address may be unknown.
+            </p>
+          )}
+          {hoveredNode.kind === 'output' && !missingFunding && (
+            <p className="graph-card-explanation">
+              An output node may already be spent. Inspect its spending links to investigate.
+            </p>
+          )}
+          <div className="graph-card-actions">
+            {props.onTrace && hoveredNode.kind !== 'address' && (
+              <button
+                type="button"
+                disabled={Boolean(traceReason)}
+                title={traceReason || 'Load one previous level of funding transactions'}
+                onClick={() => {
+                  props.onTrace?.(hoveredNode.id);
+                  dismissCard();
+                }}
+              >
+                Load previous level
+              </button>
+            )}
+            {props.onEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  props.onEdit?.(hoveredNode.id);
+                  dismissCard();
+                }}
+              >
+                Edit label and notes
+              </button>
+            )}
+          </div>
+          {traceReason && props.onTrace && hoveredNode.kind !== 'address' && (
+            <p className="graph-card-explanation">{traceReason}</p>
+          )}
+        </section>
+      )}
       {error && (
         <div className="graph-unavailable" role="status">
           <strong>The graph needs WebGL</strong>

@@ -22,7 +22,8 @@ not when scaffolding this upstream application.
 - Never open, display, copy, or commit `.env.live`. Test processes may load it directly
   without logging credentials, URLs, headers, or raw upstream exception messages.
 - No private keys, seed import, signing, spending, or wallet-mutating RPC methods.
-- Workspace names, xpubs, data and notes belong inside the encrypted envelope.
+- Workspace names are intentionally public in the saved index. Descriptions, xpubs,
+  graph data and notes belong inside the encrypted envelope.
   Passwords and decrypted state live only in memory. Do not log them.
 - Prefer vetted Bitcoin primitives and WebCrypto to custom cryptography. Test vectors,
   tampering, network mismatch, cancellations, and storage failure paths matter.

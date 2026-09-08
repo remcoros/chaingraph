@@ -4,11 +4,11 @@ Chaingraph helps you investigate Bitcoin activity and keep your own observations
 
 ## Start a workspace
 
-Create a workspace, choose mainnet or testnet4, and give it a name and password. Use a long, unique passphrase. Your password cannot be recovered. The workspace's network must match the connected backend for live lookups; choosing a different workspace network does not reconfigure Bitcoin Core or Fulcrum.
+Create a workspace, choose mainnet or testnet4, and give it a **Name (public)** and password. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. The workspace's network must match the connected backend for live lookups; choosing a different workspace network does not reconfigure Bitcoin Core or Fulcrum.
 
 You can open several workspaces and switch between their tabs. Each workspace has its own transactions, wallets, annotations, analysis results, and view settings. An unsaved indicator means the current changes have not yet reached encrypted browser storage. Autosave runs shortly after edits; heed a storage-error message and export a file if browser storage is full or unavailable.
 
-For a first look without loading your own wallet, open the **CoinJoin laboratory**. Its three 150-input/150-output transactions and surrounding paths are generated examples. Their IDs, confirmations, and activity are synthetic, not real testnet transactions. Do not use the laboratory as evidence about a real wallet.
+For a first look without loading your own wallet, open the **CoinJoin laboratory**. It starts with three generated 150-input/150-output transactions. Select one and use **Load previous transactions** or **Find spending transactions** to reveal paths from the offline fixture. **Show all fixture paths** loads the complete sample; **Reset practice paths** returns to the three starting transactions and clears analysis overlays while keeping annotations. Their IDs, confirmations, and activity are synthetic, not real testnet transactions. Do not use the laboratory as evidence about a real wallet.
 
 Use Ctrl/Cmd+K to focus the quick input and Ctrl/Cmd+S to save an encrypted browser snapshot. The first-use tour introduces the main controls. It can be skipped and restarted from Help.
 
@@ -16,7 +16,13 @@ Use Ctrl/Cmd+K to focus the quick input and Ctrl/Cmd+S to save an encrypted brow
 
 Use the quick input to load a transaction ID, an address, or an output reference written as `transaction-id:output-index`. Select an item in the graph or entity list to inspect its details and available actions.
 
-Follow funding to load the transactions that created a selected transaction's inputs. Follow spending to look for transactions consuming its outputs. These actions expand the loaded investigation; they do not scan the whole chain. Spending discovery uses address histories and is limited to outputs with a supported address representation. If discovery is partial, missing spend links must not be interpreted as proof that an output is unspent.
+**Load previous transactions** adds one earlier level. For an output whose creating transaction is missing, it loads that transaction and fills in the output value and script. Once the creating transaction is loaded, the action follows its inputs. A coinbase transaction has no earlier inputs.
+
+**Find spending transactions** checks script histories for transactions consuming the selected output, or any output of a selected transaction. It checks exact outpoint references. The result reports matches and how many were newly added, so a repeated action with an already loaded path is distinguishable from no matches. Busy histories are checked in batches of 500; repeat the action when prompted to continue. This continuation is temporary and resets when switching workspaces. Changed histories can shift a batch boundary; this is a bounded investigation, not a completeness guarantee. Missing spend links never prove an output is unspent.
+
+Use **Prefetch previous** beside the quick input controls to choose **Off**, **1 level**, or **2 levels** when adding a transaction or output. The two levels share a 500-transaction download limit and reuse loaded transactions. Large or unavailable branches produce a partial-result message. Trace individual paths to continue. Address and wallet scans keep their own bounds.
+
+**Testnet4 examples** offers three real outputs: a simple spent path, a two-input transaction with mixed scripts, and a 53-output fan-out. Load them in a testnet4 workspace connected to your node, then explore previous and spending paths. Explorer links are optional external references. These examples do not identify wallet owners.
 
 The graph represents transaction creation and consumption of outputs. An output can already be spent; the presence of an output node does not mean it is an available UTXO. Unknown funding outputs may appear before their parent transaction has been loaded. Address nodes are an optional additional view of script destinations, not proof of a common owner.
 
@@ -43,7 +49,9 @@ Drag the background to orbit in 3D, pan with the camera controls, and scroll or 
 
 Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize different properties. Value sizing is compressed logarithmically so large outputs do not overwhelm small ones. Degree describes the number of graph connections, not transaction importance or ownership confidence. Cluster colors and glow are visual aids.
 
-Select an item to add a label, note, icon, or bookmark in its inspector. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Remove a transaction from its inspector to reduce the graph; its saved annotations remain, and descendant inputs may still show output placeholders.
+Transactions are cubes, outputs are spheres, and optional addresses are diamonds. Hover a node or connection for identifiers, values, available details, and a small action toolbar. **Load previous level** expands that path; **Edit label / notes** opens and focuses the inspector. The inspector and entity list provide the same tracing workflow without hover.
+
+Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row palette with labeled symbols, keyboard arrow navigation, and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Remove a transaction from its inspector to reduce the graph; its saved annotations remain, and descendant inputs may still show output placeholders.
 
 ## Run analysis
 
@@ -61,7 +69,7 @@ Workspace autosave writes encrypted contents to this browser's storage. Lock the
 
 Export an encrypted workspace file for backup or transfer to another browser. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Current camera position and the temporary force layout are not saved.
 
-Saved workspace contents use authenticated encryption. The browser storage entry also includes a workspace identifier and save time outside the encrypted contents. File names and file sizes can reveal additional metadata. Encryption does not hide an unlocked workspace from someone using your browser or from untrusted browser extensions.
+Saved workspace contents use authenticated encryption. The browser storage entry also includes the public workspace name, a workspace identifier, and save time outside the encrypted contents. File names and file sizes can reveal additional metadata. Encryption does not hide an unlocked workspace from someone using your browser or from untrusted browser extensions.
 
 **BIP329 label exchange is different from workspace export.** Label files are plaintext JSON Lines. They can include address/output/transaction references, labels, and wallet extended public keys. They do not preserve the complete workspace, notes, bookmarks, graph settings, or analysis results. Only share them intentionally. Unsupported label record types are skipped during import.
 

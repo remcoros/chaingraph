@@ -142,6 +142,7 @@ const workspaceSchema = z.object({
   version: z.literal(1),
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
+  description: text.optional(),
   network: z.enum(['mainnet', 'testnet4']),
   createdAt: timestamp,
   demo: z.boolean(),

@@ -1,3 +1,5 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
 import { parseTransaction, outputAddress } from '../domain/workspace';
 import { addressToScriptHash, deriveAddresses } from './wallet';
@@ -248,25 +250,36 @@ export async function loadSpending(
   w: Workspace,
   vout: number | undefined,
   signal?: AbortSignal,
-): Promise<{ transactions: Transaction[]; truncated: boolean }> {
+  offset = 0,
+): Promise<{ transactions: Transaction[]; truncated: boolean; nextOffset?: number }> {
+  if (!Number.isSafeInteger(offset) || offset < 0)
+    throw new Error('Spending search offset must be a nonnegative safe integer.');
   const outputs = tx.vout.filter((o) => vout === undefined || o.n === vout);
-  const addresses = [...new Set(outputs.map(outputAddress).filter((x): x is string => !!x))];
-  if (addresses.length === 0)
-    throw new Error('No standard address is available for these outputs.');
-  const histories = await mapLimit(addresses, 4, (a) =>
-    fetchHistory(addressToScriptHash(a, w.network), signal),
-  );
-  const ids = [...new Set(histories.flatMap((h) => h.map((e) => e.tx_hash)))].filter(
-    (id) => id !== tx.txid,
-  );
+  const hashes = outputs.map((output) => {
+    const hex = output.scriptPubKey.hex;
+    if (hex !== undefined) return bytesToHex(sha256(hexToBytes(hex)).reverse());
+    const address = outputAddress(output);
+    return address ? addressToScriptHash(address, w.network) : undefined;
+  });
+  const scripts = [...new Set(hashes.filter((h): h is string => h !== undefined))];
+  if (!scripts.length)
+    throw new Error(
+      'Load the creating transaction first: these outputs have no script data to search.',
+    );
+  const histories = await mapLimit(scripts, 4, (hash) => fetchHistory(hash, signal));
+  const ids = [...new Set(histories.flatMap((h) => h.map((e) => e.tx_hash)))]
+    .filter((id) => id !== tx.txid)
+    .sort();
   const wanted = new Set(outputs.map((o) => o.n));
-  const candidates = await mapLimit(ids.slice(0, 500), 4, (id) =>
+  const nextOffset = offset + 500 < ids.length ? offset + 500 : undefined;
+  const candidates = await mapLimit(ids.slice(offset, offset + 500), 4, (id) =>
     w.transactions[id] ? Promise.resolve(w.transactions[id]) : fetchTransaction(id, signal),
   );
   return {
     transactions: candidates.filter((t) =>
       t.vin.some((i) => i.txid === tx.txid && i.vout !== undefined && wanted.has(i.vout)),
     ),
-    truncated: ids.length > 500 || outputs.some((o) => !outputAddress(o)),
+    truncated: nextOffset !== undefined || hashes.some((h) => h === undefined),
+    ...(nextOffset !== undefined ? { nextOffset } : {}),
   };
 }

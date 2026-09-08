@@ -91,9 +91,19 @@ export function WorkspaceHome({
                 <span>
                   <strong>
                     {sessions.find((s) => s.data.id === entry.id)?.data.name ??
+                      entry.publicName ??
                       `Encrypted workspace ${saved.length - i}`}
                   </strong>
                   <small>{new Date(entry.savedAt).toLocaleString()}</small>
+                  {sessions.find((session) => session.data.id === entry.id)?.data.description && (
+                    <small className="workspace-description">
+                      {sessions.find((session) => session.data.id === entry.id)?.data.description}
+                    </small>
+                  )}
+                  {!entry.publicName &&
+                    !sessions.some((session) => session.data.id === entry.id) && (
+                      <small>Unlock once to reveal and save its public name.</small>
+                    )}
                 </span>
                 <ChevronRight size={17} />
               </button>

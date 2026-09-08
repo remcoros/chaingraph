@@ -92,6 +92,7 @@ export function CreateDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState(demo ? 'CoinJoin laboratory' : 'My investigation');
+  const [description, setDescription] = useState('');
   const [net, setNet] = useState(network);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -114,8 +115,9 @@ export function CreateDialog({
       setError('Encryption needs a secure browser context. Use localhost or HTTPS.');
       return;
     }
-    const w = demo ? demoWorkspace() : newWorkspace(name.trim(), net);
+    const w = demo ? demoWorkspace(false) : newWorkspace(name.trim(), net);
     w.name = name.trim();
+    w.description = description.trim();
     onCreate(w, password);
     onClose();
   }
@@ -128,13 +130,26 @@ export function CreateDialog({
       </p>
       <form onSubmit={submit} className="stack">
         <label>
-          Workspace name
+          Name (public)
           <input
             autoFocus
             required
             maxLength={100}
             value={name}
             onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <p className="small muted">
+          The name stays visible when locked. Keep private details in the encrypted description.
+        </p>
+        <label>
+          Description (encrypted, optional)
+          <textarea
+            aria-label="Workspace description"
+            maxLength={10000}
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </label>
         {!demo && (
@@ -169,8 +184,8 @@ export function CreateDialog({
           />
         </label>
         <p className="security-note">
-          <LockKeyhole size={16} /> Encrypted in this browser and on export. Your password cannot be
-          recovered.
+          <LockKeyhole size={16} /> Contents are encrypted; the name is public. Your password cannot
+          be recovered.
         </p>
         {error && (
           <p role="alert" className="error-text">
@@ -406,6 +421,53 @@ export function ImportDialog({
         )}
         <button className="primary" disabled={busy}>
           {busy ? 'Decrypting…' : 'Open workspace'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+export function WorkspaceDetailsDialog({
+  workspace,
+  onSave,
+  onClose,
+}: {
+  workspace: Workspace;
+  onSave: (name: string, description: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(workspace.name);
+  const [description, setDescription] = useState(workspace.description ?? '');
+  return (
+    <Modal title="Workspace details" onClose={onClose}>
+      <form
+        className="stack"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!name.trim()) return;
+          onSave(name.trim(), description.trim());
+          onClose();
+        }}
+      >
+        <label>
+          Name (public)
+          <input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <p className="small muted">
+          Visible in this browser even while locked, and used in exported filenames.
+        </p>
+        <label>
+          Description (encrypted, optional)
+          <textarea
+            aria-label="Workspace description"
+            maxLength={10000}
+            rows={5}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </label>
+        <button className="primary" type="submit" disabled={!name.trim()}>
+          Save workspace details
         </button>
       </form>
     </Modal>

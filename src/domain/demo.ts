@@ -1,7 +1,7 @@
 import { newWorkspace } from './workspace';
 import type { Transaction, Workspace } from './types';
 // Deliberately synthetic, deterministic fixture; never presented as chain data.
-export function demoWorkspace(): Workspace {
+export function demoWorkspace(allPaths = true): Workspace {
   const w = newWorkspace('CoinJoin laboratory', 'testnet4');
   w.demo = true;
   const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -54,5 +54,9 @@ export function demoWorkspace(): Workspace {
       };
     }
   }
+  if (!allPaths)
+    w.transactions = Object.fromEntries(
+      Object.entries(w.transactions).filter(([, tx]) => tx.vin.length === 150),
+    );
   return w;
 }

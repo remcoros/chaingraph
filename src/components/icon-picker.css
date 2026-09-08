@@ -1,0 +1,112 @@
+.icon-picker {
+  min-width: 0;
+  flex: 1;
+}
+.icon-picker-label {
+  display: block;
+  margin-bottom: 7px;
+}
+.icon-picker-trigger {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 39px;
+}
+.icon-picker-trigger > svg {
+  margin-left: auto;
+}
+.icon-picker-preview {
+  font-size: 1.15rem;
+  width: 24px;
+  text-align: center;
+}
+.icon-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+}
+.icon-palette {
+  position: fixed;
+  box-sizing: border-box;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--color-line, #34434d);
+  border-radius: 10px;
+  background: var(--color-paper, #111a20);
+  box-shadow: 0 16px 50px #0009;
+}
+.icon-palette-heading,
+.icon-palette-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.icon-palette-heading {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.icon-palette > p {
+  flex-shrink: 0;
+}
+.icon-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  margin: 12px 0;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 3px;
+}
+.icon-palette-choice {
+  padding: 0;
+  min-height: 39px;
+  font-size: 1.2rem;
+  line-height: 1;
+  justify-content: center;
+}
+.icon-palette-choice[aria-pressed='true'] {
+  border-color: var(--color-accent, #b5e879);
+  background: #b5e87920;
+}
+.icon-palette-choice:focus-visible {
+  outline: 2px solid var(--color-accent, #b5e879);
+  outline-offset: 1px;
+}
+.icon-palette-footer {
+  font-size: 12px;
+  position: sticky;
+  bottom: 0;
+  flex-shrink: 0;
+  background: var(--color-paper, #111a20);
+  border-top: 1px solid var(--color-line, #34434d);
+  padding-top: 10px;
+}
+.related-transactions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  margin: 8px 0 12px;
+}
+.related-transactions > button {
+  max-width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.node-path-action {
+  margin: 14px 0;
+}
+.node-path-action > button {
+  width: 100%;
+  justify-content: flex-start;
+}
+.node-path-action > p {
+  margin: 6px 0 0;
+}

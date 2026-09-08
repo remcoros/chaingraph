@@ -32,7 +32,14 @@ import {
 } from 'lucide-react';
 const GraphView = lazy(() => import('./components/GraphView'));
 
-import { CreateDialog, ImportDialog, UnlockDialog, WalletDialog } from './components/Dialogs';
+import {
+  CreateDialog,
+  ImportDialog,
+  UnlockDialog,
+  WalletDialog,
+  WorkspaceDetailsDialog,
+  Modal,
+} from './components/Dialogs';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { WorkspaceHome } from './components/WorkspaceHome';
@@ -51,11 +58,13 @@ import {
   backendStatus,
   fetchTransaction,
   loadAddress,
-  loadFunding,
   loadSpending,
   scanWallet,
   type BackendStatus,
 } from './lib/api';
+import { loadAncestors } from './lib/tracing';
+import { demoWorkspace } from './domain/demo';
+import { TESTNET4_EXAMPLES } from './domain/examples';
 import { encryptWorkspace, MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
 import { useWorkspaces, type SavedWorkspace } from './lib/useWorkspaces';
@@ -85,8 +94,17 @@ export default function App() {
   const [entityKind, setEntityKind] = useState('all');
   const [rightTab, setRightTab] = useState<'inspect' | 'analysis'>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
+  const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
+  const [editToken, setEditToken] = useState(0);
+  const [examplesOpen, setExamplesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (!notice || /partial|cancelled|could not/i.test(notice)) return;
+    const timer = setTimeout(() => setNotice(''), 8000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   const [error, setError] = useState('');
   const [operation, setOperation] = useState('');
   const [fitToken, setFitToken] = useState(0);
@@ -94,6 +112,7 @@ export default function App() {
   const [live, setLive] = useState(false);
   const [scanLimit, setScanLimit] = useState(200);
   const [gap, setGap] = useState(20);
+  const spendingOffsets = useRef(new Map<string, number>());
   const operationRef = useRef<AbortController | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const labelsInput = useRef<HTMLInputElement>(null);
@@ -114,7 +133,7 @@ export default function App() {
       } else if (
         event.key.toLowerCase() === 'k' &&
         current &&
-        !document.querySelector('[role="dialog"]')
+        !document.querySelector('[role="dialog"][aria-modal="true"]')
       ) {
         event.preventDefault();
         searchInput.current?.focus();
@@ -162,6 +181,10 @@ export default function App() {
     setError('');
     setNotice('');
     setLive(false);
+    setSettingsOpen(false);
+    setExamplesOpen(false);
+    setEditToken(0);
+    spendingOffsets.current.clear();
     setFitToken((t) => t + 1);
   }, [ws.activeId]);
   useEffect(() => {
@@ -187,6 +210,29 @@ export default function App() {
   );
   const connected = !!status?.connected && !statusError;
   const canQuery = connected && w?.network === status?.network && !w?.demo;
+  const queryDisabledReason = w?.demo
+    ? undefined
+    : !connected
+      ? 'Connect your backend to load chain data.'
+      : w?.network !== status?.network
+        ? `This workspace uses ${w?.network}; the backend serves ${status?.network}.`
+        : undefined;
+  const canTrace = !!w?.demo || canQuery;
+  const fixture = useMemo(() => (w?.demo ? demoWorkspace().transactions : undefined), [w?.demo]);
+  const getTransaction = async (id: string, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    if (!fixture) return fetchTransaction(id, signal);
+    const transaction = fixture[id];
+    if (!transaction)
+      throw new Error('This transaction is outside the synthetic laboratory fixture.');
+    return transaction;
+  };
+  const editNode = (id: string) => {
+    setNotice('');
+    select(id);
+    setMobilePanel('right');
+    setEditToken((token) => token + 1);
+  };
   const run = async (task: (signal: AbortSignal) => Promise<void>) => {
     if (operationRef.current) return;
     const controller = new AbortController();
@@ -222,8 +268,10 @@ export default function App() {
   };
   async function search(e: FormEvent) {
     e.preventDefault();
-    if (!w) return;
-    const text = query.trim();
+    await addQuery(query.trim());
+  }
+  async function addQuery(text: string) {
+    if (!w || !canQuery) return;
     if (!text) return;
     await run(async (signal) => {
       if (/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
@@ -235,6 +283,15 @@ export default function App() {
         signal.throwIfAborted();
         mergeTransactions(w.id, [t]);
         select(index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index)));
+        if (prefetchDepth) {
+          const result = await loadAncestors([t], w.transactions, prefetchDepth, {
+            signal,
+            onProgress: setOperation,
+          });
+          signal.throwIfAborted();
+          mergeTransactions(w.id, result.transactions);
+          setNotice(ancestryNotice(result));
+        }
       } else {
         setOperation('Discovering address history…');
         const result = await loadAddress(text, w.network, w.transactions, signal, (p) =>
@@ -294,26 +351,68 @@ export default function App() {
       setFitToken((t) => t + 1);
     });
   }
-  async function expand(direction: 'funding' | 'spending') {
-    if (!tx || !w) return;
+  function ancestryNotice(result: Awaited<ReturnType<typeof loadAncestors>>) {
+    return `${result.transactions.length} previous transactions added.${result.truncated ? ' Partial expansion: 500-transaction limit reached. Trace individual paths to continue.' : ''}${result.failed ? ` ${result.failed} transactions could not be loaded. Retry the path to continue.` : ''}${!result.transactions.length && !result.failed && !result.truncated ? ' Previous transactions are already loaded, or this is a coinbase transaction with no previous inputs.' : ''}`;
+  }
+  async function expand(direction: 'funding' | 'spending', nodeId = selectedId) {
+    if (!w || !canTrace) return;
+    const node = graph.nodes.find((n) => n.id === nodeId);
+    if (!node?.txid || node.kind === 'address') return;
     await run(async (signal) => {
-      setOperation(`Loading ${direction} paths…`);
+      setOperation(
+        direction === 'funding'
+          ? 'Loading previous transactions…'
+          : 'Checking outputs for spending transactions…',
+      );
+      const loaded = w.transactions[node.txid!];
+      const transaction = loaded ?? (await getTransaction(node.txid!, signal));
       if (direction === 'funding') {
-        const transactions = await loadFunding(tx, w.transactions, signal);
-        signal.throwIfAborted();
-        mergeTransactions(w.id, transactions);
-        setNotice(`Added ${transactions.length} funding transactions.`);
+        if (!loaded) {
+          signal.throwIfAborted();
+          mergeTransactions(w.id, [transaction]);
+          setNotice(
+            'Creating transaction loaded. The output now has its value and script details. Trace again to load its previous inputs.',
+          );
+        } else {
+          const result = await loadAncestors([transaction], w.transactions, 1, {
+            signal,
+            fetch: getTransaction,
+            onProgress: setOperation,
+          });
+          signal.throwIfAborted();
+          mergeTransactions(w.id, result.transactions);
+          setNotice(ancestryNotice(result));
+        }
       } else {
-        const result = await loadSpending(
-          tx,
-          w,
-          selected?.kind === 'output' ? selected.vout : undefined,
-          signal,
-        );
+        const outputIndex = node.kind === 'output' ? node.vout : undefined;
+        const searchKey = `${transaction.txid}:${outputIndex ?? 'all'}`;
+        const result = fixture
+          ? {
+              transactions: Object.values(fixture).filter((t) =>
+                t.vin.some(
+                  (input) =>
+                    input.txid === transaction.txid &&
+                    (outputIndex === undefined || input.vout === outputIndex),
+                ),
+              ),
+              truncated: false,
+            }
+          : await loadSpending(
+              transaction,
+              w,
+              outputIndex,
+              signal,
+              spendingOffsets.current.get(searchKey) ?? 0,
+            );
         signal.throwIfAborted();
-        mergeTransactions(w.id, result.transactions);
+        const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
+        mergeTransactions(w.id, [...(!loaded ? [transaction] : []), ...result.transactions]);
+        if ('nextOffset' in result && result.nextOffset !== undefined)
+          spendingOffsets.current.set(searchKey, result.nextOffset);
+        else spendingOffsets.current.delete(searchKey);
+
         setNotice(
-          `${result.transactions.length} spending transactions found.${result.truncated ? ' Partial search: some history or nonstandard outputs were not searched.' : ''}`,
+          `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts could not be searched.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked history; this does not prove the output is unspent.' : ''}${fixture ? ' Searched the synthetic fixture only.' : ''}`,
         );
       }
       setFitToken((t) => t + 1);
@@ -532,6 +631,14 @@ export default function App() {
                   <button
                     onClick={() => {
                       setMenu(false);
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    Workspace details
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenu(false);
                       void exportWorkspace();
                     }}
                   >
@@ -572,6 +679,55 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+          <div className="trace-options">
+            {w.demo ? (
+              <>
+                <span>Practice tracing the synthetic CoinJoins:</span>
+                <button
+                  disabled={!!operation}
+                  onClick={() => {
+                    mergeTransactions(w.id, Object.values(fixture!));
+                    setFitToken((t) => t + 1);
+                  }}
+                >
+                  Show all fixture paths
+                </button>
+                <button
+                  disabled={!!operation}
+                  onClick={() => {
+                    change((c) => ({
+                      ...c,
+                      transactions: demoWorkspace(false).transactions,
+                      findings: [],
+                    }));
+                    setSelectedId(undefined);
+                    setFitToken((t) => t + 1);
+                  }}
+                >
+                  Reset practice paths
+                </button>
+              </>
+            ) : (
+              <>
+                <label>
+                  Prefetch previous
+                  <select
+                    aria-label="Prefetch previous levels"
+                    value={prefetchDepth}
+                    onChange={(e) => setPrefetchDepth(Number(e.target.value) as 0 | 1 | 2)}
+                  >
+                    <option value={0}>Off</option>
+                    <option value={1}>1 level</option>
+                    <option value={2}>2 levels</option>
+                  </select>
+                </label>
+                <span className="small muted">
+                  For transaction and output lookups · up to 500 previous transactions
+                </span>
+                <button onClick={() => setExamplesOpen(true)}>Testnet4 examples</button>
+              </>
+            )}
           </div>
           <div className="mobile-switch">
             <button
@@ -727,6 +883,11 @@ export default function App() {
                     sizeBy={w.view.sizeBy}
                     glow={w.view.glow}
                     fitToken={fitToken}
+                    transactions={w.transactions}
+                    onTrace={(id) => void expand('funding', id)}
+                    onEdit={editNode}
+                    busy={!!operation}
+                    traceDisabledReason={queryDisabledReason}
                   />
                 </Suspense>
               ) : (
@@ -839,15 +1000,23 @@ export default function App() {
                     tx={tx}
                     graph={graph}
                     busy={!!operation}
-                    canQuery={canQuery}
+                    canQuery={canTrace}
+                    queryDisabledReason={queryDisabledReason}
+                    editToken={editToken}
+                    onEditHandled={() => setEditToken(0)}
+                    onSelectNode={select}
                     annotationKey={`${w.id}:${selected.id}:${ws.active?.history.length}`}
                     onExpand={(direction) => void expand(direction)}
                     onRefresh={() =>
                       void run(async (signal) => {
-                        const transaction = await fetchTransaction(selected.txid!, signal);
+                        const transaction = await getTransaction(selected.txid!, signal);
                         signal.throwIfAborted();
                         mergeTransactions(w.id, [transaction]);
-                        setNotice('Transaction refreshed from your node.');
+                        setNotice(
+                          w.demo
+                            ? 'Transaction restored from the synthetic fixture.'
+                            : 'Transaction refreshed from your node.',
+                        );
                       })
                     }
                     onRemove={() => {
@@ -873,6 +1042,7 @@ export default function App() {
                   <div className="inspector-empty">
                     <Eye size={29} />
                     <h3>A closer look</h3>
+                    {w.description && <p className="workspace-description">{w.description}</p>}
                     <p>
                       Select a node in the graph or an item in Entities to inspect it, add context,
                       and follow its paths.
@@ -900,7 +1070,8 @@ export default function App() {
                   <span className="status-separator">/</span>
                   {graph.links.length.toLocaleString()} connections
                   <span className="status-separator">/</span>
-                  {Object.keys(w.transactions).length.toLocaleString()} transactions
+                  {Object.keys(w.transactions).length.toLocaleString()}{' '}
+                  {Object.keys(w.transactions).length === 1 ? 'transaction' : 'transactions'}
                 </>
               )}
             </span>
@@ -916,6 +1087,53 @@ export default function App() {
             </span>
           </footer>
         </>
+      )}
+      {w && settingsOpen && (
+        <WorkspaceDetailsDialog
+          key={w.id}
+          workspace={w}
+          onClose={() => setSettingsOpen(false)}
+          onSave={(name, description) => change((c) => ({ ...c, name, description }))}
+        />
+      )}
+      {w && examplesOpen && (
+        <Modal title="Testnet4 tracing examples" onClose={() => setExamplesOpen(false)}>
+          <p className="muted">
+            Real on-chain outputs with verified incoming and spending paths. Load an output, then
+            use the inspector to trace it. No wallet ownership is inferred.
+          </p>
+          {(w.network !== 'testnet4' || !canQuery) && (
+            <p className="warning">
+              Open a testnet4 workspace with a connected testnet4 backend to load these examples.
+            </p>
+          )}
+          <div className="example-list">
+            {TESTNET4_EXAMPLES.map((example) => (
+              <article key={example.id}>
+                <h3>{example.title}</h3>
+                <p>{example.description}</p>
+                <p className="mono small wrap">
+                  {example.txid}:{example.vout}
+                </p>
+                <div className="button-row">
+                  <button
+                    className="primary"
+                    disabled={w.network !== 'testnet4' || !canQuery || !!operation}
+                    onClick={() => {
+                      setExamplesOpen(false);
+                      void addQuery(`${example.txid}:${example.vout}`);
+                    }}
+                  >
+                    Load example output
+                  </button>
+                  <a href={example.sources[0].url} target="_blank" rel="noreferrer">
+                    Explorer reference
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </Modal>
       )}
       {(error || ws.storageError || notice) && (
         <div

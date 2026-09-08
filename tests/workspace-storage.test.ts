@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
+import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import { encryptWorkspace, decryptWorkspace } from '../src/lib/crypto';
 import { STORAGE_KEY, WorkspaceSessionStore } from '../src/lib/useWorkspaces';
 
@@ -23,6 +23,70 @@ function deferred() {
 }
 
 describe('workspace persistence state transitions', () => {
+  it('stores the workspace name publicly while keeping its optional description encrypted', async () => {
+    const storage = memoryStorage();
+    const store = new WorkspaceSessionStore({ storage });
+    const w = {
+      ...newWorkspace('Public project name', 'mainnet'),
+      description: 'Private wallet provenance and research notes.',
+    };
+    store.open(w, password);
+    await store.persist(w.id);
+    const [entry] = JSON.parse(storage.raw()!);
+    expect(entry.publicName).toBe(w.name);
+    expect(storage.raw()).toContain(w.name);
+    expect(storage.raw()).not.toContain(w.description);
+    expect(await decryptWorkspace(entry.envelope, password)).toMatchObject({
+      name: w.name,
+      description: w.description,
+    });
+    const reloaded = new WorkspaceSessionStore({ storage });
+    await reloaded.unlock(reloaded.getSnapshot().saved[0], password);
+    expect(reloaded.getSnapshot().sessions[0].data.description).toBe(w.description);
+  });
+
+  it('loads legacy saved records and migrates their public name only after unlocking and saving', async () => {
+    const w = newWorkspace('Legacy project', 'mainnet');
+    const envelope = await encryptWorkspace(w, password);
+    const storage = memoryStorage(
+      JSON.stringify([{ id: w.id, savedAt: new Date().toISOString(), envelope }]),
+    );
+    const store = new WorkspaceSessionStore({ storage });
+    expect(store.getSnapshot().storageError).toBe('');
+    expect(store.getSnapshot().saved[0].publicName).toBeUndefined();
+    await store.unlock(store.getSnapshot().saved[0], password);
+    expect(store.getSnapshot().sessions[0].savedRevision).toBe(-1);
+    expect(JSON.parse(storage.raw()!)[0].publicName).toBeUndefined();
+    await store.persist(w.id);
+    expect(JSON.parse(storage.raw()!)[0].publicName).toBe('Legacy project');
+  });
+
+  it('rejects malformed public names without discarding the original saved storage', async () => {
+    const w = newWorkspace('Valid name', 'mainnet');
+    const envelope = await encryptWorkspace(w, password);
+    for (const publicName of [null, 123, {}, '', '   ', 'x'.repeat(101)]) {
+      const original = JSON.stringify([
+        { id: w.id, publicName, savedAt: new Date().toISOString(), envelope },
+      ]);
+      const storage = memoryStorage(original);
+      const store = new WorkspaceSessionStore({ storage });
+      expect(store.getSnapshot().storageError).toContain('malformed');
+      store.open(w, password);
+      await expect(store.persist(w.id)).rejects.toThrow('malformed');
+      expect(storage.raw()).toBe(original);
+    }
+  });
+
+  it('validates optional description size without requiring it in legacy workspaces', () => {
+    const w = newWorkspace('Description limits', 'testnet4');
+    expect(parseWorkspace(w).description).toBeUndefined();
+    expect(parseWorkspace({ ...w, description: 'x'.repeat(10000) }).description).toHaveLength(
+      10000,
+    );
+    expect(() => parseWorkspace({ ...w, description: 'x'.repeat(10001) })).toThrow();
+    expect(() => parseWorkspace({ ...w, description: 42 })).toThrow();
+  });
+
   it('clears old undo snapshots after a chain refresh so undo cannot erase new transaction data', () => {
     const store = new WorkspaceSessionStore({ storage: memoryStorage() });
     const w = newWorkspace('Before label', 'mainnet');
@@ -78,7 +142,7 @@ describe('workspace persistence state transitions', () => {
     release.resolve();
     await locked;
     expect(store.getSnapshot().sessions).toHaveLength(0);
-    expect(storage.raw()).not.toContain('Latest edit before lock');
+    expect(JSON.parse(storage.raw()!)[0].publicName).toBe('Latest edit before lock');
     const restored = new WorkspaceSessionStore({ storage });
     expect(restored.getSnapshot().storageError).toBe('');
     const saved = restored.getSnapshot().saved[0];

@@ -14,15 +14,101 @@
   outline-offset: -3px;
   touch-action: none;
 }
-.graph-node-tooltip {
-  max-width: 320px;
-  padding: 8px 11px;
-  border: 1px solid color-mix(in srgb, var(--color-muted) 40%, transparent);
-  background: var(--color-paper);
+.graph-hover-card {
+  box-sizing: border-box;
+  position: absolute;
+  z-index: 8;
+  width: 320px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-muted) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-paper) 97%, white);
+  color: var(--color-ink, #e7eeeb);
+  box-shadow: 0 12px 38px #0008;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+}
+.graph-hover-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.graph-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
   color: var(--color-accent);
-  border-radius: 5px;
-  font: 12px/1.45 monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 10px;
+  font-weight: 700;
+}
+.graph-card-heading .graph-card-close {
+  min-height: 26px;
+  width: 26px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+}
+.graph-card-label {
+  display: block;
+  font-size: 14px;
   overflow-wrap: anywhere;
+}
+.graph-card-facts {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0;
+}
+.graph-card-facts div {
+  display: grid;
+  gap: 3px;
+}
+.graph-card-facts dt {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.graph-card-facts dd {
+  margin: 0;
+}
+.graph-card-identifier {
+  font:
+    11px/1.55 'IBM Plex Mono',
+    monospace;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.graph-card-explanation {
+  color: var(--color-muted);
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.graph-card-missing {
+  color: var(--color-accent);
+}
+.graph-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+.graph-card-actions button {
+  padding: 7px 9px;
+  min-height: 34px;
+  font-size: 11px;
+}
+.graph-card-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .graph-view .graph-empty,
 .graph-unavailable {
