@@ -1,0 +1,301 @@
+import { expect, test, type Page } from '@playwright/test';
+import {
+  PUBLIC_ZPUB,
+  TX_FUNDING,
+  TX_SPENDING,
+  transactions,
+  type MockCall,
+} from '../fixtures/bitcoin';
+
+const PASSWORD = 'public-wallet-refresh-test-only';
+const NEXT_RECEIVE = 'c'.repeat(64);
+const RECEIVE_HASH = '6e4f16236139f15046b38f399a683fb2aa8edf5fd128b3e5db017fb0ac74078a';
+const CHANGE_HASH = '48d4bc4257d5177c6a44dfa0e3fd17916fc15b39b8a1cbb0aa297b059f826425';
+
+async function createAndLoad(page: Page) {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
+  const dialog = page.getByRole('dialog', { name: 'Create a workspace' });
+  await dialog.getByLabel('Name (public)', { exact: true }).fill('Returning wallet fixture');
+  await dialog.getByLabel('Bitcoin network').selectOption('mainnet');
+  await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await dialog.getByLabel('Confirm password').fill(PASSWORD);
+  await dialog.getByRole('button', { name: 'Create workspace' }).click();
+  await page
+    .getByRole('dialog', { name: 'Guided tour' })
+    .getByRole('button', { name: 'Skip tour' })
+    .click();
+  await page.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  const add = page.getByRole('dialog', { name: 'Add a wallet' });
+  await add.getByLabel('Wallet name').fill('Public BIP84 wallet');
+  await add.getByLabel('Extended public key').fill(PUBLIC_ZPUB);
+  await add.getByRole('button', { name: 'Add wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Scan wallet', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeEnabled();
+}
+
+async function selectFunding(page: Page) {
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Entity type').selectOption('transaction');
+  await page.getByLabel('Filter graph entities').fill(TX_FUNDING);
+  await page.locator('.entity-list .entity-row').first().click();
+}
+
+async function phaseFixture(page: Page) {
+  let phase = 1;
+  let pause = false;
+  let waiting = false;
+  const releases: (() => void)[] = [];
+  const calls: MockCall[] = [];
+  await page.route('**/api/status', (route) =>
+    route.fulfill({ json: { network: 'mainnet', connected: true, height: 900000 } }),
+  );
+  await page.route('**/api/rpc', async (route) => {
+    const call = route.request().postDataJSON() as MockCall;
+    calls.push(call);
+    if (pause && call.method === 'blockchain.scripthash.get_history') {
+      waiting = true;
+      await new Promise<void>((resolve) => {
+        releases.push(resolve);
+      });
+      // Route disposal on cancellation is allowed and must not fail the fixture.
+      await route.abort().catch(() => {});
+      return;
+    }
+    let result: unknown;
+    if (call.method === 'blockchain.scripthash.get_history') {
+      result =
+        call.params[0] === RECEIVE_HASH
+          ? [
+              { tx_hash: TX_FUNDING, height: 899900 },
+              ...(phase > 1
+                ? [
+                    { tx_hash: TX_SPENDING, height: 899901 },
+                    { tx_hash: NEXT_RECEIVE, height: 0 },
+                  ]
+                : []),
+            ]
+          : call.params[0] === CHANGE_HASH && phase > 1
+            ? [{ tx_hash: TX_SPENDING, height: 899901 }]
+            : [];
+    } else if (call.method === 'getrawtransaction') {
+      result =
+        call.params[0] === NEXT_RECEIVE
+          ? { ...transactions[TX_FUNDING], txid: NEXT_RECEIVE, confirmations: 0 }
+          : transactions[call.params[0] as keyof typeof transactions];
+    }
+    await route.fulfill(
+      result === undefined
+        ? { status: 400, json: { error: 'Unsupported public fixture request' } }
+        : { json: { result } },
+    );
+  });
+  return {
+    calls,
+    advance: () => {
+      phase = 2;
+    },
+    pause: () => {
+      pause = true;
+    },
+    waiting: () => waiting,
+    release: () => {
+      pause = false;
+      releases.splice(0).forEach((release) => release());
+    },
+  };
+}
+
+test('reopens a wallet days later, refreshes new receives and spends, and keeps selection, drafts and encrypted metadata', async ({
+  page,
+}, testInfo) => {
+  const fixture = await phaseFixture(page);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.clock.install({ time: new Date('2026-09-05T12:00:00Z') });
+  await createAndLoad(page);
+  await page.getByRole('button', { name: 'Show new activity (1)', exact: true }).click();
+  await selectFunding(page);
+  await page.getByLabel('Node label').fill('Exchange withdrawal');
+  await page.getByLabel('Node notes').fill('Keep this source attribution after refreshing.');
+  await page.getByLabel('Bookmark', { exact: true }).check();
+  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
+  await page.getByRole('button', { name: 'Workspace menu' }).click();
+  await page.getByRole('button', { name: 'Save and lock workspace' }).click();
+  await expect(page.locator('.saved-row')).toBeVisible();
+  fixture.advance();
+  await page.clock.setSystemTime(new Date('2026-09-08T13:00:00Z'));
+  await page.reload();
+  const callsBefore = fixture.calls.length;
+  await page.locator('.saved-row').click();
+  const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
+  await unlock.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(page.locator('.wallet-row')).toContainText('Checked 3 days ago');
+  await expect(page.getByLabel('Check activity every 30s')).not.toBeChecked();
+  expect(fixture.calls.length).toBe(callsBefore);
+  await selectFunding(page);
+  await expect(page.getByLabel('Node label')).toHaveValue('Exchange withdrawal');
+  await expect(page.getByLabel('Node notes')).toHaveValue(
+    'Keep this source attribution after refreshing.',
+  );
+  await expect(page.getByLabel('Bookmark', { exact: true })).toBeChecked();
+  await page.getByLabel('Node notes').fill('Unsaved note remains during refresh.');
+  await page
+    .locator('.left-panel .panel-tabs')
+    .getByRole('button', { name: /^Wallets/ })
+    .click();
+  await page.getByRole('button', { name: 'Refresh all wallets', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+  await expect(
+    page.getByRole('button', { name: 'Refresh all wallets', exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator('.selection-heading h2')).toHaveText('Exchange withdrawal');
+  await expect(page.getByLabel('Node notes')).toHaveValue('Unsaved note remains during refresh.');
+  await expect(page.locator('.wallet-activity-link')).toContainText('2');
+  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
+  // A no-new-transaction check must not clear the unreviewed activity badge.
+  await page.getByRole('button', { name: 'Refresh all wallets', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Refresh all wallets', exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+  await expect(page.locator('.wallet-activity-link')).toContainText('2');
+  const refreshedCalls = fixture.calls
+    .slice(callsBefore)
+    .filter((call) => call.method === 'getrawtransaction');
+  expect(refreshedCalls.map((call) => call.params[0])).toEqual([
+    TX_SPENDING,
+    NEXT_RECEIVE,
+    NEXT_RECEIVE,
+  ]);
+  await page.locator('.wallet-row').click();
+  await expect(
+    page.getByText('Last check: 0 new to workspace · 1 transaction refreshed', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await page.screenshot({
+    path: testInfo.outputPath('wallet-refreshed-desktop.png'),
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Show new activity (2)', exact: true }).click();
+  await expect(page.getByLabel('Filter graph entities')).toHaveValue('');
+  await expect(page.locator('.entity-list')).toContainText(TX_SPENDING.slice(0, 8));
+  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await selectFunding(page);
+  await expect(page.getByLabel('Node notes')).toHaveValue('Unsaved note remains during refresh.');
+  await page
+    .locator('.left-panel .panel-tabs')
+    .getByRole('button', { name: /^Wallets/ })
+    .click();
+  await page.locator('.wallet-row').click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  await page.screenshot({
+    path: testInfo.outputPath('wallet-refreshed-mobile.png'),
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+  const storage = await page.evaluate(() =>
+    JSON.stringify(Object.fromEntries(Object.entries(localStorage))),
+  );
+  for (const privateValue of [PUBLIC_ZPUB, 'Exchange withdrawal', 'Unsaved note remains', PASSWORD])
+    expect(storage).not.toContain(privateValue);
+});
+
+test('cancels a returning refresh without advancing the saved check or committing partial history', async ({
+  page,
+}) => {
+  const fixture = await phaseFixture(page);
+  await createAndLoad(page);
+  const lastChecked = await page.getByText(/^Last checked /).textContent();
+  await page.clock.setSystemTime(new Date(Date.now() + 86_400_000));
+  fixture.advance();
+  fixture.pause();
+  await page.getByRole('button', { name: 'Refresh wallet', exact: true }).click();
+  await expect.poll(fixture.waiting).toBe(true);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  fixture.release();
+  await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeEnabled();
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  await expect(page.getByText(/^Last checked /)).toHaveText(lastChecked!);
+  await expect(
+    page.getByText('Last check: 1 new to workspace · 0 transactions refreshed', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Refresh wallet', exact: true }).click();
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+});
+
+test('acknowledging new wallet activity keeps analysis reports and findings active', async ({
+  page,
+}) => {
+  const fixture = await phaseFixture(page);
+  await createAndLoad(page);
+  fixture.advance();
+  await page.getByRole('button', { name: 'Refresh wallet', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeEnabled();
+  await page
+    .locator('.right-panel')
+    .getByRole('button', { name: /^Analysis/ })
+    .click();
+  const tool = page
+    .locator('.analysis-tool')
+    .filter({ has: page.getByRole('heading', { name: 'Value flow and fees', exact: true }) });
+  await tool.getByRole('button', { name: 'Run analysis' }).click();
+  await expect(tool.getByRole('status')).toBeVisible();
+  const report = await tool.getByRole('status').textContent();
+  await expect(page.locator('.finding')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Refresh all wallets', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Refresh all wallets', exact: true }),
+  ).toBeEnabled();
+  await expect(tool.getByRole('status')).toHaveText(report!);
+  await page.locator('.wallet-activity-link').click();
+  await expect(tool.getByRole('status')).toHaveText(report!);
+  await expect(page.locator('.finding')).toHaveCount(1);
+  await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(0);
+});
+
+test('monitoring only queries wallets after opt-in and preserves activity until reviewed', async ({
+  page,
+}) => {
+  const fixture = await phaseFixture(page);
+  await createAndLoad(page);
+  await page.clock.install();
+  fixture.advance();
+  const baseline = fixture.calls.length;
+  await page.clock.fastForward(31_000);
+  expect(fixture.calls.length).toBe(baseline);
+  await page.getByLabel('Check activity every 30s').check();
+  await page.clock.fastForward(31_000);
+  await expect(page.locator('.statusbar')).toContainText('3 transactions');
+  await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeEnabled();
+  await page.getByLabel('Check activity every 30s').uncheck();
+  const checked = fixture.calls.length;
+  await page.clock.fastForward(31_000);
+  expect(fixture.calls.length).toBe(checked);
+  await expect(
+    page.getByRole('button', { name: 'Show new activity (3)', exact: true }),
+  ).toBeVisible();
+});
+
+test('turning monitoring off cancels its current history requests', async ({ page }) => {
+  const fixture = await phaseFixture(page);
+  await createAndLoad(page);
+  await page.clock.install();
+  fixture.advance();
+  fixture.pause();
+  await page.getByLabel('Check activity every 30s').check();
+  await page.clock.fastForward(31_000);
+  await expect.poll(fixture.waiting).toBe(true);
+  await page.getByLabel('Check activity every 30s').uncheck();
+  fixture.release();
+  await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeEnabled();
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  const stopped = fixture.calls.length;
+  await page.clock.fastForward(31_000);
+  expect(fixture.calls.length).toBe(stopped);
+});

@@ -22,6 +22,7 @@ import {
 } from '../domain/types';
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
+import { walletActivitySummary, walletCheckAge } from '../domain/walletActivity';
 import { CopyButton } from './CopyButton';
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from './IconPicker';
@@ -162,6 +163,7 @@ export function WalletInspector({
   busy,
   canQuery,
   onScan,
+  onShowActivity,
   onRemove,
 }: {
   wallet: Wallet;
@@ -169,6 +171,7 @@ export function WalletInspector({
   busy: boolean;
   canQuery: boolean;
   onScan: () => void;
+  onShowActivity: () => void;
   onRemove: () => void;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -183,7 +186,63 @@ export function WalletInspector({
     <div className="panel-section">
       <span className="eyebrow">WATCH-ONLY WALLET</span>
       <h2>{wallet.name}</h2>
-      <p className="mono muted wrap small">{wallet.key}</p>
+      <div className="wallet-refresh-summary">
+        <button className="primary" disabled={busy || !canQuery} onClick={onScan}>
+          <RefreshCw size={15} />
+          {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
+        </button>
+        <p
+          className="small muted"
+          title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}
+        >
+          {walletCheckAge(wallet.scannedAt)}
+          {wallet.scannedAt && (
+            <small>Last checked {new Date(wallet.scannedAt).toLocaleString()}</small>
+          )}
+        </p>
+        {wallet.lastActivity && (
+          <p className="small">Last check: {walletActivitySummary(wallet)}</p>
+        )}
+        {!!wallet.unreviewedTransactionIds?.length && (
+          <button onClick={onShowActivity} title="Transactions loaded since your last review">
+            Show new activity ({wallet.unreviewedTransactionIds.length})
+          </button>
+        )}
+        {wallet.activityOverflow && (
+          <p className="small warning">
+            Showing the latest 10,000 unreviewed transactions. Earlier loaded transactions remain in
+            the full graph.
+          </p>
+        )}
+        {!!wallet.lastActivity?.missingTransactionCount && (
+          <p className="warning small">
+            {wallet.lastActivity.missingTransactionCount} previously observed transactions are
+            absent from checked histories. Saved transactions and annotations remain in the graph.
+            This can follow a replacement, removal or chain reorganization.
+          </p>
+        )}
+        {wallet.scannedAt && (
+          <p className={`scan-result ${wallet.scanComplete ? '' : 'warning'}`}>
+            {wallet.scanComplete
+              ? 'Gap limit reached on both branches.'
+              : 'Partial scan: increase limits or refresh to continue.'}
+            <small>
+              {wallet.scanGap ? `${wallet.scanGap} unused addresses · ` : ''}
+              {wallet.scanLimit} addresses maximum per branch
+            </small>
+            {!!wallet.pendingTransactionIds?.length && (
+              <small>
+                {wallet.pendingTransactionIds.length} transaction downloads queued for the next
+                refresh.
+              </small>
+            )}
+          </p>
+        )}
+      </div>
+      <details className="wallet-key-details">
+        <summary>Extended public key</summary>
+        <p className="mono muted wrap small">{wallet.key}</p>
+      </details>
       <dl className="details">
         <div>
           <dt>Address type</dt>
@@ -205,18 +264,6 @@ export function WalletInspector({
       <p className="small muted">
         Received outputs include spent outputs; this is not a wallet balance.
       </p>
-      <button className="primary" disabled={busy || !canQuery} onClick={onScan}>
-        <RefreshCw size={15} />
-        {wallet.scannedAt ? 'Rescan wallet' : 'Scan wallet'}
-      </button>
-      {wallet.scannedAt && (
-        <p className={`scan-result ${wallet.scanComplete ? '' : 'warning'}`}>
-          {wallet.scanComplete
-            ? 'Gap limit reached on both branches.'
-            : 'Partial scan: increase limits or continue scanning.'}
-          <small>Last scan {new Date(wallet.scannedAt).toLocaleString()}</small>
-        </p>
-      )}
       <div className="wallet-addresses">
         <h3>Discovered addresses</h3>
         {wallet.addresses

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Workspace } from '../domain/types';
 import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
+import { walletEvidenceChanged } from '../domain/walletActivity';
 import {
   encryptWorkspace,
   decryptWorkspace,
@@ -165,7 +166,10 @@ export class WorkspaceSessionStore {
     const current = this.state.sessions.find((s) => s.data.id === id);
     if (!current) return;
     let data = fn(current.data);
-    if (data.transactions !== current.data.transactions || data.wallets !== current.data.wallets) {
+    if (
+      data.transactions !== current.data.transactions ||
+      walletEvidenceChanged(current.data.wallets, data.wallets)
+    ) {
       data = { ...data, findings: data.findings.map((finding) => ({ ...finding, stale: true })) };
     }
     assertWorkspaceBudget(data);

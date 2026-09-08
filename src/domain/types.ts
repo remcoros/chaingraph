@@ -45,7 +45,15 @@ export interface Wallet {
   scannedAt?: string;
   scanComplete?: boolean;
   scanLimit?: number;
+  scanGap?: number;
   pendingTransactionIds?: string[];
+  unreviewedTransactionIds?: string[];
+  activityOverflow?: boolean;
+  lastActivity?: {
+    newTransactionIds: string[];
+    refreshedTransactionCount: number;
+    missingTransactionCount: number;
+  };
 }
 export interface Annotation {
   label: string;

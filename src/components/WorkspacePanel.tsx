@@ -1,5 +1,19 @@
-import { Bookmark, ChevronRight, Plus, ShieldCheck, Wallet as WalletIcon } from 'lucide-react';
-import { short, type Annotation, type GraphNode, type Workspace } from '../domain/types';
+import {
+  Bookmark,
+  ChevronRight,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Wallet as WalletIcon,
+} from 'lucide-react';
+import {
+  short,
+  type Annotation,
+  type GraphNode,
+  type Wallet,
+  type Workspace,
+} from '../domain/types';
+import { walletCheckAge } from '../domain/walletActivity';
 import type { GraphFilters } from '../domain/graphFilters';
 import EntityBrowser from './EntityBrowser';
 interface Props {
@@ -11,6 +25,9 @@ interface Props {
   onSelectWallet: (id: string) => void;
   onSelectNode: (id: string) => void;
   onAddWallet: () => void;
+  busy: boolean;
+  onRefreshAll: () => void;
+  onShowActivity: (wallet: Wallet) => void;
   gap: number;
   setGap: (gap: number) => void;
   scanLimit: number;
@@ -38,6 +55,9 @@ export function WorkspacePanel({
   onSelectWallet,
   onSelectNode,
   onAddWallet,
+  busy,
+  onRefreshAll,
+  onShowActivity,
   gap,
   setGap,
   scanLimit,
@@ -83,21 +103,39 @@ export function WorkspacePanel({
         <>
           <div className="panel-body wallet-list">
             {w.wallets.map((item) => (
-              <button
-                className={`wallet-row ${selectedWalletId === item.id ? 'selected' : ''}`}
-                key={item.id}
-                onClick={() => onSelectWallet(item.id)}
-              >
-                <WalletIcon size={19} />
-                <span>
-                  <strong>{item.name}</strong>
-                  <small>
-                    {item.addresses.filter((a) => a.history?.length).length} used addresses ·{' '}
-                    {item.scriptType}
-                  </small>
-                </span>
-                <ChevronRight size={14} />
-              </button>
+              <div className="wallet-card" key={item.id}>
+                <button
+                  className={`wallet-row ${selectedWalletId === item.id ? 'selected' : ''}`}
+                  key={item.id}
+                  onClick={() => onSelectWallet(item.id)}
+                >
+                  <WalletIcon size={19} />
+                  <span>
+                    <strong>{item.name}</strong>
+                    <small>
+                      {item.addresses.filter((a) => a.history?.length).length} used addresses ·{' '}
+                      {item.scriptType}
+                    </small>
+                    <small
+                      title={item.scannedAt ? new Date(item.scannedAt).toLocaleString() : undefined}
+                    >
+                      {walletCheckAge(item.scannedAt)}
+                      {item.scannedAt && !item.scanComplete ? ' · partial' : ''}
+                    </small>
+                  </span>
+                  <ChevronRight size={14} />
+                </button>
+                {!!item.unreviewedTransactionIds?.length && (
+                  <button
+                    className="wallet-activity-link"
+                    title="Transactions loaded since your last review"
+                    onClick={() => onShowActivity(item)}
+                  >
+                    Show new activity · {item.unreviewedTransactionIds.length}
+                    {item.activityOverflow ? '+' : ''}
+                  </button>
+                )}
+              </div>
             ))}
             {w.wallets.length === 0 && (
               <div className="empty-panel">
@@ -112,6 +150,15 @@ export function WorkspacePanel({
             </button>
           </div>
           <div className="scan-settings">
+            {!!w.wallets.length && (
+              <button
+                className="refresh-wallets"
+                disabled={busy || !canQuery}
+                onClick={onRefreshAll}
+              >
+                <RefreshCw size={15} /> Refresh all wallets
+              </button>
+            )}
             <div className="section-title">
               <h3>Discovery</h3>
               <span className="eyebrow">CLIENT-SIDE</span>
@@ -145,8 +192,8 @@ export function WorkspacePanel({
               <span>Check activity every 30s</span>
             </label>
             <p className="small muted">
-              Both receive and change branches. Scan limits are explicit; incomplete history stays
-              marked.
+              {live ? 'Monitoring while unlocked. ' : 'Refresh to check for new activity. '}
+              Both receive and change branches; 500 transaction downloads per wallet and check.
             </p>
           </div>
         </>

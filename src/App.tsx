@@ -50,6 +50,11 @@ import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { AboutDialog } from './components/AboutDialog';
 import { filterGraph, type GraphFilters } from './domain/graphFilters';
+import {
+  applyWalletScan,
+  walletActivitySummary,
+  walletEvidenceChanged,
+} from './domain/walletActivity';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
@@ -383,11 +388,15 @@ export default function App() {
       setFitToken((t) => t + 1);
     });
   }
-  async function scan(target: Wallet) {
-    if (!w) return;
-    await run(async (signal) => {
-      setOperation(`Scanning ${target.name}…`);
-      const result = await scanWallet(target, w.network, w.transactions, {
+  async function refreshWallets(targets: Wallet[], initial: Workspace, signal: AbortSignal) {
+    let snapshot = initial;
+    let added = 0;
+    let refreshed = 0;
+    let partial = false;
+    let missing = 0;
+    for (const target of targets) {
+      setOperation(`${target.scannedAt ? 'Refreshing' : 'Scanning'} ${target.name}…`);
+      const result = await scanWallet(target, snapshot.network, snapshot.transactions, {
         gap,
         maxIndex: scanLimit,
         signal,
@@ -395,35 +404,51 @@ export default function App() {
       });
       signal.throwIfAborted();
       ws.update(
-        w.id,
-        (c) => ({
-          ...c,
-          wallets: c.wallets.map((x) =>
-            x.id === target.id
-              ? {
-                  ...x,
-                  addresses: result.wallet.addresses,
-                  scannedAt: result.wallet.scannedAt,
-                  scanComplete: result.wallet.scanComplete,
-                  scanLimit: result.wallet.scanLimit,
-                  pendingTransactionIds: result.wallet.pendingTransactionIds,
-                }
-              : x,
-          ),
-          transactions: {
-            ...c.transactions,
-            ...Object.fromEntries(result.transactions.map((t) => [t.txid, t])),
-          },
-        }),
+        initial.id,
+        (current) => applyWalletScan(current, result.wallet, result.transactions),
         false,
       );
+      snapshot = applyWalletScan(snapshot, result.wallet, result.transactions);
+      added += result.wallet.lastActivity?.newTransactionIds.length ?? 0;
+      refreshed += result.wallet.lastActivity?.refreshedTransactionCount ?? 0;
+      missing += result.wallet.lastActivity?.missingTransactionCount ?? 0;
+      partial ||= !result.wallet.scanComplete;
+    }
+    return { snapshot, added, refreshed, partial, missing };
+  }
+  async function scan(target?: Wallet) {
+    if (!w || !canQuery) return;
+    await run(async (signal) => {
+      const result = await refreshWallets(target ? [target] : w.wallets, w, signal);
       setNotice(
-        result.wallet.scanComplete
-          ? `Scan complete within the ${gap}-address gap assumption. ${result.transactions.length} transactions loaded.`
-          : `Partial scan: reached an address or transaction limit. Increase the address limit or scan again to continue.`,
+        `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${result.partial ? ' Partial scan: increase the address limit or refresh again to continue queued transactions.' : ` Gap limit reached on both branches (${gap} unused addresses).`}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
       );
-      setFitToken((t) => t + 1);
+      // Only the first discovery frames an empty canvas. Returning checks leave
+      // the user's camera, selection, filters and annotation draft alone.
+      if (!Object.keys(w.transactions).length && result.added) setFitToken((token) => token + 1);
     });
+  }
+  function showWalletActivity(target: Wallet) {
+    const ids = new Set(target.unreviewedTransactionIds ?? []);
+    updateFilters({
+      includeIds: graph.nodes
+        .filter((node) => node.txid && ids.has(node.txid))
+        .map((node) => node.id),
+      preserveContext: true,
+    });
+    setLeftTab('entities');
+    setMobilePanel('graph');
+    change(
+      (current) => ({
+        ...current,
+        wallets: current.wallets.map((wallet) =>
+          wallet.id === target.id
+            ? { ...wallet, unreviewedTransactionIds: [], activityOverflow: false }
+            : wallet,
+        ),
+      }),
+      false,
+    );
   }
   function ancestryNotice(result: Awaited<ReturnType<typeof loadAncestors>>) {
     return `${result.transactions.length} previous transactions added.${result.truncated ? ' Partial expansion: 500-transaction limit reached. Trace individual paths to continue.' : ''}${result.failed ? ` ${result.failed} transactions could not be loaded. Retry the path to continue.` : ''}${!result.transactions.length && !result.failed && !result.truncated ? ' Previous transactions are already loaded, or this is a coinbase transaction with no previous inputs.' : ''}`;
@@ -508,64 +533,61 @@ export default function App() {
   // Poll from the client, only while this workspace is unlocked. Backend never owns scan state.
   useEffect(() => {
     if (!live || !canQuery || !w) return;
+    let monitorOperation: AbortController | undefined;
     const timer = setInterval(() => {
       if (operationRef.current) return;
       const current = wRef.current;
       if (!current) return;
       void run(async (signal) => {
+        monitorOperation = operationRef.current;
         setOperation('Checking watched activity…');
-        let added = 0;
-        let partial = false;
-        for (const target of current.wallets) {
-          const result = await scanWallet(target, current.network, current.transactions, {
-            gap,
-            maxIndex: scanLimit,
-            signal,
-          });
-          signal.throwIfAborted();
-          ws.update(
-            current.id,
-            (c) => ({
-              ...c,
-              wallets: c.wallets.map((x) =>
-                x.id === target.id
-                  ? {
-                      ...x,
-                      addresses: result.wallet.addresses,
-                      scannedAt: result.wallet.scannedAt,
-                      scanComplete: result.wallet.scanComplete,
-                      scanLimit: result.wallet.scanLimit,
-                      pendingTransactionIds: result.wallet.pendingTransactionIds,
-                    }
-                  : x,
-              ),
-              transactions: {
-                ...c.transactions,
-                ...Object.fromEntries(result.transactions.map((t) => [t.txid, t])),
-              },
-            }),
-            false,
-          );
-          added += result.transactions.length;
-          partial ||= !result.wallet.scanComplete;
-        }
+        const checked = await refreshWallets(current.wallets, current, signal);
+        let added = checked.added;
+        let refreshed = checked.refreshed;
+        let partial = checked.partial;
+        let snapshot = checked.snapshot;
         for (const address of current.watchedAddresses) {
-          const result = await loadAddress(address, current.network, current.transactions, signal);
+          const result = await loadAddress(address, current.network, snapshot.transactions, signal);
           signal.throwIfAborted();
           mergeTransactions(current.id, result.transactions);
-          added += result.transactions.length;
+          added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
+          refreshed += result.transactions.filter((tx) => !!snapshot.transactions[tx.txid]).length;
+          snapshot = {
+            ...snapshot,
+            transactions: {
+              ...snapshot.transactions,
+              ...Object.fromEntries(result.transactions.map((tx) => [tx.txid, tx])),
+            },
+          };
           partial ||= result.truncated;
         }
         setNotice(
-          `Activity check finished · ${added} transactions loaded or refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}`,
+          `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
         );
+      }).finally(() => {
+        monitorOperation = undefined;
       });
     }, 30000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      monitorOperation?.abort();
+    };
   }, [live, canQuery, w?.id, gap, scanLimit]);
   const entityNodes = visibleGraph.matchedNodes;
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
-  useEffect(() => setRunReports({}), [w?.transactions, w?.wallets]);
+  const analysisEvidence = useRef<{ transactions?: Workspace['transactions']; wallets: Wallet[] }>({
+    wallets: [],
+  });
+  useEffect(() => {
+    const previous = analysisEvidence.current;
+    const next = { transactions: w?.transactions, wallets: w?.wallets ?? [] };
+    if (
+      previous.transactions !== next.transactions ||
+      walletEvidenceChanged(previous.wallets, next.wallets)
+    )
+      setRunReports({});
+    analysisEvidence.current = next;
+  }, [w?.transactions, w?.wallets]);
   function centerNode(id = selectedId, filters?: GraphFilters) {
     if (!id) return;
     const rendered = filters
@@ -1005,6 +1027,9 @@ export default function App() {
                 setMobilePanel('right');
               }}
               onAddWallet={() => setWalletDialog(true)}
+              busy={!!operation}
+              onRefreshAll={() => void scan()}
+              onShowActivity={showWalletActivity}
               gap={gap}
               setGap={setGap}
               scanLimit={scanLimit}
@@ -1257,6 +1282,7 @@ export default function App() {
                     busy={!!operation}
                     canQuery={canQuery}
                     onScan={() => void scan(wallet)}
+                    onShowActivity={() => showWalletActivity(wallet)}
                     onRemove={() => {
                       change((c) => ({
                         ...c,

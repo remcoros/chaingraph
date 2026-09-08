@@ -1672,3 +1672,39 @@ small,
     flex-wrap: wrap;
   }
 }
+
+.wallet-card {
+  border-bottom: 1px solid var(--color-rule);
+  padding-bottom: 4px;
+}
+.wallet-card .wallet-row {
+  border-bottom: 0;
+}
+.wallet-activity-link {
+  margin: 0 8px 6px 40px;
+  padding: 5px 8px;
+  min-height: 32px;
+  font-size: 11px;
+  color: var(--color-accent);
+}
+.refresh-wallets {
+  width: 100%;
+  margin-bottom: 14px;
+}
+.wallet-refresh-summary {
+  margin: 12px 0 16px;
+}
+.wallet-refresh-summary > .primary {
+  width: 100%;
+}
+.wallet-refresh-summary small {
+  display: block;
+  margin-top: 4px;
+}
+.wallet-key-details {
+  margin: 12px 0;
+  font-size: 12px;
+}
+.wallet-key-details summary {
+  cursor: pointer;
+}
