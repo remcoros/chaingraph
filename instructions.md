@@ -25,6 +25,12 @@ Use the quick input to load a transaction ID, an address, or an output reference
 
 **Load previous transactions**, on a selected transaction, adds one earlier level. For an output, **Open creating transaction** opens only the transaction that created that outpoint, loading it if needed. Use the transaction-level action to follow its inputs further. A coinbase transaction has no earlier inputs.
 
+You can select inputs again after following a previous transaction, including a
+large CoinJoin. This exposes that transaction's input placeholders and fetches
+only the selected input's creator. If loading fails, the clicked input stays
+selected and the displayed transaction remains open. The flow shows the failure
+and **Retry previous outputs** retries the lookup without adding the root again.
+
 For an output's current availability, use **Check current UTXO status** in the
 Inspector. This queries Core with mempool spends included and timestamps the result.
 A positive result means **Unspent at check**. **Not in current UTXO set** does not

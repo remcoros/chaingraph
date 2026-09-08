@@ -67,3 +67,77 @@ test('a real WabiSabi input opens its creating CoinJoin without downloading its 
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('wabisabi-parent-navigation.png') });
 });
+
+test('a second input hop inside the real WabiSabi example survives an unavailable creator', async ({
+  page,
+}, testInfo) => {
+  const template = WORKSPACE_TEMPLATES.find((entry) => entry.id === 'mainnet-wabisabi')!;
+  const snapshot = JSON.parse(
+    readFileSync(
+      new URL('../../src/domain/templateData/mainnet-wabisabi.json', import.meta.url),
+      'utf8',
+    ),
+  ) as { roots: string[]; transactions: Record<string, Transaction> };
+  const root = snapshot.transactions[snapshot.roots[0]];
+  const parent = snapshot.transactions[root.vin[0].txid!];
+  const index = parent.vin.findIndex((input) => input.txid && !snapshot.transactions[input.txid]);
+  expect(index).toBeGreaterThanOrEqual(0);
+  const input = parent.vin[index];
+  await mockBitcoin(page, { networks: ['mainnet'] });
+  const requested: string[] = [];
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/api/rpc', async (route) => {
+    requested.push(route.request().postDataJSON().params[0]);
+    return route.fulfill({ status: 503, json: { error: 'Backend request timed out' } });
+  });
+  await page.addInitScript(() => localStorage.setItem('chaingraph.tour.seen', '1'));
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: `Create ${template.name} workspace`, exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Create a workspace' });
+  await dialog.getByLabel('Password', { exact: true }).fill('public-coinjoin-navigation-fixture');
+  await dialog.getByLabel('Confirm password').fill('public-coinjoin-navigation-fixture');
+  await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  const flow = page.locator('.transaction-view');
+  await flow
+    .getByRole('button', { name: 'Go to previous transaction for input 0', exact: true })
+    .click();
+  await expect(
+    flow.getByRole('button', { name: `Select displayed transaction ${parent.txid}` }),
+  ).toBeVisible();
+  if (index >= 3) await flow.getByRole('button', { name: /^Show all \d+ inputs$/ }).click();
+  const inputRow = flow.getByRole('button', {
+    name: `Input ${index}: ${input.txid}:${input.vout}`,
+    exact: true,
+  });
+  await inputRow.click();
+  await expect(inputRow).toHaveAttribute('aria-pressed', 'true');
+  await expect(flow.getByRole('alert')).toContainText('timed out');
+  await expect(flow.getByRole('alert')).toBeInViewport({ ratio: 1 });
+  const retry = flow.getByRole('button', { name: 'Retry previous outputs', exact: true });
+  await expect(retry).toBeInViewport({ ratio: 1 });
+  expect(
+    await retry.evaluate((button) => {
+      const bounds = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2,
+      );
+      return !!hit && button.contains(hit);
+    }),
+  ).toBe(true);
+
+  await expect(
+    flow.getByRole('button', { name: `Select displayed transaction ${parent.txid}` }),
+  ).toBeVisible();
+  await expect(page.locator('.statusbar')).toContainText(
+    `${Object.keys(snapshot.transactions).length} transactions`,
+  );
+  await expect(page.locator('.graph-canvas canvas')).toBeVisible();
+  expect([...new Set(requested)]).toEqual([input.txid]);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('wabisabi-second-input-load-failure.png') });
+});

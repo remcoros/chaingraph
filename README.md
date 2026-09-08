@@ -132,6 +132,11 @@ loaded; missing information stays **Status unknown**. Refresh to check the curre
 
 Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, with expand/collapse controls above the rows and the selected row kept visible. Selecting an input loads only its creating transaction when missing. Use **Load all input details** for a bounded batch of other inputs, with explicit retry or continuation for partial results. Click the central transaction block to select it, or use its label, tag and icon controls to edit it. Missing spending data does not prove an output is unspent.
 
+Following an input inside a compact parent exposes its input placeholders without
+downloading every previous transaction. If the selected input's creator cannot be
+loaded, the input stays selected, the displayed transaction remains open, and the
+flow shows an error with **Retry previous outputs**.
+
 The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).
 
 Edits to labels, notes, icons, bookmarks, tags and workspace details save automatically.

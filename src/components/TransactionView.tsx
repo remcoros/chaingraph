@@ -58,6 +58,7 @@ function TransactionRows({
   onTrace,
   disabledReason,
   inputLoading,
+  inputError,
   onSmallAmountThresholdChange,
   hiddenNodeIds = [],
   onSetHidden,
@@ -124,7 +125,10 @@ function TransactionRows({
       return {
         top:
           (heading?.bottom ?? bounds.top) + (laneHeading?.getBoundingClientRect().height ?? 0) + 4,
-        bottom: bounds.bottom - 8,
+        bottom:
+          bounds.bottom -
+          8 -
+          (panel.querySelector('.transaction-input-feedback')?.getBoundingClientRect().height ?? 0),
         row: row.getBoundingClientRect(),
       };
     };
@@ -164,7 +168,14 @@ function TransactionRows({
       observer.disconnect();
       panel.removeEventListener('scroll', rememberScroll);
     };
-  }, [selected?.id, expandedInputs, expandedOutputs, workspace.view.flowAmountThreshold]);
+  }, [
+    selected?.id,
+    expandedInputs,
+    expandedOutputs,
+    workspace.view.flowAmountThreshold,
+    inputLoading,
+    inputError,
+  ]);
   const inputRows: Row[] = tx.vin.map((input, index) => ({
     id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
     index,
@@ -555,6 +566,10 @@ export function TransactionView(props: Props) {
               choose(current.tx.txid);
               onSelect(id);
             }}
+            onEdit={(id, target) => {
+              choose(current.tx.txid);
+              props.onEdit(id, target);
+            }}
             previous={preview('previous')}
             next={preview('next')}
             identity={
@@ -663,27 +678,6 @@ export function TransactionView(props: Props) {
           </p>
         )}
         <div className="transaction-view-actions">
-          {inputLoading && (
-            <small className="transaction-input-status" role="status">
-              Loading previous outputs…
-            </small>
-          )}
-          {inputError && (
-            <div className="transaction-input-error" role="alert">
-              <span>{inputError}</span>
-              {onRetryInputs && (
-                <button
-                  type="button"
-                  className="text-button"
-                  disabled={!!disabledReason || inputLoading}
-                  title={disabledReason}
-                  onClick={onRetryInputs}
-                >
-                  Retry previous outputs
-                </button>
-              )}
-            </div>
-          )}
           {selected.kind === 'output' && !missingCreating && !selectedUnspendable && (
             <small
               className="transaction-coverage"
@@ -711,6 +705,31 @@ export function TransactionView(props: Props) {
           )}
         </div>
       </div>
+      {(inputLoading || inputError) && (
+        <div className="transaction-input-feedback">
+          {inputLoading && (
+            <small className="transaction-input-status" role="status">
+              Loading previous outputs…
+            </small>
+          )}
+          {inputError && (
+            <div className="transaction-input-error" role="alert">
+              <span>{inputError}</span>
+              {onRetryInputs && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!!disabledReason || inputLoading}
+                  title={disabledReason}
+                  onClick={onRetryInputs}
+                >
+                  Retry previous outputs
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </details>
   );
 }

@@ -178,3 +178,69 @@ test('switching workspace cancels pending input hydration and preserves the new 
   await page.locator('.workspace-tab').filter({ hasText: 'Current workspace' }).click();
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
 });
+
+for (const action of ['row', 'arrow'] as const) {
+  test(`a compact parent's input ${action} retains flow context when its creator fails to load`, async ({
+    page,
+  }, testInfo) => {
+    await mockBitcoin(page);
+    let available = false;
+    const olderCalls: string[] = [];
+    await page.route('**/api/rpc', async (route) => {
+      const call = route.request().postDataJSON();
+      if (call.params[0] === TX_FUNDING)
+        return route.fulfill({
+          json: {
+            result: {
+              ...transactions[TX_FUNDING],
+              vin: [{ txid: TX_OLDER, vout: 0 }],
+            },
+          },
+        });
+      if (call.params[0] !== TX_OLDER) return route.fallback();
+      olderCalls.push(call.method);
+      if (!available)
+        return route.fulfill({ status: 503, json: { error: 'Backend request timed out' } });
+      return route.fulfill({ json: { result: { ...transactions[TX_FUNDING], txid: TX_OLDER } } });
+    });
+    await page.goto('/');
+    await create(page, `Compact input ${action}`);
+    await add(page, TX_SPENDING);
+    const flow = page.locator('.transaction-view');
+    await flow.getByRole('button', { name: /^Input 0:/ }).click();
+    await expect(page.locator('.statusbar')).toContainText('2 transactions');
+    await flow
+      .getByRole('button', { name: 'Go to previous transaction for input 0', exact: true })
+      .click();
+    await expect(
+      flow.getByRole('button', { name: `Select displayed transaction ${TX_FUNDING}` }),
+    ).toBeVisible();
+    // Do not select the central transaction: that would expand its compact context
+    // and conceal the bug triggered by selecting its still-unloaded input directly.
+    await flow
+      .getByRole('button', {
+        name: action === 'row' ? `Input 0: ${TX_OLDER}:0` : 'Load previous transaction for input 0',
+        exact: true,
+      })
+      .click();
+    await expect(flow).toBeVisible();
+    await expect(
+      flow.getByRole('button', { name: `Select displayed transaction ${TX_FUNDING}` }),
+    ).toBeVisible();
+    await expect(
+      flow.getByRole('button', { name: `Input 0: ${TX_OLDER}:0`, exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(flow.getByRole('alert')).toContainText('could not be loaded');
+    await expect(flow.getByRole('alert')).toContainText('timed out');
+    expect(olderCalls.length).toBeGreaterThan(0);
+    await expect(page.locator('.statusbar')).toContainText('2 transactions');
+    await page.screenshot({ path: testInfo.outputPath(`compact-input-${action}-failure.png`) });
+    available = true;
+    await flow.getByRole('button', { name: 'Retry previous outputs', exact: true }).click();
+    await expect(page.locator('.statusbar')).toContainText('3 transactions');
+    await expect(flow.getByRole('alert')).toHaveCount(0);
+    await expect(
+      flow.getByRole('button', { name: `Input 0: ${TX_OLDER}:0`, exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+}

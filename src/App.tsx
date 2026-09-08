@@ -503,13 +503,30 @@ export default function App() {
   const select = useCallback(
     (id: string) => {
       selectionGeneration.current++;
-      const active = wRef.current;
+      const active = ws.getSession(wRef.current?.id ?? '')?.data;
       const target = /^(tx|out):([0-9a-f]{64})(?::([0-9]+))?$/.exec(id);
       const scope = target && active?.inputContext?.[target[2]];
+      const promote: string[] = [];
       // An already visible input output stays compact. Opening its transaction or
       // a hidden sibling explicitly reveals the complete parent before selecting.
       if (active && target && scope && (target[1] === 'tx' || !scope.includes(Number(target[3]))))
-        ws.update(active.id, (current) => promoteInputContext(current, [target[2]]), false);
+        promote.push(target[2]);
+      // Flow can display a compact parent's inputs before the canvas contains
+      // their placeholders. Expose that spending transaction before selecting
+      // its input, so failed creator loading cannot invalidate the selection.
+      const displayedId = active?.view.transactionFlow?.transactionId;
+      if (
+        active &&
+        displayedId &&
+        active.inputContext?.[displayedId] &&
+        target?.[1] === 'out' &&
+        active.transactions[displayedId]?.vin.some(
+          (input) => input.txid === target[2] && input.vout === Number(target[3]),
+        )
+      )
+        promote.push(displayedId);
+      if (active && promote.length)
+        ws.update(active.id, (current) => promoteInputContext(current, promote), false);
       setSelectedId(id);
       setGraphFilters((filters) =>
         filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
@@ -524,7 +541,7 @@ export default function App() {
       );
       setRightTab('inspect');
     },
-    [ws.update],
+    [ws.update, ws.getSession],
   );
   useEffect(() => {
     operationRef.current?.abort();
@@ -1005,11 +1022,17 @@ export default function App() {
   }
   async function expand(direction: 'funding' | 'spending', nodeId = selectedId) {
     if (!w) return;
-    const node = recoveryGraph.nodes.find((n) => n.id === nodeId);
+    const snapshot = ws.getSession(w.id)?.data;
+    if (!snapshot) return;
+    // A flow arrow selects and traces in one event. Read newly exposed input
+    // placeholders from the session instead of waiting for the next render.
+    const node =
+      recoveryGraph.nodes.find((n) => n.id === nodeId) ??
+      buildGraph(snapshot).nodes.find((n) => n.id === nodeId);
     if (!node?.txid || node.kind === 'address') return;
     if (
       !canTrace &&
-      !(direction === 'funding' && node.kind === 'output' && w.transactions[node.txid])
+      !(direction === 'funding' && node.kind === 'output' && snapshot.transactions[node.txid])
     )
       return;
     await run(async (signal) => {
@@ -1018,7 +1041,7 @@ export default function App() {
           ? 'Loading previous transactions…'
           : 'Checking outputs for spending transactions…',
       );
-      const loaded = w.transactions[node.txid!];
+      const loaded = snapshot.transactions[node.txid!];
       const traceSourceId = loaded ? txNodeId(node.txid!) : node.id;
       const transaction = loaded ?? (await getTransaction(node.txid!, signal));
       signal.throwIfAborted();
