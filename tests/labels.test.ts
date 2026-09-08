@@ -1,16 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { base58check } from '@scure/base';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { exportLabels, importLabels } from '../src/lib/labels';
+import { isExtendedPublicKey } from '../src/lib/wallet';
 import { newWorkspace } from '../src/domain/workspace';
 
-// Public BIP84/BIP32 vectors (CC0); the xprv is BIP32 test vector 1.
+// Public BIP32/BIP84 vectors (CC0): a valid depth-2 parent xpub, the BIP84
+// account zpub, and the BIP32 test vector 1 master xprv.
+const parentXpub =
+  'xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5';
+const taprootXpub =
+  'xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ';
 const zpub =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
-const masterXpub =
-  'xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm';
 const masterXprv =
   'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi';
+// Widely quoted "example xpub" whose payload is private-shaped (key data is
+// 0x00 followed by 32 bytes); it must be rejected despite its public version.
+const privateShapedXpub =
+  'xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm';
 const txid = 'a'.repeat(64);
 const addr = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu';
+const base58 = base58check(sha256);
+/** Re-encode a public vector with selected bytes changed; checksums stay valid. */
+function mutateKey(key: string, changes: Record<number, number>): string {
+  const bytes = base58.decode(key);
+  for (const [offset, value] of Object.entries(changes)) bytes[Number(offset)] = value;
+  return base58.encode(bytes);
+}
 
 describe('BIP329 label import boundary', () => {
   it('imports well-formed records and skips unsupported types', () => {
@@ -49,17 +66,20 @@ describe('BIP329 label import boundary', () => {
     expect(Object.keys(crlf.annotations)).toHaveLength(2);
   });
 
-  it('skips records without a usable label so existing labels are never erased', () => {
+  it('skips records with an omitted label while honoring explicit empty and whitespace labels', () => {
     const result = importLabels(
       [
         JSON.stringify({ type: 'tx', ref: txid }),
-        JSON.stringify({ type: 'tx', ref: txid, label: '' }),
-        JSON.stringify({ type: 'tx', ref: txid, label: '   ' }),
         JSON.stringify({ type: 'output', ref: `${txid}:0`, spendable: false }),
+        JSON.stringify({ type: 'tx', ref: 'b'.repeat(64), label: '' }),
+        JSON.stringify({ type: 'tx', ref: 'c'.repeat(64), label: '   ' }),
       ].join('\n'),
     );
-    expect(result.annotations).toEqual({});
-    expect(result.skipped).toBe(4);
+    // Omitted labels leave existing values unchanged (BIP329); explicit empty
+    // or whitespace strings are valid values and clear or replace labels.
+    expect(result.skipped).toBe(2);
+    expect(result.annotations[`tx:${'b'.repeat(64)}`].label).toBe('');
+    expect(result.annotations[`tx:${'c'.repeat(64)}`].label).toBe('   ');
   });
 
   it('normalizes hexadecimal references and bech32 addresses to canonical lowercase', () => {
@@ -79,13 +99,34 @@ describe('BIP329 label import boundary', () => {
   });
 
   it('accepts extended public keys at any depth and rejects private key material', () => {
-    expect(
-      importLabels(JSON.stringify({ type: 'xpub', ref: masterXpub, label: 'Root account' }))
-        .annotations[`xpub:${masterXpub}`].label,
-    ).toBe('Root account');
+    for (const ref of [parentXpub, taprootXpub, zpub]) {
+      expect(
+        importLabels(JSON.stringify({ type: 'xpub', ref, label: 'Key record' })).annotations[
+          `xpub:${ref}`
+        ].label,
+      ).toBe('Key record');
+    }
     for (const ref of [masterXprv, 'xpub-invalid', 'O'.repeat(111)]) {
       expect(() => importLabels(JSON.stringify({ type: 'xpub', ref, label: 'Secret' }))).toThrow(
         `Invalid reference on line 1`,
+      );
+    }
+  });
+
+  it('validates the complete key payload, not only the public version bytes', () => {
+    // Public vector payloads mutated then re-checksummed; no secrets used.
+    const uncompressedPrefix = mutateKey(taprootXpub, { 45: 4 }); // not a compressed point
+    const offCurveBytes = base58.decode(taprootXpub);
+    offCurveBytes.fill(0xff, 45, 78); // x = 2^256 - 1, beyond the secp256k1 field order
+    offCurveBytes[45] = 2;
+    const offCurve = base58.encode(offCurveBytes);
+    expect(isExtendedPublicKey(parentXpub)).toBe(true);
+    expect(isExtendedPublicKey(taprootXpub)).toBe(true);
+    expect(isExtendedPublicKey(zpub)).toBe(true);
+    for (const ref of [privateShapedXpub, uncompressedPrefix, offCurve]) {
+      expect(isExtendedPublicKey(ref)).toBe(false);
+      expect(() => importLabels(JSON.stringify({ type: 'xpub', ref, label: 'Bad' }))).toThrow(
+        'Invalid reference on line 1',
       );
     }
   });

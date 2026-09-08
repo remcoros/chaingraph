@@ -101,7 +101,9 @@ export function validateExtendedPublicKey(key: string, network: WalletNetwork): 
 }
 
 /** Structural check for untrusted key references (for example BIP329 xpub records).
- * Accepts only the known public version bytes, so private material is never stored. */
+ * Validates the complete payload with vetted HDKey parsing: a recognized public
+ * version alone is not enough, so private-shaped or invalid-point payloads and
+ * any private material are rejected. Account depth is not required here. */
 export function isExtendedPublicKey(key: unknown): boolean {
   if (typeof key !== 'string' || key.length < 100 || key.length > 120) return false;
   let raw: Uint8Array;
@@ -112,7 +114,16 @@ export function isExtendedPublicKey(key: unknown): boolean {
   }
   if (raw.length !== 78) return false;
   const version = new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getUint32(0);
-  return versions.some((item) => item.public === version);
+  const encoding = versions.find((item) => item.public === version);
+  if (!encoding) return false;
+  // Byte 45 starts the key data; 0x00 marks the private-key serialization shape.
+  if (raw[45] === 0) return false;
+  try {
+    const node = HDKey.fromExtendedKey(key, encoding);
+    return !node.privateKey && node.publicKey !== null;
+  } catch {
+    return false;
+  }
 }
 
 export function inspectExtendedPublicKey(

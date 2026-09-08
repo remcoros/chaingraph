@@ -199,6 +199,23 @@ describe('read-only proxy', () => {
     expect(f.coreCalls.filter((rpc) => rpc.method === 'getblockhash')).toHaveLength(1);
     expect(f.coreCalls.filter((rpc) => rpc.method === 'getblockchaininfo')).toHaveLength(2);
   });
+  it('never caches malformed or failed genesis lookups, so the next request retries', async () => {
+    let attempts = 0;
+    const f = await fixture({
+      core: (rpc, res) => {
+        if (rpc.method === 'getblockhash' && ++attempts === 1) {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ id: rpc.id, result: 'not-a-hash' }));
+          return true;
+        }
+        return false;
+      },
+    });
+    const first = await f.rpc('blockchain.scripthash.get_history', [hash]);
+    expect(await first.json()).toEqual({ error: 'Invalid Bitcoin genesis block' });
+    expect((await f.rpc('blockchain.scripthash.get_history', [hash])).status).toBe(200);
+    expect(f.coreCalls.filter((rpc) => rpc.method === 'getblockhash')).toHaveLength(2);
+  });
   it('rejects Electrum on another genesis chain', async () => {
     const f = await fixture({ genesis: otherHash });
     expect((await f.rpc('blockchain.scripthash.get_history', [hash])).status).toBe(503);

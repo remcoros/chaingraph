@@ -59,9 +59,10 @@ export function importLabels(content: string): {
       skipped++;
       continue;
     }
-    // BIP329 labels are optional; a record without a usable label must not
-    // alter or erase an existing label.
-    if (item.label === undefined || (typeof item.label === 'string' && !item.label.trim())) {
+    // BIP329 labels are optional: an omitted label must leave the existing
+    // value unchanged. An explicit string (including empty, which clears the
+    // label) is honored.
+    if (item.label === undefined) {
       skipped++;
       continue;
     }
