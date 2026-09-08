@@ -28,3 +28,24 @@ the original deadline and concurrency slot. Authentication failures, response
 errors, parsing errors, cancellations and fresh-connection failures are outside
 that retry. Final regression and live verification results belong in the validation
 report after integration.
+
+
+## Verified correction
+
+The reviewed correction was integrated at main `a47123b`. Repeating the same
+probe at testnet4 height 151458 produced:
+
+| Idle interval | Result | Elapsed |
+| --- | --- | --- |
+| Initial request | Connected | 64 ms |
+| 15 seconds | Connected | 9 ms |
+| 30 seconds | Reused-socket reset recovered with one fresh request | 15 ms |
+| 1 second | Connected | 55 ms |
+| 30 seconds | Reused-socket reset recovered with one fresh request | 18 ms |
+
+All five application calls succeeded. The probe observed both underlying resets,
+so this exercises recovery rather than merely failing to reproduce the race.
+Client shutdown subsequently aborted its remaining socket as expected. Nine
+transport regressions also passed, including a held fresh retry closed by client
+shutdown or external cancellation and preservation of the original timeout.
+Certificate verification, system CA use and authentication were unchanged.

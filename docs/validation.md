@@ -1,5 +1,27 @@
 # Validation results
 
+## Final transport integration, 2026-09-08
+
+Main `a47123b` adds the independently reviewed stale-socket correction to the UI
+foundation below. Build, **218 unit/backend tests**, formatting and the separate
+**5/5 live testnet4 checks** passed at height 151458. No frontend runtime code
+changed after the complete **48-test browser run**.
+
+The actual idle-time probe that reproduced the defect was repeated with the fix.
+All five read-only calls succeeded. Both 30-second idle intervals still triggered
+an underlying `ECONNRESET` on a reused socket, but the single fresh-connection retry
+completed in 15 and 18 ms. The original deadline, cancellation and concurrency
+limits are preserved. Nine deterministic transport tests cover retry boundaries,
+shutdown, external cancellation and the original deadline. See the
+[probe evidence](research/core-keepalive.md) and [Kimi review](reviews/kimi-foundation.md).
+
+The linux/amd64 image was rebuilt from this source and started with a read-only
+root, no capabilities and no-new-privileges. Its health check passed. The extended
+production-browser smoke passed against its built assets and CSP: WebGL,
+transaction rows, annotations, tags, encrypted save, reload and unlock. These
+container chain requests were synthetic; the live checks above used the host
+proxy. No publication or native ARM runtime validation is implied.
+
 ## Shared analysis foundation, 2026-09-08
 
 The [foundation review](reviews/2026-09-08-foundation.md) records renderer isolation, transaction/script inspection, wallet refresh and encrypted tags. The application remains version 0.2.0; experimental renderers and layouts are reviewed in separate local branches.
