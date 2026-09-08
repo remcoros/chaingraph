@@ -1,5 +1,43 @@
 # Validation results
 
+## Compact flow and automatic workspace state, 2026-09-08
+
+The main transaction sits between input/output lanes, with exact-outpoint arrows
+and adjacent transaction cards. Large lists show three rows plus the selection.
+OP_RETURN previews decode literal pushes as safe UTF-8 or explicit hex, with full
+selectable/copyable data. Inspector identifiers appear once; the output index stays
+visible when its transaction ID truncates. Tags can be created and assigned inline.
+Annotation and workspace-detail edits apply immediately, with no Save button.
+
+Encrypted workspaces now retain camera/node coordinates, selection, filters,
+pane choices and transaction-flow expansion. Continuous typing groups into Undo
+steps; leaving a field starts a new step. Lock waits for the encrypted revision.
+Tests wait for the completed lock before reloading, rather than interrupting crypto.
+
+TypeScript, production build, formatting and **253 unit/backend tests passed**.
+All **53 distinct browser cases passed across serial runs**, including real renderer
+camera capture/restoration across two workspaces, Flat/3D mode recovery, exact-output
+flow navigation, 150-output phone scrolling, safe OP_RETURN clipboard actions and
+inline tag creation. The final graph/OP_RETURN/persistence run passed all 11 cases.
+The freshly built application also passed the production browser smoke under the
+real server CSP. This used a temporary host server, not a rebuilt container.
+
+A fresh live public-testnet4 journey loaded an output, its previous transaction and
+exact spender, inspected verified raw bytes, edited notes and created an inline tag.
+Desktop and phone views had no uncaught browser errors or horizontal overflow.
+
+- [Desktop flow](screenshots/flow-main-transaction-desktop.png)
+- [Phone flow](screenshots/flow-main-transaction-phone.png)
+- [Phone inspector and inline tag](screenshots/flow-main-inspector-phone.png)
+- [Phone graph](screenshots/flow-main-graph-phone.png)
+
+Review fixed a typing render-depth failure caused by rebuilding graph/navigation
+state on presentation-only writes. It also caught initial-fit and StrictMode camera
+restoration races, typing groups crossing lock/reopen, and the installed engine's
+omitted z coordinate in Flat mode. Snapshots canonicalize Flat depth to zero and
+retain strict finite-coordinate checks in 3D. The OP_RETURN research is recorded
+[with primary references](research/op-return.md).
+
 ## Compact main workbench, 2026-09-08
 
 Workspace tabs now share the main header. Lookup and previous-level prefetch share

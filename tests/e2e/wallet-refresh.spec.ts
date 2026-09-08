@@ -107,7 +107,7 @@ async function phaseFixture(page: Page) {
   };
 }
 
-test('reopens a wallet days later, refreshes new receives and spends, and keeps selection, drafts and encrypted metadata', async ({
+test('reopens a wallet days later, refreshes new receives and spends, and keeps selection, notes and encrypted metadata', async ({
   page,
 }, testInfo) => {
   const fixture = await phaseFixture(page);
@@ -120,9 +120,8 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await page.getByLabel('Node label').fill('Exchange withdrawal');
   await page.getByLabel('Node notes').fill('Keep this source attribution after refreshing.');
   await page.getByLabel('Bookmark', { exact: true }).check();
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
   await page.getByRole('button', { name: 'Workspace menu' }).click();
-  await page.getByRole('button', { name: 'Save and lock workspace' }).click();
+  await page.getByRole('button', { name: 'Lock workspace' }).click();
   await expect(page.locator('.saved-row')).toBeVisible();
   fixture.advance();
   await page.clock.setSystemTime(new Date('2026-09-08T13:00:00Z'));
@@ -132,6 +131,14 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
   await unlock.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  // Reopening restores the selected transaction and the Entities tab. Navigate
+  // explicitly to wallet controls before checking that monitoring stays off.
+  await expect(page.getByLabel('Node label')).toHaveValue('Exchange withdrawal');
+  await expect(page.getByLabel('Filter graph entities')).toHaveValue(TX_FUNDING);
+  await page
+    .locator('.left-panel .panel-tabs')
+    .getByRole('button', { name: /^Wallets/ })
+    .click();
   await expect(page.locator('.wallet-row')).toContainText('Checked 3 days ago');
   await expect(page.getByLabel('Check activity every 30s')).not.toBeChecked();
   expect(fixture.calls.length).toBe(callsBefore);
@@ -141,7 +148,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
     'Keep this source attribution after refreshing.',
   );
   await expect(page.getByLabel('Bookmark', { exact: true })).toBeChecked();
-  await page.getByLabel('Node notes').fill('Unsaved note remains during refresh.');
+  await page.getByLabel('Node notes').fill('Edited note remains during refresh.');
   await page
     .locator('.left-panel .panel-tabs')
     .getByRole('button', { name: /^Wallets/ })
@@ -152,9 +159,8 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
     page.getByRole('button', { name: 'Refresh all wallets', exact: true }),
   ).toBeEnabled();
   await expect(page.locator('.selection-heading h2')).toHaveText('Exchange withdrawal');
-  await expect(page.getByLabel('Node notes')).toHaveValue('Unsaved note remains during refresh.');
+  await expect(page.getByLabel('Node notes')).toHaveValue('Edited note remains during refresh.');
   await expect(page.locator('.wallet-activity-link')).toContainText('2');
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
   // A no-new-transaction check must not clear the unreviewed activity badge.
   await page.getByRole('button', { name: 'Refresh all wallets', exact: true }).click();
   await expect(
@@ -184,7 +190,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await expect(page.locator('.entity-list')).toContainText(TX_SPENDING.slice(0, 8));
   await page.getByRole('button', { name: 'All paths', exact: true }).click();
   await selectFunding(page);
-  await expect(page.getByLabel('Node notes')).toHaveValue('Unsaved note remains during refresh.');
+  await expect(page.getByLabel('Node notes')).toHaveValue('Edited note remains during refresh.');
   await page
     .locator('.left-panel .panel-tabs')
     .getByRole('button', { name: /^Wallets/ })
@@ -202,7 +208,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   const storage = await page.evaluate(() =>
     JSON.stringify(Object.fromEntries(Object.entries(localStorage))),
   );
-  for (const privateValue of [PUBLIC_ZPUB, 'Exchange withdrawal', 'Unsaved note remains', PASSWORD])
+  for (const privateValue of [PUBLIC_ZPUB, 'Exchange withdrawal', 'Edited note remains', PASSWORD])
     expect(storage).not.toContain(privateValue);
 });
 

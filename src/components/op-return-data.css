@@ -1,0 +1,33 @@
+.op-return-data {
+  min-width: 0;
+  font-size: 0.75rem;
+}
+.op-return-data > summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.3rem 0;
+  cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.op-return-body {
+  min-width: 0;
+  padding: 0.2rem 0 0.4rem;
+}
+.op-return-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.op-return-body pre {
+  max-height: 9rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-family: 'IBM Plex Mono', monospace;
+  user-select: text;
+  unicode-bidi: plaintext;
+  margin: 0.35rem 0;
+}

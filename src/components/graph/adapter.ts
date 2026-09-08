@@ -1,3 +1,4 @@
+import type { GraphSnapshot } from '../../domain/graphSnapshot';
 /** Renderer-only contract. No workspace objects or mutable renderer objects cross it. */
 export interface RenderNode {
   id: string;
@@ -46,6 +47,8 @@ export interface GraphAdapterEvents {
   error(): void;
   /** A recoverable renderer has restored its graphics context. */
   recovered?(): void;
+  /** Settled geometry and camera only; consumers decide where to persist it. */
+  snapshot?(snapshot: GraphSnapshot): void;
 }
 export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;
@@ -53,6 +56,8 @@ export interface GraphAdapter {
   resize(width: number, height: number): void;
   focus(id: string): void;
   fit(): void;
+  /** Optional initial view restoration; adapters without persistence remain valid. */
+  restoreSnapshot?(snapshot: GraphSnapshot): void;
   dispose(): void;
 }
 export type GraphAdapterFactory = (

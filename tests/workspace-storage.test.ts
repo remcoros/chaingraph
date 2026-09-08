@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import { encryptWorkspace, decryptWorkspace } from '../src/lib/crypto';
 import { STORAGE_KEY, WorkspaceSessionStore } from '../src/lib/useWorkspaces';
@@ -23,6 +23,75 @@ function deferred() {
 }
 
 describe('workspace persistence state transitions', () => {
+  it('starts a fresh undo group after locking and immediately reopening the same workspace', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+      const w = newWorkspace('Original', 'testnet4');
+      store.open(w, password);
+      store.update(w.id, (current) => ({ ...current, name: 'Before lock' }), true, 'name');
+      await store.lock(w.id);
+      await store.unlock(store.getSnapshot().saved[0], password);
+      store.update(w.id, (current) => ({ ...current, name: 'After unlock' }), true, 'name');
+      expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+      store.undo(w.id);
+      expect(store.getSnapshot().sessions[0].data.name).toBe('Before lock');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('groups continuous typing without losing the latest view or merging across undo', () => {
+    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const w = newWorkspace('Typing', 'testnet4');
+    store.open(w, password);
+    const edit = (label: string) =>
+      store.update(
+        w.id,
+        (current) => ({
+          ...current,
+          annotations: {
+            ...current.annotations,
+            example: { label, note: '', icon: '', bookmarked: false },
+          },
+        }),
+        true,
+        'example:label',
+      );
+    edit('a');
+    edit('ab');
+    store.update(
+      w.id,
+      (current) => ({ ...current, view: { ...current.view, glow: false } }),
+      false,
+    );
+    edit('abc');
+    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    store.undo(w.id);
+    expect(store.getSnapshot().sessions[0].data.annotations.example).toBeUndefined();
+    expect(store.getSnapshot().sessions[0].data.view.glow).toBe(false);
+    edit('next');
+    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    store.undo(w.id);
+    expect(store.getSnapshot().sessions[0].data.annotations.example).toBeUndefined();
+  });
+
+  it('separates different annotation fields and intervening user actions in undo', () => {
+    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const w = newWorkspace('Fields', 'testnet4');
+    store.open(w, password);
+    store.update(w.id, (current) => ({ ...current, name: 'First' }), true, 'name');
+    store.update(w.id, (current) => ({ ...current, description: 'Note' }), true, 'description');
+    store.update(w.id, (current) => ({ ...current, name: 'Second' }), true, 'name');
+    store.undo(w.id);
+    expect(store.getSnapshot().sessions[0].data).toMatchObject({
+      name: 'First',
+      description: 'Note',
+    });
+    store.undo(w.id);
+    expect(store.getSnapshot().sessions[0].data.description).toBeUndefined();
+  });
+
   it('stores the workspace name publicly while keeping its optional description encrypted', async () => {
     const storage = memoryStorage();
     const store = new WorkspaceSessionStore({ storage });

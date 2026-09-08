@@ -1,3 +1,5 @@
+import type { GraphSnapshot } from './graphSnapshot';
+import type { GraphFilters } from './graphFilters';
 export type Network = 'mainnet' | 'testnet4';
 export type ScriptType = 'p2pkh' | 'p2sh-p2wpkh' | 'p2wpkh' | 'p2tr';
 export interface TxInput {
@@ -82,6 +84,12 @@ export interface AnalysisFinding {
   scopeTxids?: string[];
   stale?: boolean;
 }
+export interface TransactionFlowState {
+  transactionId?: string;
+  expandedInputs?: boolean;
+  expandedOutputs?: boolean;
+  open?: boolean;
+}
 export interface Workspace {
   version: 1;
   id: string;
@@ -102,6 +110,16 @@ export interface Workspace {
     glow: boolean;
     showAddresses: boolean;
     highlightMode?: 'all' | 'wallets' | 'tags' | 'none';
+    graphSnapshot?: GraphSnapshot;
+    selectionId?: string;
+    filters?: GraphFilters;
+    leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
+    rightTab?: 'inspect' | 'analysis';
+    focusGraph?: boolean;
+    prefetchDepth?: 0 | 1 | 2;
+    selectedWallet?: string;
+    mobilePanel?: 'graph' | 'left' | 'right';
+    transactionFlow?: TransactionFlowState;
   };
 }
 export interface GraphNode {

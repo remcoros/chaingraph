@@ -439,39 +439,40 @@ export function WorkspaceDetailsDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState(workspace.name);
-  const [description, setDescription] = useState(workspace.description ?? '');
   return (
     <Modal title="Workspace details" onClose={onClose}>
-      <form
-        className="stack"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!name.trim()) return;
-          onSave(name.trim(), description.trim());
-          onClose();
-        }}
-      >
+      <div className="stack">
         <label>
           Name (public)
-          <input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            required
+            maxLength={100}
+            value={name}
+            aria-invalid={!name.trim()}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (e.target.value.trim()) onSave(e.target.value.trim(), workspace.description ?? '');
+            }}
+          />
         </label>
-        <p className="small muted">
-          Visible in this browser even while locked, and used in exported filenames.
-        </p>
+        <p className="small muted">Visible even while locked. Changes save automatically.</p>
+        {!name.trim() && (
+          <p role="alert">A name is required. The previous name is kept until you enter one.</p>
+        )}
         <label>
           Description (encrypted, optional)
           <textarea
             aria-label="Workspace description"
             maxLength={10000}
-            rows={5}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            value={workspace.description ?? ''}
+            onChange={(e) => onSave(workspace.name, e.target.value)}
           />
         </label>
-        <button className="primary" type="submit" disabled={!name.trim()}>
-          Save workspace details
+        <button className="primary" type="button" onClick={onClose}>
+          Done
         </button>
-      </form>
+      </div>
     </Modal>
   );
 }

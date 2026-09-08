@@ -19,18 +19,17 @@
 .transaction-view {
   position: relative;
   flex: 0 1 auto;
-  max-height: min(65%, 460px);
-  margin: 8px 8px 0;
+  max-height: min(50%, 340px);
+  margin: 6px 8px 0;
   overflow: auto;
   overscroll-behavior: contain;
-  background: color-mix(in srgb, var(--color-paper) 97%, transparent);
+  background: var(--color-paper);
   border: 1px solid var(--color-rule);
-  border-radius: 8px;
-  box-shadow: 0 5px 22px #0002;
-  font-size: 12px;
+  border-radius: 7px;
+  font-size: 11px;
 }
 .transaction-view > summary {
-  padding: 10px 12px;
+  padding: 7px 10px;
   cursor: pointer;
   position: sticky;
   top: 0;
@@ -44,79 +43,210 @@
   font-weight: 400;
 }
 .transaction-view-body {
-  padding: 0 12px 10px;
+  padding: 0 8px 7px;
 }
-.transaction-view-identity,
-.transaction-choice,
-.transaction-view-actions {
+.transaction-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 106px minmax(0, 1fr);
+  grid-template-areas: 'previous identity next' 'inputs identity outputs';
+  column-gap: 13px;
+  align-items: start;
+}
+.transaction-flow-previous {
+  grid-area: previous;
+}
+.transaction-flow-next {
+  grid-area: next;
+}
+.transaction-flow-inputs {
+  grid-area: inputs;
+}
+.transaction-flow-outputs {
+  grid-area: outputs;
+}
+.transaction-flow-hint {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  min-height: 35px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.transaction-flow-next .transaction-flow-hint {
+  justify-content: flex-end;
+  text-align: right;
+}
+.transaction-neighbor {
+  max-height: 80px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding: 2px 0;
+}
+.transaction-neighbor-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, var(--color-rule));
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-paper));
+  border-radius: 6px;
+  text-align: left;
+}
+.transaction-neighbor-previous .transaction-neighbor-card {
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+.transaction-neighbor-next .transaction-neighbor-card {
+  border-right: 0;
+  border-radius: 6px 0 0 6px;
+}
+.transaction-neighbor-card > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+.transaction-neighbor-card small {
+  font-size: 9px;
+  color: var(--color-muted);
+}
+.transaction-neighbor-card strong {
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transaction-neighbor-card > svg {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+.transaction-neighbor-card.is-missing {
+  border-style: dashed;
+  background: none;
 }
 .transaction-view-identity {
-  justify-content: space-between;
+  grid-area: identity;
+  position: sticky;
+  top: 44px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 24px;
+  padding: 10px 5px;
+  border: 1px solid var(--color-rule);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-paper));
+  text-align: center;
+}
+.transaction-view-identity > svg {
+  color: var(--color-accent);
+}
+.transaction-identity-select {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10px;
+  text-align: center;
+}
+.transaction-identity-select span {
+  font-size: 9px;
+  white-space: normal;
+}
+.transaction-identity-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+}
+.transaction-identity-tools {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+}
+.transaction-identity-tools .icon-button {
+  min-height: 24px;
+  padding: 4px;
 }
 .transaction-choice {
-  flex-direction: row;
-  margin: 2px 0 6px;
-  font-size: 11px;
+  width: 100%;
+  min-width: 0;
+  font-size: 9px;
+  padding: 4px 14px 4px 3px;
 }
-.transaction-choice select {
-  flex: 1;
+.transaction-flow section {
   min-width: 0;
 }
-.transaction-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
-}
-.transaction-columns h4 {
-  margin: 8px 0;
+.transaction-flow h4 {
+  margin: 5px 0;
   color: var(--color-muted);
-  text-transform: uppercase;
   font-size: 10px;
-  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+.transaction-flow-outputs h4 {
+  text-align: right;
 }
 .transaction-rows {
   display: grid;
   gap: 4px;
 }
 .transaction-row {
+  position: relative;
   display: flex;
   min-width: 0;
   border: 1px solid var(--color-rule);
   border-radius: 5px;
-  overflow: hidden;
-}
-.transaction-row {
-  scroll-margin-top: 44px;
+  scroll-margin-top: 38px;
   scroll-margin-bottom: 8px;
+}
+.transaction-row::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 1px;
+  background: var(--color-rule);
+}
+.transaction-flow-inputs .transaction-row::after {
+  left: 100%;
+}
+.transaction-flow-outputs .transaction-row::after {
+  right: 100%;
 }
 .transaction-row.is-selected {
   border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.transaction-row.is-selected::after {
+  background: var(--color-accent);
+  height: 2px;
+}
+.transaction-row-content {
+  flex: 1;
+  min-width: 0;
 }
 .transaction-row-select {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   display: flex;
   align-items: flex-start;
   border: 0;
   background: none;
-  padding: 7px;
+  padding: 5px;
   text-align: left;
   justify-content: flex-start;
-  gap: 7px;
-  border-radius: 0;
+  gap: 5px;
+  border-radius: 4px;
 }
 .transaction-row-select:disabled {
   opacity: 1;
 }
 .transaction-row-index {
   color: var(--color-muted);
-  font-size: 10px;
-  padding-top: 2px;
+  font-size: 9px;
+  padding-top: 1px;
 }
 .transaction-row-main {
   display: grid;
@@ -129,27 +259,102 @@
   white-space: nowrap;
   font-size: 11px;
 }
-.transaction-row-main span {
+.transaction-row-main > span {
   font-size: 11px;
 }
-.transaction-row-main small {
-  font-size: 9px;
-  color: var(--color-muted);
-}
-.transaction-row-edit {
-  align-self: center;
+.transaction-row-tools {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   flex-shrink: 0;
-  padding: 6px;
-  min-width: 26px;
+}
+.transaction-row-tools .icon-button {
+  padding: 3px;
+  min-width: 23px;
+  min-height: 21px;
+}
+.transaction-row-follow.is-loaded {
+  color: var(--color-accent);
 }
 .transaction-expand {
-  margin: 5px 0;
+  margin: 5px 0 0;
+  font-size: 10px;
 }
 .transaction-view-actions {
-  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+.transaction-view-actions:empty {
+  display: none;
+}
+.transaction-view-actions > button {
+  font-size: 10px;
 }
 .transaction-coverage {
-  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-size: 9px;
+  margin-left: auto;
+}
+.transaction-view .entity-badges {
+  white-space: normal;
+}
+.transaction-view-identity .entity-badges {
+  justify-content: center;
+}
+.transaction-view .entity-badges > span {
+  font-size: 9px;
+  padding: 1px 4px;
+}
+@media (max-width: 700px) {
+  .transaction-view {
+    max-height: 46%;
+    margin: 5px 5px 0;
+  }
+  .transaction-view-body {
+    padding: 0 5px 7px;
+  }
+  .transaction-flow {
+    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
+    column-gap: 7px;
+  }
+  .transaction-view-identity {
+    padding: 7px 3px;
+  }
+  .transaction-identity-select strong {
+    font-size: 8px;
+  }
+  .transaction-row-select {
+    padding: 5px 3px;
+    gap: 3px;
+  }
+  .transaction-row-main strong,
+  .transaction-row-main > span {
+    font-size: 10px;
+  }
+  .transaction-row-tools .icon-button {
+    min-width: 24px;
+    min-height: 24px;
+  }
+  .transaction-row::after {
+    width: 6px;
+  }
+  .transaction-neighbor-card {
+    padding: 5px 3px;
+    gap: 2px;
+  }
+  .transaction-neighbor-card small {
+    font-size: 8px;
+  }
+  .transaction-neighbor-card strong {
+    font-size: 9px;
+  }
+  .transaction-flow-hint {
+    font-size: 9px;
+  }
 }
 .script-inspector > summary {
   cursor: pointer;
@@ -192,51 +397,41 @@
   max-height: 320px;
   overflow: auto;
 }
-@media (max-width: 700px) {
-  .transaction-view {
-    max-height: 48%;
-  }
-  .transaction-view > summary small {
-    display: none;
-  }
-  .transaction-columns {
-    gap: 6px;
-  }
-  .transaction-row-edit {
-    min-width: 28px;
-    padding: 4px;
-  }
-  .transaction-row-select {
-    padding: 6px 3px;
-    gap: 3px;
-    min-height: 64px;
-  }
-  .transaction-row-index {
-    font-size: 9px;
-  }
-  .transaction-row-main strong {
-    font-size: 10px;
-  }
-  .transaction-row-main span {
-    font-size: 10px;
-  }
-}
 
-.transaction-view-metadata {
-  flex-basis: 100%;
-  min-width: 0;
+.transaction-row::before {
+  content: '';
+  position: absolute;
+  top: calc(50% - 3px);
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid var(--color-rule);
+}
+.transaction-flow-inputs .transaction-row::before {
+  left: calc(100% + 8px);
+}
+.transaction-flow-outputs .transaction-row::before {
+  right: 100%;
+}
+.transaction-row.is-selected::before {
+  border-left-color: var(--color-accent);
+}
+@media (max-width: 700px) {
+  .transaction-flow-inputs .transaction-row::before {
+    left: calc(100% + 2px);
+  }
+}
+.transaction-coverage {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
-.transaction-view-metadata > strong {
+.transaction-coverage > button {
+  font-size: 9px;
+}
+.transaction-row-main > span {
   overflow-wrap: anywhere;
-  font-size: 12px;
 }
-.transaction-view-metadata:empty {
-  display: none;
-}
-.transaction-view .entity-badges {
-  white-space: normal;
+.transaction-row .op-return-data {
+  margin: 0 5px;
+  font-size: 10px;
 }

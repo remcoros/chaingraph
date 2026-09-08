@@ -79,11 +79,11 @@ The **Tools** and **Findings** controls jump between configuration and results. 
 
 Exclude a finding to remove its overlay without deleting the result. Rerunning the same tool preserves exclusions when the finding's node and transaction evidence is unchanged. Loading or changing wallet/transaction data marks prior results **Needs rerun** and removes stale overlays. User annotations stay separate from algorithm results.
 
-## Save, lock, and exchange data
+## Autosave, lock, and exchange data
 
 Workspace autosave writes encrypted contents to this browser's storage. Lock the workspace to close its unlocked session. Reopening requires its password. On the Workspaces screen, search saved public names or use the trash button to delete a locked browser copy. The confirmation affects only that copy, not exported files; lock an open workspace first. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
 
-Export an encrypted workspace file for backup or transfer to another browser. On narrow screens, Export and Undo are in **Workspace menu** beside the lookup controls. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Current camera position and the temporary force layout are not saved.
+Export an encrypted workspace file for backup or transfer to another browser. On narrow screens, Export and Undo are in **Workspace menu** beside the lookup controls. Import it and supply the password to reopen it. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Camera position and node coordinates are included with your view settings.
 
 Saved workspace contents use authenticated encryption. The browser storage entry also includes the public workspace name, a workspace identifier, and save time outside the encrypted contents. File names and file sizes can reveal additional metadata. Encryption does not hide an unlocked workspace from someone using your browser or from untrusted browser extensions.
 
@@ -119,11 +119,10 @@ The Inspector’s **Scripts and raw transaction** section shows saved output scr
 
 ## Tags and wallet matches
 
-Open **Tags** beside Wallets and Entities to create named groups for sources,
-destinations, or other entities. A new tag includes the current selection. Use
-**Add selection** for individual transactions or outputs, or open **Tags** in the
-inspector and choose **This address and its outputs** to apply a group to every
-loaded output at that address. Address membership also applies to outputs loaded
+Use **Add or choose tags** in the inspector to search, create and assign a group
+without leaving the selection. Choose **This output** for an individual output or
+**Address + outputs** to apply it to every loaded output at that address.
+The **Tags** tab beside Wallets and Entities manages groups, imports and graph filters. Address membership also applies to outputs loaded
 later. It does not assign the entire creating or spending transaction to that tag.
 
 **Group existing labels** creates tags from matching nonempty labels, including
@@ -156,3 +155,11 @@ reopen. **Show wallet matches** reveals all loaded script matches and their conn
 transactions without acknowledging new activity. **All paths** clears these filters.
 The optional **Check activity every 30s** monitor runs only while unlocked and must
 be enabled again after reopen. Turning it off cancels its in-flight check.
+
+Labels, notes, icons, bookmarks, tags and workspace details save automatically. Check
+**Encrypted · saved** before closing the tab; **Lock workspace** waits for encryption.
+Reopening restores your selected item, filters, graph camera and transaction-flow panel.
+Create or choose a tag directly in the inspector. Scope it to one output or to an address
+and its outputs. The transaction flow arrows follow the selected outpoint to its creating
+or loaded spending transaction. Expand OP_RETURN data to select or copy the decoded text
+(or hex for binary data).

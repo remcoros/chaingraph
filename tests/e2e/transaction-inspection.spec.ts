@@ -40,13 +40,26 @@ test('transaction rows retain spending context, load missing prevouts, label and
   await expect(view.locator('.transaction-row[data-selected="true"]')).toHaveCount(1);
   await view.getByRole('button', { name: 'Load creating transaction', exact: true }).click();
   await expect(view.getByLabel('Displayed transaction', { exact: true })).toBeVisible();
-  await view.getByLabel('Displayed transaction', { exact: true }).selectOption(TX_FUNDING);
+  await view
+    .getByRole('button', { name: `Go to previous transaction ${TX_FUNDING}`, exact: true })
+    .click();
+  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(TX_FUNDING);
+  await view
+    .getByRole('button', { name: `Go to spending transaction ${TX_SPENDING}`, exact: true })
+    .click();
+  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(TX_SPENDING);
+  await expect(view.getByRole('button', { name: /^Input 0:/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await view
+    .getByRole('button', { name: `Go to previous transaction ${TX_FUNDING}`, exact: true })
+    .click();
   await expect(view.locator('.transaction-row[data-selected="true"]')).toContainText(
     '100,000,000 sats',
   );
   await view.getByRole('button', { name: 'Edit output 0 annotation', exact: true }).click();
   await page.getByLabel('Node label').fill('Exchange withdrawal');
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
   await expect(view.locator('.transaction-row[data-selected="true"]')).toContainText(
     'Exchange withdrawal',
   );
@@ -55,6 +68,21 @@ test('transaction rows retain spending context, load missing prevouts, label and
   await page.screenshot({ path: 'test-results/transaction-inspection-desktop.png' });
   await view.locator(':scope > summary').click();
   await expect(view.locator('.transaction-columns')).not.toBeVisible();
+  await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
+  // Lock completes only after the current encrypted revision reaches storage.
+  await expect(page.locator('.saved-row')).toBeVisible();
+  await page.reload();
+  await page.locator('.saved-row').click();
+  await page.getByRole('dialog').getByLabel('Password').fill('transaction-inspection-test');
+  await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(view).toBeVisible();
+  await expect(view).not.toHaveAttribute('open');
+  await view.locator(':scope > summary').click();
+  await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(TX_FUNDING);
+  await expect(view.locator('.transaction-row[data-selected="true"]')).toContainText(
+    'Exchange withdrawal',
+  );
 });
 
 test('large transaction lists collapse and remain usable on a phone', async ({ page }) => {
@@ -67,7 +95,7 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   await page.locator('.entity-row').click();
   await page.getByRole('button', { name: 'Graph', exact: true }).click();
   const view = page.locator('.transaction-view');
-  await expect(view.locator('.transaction-row')).toHaveCount(8);
+  await expect(view.locator('.transaction-row')).toHaveCount(6);
   await view.getByRole('button', { name: 'Show all 150 outputs', exact: true }).click();
   await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeAttached();
   await view.getByRole('button', { name: /^Output 149:/ }).click();
@@ -75,11 +103,40 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   await expect(view.locator('.transaction-row[data-selected="true"]')).toBeAttached();
   await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: 'test-results/transaction-inspection-mobile.png' });
+  await view.getByRole('button', { name: 'Show all 150 outputs', exact: true }).click();
+  await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeInViewport({ ratio: 1 });
+  await view.hover();
+  await page.mouse.wheel(0, -20000);
+  await expect.poll(() => view.evaluate((element) => element.scrollTop)).toBe(0);
+  await page.setViewportSize({ width: 420, height: 800 });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect(await view.evaluate((element) => element.scrollTop)).toBe(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
   await page.getByRole('button', { name: 'Inspector', exact: true }).first().click();
   await page.locator('.script-inspector > summary').click();
   await expect(page.locator('.script-inspector')).toContainText(
     'Synthetic fixture: raw transaction and witness data are unavailable.',
   );
+  await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
+  // Lock completes only after the current encrypted revision reaches storage.
+  await expect(page.locator('.saved-row')).toBeVisible();
+  await page.reload();
+  await page.locator('.saved-row').click();
+  await page.getByRole('dialog').getByLabel('Password').fill('transaction-inspection-test');
+  await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
+  await expect(view.getByRole('button', { name: 'Collapse outputs', exact: true })).toBeAttached();
+  await expect(view.getByRole('button', { name: /^Output 149:/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeInViewport({ ratio: 1 });
   expect(calls).toHaveLength(0);
 });
 
@@ -142,7 +199,7 @@ test('raw inspection is explicit, verified, and displays witness bytes without p
   ).toBeVisible();
 });
 
-test('keeps selected rows visible through tag wrapping and resize, preserves manual scrolling, and shows transaction labels', async ({
+test('keeps selected rows visible through tag wrapping and resize, and shows transaction labels', async ({
   page,
 }) => {
   const { newWorkspace } = await import('../../src/domain/workspace');
@@ -239,18 +296,7 @@ test('keeps selected rows visible through tag wrapping and resize, preserves man
   expect(badgeGeometry.height).toBeGreaterThan(35);
   expect(badgeGeometry.overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: test.info().outputPath('selected-tag-after-resize.png') });
-  await panel.hover();
-  await page.mouse.wheel(0, -1500);
-  await expect.poll(async () => (await geometry()).scroll).toBe(0);
-  expect((await geometry()).clipped).toBeGreaterThan(0);
   await page.setViewportSize({ width: 420, height: 800 });
-  // Wait for actual layout observation, then confirm it respects deliberate browsing away.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  expect((await geometry()).scroll).toBe(0);
+  await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

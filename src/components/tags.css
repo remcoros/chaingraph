@@ -153,3 +153,127 @@
   font-size: 11px;
   color: var(--color-output);
 }
+
+.selected-tag-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.selected-tag-chips > svg {
+  flex: none;
+  color: var(--color-muted);
+  margin-right: 2px;
+}
+.selected-tag-chip,
+.selected-tag-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+.selected-tag-chip > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selected-tag-add {
+  border-style: dashed;
+  color: var(--color-muted);
+}
+.tag-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+}
+.tag-picker {
+  position: fixed;
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: 9px;
+  background: var(--color-paper, #111a20);
+  box-shadow: 0 16px 50px #0009;
+}
+.tag-picker .tags-heading {
+  margin-bottom: 8px;
+}
+.tag-scope {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 9px;
+}
+.tag-scope button {
+  flex: 1;
+  min-height: 30px;
+  padding: 4px 5px;
+  font-size: 11px;
+}
+.tag-scope button[aria-pressed='true'] {
+  border-color: var(--color-output);
+  color: var(--color-output);
+  background: color-mix(in srgb, var(--color-output) 10%, transparent);
+}
+.tag-picker-search input {
+  width: 100%;
+}
+.tag-picker-options {
+  max-height: 190px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 7px 0;
+}
+.tag-picker .tag-assignment {
+  min-height: 35px;
+  padding: 5px 4px;
+  border-radius: 4px;
+}
+.tag-picker .tag-assignment:hover,
+.tag-picker .tag-assignment:focus-within {
+  background: color-mix(in srgb, var(--color-output) 8%, transparent);
+}
+.tag-picker .tag-assignment > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tag-picker .tag-assignment input {
+  flex: none;
+  accent-color: var(--color-output);
+}
+.tag-picker-create {
+  border-top: 1px solid var(--color-rule);
+  padding-bottom: 8px;
+}
+.tag-picker-create > button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.tag-picker-create > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag-picker-create > button > svg {
+  flex: none;
+}
+.tag-picker-footer {
+  border-top: 1px solid var(--color-rule);
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tag-picker-footer .text-button {
+  padding: 3px;
+}

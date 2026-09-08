@@ -55,7 +55,6 @@ test('icon palette supports selection, clearing, arrow keys, Escape and focus re
   await picker.getByRole('button', { name: 'Cold storage', exact: true }).click();
   await expect(trigger).toHaveAccessibleName('Node icon: Cold storage');
   await expect(trigger).toBeFocused();
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
   await trigger.click();
   await picker.getByRole('button', { name: 'Clear icon', exact: true }).click();
   await expect(trigger).toHaveAccessibleName('Node icon: None');
@@ -75,7 +74,6 @@ test('an arbitrary imported icon stays selected until explicitly replaced or cle
   );
   await page.keyboard.press('Escape');
   await page.getByLabel('Node notes').fill('Keep my imported icon');
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
   await expect(trigger).toContainText('🪐');
 });
 

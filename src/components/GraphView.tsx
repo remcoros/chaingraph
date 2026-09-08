@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
+import {
+  graphSnapshotSchema,
+  mergeGraphSnapshot,
+  type GraphSnapshot,
+} from '../domain/graphSnapshot';
 import type { GraphAdapter, GraphAdapterFactory } from './graph/adapter';
 import { createDefaultAdapter } from './graph/defaultAdapter';
 import {
@@ -12,6 +17,9 @@ import {
 
 export interface GraphViewProps {
   adapterFactory?: GraphAdapterFactory;
+  /** Initial view for this mounted workspace. Own saves never reapply the camera. */
+  snapshot?: GraphSnapshot;
+  onSnapshot?: (snapshot: GraphSnapshot) => void;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
   toolbar?: ReactNode;
   /** Shared controls floating over the viewport, outside the renderer event surface. */
@@ -48,6 +56,9 @@ export default function GraphView(props: GraphViewProps) {
   const cardEntered = useRef(false);
   const [hover, setHover] = useState<HoverCard>();
   const [error, setError] = useState(false);
+  const savedSnapshot = useRef(props.snapshot);
+  const lastFitToken = useRef(props.fitToken);
+  const snapshotSignature = useRef(props.snapshot ? JSON.stringify(props.snapshot) : '');
 
   function keepCardOpen() {
     clearTimeout(closeTimer.current);
@@ -126,7 +137,18 @@ export default function GraphView(props: GraphViewProps) {
         dismiss: () => dismissCard(),
         error: () => setError(true),
         recovered: () => setError(false),
+        snapshot: (next) => {
+          const parsed = graphSnapshotSchema.safeParse(next);
+          if (!parsed.success) return;
+          const merged = mergeGraphSnapshot(savedSnapshot.current, parsed.data);
+          const signature = JSON.stringify(merged);
+          if (signature === snapshotSignature.current) return;
+          savedSnapshot.current = merged;
+          snapshotSignature.current = signature;
+          current.current.onSnapshot?.(merged);
+        },
       });
+      if (savedSnapshot.current) adapter.restoreSnapshot?.(savedSnapshot.current);
       graphRef.current = adapter;
       adapter.canvas.tabIndex = 0;
       adapter.canvas.setAttribute(
@@ -170,7 +192,9 @@ export default function GraphView(props: GraphViewProps) {
   ]);
 
   useEffect(() => {
-    if (props.fitToken) graphRef.current?.fit();
+    if (props.fitToken === lastFitToken.current) return;
+    lastFitToken.current = props.fitToken;
+    graphRef.current?.fit();
   }, [adapterFactory, props.fitToken]);
 
   useEffect(() => {

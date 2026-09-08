@@ -19,17 +19,19 @@ function setup() {
   } as unknown as HTMLElement;
   let data: any = { nodes: [], links: [] };
   let camera = { x: 0, y: 0, z: 300 };
-  const controls = {};
+  const controls = Object.assign(new EventTarget(), { target: new Vector3() });
+  const cameraObject = { up: new Vector3(0, 1, 0) };
   const callbacks: Record<string, (...args: any[]) => void> = {};
   const scene = new Scene();
   const graph: any = {
     scene: () => scene,
     renderer: () => ({ domElement: canvas, setPixelRatio: vi.fn(), getPixelRatio: () => 1 }),
     controls: () => controls,
-    camera: () => ({ up: new Vector3() }),
-    cameraPosition: vi.fn((position) => {
+    camera: () => cameraObject,
+    cameraPosition: vi.fn((position, target) => {
       if (!position) return camera;
       camera = position;
+      if (target) controls.target.set(target.x, target.y, target.z);
       return graph;
     }),
     graphData: vi.fn((next) => {
@@ -75,6 +77,15 @@ function setup() {
     '_destructor',
   ])
     graph[name] = vi.fn(() => graph);
+  // Match the pinned three-forcegraph numDimensions onChange behavior.
+  graph.numDimensions = vi.fn((dimensions: number) => {
+    if (dimensions === 2)
+      data.nodes.forEach((node: any) => {
+        delete node.z;
+        delete node.vz;
+      });
+    return graph;
+  });
   for (const name of [
     'nodeThreeObject',
     'onNodeHover',
@@ -95,6 +106,7 @@ function setup() {
     select: vi.fn(),
     dismiss: vi.fn(),
     error: vi.fn(),
+    snapshot: vi.fn(),
   };
   const adapter = createForceAdapter(container, events);
   adapter.resize(900, 600);
@@ -155,11 +167,153 @@ beforeEach(() =>
   vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), devicePixelRatio: 1 }),
 );
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('force adapter contract', () => {
+  it('restores positions and camera without first-data fit or a conflicting flat-view tween', () => {
+    const { adapter, graph, callbacks } = setup();
+    const snapshot = {
+      version: 1 as const,
+      dimensions: 2 as const,
+      camera: {
+        position: { x: 40, y: -20, z: 550 },
+        target: { x: 40, y: -20, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+      },
+      nodes: [
+        { id: 'a', x: -42, y: 17, z: 0 },
+        { id: 'b', x: 65, y: -12, z: 0 },
+      ],
+    };
+    adapter.restoreSnapshot?.(snapshot);
+    adapter.update(frame());
+    expect(
+      graph.graphData().nodes.map(({ id, x, y, z }: any) => ({ id, x, y, z: z ?? 0 })),
+    ).toEqual(snapshot.nodes);
+    expect(graph.graphData().nodes.every((node: any) => node.z === undefined)).toBe(true);
+    expect(graph.cooldownTicks).toHaveBeenLastCalledWith(0);
+    expect(graph.cameraPosition.mock.calls.filter((args: any[]) => args.length)).toEqual([
+      [snapshot.camera.position, snapshot.camera.target, 0],
+    ]);
+    callbacks.onEngineStop();
+    expect(graph.zoomToFit).not.toHaveBeenCalled();
+    adapter.dispose();
+  });
+  it('emits settled snapshots once, debounces camera motion, and releases pending work', () => {
+    vi.useFakeTimers();
+    const { adapter, graph, callbacks, events, controls } = setup();
+    adapter.update(frame());
+    controls.dispatchEvent(new Event('change'));
+    vi.advanceTimersByTime(1000);
+    expect(events.snapshot).not.toHaveBeenCalled();
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1000);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    expect(events.snapshot).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        dimensions: 2,
+        nodes: expect.arrayContaining([expect.objectContaining({ id: 'a', x: 20, y: 30, z: 0 })]),
+      }),
+    );
+    // Saving or annotating produces a presentation update, not a new camera snapshot.
+    adapter.update(frame());
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1000);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    graph.cameraPosition({ x: 70, y: -20, z: 450 }, { x: 70, y: -20, z: 0 }, 0);
+    controls.dispatchEvent(new Event('change'));
+    vi.advanceTimersByTime(300);
+    controls.dispatchEvent(new Event('change'));
+    vi.advanceTimersByTime(300);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(400);
+    expect(events.snapshot).toHaveBeenCalledTimes(2);
+    graph.graphData().nodes[0].x = 999;
+    expect(vi.mocked(events.snapshot!).mock.calls[0][0].nodes[0].x).toBe(20);
+    controls.dispatchEvent(new Event('change'));
+    adapter.dispose();
+    expect(events.snapshot).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(events.snapshot!).mock.calls[2][0].nodes[0].x).toBe(999);
+    vi.advanceTimersByTime(1000);
+    controls.dispatchEvent(new Event('end'));
+    expect(events.snapshot).toHaveBeenCalledTimes(3);
+  });
+  it('captures omitted Flat depth as zero while rejecting invalid 3D depth', () => {
+    vi.useFakeTimers();
+    const { adapter, graph, callbacks, events } = setup();
+    adapter.update(frame(2));
+    expect(graph.graphData().nodes.every((node: any) => node.z === undefined)).toBe(true);
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1000);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(events.snapshot!).mock.calls[0][0].nodes.every((node) => node.z === 0)).toBe(
+      true,
+    );
+    adapter.update(frame(3));
+    graph.graphData().nodes[0].z = NaN;
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1000);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    adapter.dispose();
+  });
+  it('discards a saved mode mismatch and resumes normal physics after a restored mode changes', () => {
+    const saved = {
+      version: 1 as const,
+      dimensions: 3 as const,
+      camera: {
+        position: { x: 40, y: -20, z: 550 },
+        target: { x: 40, y: -20, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+      },
+      nodes: [
+        { id: 'a', x: -42, y: 17, z: 23 },
+        { id: 'b', x: 65, y: -12, z: -29 },
+      ],
+    };
+    const mismatch = setup();
+    mismatch.adapter.restoreSnapshot?.(saved);
+    mismatch.adapter.update(frame(2));
+    mismatch.callbacks.onEngineStop();
+    expect(mismatch.graph.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(mismatch.graph.graphData().nodes[0].x).toBe(20);
+    mismatch.adapter.dispose();
+    const matching = setup();
+    matching.adapter.restoreSnapshot?.(saved);
+    matching.adapter.update(frame(3));
+    expect(matching.graph.cooldownTicks).toHaveBeenLastCalledWith(0);
+    matching.callbacks.onEngineStop();
+    matching.adapter.update(frame(2));
+    expect(matching.graph.cooldownTicks).toHaveBeenLastCalledWith(120);
+    matching.adapter.dispose();
+  });
+  it('rejects invalid restored geometry and retains coordinates across temporary filtering', () => {
+    vi.useFakeTimers();
+    const { adapter, graph, callbacks } = setup();
+    adapter.restoreSnapshot?.({
+      version: 1,
+      dimensions: 2,
+      camera: {
+        position: { x: NaN, y: 0, z: 1 },
+        target: { x: 0, y: 0, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+      },
+      nodes: [],
+    });
+    adapter.update(frame());
+    graph.graphData().nodes[1].x = 450;
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1000);
+    adapter.update({ ...frame(), nodes: [frame().nodes[0]], links: [] });
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1000);
+    adapter.update(frame());
+    expect(graph.graphData().nodes[1].x).toBe(450);
+    expect(graph.cooldownTicks).toHaveBeenLastCalledWith(120);
+    adapter.dispose();
+  });
   it('owns mutable clones and updates presentation without restarting layout or losing positions', () => {
     const { adapter, graph } = setup();
     const input = frame();

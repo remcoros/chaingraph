@@ -25,6 +25,11 @@ import type {
   GraphHit,
   GraphPointer,
 } from './adapter';
+import {
+  GRAPH_SNAPSHOT_NODE_LIMIT,
+  graphSnapshotSchema,
+  type GraphSnapshot,
+} from '../../domain/graphSnapshot';
 
 // One draw call for all halos; the ordinary node meshes retain graph picking.
 function makeHalos() {
@@ -84,6 +89,10 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let settled = false;
   let pendingFocus: string | undefined;
   let dead = false;
+  let initialSnapshot: GraphSnapshot | undefined;
+  const retainedPositions = new Map<string, GraphSnapshot['nodes'][number]>();
+  let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastSnapshot = '';
   let hit: GraphHit | undefined;
   let point: GraphPointer = { x: 0, y: 0, pointerType: 'mouse' };
   const pointers = new Set<number>();
@@ -91,6 +100,48 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let selectable = false;
   const raycaster = new Raycaster();
   const cleanups: (() => void)[] = [];
+  const emitSnapshot = () => {
+    clearTimeout(snapshotTimer);
+    if (dead || !settled || !dimensions || !events.snapshot) return;
+    const data = graph.graphData().nodes;
+    if (!data.length) return;
+    const round = (value: number) => Math.round(value * 1000) / 1000;
+    const point = (value: { x: number; y: number; z: number }) => ({
+      x: round(value.x),
+      y: round(value.y),
+      z: round(value.z),
+    });
+    const controls = graph.controls() as { target: Vector3 };
+    const parsed = graphSnapshotSchema.safeParse({
+      version: 1,
+      dimensions,
+      camera: {
+        position: point(graph.cameraPosition()),
+        target: point(controls.target),
+        up: point(graph.camera().up),
+      },
+      nodes: data
+        // three-forcegraph removes the unused z coordinate in Flat mode.
+        // Canonical snapshots retain z=0; invalid 3D coordinates still fail validation.
+        .map((node) => ({
+          id: node.id,
+          ...point({ x: node.x!, y: node.y!, z: dimensions === 2 ? 0 : node.z! }),
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    });
+    if (!parsed.success) return;
+    for (const node of parsed.data.nodes) retainedPositions.set(node.id, node);
+    while (retainedPositions.size > GRAPH_SNAPSHOT_NODE_LIMIT)
+      retainedPositions.delete(retainedPositions.keys().next().value!);
+    const signature = JSON.stringify(parsed.data);
+    if (signature === lastSnapshot) return;
+    lastSnapshot = signature;
+    events.snapshot(parsed.data);
+  };
+  const scheduleSnapshot = () => {
+    clearTimeout(snapshotTimer);
+    snapshotTimer = setTimeout(emitSnapshot, duration() + 150);
+  };
   const listen = <K extends keyof (HTMLElementEventMap & { webglcontextlost: Event })>(
     name: K,
     fn: (event: (HTMLElementEventMap & { webglcontextlost: Event })[K]) => void,
@@ -162,6 +213,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     needsFit = true;
     pendingFocus = undefined;
     if (visible && graph.graphData().nodes.length) graph.zoomToFit(duration(), fitPadding);
+    scheduleSnapshot();
   };
   const emitHover = () => {
     if (!dead && !pointers.size && point.pointerType !== 'touch')
@@ -211,7 +263,10 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   };
   const dispose = () => {
     if (dead) return;
+    // Deliver the final settled camera before releasing this workspace's adapter.
+    emitSnapshot();
     dead = true;
+    clearTimeout(snapshotTimer);
     cleanups.forEach((cleanup) => cleanup());
     graph.scene().remove(halos);
     halos.geometry.dispose();
@@ -268,6 +323,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           needsFit = false;
           graph.zoomToFit(duration(), fitPadding);
         }
+        scheduleSnapshot();
       });
     graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     const orbit = graph.controls() as unknown as {
@@ -275,11 +331,19 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       screenSpacePanning: boolean;
       enableDamping: boolean;
       dampingFactor: number;
+      addEventListener(type: string, listener: () => void): void;
+      removeEventListener(type: string, listener: () => void): void;
     };
     orbit.zoomToCursor = true;
     orbit.screenSpacePanning = true;
     orbit.enableDamping = duration() !== 0;
     orbit.dampingFactor = 0.18;
+    orbit.addEventListener('change', scheduleSnapshot);
+    orbit.addEventListener('end', emitSnapshot);
+    cleanups.push(() => {
+      orbit.removeEventListener('change', scheduleSnapshot);
+      orbit.removeEventListener('end', emitSnapshot);
+    });
     const track = (event: PointerEvent) => {
       const rect = element.getBoundingClientRect();
       point = {
@@ -370,17 +434,33 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
             z: target.z + (dz / length) * 180,
           };
     graph.cameraPosition(position, target, duration());
+    scheduleSnapshot();
   };
   return {
     canvas,
+    restoreSnapshot(snapshot) {
+      if (dead) return;
+      const parsed = graphSnapshotSchema.safeParse(snapshot);
+      if (!parsed.success) return;
+      initialSnapshot = parsed.data;
+      for (const node of parsed.data.nodes) retainedPositions.set(node.id, node);
+      needsFit = false;
+    },
     update(frame: GraphFrame) {
       if (dead) return;
+      if (initialSnapshot && initialSnapshot.dimensions !== frame.dimensions) {
+        // The mode preference may have reached storage before its new layout settled.
+        initialSnapshot = undefined;
+        retainedPositions.clear();
+        needsFit = true;
+      }
       const previous = new Map(graph.graphData().nodes.map((node) => [node.id, node]));
       const nodes = frame.nodes.map((node): SimNode => {
         const existing = previous.get(node.id);
         if (!existing) {
+          const position = retainedPositions.get(node.id);
           if (frame.dimensions === 2) savedDepth.set(node.id, node.z || 0);
-          return { ...node, z: frame.dimensions === 2 ? 0 : node.z };
+          return { ...node, ...position, z: frame.dimensions === 2 ? 0 : (position?.z ?? node.z) };
         }
         const { x, y, z } = existing;
         return Object.assign(existing, node, { x, y, z });
@@ -395,9 +475,14 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         links.map((link) => [link.id, link.source, link.target]),
       ]);
       if (signature !== topology) {
-        if (!previous.size && nodes.length) needsFit = true;
+        const restoredLayout =
+          !previous.size &&
+          initialSnapshot?.dimensions === frame.dimensions &&
+          nodes.every((node) => retainedPositions.has(node.id));
+        if (!previous.size && nodes.length && !initialSnapshot) needsFit = true;
         topology = signature;
         settled = false;
+        graph.cooldownTicks(restoredLayout ? 0 : 120);
         graph.graphData({ nodes, links });
       } else {
         const styles = new Map(links.map((link) => [link.id, link]));
@@ -410,6 +495,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       }
       graph.backgroundColor(frame.background);
       if (dimensions !== frame.dimensions) {
+        if (dimensions !== undefined) {
+          // Initial restoration suppresses simulation; subsequent mode changes must not.
+          settled = false;
+          graph.cooldownTicks(120);
+        }
         dimensions = frame.dimensions;
         for (const node of nodes) {
           if (dimensions === 2) {
@@ -435,7 +525,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           ONE: dimensions === 2 ? TOUCH.PAN : TOUCH.ROTATE,
           TWO: TOUCH.DOLLY_PAN,
         };
-        if (dimensions === 2) {
+        if (dimensions === 2 && initialSnapshot?.dimensions !== 2) {
           const camera = graph.cameraPosition();
           graph.camera().up.set(0, 1, 0);
           // No tween on an empty scene: a pending mode tween can overwrite first-data fit.
@@ -447,6 +537,16 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         }
       }
       refreshStyle();
+      if (initialSnapshot && nodes.length) {
+        const snapshot = initialSnapshot;
+        initialSnapshot = undefined;
+        if (snapshot.dimensions === dimensions) {
+          // Apply after dimensions, whose default camera reset must not overwrite restoration.
+          graph.camera().up.set(snapshot.camera.up.x, snapshot.camera.up.y, snapshot.camera.up.z);
+          graph.cameraPosition(snapshot.camera.position, snapshot.camera.target, 0);
+          needsFit = false;
+        }
+      }
     },
     resize(width, height) {
       if (dead) return;
@@ -461,6 +561,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       else if (needsFit && settled && graph.graphData().nodes.length) {
         needsFit = false;
         graph.zoomToFit(duration(), fitPadding);
+        scheduleSnapshot();
       }
     },
     focus,

@@ -100,7 +100,7 @@ export function AboutDialog({
               </dd>
             </div>
             <div>
-              <dt>Save workspace</dt>
+              <dt>Flush automatic save</dt>
               <dd>
                 <kbd>Ctrl / ⌘ S</kbd>
               </dd>

@@ -223,3 +223,62 @@ a {
   font-size: 12px;
   margin-bottom: 15px;
 }
+
+/* Compact, selectable identifiers keep the inspector's primary actions in reach. */
+.selection-facts {
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+.selection-facts > div {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.selection-facts dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.selection-facts dd {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.selection-facts code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  min-width: 0;
+  user-select: text;
+}
+.selection-facts .copy-control {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.selection-heading h2 {
+  font-size: 15px;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.annotation-editor .section-title small {
+  font-size: 10px;
+}
+
+.selection-facts code.outpoint-identity {
+  display: flex;
+  min-width: 0;
+}
+.outpoint-identity > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.outpoint-identity > span:last-child {
+  flex-shrink: 0;
+}

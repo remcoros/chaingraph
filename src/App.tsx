@@ -50,7 +50,7 @@ import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { HelpMenu } from './components/HelpMenu';
 import { AboutDialog } from './components/AboutDialog';
-import { filterGraph, type GraphFilters } from './domain/graphFilters';
+import { filterGraph, valueFilterError, type GraphFilters } from './domain/graphFilters';
 import {
   applyWalletScan,
   walletActivitySummary,
@@ -103,6 +103,7 @@ export default function App() {
   const [fileDialog, setFileDialog] = useState<File>();
   const [menu, setMenu] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
+  const [viewOwner, setViewOwner] = useState<string>();
   const [selectedWallet, setSelectedWallet] = useState<string>();
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
@@ -184,7 +185,10 @@ export default function App() {
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   }, [ws.persist]);
-  const graph = useMemo(() => (w ? buildGraph(w) : { nodes: [], links: [] }), [w]);
+  const graph = useMemo(
+    () => (w ? buildGraph(w) : { nodes: [], links: [] }),
+    [w?.id, w?.transactions, w?.annotations, w?.findings, w?.view.showAddresses],
+  );
   const walletMatches = useMemo(() => (w ? buildWalletMatches(w, graph) : new Map()), [w, graph]);
   const tagIndex = useMemo(() => (w ? buildTagIndex(w, graph) : new Map()), [w, graph]);
   const nodePresentation = useMemo(() => {
@@ -223,6 +227,7 @@ export default function App() {
       ),
     [graph, effectiveFilters, w?.view.showAddresses, w?.annotations],
   );
+  const graphIds = graph.nodes.map((node) => node.id).join('|');
   useEffect(() => {
     const available = new Set(graph.nodes.map((node) => node.id));
     setNavigation((current) => {
@@ -233,7 +238,7 @@ export default function App() {
       return { ids, index };
     });
     if (selectedId && !available.has(selectedId)) setSelectedId(undefined);
-  }, [graph.nodes, selectedId]);
+  }, [graphIds, selectedId]);
   const renderEntityMetadata = (id: string) => {
     const match = walletMatches.get(id);
     return (
@@ -292,8 +297,13 @@ export default function App() {
   useEffect(() => {
     operationRef.current?.abort();
     setOperation('');
-    setSelectedId(undefined);
-    setSelectedWallet(undefined);
+    setSelectedId(w?.view.selectionId);
+    setSelectedWallet(w?.view.selectedWallet);
+    setLeftTab(w?.view.leftTab ?? 'wallets');
+    setRightTab(w?.view.rightTab ?? 'inspect');
+    setMobilePanel(w?.view.mobilePanel ?? 'graph');
+    setPrefetchDepth(w?.view.prefetchDepth ?? 1);
+    setViewOwner(w?.id);
     setError('');
     setNotice('');
     setLive(false);
@@ -302,13 +312,15 @@ export default function App() {
     setEditToken(0);
     setQuery('');
     setFocusRequest(undefined);
-    setGraphFilters({});
-    setNavigation({ ids: [], index: -1 });
-    setFocusGraph(false);
+    setGraphFilters(w?.view.filters ?? {});
+    setNavigation(
+      w?.view.selectionId ? { ids: [w.view.selectionId], index: 0 } : { ids: [], index: -1 },
+    );
+    setFocusGraph(w?.view.focusGraph ?? false);
     setRunReports({});
     spendingOffsets.current.clear();
-    setFitToken((t) => t + 1);
-  }, [ws.activeId]);
+    if (!w?.view.graphSnapshot) setFitToken((t) => t + 1);
+  }, [w?.id]);
   useEffect(() => {
     if (!w) return;
     try {
@@ -331,11 +343,47 @@ export default function App() {
     }
   }, [tour]);
   const change = useCallback(
-    (fn: (data: Workspace) => Workspace, undo = true) => {
-      if (w) ws.update(w.id, fn, undo);
+    (fn: (data: Workspace) => Workspace, undo = true, group?: string) => {
+      if (w) ws.update(w.id, fn, undo, group);
     },
     [w, ws.update],
   );
+  // Hydration has its own owner so a workspace switch never writes the previous view
+  // into the newly active workspace. Presentation does not consume annotation undo.
+  useEffect(() => {
+    if (!w || viewOwner !== w.id) return;
+    const presentation = {
+      selectionId: selectedId,
+      selectedWallet,
+      filters: valueFilterError(graphFilters) ? (w.view.filters ?? {}) : graphFilters,
+      leftTab,
+      rightTab,
+      mobilePanel,
+      focusGraph,
+      prefetchDepth,
+    };
+    ws.update(
+      w.id,
+      (current) => {
+        const nextView = { ...current.view, ...presentation };
+        return JSON.stringify(current.view) === JSON.stringify(nextView)
+          ? current
+          : { ...current, view: nextView };
+      },
+      false,
+    );
+  }, [
+    w?.id,
+    viewOwner,
+    selectedId,
+    selectedWallet,
+    graphFilters,
+    leftTab,
+    rightTab,
+    mobilePanel,
+    focusGraph,
+    prefetchDepth,
+  ]);
   const changeTags = (update: (workspace: Workspace) => Workspace) => {
     try {
       change((current) => {
@@ -498,7 +546,7 @@ export default function App() {
         `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${result.partial ? ' Partial scan: increase the address limit or refresh again to continue queued transactions.' : ` Gap limit reached on both branches (${gap} unused addresses).`}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
       );
       // Only the first discovery frames an empty canvas. Returning checks leave
-      // the user's camera, selection, filters and annotation draft alone.
+      // the user's camera, selection, filters and annotations alone.
       if (!Object.keys(w.transactions).length && result.added) setFitToken((token) => token + 1);
     });
   }
@@ -1081,7 +1129,7 @@ export default function App() {
                     }}
                   >
                     <LockKeyhole size={15} />
-                    Save and lock workspace
+                    Lock workspace
                   </button>
                 </div>
               )}
@@ -1174,28 +1222,39 @@ export default function App() {
             />
             <section className="graph-stage" data-tour="graph-stage" aria-label="Graph workspace">
               <div className="graph-stage-content">
-                <TransactionView
-                  renderMetadata={renderEntityMetadata}
-                  workspace={w}
-                  selected={selected}
-                  onSelect={select}
-                  onEdit={editNode}
-                  onTrace={(direction, id) => void expand(direction, id)}
-                  disabledReason={
-                    operation ? 'Wait for the current operation to finish.' : queryDisabledReason
-                  }
-                />
+                {viewOwner === w.id && (
+                  <TransactionView
+                    key={w.id}
+                    state={w.view.transactionFlow}
+                    onStateChange={(transactionFlow) =>
+                      ws.update(
+                        w.id,
+                        (current) => ({ ...current, view: { ...current.view, transactionFlow } }),
+                        false,
+                      )
+                    }
+                    renderMetadata={renderEntityMetadata}
+                    workspace={w}
+                    selected={selected}
+                    onSelect={select}
+                    onEdit={editNode}
+                    onTrace={(direction, id) => void expand(direction, id)}
+                    disabledReason={
+                      operation ? 'Wait for the current operation to finish.' : queryDisabledReason
+                    }
+                  />
+                )}
                 <div className="graph-renderer-region">
                   {!graph.nodes.length && (
                     <GraphControls
                       view={w.view}
                       onChange={(update) =>
-                        change((current) => ({ ...current, view: update(current.view) }))
+                        change((current) => ({ ...current, view: update(current.view) }), false)
                       }
                       onFit={() => setFitToken((token) => token + 1)}
                     />
                   )}
-                  {graph.nodes.length ? (
+                  {graph.nodes.length && viewOwner === w.id ? (
                     <Suspense
                       fallback={
                         <div className="graph-empty">
@@ -1205,6 +1264,18 @@ export default function App() {
                       }
                     >
                       <GraphView
+                        key={w.id}
+                        snapshot={w.view.graphSnapshot}
+                        onSnapshot={(snapshot) =>
+                          ws.update(
+                            w.id,
+                            (current) => ({
+                              ...current,
+                              view: { ...current.view, graphSnapshot: snapshot },
+                            }),
+                            false,
+                          )
+                        }
                         navigation={graphNavigation}
                         legend={
                           <GraphLegend
@@ -1217,7 +1288,10 @@ export default function App() {
                           <GraphControls
                             view={w.view}
                             onChange={(update) =>
-                              change((current) => ({ ...current, view: update(current.view) }))
+                              change(
+                                (current) => ({ ...current, view: update(current.view) }),
+                                false,
+                              )
                             }
                             onFit={() => setFitToken((token) => token + 1)}
                           />
@@ -1392,12 +1466,26 @@ export default function App() {
                       });
                       setSelectedId(undefined);
                     }}
-                    onSave={(annotation) =>
-                      change((current) => ({
-                        ...current,
-                        annotations: { ...current.annotations, [selected.id]: annotation },
-                      }))
-                    }
+                    onSave={(annotation, group) => {
+                      const previous = w.annotations[selected.id] ?? {
+                        label: '',
+                        note: '',
+                        icon: '',
+                        bookmarked: false,
+                      };
+                      const field =
+                        (Object.keys(annotation) as (keyof typeof annotation)[]).find(
+                          (key) => annotation[key] !== previous?.[key],
+                        ) ?? 'label';
+                      change(
+                        (current) => ({
+                          ...current,
+                          annotations: { ...current.annotations, [selected.id]: annotation },
+                        }),
+                        true,
+                        `annotation:${selected.id}:${field}:${group}`,
+                      );
+                    }}
                   />
                 ) : (
                   <div className="inspector-empty">
@@ -1454,7 +1542,14 @@ export default function App() {
           key={w.id}
           workspace={w}
           onClose={() => setSettingsOpen(false)}
-          onSave={(name, description) => change((c) => ({ ...c, name, description }))}
+          onSave={(name, description) =>
+            change(
+              (c) =>
+                c.name === name && c.description === description ? c : { ...c, name, description },
+              true,
+              'workspace-details',
+            )
+          }
         />
       )}
       {examplesOpen && (

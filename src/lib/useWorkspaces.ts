@@ -87,6 +87,7 @@ export class WorkspaceSessionStore {
   private listeners = new Set<() => void>();
   private writing: Promise<void> = Promise.resolve();
   private locking = new Map<string, Promise<void>>();
+  private editGroups = new Map<string, { key: string; at: number }>();
   private storedRaw: string | null = null;
   private storageInvalid = false;
   private options: StoreOptions;
@@ -135,6 +136,8 @@ export class WorkspaceSessionStore {
       this.setActiveId(data.id);
       return;
     }
+    // Typing groups belong to one unlocked session, never a later reopen.
+    this.editGroups.delete(data.id);
     this.patch({
       sessions: [
         ...this.state.sessions,
@@ -161,7 +164,7 @@ export class WorkspaceSessionStore {
     // Legacy or stale index labels are migrated from the authenticated workspace on save.
     this.add(data, password, entry.publicName === data.name);
   };
-  update = (id: string, fn: (w: Workspace) => Workspace, undo = true) => {
+  update = (id: string, fn: (w: Workspace) => Workspace, undo = true, group?: string) => {
     if (this.locking.has(id)) return;
     const current = this.state.sessions.find((s) => s.data.id === id);
     if (!current) return;
@@ -177,6 +180,11 @@ export class WorkspaceSessionStore {
     }
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
+    const previousGroup = this.editGroups.get(id);
+    const now = Date.now();
+    const coalesce = undo && group && previousGroup?.key === group && now - previousGroup.at < 1500;
+    if (undo && group) this.editGroups.set(id, { key: group, at: now });
+    else if (undo || evidenceChanged) this.editGroups.delete(id);
     // Chain refreshes are not undoable. Older snapshots are invalidated only when
     // evidence changed; a quiet check retains them, with the latest scan-owned
     // metadata carried in so undo restores user edits, never stale check state.
@@ -189,16 +197,22 @@ export class WorkspaceSessionStore {
               data,
               revision: s.revision + 1,
               history: undo
-                ? [...s.history.slice(-14), s.data]
+                ? coalesce
+                  ? s.history
+                  : [...s.history.slice(-14), s.data]
                 : evidenceChanged
                   ? []
-                  : s.history.map((snapshot) => carryScanMetadata(snapshot, data)),
+                  : s.history.map((snapshot) => ({
+                      ...carryScanMetadata(snapshot, data),
+                      view: data.view,
+                    })),
             },
       ),
     });
   };
   undo = (id: string) => {
     if (this.locking.has(id)) return;
+    this.editGroups.delete(id);
     this.patch({
       sessions: this.state.sessions.map((s) =>
         s.data.id === id && s.history.length
@@ -318,6 +332,7 @@ export class WorkspaceSessionStore {
         const current = this.state.sessions.find((s) => s.data.id === id);
         if (current && current.revision !== current.savedRevision)
           throw new Error('Workspace changed while locking; keep it open and save again.');
+        this.editGroups.delete(id);
         this.patch({
           sessions: this.state.sessions.filter((s) => s.data.id !== id),
           activeId: this.state.activeId === id ? undefined : this.state.activeId,

@@ -95,3 +95,16 @@ Read [architecture and extension points](docs/architecture.md), [user instructio
 Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, and the selected row remains visible. Use a row’s pencil to edit its annotation, or load missing previous outputs one level at a time. Missing spending data does not prove an output is unspent.
 
 The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. The laboratory has no serialized raw data. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).
+
+Edits to labels, notes, icons, bookmarks, tags and workspace details save automatically.
+The status bar confirms when the encrypted copy has reached browser storage; locking
+flushes pending edits first. Graph camera/layout, filters, selection and transaction-flow
+expansion are encrypted and restored when reopening. Export remains an explicit action
+for keeping a portable backup.
+
+The compact transaction flow places inputs and outputs around the current transaction.
+Select an output to see adjacent creating/spending transactions and use its arrows to
+follow the exact outpoint. Missing transactions can be loaded from the same view.
+OP_RETURN outputs show decoded text when possible, with a short preview and expandable,
+selectable, copyable full data. Binary data stays hex; script decoding never executes it.
+Tags can be searched, created and assigned from **Add or choose tags** in the inspector.

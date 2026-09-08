@@ -8,6 +8,7 @@ import {
 } from '../domain/transactionInspection';
 import { fetchRawInspection } from '../lib/transactionInspection';
 import { CopyButton } from './CopyButton';
+import { OpReturnData } from './OpReturnData';
 import './transaction-view.css';
 
 function HexField({
@@ -135,6 +136,7 @@ export function ScriptInspector({
           </select>
         </label>
         <HexField title="scriptPubKey hex" value={outputHex} decode />
+        <OpReturnData hex={outputHex} />
         {!raw && (
           <>
             <button

@@ -102,7 +102,6 @@ test('public BIP84 wallet scans both branches, annotates and bookmarks graph ent
   await page.getByRole('button', { name: /Node icon/ }).click();
   await page.getByRole('button', { name: 'Star', exact: true }).click();
   await page.getByLabel('Bookmark', { exact: true }).check();
-  await page.getByRole('button', { name: 'Save annotation' }).click();
   await expect(page.locator('.selection-heading h2')).toHaveText('Salary origin');
   await page.getByRole('button', { name: 'Bookmarks', exact: true }).click();
   await expect(
@@ -135,7 +134,7 @@ test('locks, rejects the wrong password, and restores a saved workspace after re
   await page.goto('/');
   await createWorkspace(page, 'Secret study');
   await page.getByRole('button', { name: 'Workspace menu' }).click();
-  await page.getByRole('button', { name: 'Save and lock workspace' }).click();
+  await page.getByRole('button', { name: 'Lock workspace' }).click();
   await expect(page.locator('.saved-row')).toHaveCount(1);
   await expect(page.locator('.saved-row')).toContainText('Secret study');
   await expect(page.getByRole('navigation', { name: 'Open workspaces' })).not.toContainText(
@@ -185,7 +184,6 @@ test('exports encrypted data and reimports a copy with annotations intact', asyn
   await page.getByRole('button', { name: 'Add to graph' }).click();
   await expect(page.getByLabel('Node label')).toBeVisible();
   await page.getByLabel('Node label').fill('A portable label');
-  await page.getByRole('button', { name: 'Save annotation' }).click();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   const download = await downloadPromise;
@@ -354,7 +352,7 @@ test('keeps multiple wallets independent inside one encrypted workspace', async 
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });
 
-test('keeps annotation drafts through view changes and reconciles an undo while editing', async ({
+test('automatic annotation edits survive view changes and undo restores the latest fields', async ({
   page,
 }) => {
   await mockBitcoin(page);
@@ -363,19 +361,22 @@ test('keeps annotation drafts through view changes and reconciles an undo while 
   await page.getByLabel('Transaction, output, or address').fill(TX_FUNDING);
   await page.getByRole('button', { name: 'Add to graph' }).click();
   const label = page.getByLabel('Node label');
-  await label.fill('First saved context');
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
-  await label.fill('Unsaved second draft');
+  const notes = page.getByLabel('Node notes');
+  await label.fill('First context');
+  await notes.fill('Keep the latest note');
+  await label.fill('Second context');
   await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
   await page.getByLabel('Size nodes by').selectOption('value');
-  await expect(label).toHaveValue('Unsaved second draft');
-  await page.getByRole('button', { name: 'Save annotation', exact: true }).click();
-  await label.fill('Third draft survives undo');
+  await expect(label).toHaveValue('Second context');
+  await label.fill('Third context');
   await page.getByRole('button', { name: 'Undo workspace change' }).click();
-  await expect(label).toHaveValue('Third draft survives undo');
-  await expect(page.locator('.annotation-conflict')).toBeVisible();
-  await page.getByRole('button', { name: 'Reload saved annotation' }).click();
-  await expect(label).toHaveValue('First saved context');
+  await expect(label).toHaveValue('Second context');
+  await expect(notes).toHaveValue('Keep the latest note');
+  await notes.fill('Note changed after undo');
+  await expect(label).toHaveValue('Second context');
+  await expect(notes).toHaveValue('Note changed after undo');
+  await expect(page.getByRole('button', { name: 'Save annotation' })).toHaveCount(0);
+  await saved(page);
 });
 
 test('imports a long wallet label during scanning and reopens it intact', async ({ page }) => {
@@ -440,7 +441,7 @@ test('about and connection navigation work and locked copies can be deliberately
   await page.keyboard.press('Escape');
   await createWorkspace(page, 'Disposable browser study');
   await page.getByRole('button', { name: 'Workspace menu' }).click();
-  await page.getByRole('button', { name: 'Save and lock workspace' }).click();
+  await page.getByRole('button', { name: 'Lock workspace' }).click();
   const remove = page.getByRole('button', {
     name: 'Delete saved workspace Disposable browser study',
   });
@@ -463,16 +464,22 @@ test('selection history preserves path depth and skips removed transaction nodes
   for (const id of [TX_FUNDING, TX_SPENDING]) {
     await page.getByLabel('Transaction, output, or address').fill(id);
     await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
-    await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(id);
+    await expect(
+      page.locator(`.selection-heading .selection-facts code[title="${id}"]`),
+    ).toBeVisible();
   }
   await page.getByLabel('Focus graph paths').selectOption('1');
   await page.getByRole('button', { name: 'Previous selection', exact: true }).click();
-  await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(TX_FUNDING);
+  await expect(
+    page.locator(`.selection-heading .selection-facts code[title="${TX_FUNDING}"]`),
+  ).toBeVisible();
   await expect(page.getByLabel('Focus graph paths')).toHaveValue('1');
   await page.getByRole('button', { name: 'Remove transaction from graph', exact: true }).click();
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
   await page.getByRole('button', { name: 'Next selection', exact: true }).click();
-  await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(TX_SPENDING);
+  await expect(
+    page.locator(`.selection-heading .selection-facts code[title="${TX_SPENDING}"]`),
+  ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Previous selection', exact: true }),
   ).toBeDisabled();
@@ -501,27 +508,25 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   });
   const label = page.getByLabel('Node label');
   const notes = page.getByLabel('Node notes');
-  const save = page.getByRole('button', { name: /Save annotation/ });
   const editor = page.locator('.annotation-editor');
   const evidence = page.locator('.selection-evidence');
 
-  // --- 1440x900: trace actions near the summary and Save above the fold ---
+  // --- 1440x900: trace actions and automatic editing above the fold ---
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(loadPrevious).toBeVisible();
   await expect(findSpending).toBeVisible();
   await expect(label).toBeVisible();
   await expect(notes).toBeVisible();
-  await expect(save).toBeVisible();
   const traceBox = await loadPrevious.boundingBox();
   const editorBox = await editor.boundingBox();
-  const saveBox = await save.boundingBox();
+  const notesBox = await notes.boundingBox();
   const evidenceBox = await evidence.boundingBox();
   // Common trace actions precede the editor; the evidence block stays below it.
   expect(traceBox!.y).toBeLessThan(editorBox!.y);
   expect(evidenceBox!.y).toBeGreaterThanOrEqual(editorBox!.y + editorBox!.height);
-  // Save is fully reachable without scrolling the sidebar at this viewport.
-  expect(saveBox!.y + saveBox!.height).toBeLessThanOrEqual(900);
-  await expect(save).toBeInViewport({ ratio: 1 });
+  // Notes are fully reachable without scrolling the sidebar at this viewport.
+  expect(notesBox!.y + notesBox!.height).toBeLessThanOrEqual(900);
+  await expect(notes).toBeInViewport({ ratio: 1 });
 
   // Editing survives toggling the collapsible chain evidence.
   await notes.fill('Draft that must survive evidence toggles.');
@@ -538,7 +543,7 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   await page.keyboard.press('Tab');
   await expect(notes).toBeFocused();
 
-  // --- 390x844: editing stays above the evidence and Save is scroll-reachable ---
+  // --- 390x844: editing stays above the evidence and notes remain reachable ---
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Inspector' }).click();
   await expect(page.locator('.graph-navigation')).toBeHidden();
@@ -548,7 +553,7 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   const editorMobile = await editor.boundingBox();
   const evidenceMobile = await evidence.boundingBox();
   expect(evidenceMobile!.y).toBeGreaterThan(editorMobile!.y);
-  await expect(save).toBeInViewport({ ratio: 1 });
+  await expect(notes).toBeInViewport({ ratio: 1 });
   await expect(notes).toHaveValue('Draft that must survive evidence toggles.');
 });
 

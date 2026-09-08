@@ -15,7 +15,8 @@ Use for substantive graph, panel, navigation or workspace interactions. Verify b
 - Keep icon-only controls visually compact with accessible names. Custom selects and popovers need keyboard navigation, focus return and usable empty/disabled states.
 - Compare shared selection, hover, trace and annotation actions across renderer adapters. Transaction input/output views and script inspection must work independently from the canvas.
 - Verify wallet refresh preserves the camera, selection, labels and tags; new activity must remain discoverable until reviewed. Do not infer unspent status from missing loaded spends.
-- Confirm Save and trace controls are fully inside the visible panel, not merely within the browser viewport behind a clipped ancestor. Expand and collapse large transaction lists without moving the whole page.
+- Confirm annotation and trace controls are fully inside the visible panel, not merely within the browser viewport behind a clipped ancestor. Expand and collapse large transaction lists without moving the whole page.
+- Edit a note and immediately change selection or lock. Verify the edit survives reopening without a Save action, and that graph restoration does not mix workspaces.
 - Keep private workspace content out of URLs, logs and plaintext storage. Public workspace names are the intentional exception.
 - Run browser suites serially within a checkout. Parallel worktrees need separate dependencies, preview/test ports and artifact directories; use the port overrides described in CONTRIBUTING.md.
 - Record actionable findings and fixes in the release review, along with what was actually tested.

@@ -39,14 +39,21 @@ test('lookup prefetch hydrates previous outputs and the spending action follows 
   await page.getByLabel('Entity type').selectOption('output');
   await page.getByLabel('Filter graph entities').fill(TX_FUNDING);
   await page.locator('.entity-row').first().click();
-  await expect(page.locator('.selection-value')).toHaveText('100,000,000 sats');
+  await expect(
+    page
+      .locator('.selection-facts > div')
+      .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
+      .locator('dd'),
+  ).toHaveText('100,000,000 sats');
   await page.getByRole('button', { name: 'Find spending transactions', exact: true }).click();
   await expect(
     page.getByRole('status').filter({ hasText: '1 spending transaction found; 0 added' }),
   ).toBeVisible();
   await page.getByRole('button', { name: /^Spending transaction:/ }).click();
   await expect(page.locator('.selection-heading .eyebrow')).toHaveText('TRANSACTION');
-  await expect(page.locator('.selection-heading .identifier-row code')).toHaveText(TX_SPENDING);
+  await expect(
+    page.locator(`.selection-heading .selection-facts code[title="${TX_SPENDING}"]`),
+  ).toBeVisible();
 });
 test('an unresolved output can load its creating transaction without prefetch', async ({
   page,
@@ -60,9 +67,19 @@ test('an unresolved output can load its creating transaction without prefetch', 
   await page.getByLabel('Entity type').selectOption('output');
   await page.getByLabel('Filter graph entities').fill(TX_FUNDING);
   await page.locator('.entity-row').first().click();
-  await expect(page.locator('.selection-value')).toHaveText('Unknown value');
+  await expect(
+    page
+      .locator('.selection-facts > div')
+      .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
+      .locator('dd'),
+  ).toHaveText('Unknown value');
   await page.getByRole('button', { name: 'Load previous transactions', exact: true }).click();
-  await expect(page.locator('.selection-value')).toHaveText('100,000,000 sats');
+  await expect(
+    page
+      .locator('.selection-facts > div')
+      .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
+      .locator('dd'),
+  ).toHaveText('100,000,000 sats');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });
 test('laboratory reveals incoming and outgoing fixture paths while offline', async ({ page }) => {
@@ -89,9 +106,9 @@ test('public workspace names survive locking while descriptions remain encrypted
     'Private investigation details',
   );
   await details.getByLabel('Name (public)', { exact: true }).fill('Recognizable locked study');
-  await details.getByRole('button', { name: 'Save workspace details' }).click();
+  await details.getByRole('button', { name: 'Done' }).click();
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Save and lock workspace', exact: true }).click();
+  await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await expect(page.locator('.saved-row')).toContainText('Recognizable locked study');
   await expect(page.locator('body')).not.toContainText('Private investigation details');
   const raw = await page.evaluate(() => localStorage.getItem('chaingraph.encrypted-workspaces.v1'));

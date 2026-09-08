@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { graphSnapshotSchema } from './graphSnapshot';
 import type { Workspace, Transaction, GraphData, GraphNode } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
 import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
@@ -197,6 +198,42 @@ const workspaceSchema = z.object({
     glow: z.boolean(),
     showAddresses: z.boolean(),
     highlightMode: z.enum(['all', 'wallets', 'tags', 'none']).optional(),
+    graphSnapshot: graphSnapshotSchema.optional(),
+    selectionId: z.string().max(300).optional(),
+    filters: z
+      .object({
+        tagId: z.string().max(200).optional(),
+        walletId: z.string().max(200).optional(),
+        query: z.string().max(10000).optional(),
+        kind: z.enum(['all', 'transaction', 'output', 'address']).optional(),
+        label: z.enum(['all', 'labeled', 'unlabeled']).optional(),
+        bookmarkedOnly: z.boolean().optional(),
+        minSats: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
+        maxSats: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
+        spend: z.enum(['all', 'observed', 'unknown']).optional(),
+        funding: z.enum(['all', 'missing', 'loaded']).optional(),
+        showAddresses: z.boolean().optional(),
+        focus: z
+          .object({ id: z.string().max(300), hops: z.union([z.literal(1), z.literal(2)]) })
+          .optional(),
+        preserveContext: z.boolean().optional(),
+        includeIds: z.array(z.string().max(300)).max(MAX_GRAPH_RECORDS).optional(),
+      })
+      .optional(),
+    leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
+    rightTab: z.enum(['inspect', 'analysis']).optional(),
+    focusGraph: z.boolean().optional(),
+    prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+    selectedWallet: z.string().max(200).optional(),
+    mobilePanel: z.enum(['graph', 'left', 'right']).optional(),
+    transactionFlow: z
+      .object({
+        transactionId: txid.optional(),
+        expandedInputs: z.boolean().optional(),
+        expandedOutputs: z.boolean().optional(),
+        open: z.boolean().optional(),
+      })
+      .optional(),
   }),
 });
 

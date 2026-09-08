@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Check,
   ChevronDown,
   Crosshair,
   RefreshCw,
@@ -25,6 +24,8 @@ import { walletActivitySummary, walletCheckAge } from '../domain/walletActivity'
 import { CopyButton } from './CopyButton';
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from './IconPicker';
+import { OpReturnData } from './OpReturnData';
+import { decodeOpReturn } from '../domain/opReturn';
 
 export function AnnotationEditor({
   annotation,
@@ -35,12 +36,9 @@ export function AnnotationEditor({
   annotation: Annotation;
   editToken?: number;
   onEditHandled?: () => void;
-  onSave: (a: Annotation) => void;
+  onSave: (a: Annotation, group?: string) => void;
 }) {
-  const [draft, setDraft] = useState(annotation);
-  const [saved, setSaved] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const baseline = useRef(annotation);
+  const editGroup = useRef('');
   const labelRef = useRef<HTMLInputElement>(null);
   const previousEditToken = useRef<number | undefined>(undefined);
   useEffect(() => {
@@ -50,60 +48,17 @@ export function AnnotationEditor({
     }
     previousEditToken.current = editToken;
   }, [editToken]);
-  useEffect(() => {
-    if (JSON.stringify(annotation) === JSON.stringify(baseline.current)) return;
-    if (
-      JSON.stringify(draft) !== JSON.stringify(baseline.current) &&
-      JSON.stringify(draft) !== JSON.stringify(annotation)
-    ) {
-      baseline.current = annotation;
-      setConflict(true);
-      return;
-    }
-    baseline.current = annotation;
-    setDraft(annotation);
-    setConflict(false);
-  }, [annotation]);
   return (
-    <form
+    <section
       className="panel-section annotation-editor"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave(draft);
-        setSaved(true);
-        setConflict(false);
+      aria-label="Label and notes"
+      onFocusCapture={() => {
+        editGroup.current = crypto.randomUUID();
       }}
     >
-      {conflict && (
-        <div className="annotation-conflict" role="status">
-          <p>
-            Saved annotation changed while you were editing. Your draft is preserved. Saving
-            replaces the saved annotation.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setDraft(annotation);
-              setConflict(false);
-              setSaved(false);
-            }}
-          >
-            Reload saved annotation
-          </button>
-        </div>
-      )}
       <div className="section-title">
         <h3>Label and notes</h3>
-        <button type="submit" className="primary annotation-save">
-          {saved ? (
-            <>
-              <Check size={15} />
-              Saved
-            </>
-          ) : (
-            'Save annotation'
-          )}
-        </button>
+        <small className="muted">Saves automatically</small>
       </div>
       <label>
         Label
@@ -112,10 +67,9 @@ export function AnnotationEditor({
           aria-label="Node label"
           maxLength={200}
           placeholder="Give this a meaningful name"
-          value={draft.label}
+          value={annotation.label}
           onChange={(e) => {
-            setDraft({ ...draft, label: e.target.value });
-            setSaved(false);
+            onSave({ ...annotation, label: e.target.value }, editGroup.current);
           }}
         />
       </label>
@@ -126,34 +80,31 @@ export function AnnotationEditor({
           rows={3}
           maxLength={10000}
           placeholder="What do you know about this?"
-          value={draft.note}
+          value={annotation.note}
           onChange={(e) => {
-            setDraft({ ...draft, note: e.target.value });
-            setSaved(false);
+            onSave({ ...annotation, note: e.target.value }, editGroup.current);
           }}
         />
       </label>
       <div className="annotation-actions">
         <IconPicker
-          value={draft.icon}
+          value={annotation.icon}
           onChange={(icon) => {
-            setDraft({ ...draft, icon });
-            setSaved(false);
+            onSave({ ...annotation, icon }, editGroup.current);
           }}
         />
         <label className="switch-label">
           <input
             type="checkbox"
-            checked={draft.bookmarked}
+            checked={annotation.bookmarked}
             onChange={(e) => {
-              setDraft({ ...draft, bookmarked: e.target.checked });
-              setSaved(false);
+              onSave({ ...annotation, bookmarked: e.target.checked }, editGroup.current);
             }}
           />
           Bookmark
         </label>
       </div>
-    </form>
+    </section>
   );
 }
 export function WalletInspector({
@@ -333,7 +284,7 @@ interface NodeInspectorProps {
   onCenter?: () => void;
   onRefresh: () => void;
   onRemove: () => void;
-  onSave: (annotation: Annotation) => void;
+  onSave: (annotation: Annotation, group?: string) => void;
 }
 export function NodeInspector({
   tagsPanel,
@@ -371,8 +322,12 @@ export function NodeInspector({
       : !hasPrevious
         ? 'Coinbase transactions do not have previous transactions.'
         : undefined);
+  const selectedOutput =
+    selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
+  const opReturn = decodeOpReturn(selectedOutput?.scriptPubKey.hex);
   const spendingReason =
     unavailable ||
+    (opReturn ? 'OP_RETURN outputs are unspendable.' : undefined) ||
     (selected.kind === 'address'
       ? 'Select a transaction or output to find spending transactions.'
       : !tx
@@ -393,8 +348,6 @@ export function NodeInspector({
     ),
   ].filter((id) => id.startsWith('tx:') && !!w.transactions[id.slice(3)]);
   const spendingCount = spendingNodes.length;
-  const selectedOutput =
-    selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
   const identifier = selected.id.replace(/^(tx|out|addr):/, '');
   const previousHint = !tx
     ? 'Load the transaction that created this output.'
@@ -435,21 +388,57 @@ export function NodeInspector({
             </button>
           )}
         </div>
-        <h2>{w.annotations[selected.id]?.label || selected.label}</h2>
-        <div className="identifier-row">
-          <code className="wrap">{identifier}</code>
-          <CopyButton
-            value={identifier}
-            label={
-              selected.kind === 'output'
-                ? 'Copy outpoint'
+        {w.annotations[selected.id]?.label && <h2>{w.annotations[selected.id].label}</h2>}
+        <dl className="selection-facts">
+          {selected.address && selected.kind !== 'address' && (
+            <div>
+              <dt>Address</dt>
+              <dd>
+                <code title={selected.address}>{short(selected.address, 12)}</code>
+                <CopyButton value={selected.address} label="Copy address" />
+              </dd>
+            </div>
+          )}
+          <div>
+            <dt>
+              {selected.kind === 'output'
+                ? 'Outpoint'
                 : selected.kind === 'address'
-                  ? 'Copy address'
-                  : 'Copy transaction ID'
-            }
-          />
-        </div>
-        <div className="selection-value">{formatSats(selected.value)}</div>
+                  ? 'Address'
+                  : 'Transaction'}
+            </dt>
+            <dd>
+              <code
+                title={identifier}
+                className={selected.kind === 'output' ? 'outpoint-identity' : undefined}
+              >
+                {selected.kind === 'output' ? (
+                  <>
+                    <span>{short(selected.txid ?? '', 8)}</span>
+                    <span>:{selected.vout}</span>
+                  </>
+                ) : (
+                  short(identifier, 12)
+                )}
+              </code>
+              <CopyButton
+                value={identifier}
+                label={
+                  selected.kind === 'output'
+                    ? 'Copy outpoint'
+                    : selected.kind === 'address'
+                      ? 'Copy address'
+                      : 'Copy transaction ID'
+                }
+              />
+            </dd>
+          </div>
+          <div>
+            <dt>Value</dt>
+            <dd>{formatSats(selected.value)}</dd>
+          </div>
+        </dl>
+        {selectedOutput && <OpReturnData hex={selectedOutput.scriptPubKey.hex} />}
         {cautions.length > 0 && (
           <p className="selection-caution">
             <TriangleAlert size={13} />
@@ -458,9 +447,11 @@ export function NodeInspector({
         )}
         {selected.kind !== 'address' && (
           <p className="small muted spending-note">
-            {spendingCount
-              ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
-              : 'No spending transaction is loaded. This does not establish that these coins are unspent.'}
+            {opReturn
+              ? 'OP_RETURN · Unspendable output'
+              : spendingCount
+                ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
+                : 'Spend status unknown. No spending transaction loaded.'}
           </p>
         )}
         <div className="selection-trace">
@@ -536,12 +527,6 @@ export function NodeInspector({
             <ChevronDown size={15} aria-hidden="true" />
           </summary>
           <div className="evidence-body">
-            {selected.address && (
-              <label className="detail-label">
-                Address
-                <code className="wrap">{selected.address}</code>
-              </label>
-            )}
             {selected.kind === 'output' && (
               <dl className="details">
                 <div>
