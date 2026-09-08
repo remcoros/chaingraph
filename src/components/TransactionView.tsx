@@ -503,6 +503,7 @@ export function TransactionView(props: Props) {
   return (
     <details
       className="transaction-view"
+      data-tour="transaction-flow"
       open={state?.open ?? true}
       onToggle={(event) => {
         const open = event.currentTarget.open;

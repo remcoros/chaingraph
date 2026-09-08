@@ -87,6 +87,7 @@ import {
 import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/api';
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { ancestryNotice, loadAncestors, traceSourceExists } from './lib/tracing';
+import { WORKBENCH_TOUR, availableTourSteps } from './features/tour/steps';
 import { WORKSPACE_TEMPLATES } from './domain/workspaceTemplates';
 import { MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
@@ -172,7 +173,19 @@ export default function App() {
   const [error, setError] = useState('');
   const [operation, setOperation] = useState('');
   const [fitToken, setFitToken] = useState(0);
-  const [tour, setTour] = useState<number>();
+  const [tour, setTour] = useState<string>();
+  const tourSteps = availableTourSteps(WORKBENCH_TOUR, {
+    hasSelection: !!selectedId,
+    hasTransactions: !!w && Object.keys(w.transactions).length > 0,
+    features: [],
+  });
+  const tourStep =
+    tour === undefined ? undefined : (tourSteps.find((step) => step.id === tour) ?? tourSteps[0]);
+  // Tour previews never feed the persisted presentation effect or selection history.
+  const shownLeftTab = tourStep?.view?.leftTab ?? leftTab;
+  const shownRightTab = tourStep?.view?.rightTab ?? rightTab;
+  const shownMobilePanel = tourStep?.view?.panel ?? mobilePanel;
+  const shownFocusGraph = tourStep ? false : focusGraph;
   const [live, setLive] = useState(false);
   const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const [scanLimit, setScanLimit] = useState(200);
@@ -452,6 +465,7 @@ export default function App() {
   );
   useEffect(() => {
     operationRef.current?.abort();
+    setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
     setSelectedWallet(w?.view.selectedWallet);
@@ -482,23 +496,14 @@ export default function App() {
     if (!w) return;
     try {
       if (!localStorage.getItem('chaingraph.tour.seen')) {
-        setTour(0);
+        setTour(WORKBENCH_TOUR[0].id);
         localStorage.setItem('chaingraph.tour.seen', '1');
       }
     } catch {
       // A denied/full store must not crash an unlocked workspace or block export.
-      setTour(0);
+      setTour(WORKBENCH_TOUR[0].id);
     }
   }, [w?.id]);
-  useEffect(() => {
-    if (tour === undefined) return;
-    if (tour === 1) setMobilePanel('left');
-    else if (tour === 2) setMobilePanel('graph');
-    else if (tour === 3) {
-      setMobilePanel('right');
-      setRightTab('analysis');
-    }
-  }, [tour]);
   const change = useCallback(
     (fn: (data: Workspace) => Workspace, undo = true, group?: string) => {
       if (w) ws.update(w.id, fn, undo, group);
@@ -1307,7 +1312,7 @@ export default function App() {
           actions={[
             {
               label: w ? 'Show guided tour' : 'Getting started',
-              onSelect: () => (w ? setTour(0) : setAboutOpen('guide')),
+              onSelect: () => (w ? setTour(WORKBENCH_TOUR[0].id) : setAboutOpen('guide')),
             },
             {
               label: 'Example workspaces',
@@ -1335,7 +1340,7 @@ export default function App() {
       ) : (
         <>
           <div className="workbench-toolbar">
-            <div className="lookup-controls">
+            <div className="lookup-controls" data-tour="chain-lookup">
               <form className="search-form" onSubmit={search}>
                 <Search size={17} />
                 <input
@@ -1372,7 +1377,7 @@ export default function App() {
                 </label>
               )}
             </div>
-            <div className="workspace-actions">
+            <div className="workspace-actions" data-tour="workspace-actions">
               <button
                 className="icon-button workspace-undo"
                 aria-label="Undo workspace change"
@@ -1465,31 +1470,31 @@ export default function App() {
           </div>
           <div className="mobile-switch">
             <button
-              className={mobilePanel === 'left' ? 'active' : ''}
+              className={shownMobilePanel === 'left' ? 'active' : ''}
               onClick={() => setMobilePanel('left')}
             >
               <WalletIcon size={15} />
               Browse
             </button>
             <button
-              className={mobilePanel === 'graph' ? 'active' : ''}
+              className={shownMobilePanel === 'graph' ? 'active' : ''}
               onClick={() => setMobilePanel('graph')}
             >
               <GitBranch size={15} />
               Graph
             </button>
             <button
-              className={mobilePanel === 'right' ? 'active' : ''}
+              className={shownMobilePanel === 'right' ? 'active' : ''}
               onClick={() => setMobilePanel('right')}
             >
               <List size={15} />
-              {rightTab === 'analysis' ? 'Analysis' : 'Inspector'}
+              {shownRightTab === 'analysis' ? 'Analysis' : 'Inspector'}
             </button>
           </div>
           <main
             id="main-workspace"
             tabIndex={-1}
-            className={`workbench show-${mobilePanel} ${focusGraph ? 'focus-graph' : ''}`}
+            className={`workbench show-${shownMobilePanel} ${shownFocusGraph ? 'focus-graph' : ''}`}
           >
             <WorkspacePanel
               w={w}
@@ -1513,7 +1518,7 @@ export default function App() {
                   }}
                 />
               }
-              leftTab={leftTab}
+              leftTab={shownLeftTab}
               setLeftTab={setLeftTab}
               selectedWalletId={wallet?.id}
               selectedId={selectedId}
@@ -1573,8 +1578,13 @@ export default function App() {
                 {viewOwner === w.id && (
                   <TransactionView
                     key={w.id}
-                    state={w.view.transactionFlow}
+                    state={
+                      tourStep?.view?.flowOpen
+                        ? { ...w.view.transactionFlow, open: true }
+                        : w.view.transactionFlow
+                    }
                     onStateChange={(transactionFlow) =>
+                      !tourStep &&
                       ws.update(
                         w.id,
                         (current) => ({ ...current, view: { ...current.view, transactionFlow } }),
@@ -1609,7 +1619,7 @@ export default function App() {
                     <GraphControls
                       smallAmountHiddenCount={amountGraph.hiddenCount}
                       view={w.view}
-                      focusGraph={focusGraph}
+                      focusGraph={shownFocusGraph}
                       onToggleFocus={() => setFocusGraph((value) => !value)}
                       onChange={(update) =>
                         change((current) => ({ ...current, view: update(current.view) }), false)
@@ -1662,7 +1672,7 @@ export default function App() {
                           <GraphControls
                             smallAmountHiddenCount={amountGraph.hiddenCount}
                             view={w.view}
-                            focusGraph={focusGraph}
+                            focusGraph={shownFocusGraph}
                             onToggleFocus={() => setFocusGraph((value) => !value)}
                             onChange={(update) =>
                               change(
@@ -1746,20 +1756,20 @@ export default function App() {
             <aside className="right-panel" data-tour="analysis-panel">
               <div className="panel-tabs">
                 <button
-                  className={rightTab === 'inspect' ? 'active' : ''}
+                  className={shownRightTab === 'inspect' ? 'active' : ''}
                   onClick={() => setRightTab('inspect')}
                 >
                   Inspector
                 </button>
                 <button
-                  className={rightTab === 'analysis' ? 'active' : ''}
+                  className={shownRightTab === 'analysis' ? 'active' : ''}
                   onClick={() => setRightTab('analysis')}
                 >
                   Analysis <span>{w.findings.length}</span>
                 </button>
               </div>
               <div className="inspector-scroll" ref={inspectorScroll}>
-                {rightTab === 'analysis' ? (
+                {shownRightTab === 'analysis' ? (
                   <AnalysisPanel
                     uiState={analysisUiState}
                     onUiStateChange={updateAnalysisUiState}
@@ -1790,7 +1800,7 @@ export default function App() {
                       }))
                     }
                   />
-                ) : wallet ? (
+                ) : wallet && tourStep?.view?.rightTab !== 'inspect' ? (
                   <WalletInspector
                     wallet={wallet}
                     workspace={w}
@@ -1956,7 +1966,7 @@ export default function App() {
         <AboutDialog
           initialTab={aboutOpen}
           onClose={() => setAboutOpen(false)}
-          onTour={w ? () => setTour(0) : undefined}
+          onTour={w ? () => setTour(WORKBENCH_TOUR[0].id) : undefined}
           status={status}
           networks={networks}
           statuses={statuses}
@@ -2190,7 +2200,9 @@ export default function App() {
           onClose={() => setFileDialog(undefined)}
         />
       )}
-      {tour !== undefined && <GuidedTour tour={tour} setTour={setTour} />}
+      {tour !== undefined && !!w && (
+        <GuidedTour steps={tourSteps} activeId={tour} onStepChange={setTour} />
+      )}
     </div>
   );
 }

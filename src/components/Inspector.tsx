@@ -58,6 +58,7 @@ export function AnnotationEditor({
   return (
     <section
       className="panel-section annotation-editor"
+      data-tour="annotation-editor"
       aria-label="Label and notes"
       onFocusCapture={() => {
         editGroup.current = crypto.randomUUID();

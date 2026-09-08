@@ -675,3 +675,32 @@ The full unrelated browser suite was not rerun. The test migration also observed
 minor notes clipping in a disconnected 543-record synthetic fixture; the connected
 dense baseline and the real disconnected template both passed their visibility
 checks. That larger offline layout remains a separate Inspector refinement.
+
+## Expanded guided tour (2026-09-08)
+
+The first-use tour now covers ten practical topics with a floating, collapsible
+contents navigator, stable step IDs, Back/Next, active-topic indication and
+keyboard focus restoration. Step metadata and optional availability rules live
+separately from the renderer. App projects temporary panel and flow views without
+persisting those choices, changing selection or starting scans.
+
+Eight browser scenarios passed together: sequential traversal of all topics in an
+empty workspace, direct jumps and keyboard focus, preserved selection and prior
+panels, reverse navigation on mobile, an unobscured mobile annotation editor with
+scroll restoration, collapsed flow and tab choices surviving encrypted save and
+unlock, short-landscape navigation, and the existing restartable-tour regression.
+The tests use real public template snapshots and mocked network boundaries; they
+observed no unexpected RPC calls. All 446 unit/backend tests also passed.
+
+Screenshot review at 1440×1000 and 390×844 found and corrected the phone tour card
+covering its annotation target. That step now temporarily reveals the editor and
+places the card above it. At 740×420 the navigation and explanations scroll within
+the card while Skip and Next remain visible; opening contents reveals the current
+topic, and changing topics resets the explanation's scroll position.
+
+Reviewed screenshots: [transaction flow](screenshots/tour-flow.png),
+[topic navigation](screenshots/tour-contents.png), and
+[mobile annotation showcase](screenshots/tour-mobile.png).
+These are Chromium/SwiftShader UI checks, not physical-device benchmarks. The
+unrelated browser suite and production container were not rerun for this UI-only
+change. Build and formatting checks passed.

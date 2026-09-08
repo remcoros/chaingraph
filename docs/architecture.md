@@ -243,3 +243,35 @@ cancellation, snapshot flush and autosave scheduling behavior.
 `workspaceTemplates.ts` exposes a small catalog filtered by the backend's configured networks. Home and Help share the same template cards and ordinary creation dialog. The template fixes its network; users choose a public name, encrypted description and password. `templateWorkspace.worker.ts` lazily loads the selected bundled snapshot, adds starter annotations and validates the resulting workspace off the UI thread. Closing the dialog cancels the worker, and supported networks are checked again before opening its result.
 
 Every copy receives a fresh workspace ID and tag IDs; parsed data is independent of the cached snapshot. Templates are normal workspaces (`demo: false`) with the usual encryption, autosave, export, wallet and tracing behavior. There is no template storage mode or server-side workspace state. Initial direct parents are included, with unrelated parent outputs scoped out of the graph using existing input-context state. Snapshot dates, public references, verification and interpretation limits are recorded in [workspace template research](research/workspace-templates.md). The old synthetic generator now lives only in `tests/fixtures/laboratory.ts`.
+
+### Extending the guided tour
+
+`src/features/tour/steps.ts` defines named steps with a stable ID, navigation label,
+copy, icon, target selector and optional fallback selector. Order is a property of
+the array, never a numeric condition elsewhere. `availableTourSteps` applies each
+step's optional `when(context)` predicate before both navigation and presentation.
+Context exposes current selection/data availability and a feature capability list;
+the current adapter advertises no experimental capabilities.
+
+`GuidedTour.tsx` renders the supplied steps without knowledge of wallets, analysis
+engines or individual tab names. Its spotlight is a measured overlay, rather than
+changing the target's stacking order. Resize and scroll observers maintain target
+bounds and are removed when the step changes or the tour closes. Missing targets
+can use a visible fallback area and prerequisite copy. The topic navigator,
+progress and Back/Next controls derive from the available steps.
+
+To add trace/canvas or another feature:
+
+1. Add a stable `data-tour` anchor to the real control or panel.
+2. Add a step with a unique ID, useful workflow copy and a prerequisite/fallback
+   for an empty selection. Use `when` if the whole feature is optional.
+3. Extend the App presentation adapter if the feature needs a new view. Existing
+   `view` hints project displayed tabs, mobile panels, focus mode and flow expansion
+   without writing those previews into saved presentation state. Keep feature
+   preparation out of the renderer and never launch scans from a tour step.
+4. Test direct jumps, missing data, skip/Escape, layout restoration and narrow
+   viewports. Do not assume the preceding step ran: users can jump to any topic.
+
+The tour starts once per browser, remains skippable and restarts from Help. The
+existing `chaingraph.tour.seen` preference stays compatible. Graph data, annotations
+and selection are not changed by stepping through the tour.

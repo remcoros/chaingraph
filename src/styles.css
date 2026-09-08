@@ -1342,53 +1342,6 @@ small,
   font-size: 9px;
   pointer-events: none;
 }
-.tour-card {
-  width: min(100%, 450px);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  padding: 25px;
-  box-shadow: 0 20px 80px var(--color-shadow);
-}
-.tour-card .eyebrow {
-  font-size: 9px;
-}
-.tour-card .text-button {
-  font-size: 10px;
-  color: var(--color-muted);
-}
-.tour-symbol {
-  margin: 28px 0 17px;
-  color: var(--color-accent);
-}
-.tour-card h2 {
-  font-size: 24px;
-  margin-bottom: 14px;
-}
-.tour-card > p {
-  color: var(--color-muted);
-  line-height: 1.9;
-  font-size: var(--text-sm);
-}
-.tour-bottom {
-  margin-top: 27px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.tour-dots {
-  display: flex;
-  gap: 5px;
-}
-.tour-dots i {
-  width: 5px;
-  height: 5px;
-  background: var(--color-rule);
-  border-radius: 50%;
-}
-.tour-dots i.active {
-  background: var(--color-accent);
-}
 @media (min-width: 640px) {
   .welcome {
     padding: 65px 40px;
@@ -1543,34 +1496,6 @@ small,
   }
 }
 
-/* The tour illuminates the real control group rather than showing a replica. */
-.tour-highlight {
-  position: relative;
-  z-index: 101;
-  outline: 1px solid var(--color-accent);
-  outline-offset: -1px;
-  pointer-events: none;
-}
-.tour-backdrop {
-  align-items: flex-end;
-  justify-content: flex-end;
-}
-.tour-card {
-  position: relative;
-  z-index: 103;
-}
-@media (min-width: 1000px) {
-  .tour-backdrop {
-    padding: 40px 340px 70px 40px;
-  }
-}
-.tour-backdrop {
-  background: transparent;
-  z-index: 102;
-}
-.tour-highlight {
-  box-shadow: 0 0 0 100vmax var(--color-backdrop);
-}
 .selection-heading > .text-button {
   display: flex;
   width: 100%;
@@ -1888,4 +1813,164 @@ small,
   padding: 18px 25px 12px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-rule);
+}
+
+/* The spotlight is a separate overlay, so targets keep their own stacking and layout. */
+.tour-backdrop {
+  z-index: 102;
+  align-items: flex-end;
+  justify-content: flex-end;
+  background: var(--color-backdrop);
+  padding: 20px;
+}
+.tour-backdrop.has-spotlight {
+  background: transparent;
+}
+.tour-backdrop.tour-place-left {
+  justify-content: flex-start;
+}
+.tour-spotlight {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid var(--color-accent);
+  border-radius: 5px;
+  box-shadow: 0 0 0 100vmax var(--color-backdrop);
+}
+.tour-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, 430px);
+  max-height: calc(100dvh - 40px);
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 60px var(--color-shadow);
+  overflow: hidden;
+}
+.tour-heading,
+.tour-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tour-heading .eyebrow {
+  font-size: 10px;
+}
+.tour-heading .text-button {
+  font-size: 12px;
+}
+.tour-contents-toggle {
+  flex-shrink: 0;
+  justify-content: flex-start;
+  font-size: 12px;
+}
+.tour-contents-toggle > span {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tour-index {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  max-height: min(210px, 30dvh);
+  overflow-y: auto;
+  flex-shrink: 1;
+}
+.tour-index button {
+  justify-content: flex-start;
+  text-align: left;
+  padding: 6px 8px;
+  white-space: normal;
+  font-size: 12px;
+  background: transparent;
+  border-color: transparent;
+}
+.tour-index button > span {
+  color: var(--color-muted);
+  font: 10px var(--font-mono);
+}
+.tour-index button[aria-current='step'] {
+  color: var(--color-accent);
+  background: var(--color-raised);
+  border-color: var(--color-accent);
+}
+.tour-copy {
+  min-height: 0;
+  overflow-y: auto;
+}
+.tour-copy h2 {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 20px;
+  line-height: 1.35;
+  margin: 4px 0 12px;
+}
+.tour-copy h2 svg {
+  flex-shrink: 0;
+  color: var(--color-accent);
+  margin-top: 2px;
+}
+.tour-copy p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-muted);
+  margin: 0;
+}
+.tour-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-paper);
+  border-radius: var(--radius-sm);
+  margin-top: 12px;
+}
+.tour-tip svg {
+  flex-shrink: 0;
+  color: var(--color-accent);
+  margin-top: 3px;
+}
+.tour-tip p {
+  font-size: 12px;
+}
+.tour-copy .tour-prerequisite {
+  margin-top: 10px;
+  color: var(--color-warning);
+  font-size: 12px;
+}
+.tour-bottom {
+  border-top: 1px solid var(--color-rule);
+  padding-top: 12px;
+}
+.tour-bottom > span {
+  max-width: 120px;
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .tour-backdrop {
+    padding: 10px;
+  }
+  .tour-card {
+    padding: 14px;
+    max-height: calc(100dvh - 20px);
+  }
+  .tour-contents-toggle > span {
+    display: none;
+  }
+  .tour-contents-toggle > svg:last-child {
+    margin-left: auto;
+  }
+}
+
+.tour-backdrop.tour-place-top {
+  align-items: flex-start;
 }

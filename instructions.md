@@ -10,7 +10,7 @@ You can open several workspaces and switch between their tabs in the main header
 
 For a first look without loading your own wallet, choose an example on the welcome screen or **Help and samples → Example workspaces**. Each contains real transactions with starter labels, tags, icons and bookmarks. Only networks configured on your backend appear. Choosing one opens **Create a workspace** with an editable name and description and a fixed network. Set a password to create your own encrypted copy, then explore, edit and autosave it like any other workspace. No initial chain download is needed.
 
-Use Ctrl/Cmd+K to focus the quick input. Changes save automatically; Ctrl/Cmd+S also finishes any pending encrypted save. The first-use tour introduces the main controls. It can be skipped and restarted from Help.
+Use Ctrl/Cmd+K to focus the quick input. Changes save automatically; Ctrl/Cmd+S also finishes any pending encrypted save. The first-use guided tour covers workspaces, wallet refresh, adding chain data, the 3D graph, transaction flow, labels, tags, filters, bookmarks and encrypted backups. **Tour contents** opens a topic index so you can jump in any order; **Back** and **Next** move through the topics. Skip or press Escape at any time, then restart from **Help and samples → Show guided tour**. The tour previews the relevant panels and returns to your previous layout when closed. It does not select entities or start scans. Open an example workspace first to see the flow and annotation controls with real data.
 
 ## Find activity
 
