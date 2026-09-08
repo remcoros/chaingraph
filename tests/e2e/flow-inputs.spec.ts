@@ -33,7 +33,7 @@ async function settleRendering(page: Page) {
   );
 }
 
-test('automatic flow input loading stops at one level until the user navigates backward', async ({
+test('input selection and backward navigation follow one outpoint; bulk details are explicit', async ({
   page,
 }) => {
   await mockBitcoin(page);
@@ -61,6 +61,12 @@ test('automatic flow input loading stops at one level until the user navigates b
   await expect(page.getByLabel('Prefetch previous levels')).toHaveValue('0');
   await add(page, TX_SPENDING);
   const flow = page.locator('.transaction-view');
+  await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText(
+    'Select to load previous output',
+  );
+  await settleRendering(page);
+  expect(fetched).toEqual([TX_SPENDING]);
+  await flow.getByRole('button', { name: /^Input 0:/ }).click();
   await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText('100,000,000 sats');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await settleRendering(page);
@@ -74,6 +80,12 @@ test('automatic flow input loading stops at one level until the user navigates b
   await expect(
     flow.getByRole('button', { name: `Select displayed transaction ${TX_FUNDING}` }),
   ).toBeVisible();
+  await settleRendering(page);
+  expect(fetched).toEqual([TX_SPENDING, TX_FUNDING]);
+  await flow.getByRole('button', { name: `Select displayed transaction ${TX_FUNDING}` }).click();
+  await settleRendering(page);
+  expect(fetched).toEqual([TX_SPENDING, TX_FUNDING]);
+  await flow.getByRole('button', { name: /^Load all input details/ }).click();
   await expect(page.locator('.statusbar')).toContainText('3 transactions');
   expect(fetched).toEqual([TX_SPENDING, TX_FUNDING, TX_OLDER]);
 });
@@ -97,9 +109,10 @@ test('unavailable previous outputs show a retry and recover without adding the t
   await create(page, 'Retry previous outputs');
   await add(page, TX_SPENDING);
   const flow = page.locator('.transaction-view');
-  await expect(flow.getByRole('alert')).toContainText('1 input transaction could not be loaded');
+  await flow.getByRole('button', { name: /^Input 0:/ }).click();
+  await expect(flow.getByRole('alert')).toContainText('1 creating transaction could not be loaded');
   await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText(
-    'Previous output unavailable',
+    'Select to load previous output',
   );
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
   expect(failed).toBeGreaterThan(0);
@@ -139,6 +152,10 @@ test('switching workspace cancels pending input hydration and preserves the new 
   await page.goto('/');
   await create(page, 'Pending input workspace');
   await add(page, TX_SPENDING);
+  await page
+    .locator('.transaction-view')
+    .getByRole('button', { name: /^Input 0:/ })
+    .click();
   await expect.poll(() => received).toBe(true);
   await expect(page.locator('.transaction-input-status')).toContainText('Loading previous outputs');
   await create(page, 'Current workspace');

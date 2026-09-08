@@ -3,16 +3,18 @@ import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
 import { mapLimit } from './api';
 
-/** Only the displayed transaction's direct inputs, never recursive graph expansion. */
-export function flowInputPlan(workspace: Workspace, selected?: GraphNode) {
+/** Default navigation resolves only the selected outpoint. Bulk input details are explicit. */
+export function flowInputPlan(workspace: Workspace, selected?: GraphNode, allInputs = false) {
   const related = selected ? relatedTransactions(workspace.transactions, selected) : [];
   const current =
     related.find(({ tx }) => tx.txid === workspace.view.transactionFlow?.transactionId) ??
     related[0];
   const missing = new Set(
-    current?.tx.vin.flatMap((input) =>
-      input.txid && !workspace.transactions[input.txid] ? [input.txid] : [],
-    ) ?? [],
+    allInputs
+      ? (current?.tx.vin.flatMap((input) =>
+          input.txid && !workspace.transactions[input.txid] ? [input.txid] : [],
+        ) ?? [])
+      : [],
   );
   if (selected?.kind === 'output' && selected.txid && !workspace.transactions[selected.txid])
     missing.add(selected.txid);
@@ -25,6 +27,7 @@ export function mergeFlowInputs(
   transactionId: string | undefined,
   selected: GraphNode | undefined,
   loaded: Transaction[],
+  allInputs = false,
 ) {
   // A removal may complete while its input requests are in flight. Never restore
   // the removed investigation branch when those requests finally arrive.
@@ -32,10 +35,11 @@ export function mergeFlowInputs(
   const context = { ...workspace.inputContext };
   const provenance = new Set([...(workspace.contextTransactionIds ?? []), ...Object.keys(context)]);
   const current = transactionId ? workspace.transactions[transactionId] : undefined;
-  const references =
-    current?.vin.flatMap((input) =>
-      input.txid && input.vout !== undefined ? [{ txid: input.txid, vout: input.vout }] : [],
-    ) ?? [];
+  const references = allInputs
+    ? (current?.vin.flatMap((input) =>
+        input.txid && input.vout !== undefined ? [{ txid: input.txid, vout: input.vout }] : [],
+      ) ?? [])
+    : [];
   if (selected?.kind === 'output' && selected.txid && selected.vout !== undefined)
     references.push({ txid: selected.txid, vout: selected.vout });
   const added = new Set(loaded.map((tx) => tx.txid));
@@ -47,7 +51,7 @@ export function mergeFlowInputs(
       );
   }
   for (const tx of loaded) if (!workspace.transactions[tx.txid]) provenance.add(tx.txid);
-  if (transactionId) delete context[transactionId];
+  if (transactionId && (allInputs || selected?.kind !== 'output')) delete context[transactionId];
   const inputContext = Object.keys(context).length ? context : undefined;
   if (!loaded.length && JSON.stringify(inputContext) === JSON.stringify(workspace.inputContext))
     return workspace;
@@ -78,13 +82,24 @@ export function useFlowInputs(options: {
       : '';
   const enabled = options.enabled && options.workspace?.view.transactionFlow?.open !== false;
   const [attempt, setAttempt] = useState(0);
+  const [bulkTarget, setBulkTarget] = useState('');
+  const allInputs = bulkTarget === target;
+  // Returning to an earlier selection must not silently repeat a bulk action.
+  useEffect(() => setBulkTarget(''), [target]);
+  const missingInputCount = options.workspace
+    ? flowInputPlan(options.workspace, options.selected, true).missing.length
+    : 0;
   const [state, setState] = useState({ target: '', loading: false, error: '' });
   useEffect(() => {
     if (!target || !enabled) return;
     const { workspace, selected, fetch, update } = latest.current;
     if (!workspace) return;
-    const { transactionId, missing } = flowInputPlan(workspace, selected);
-    update(workspace.id, (current) => mergeFlowInputs(current, transactionId, selected, []), false);
+    const { transactionId, missing } = flowInputPlan(workspace, selected, allInputs);
+    update(
+      workspace.id,
+      (current) => mergeFlowInputs(current, transactionId, selected, [], allInputs),
+      false,
+    );
     if (!missing.length) {
       setState({ target, loading: false, error: '' });
       return;
@@ -107,6 +122,7 @@ export function useFlowInputs(options: {
     void (async () => {
       const loaded: Transaction[] = [];
       let failed = 0;
+      const reasons = new Set<string>();
       await mapLimit(missing.slice(0, 500), 4, async (id) => {
         try {
           const tx = await fetch(id, controller.signal);
@@ -115,20 +131,31 @@ export function useFlowInputs(options: {
         } catch (error) {
           if (controller.signal.aborted) throw error;
           failed++;
+          // Categorize known backend failures without echoing arbitrary exception text.
+          const message = error instanceof Error ? error.message.toLowerCase() : '';
+          if (message.includes('timed out')) reasons.add('The backend request timed out.');
+          else if (message.includes('size limit'))
+            reasons.add('The backend response exceeded its size limit.');
+          else if (message.includes('rate limit'))
+            reasons.add('The backend rate limit was reached.');
+          else if (message.includes('disconnected') || message.includes('connection failed'))
+            reasons.add('The backend connection is unavailable.');
+          else if (message === 'electrum rejected the request')
+            reasons.add('Electrum rejected the transaction request.');
         }
       });
       controller.signal.throwIfAborted();
       if (loaded.length)
         update(
           workspace.id,
-          (current) => mergeFlowInputs(current, transactionId, selected, loaded),
+          (current) => mergeFlowInputs(current, transactionId, selected, loaded, allInputs),
           false,
         );
       setState({
         target,
         loading: false,
         error: failed
-          ? `${failed} input transaction${failed === 1 ? '' : 's'} could not be loaded. Retry when the upstream is available.`
+          ? `${failed} ${allInputs ? 'input' : 'creating'} transaction${failed === 1 ? '' : 's'} could not be loaded from the backend. ${loaded.length ? `${loaded.length} loaded successfully. ` : ''}${[...reasons].join(' ')}${reasons.size ? ' ' : ''}Retry this request; other paths have not been followed.`
           : missing.length > 500
             ? 'Loaded 500 input transactions. Continue to load the remaining inputs.'
             : '',
@@ -142,8 +169,13 @@ export function useFlowInputs(options: {
         });
     });
     return () => controller.abort();
-  }, [target, enabled, attempt]);
+  }, [target, enabled, attempt, allInputs]);
   return {
+    missingInputCount,
+    onLoadAllInputs: () => {
+      setBulkTarget(target);
+      setAttempt((value) => value + 1);
+    },
     inputLoading: enabled && state.target === target && state.loading,
     inputError: state.target === target ? state.error : '',
     onRetryInputs: () => setAttempt((value) => value + 1),

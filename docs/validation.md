@@ -1,5 +1,32 @@
 # Validation results
 
+## Wallet record tabs and targeted input navigation, 2026-09-08
+
+Wallet selection exposes Transactions and UTXOs while keeping the wallet context
+available during entity editing. Browser coverage exercises history ordering and
+deduplication, unloaded transaction selection, metadata persistence through locking,
+UTXO refresh after a spend, partial backend failure and wallet-switch cancellation.
+UTXO observations come from bounded Electrum queries, never absent graph spends.
+
+Manual desktop and 390-pixel phone inspection reproduced the wallet tab overlap:
+the two-row header inherited a fixed 45-pixel height, letting inspector content
+cover the lower row. The header now fits both rows. Actual clicks on all four tabs
+passed on both viewports; a browser regression checks containment and hit targets.
+
+The bundled real WabiSabi case with 327 inputs and 279 outputs passed selection of
+an input and navigation to its creating CoinJoin without additional ancestor RPCs.
+The parent has more than 100 inputs and missing ancestry, so the scenario catches
+the previous automatic fan-out. Bulk input loading remains an explicit action.
+The production build and all 489 unit/backend tests passed. Browser checks cover
+the affected wallet, flow, hover, icon, refresh and tracing workflows; this change
+does not claim a fresh run of the entire browser suite.
+
+A read-only check of the public example wallet succeeded for all 20 discovered
+addresses against the configured mainnet backend, returning zero current UTXOs.
+Positive UTXO verification, malformed responses and partial failures were exercised
+with fixtures; the live check did not validate a currently unspent positive match.
+Screenshots from the manual review remain in ignored local artifacts.
+
 ## Deferred autosave and entity visibility, 2026-09-08
 
 Graph navigation now coalesces camera snapshots after 1.2 seconds of quiet and

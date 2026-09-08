@@ -275,3 +275,25 @@ To add trace/canvas or another feature:
 The tour starts once per browser, remains skippable and restarts from Help. The
 existing `chaingraph.tour.seen` preference stays compatible. Graph data, annotations
 and selection are not changed by stepping through the tour.
+
+### Wallet record navigation
+
+The encrypted selected-wallet context remains set while entity selection changes.
+Optional `view.rightTab` values `transactions` and `utxos` expose the wallet's
+read-only record panels. The Inspector prioritizes an actual entity selection;
+selecting the wallet row returns to wallet settings. Historical records union
+known address histories and verified loaded script matches, without requiring all
+transactions to be present. Selecting an unloaded row fetches one transaction and
+uses the shared selection/focus path. Failed or cancelled loads retain the graph.
+
+Wallet UTXO observations are component-local, keyed by workspace and wallet.
+Electrum queries use already discovered scripts in bounded batches; tab changes,
+wallet changes and discovery updates cancel pending work. Coverage and failure
+counts stay explicit. Loaded outpoints must match observed amount and script before
+being displayed or selected. They are never inferred from missing loaded spends.
+See [protocol and record validation](research/wallet-records.md).
+
+Flow input hydration now loads only the creating transaction of a selected
+outpoint. Selecting a transaction performs no automatic parent fan-out. The
+flow panel's explicit bulk action loads up to 500 missing parents with four
+concurrent requests; progress, partial errors and continuation remain visible.

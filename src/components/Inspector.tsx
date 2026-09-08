@@ -231,23 +231,6 @@ export function WalletInspector({
       <p className="small muted">
         Received outputs include spent outputs; this is not a wallet balance.
       </p>
-      <div className="wallet-addresses">
-        <h3>Discovered addresses</h3>
-        {wallet.addresses
-          .filter((a) => a.history?.length)
-          .slice(0, 30)
-          .map((a) => (
-            <div className="wallet-address" key={a.address}>
-              <span className="mono">{short(a.address, 9)}</span>
-              <small>
-                {a.branch === 0 ? 'Receive' : 'Change'} / {a.index} · {a.history?.length} tx
-              </small>
-            </div>
-          ))}
-        {!wallet.addresses.some((a) => a.history?.length) && (
-          <p className="muted small">Used addresses appear after scanning.</p>
-        )}
-      </div>
       {confirmRemove ? (
         <div className="stack">
           <p className="small">
@@ -335,10 +318,10 @@ export function NodeInspector({
         : undefined);
   const hasPrevious = !tx || tx.vin.some((input) => !!input.txid);
   const previousReason =
-    unavailable ||
+    (selected.kind === 'output' && tx && !busy ? undefined : unavailable) ||
     (selected.kind === 'address' || !selected.txid
       ? 'Select a transaction or output to load its previous transactions.'
-      : !hasPrevious
+      : !hasPrevious && selected.kind !== 'output'
         ? 'Coinbase transactions do not have previous transactions.'
         : undefined);
   const selectedOutput =
@@ -378,7 +361,7 @@ export function NodeInspector({
   const previousHint = !tx
     ? 'Load the transaction that created this output.'
     : selected.kind === 'output'
-      ? "Load the inputs of this output's creating transaction."
+      ? 'Open only the transaction that created this output.'
       : "Load the source transactions of this transaction's inputs.";
   const spendingHint =
     selected.kind === 'output'
@@ -568,7 +551,9 @@ export function NodeInspector({
             onClick={() => onExpand('funding')}
           >
             <ArrowDownLeft size={14} />
-            Load previous transactions
+            {selected.kind === 'output'
+              ? 'Open creating transaction'
+              : 'Load previous transactions'}
           </button>
           <button
             disabled={!!spendingReason}

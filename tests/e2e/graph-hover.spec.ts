@@ -238,10 +238,10 @@ test('floating navigation preserves distinct silhouettes, actual picking, card a
     (await toolbar.getByRole('button', { name: 'Edit label and notes' }).boundingBox())!.height,
   ).toBeLessThanOrEqual(30);
   await page.screenshot({ path: test.info().outputPath('compact-node-card.png') });
-  await card.getByRole('button', { name: 'Load previous level' }).hover();
+  await card.getByRole('button', { name: /Load previous level|Open creating transaction/ }).hover();
   await page.waitForTimeout(800);
   await expect(card).toBeVisible();
-  await card.getByRole('button', { name: 'Load previous level' }).click();
+  await card.getByRole('button', { name: /Load previous level|Open creating transaction/ }).click();
   await expect(page.getByTestId('action')).toHaveText(`trace:${outputId}`);
   await page.mouse.move(10, 10);
   await hover(page, meshes.output);
@@ -333,7 +333,9 @@ test('shared GraphView handles a substitute adapter with identical semantic acti
     await emit('hover', { type: 'node', id: entity });
     await expect(card).toBeVisible();
     if (id !== 'address-edge') {
-      await card.getByRole('button', { name: 'Load previous level' }).click();
+      await card
+        .getByRole('button', { name: /Load previous level|Open creating transaction/ })
+        .click();
       await expect(page.getByTestId('action')).toHaveText(`trace:${entity}`);
       await emit('hover', { type: 'node', id: entity });
     }
@@ -343,7 +345,9 @@ test('shared GraphView handles a substitute adapter with identical semantic acti
   }
   await page.evaluate(() => (window as any).fixture.setBusy(true));
   await emit('hover', { type: 'node', id: outputId });
-  await expect(card.getByRole('button', { name: 'Load previous level' })).toBeDisabled();
+  await expect(
+    card.getByRole('button', { name: /Load previous level|Open creating transaction/ }),
+  ).toBeDisabled();
   await expect(card).toContainText('Another operation is running.');
   await emit('select');
   await expect(card).toBeHidden();

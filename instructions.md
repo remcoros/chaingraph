@@ -27,7 +27,7 @@ repeated. Loaded spending links and tracing actions remain available independent
 
 **Find spending transactions** checks script histories for transactions consuming the selected output, or any output of a selected transaction. It checks exact outpoint references. The result reports matches and how many were newly added, so a repeated action with an already loaded path is distinguishable from no matches. Busy histories are checked in batches of 500; repeat the action when prompted to continue. This continuation is temporary and resets when switching workspaces. Changed histories can shift a batch boundary; this is a bounded investigation, not a completeness guarantee. Missing spend links never prove an output is unspent.
 
-Use the **Previous** selector beside the quick input to choose **Off**, **1 level**, or **2 levels** when adding a transaction or output. It starts at **Off**. On narrow screens, the selector shows just the depth. The two levels share a 500-transaction download limit and reuse loaded transactions. Large or unavailable branches produce a partial-result message. Trace individual paths to continue. Address and wallet scans keep their own bounds. The open transaction flow independently loads the displayed transaction’s direct inputs so their values, scripts and addresses are available even with Previous Off. These input parents initially contribute only relevant outputs to the graph; select or navigate to a parent to open its wider transaction context. Automatic input loading uses four concurrent requests and a 500-parent batch, with a visible retry or continuation when needed.
+Use the **Previous** selector beside the quick input to choose **Off**, **1 level**, or **2 levels** when adding a transaction or output. It starts at **Off**. On narrow screens, the selector shows just the depth. The two levels share a 500-transaction download limit and reuse loaded transactions. Large or unavailable branches produce a partial-result message. Trace individual paths to continue. Address and wallet scans keep their own bounds. Selecting an input or output loads only the transaction that created that outpoint, even with Previous Off. The input arrow and **Open creating transaction** open just that transaction. **Load all input details** explicitly loads the displayed transaction's remaining input data in a bounded batch. These input parents initially contribute only relevant outputs to the graph; select or navigate to a parent to open its wider transaction context. Explicit input loading uses four concurrent requests and a 500-parent batch, with a visible retry or continuation when needed.
 
 The gallery offers six mainnet and three testnet4 examples. On desktop, the top two rows contain mainnet cases, with a thin divider before the testnet4 row; narrow screens use fewer columns. Mainnet cases cover equal outputs with a spending hop (Whirlpool), a large WabiSabi CoinJoin, a public xpub wallet, an OP_RETURN message, a large-value split and batched outputs. Testnet4 cases cover a known spent-output path, a 53-output fan-out and a mixed-script spending path. Start with a bookmark and follow its notes for suggested comparisons and navigation. The wallet example includes an intentionally public BIP84 test zpub, derived addresses and real activity. Never deposit funds to its addresses. Wallets shows the bounded scan and remaining transactions, with controls to continue through your backend. The starting transaction's direct input data is included. **Refresh transaction**, **Load previous transactions** and **Find spending transactions** use your backend to extend or update these snapshots. Confirmation counts are historical; a missing spender does not prove an output is currently unspent. Explorer references are optional external links. Starter labels describe observations, not wallet ownership. See [sources and verification](docs/research/workspace-templates.md).
 
@@ -245,3 +245,21 @@ restore manually hidden items. Changing this list mode does not remove chain dat
 **Fit graph** frames all displayed nodes. Both account for node sizes, displayed
 labels and the floating navigation toolbar, while retaining the current viewing direction. Orbiting may
 still bring nodes in front of each other; Flat and Fit provide alternate views.
+
+## Wallet transactions and UTXOs
+
+Select a wallet, then open **Transactions** or **UTXOs** in the right panel.
+Transactions lists known history once per transaction, with unconfirmed activity
+first and confirmed history newest first. Unloaded entries can be selected to
+fetch their details. Rows focus the graph even when selection locking is off;
+the list stays open. Switch to **Inspector** to edit the selected item's metadata,
+then return to the same wallet list. Select the wallet again for wallet settings.
+
+UTXOs queries the discovered addresses when opened. It lists outputs reported
+unspent by your backend at the displayed check time, including mempool activity.
+Use its refresh button to update the list. At most 100 addresses are checked per
+action; **Check next addresses** continues larger lists. Failed checks and partial
+wallet discovery are shown explicitly. Returning after locking requires a fresh
+UTXO check; this list is not a persisted balance. Selecting a UTXO loads and verifies
+its creating transaction when necessary. An output leaving this list does not
+remove its transaction, labels or notes from the workspace.

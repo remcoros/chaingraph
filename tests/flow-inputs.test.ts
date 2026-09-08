@@ -21,7 +21,26 @@ describe('displayed transaction input hydration scope', () => {
     w.transactions[parent] = tx(parent, grandparent);
     expect(flowInputPlan(w, selected)).toEqual({ transactionId: child, missing: [] });
     w.view.transactionFlow.transactionId = parent;
-    expect(flowInputPlan(w, selected)).toEqual({ transactionId: parent, missing: [grandparent] });
+    expect(flowInputPlan(w, selected)).toEqual({ transactionId: parent, missing: [] });
+    expect(flowInputPlan(w, selected, true)).toEqual({
+      transactionId: parent,
+      missing: [grandparent],
+    });
+  });
+  it('selects one CoinJoin input without requesting other parents or expanding cached siblings', () => {
+    const w = newWorkspace('Single CoinJoin path', 'mainnet');
+    const parents = Array.from({ length: 327 }, (_, index) => index.toString(16).padStart(64, '0'));
+    w.transactions[child] = { ...tx(child), vin: parents.map((txid) => ({ txid, vout: 0 })) };
+    const selected = buildGraph(w).nodes.find((node) => node.id === `out:${parents[5]}:0`)!;
+    expect(flowInputPlan(w, selected).missing).toEqual([parents[5]]);
+    const transactionNode = buildGraph(w).nodes.find((node) => node.id === `tx:${child}`)!;
+    expect(flowInputPlan(w, transactionNode).missing).toEqual([]);
+    expect(flowInputPlan(w, transactionNode, true).missing).toHaveLength(327);
+    w.transactions[parents[0]] = tx(parents[0]);
+    w.inputContext = { [parents[0]]: [1] };
+    const merged = mergeFlowInputs(w, child, selected, [tx(parents[5])]);
+    expect(merged.inputContext).toEqual({ [parents[0]]: [1], [parents[5]]: [0] });
+    expect(flowInputPlan(merged, selected).missing).toEqual([]);
   });
   it('deduplicates shared input transactions and ignores coinbase inputs', () => {
     const w = newWorkspace('Public fixture', 'testnet4');
@@ -33,7 +52,8 @@ describe('displayed transaction input hydration scope', () => {
       ],
     };
     const selected = buildGraph(w).nodes.find((n) => n.id === `tx:${child}`)!;
-    expect(flowInputPlan(w, selected).missing).toEqual([parent]);
+    expect(flowInputPlan(w, selected).missing).toEqual([]);
+    expect(flowInputPlan(w, selected, true).missing).toEqual([parent]);
     w.transactions[child] = tx(child);
     expect(flowInputPlan(w, selected).missing).toEqual([]);
   });
@@ -54,7 +74,7 @@ describe('flow input merge and explicit promotion', () => {
       ...tx(parent, grandparent),
       vout: [0, 1, 2].map((n) => ({ n, value: 1, scriptPubKey: { hex: '51' } })),
     };
-    const merged = mergeFlowInputs(w, child, selected, [funding]);
+    const merged = mergeFlowInputs(w, child, selected, [funding], true);
     expect(merged.inputContext).toEqual({ [parent]: [0] });
     expect(merged.transactions[parent]).toBe(funding);
     expect(merged.annotations).toBe(w.annotations);
@@ -79,10 +99,10 @@ describe('flow input merge and explicit promotion', () => {
       ],
     };
     w.inputContext = { [parent]: [1] };
-    const merged = mergeFlowInputs(w, child, undefined, []);
+    const merged = mergeFlowInputs(w, child, undefined, [], true);
     expect(merged.inputContext).toEqual({ [parent]: [0, 1, 2] });
     expect(w.inputContext).toEqual({ [parent]: [1] });
-    expect(mergeFlowInputs(merged, child, undefined, [])).toBe(merged);
+    expect(mergeFlowInputs(merged, child, undefined, [], true)).toBe(merged);
   });
 
   it('does not downgrade explicit transactions, including those added while hydration was in flight', () => {
@@ -92,7 +112,7 @@ describe('flow input merge and explicit promotion', () => {
     const merged = mergeFlowInputs(w, child, undefined, [tx(parent, grandparent)]);
     expect(merged.inputContext).toBeUndefined();
     expect(buildGraph(merged).nodes.map((node) => node.id)).toContain(`out:${grandparent}:0`);
-    expect(mergeFlowInputs(merged, child, undefined, [])).toBe(merged);
+    expect(mergeFlowInputs(merged, child, undefined, [], true)).toBe(merged);
   });
 
   it('promotes an inspected parent even without network activity while keeping another parent scoped', () => {
@@ -111,6 +131,18 @@ describe('flow input merge and explicit promotion', () => {
       }),
     );
     expect(w.inputContext).toEqual({ [parent]: [0], [grandparent]: [0] });
+  });
+
+  it('does not promote the displayed creating transaction merely because its output is selected', () => {
+    const w = newWorkspace('Keep selected path compact', 'mainnet');
+    w.transactions[parent] = tx(parent, grandparent);
+    w.inputContext = { [parent]: [0] };
+    const selected = buildGraph(w).nodes.find((node) => node.id === `out:${parent}:0`)!;
+    expect(mergeFlowInputs(w, parent, selected, [])).toBe(w);
+    expect(
+      mergeFlowInputs(w, parent, { ...selected, kind: 'transaction', id: `tx:${parent}` }, [])
+        .inputContext,
+    ).toBeUndefined();
   });
 
   it('hydrates a selected missing output without requiring a loaded spending transaction', () => {

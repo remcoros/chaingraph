@@ -68,7 +68,7 @@ This is a trusted, single-user, fully self-hosted application. The backend has *
 - Wallet import accepts account-level public keys at depth 3: `xpub`/`ypub`/`zpub` on mainnet and `tpub`/`upub`/`vpub` on testnet4. Supported single-key scripts are legacy P2PKH, nested SegWit, native SegWit, and BIP86 Taproot. Descriptors, multisig, private keys, signing, and spending are unsupported.
 - Loaded transactions are a **history snapshot**. Status polling does not refresh every saved confirmation count or detect every reorganization. Scans have address, history, and transaction bounds; a partial result is not proof that no further activity exists.
 - CIOH produces a hypothesis. Skipping conspicuous equal-output transactions does not detect all collaborative spends or PayJoin. No tool identifies a person or proves wallet ownership.
-- Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node for details and compact tracing/editing actions; connection lines do not open hover cards. The lookup toolbar defaults to Previous Off, with 1 and 2 levels available, bounded to 500 downloads per action. The displayed transaction separately loads its direct input data automatically. Automatically fetched parents initially show only relevant outputs in the graph, keeping unrelated branches out of the current view. Workspaces share the main header; Help and samples holds the tour, examples and About. Graph navigation floats over the canvas. The Flat graph layout still requires WebGL; the transaction inputs/outputs panel does not. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
+- Transactions use cubes, outputs use spheres, and optional addresses use diamonds. Hover a node for details and compact tracing/editing actions; connection lines do not open hover cards. The lookup toolbar defaults to Previous Off, with 1 and 2 levels available, bounded to 500 downloads per action. Selecting an output loads only its creating transaction when needed. Use **Load all input details** in the flow panel for a bounded batch of the displayed transaction's other inputs. Automatically fetched parents initially show only relevant outputs in the graph, keeping unrelated branches out of the current view. Workspaces share the main header; Help and samples holds the tour, examples and About. Graph navigation floats over the canvas. The Flat graph layout still requires WebGL; the transaction inputs/outputs panel does not. The entity list provides a keyboard-friendly inspection path. Individual node dragging is disabled because of an upstream pointer-handling issue; camera orbit, pan, zoom, and node selection remain available.
 - Tools are extensible through [`src/domain/analysis.ts`](src/domain/analysis.ts). There is no custom-script IDE, Boltzmann implementation, service worker, or WebSocket live feed in this version. Boltzmann-related research and license compatibility remain research work.
 
 The guided tour has a floating **Tour contents** navigator with ten workflow topics. Jump directly to wallet refresh, transaction flow, annotations, tags or other controls. Panel previews are temporary; closing the tour returns to your original layout and selection. Restart it from Help.
@@ -112,7 +112,7 @@ Transaction rows show input/output counts and a compact confirmation status. Blo
 come from recorded chain observations. **Unconfirmed** means a mempool observation was
 loaded; missing information stays **Status unknown**. Refresh to check the current state.
 
-Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, with expand/collapse controls above the rows and the selected row kept visible. Direct input transactions load automatically while the flow panel is open, with explicit retry or continuation for unavailable or bounded results. Click the central transaction block to select it, or use its label, tag and icon controls to edit it. Missing spending data does not prove an output is unspent.
+Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, with expand/collapse controls above the rows and the selected row kept visible. Selecting an input loads only its creating transaction when missing. Use **Load all input details** for a bounded batch of other inputs, with explicit retry or continuation for partial results. Click the central transaction block to select it, or use its label, tag and icon controls to edit it. Missing spending data does not prove an output is unspent.
 
 The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).
 
@@ -126,7 +126,7 @@ workspaces captures the latest view first.
 
 The compact transaction flow places inputs and outputs around the current transaction.
 Select an output to see adjacent creating/spending transactions and use its arrows to
-follow the exact outpoint. Direct input data loads automatically; explicit navigation opens the corresponding parent transaction and its wider context.
+follow the exact outpoint. Selection resolves only the chosen outpoint; explicit navigation opens its creating transaction. Other input details load through the explicit bulk control.
 OP_RETURN outputs show decoded text when possible, with a short preview and expandable,
 selectable, copyable full data. Binary data stays hex; script decoding never executes it.
 Tags can be searched, created and assigned from **Add or choose tags** in the inspector.
@@ -173,3 +173,18 @@ without ancestry provenance are handled conservatively.
 Flow arrows are visible on every transaction/output connection. Connections touching
 the selected entity use larger arrows and thicker highlighted lines. Address
 associations remain undirected.
+
+### Browse a wallet
+
+Select a wallet to reveal **Transactions** and **UTXOs** beside the Inspector.
+Transactions includes known history, newest first, including entries whose details
+are not loaded yet. Select a row to load it if needed and focus it on the graph,
+then switch to Inspector to edit labels, notes, tags or icons. The wallet context
+and list remain available.
+
+UTXOs checks already discovered addresses through your backend, including mempool
+activity. Results carry a check time and explicit coverage; partial scans or failed
+addresses never imply an empty wallet. Refresh to recheck, or check the next batch
+for larger address sets. These observations are temporary and do not delete saved
+transactions when an output is spent. The old discovered-address list has been
+removed from the wallet inspector.

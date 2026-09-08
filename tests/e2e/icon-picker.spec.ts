@@ -86,8 +86,8 @@ test('automatically resolved funding exposes its loaded spend and stops at coinb
   await page.getByLabel('Filter graph entities').fill(`${TX_FUNDING}:0`);
   await page.locator('.entity-list .entity-row').first().click();
   await expect(
-    page.getByRole('button', { name: 'Load previous transactions', exact: true }),
-  ).toBeDisabled();
+    page.getByRole('button', { name: 'Open creating transaction', exact: true }),
+  ).toBeEnabled();
   await expect(page.locator('.selection-heading')).toContainText(
     '1 spending transaction is loaded for this output',
   );

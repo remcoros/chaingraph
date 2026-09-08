@@ -257,7 +257,7 @@ const workspaceSchema = z.object({
       })
       .optional(),
     leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
-    rightTab: z.enum(['inspect', 'analysis']).optional(),
+    rightTab: z.enum(['inspect', 'analysis', 'transactions', 'utxos']).optional(),
     focusGraph: z.boolean().optional(),
     prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
     selectedWallet: z.string().max(200).optional(),

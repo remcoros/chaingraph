@@ -34,6 +34,8 @@ interface Props extends VisibilityProps {
   inputLoading?: boolean;
   inputError?: string;
   onRetryInputs?: () => void;
+  missingInputCount?: number;
+  onLoadAllInputs?: () => void;
   onSmallAmountThresholdChange?: (threshold: number) => void;
   renderMetadata?: (nodeId: string) => ReactNode;
   state?: TransactionFlowState;
@@ -298,9 +300,9 @@ function TransactionRows({
                                   : address
                                     ? short(address, 8)
                                     : !row.output
-                                      ? inputLoading
+                                      ? inputLoading && matches(row)
                                         ? 'Loading previous output…'
-                                        : 'Previous output unavailable'
+                                        : 'Select to load previous output'
                                       : 'Script output')}
                           </strong>
                           <span>
@@ -526,6 +528,22 @@ export function TransactionView(props: Props) {
         </span>
       </summary>
       <div className="transaction-view-body">
+        <div className="transaction-view-actions">
+          {!!props.missingInputCount && props.onLoadAllInputs && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={!!disabledReason || inputLoading}
+              title={
+                disabledReason ||
+                `Fetch ${props.missingInputCount} missing input transactions. Up to 500 per action; other branches are not followed.`
+              }
+              onClick={props.onLoadAllInputs}
+            >
+              Load all input details ({props.missingInputCount})
+            </button>
+          )}
+        </div>
         {current ? (
           <TransactionRows
             {...props}

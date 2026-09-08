@@ -1,3 +1,5 @@
+import { WalletRecordsPanel } from './components/WalletRecordsPanel';
+import { verifyWalletUtxo, type WalletUtxoRecord } from './domain/walletRecords';
 import { useAnalysisUiState, type AnalysisUiRunReport } from './lib/useAnalysisUiState';
 import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
@@ -116,6 +118,7 @@ export default function App() {
   const inspectorScroll = useRef<HTMLDivElement>(null);
   const [viewOwner, setViewOwner] = useState<string>();
   const [selectedWallet, setSelectedWallet] = useState<string>();
+  const selectionGeneration = useRef(0);
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
   const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
@@ -156,7 +159,7 @@ export default function App() {
           ? update(current.workspaceId === w?.id ? current.reports : {})
           : update,
     }));
-  const [rightTab, setRightTab] = useState<'inspect' | 'analysis'>('inspect');
+  const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [editToken, setEditToken] = useState(0);
@@ -183,7 +186,12 @@ export default function App() {
     tour === undefined ? undefined : (tourSteps.find((step) => step.id === tour) ?? tourSteps[0]);
   // Tour previews never feed the persisted presentation effect or selection history.
   const shownLeftTab = tourStep?.view?.leftTab ?? leftTab;
-  const shownRightTab = tourStep?.view?.rightTab ?? rightTab;
+  const shownRightTab =
+    tourStep?.view?.rightTab ??
+    ((rightTab === 'transactions' || rightTab === 'utxos') &&
+    !w?.wallets.some((item) => item.id === selectedWallet)
+      ? 'inspect'
+      : rightTab);
   const shownMobilePanel = tourStep?.view?.panel ?? mobilePanel;
   const shownFocusGraph = tourStep ? false : focusGraph;
   const [live, setLive] = useState(false);
@@ -439,6 +447,7 @@ export default function App() {
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
     (id: string) => {
+      selectionGeneration.current++;
       const active = wRef.current;
       const target = /^(tx|out):([0-9a-f]{64})(?::([0-9]+))?$/.exec(id);
       const scope = target && active?.inputContext?.[target[2]];
@@ -458,7 +467,6 @@ export default function App() {
               index: Math.min(99, current.index + 1),
             },
       );
-      setSelectedWallet(undefined);
       setRightTab('inspect');
     },
     [ws.update],
@@ -729,6 +737,37 @@ export default function App() {
     );
     return accepted;
   };
+  function selectWalletRecord(nodeId: string, utxo?: WalletUtxoRecord) {
+    if (!w || !wallet) return;
+    const ownerId = w.id;
+    const walletId = wallet.id;
+    const tab = shownRightTab;
+    const transactionId = nodeId.split(':')[1];
+    const generation = selectionGeneration.current;
+    void run(async (signal) => {
+      const transaction =
+        w.transactions[transactionId] ?? (await fetchTransaction(w.network, transactionId, signal));
+      signal.throwIfAborted();
+      if (selectionGeneration.current !== generation) return;
+      const current = ws.getSession(ownerId)?.data;
+      if (
+        !current ||
+        !current.wallets.some((item) => item.id === walletId) ||
+        wRef.current?.id !== ownerId
+      )
+        return;
+      if (utxo && !verifyWalletUtxo(utxo, transaction, w.network))
+        throw new Error(
+          'The UTXO response does not match its transaction. Refresh the wallet UTXOs and retry.',
+        );
+      mergeTransactions(ownerId, [transaction]);
+      ws.update(ownerId, (value) => setNodesHidden(value, [nodeId], false), false);
+      select(nodeId);
+      setRightTab(tab);
+      setGraphFilters({});
+      setFocusRequest({ id: nodeId, token: Date.now() });
+    });
+  }
   async function search(e: FormEvent) {
     e.preventDefault();
     await addQuery(query.trim());
@@ -871,9 +910,14 @@ export default function App() {
     );
   }
   async function expand(direction: 'funding' | 'spending', nodeId = selectedId) {
-    if (!w || !canTrace) return;
-    const node = graph.nodes.find((n) => n.id === nodeId);
+    if (!w) return;
+    const node = recoveryGraph.nodes.find((n) => n.id === nodeId);
     if (!node?.txid || node.kind === 'address') return;
+    if (
+      !canTrace &&
+      !(direction === 'funding' && node.kind === 'output' && w.transactions[node.txid])
+    )
+      return;
     await run(async (signal) => {
       setOperation(
         direction === 'funding'
@@ -886,7 +930,32 @@ export default function App() {
       signal.throwIfAborted();
       if (!traceSourceExists(ws.getSession(w.id)!.data, traceSourceId)) return;
       if (direction === 'funding') {
-        if (!loaded) {
+        if (node.kind === 'output') {
+          mergeTransactions(w.id, [transaction]);
+          const id = txNodeId(transaction.txid);
+          ws.update(
+            w.id,
+            (current) => ({
+              ...setNodesHidden(current, [id], false),
+              view: {
+                ...current.view,
+                hiddenNodeIds: current.view.hiddenNodeIds?.filter((hidden) => hidden !== id),
+                transactionFlow: {
+                  ...current.view.transactionFlow,
+                  transactionId: transaction.txid,
+                  open: true,
+                },
+              },
+            }),
+            false,
+          );
+          select(id);
+          setGraphFilters({});
+          setFocusRequest({ id, token: Date.now() });
+          setNotice(
+            'Creating transaction opened. Load its input details explicitly to trace further.',
+          );
+        } else if (!loaded) {
           signal.throwIfAborted();
           mergeTransactions(w.id, [transaction]);
           setNotice(
@@ -1083,7 +1152,6 @@ export default function App() {
     setGraphFilters(filters);
     setNavigation({ ...navigation, index });
     setSelectedId(id);
-    setSelectedWallet(undefined);
     setRightTab('inspect');
     centerNode(id, filters);
   }
@@ -1488,7 +1556,13 @@ export default function App() {
               onClick={() => setMobilePanel('right')}
             >
               <List size={15} />
-              {shownRightTab === 'analysis' ? 'Analysis' : 'Inspector'}
+              {shownRightTab === 'analysis'
+                ? 'Analysis'
+                : shownRightTab === 'transactions'
+                  ? 'Transactions'
+                  : shownRightTab === 'utxos'
+                    ? 'UTXOs'
+                    : 'Inspector'}
             </button>
           </div>
           <main
@@ -1523,6 +1597,8 @@ export default function App() {
               selectedWalletId={wallet?.id}
               selectedId={selectedId}
               onSelectWallet={(id) => {
+                selectionGeneration.current++;
+                operationRef.current?.abort();
                 setSelectedWallet(id);
                 setSelectedId(undefined);
                 setRightTab('inspect');
@@ -1754,7 +1830,7 @@ export default function App() {
               </div>
             </section>
             <aside className="right-panel" data-tour="analysis-panel">
-              <div className="panel-tabs">
+              <div className={`panel-tabs ${wallet ? 'has-wallet-tabs' : ''}`}>
                 <button
                   className={shownRightTab === 'inspect' ? 'active' : ''}
                   onClick={() => setRightTab('inspect')}
@@ -1767,9 +1843,44 @@ export default function App() {
                 >
                   Analysis <span>{w.findings.length}</span>
                 </button>
+                {wallet && (
+                  <>
+                    <button
+                      className={shownRightTab === 'transactions' ? 'active' : ''}
+                      aria-pressed={shownRightTab === 'transactions'}
+                      onClick={() => setRightTab('transactions')}
+                    >
+                      Transactions
+                    </button>
+                    <button
+                      className={shownRightTab === 'utxos' ? 'active' : ''}
+                      aria-pressed={shownRightTab === 'utxos'}
+                      onClick={() => setRightTab('utxos')}
+                    >
+                      UTXOs
+                    </button>
+                  </>
+                )}
               </div>
               <div className="inspector-scroll" ref={inspectorScroll}>
-                {shownRightTab === 'analysis' ? (
+                {wallet && (
+                  <WalletRecordsPanel
+                    key={`${w.id}:${wallet.id}`}
+                    workspace={w}
+                    wallet={wallet}
+                    active={
+                      shownRightTab === 'transactions' || shownRightTab === 'utxos'
+                        ? shownRightTab
+                        : undefined
+                    }
+                    canQuery={canQuery}
+                    busy={!!operation}
+                    selectedId={selectedId}
+                    onSelect={selectWalletRecord}
+                  />
+                )}
+                {shownRightTab === 'transactions' ||
+                shownRightTab === 'utxos' ? null : shownRightTab === 'analysis' ? (
                   <AnalysisPanel
                     uiState={analysisUiState}
                     onUiStateChange={updateAnalysisUiState}
@@ -1800,7 +1911,7 @@ export default function App() {
                       }))
                     }
                   />
-                ) : wallet && tourStep?.view?.rightTab !== 'inspect' ? (
+                ) : wallet && !selected && tourStep?.view?.rightTab !== 'inspect' ? (
                   <WalletInspector
                     wallet={wallet}
                     workspace={w}

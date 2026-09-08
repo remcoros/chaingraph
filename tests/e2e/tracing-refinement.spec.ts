@@ -48,6 +48,7 @@ for (const depth of ['0', '1'])
     await setup(page);
     await page.getByLabel('Prefetch previous levels').selectOption(depth);
     await add(page, TX_SPENDING);
+    if (depth === '0') await page.getByRole('button', { name: /Load all input details/ }).click();
     await expect(page.locator('.statusbar')).toContainText('2 transactions');
     const requests: string[] = [];
     page.on('request', (request) => {
@@ -61,7 +62,9 @@ for (const depth of ['0', '1'])
     await canvas.press('Enter');
     const card = page.getByRole('dialog', { name: 'Graph item details' });
     await expect(card).toBeVisible();
-    await card.getByRole('button', { name: 'Load previous level', exact: true }).click();
+    await card
+      .getByRole('button', { name: /Load previous level|Open creating transaction/ })
+      .click();
     await expect(
       page.getByRole('status').filter({
         hasText:
@@ -88,6 +91,7 @@ test('successful output lookup focuses that output with selection locking disabl
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await setup(page);
   await add(page, TX_FUNDING);
+  await page.getByRole('button', { name: /Load all input details/ }).click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await expect(
     page.getByRole('button', { name: 'Lock to selection', exact: true }),
@@ -107,13 +111,25 @@ test('successful output lookup focuses that output with selection locking disabl
   await add(page, `${TX_SPENDING}:1`);
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
   await expect.poll(async () => (await saved(page))?.view.selectionId).toBe(`out:${TX_SPENDING}:1`);
+  // Selection can save before the idle camera snapshot. Wait for the focused view too.
+  await expect
+    .poll(async () => (await saved(page))?.view.graphSnapshot?.camera)
+    .not.toEqual(before);
+  await expect
+    .poll(async () =>
+      (await saved(page))?.view.graphSnapshot?.nodes.some(
+        (node) => node.id === `out:${TX_SPENDING}:1`,
+      ),
+    )
+    .toBe(true);
   const state = (await saved(page))!;
   expect(state.view.graphSnapshot!.camera).not.toEqual(before);
   expect(state.view.lockToSelection).not.toBe(true);
   const point = state.view.graphSnapshot!.nodes.find((node) => node.id === `out:${TX_SPENDING}:1`)!;
   const camera = state.view.graphSnapshot!.camera;
   expect(Math.hypot(camera.target.x - point.x, camera.target.y - point.y)).toBeLessThan(60);
-  expect(camera.position.z).toBeCloseTo(180, 0);
+  // Distance adapts to the selected node and its immediate neighborhood.
+  expect(camera.position.z).toBeGreaterThan(camera.target.z);
 });
 
 test('opening a saved workspace focuses its password and returns focus when dismissed', async ({
@@ -160,9 +176,10 @@ test('deleting a root while manual tracing is pending discards late results and 
     await route.fulfill({ json: { result: transactions[TX_FUNDING] } }).catch(() => {});
   });
   await add(page, TX_SPENDING);
-  await expect.poll(() => requests).toBe(1);
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  expect(requests).toBe(0);
   await page.getByRole('button', { name: 'Load previous transactions', exact: true }).click();
-  await expect.poll(() => requests).toBe(2);
+  await expect.poll(() => requests).toBe(1);
   await page
     .locator('.entity-list-entry')
     .filter({ has: page.locator(`.entity-row[title="tx:${TX_SPENDING}"]`) })
@@ -227,6 +244,7 @@ test('a retained output placeholder cannot admit a late trace after its loaded c
   await page.locator('.saved-row').click();
   await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await page.getByRole('button', { name: 'Open creating transaction', exact: true }).click();
   await page.getByRole('button', { name: 'Load previous transactions', exact: true }).click();
   await expect.poll(() => requested).toBe(true);
   await page

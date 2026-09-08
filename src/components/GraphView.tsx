@@ -323,7 +323,11 @@ export default function GraphView(props: GraphViewProps) {
           0,
         )
       : 0;
-  const traceReason = props.busy ? 'Another operation is running.' : props.traceDisabledReason;
+  const traceReason = props.busy
+    ? 'Another operation is running.'
+    : hoveredNode?.kind === 'output' && transaction
+      ? undefined
+      : props.traceDisabledReason;
 
   useEffect(() => {
     if (hover && !hoveredNode) dismissCard();
@@ -413,8 +417,17 @@ export default function GraphView(props: GraphViewProps) {
                   <button
                     type="button"
                     disabled={Boolean(traceReason)}
-                    aria-label="Load previous level"
-                    title={traceReason || 'Load one previous level of funding transactions'}
+                    aria-label={
+                      hoveredNode.kind === 'output'
+                        ? 'Open creating transaction'
+                        : 'Load previous level'
+                    }
+                    title={
+                      traceReason ||
+                      (hoveredNode.kind === 'output'
+                        ? 'Open only the transaction that created this output'
+                        : 'Load one previous level of funding transactions')
+                    }
                     onClick={() => {
                       props.onTrace?.(hoveredNode.id);
                       dismissCard();
