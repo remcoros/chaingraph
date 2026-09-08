@@ -66,7 +66,7 @@ test('selection lock and display options persist, and mobile panels ignore deskt
       { timeout: 15000 },
     )
     .toBe(true);
-  const focus = page.getByRole('button', { name: 'Focus graph', exact: true });
+  const focus = page.getByRole('button', { name: 'Hide panels', exact: true });
   await focus.click();
   await expect(page.locator('.right-panel')).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });

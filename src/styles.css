@@ -2001,3 +2001,54 @@ small,
 .tour-backdrop.tour-place-top {
   align-items: flex-start;
 }
+
+/* First-use feedback stays next to the control that needs attention. */
+.workspace-menu {
+  position: relative;
+}
+.workspace-menu .dropdown {
+  top: calc(100% + 8px);
+}
+.workspace-menu .dropdown > .mobile-workspace-undo {
+  display: none;
+}
+.lookup-error {
+  padding: 7px 16px;
+  color: var(--color-error);
+  font-size: 12px;
+}
+.search-form input[aria-invalid='true'] {
+  outline: 1px solid var(--color-error);
+}
+.connection-network {
+  display: none;
+}
+.lookup-prefetch > span {
+  display: none;
+}
+.lookup-prefetch select {
+  width: 116px;
+}
+.entity-browser .entity-row small,
+.entity-browser .entity-chain-status,
+.transaction-summary-content > small {
+  font-size: 12px;
+}
+.graph-legend,
+.graph-legend .graph-help {
+  font-size: 11px;
+}
+@media (max-width: 999px) {
+  .connection-network {
+    display: inline;
+    font-size: 11px;
+  }
+}
+@media (max-width: 560px) {
+  .workspace-menu .dropdown > .mobile-workspace-undo {
+    display: flex;
+  }
+  .lookup-prefetch select {
+    width: 110px;
+  }
+}

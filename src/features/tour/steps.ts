@@ -70,7 +70,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="chain-lookup"]',
     view: { panel: 'graph' },
     text: 'Paste a transaction ID, txid:vout outpoint, or Bitcoin address. The backend queries the matching network through your own nodes.',
-    tip: 'Previous starts at Off. Choose one or two levels when you want more ancestry, then expand individual paths as needed.',
+    tip: 'Previous: off loads only the requested transaction. Choose one or two levels when you want more ancestry, then expand individual paths as needed.',
   },
   {
     id: 'graph',
@@ -80,7 +80,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="graph-stage"]',
     view: { panel: 'graph' },
     text: 'Cubes are transactions, spheres are outputs, and arrows show spending direction. Orbit by dragging empty space, scroll to zoom, and right-drag to pan. Flat offers a 2D layout.',
-    tip: 'Hover a node for tracing and editing actions. Use Size by value, amount filters and tag highlights to follow the larger flows. Fit restores the overview.',
+    tip: 'Hover a node for tracing and editing actions. Choose Value under Size by to compare amounts. Fit frames visible nodes; Hide panels makes more room without moving the camera.',
   },
   {
     id: 'flow',

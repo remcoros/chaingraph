@@ -599,6 +599,7 @@ export default function GraphView(props: GraphViewProps) {
                     disabled={!props.nodes.length}
                   >
                     <Expand size={14} />
+                    <span>Fit</span>
                   </button>
                   {rendererActions.zoom && (
                     <>

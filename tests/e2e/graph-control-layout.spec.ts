@@ -8,10 +8,10 @@ test('focus controls follow the side-panel breakpoint and selection lock shows i
   await mockBitcoin(page, false);
   await page.setViewportSize({ width: 1000, height: 900 });
   await openLaboratoryFixture(page, 'Graph control layout', 'graph-control-layout');
-  const focus = page.getByRole('button', { name: 'Focus graph', exact: true });
+  const focus = page.getByRole('button', { name: 'Hide panels', exact: true });
   await expect(page.locator('.left-panel')).toBeVisible();
   await expect(page.locator('.right-panel')).toBeVisible();
-  await expect(focus).toHaveText('Focus graph');
+  await expect(focus).toHaveText('Hide panels');
   await focus.click();
   await expect(page.locator('.left-panel')).toBeHidden();
   await expect(page.locator('.right-panel')).toBeHidden();

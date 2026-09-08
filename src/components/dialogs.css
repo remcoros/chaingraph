@@ -1,0 +1,32 @@
+/* Keep wheel/touch scrolling inside a modal instead of moving the page behind it. */
+.modal-backdrop,
+.modal {
+  overscroll-behavior: contain;
+}
+
+.password-field {
+  display: grid;
+  gap: 7px;
+}
+
+.password-input {
+  position: relative;
+}
+
+.password-input input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.password-input .icon-button {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.password-field input[aria-invalid='true'] {
+  border-color: var(--color-error);
+}

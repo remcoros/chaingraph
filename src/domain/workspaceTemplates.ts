@@ -78,7 +78,7 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
     description:
       'Explore a large fan-out without losing the main flow. Filter small amounts, compare four script types and use bookmarks to jump between the largest and smallest outputs.',
     summary: 'A 143-output transaction with amount and script tags.',
-    icon: '⑂',
+    icon: '📤',
     sources: [chainSource('mainnet', batchSeed)],
   },
   {
@@ -136,7 +136,7 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
     description:
       'Compare a testnet4 fan-out containing P2WSH, P2WPKH and data outputs. Tags group script observations without assuming payment or change roles.',
     summary: 'One input, 53 outputs, and the funding transaction.',
-    icon: '⑂',
+    icon: '📤',
     sources: [chainSource('testnet4', fanoutSeed)],
   },
   {
@@ -350,7 +350,7 @@ export async function createTemplateWorkspace(
       txNodeId(fanoutSeed),
       '53-output fan-out',
       `One input and 53 outputs: 51 P2WSH outputs, one P2WPKH output, and one OP_RETURN output. ${snapshotNote}`,
-      '⑂',
+      '📤',
       true,
     );
     annotate(
@@ -438,7 +438,7 @@ export async function createTemplateWorkspace(
       txNodeId(batchSeed),
       '143-output fan-out',
       `One input funds 143 outputs across four script types. Try the amount filter in the flow panel and independently in the graph. Fan-out alone does not prove an exchange withdrawal batch. ${snapshotNote}`,
-      '⑂',
+      '📤',
       true,
     );
     for (const [output, label, icon] of [

@@ -22,7 +22,7 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   };
   await checkFloatingNavigation();
   await expect(
-    page.locator('.graph-controls').getByRole('button', { name: 'Focus graph', exact: true }),
+    page.locator('.graph-controls').getByRole('button', { name: 'Hide panels', exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Flat', exact: true }).click();
   await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
@@ -39,7 +39,7 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   await page.waitForTimeout(800);
   await expect(page.getByLabel('Size nodes by')).toBeVisible();
   await checkFloatingNavigation();
-  await expect(page.getByRole('button', { name: 'Focus graph', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Hide panels', exact: true })).toBeHidden();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: test.info().outputPath('mobile-workbench.png') });

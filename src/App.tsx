@@ -1,4 +1,5 @@
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
+import { addressToScriptHash } from './lib/wallet';
 import {
   verifiedWalletAddresses,
   verifyWalletUtxo,
@@ -118,6 +119,47 @@ export default function App() {
   const [walletDialog, setWalletDialog] = useState(false);
   const [fileDialog, setFileDialog] = useState<File>();
   const [menu, setMenu] = useState(false);
+  const workspaceMenu = useRef<HTMLDivElement>(null);
+  const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const items = () =>
+      [
+        ...(workspaceMenu.current?.querySelectorAll<HTMLButtonElement>(
+          '.dropdown button:not(:disabled)',
+        ) ?? []),
+      ].filter((item) => item.offsetParent !== null);
+    items()[0]?.focus({ preventScroll: true });
+    const outside = (event: PointerEvent) => {
+      if (!workspaceMenu.current?.contains(event.target as Node)) setMenu(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenu(false);
+        workspaceMenuTrigger.current?.focus({ preventScroll: true });
+      }
+      const buttons = items();
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (index < 0) return;
+      const next =
+        event.key === 'ArrowDown'
+          ? (index + 1) % buttons.length
+          : event.key === 'ArrowUp'
+            ? (index - 1 + buttons.length) % buttons.length
+            : undefined;
+      if (next !== undefined) {
+        event.preventDefault();
+        buttons[next]?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', key);
+    };
+  }, [menu]);
   const [selectedId, setSelectedId] = useState<string>();
   const inspectorScroll = useRef<HTMLDivElement>(null);
   const [viewOwner, setViewOwner] = useState<string>();
@@ -171,6 +213,7 @@ export default function App() {
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [queryError, setQueryError] = useState('');
   const [notice, setNotice] = useState('');
   useEffect(() => {
     if (!notice || /partial|cancelled|could not/i.test(notice)) return;
@@ -502,6 +545,8 @@ export default function App() {
     setEntityRemoval(undefined);
     setEditToken(0);
     setQuery('');
+    setQueryError('');
+    setMenu(false);
     setFocusRequest(undefined);
     setGraphFilters(w?.view.filters ?? {});
     setNavigation(
@@ -805,7 +850,21 @@ export default function App() {
   }
   async function search(e: FormEvent) {
     e.preventDefault();
-    await addQuery(query.trim());
+    const text = query.trim();
+    if (!w || !text) return;
+    if (!/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
+      try {
+        addressToScriptHash(text, w.network);
+      } catch {
+        setQueryError(
+          `Enter a 64-character transaction ID, txid:vout, or a valid ${w.network} Bitcoin address.`,
+        );
+        searchInput.current?.focus({ preventScroll: true });
+        return;
+      }
+    }
+    setQueryError('');
+    await addQuery(text);
   }
   async function addQuery(text: string) {
     if (!w || !canQuery) return;
@@ -1416,6 +1475,7 @@ export default function App() {
               ? `${status?.network} · ${status?.height?.toLocaleString() ?? 'connected'}`
               : 'Offline'}
           </span>
+          <span className="connection-network">{displayNetwork ?? 'Offline'}</span>
         </button>
         <HelpMenu
           actions={[
@@ -1457,7 +1517,12 @@ export default function App() {
                   aria-label="Transaction, output, or address"
                   placeholder="Transaction ID, txid:vout, or Bitcoin address"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  aria-invalid={!!queryError}
+                  aria-describedby={queryError ? 'lookup-error' : undefined}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setQueryError('');
+                  }}
                   spellCheck={false}
                 />
                 <button
@@ -1473,15 +1538,15 @@ export default function App() {
                   className="lookup-prefetch"
                   title="Previous transaction levels for transaction/output lookups. Up to 500 downloads per action."
                 >
-                  <span>Previous</span>
+                  <span>Previous levels</span>
                   <select
                     aria-label="Prefetch previous levels"
                     value={prefetchDepth}
                     onChange={(e) => setPrefetchDepth(Number(e.target.value) as 0 | 1 | 2)}
                   >
-                    <option value={0}>Off</option>
-                    <option value={1}>1 level</option>
-                    <option value={2}>2 levels</option>
+                    <option value={0}>Previous: off</option>
+                    <option value={1}>Previous: 1</option>
+                    <option value={2}>Previous: 2</option>
                   </select>
                 </label>
               )}
@@ -1498,85 +1563,108 @@ export default function App() {
               </button>
               <button
                 className="export-button"
+                title="Export encrypted workspace backup"
+                aria-label="Export encrypted workspace backup"
                 onClick={() => void exportWorkspace()}
                 disabled={!!operation}
               >
                 <Download size={16} />
-                <span>Export</span>
+                <span>Export workspace</span>
               </button>
-              <button
-                className="icon-button"
-                aria-label="Workspace menu"
-                onClick={() => setMenu(!menu)}
+              <div
+                className="workspace-menu"
+                ref={workspaceMenu}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) setMenu(false);
+                }}
               >
-                <Ellipsis size={20} />
-              </button>
-              {menu && (
-                <div className="dropdown">
-                  <button
-                    className="mobile-workspace-undo"
-                    aria-label="Undo workspace change"
-                    disabled={!ws.active?.history.length || !!operation}
-                    onClick={() => {
-                      setMenu(false);
-                      ws.undo(w.id);
-                    }}
+                <button
+                  ref={workspaceMenuTrigger}
+                  className="icon-button"
+                  aria-label="Workspace menu"
+                  aria-expanded={menu}
+                  aria-controls={menu ? 'workspace-menu-actions' : undefined}
+                  onClick={() => setMenu(!menu)}
+                >
+                  <Ellipsis size={20} />
+                </button>
+                {menu && (
+                  <div
+                    className="dropdown"
+                    id="workspace-menu-actions"
+                    role="group"
+                    aria-label="Workspace actions"
                   >
-                    <Undo2 size={15} /> Undo workspace change
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenu(false);
-                      setSettingsOpen(true);
-                    }}
-                  >
-                    Workspace details
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenu(false);
-                      void exportWorkspace();
-                    }}
-                  >
-                    <Download size={15} />
-                    Export encrypted workspace
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenu(false);
-                      labelsInput.current?.click();
-                    }}
-                  >
-                    <Upload size={15} />
-                    Import BIP329 labels
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenu(false);
-                      download('labels.jsonl', exportLabels(w), 'application/x-ndjson');
-                      setNotice(
-                        'BIP329 labels exported as unencrypted JSONL. Notes and graph layout use the encrypted workspace format.',
-                      );
-                    }}
-                  >
-                    <Download size={15} />
-                    Export labels · plaintext
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenu(false);
-                      operationRef.current?.abort();
-                      flushActiveGraph();
-                      void ws.lock(w.id).catch((e) => setError(e.message));
-                    }}
-                  >
-                    <LockKeyhole size={15} />
-                    Lock workspace
-                  </button>
-                </div>
-              )}
+                    <button
+                      className="mobile-workspace-undo"
+                      aria-label="Undo workspace change"
+                      disabled={!ws.active?.history.length || !!operation}
+                      onClick={() => {
+                        setMenu(false);
+                        ws.undo(w.id);
+                      }}
+                    >
+                      <Undo2 size={15} /> Undo workspace change
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenu(false);
+                        setSettingsOpen(true);
+                      }}
+                    >
+                      Workspace details
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenu(false);
+                        void exportWorkspace();
+                      }}
+                    >
+                      <Download size={15} />
+                      Export encrypted workspace
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenu(false);
+                        labelsInput.current?.click();
+                      }}
+                    >
+                      <Upload size={15} />
+                      Import BIP329 labels
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenu(false);
+                        download('labels.jsonl', exportLabels(w), 'application/x-ndjson');
+                        setNotice(
+                          'BIP329 labels exported as unencrypted JSONL. Notes and graph layout use the encrypted workspace format.',
+                        );
+                      }}
+                    >
+                      <Download size={15} />
+                      Export BIP329 labels · plaintext
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenu(false);
+                        operationRef.current?.abort();
+                        flushActiveGraph();
+                        void ws.lock(w.id).catch((e) => setError(e.message));
+                      }}
+                    >
+                      <LockKeyhole size={15} />
+                      Lock workspace
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+          {queryError && (
+            <div className="lookup-error" id="lookup-error" role="alert">
+              {queryError}
+            </div>
+          )}
           <div className="mobile-switch">
             <button
               className={shownMobilePanel === 'left' ? 'active' : ''}

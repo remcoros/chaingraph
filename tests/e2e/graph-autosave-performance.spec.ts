@@ -317,7 +317,9 @@ test('dense graph gestures defer snapshot serialization and encryption, then exp
   await page.mouse.move(nextPoint.x, nextPoint.y);
   await page.mouse.wheel(0, -350);
   const downloading = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Export encrypted workspace backup', exact: true })
+    .click();
   const download = await downloading;
   const exported = parseWorkspace(
     await decryptWorkspace(JSON.parse(await readFile((await download.path())!, 'utf8')), password),

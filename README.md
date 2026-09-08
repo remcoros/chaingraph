@@ -63,6 +63,13 @@ Workspace names are public so locked workspaces remain identifiable. Optional de
 
 This is a trusted, single-user, fully self-hosted application. The backend has **no user authentication** and binds to loopback by default. Public or shared hosting is unsupported. Browser-origin checks and upstream request limits do not provide a user authorization system. Workspace encryption protects saved data, not an unlocked session or untrusted code served to the browser. Web Crypto requires localhost or HTTPS.
 
+Workspace creation shows the eight-character password minimum before submission.
+Use the eye buttons to reveal or hide passwords while entering them. Validation
+appears inside the dialog. Reloading locks workspaces because Chaingraph never
+stores the password; reopen a saved workspace to unlock it. The header **Export workspace**
+button saves an encrypted workspace backup; **Export BIP329 labels · plaintext**
+in the workspace menu saves unencrypted labels.
+
 ## Current boundaries
 
 - Wallet import accepts account-level public keys at depth 3: `xpub`/`ypub`/`zpub` on mainnet and `tpub`/`upub`/`vpub` on testnet4. Supported single-key scripts are legacy P2PKH, nested SegWit, native SegWit, and BIP86 Taproot. Descriptors, multisig, private keys, signing, and spending are unsupported.
@@ -144,7 +151,7 @@ Tags can be searched, created and assigned from **Add or choose tags** in the in
 
 **Lock to selection** keeps the graph centered as you select items anywhere in the
 workbench. Graph controls independently show or hide labels, tags and icons. On
-desktop, **Focus graph** sits beside the 3D/Flat toggle and temporarily hides the
+desktop, **Hide panels** sits beside the 3D/Flat toggle and temporarily hides the
 side panels; it is hidden on mobile, where panels already have separate views.
 
 Choose **Entities → Match graph** to keep the list aligned with the filtered

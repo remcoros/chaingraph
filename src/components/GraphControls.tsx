@@ -33,13 +33,15 @@ export function GraphControls({
       {onToggleFocus && (
         <button
           className={`icon-button graph-focus-toggle ${focusGraph ? 'active' : ''}`}
-          aria-label={focusGraph ? 'Show panels' : 'Focus graph'}
-          title={focusGraph ? 'Show panels' : 'Focus graph'}
+          aria-label={focusGraph ? 'Show panels' : 'Hide panels'}
+          title={
+            focusGraph ? 'Show the side panels' : 'Hide side panels to give the graph more room'
+          }
           aria-pressed={Boolean(focusGraph)}
           onClick={onToggleFocus}
         >
           {focusGraph ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          <span>{focusGraph ? 'Show panels' : 'Focus graph'}</span>
+          <span>{focusGraph ? 'Show panels' : 'Hide panels'}</span>
         </button>
       )}
       <label className="size-control">

@@ -200,6 +200,7 @@ export function WorkspacePanel({
               Gap limit
               <input
                 aria-label="Gap limit"
+                title="Stop a branch after this many consecutive addresses with no transaction history."
                 type="number"
                 min={10}
                 max={100}
@@ -209,7 +210,11 @@ export function WorkspacePanel({
             </label>
             <label>
               Addresses / branch
-              <select value={scanLimit} onChange={(e) => setScanLimit(Number(e.target.value))}>
+              <select
+                title="Maximum addresses checked on each receive/change branch per scan. Increase this if the scan is partial."
+                value={scanLimit}
+                onChange={(e) => setScanLimit(Number(e.target.value))}
+              >
                 <option value={200}>200</option>
                 <option value={500}>500</option>
                 <option value={1000}>1,000</option>
@@ -226,7 +231,8 @@ export function WorkspacePanel({
             </label>
             <p className="small muted">
               {live ? 'Monitoring while unlocked. ' : 'Refresh to check for new activity. '}
-              Both receive and change branches; 500 transaction downloads per wallet and check.
+              Each check scans receive and change branches, downloading up to 500 transactions per
+              wallet.
             </p>
           </div>
         </>

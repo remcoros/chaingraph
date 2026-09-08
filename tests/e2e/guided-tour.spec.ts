@@ -122,7 +122,7 @@ test('tour previews panels but restores focused graph, prior tabs and selected a
     .locator('.right-panel .panel-tabs')
     .getByRole('button', { name: /^Analysis/ })
     .click();
-  await page.getByRole('button', { name: 'Focus graph', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide panels', exact: true }).click();
   await expect(page.locator('.left-panel')).toBeHidden();
   await restart(page);
   await jump(page, 'Tags');

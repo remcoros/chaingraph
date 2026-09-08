@@ -572,3 +572,9 @@
     flex-wrap: wrap;
   }
 }
+
+.transaction-row-main > span,
+.transaction-row-main strong,
+.transaction-view {
+  font-size: 12px;
+}

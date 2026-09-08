@@ -218,7 +218,9 @@ test('exports encrypted data and reimports a copy with annotations intact', asyn
   await expect(page.getByLabel('Node label')).toBeVisible();
   await page.getByLabel('Node label').fill('A portable label');
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Export encrypted workspace backup', exact: true })
+    .click();
   const download = await downloadPromise;
   const file = testInfo.outputPath('workspace.chaingraph');
   await download.saveAs(file);

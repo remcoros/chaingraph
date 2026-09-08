@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react';
-import { X, LockKeyhole, ArrowRight } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode, type FormEvent } from 'react';
+import { X, LockKeyhole, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { Network, ScriptType, Wallet, Workspace } from '../domain/types';
 import { newWorkspace, parseWorkspace } from '../domain/workspace';
 import type { WorkspaceTemplate } from '../domain/workspaceTemplates';
@@ -7,6 +7,7 @@ import { loadTemplateWorkspace } from '../lib/templateWorkspace';
 import { inspectExtendedPublicKey, deriveAddresses } from '../lib/wallet';
 import { decryptWorkspace } from '../lib/crypto';
 import type { SavedWorkspace } from '../lib/useWorkspaces';
+import './dialogs.css';
 export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: string) {
   const ref = useRef<HTMLDivElement>(null);
   // Capture the invoker before children mount and React applies autoFocus.
@@ -19,7 +20,7 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
       (
         el?.querySelector<HTMLElement>('[data-autofocus]:not(:disabled)') ??
         el?.querySelector<HTMLElement>('input:not(:disabled),button:not(:disabled)')
-      )?.focus();
+      )?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -57,7 +58,7 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
         : fallbackFocusSelector
           ? document.querySelector<HTMLElement>(fallbackFocusSelector)
           : null;
-      target?.focus();
+      target?.focus({ preventScroll: true });
     };
   }, [previous, fallbackFocusSelector]);
   return ref;
@@ -101,6 +102,76 @@ export function Modal({
     </div>
   );
 }
+function focusDialogField(input: HTMLInputElement | null) {
+  if (!input) return;
+  input.focus({ preventScroll: true });
+  const modal = input.closest<HTMLElement>('.modal');
+  if (!modal) return;
+  const fieldBounds = input.getBoundingClientRect();
+  const modalBounds = modal.getBoundingClientRect();
+  if (fieldBounds.top < modalBounds.top + 16)
+    modal.scrollTop += fieldBounds.top - modalBounds.top - 16;
+  else if (fieldBounds.bottom > modalBounds.bottom - 16)
+    modal.scrollTop += fieldBounds.bottom - modalBounds.bottom + 16;
+}
+
+function PasswordField({
+  label = 'Password',
+  value,
+  onChange,
+  disabled,
+  creating,
+  autofocus,
+  describedBy,
+  invalid,
+  inputRef,
+}: {
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  creating?: boolean;
+  autofocus?: boolean;
+  describedBy?: string;
+  invalid?: boolean;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
+  const id = useId();
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="password-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="password-input">
+        <input
+          id={id}
+          ref={inputRef}
+          type={visible ? 'text' : 'password'}
+          autoComplete={creating ? 'new-password' : 'current-password'}
+          data-autofocus={autofocus || undefined}
+          required
+          maxLength={1024}
+          disabled={disabled}
+          aria-describedby={describedBy}
+          aria-invalid={invalid || undefined}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`${visible ? 'Hide' : 'Show'} ${label === 'Confirm password' ? 'confirmation' : 'password'}`}
+          aria-pressed={visible}
+          title={`${visible ? 'Hide' : 'Show'} ${label === 'Confirm password' ? 'confirmation' : 'password'}`}
+          disabled={disabled}
+          onClick={() => setVisible((current) => !current)}
+        >
+          {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function CreateDialog({
   networks,
   template,
@@ -121,8 +192,20 @@ export function CreateDialog({
   }, [networks, net, template]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const nameInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const confirmInput = useRef<HTMLInputElement>(null);
+  const [invalidField, setInvalidField] = useState<'name' | 'password' | 'confirm'>();
+  const errorId = useId();
+  const passwordHintId = useId();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  function clearFieldError(field: 'name' | 'password' | 'confirm') {
+    if (invalidField === field || (field === 'password' && invalidField === 'confirm')) {
+      setInvalidField(undefined);
+      setError('');
+    }
+  }
   const pending = useRef<AbortController | undefined>(undefined);
   const supported = useRef(networks);
   supported.current = networks;
@@ -135,17 +218,24 @@ export function CreateDialog({
     e.preventDefault();
     if (pending.current) return;
     if (!name.trim()) {
+      setInvalidField('name');
+      focusDialogField(nameInput.current);
       setError('Enter a workspace name.');
       return;
     }
     if (password.length < 8) {
+      setInvalidField('password');
+      focusDialogField(passwordInput.current);
       setError('Use at least 8 characters. A long, unique passphrase is better.');
       return;
     }
     if (password !== confirm) {
+      setInvalidField('confirm');
+      focusDialogField(confirmInput.current);
       setError('Passwords do not match.');
       return;
     }
+    setInvalidField(undefined);
     if (!crypto.subtle) {
       setError('Encryption needs a secure browser context. Use localhost or HTTPS.');
       return;
@@ -193,12 +283,14 @@ export function CreateDialog({
           ? 'Start with real transactions, labels and tags. This is your own editable copy, saved like any other workspace.'
           : 'A private space for your wallets, transactions, labels, and investigations.'}
       </p>
-      <form onSubmit={submit} className="stack">
+      <form onSubmit={submit} className="stack" noValidate>
         <label>
           Name (public)
           <input
             disabled={busy}
-            autoFocus
+            ref={nameInput}
+            aria-invalid={invalidField === 'name' || undefined}
+            aria-describedby={invalidField === 'name' ? errorId : undefined}
             data-autofocus
             required
             maxLength={100}
@@ -217,6 +309,7 @@ export function CreateDialog({
             onChange={(e) => {
               suggestedName.current = false;
               setName(e.target.value);
+              clearFieldError('name');
             }}
           />
         </label>
@@ -260,36 +353,40 @@ export function CreateDialog({
             further through your backend.
           </p>
         )}
-        <label>
-          Password
-          <input
-            disabled={busy}
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            maxLength={1024}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <label>
-          Confirm password
-          <input
-            disabled={busy}
-            type="password"
-            autoComplete="new-password"
-            required
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-          />
-        </label>
+        <PasswordField
+          value={password}
+          onChange={(value) => {
+            setPassword(value);
+            clearFieldError('password');
+          }}
+          disabled={busy}
+          creating
+          inputRef={passwordInput}
+          invalid={invalidField === 'password'}
+          describedBy={`${passwordHintId}${invalidField === 'password' ? ` ${errorId}` : ''}`}
+        />
+        <p id={passwordHintId} className="small muted">
+          At least 8 characters. Use a long, unique passphrase.
+        </p>
+        <PasswordField
+          label="Confirm password"
+          value={confirm}
+          onChange={(value) => {
+            setConfirm(value);
+            clearFieldError('confirm');
+          }}
+          disabled={busy}
+          creating
+          inputRef={confirmInput}
+          invalid={invalidField === 'confirm'}
+          describedBy={invalidField === 'confirm' ? errorId : undefined}
+        />
         <p className="security-note">
           <LockKeyhole size={16} /> Contents are encrypted; the name is public. Your password cannot
-          be recovered.
+          be recovered. Workspaces lock on reload; Chaingraph never stores your password.
         </p>
         {error && (
-          <p role="alert" className="error-text">
+          <p id={errorId} role="alert" className="error-text">
             {error}
           </p>
         )}
@@ -319,6 +416,8 @@ export function UnlockDialog({
   onClose: () => void;
 }) {
   const [password, setPassword] = useState('');
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const errorId = useId();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   return (
@@ -329,8 +428,16 @@ export function UnlockDialog({
       </p>
       <form
         className="stack"
+        noValidate
         onSubmit={async (e) => {
           e.preventDefault();
+          if (busy) return;
+          if (!password) {
+            setError('Enter your workspace password.');
+            focusDialogField(passwordInput.current);
+            return;
+          }
+          setError('');
           setBusy(true);
           try {
             await onUnlock(entry, password);
@@ -344,20 +451,23 @@ export function UnlockDialog({
           }
         }}
       >
-        <label>
-          Password
-          <input
-            type="password"
-            autoComplete="current-password"
-            autoFocus
-            data-autofocus
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+        <PasswordField
+          value={password}
+          onChange={(value) => {
+            setPassword(value);
+            setError('');
+          }}
+          disabled={busy}
+          autofocus
+          inputRef={passwordInput}
+          invalid={Boolean(error)}
+          describedBy={error ? errorId : undefined}
+        />
+        <p className="small muted">
+          Workspaces lock on reload. Chaingraph never stores your password.
+        </p>
         {error && (
-          <p className="error-text" role="alert">
+          <p id={errorId} className="error-text" role="alert">
             {error}
           </p>
         )}
@@ -492,6 +602,8 @@ export function ImportDialog({
   onClose: () => void;
 }) {
   const [password, setPassword] = useState('');
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const errorId = useId();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   return (
@@ -499,8 +611,16 @@ export function ImportDialog({
       <p className="muted wrap">{file.name}</p>
       <form
         className="stack"
+        noValidate
         onSubmit={async (e) => {
           e.preventDefault();
+          if (busy) return;
+          if (!password) {
+            setError('Enter your workspace password.');
+            focusDialogField(passwordInput.current);
+            return;
+          }
+          setError('');
           setBusy(true);
           try {
             const data = parseWorkspace(
@@ -515,18 +635,23 @@ export function ImportDialog({
           }
         }}
       >
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+        <PasswordField
+          value={password}
+          onChange={(value) => {
+            setPassword(value);
+            setError('');
+          }}
+          disabled={busy}
+          autofocus
+          inputRef={passwordInput}
+          invalid={Boolean(error)}
+          describedBy={error ? errorId : undefined}
+        />
+        <p className="small muted">
+          Workspaces lock on reload. Chaingraph never stores your password.
+        </p>
         {error && (
-          <p role="alert" className="error-text">
+          <p id={errorId} role="alert" className="error-text">
             {error}
           </p>
         )}
