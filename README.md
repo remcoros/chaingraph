@@ -85,9 +85,12 @@ assumptions without attributing ownership.
 
 ## Renderer experiment
 
-This isolated branch uses a purpose-built Three.js adapter with stable directed
-stages, bounded camera damping, cursor zoom and decluttered captions. The rest of
-the workbench remains shared. See the [scope, review and limitations](docs/experiments/flow-renderer-v2.md).
+This isolated branch uses a purpose-built Three.js adapter with a small Compact /
+Directed layout selector. Compact creates rounded force neighborhoods; Directed
+separates input, transaction and output stages. Both settle once, preserve edits
+and support cursor zoom and decluttered captions. Existing snapshots open as Saved
+view; choose a layout to rearrange them. The rest of the workbench remains shared.
+See the [scope, review and limitations](docs/experiments/flow-renderer-v2.md).
 
 ## Development
 

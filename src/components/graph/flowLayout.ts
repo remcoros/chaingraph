@@ -1,8 +1,11 @@
 import type { RenderLink, RenderNode } from './adapter';
 export type Position = { x: number; y: number; z: number };
-export type LayoutNode = Pick<RenderNode, 'id' | 'shape' | 'x' | 'y' | 'z' | 'fx' | 'fy' | 'fz'>;
+export type LayoutNode = Pick<RenderNode, 'id' | 'shape' | 'x' | 'y' | 'z' | 'fx' | 'fy' | 'fz'> &
+  Partial<Pick<RenderNode, 'radius'>>;
 export interface LayoutRequest {
   revision: number;
+  strategy?: 'compact' | 'directed';
+  dimensions?: 2 | 3;
   nodes: LayoutNode[];
   links: Pick<RenderLink, 'source' | 'target'>[];
   previous: [string, Position][];

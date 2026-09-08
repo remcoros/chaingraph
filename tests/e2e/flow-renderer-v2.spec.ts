@@ -490,3 +490,101 @@ test('an immediate checkpoint completes pending layout and rejects its later wor
   expect(saved.late).toBe(false);
   expect(errors).toEqual([]);
 });
+
+test('layout choices are reversible, dimension-specific, keyboard accessible and snapshot compatible', async ({
+  page,
+}) => {
+  const errors = await open(page);
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.update({ ...f.frame, nodes: f.frame.nodes.map(({ x, y, z, ...n }: RenderNode) => n) });
+  });
+  const select = page.getByLabel('Graph layout', { exact: true });
+  await expect(select).toHaveValue('compact');
+  await select.selectOption('directed');
+  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
+  const directed = await geometry(page);
+  await drag(page);
+  const directedCamera = await camera(page);
+  await select.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(select).toHaveValue('compact');
+  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
+  const compact = await geometry(page);
+  expect(compact).not.toEqual(directed);
+  await drag(page, 'right');
+  const compactCamera = await camera(page);
+  await select.selectOption('directed');
+  await expect.poll(() => geometry(page)).toEqual(directed);
+  expect(await camera(page)).toEqual(directedCamera);
+  await select.selectOption('compact');
+  await expect.poll(() => geometry(page)).toEqual(compact);
+  expect(await camera(page)).toEqual(compactCamera);
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.update({ ...f.frame, dimensions: 2 });
+  });
+  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
+  const flat = await geometry(page);
+  expect(flat.every(([, p]: [string, { z: number }]) => p.z === 0)).toBe(true);
+  expect(flat).not.toEqual(compact);
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.update({ ...f.frame, dimensions: 3 });
+  });
+  await expect.poll(() => geometry(page)).toEqual(compact);
+  expect(await camera(page)).toEqual(compactCamera);
+  const restored = await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.graph.flushSnapshot();
+    const snapshot = f.snapshots.at(-1);
+    f.reset();
+    f.graph.restoreSnapshot(snapshot);
+    f.graph.update(f.frame);
+    f.graph.flushSnapshot();
+    return { before: snapshot, after: f.snapshots.at(-1) };
+  });
+  expect(restored.after).toEqual(restored.before);
+  await expect(select).toHaveValue('saved');
+  await select.selectOption('directed');
+  await expect.poll(() => page.evaluate(() => !(window as any).fixture.graph.pending)).toBe(true);
+  await select.selectOption('saved');
+  await expect.poll(() => geometry(page)).toEqual(compact);
+  expect(await camera(page)).toEqual(compactCamera);
+  expect(errors).toEqual([]);
+});
+
+test('rapid layout changes checkpoint the latest choice and discard obsolete worker results', async ({
+  page,
+}) => {
+  const errors = await open(page);
+  const result = await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.graph.worker.terminate();
+    const requests: any[] = [];
+    f.graph.worker = { postMessage: (r: any) => requests.push(r), terminate() {} };
+    const select = document.querySelector<HTMLSelectElement>('[aria-label="Graph layout"]')!;
+    select.value = 'directed';
+    select.dispatchEvent(new Event('change'));
+    select.value = 'compact';
+    select.dispatchEvent(new Event('change'));
+    f.graph.accept({
+      revision: requests[0].revision,
+      positions: [['obsolete', { x: 0, y: 0, z: 0 }]],
+    });
+    const pending = f.graph.pending.strategy;
+    f.graph.flushSnapshot();
+    const snapshot = f.snapshots.at(-1);
+    f.graph.accept({ revision: requests[1].revision, positions: [['late', { x: 0, y: 0, z: 0 }]] });
+    return { pending, snapshot, positions: [...f.graph.positions] };
+  });
+  expect(result.pending).toBe('compact');
+  expect(result.snapshot.nodes).toHaveLength(4);
+  expect(result.positions.map(([id]: [string]) => id).sort()).toEqual([
+    'address',
+    'creating',
+    'output',
+    'spending',
+  ]);
+  expect(errors).toEqual([]);
+});

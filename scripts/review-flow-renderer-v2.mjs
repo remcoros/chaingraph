@@ -6,7 +6,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-const output = 'artifacts/flow-renderer-v2';
+const output = process.argv.includes('--layouts')
+  ? 'artifacts/flow-renderer-v2/layouts'
+  : 'artifacts/flow-renderer-v2';
 await mkdir(output, { recursive: true });
 const baseline = process.argv.includes('--baseline');
 const cache = path.join(os.homedir(), '.cache/ms-playwright');
@@ -76,10 +78,27 @@ try {
     await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 30000 });
     if (id === 'mainnet-large-value-path')
       await page.getByLabel('Size nodes by').selectOption('value');
+    if (process.argv.includes('--layouts') && !baseline) {
+      await page.getByLabel('Graph layout', { exact: true }).selectOption('compact');
+      await expect(page.getByLabel('Graph layout', { exact: true })).toHaveAttribute(
+        'aria-busy',
+        'false',
+      );
+    }
     await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
     await page.waitForTimeout(baseline ? 700 : 200);
     const prefix = `${output}/${baseline ? 'main' : 'flow'}-${id}`;
     await page.screenshot({ path: `${prefix}-3d.png` });
+    if (process.argv.includes('--layouts') && !baseline) {
+      await page.getByLabel('Graph layout', { exact: true }).selectOption('directed');
+      await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', {
+        timeout: 30000,
+      });
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${prefix}-directed.png` });
+      await page.getByLabel('Graph layout', { exact: true }).selectOption('compact');
+      await page.waitForTimeout(500);
+    }
     const gpu = await page.locator('canvas').evaluate((canvas) => {
       const gl = canvas.getContext('webgl2'),
         ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -88,7 +107,7 @@ try {
     const counts = await page.locator('.statusbar').innerText();
     await page.getByRole('button', { name: 'Flat', exact: true }).click();
     await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
-    await page.waitForTimeout(baseline ? 700 : 200);
+    await page.waitForTimeout(baseline ? 700 : 1000);
     await page.screenshot({ path: `${prefix}-flat.png` });
     if (!baseline) {
       await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -191,6 +210,8 @@ try {
         'Public renderer review: follow this exact outpoint.',
       );
       await expect(page.locator('canvas')).toBeVisible();
+      if (process.argv.includes('--layouts'))
+        await expect(page.getByLabel('Graph layout', { exact: true })).toHaveValue('saved');
       if (id === 'testnet4-spent-output') {
         const hops = page.locator('.transaction-flow button[aria-label^="Go to"]');
         const names = await hops.evaluateAll((es) => es.map((e) => e.getAttribute('aria-label')));
@@ -213,6 +234,29 @@ try {
     console.log(id, errors.length ? 'ERRORS' : 'reviewed');
     expect(errors).toEqual([]);
     await context.close();
+  }
+  if (process.argv.includes('--layouts') && !baseline) {
+    const sections = cases
+      .map(
+        ([id, name]) =>
+          `<section><h2>${name}</h2><div class="compare">${[
+            ['Compact', `flow-${id}-3d.png`],
+            ['Directed', `flow-${id}-directed.png`],
+            ['Main force baseline', `../main-${id}-3d.png`],
+          ]
+            .map(
+              ([label, file]) =>
+                `<figure><figcaption>${label}</figcaption><a href="${file}"><img src="${file}" alt="${label}: ${name}" loading="lazy"></a></figure>`,
+            )
+            .join(
+              '',
+            )}</div><p><a href="flow-${id}-flat.png">Compact Flat</a> · <a href="flow-${id}-selected.png">Selected output</a> · <a href="flow-${id}-hover-edit.png">Shared editing card</a></p></section>`,
+      )
+      .join('');
+    await writeFile(
+      `${output}/index.html`,
+      `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chaingraph layout review</title><style>body{background:#131b20;color:#dce7e2;font:15px system-ui;margin:24px}a{color:#a9d878}h1{font-size:24px}.compare{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}figure{margin:0}figcaption{padding:8px 0}img{width:100%}section{margin:30px 0}@media(max-width:850px){.compare{grid-template-columns:1fr}}</style><h1>Compact and Directed layouts</h1><p>Public bundled snapshots. Main baseline captured during the initial renderer review. Chromium software WebGL; no physical GPU performance claim. Click images to inspect full size.</p>${sections}</html>`,
+    );
   }
   await writeFile(
     `${output}/${baseline ? 'main' : 'flow'}-observations.json`,

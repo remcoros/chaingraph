@@ -33,7 +33,8 @@ import {
   type GraphSnapshot,
 } from '../../domain/graphSnapshot';
 import { frameCamera } from './cameraFraming';
-import { flowLayout, type LayoutRequest, type LayoutResult, type Position } from './flowLayout';
+import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
+import { layoutGraph } from './compactLayout';
 import { makeFlowEdges } from './flowEdges';
 import './flowRenderer.css';
 
@@ -74,7 +75,13 @@ export class FlowRenderer implements GraphAdapter {
   private worker?: Worker;
   private pending?: LayoutRequest;
   private dimensions: 2 | 3 = 3;
-  private modeViews = new Map<number, GraphSnapshot['camera']>();
+  private layout: 'compact' | 'directed' | 'saved' = 'compact';
+  private layouts = new Map<
+    string,
+    { positions: Map<string, Position>; camera: GraphSnapshot['camera'] }
+  >();
+  private layoutControl: HTMLLabelElement;
+  private layoutSelect: HTMLSelectElement;
   private width = 0;
   private height = 0;
   private inset = 0;
@@ -111,6 +118,25 @@ export class FlowRenderer implements GraphAdapter {
     this.labels.className = 'flow-renderer-labels';
     this.labels.setAttribute('aria-hidden', 'true');
     container.append(this.labels);
+    this.layoutControl = document.createElement('label');
+    this.layoutControl.className = 'flow-layout-control';
+    this.layoutControl.append('Layout ');
+    this.layoutSelect = document.createElement('select');
+    this.layoutSelect.setAttribute('aria-label', 'Graph layout');
+    this.layoutSelect.title =
+      'Compact gathers connected nodes into rounded groups. Directed arranges input → transaction → output stages.';
+    for (const [value, text] of [
+      ['compact', 'Compact'],
+      ['directed', 'Directed'],
+      ['saved', 'Saved view'],
+    ]) {
+      const option = new Option(text, value);
+      option.hidden = value === 'saved';
+      this.layoutSelect.add(option);
+    }
+    this.layoutSelect.addEventListener('change', this.changeLayout);
+    this.layoutControl.append(this.layoutSelect);
+    container.append(this.layoutControl);
     this.camera.position.set(260, 140, 1000);
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.enableDamping = !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -135,7 +161,7 @@ export class FlowRenderer implements GraphAdapter {
         e.preventDefault();
         this.worker?.terminate();
         this.worker = undefined;
-        if (this.pending) this.accept(flowLayout(this.pending));
+        if (this.pending) this.accept(layoutGraph(this.pending));
       };
     } catch {
       /* Bounded synchronous fallback uses the same layout. */
@@ -341,7 +367,7 @@ export class FlowRenderer implements GraphAdapter {
     if (this.dead) return;
     this.stopDamping();
     // Explicit workspace transitions cannot wait on a layout worker reply.
-    if (this.pending) this.accept(flowLayout(this.pending));
+    if (this.pending) this.accept(layoutGraph(this.pending));
     this.cancelQuiet();
     if (this.positions.size && !this.pending) {
       if (!this.snapshotNodes) {
@@ -367,6 +393,11 @@ export class FlowRenderer implements GraphAdapter {
   restoreSnapshot(snapshot: GraphSnapshot) {
     const parsed = graphSnapshotSchema.safeParse(snapshot);
     if (!parsed.success) return;
+    this.layout = 'saved';
+    this.layoutSelect.options[2].hidden = false;
+    this.layoutSelect.value = 'saved';
+    this.layouts.clear();
+    this.topology = '';
     this.dimensions = parsed.data.dimensions;
     this.cache = new Map(parsed.data.nodes.map(({ id, ...p }) => [id, p]));
     this.firstFit = false;
@@ -389,6 +420,38 @@ export class FlowRenderer implements GraphAdapter {
     this.controls.touches.ONE = this.dimensions === 2 ? TOUCH.PAN : TOUCH.ROTATE;
     this.controls.touches.TWO = TOUCH.DOLLY_PAN;
   }
+  private layoutKey() {
+    return `${this.layout}:${this.dimensions}`;
+  }
+  private rememberLayout() {
+    if (!this.pending)
+      this.layouts.set(this.layoutKey(), {
+        positions: new Map(this.cache),
+        camera: this.cameraRecord(),
+      });
+  }
+  private changeLayout = () => {
+    if (this.dead) return;
+    this.stopDamping();
+    this.rememberLayout();
+    this.layout = this.layoutSelect.value as typeof this.layout;
+    const saved = this.layouts.get(this.layoutKey());
+    this.cache = new Map(saved?.positions);
+    this.topology = '';
+    this.firstFit = false;
+    this.pendingFocus = undefined;
+    this.lastFrame = undefined;
+    this.pendingFit = !saved;
+    if (saved) this.restoreCamera(saved.camera);
+    this.events.dismiss();
+    this.hovered = undefined;
+    this.update({
+      nodes: this.nodes,
+      links: this.links,
+      dimensions: this.dimensions,
+      background: `#${this.renderer.getClearColor(new Color()).getHexString()}`,
+    });
+  };
   update(frame: GraphFrame) {
     if (this.dead) return;
     this.nodes = frame.nodes.map((n) => ({ ...n }));
@@ -399,12 +462,20 @@ export class FlowRenderer implements GraphAdapter {
     this.renderer.setClearColor(frame.background);
     if (this.dimensions !== frame.dimensions) {
       this.stopDamping();
-      this.modeViews.set(this.dimensions, this.cameraRecord());
+      this.rememberLayout();
       this.dimensions = frame.dimensions;
       this.configureDimensions();
-      const saved = this.modeViews.get(this.dimensions);
-      if (saved) this.restoreCamera(saved);
-      else {
+      const saved = this.layouts.get(this.layoutKey());
+      if (saved) {
+        this.cache = new Map(saved.positions);
+        this.topology = '';
+        this.restoreCamera(saved.camera);
+      } else {
+        if (this.layout === 'compact') {
+          this.cache.clear();
+          this.topology = '';
+          this.pendingFit = true;
+        }
         const distance = this.camera.position.distanceTo(this.controls.target);
         const target = point(this.controls.target);
         target.z = 0;
@@ -429,9 +500,12 @@ export class FlowRenderer implements GraphAdapter {
     this.topology = signature;
     const request: LayoutRequest = {
       revision: ++this.revision,
-      nodes: this.nodes.map(({ id, shape, x, y, z, fx, fy, fz }) => ({
+      strategy: this.layout === 'directed' ? 'directed' : 'compact',
+      dimensions: this.dimensions,
+      nodes: this.nodes.map(({ id, shape, radius, x, y, z, fx, fy, fz }) => ({
         id,
         shape,
+        radius,
         x,
         y,
         z,
@@ -443,12 +517,14 @@ export class FlowRenderer implements GraphAdapter {
       previous: [...this.cache],
     };
     this.pending = request;
+    this.layoutSelect.setAttribute('aria-busy', 'true');
     if (this.worker) this.worker.postMessage(request);
-    else this.accept(flowLayout(request));
+    else this.accept(layoutGraph(request));
   }
   private accept(result: LayoutResult) {
     if (this.dead || !this.pending || result.revision !== this.revision) return;
     this.pending = undefined;
+    this.layoutSelect.setAttribute('aria-busy', 'false');
     this.positions = new Map(result.positions);
     this.snapshotNodes = undefined;
     for (const [id, p] of result.positions) {
@@ -732,6 +808,9 @@ export class FlowRenderer implements GraphAdapter {
     this.renderer.forceContextLoss();
     this.canvas.remove();
     this.labels.remove();
+    this.layoutSelect.removeEventListener('change', this.changeLayout);
+    this.layoutControl.remove();
+    this.layouts.clear();
     this.cache.clear();
     this.positions.clear();
     this.setActive(false);

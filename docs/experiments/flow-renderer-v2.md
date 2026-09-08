@@ -8,7 +8,8 @@ It supports exact-outpoint tracing and annotation in the existing wallet workben
 Direct Three.js replaces the generic force wrapper behind `graph/defaultAdapter.ts`.
 Babylon.js thin instances were the alternative considered. Three.js already provides
 instancing, picking and cursor zoom under the existing MIT dependency policy; no
-new dependency was needed. [Primary sources, licenses and limits](../research/flow-renderer-v2.md)
+new drawing dependency was needed. The Compact follow-up pins the already-used
+MIT `d3-force-3d` 3.0.6 as a direct layout dependency. [Primary sources, licenses and limits](../research/flow-renderer-v2.md)
 were checked on 2026-09-08. New application code remains MIT.
 
 GraphView, the 2D flow, toolbars, side panels, semantic selection, tracing, annotation
@@ -24,18 +25,34 @@ copied wholesale. Its historical Studio preference was not used.
 
 ## Layout, drawing and interaction
 
-A worker assigns directed stages and orders neighbors in two sweeps. Dense stages
-use staggered shelves: rows remain separate in Flat, while depth separates columns
-in 3D. Stages and depth express layout only, never time, amount or ownership.
-Disconnected investigations remain separate. Every node and individual connection
-remains present; there are no aggregate nodes or merged edges.
+The renderer's small **Compact / Directed** selector chooses between two static
+layouts. Compact is the default for fresh graphs. It uses 180 stopped d3-force-3d
+ticks in the worker, with link attraction, charge, radius-aware collision and weak
+centering. Hubs form rounded 3D neighborhoods and sparse paths occupy less space.
+Flat gets a separate 2D simulation, avoiding a flattened sphere's overlap.
 
-Existing positions are immutable anchors. New parents/spenders extend around them,
+Directed assigns stages and orders neighbors in two sweeps. Dense stages use
+staggered shelves: rows remain separate in Flat, while depth separates columns in
+3D. It remains useful for explicit input → transaction → output inspection. Layout
+positions never imply time, amount or ownership. Every node and individual
+connection remains present; there are no aggregate nodes or merged edges.
+
+Within a chosen layout, existing positions are immutable anchors. New parents/spenders extend around them,
 filters retain a bounded coordinate cache, and metadata edits do not run layout.
 Revision checks reject stale worker replies. Worker failure uses the same local
 algorithm. Version-1 snapshots restore existing coordinates and perspective cameras,
 including old force layouts. An explicit checkpoint completes any pending layout
 synchronously so lock/export/switch captures the latest view.
+
+Choosing a strategy explicitly rearranges and fits the graph. Switching back restores
+its cached positions and camera during the session, including separate Compact
+3D/Flat views. A native, keyboard-accessible selector is the only new control.
+Loaded snapshots show **Saved view** and retain their exact coordinates/camera until
+an explicit choice. No schema field was added: algorithm identity and alternative
+views are not persisted. New nodes in a reopened Saved view use Compact placement
+around its fixed anchors. Switching to another strategy then back to Saved view is
+also reversible during the session. All coordinate caches have the existing node
+limit and at most six strategy/dimension entries.
 
 Three instanced shape batches respect supplied silhouettes, radii and palette.
 One edge batch projects trimmed ribbons and camera-facing arrows in its vertex
@@ -63,7 +80,7 @@ Explicit flush captures the current visible camera and cancels residual damping.
 Context loss releases activity and requests browser recovery; restoration clears
 the shared error. Disposal releases controls, worker, callbacks, GPU and DOM state.
 
-## Validation and visual review
+## Initial directed implementation validation
 
 Final targeted browser run: **25 passed in 4.2 minutes**, serially, with source held fixed.
 
@@ -111,7 +128,52 @@ Iteration fixed reversed arrow winding, touch-leave hover, excessive dense-selec
 brightness, repeated captions and pending-layout flush. One run made while source
 was changing failed its idle-save assertion; the final run holds source fixed.
 
+## Compact follow-up validation
+
+The follow-up compares Compact, Directed and the initial main screenshots in the
+same five bundled workspaces. Use `node scripts/review-flow-renderer-v2.mjs --layouts`
+for current screenshots and the editing/navigation pass. Evidence is under ignored
+`artifacts/flow-renderer-v2/layouts/`. Initial captures of Saved view confirmed
+compatible restoration; current overview captures explicitly choose Compact.
+
+New unit regressions measure rounded dense-hub spans, deterministic ordering,
+immutable input, sparse path diameter, 2D geometry and anchored expansion/filtering.
+The synthetic twelve-node path has less than half the diameter of Directed.
+New browser regressions cover keyboard layout choice, return-camera/position
+caches, Flat/3D restoration, legacy snapshots, rapid strategy changes and immediate
+checkpointing with obsolete worker replies.
+
+Fixed-source results: **27 browser tests passed**, serially (nine renderer tests in
+26.3 seconds, 18 shared tests in 4.0 minutes). **23 focused unit tests**, TypeScript,
+build and changed-code formatting passed. Shared checks include gesture save
+deferral, encryption-failure retry, failed-request camera preservation,
+lock/export/switch, selection lock, visibility and encrypted view restoration.
+The 1,501-node autosave fixture retained 15,000 observations, with zero encryption
+jobs during gestures and a maximum observed gesture long task of 94 ms. This is
+software WebGL scheduling evidence, not an FPS or physical GPU benchmark.
+
+The initial development capture restarted after Vite's one-time dependency
+optimization reload. Subsequent browser runs use settled dependencies and fixed
+renderer source.
+
+The final five-template preview pass had zero browser errors and unchanged
+node/connection counts. It repeated graph/2D/Entities selection, shared-card
+label/note editing, filters, hide/show, selection lock and lock/reopen. The wallet
+also exercised tags/icons/address visibility; testnet4 traversed its loaded spender
+and checked the narrow screen. Screenshots were opened for all five Compact
+cases and compared with Directed and the initial main baseline. WabiSabi returns
+to a rounded hub; wallet and Whirlpool paths fit into tighter neighborhoods.
+The large-value pair remains visibly different. Dense central overlap and the
+small mobile graph area remain tradeoffs. `layouts/index.html` links full-size
+Compact, Directed and main images plus Flat, selection and editing evidence.
+
 ## Limits
+
+Compact trades stage ordering for less travel; dense hubs can still occlude nodes.
+Collision uses radii at placement time; later value-sizing changes preserve positions
+and can introduce overlap. The bounded solver does not guarantee convergence or
+optimal packing. Saved view preserves geometry, not the previous strategy identity.
+Synchronous checkpoint/worker-failure simulation can pause on large unseen graphs.
 
 Anchoring can leave long or backward-looking links when investigations join; arrows
 retain their actual direction. There is no crossing optimizer. Dense overviews

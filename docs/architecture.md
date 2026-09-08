@@ -307,8 +307,14 @@ address selections appear immediately.
 ### Isolated flow renderer v2 experiment
 
 On this experiment branch, `graph/defaultAdapter.ts` selects `FlowRenderer`. A
-layout worker owns stable directed shelves; instanced shapes and GPU-projected
-edges own drawing. Pooled captions are visual only. `RenderNode.selected` is an
+layout worker owns a bounded, static d3-force-3d Compact strategy and stable
+Directed shelves; instanced shapes and GPU-projected edges own drawing. Only the
+renderer owns the small layout selector. Existing coordinates anchor additions,
+while explicit strategy changes can rearrange nodes. Compact has separate 2D/3D
+positions. In-memory strategy/dimension caches preserve return views. Version-1
+snapshots retain positions/camera without adding strategy metadata; restored
+coordinates appear as Saved view and use anchored Compact placement for additions.
+Pooled captions are visual only. `RenderNode.selected` is an
 optional presentation hint independent of glow. Shared GraphView still owns every
 entity action, and version-1 graph snapshots and persistence scheduling retain
 their existing boundary. See the [decision and limitations](experiments/flow-renderer-v2.md).
