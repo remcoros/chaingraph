@@ -19,7 +19,7 @@
 .transaction-view {
   position: relative;
   flex: 0 1 auto;
-  max-height: min(45%, 430px);
+  max-height: min(65%, 460px);
   margin: 8px 8px 0;
   overflow: auto;
   overscroll-behavior: contain;
