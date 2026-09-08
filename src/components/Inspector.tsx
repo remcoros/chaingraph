@@ -189,7 +189,7 @@ export function WalletInspector({
               ? 'Gap limit reached on both branches.'
               : 'Partial scan: increase limits or refresh to continue.'}
             <small>
-              {wallet.scanGap ? `${wallet.scanGap} unused addresses · ` : ''}
+              {wallet.scanGap ? `Gap limit ${wallet.scanGap} · ` : ''}
               {wallet.scanLimit} addresses maximum per branch
             </small>
             {!!wallet.pendingTransactionIds?.length && (

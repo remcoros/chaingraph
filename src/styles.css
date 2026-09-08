@@ -1740,11 +1740,29 @@ small,
 .welcome-examples {
   grid-column: 1 / -1;
 }
+.workspace-template-gallery {
+  container-type: inline-size;
+  margin-top: 18px;
+}
+.workspace-template-group + .workspace-template-group {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-rule);
+}
 .workspace-template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  margin-top: 18px;
+}
+@container (min-width: 460px) {
+  .workspace-template-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 700px) {
+  .workspace-template-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 .workspace-template {
   display: flex;
@@ -1766,6 +1784,9 @@ small,
   padding: 16px;
   background: transparent;
   white-space: normal;
+}
+.workspace-template-open:focus-visible {
+  outline-offset: -3px;
 }
 .workspace-template-open strong {
   font-size: 14px;
@@ -1802,7 +1823,7 @@ small,
 }
 
 .example-workspaces-dialog {
-  width: min(100%, 720px);
+  width: min(100%, 1040px);
 }
 
 .example-workspaces-dialog .modal-heading {

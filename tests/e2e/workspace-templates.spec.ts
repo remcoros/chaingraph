@@ -6,6 +6,9 @@ import { parseWorkspace } from '../../src/domain/workspace';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
 const PASSWORD = 'public-template-test-password';
+const mainnetTemplates = WORKSPACE_TEMPLATES.filter((entry) => entry.network === 'mainnet');
+const testnetTemplates = WORKSPACE_TEMPLATES.filter((entry) => entry.network === 'testnet4');
+const messageTemplate = WORKSPACE_TEMPLATES.find((entry) => entry.id === 'mainnet-op-return')!;
 const STORAGE = 'chaingraph.encrypted-workspaces.v1';
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('chaingraph.tour.seen', '1'));
@@ -62,7 +65,9 @@ for (const template of WORKSPACE_TEMPLATES) {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/');
-    await expect(page.locator('.workspace-template-open')).toHaveCount(2);
+    await expect(page.locator('.workspace-template-open')).toHaveCount(
+      template.network === 'mainnet' ? 6 : 3,
+    );
     const dialog = await prepare(page, template.name);
     await expect(dialog.getByLabel('Name (public)', { exact: true })).toHaveValue(template.name);
     await expect(dialog.getByLabel('Workspace description')).toHaveValue(template.description);
@@ -84,8 +89,23 @@ for (const template of WORKSPACE_TEMPLATES) {
     expect(storage).not.toContain(template.description);
     expect(storage).not.toContain(PASSWORD);
     expect(storage).not.toContain('OP_RETURN text');
+    if (template.id === 'mainnet-public-wallet') {
+      expect(copy.wallets).toHaveLength(1);
+      const wallet = copy.wallets[0];
+      expect(wallet.addresses.length).toBeGreaterThan(0);
+      expect(wallet.addresses.some((address) => address.history?.length)).toBe(true);
+      expect(storage).not.toContain(wallet.key);
+      await page.locator('.wallet-row').filter({ hasText: wallet.name }).click();
+      await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeVisible();
+      await expect(page.locator('.scan-result')).toContainText(`Gap limit ${wallet.scanGap}`);
+      await page.screenshot({ path: 'artifacts/example-public-wallet.png' });
+    } else {
+      expect(copy.wallets).toEqual([]);
+    }
     expect(calls).toEqual([]);
     expect(errors).toEqual([]);
+    if (template.id === 'mainnet-wabisabi')
+      await page.screenshot({ path: 'artifacts/example-wabisabi.png' });
   });
 }
 
@@ -94,7 +114,7 @@ test('template copies retain edits after lock, and Help creates an independent w
 }) => {
   await mockBitcoin(page);
   await page.goto('/');
-  const template = WORKSPACE_TEMPLATES[1];
+  const template = messageTemplate;
   const dialog = await prepare(page, template.name);
   const name = dialog.getByLabel('Name (public)', { exact: true });
   await name.click();
@@ -114,7 +134,7 @@ test('template copies retain edits after lock, and Help creates an independent w
   await expect(page.getByLabel('Node notes', { exact: true })).toHaveValue(
     'Private observation retained',
   );
-  for (const next of [template, WORKSPACE_TEMPLATES[2]]) {
+  for (const next of [template, testnetTemplates[0]]) {
     await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
     const create = await prepare(page, next.name);
@@ -138,16 +158,21 @@ test('unsupported examples stay hidden and creation works with configured but di
 }) => {
   const calls = await mockBitcoin(page, { networks: ['testnet4'], connected: false });
   await page.goto('/');
-  await expect(page.locator('.workspace-template-network')).toHaveText(['Testnet4', 'Testnet4']);
+  await expect(page.locator('.workspace-template-network')).toHaveText([
+    'Testnet4',
+    'Testnet4',
+    'Testnet4',
+  ]);
   await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
   const examples = page.getByRole('dialog', { name: 'Example workspaces' });
   await expect(examples.locator('.workspace-template-network')).toHaveText([
     'Testnet4',
     'Testnet4',
+    'Testnet4',
   ]);
   await examples.getByRole('button', { name: 'Close dialog', exact: true }).click();
-  const dialog = await prepare(page, WORKSPACE_TEMPLATES[2].name);
+  const dialog = await prepare(page, testnetTemplates[0].name);
   await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
   expect((await savedWorkspaces(page))[0].network).toBe('testnet4');
   expect(calls).toEqual([]);
@@ -178,7 +203,7 @@ test('creation locks the fields while loading and cancellation does not leave a 
     await route.continue().catch(() => {});
   });
   await page.goto('/');
-  const dialog = await prepare(page, WORKSPACE_TEMPLATES[1].name);
+  const dialog = await prepare(page, messageTemplate.name);
   await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await expect(dialog.getByLabel('Password', { exact: true })).toBeDisabled();
   await expect(dialog.getByLabel('Name (public)', { exact: true })).toBeDisabled();
@@ -190,7 +215,7 @@ test('creation locks the fields while loading and cancellation does not leave a 
     await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]').length, STORAGE),
   ).toBe(0);
   await page.unroute('**/src/lib/templateWorkspace.worker.ts*');
-  const retry = await prepare(page, WORKSPACE_TEMPLATES[1].name);
+  const retry = await prepare(page, messageTemplate.name);
   await retry.getByRole('button', { name: 'Create workspace', exact: true }).click();
   expect(await savedWorkspaces(page)).toHaveLength(1);
 });
@@ -199,7 +224,7 @@ test('a failed template download leaves the form retryable', async ({ page }) =>
   await mockBitcoin(page);
   await page.route('**/src/lib/templateWorkspace.worker.ts*', (route) => route.abort());
   await page.goto('/');
-  const dialog = await prepare(page, WORKSPACE_TEMPLATES[1].name);
+  const dialog = await prepare(page, messageTemplate.name);
   await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Could not load the example workspace');
   await expect(dialog.getByLabel('Password', { exact: true })).toBeEnabled();
@@ -218,7 +243,7 @@ test('mobile examples keep their close control visible and cancellation restores
   await page.getByRole('button', { name: 'Example workspaces', exact: true }).click();
   const examples = page.getByRole('dialog', { name: 'Example workspaces' });
   const last = examples.getByRole('button', {
-    name: 'Create Explore 53 outputs workspace',
+    name: `Create ${testnetTemplates.at(-1)!.name} workspace`,
     exact: true,
   });
   await last.scrollIntoViewIfNeeded();
@@ -232,4 +257,64 @@ test('mobile examples keep their close control visible and cancellation restores
   await expect(create).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Help and samples', exact: true })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('desktop examples form two mainnet rows and one testnet4 row in Home and Help', async ({
+  page,
+}) => {
+  await mockBitcoin(page);
+  await page.goto('/');
+  async function checkGallery(gallery: import('@playwright/test').Locator) {
+    await expect(gallery.locator('.workspace-template')).toHaveCount(9);
+    const mainnet = gallery.getByRole('region', { name: 'Mainnet examples', exact: true });
+    const testnet = gallery.getByRole('region', { name: 'Testnet4 examples', exact: true });
+    await expect(mainnet.locator('.workspace-template')).toHaveCount(6);
+    await expect(testnet.locator('.workspace-template')).toHaveCount(3);
+    const cards = await gallery.locator('.workspace-template').evaluateAll((elements) =>
+      elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: Math.round(rect.x), y: Math.round(rect.y) };
+      }),
+    );
+    expect(new Set(cards.map((card) => card.x)).size).toBe(3);
+    expect(new Set(cards.map((card) => card.y)).size).toBe(3);
+    expect(cards[0].y).toBe(cards[2].y);
+    expect(cards[3].y).toBe(cards[5].y);
+    expect(cards[6].y).toBe(cards[8].y);
+    expect(cards[6].y).toBeGreaterThan(cards[5].y);
+    await expect(testnet).toHaveCSS('border-top-width', '1px');
+  }
+  await checkGallery(page.locator('.welcome-examples'));
+  await page.getByRole('button', { name: 'Example workspaces', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Example workspaces' });
+  await checkGallery(dialog);
+  const first = dialog.locator('.workspace-template-open').first();
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(first).toBeFocused();
+  await expect(first).toHaveCSS('outline-offset', '-3px');
+  await page.screenshot({ path: 'artifacts/examples-desktop.png' });
+  // Narrow layouts retain all cases and the network boundary without horizontal scrolling.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const last = dialog.getByRole('button', {
+    name: `Create ${testnetTemplates.at(-1)!.name} workspace`,
+    exact: true,
+  });
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport();
+  await expect(dialog.getByRole('button', { name: 'Close dialog', exact: true })).toBeInViewport();
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'artifacts/examples-mobile.png' });
+});
+
+test('mainnet-only galleries have six examples and no network separator', async ({ page }) => {
+  await mockBitcoin(page, { networks: ['mainnet'] });
+  await page.goto('/');
+  const gallery = page.locator('.workspace-template-gallery');
+  await expect(gallery.locator('.workspace-template')).toHaveCount(mainnetTemplates.length);
+  await expect(gallery.locator('.workspace-template-group')).toHaveCount(1);
+  await expect(gallery.locator('.workspace-template-group')).toHaveCSS('border-top-width', '0px');
+  await expect(gallery.getByRole('region', { name: 'Testnet4 examples', exact: true })).toHaveCount(
+    0,
+  );
 });

@@ -1,5 +1,5 @@
-import type { Annotation, Network, Transaction, Workspace, WorkspaceTag } from './types';
-import { outputNodeId, txNodeId } from './types';
+import type { Annotation, Network, Transaction, Wallet, Workspace, WorkspaceTag } from './types';
+import { outputNodeId, sats, txNodeId } from './types';
 import { newWorkspace, parseWorkspace } from './workspace';
 
 export interface WorkspaceTemplate {
@@ -18,6 +18,12 @@ const messageSeed = '8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d37786
 const spentSeed = 'd4e564d295233f62603f7a7e9527acf88f6e467985868f15339887285d64bb1a';
 const spentSpender = '8cfd7566b77a32519b7f9054c879ce73628255fb6171e431ba5134c114cd1044';
 const fanoutSeed = 'cc159432ffb7a166abeccc79800e9616a09ea9ac6937080c2ca37b38671970e5';
+const largeSeed = 'a6d697a25266ce3c78774fd1d75f896b7af522ada209b0f6228ea497bc49a46d';
+const largeParent = '17a0d14d4ec50f3384e1c9c6eac7a67345b4c1946a518ab2d943a6d71fe5266e';
+const batchSeed = '3d81a6b95903dd457d45a2fc998acc42fe96f59ef01157bdcbc331fe451c8d9e';
+const wabisabiSeed = 'fb596c9f675471019c60e984b569f9020dac3b2822b16396042b50c890b45e5e';
+const mixedSeed = 'b92eb2d8abf81a25197bacde9845eea3d711bd6edf25e1e8975d731271dd83eb';
+const mixedSpender = 'e0d797ca417b3c39e64677da7be5591f7c5e5d945743e9046efdbb10fd8ba76f';
 const chainSource = (network: Network, txid: string, title = 'Transaction on mempool.space') => ({
   title,
   url: `https://mempool.space/${network === 'testnet4' ? 'testnet4/' : ''}tx/${txid}`,
@@ -28,13 +34,17 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
   {
     id: 'mainnet-equal-outputs',
     network: 'mainnet',
-    name: 'Equal outputs and a spending hop',
+    name: 'Whirlpool: five equal outputs',
     description:
-      'Compare five equal outputs and one verified successor. Labels and tags separate observed amounts and outpoints from ownership hypotheses.',
+      'Explore a published Whirlpool example with five inputs and five equal outputs, then follow one verified successor. Labels and tags keep amount observations separate from ownership hypotheses.',
     summary: 'Five equal outputs, a nine-input successor, and their direct input data.',
     icon: '🔬',
     sources: [
       chainSource('mainnet', equalSeed),
+      {
+        title: 'Published Whirlpool example',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/3dd81a0dcf9fb4fedd6db6871e5e74315a50531f/src/lib/analysis/heuristics/__tests__/fixtures/api-responses/whirlpool-coinjoin.json',
+      },
       chainSource('mainnet', equalSpender, 'Known successor on mempool.space'),
     ],
   },
@@ -47,6 +57,64 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
     summary: 'One input, two outputs, and the funding transaction.',
     icon: '📝',
     sources: [chainSource('mainnet', messageSeed)],
+  },
+  {
+    id: 'mainnet-large-value-path',
+    network: 'mainnet',
+    name: 'Follow the largest output',
+    description:
+      'Compare a 3,400 BTC output with a 598.50 BTC output. Follow a loaded funding hop, size nodes by value and hide small amounts to see the dominant flow.',
+    summary: 'Fifteen inputs, a large split, and a highlighted funding hop.',
+    icon: '🐋',
+    sources: [
+      chainSource('mainnet', largeSeed),
+      chainSource('mainnet', largeParent, 'Loaded funding hop'),
+    ],
+  },
+  {
+    id: 'mainnet-batch-outputs',
+    network: 'mainnet',
+    name: 'One input, 143 outputs',
+    description:
+      'Explore a large fan-out without losing the main flow. Filter small amounts, compare four script types and use bookmarks to jump between the largest and smallest outputs.',
+    summary: 'A 143-output transaction with amount and script tags.',
+    icon: '⑂',
+    sources: [chainSource('mainnet', batchSeed)],
+  },
+  {
+    id: 'mainnet-wabisabi',
+    network: 'mainnet',
+    name: 'A large WabiSabi CoinJoin',
+    description:
+      'Explore 327 inputs and 279 outputs in a public WabiSabi example. Compare repeated amounts, filter the smaller outputs and trace individual outpoints without treating common inputs as one owner.',
+    summary: '327 inputs, 279 outputs, equal-value groups and full input data.',
+    icon: '🌀',
+    sources: [
+      chainSource('mainnet', wabisabiSeed),
+      {
+        title: 'WabiSabi discovery fixture',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/3dd81a0dcf9fb4fedd6db6871e5e74315a50531f/src/lib/analysis/heuristics/__tests__/fixtures/api-responses/wabisabi-coinjoin.json',
+      },
+    ],
+  },
+  {
+    id: 'mainnet-public-wallet',
+    network: 'mainnet',
+    name: 'Explore a public demo wallet',
+    description:
+      'Explore the public BIP84 test wallet used by am-i-exposed. Follow saved wallet outputs and continue its bounded scan from Wallets. The test seed is public: never send funds to these addresses.',
+    summary: 'Public test zpub, wallet highlights and two spending paths. Never deposit.',
+    icon: '👛',
+    sources: [
+      {
+        title: 'am-i-exposed public wallet example',
+        url: 'https://github.com/Copexit/am-i-exposed/blob/main/src/lib/constants.ts',
+      },
+      {
+        title: 'BIP84 public test vector',
+        url: 'https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki#test-vectors',
+      },
+    ],
   },
   {
     id: 'testnet4-spent-output',
@@ -71,6 +139,19 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
     icon: '⑂',
     sources: [chainSource('testnet4', fanoutSeed)],
   },
+  {
+    id: 'testnet4-mixed-path',
+    network: 'testnet4',
+    name: 'From mixed scripts to a spend',
+    description:
+      'Follow a 1,018,062-sat P2WSH output into its 1,000,000-sat successor. Compare the large sibling output and OP_RETURN, then tag the exact path through both transactions.',
+    summary: 'Two inputs, three script forms, and a verified spending hop.',
+    icon: '🧭',
+    sources: [
+      chainSource('testnet4', mixedSeed),
+      chainSource('testnet4', mixedSpender, 'Verified successor'),
+    ],
+  },
 ];
 
 interface Snapshot {
@@ -78,6 +159,7 @@ interface Snapshot {
   retrievedAt: string;
   roots: string[];
   transactions: Record<string, Transaction>;
+  wallet?: Omit<Wallet, 'id'>;
 }
 
 async function loadSnapshot(id: string): Promise<Snapshot> {
@@ -90,6 +172,16 @@ async function loadSnapshot(id: string): Promise<Snapshot> {
       return (await import('./templateData/testnet4-spent-output.json')).default;
     case 'testnet4-fan-out':
       return (await import('./templateData/testnet4-fan-out.json')).default;
+    case 'mainnet-large-value-path':
+      return (await import('./templateData/mainnet-large-value-path.json')).default;
+    case 'mainnet-batch-outputs':
+      return (await import('./templateData/mainnet-batch-outputs.json')).default;
+    case 'mainnet-wabisabi':
+      return (await import('./templateData/mainnet-wabisabi.json')).default;
+    case 'mainnet-public-wallet':
+      return (await import('./templateData/mainnet-public-wallet.json')).default as Snapshot;
+    case 'testnet4-mixed-path':
+      return (await import('./templateData/testnet4-mixed-path.json')).default;
     default:
       throw new Error('Unknown workspace template.');
   }
@@ -252,7 +344,7 @@ export async function createTemplateWorkspace(
       'Creating transaction, exact spent outpoint, and its known spender.',
       [txNodeId(spentSeed), selected, txNodeId(spentSpender)],
     );
-  } else {
+  } else if (id === 'testnet4-fan-out') {
     selected = outputNodeId(fanoutSeed, 0);
     annotate(
       txNodeId(fanoutSeed),
@@ -293,13 +385,264 @@ export async function createTemplateWorkspace(
     ]);
     tag('Data output', '#a78bfa', 'One observed OP_RETURN output.', [outputNodeId(fanoutSeed, 52)]);
   }
+  if (id === 'mainnet-large-value-path') {
+    selected = outputNodeId(largeSeed, 1);
+    annotate(
+      txNodeId(largeSeed),
+      'Fifteen inputs, two outputs',
+      `Compare the two output amounts using Size by value. Several inputs come from transactions with small sibling outputs; use amount filters to simplify the graph. The inputs do not prove one owner. ${snapshotNote}`,
+      '🐋',
+      true,
+    );
+    annotate(
+      selected,
+      '3,400 BTC output',
+      '340,000,000,000 sats in a P2WSH output, about 85% of the transaction output value. Its size does not identify a recipient or establish a payment role.',
+      '🐋',
+      true,
+    );
+    annotate(
+      outputNodeId(largeSeed, 0),
+      '598.50 BTC output',
+      '59,849,955,894 sats in a P2WPKH output. Compare the size and script with output 1. A smaller amount or different script is not proof of change.',
+      '◇',
+      true,
+    );
+    annotate(
+      txNodeId(largeParent),
+      'Loaded funding hop',
+      'This transaction creates output 1, consumed by input 0 of the fifteen-input transaction. Follow the exact arrow forward; its other outputs are visible for comparison.',
+      '🔗',
+      true,
+    );
+    annotate(
+      outputNodeId(largeParent, 1),
+      'Verified input connection',
+      'The downstream transaction references this exact outpoint at input 0. This link is an observation, without assigning its value to a particular downstream output.',
+      '🔗',
+      true,
+    );
+    tag('Dominant output', '#fbbf24', 'Largest observed output, with no ownership attribution.', [
+      selected,
+    ]);
+    tag('Verified funding hop', '#38bdf8', 'Exact parent outpoint and consuming transaction.', [
+      txNodeId(largeParent),
+      outputNodeId(largeParent, 1),
+      txNodeId(largeSeed),
+    ]);
+  } else if (id === 'mainnet-batch-outputs') {
+    const outputs = snapshot.transactions[batchSeed].vout;
+    const ranked = [...outputs].sort((a, b) => sats(b.value) - sats(a.value));
+    selected = outputNodeId(batchSeed, ranked[0].n);
+    annotate(
+      txNodeId(batchSeed),
+      '143-output fan-out',
+      `One input funds 143 outputs across four script types. Try the amount filter in the flow panel and independently in the graph. Fan-out alone does not prove an exchange withdrawal batch. ${snapshotNote}`,
+      '⑂',
+      true,
+    );
+    for (const [output, label, icon] of [
+      [ranked[0], 'Largest output', '🐋'],
+      [ranked[ranked.length - 1], 'Smallest output', '🔎'],
+    ] as const) {
+      annotate(
+        outputNodeId(batchSeed, output.n),
+        label,
+        `${sats(output.value).toLocaleString('en-US')} sats. Use this bookmark to compare the extremes before applying an amount filter. No payment or change role has been assigned.`,
+        icon,
+        true,
+      );
+    }
+    const small = outputs.filter((output) => sats(output.value) < 10_000);
+    tag(
+      'Below 10,000 sats',
+      '#fbbf24',
+      'Amount comparison group, not a dust-attack attribution.',
+      small.map((output) => outputNodeId(batchSeed, output.n)),
+    );
+    for (const [type, label, color] of [
+      ['witness_v0_keyhash', 'P2WPKH', '#38bdf8'],
+      ['witness_v0_scripthash', 'P2WSH', '#a78bfa'],
+      ['scripthash', 'P2SH', '#34d399'],
+      ['pubkeyhash', 'P2PKH', '#fb7185'],
+    ] as const) {
+      tag(
+        label,
+        color,
+        'Shared script form does not establish common ownership.',
+        outputs
+          .filter((output) => output.scriptPubKey.type === type)
+          .map((output) => outputNodeId(batchSeed, output.n)),
+      );
+    }
+  } else if (id === 'mainnet-wabisabi') {
+    const transaction = snapshot.transactions[wabisabiSeed];
+    annotate(
+      txNodeId(wabisabiSeed),
+      'WabiSabi example: compare amounts',
+      `327 inputs and 279 outputs. The discovery source identifies this as a WabiSabi CoinJoin; the saved data independently verifies its transaction structure, not participant identities. Try the independent amount filters and follow one outpoint at a time. ${snapshotNote}`,
+      '🌀',
+      true,
+    );
+    const groups = new Map<number, number[]>();
+    for (const output of transaction.vout) {
+      const amount = sats(output.value);
+      const indices = groups.get(amount) ?? [];
+      indices.push(output.n);
+      groups.set(amount, indices);
+    }
+    const ranked = [...groups]
+      .filter(([, indices]) => indices.length > 1)
+      .sort((a, b) => b[1].length - a[1].length);
+    const colors = ['#38bdf8', '#a78bfa', '#fbbf24', '#34d399'];
+    for (const [index, [amount, indices]] of ranked.slice(0, 4).entries()) {
+      const amountText = amount.toLocaleString('en-US');
+      tag(
+        `${amountText} sats × ${indices.length}`,
+        colors[index],
+        'Repeated output amount, not a common-owner group or proof of a unique input-to-output mapping.',
+        indices.map((n) => outputNodeId(wabisabiSeed, n)),
+      );
+      annotate(
+        outputNodeId(wabisabiSeed, indices[0]),
+        `${amountText}-sat group`,
+        `One of ${indices.length} outputs with this exact amount. Matching values create multiple plausible paths through the transaction; selecting one does not establish where any particular input went.`,
+        '◇',
+        true,
+      );
+    }
+    const largest = transaction.vout.reduce((best, output) =>
+      output.value > best.value ? output : best,
+    );
+    annotate(
+      outputNodeId(wabisabiSeed, largest.n),
+      'Largest output',
+      `${sats(largest.value).toLocaleString('en-US')} sats. Compare its amount with the tagged equal-value groups. Neither size nor uniqueness identifies an owner or a payment role.`,
+      '🐋',
+      true,
+    );
+  } else if (id === 'mainnet-public-wallet') {
+    if (!snapshot.wallet) throw new Error('Public wallet template is missing its wallet data.');
+    const wallet = { ...snapshot.wallet, id: crypto.randomUUID() };
+    workspace.wallets = [wallet];
+    const addressBranches = new Map(
+      wallet.addresses.map((address) => [address.address, address.branch]),
+    );
+    const matched: [string[], string[]] = [[], []];
+    for (const transaction of Object.values(snapshot.transactions)) {
+      for (const output of transaction.vout) {
+        const branch = output.scriptPubKey.address
+          ? addressBranches.get(output.scriptPubKey.address)
+          : undefined;
+        if (branch === undefined) continue;
+        const node = outputNodeId(transaction.txid, output.n);
+        matched[branch].push(node);
+        // Context parents expose only referenced outputs. Promote matched wallet outputs
+        // so every wallet tag and bookmark is initially available in the graph.
+        if (
+          workspace.inputContext?.[transaction.txid] &&
+          !workspace.inputContext[transaction.txid].includes(output.n)
+        )
+          workspace.inputContext[transaction.txid].push(output.n);
+        annotate(
+          node,
+          branch === 0 ? 'Demo wallet receive output' : 'Demo wallet change-branch output',
+          `${sats(output.value).toLocaleString('en-US')} sats to an address derived from the intentionally published demo zpub at branch ${branch}. This establishes a key derivation match, not the identity of a person. A change derivation branch is not proof of the economic purpose of this output.`,
+          '👛',
+          matched[branch].length <= 2,
+        );
+      }
+    }
+    for (const [branch, nodes] of matched.entries()) {
+      if (nodes.length)
+        tag(
+          branch === 0 ? 'Demo wallet: receive branch' : 'Demo wallet: change branch',
+          branch === 0 ? '#38bdf8' : '#a78bfa',
+          'Outputs matching addresses derived from the published demo key. The bundled scan is bounded and incomplete.',
+          nodes,
+        );
+    }
+    for (const [index, root] of snapshot.roots.entries()) {
+      const transaction = snapshot.transactions[root];
+      const consumesWalletOutput = transaction.vin.some((input) => {
+        if (!input.txid || input.vout === undefined) return false;
+        const address = snapshot.transactions[input.txid]?.vout[input.vout]?.scriptPubKey.address;
+        return address !== undefined && addressBranches.has(address);
+      });
+      annotate(
+        txNodeId(root),
+        `Demo wallet ${consumesWalletOutput ? 'spending' : 'funding'} hop ${index + 1}`,
+        `This transaction ${consumesWalletOutput ? 'spends an output at' : 'funds'} a saved address derived from the public BIP84 test zpub. The test seed is public: never deposit funds here. Open Wallets to inspect or continue discovery; the bundled address set and history are a bounded sample, not the full wallet balance. ${snapshotNote}`,
+        '👛',
+        true,
+      );
+    }
+  } else if (id === 'testnet4-mixed-path') {
+    selected = outputNodeId(mixedSeed, 0);
+    annotate(
+      txNodeId(mixedSeed),
+      'Three script forms',
+      `Two inputs fund a P2WSH output, a zero-value data output and a large P2WPKH sibling. Compare their amounts before tracing the bookmarked output. ${snapshotNote}`,
+      '🧭',
+      true,
+    );
+    annotate(
+      selected,
+      'Follow 1,018,062 sats',
+      'This P2WSH outpoint is consumed by input 0 of the loaded successor. Click the spending arrow to follow its exact connection.',
+      '🔗',
+      true,
+    );
+    annotate(
+      txNodeId(mixedSpender),
+      'One-input successor',
+      'The observed 1,018,062-sat input funds one 1,000,000-sat P2WPKH output. The 18,062-sat difference is the transaction fee.',
+      '🔗',
+      true,
+    );
+    annotate(
+      outputNodeId(mixedSpender, 0),
+      '1,000,000-sat destination output',
+      'The next observed output on this path. No further spending transaction is included, so this snapshot does not establish a final destination or current UTXO status.',
+      '📍',
+      true,
+    );
+    annotate(
+      outputNodeId(mixedSeed, 1),
+      'OP_RETURN output',
+      'Zero-value data output. Inspect its saved script and decoded data; the payload does not prove authorship.',
+      '📝',
+    );
+    annotate(
+      outputNodeId(mixedSeed, 2),
+      'Large sibling output',
+      '4,998,981,938 sats in a P2WPKH script. Its larger amount is not proof of change. No successor for this sibling is included.',
+      '🐋',
+      true,
+    );
+    tag(
+      'Verified spending path',
+      '#38bdf8',
+      'Exact outpoint relationship and successor output, without owner attribution.',
+      [selected, txNodeId(mixedSpender), outputNodeId(mixedSpender, 0)],
+    );
+    tag(
+      'Compare sibling amounts',
+      '#fbbf24',
+      'The two nonzero outputs of the creating transaction.',
+      [selected, outputNodeId(mixedSeed, 2)],
+    );
+    tag('Data output', '#a78bfa', 'Observed OP_RETURN script.', [outputNodeId(mixedSeed, 1)]);
+  }
   workspace.view = {
     ...workspace.view,
+    sizeBy: id === 'mainnet-large-value-path' ? 'value' : workspace.view.sizeBy,
+    highlightMode: id === 'mainnet-public-wallet' ? 'wallets' : workspace.view.highlightMode,
     showLabels: true,
     showTags: true,
     showIcons: true,
     selectionId: selected,
-    leftTab: 'bookmarks',
+    leftTab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks',
     rightTab: 'inspect',
     prefetchDepth: 0,
     transactionFlow: { transactionId: snapshot.roots[0], open: true },

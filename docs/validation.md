@@ -704,3 +704,25 @@ Reviewed screenshots: [transaction flow](screenshots/tour-flow.png),
 These are Chromium/SwiftShader UI checks, not physical-device benchmarks. The
 unrelated browser suite and production container were not rerun for this UI-only
 change. Build and formatting checks passed.
+
+### Nine annotated example workspaces
+
+The final gallery contains six mainnet and three testnet4 examples, grouped in
+three desktop columns with a thin network divider. Unsupported networks are
+omitted; narrow layouts retain every available example and a reachable close
+control. Keyboard card focus now uses an inset outline to avoid clipping.
+
+The final catalog includes a 327-input / 279-output WabiSabi example and a public
+BIP84 demo wallet with verified derivation and explicitly incomplete discovery.
+Sources, raw-byte checks and snapshot bounds are in
+[workspace template research](research/workspace-templates.md).
+
+Validation: production build, formatting, portability, 29 template domain tests
+and all 17 template browser scenarios passed. Browser scenarios were exercised
+incrementally; replaced examples and affected interactions were rerun after the
+catalog changes. The scenarios cover offline initial creation, encrypted copies,
+network filtering, editing and locking, cancellation, retry, responsive layout
+and keyboard focus. Desktop/mobile gallery and both new graph screenshots were
+inspected. The wallet inspection exposed ambiguous gap-limit wording, now labeled
+explicitly as a configured limit. Screenshots remain local under `artifacts/`.
+These are functional checks, not a mobile GPU benchmark or a complete wallet scan.
