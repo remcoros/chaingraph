@@ -70,8 +70,8 @@ export function applyWalletScan(
 /** Refresh a retained undo snapshot with the latest scan-owned metadata.
  * Quiet checks and activity acknowledgment are not undoable: undo may restore
  * user edits (names, colors, tags, annotations, views) but must not roll back
- * scan timestamps, bounds, work queues, or review state, and must not
- * resurrect a wallet the user deleted after the snapshot was taken. */
+ * scan timestamps, bounds, work queues, or review state. Wallet membership stays
+ * with the snapshot so an explicit Undo can still restore a user-deleted wallet. */
 export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Workspace {
   const latestById = new Map(latest.wallets.map((wallet) => [wallet.id, wallet]));
   let changed = false;

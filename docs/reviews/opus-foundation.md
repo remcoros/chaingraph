@@ -31,13 +31,14 @@ touch.
   viewports; force-directed layouts were allowed to settle before judging
   framing, per the brief.
 
-Test results after the change:
+Test evidence:
 
 - `npm run build` (tsc `--noEmit` + vite build): passes.
 - `npm test`: 203/203 unit tests pass.
-- `npm run test:e2e` (`CHAINGRAPH_E2E_PORT=4209`): 46/46 pass. The panel-focused
-  specs (`transaction-inspection.spec.ts`, `tracing.spec.ts`) were re-run after
-  the fix: 7/7 pass.
+- Baseline `npm run test:e2e` (`CHAINGRAPH_E2E_PORT=4209`): 46/46 pass. The
+  panel-focused specs (`transaction-inspection.spec.ts`, `tracing.spec.ts`) ran
+  after the CSS fix: 7/7 pass. The coordinator runs the combined suite after
+  integration.
 - `prettier --check` clean on the changed file.
 
 The full reviewer path was walked and confirmed working: lookup a testnet4
@@ -76,8 +77,9 @@ Fix: raise the cap to `max-height: min(65%, 460px)` in
 - The panel is `flex: 0 1 auto`, so it still sizes to its content and only the
   cap changed; normal transactions now show their footer without a scrollbar.
 - The graph region keeps `flex: 1; min-height: 150px`, and the panel can still
-  shrink (`flex-shrink: 1`), so the taller cap never starves the canvas: on a
-  short viewport the graph holds its 150px floor and the panel scrolls instead.
+  shrink (`flex-shrink: 1`), so the taller cap preserves a 150px graph region on short viewports and the panel scrolls
+  instead. Shared controls occupy part of that region, so the actual canvas can
+  be shorter; the coordinator separately fixed adaptive Fit margins for it.
 - Large transactions (e.g. the 150/150 fixture) still cap and scroll as before,
   which is the intended behaviour for long lists.
 - The mobile override (`@media (max-width: 700px) { max-height: 48% }`) is
