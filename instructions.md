@@ -191,8 +191,9 @@ or loaded spending transaction. Expand OP_RETURN data to select or copy the deco
 
 ### Follow larger transfers with less noise
 
-Use **All amounts** in either the graph toolbar or the transaction flow to hide
-outputs below 546, 1,000, 10,000 or 100,000 sats. Both controls share one saved
+Use **All amounts** in either the graph toolbar or the transaction flow to show
+outputs greater than 546, 1,000, 10,000 or 100,000 sats. An amount exactly equal to
+the selected threshold is filtered out. Both controls share one saved
 setting. These are display thresholds, not a classification of dust attacks or
 Bitcoin relay policy. Unknown values and the selected output stay visible. A
 **filtered · Show** control restores omitted flow rows. You can also choose a
@@ -207,3 +208,9 @@ another download. The notice now says when that happens. Removing the original
 transaction cleans up unused input context too. Shared, independently added,
 annotated or wallet-related transactions remain; Undo restores the removed branch.
 Older saved data without recorded ancestry provenance is retained conservatively.
+
+Amount filtering also hides orphan transaction/address nodes and prefetched branches
+that lose their connection to the investigation. **All amounts** restores them;
+Entities still lets you select a filtered item. Separately added investigations
+and the current selection remain available. Direction arrows appear throughout
+the transaction/output graph, with bolder connections around your selection.

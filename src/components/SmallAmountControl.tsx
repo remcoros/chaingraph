@@ -18,13 +18,13 @@ export function SmallAmountControl({
     <span className={`small-amount-control ${threshold ? 'is-active' : ''}`}>
       <select
         aria-label={`Hide small amounts in ${context}`}
-        title="Hide inputs and outputs below this amount in the graph and flow. Selected outputs remain visible. This is not a dust policy."
+        title="Show input and output amounts strictly above this threshold in the graph and flow. Selected outputs remain visible. This is not a dust policy."
         value={threshold}
         onChange={(event) => onChange(Number(event.target.value))}
       >
         {presets.map((value) => (
           <option key={value} value={value}>
-            {value ? `< ${value.toLocaleString('en-US')} sats` : 'All amounts'}
+            {value ? `> ${value.toLocaleString('en-US')} sats` : 'All amounts'}
           </option>
         ))}
       </select>

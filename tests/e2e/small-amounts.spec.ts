@@ -69,16 +69,17 @@ test('shared amount filters retain selections and unknown inputs, restore all am
   await expect(input(0)).toHaveCount(0);
   await expect(input(2)).toBeVisible(); // Missing amount is unknown, not small.
   await expect(output(0)).toHaveCount(0);
-  await expect(output(1)).toBeVisible(); // Exactly 1,000 sats is retained.
+  await expect(output(1)).toHaveCount(0); // Greater than excludes the exact boundary.
+  await expect(graphFilter.locator('option:checked')).toHaveText('> 1,000 sats');
   await expect(
     flow.getByRole('button', { name: 'Show 1 amount-filtered inputs', exact: true }),
   ).toBeVisible();
   await expect(
-    flow.getByRole('button', { name: 'Show 1 amount-filtered outputs', exact: true }),
+    flow.getByRole('button', { name: 'Show 2 amount-filtered outputs', exact: true }),
   ).toBeVisible();
   await page.locator(`.entity-row[title="out:${TX_SPENDING}:0"]`).click();
   await expect(output(0)).toBeVisible();
-  await expect(output(0)).toContainText('Selected · below filter');
+  await expect(output(0)).toContainText('Selected · outside filter');
   await expect(output(0)).toHaveAttribute('aria-pressed', 'true');
   await flowFilter.selectOption('546');
   await expect(graphFilter).toHaveValue('546');
@@ -95,7 +96,7 @@ test('shared amount filters retain selections and unknown inputs, restore all am
   await expect(flowFilter).toHaveValue('0');
   await expect(graphFilter).toHaveValue('0');
   await expect(input(0)).toBeVisible();
-  await expect(output(0)).not.toContainText('Selected · below filter');
+  await expect(output(0)).not.toContainText('Selected · outside filter');
 });
 
 test('amount controls and entity metadata stay readable on a phone', async ({ page }) => {

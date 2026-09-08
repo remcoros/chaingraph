@@ -468,3 +468,35 @@ The final wording pass renamed the manual visibility options to **Not hidden**,
 **Hidden**, and **All entities**, with a tooltip explaining that amount-filtered
 outputs stay listed. Compact phone targets and tight framing around a single
 focused node remain presentation tradeoffs; Fit restores the wider path.
+
+## Retained-value labels, orphan branches and direction arrows, 2026-09-08
+
+Amount selectors now show **> threshold**, with matching strict greater-than
+behavior. Exactly equal values are filtered out unless selected. The flow labels
+this selection exception as outside the filter.
+
+Canvas cleanup now omits isolated transaction/address nodes while a value filter
+is active, including legacy records without context provenance. For tracked
+prefetched ancestry, reachability before and after filtering removes entire
+branches disconnected by small outputs, even when those branches contain larger
+siblings or unknown-value inputs. Independent investigations and the selection
+remain anchors. Cached data and manual hidden state are untouched.
+
+Every funding/spending edge has a directional arrow. Selected incident edges use
+larger arrows and thicker accent lines; address associations remain undirected.
+Four-sided arrow geometry limits the extra rendering cost. Build, formatting and
+404 unit/backend tests pass. Browser amount-filter, mobile layout, dense-gesture
+save deferral and encryption-failure recovery checks pass with all arrows enabled.
+Seven targeted browser scenarios passed in total, including actual node picking,
+hover actions, keyboard navigation, quiet connection hover and mobile touch.
+The screenshot test's address-color detector was tightened so muted arrows do not
+get mistaken for address meshes; its real pointer-picking assertions remain intact.
+
+A fresh live mainnet browser journey loaded the reported transaction with one
+prefetch level, followed its parent, and expanded ten cached input transactions.
+The complete graph had 90 nodes. At **> 10,000 sats**, the canvas projection retained
+44 nodes and three loaded transactions along the large-value path, rather than
+the nine detached small-input branches. Remaining unknown-value input placeholders
+stay visible on the connected branch. Switching to All amounts and back succeeded,
+encrypted autosave completed and no browser runtime errors occurred. See the
+[expanded ancestry screenshot](screenshots/mainnet-direction-filter.png).

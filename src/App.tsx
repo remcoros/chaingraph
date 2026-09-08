@@ -72,7 +72,7 @@ import {
   markContextTransactions,
   promoteInputContext,
 } from './domain/workspace';
-import { filterSmallAmounts } from './domain/smallAmounts';
+import { filterSmallAmounts, omitAmountOrphans } from './domain/smallAmounts';
 import { analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
@@ -289,16 +289,27 @@ export default function App() {
     () => filterSmallAmounts(graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds),
     [graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds],
   );
-  const visibleGraph = useMemo(
-    () =>
-      filterGraph(
-        amountGraph,
-        { ...effectiveFilters, showAddresses: w?.view.showAddresses },
-        w?.annotations,
-        { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
-      ),
-    [amountGraph, effectiveFilters, w?.view.showAddresses, w?.view.hiddenNodeIds, w?.annotations],
-  );
+  const visibleGraph = useMemo(() => {
+    const filtered = filterGraph(
+      amountGraph,
+      { ...effectiveFilters, showAddresses: w?.view.showAddresses },
+      w?.annotations,
+      { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
+    );
+    return w?.view.smallAmountThreshold ||
+      effectiveFilters.minSats !== undefined ||
+      effectiveFilters.maxSats !== undefined
+      ? omitAmountOrphans(filtered, selectedId)
+      : filtered;
+  }, [
+    amountGraph,
+    effectiveFilters,
+    w?.view.smallAmountThreshold,
+    w?.view.showAddresses,
+    w?.view.hiddenNodeIds,
+    w?.annotations,
+    selectedId,
+  ]);
   const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
   // Address visibility is a canvas preference. Manually hidden addresses must
   // remain recoverable without enabling every address node in the renderer.

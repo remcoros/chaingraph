@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterSmallAmounts } from '../src/domain/smallAmounts';
+import { filterSmallAmounts, omitAmountOrphans } from '../src/domain/smallAmounts';
 import { filterGraph } from '../src/domain/graphFilters';
 import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import type { GraphData } from '../src/domain/types';
@@ -24,12 +24,12 @@ const graph: GraphData = {
 const ids = (value: GraphData) => value.nodes.map((node) => node.id);
 
 describe('small amount presentation', () => {
-  it('filters strictly below the threshold, retaining unknown values and transactions', () => {
+  it('shows strictly greater amounts, retaining unknown values and connected transactions', () => {
     const before = structuredClone(graph);
     const result = filterSmallAmounts(graph, 546);
-    expect(result.hiddenCount).toBe(2);
-    expect(ids(result)).toEqual(['tx:a', 'out:a:2', 'out:unknown:0', 'addr:example']);
-    expect(result.links.map((link) => link.id)).toEqual(['boundary', 'input']);
+    expect(result.hiddenCount).toBe(3);
+    expect(ids(result)).toEqual(['tx:a', 'out:unknown:0']);
+    expect(result.links.map((link) => link.id)).toEqual(['input']);
     expect(graph).toEqual(before);
     expect(ids(filterSmallAmounts(graph, 0))).toEqual(ids(graph));
     expect(ids(filterSmallAmounts(graph, 100_000))).toContain('tx:a');
@@ -54,11 +54,11 @@ describe('small amount presentation', () => {
     const result = filterGraph(filtered, { kind: 'transaction', preserveContext: true });
     expect(ids(result)).not.toContain('out:a:0');
     expect(ids(result)).not.toContain('out:a:1');
-    expect(ids(result)).toContain('out:a:2');
+    expect(ids(result)).not.toContain('out:a:2');
     expect(ids(filterGraph(filtered, { focus: { id: 'tx:a', hops: 2 } }))).not.toContain('out:a:1');
   });
 
-  it('omits automatic context cubes only when amount filtering removes every valid incident edge', () => {
+  it('omits orphan cubes regardless of provenance and keeps connected unknown inputs', () => {
     const fixture: GraphData = {
       nodes: [
         { id: 'tx:auto', txid: 'auto', kind: 'transaction', label: 'Automatic parent' },
@@ -83,13 +83,7 @@ describe('small amount presentation', () => {
     const before = structuredClone(fixture);
     const result = filterSmallAmounts(fixture, 546, undefined, provenance);
     expect(ids(result)).not.toContain('tx:auto');
-    expect(ids(result)).toEqual([
-      'tx:explicit',
-      'tx:unknown',
-      'out:unknown:0',
-      'tx:isolated',
-      'tx:main',
-    ]);
+    expect(ids(result)).toEqual(['tx:unknown', 'out:unknown:0', 'tx:main']);
     expect(result.hiddenCount).toBe(2); // The user-facing count describes outputs only.
     expect(result.links.map((link) => link.id)).toEqual(['unknown-create', 'unknown-spend']);
     expect(fixture).toEqual(before);
@@ -97,9 +91,9 @@ describe('small amount presentation', () => {
     expect(ids(filterSmallAmounts(fixture, 546, 'tx:auto', provenance))).toContain('tx:auto');
     expect(ids(filterSmallAmounts(fixture, 546, 'out:auto:0', provenance))).toContain('tx:auto');
 
-    // Other filters may subsequently hide all connections but do not trigger amount pruning.
+    // Canvas cleanup after other filters also drops remaining orphan scaffolding.
     const manual = filterGraph(result, {}, {}, { hiddenNodeIds: ['out:unknown:0'] });
-    expect(ids(manual)).toContain('tx:unknown');
+    expect(ids(omitAmountOrphans(manual))).not.toContain('tx:unknown');
     const transactions = filterGraph(result, { kind: 'transaction' });
     expect(ids(transactions)).toContain('tx:unknown');
   });
@@ -119,4 +113,39 @@ describe('small amount presentation', () => {
       ).toThrow();
     }
   });
+});
+
+it('hides a prefetched branch cut off by a small connecting output, even with large siblings', () => {
+  const fixture: GraphData = {
+    nodes: [
+      { id: 'tx:root', kind: 'transaction', label: 'Investigation' },
+      { id: 'out:root:0', kind: 'output', label: 'Large destination', value: 1e8 },
+      { id: 'tx:parent', kind: 'transaction', label: 'Prefetched parent' },
+      { id: 'out:parent:0', kind: 'output', label: 'Small bridge', value: 300 },
+      { id: 'out:parent:1', kind: 'output', label: 'Unrelated large sibling', value: 1e8 },
+      { id: 'tx:grandparent', kind: 'transaction', label: 'More prefetched ancestry' },
+      { id: 'out:grandparent:0', kind: 'output', label: 'Parent funding', value: 2e8 },
+    ],
+    links: [
+      { id: 'r', source: 'tx:root', target: 'out:root:0', kind: 'creates' },
+      { id: 'p', source: 'tx:parent', target: 'out:parent:0', kind: 'creates' },
+      { id: 'bridge', source: 'out:parent:0', target: 'tx:root', kind: 'spends' },
+      { id: 'sibling', source: 'tx:parent', target: 'out:parent:1', kind: 'creates' },
+      { id: 'g', source: 'tx:grandparent', target: 'out:grandparent:0', kind: 'creates' },
+      { id: 'funding', source: 'out:grandparent:0', target: 'tx:parent', kind: 'spends' },
+    ],
+  };
+  const context = ['parent', 'grandparent'];
+  const before = structuredClone(fixture);
+  expect(ids(filterSmallAmounts(fixture, 546, 'tx:root', context))).toEqual([
+    'tx:root',
+    'out:root:0',
+  ]);
+  expect(filterSmallAmounts(fixture, 546, 'tx:root', context).hiddenCount).toBe(3);
+  expect(ids(filterSmallAmounts(fixture, 0, 'tx:root', context))).toEqual(ids(fixture));
+  // Selecting the detached branch restores its inspection context without resetting the filter.
+  expect(ids(filterSmallAmounts(fixture, 546, 'out:parent:1', context))).toContain('tx:parent');
+  // A separately added parent remains an independent investigation.
+  expect(ids(filterSmallAmounts(fixture, 546, 'tx:root', ['grandparent']))).toContain('tx:parent');
+  expect(fixture).toEqual(before);
 });

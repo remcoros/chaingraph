@@ -64,11 +64,26 @@ describe('shared graph semantics and presentation', () => {
       palette,
     );
     expect(selected.nodes[1]).toMatchObject({ color: palette.accent, highlight: true });
-    expect(selected.links.map((link) => link.arrowLength)).toEqual([3.6, 3.6, 0]);
+    expect(selected.links.map((link) => link.arrowLength)).toEqual([4.5, 4.5, 0]);
     expect(selected.links.every((link) => link.width === 0.65)).toBe(true);
     expect(
       presentGraph({ ...input, glow: false }, palette).nodes.every((node) => !node.highlight),
     ).toBe(true);
+  });
+  it('shows direction on every funding and spending link and strengthens only the selected neighborhood', () => {
+    const baseline = presentGraph(input, palette).links;
+    expect(baseline.map((link) => link.arrowLength)).toEqual([3.6, 3.6, 0]);
+    expect(baseline.every((link) => link.width === 0 && link.color === palette.muted)).toBe(true);
+    const selected = presentGraph({ ...input, selectedId: 'tx' }, palette).links;
+    expect(selected[0].arrowLength).toBeGreaterThan(baseline[0].arrowLength);
+    expect(selected[0].width).toBeGreaterThan(baseline[0].width);
+    expect(selected[0].color).toBe(palette.accent);
+    expect(selected[0]).toMatchObject({ source: 'tx', target: 'out' });
+    expect(selected[1]).toEqual(baseline[1]);
+    expect(selected[2].arrowLength).toBe(0);
+    const addressSelected = presentGraph({ ...input, selectedId: 'addr' }, palette).links;
+    expect(addressSelected[2].arrowLength).toBe(0);
+    expect(addressSelected[2].width).toBeGreaterThan(0);
   });
   it('independently projects annotation labels, tags and icons without generated IDs leaking through', () => {
     const nodePresentation = new Map([
@@ -127,7 +142,6 @@ describe('shared graph semantics and presentation', () => {
       palette,
     );
     expect(overridden.nodes[0].radius).toBeCloseTo(base * 1.5);
-    expect(presentGraph(input, palette).links.every((link) => link.arrowLength === 0)).toBe(true);
   });
   it('filters missing endpoints before degree sizing and restores defaults when overrides disappear', () => {
     const frame = presentGraph({ ...input, nodes: nodes.slice(0, 2), sizeBy: 'degree' }, palette);

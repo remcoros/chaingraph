@@ -313,7 +313,7 @@ function TransactionRows({
                               className="amount-selection-badge"
                               title="The selected output stays visible below the amount filter."
                             >
-                              Selected · below filter
+                              Selected · outside filter
                             </span>
                           )}
                           {row.id && hidden.has(row.id) && (

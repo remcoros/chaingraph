@@ -60,6 +60,7 @@ function setup() {
     'nodeOpacity',
     'linkOpacity',
     'linkDirectionalArrowRelPos',
+    'linkDirectionalArrowResolution',
     'cooldownTicks',
     'cooldownTime',
     'd3AlphaDecay',
@@ -542,6 +543,7 @@ describe('force adapter contract', () => {
       graphWrites,
     );
     expect(graph.linkOpacity).toHaveBeenCalledWith(0.46);
+    expect(graph.linkDirectionalArrowResolution).toHaveBeenCalledWith(4);
     adapter.dispose();
   });
   it('preserves 2D pan and 3D orbit mappings, resize, focus and explicit fit', () => {

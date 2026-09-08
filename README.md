@@ -134,8 +134,10 @@ and Undo restores a removal. Stopping an address watch retains shared transactio
 Individual inputs and outputs can be hidden, while complete transaction records stay intact.
 
 **All amounts** in the graph toolbar and transaction flow switches the same saved
-filter. Choose a satoshi threshold to omit known smaller inputs and outputs; the
-selected output and unknown values remain visible. The flow reports omitted rows
+filter. Choose a satoshi threshold to show amounts strictly greater than it; the
+selected output and unknown values remain visible. Isolated transaction/address
+nodes and prefetched branches cut off by the amount filter are omitted from the
+canvas; their data stays in the workspace. The flow reports omitted rows
 and offers **Show** to restore them. The entity list stays available for selecting
 filtered outputs. **Size by Value** uses a bounded logarithmic radius so small
 outputs remain selectable while large transfers stand out.
@@ -146,3 +148,7 @@ already cached input context. Removing a transaction also removes its unused inp
 context, including previously expanded context. Shared, independently
 added, annotated and wallet-related context is retained. Older saved workspaces
 without ancestry provenance are handled conservatively.
+
+Flow arrows are visible on every transaction/output connection. Connections touching
+the selected entity use larger arrows and thicker highlighted lines. Address
+associations remain undirected.

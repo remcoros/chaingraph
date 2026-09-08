@@ -462,6 +462,8 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .nodeOpacity(0.95)
       .linkOpacity(0.46)
       .linkDirectionalArrowRelPos(0.7)
+      // Every flow link has an arrow. Four sides keep dense graphs economical.
+      .linkDirectionalArrowResolution(4)
       .cooldownTicks(120)
       .cooldownTime(6000)
       .d3AlphaDecay(0.035)

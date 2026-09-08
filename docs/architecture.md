@@ -73,7 +73,7 @@ The graph is derived from workspace transactions and annotations. Only active, n
 
 `graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`, optional `flushSnapshot`, and a canvas reference for shared accessibility focus. Factories receive hover/select events containing only `{ type: 'node' | 'link', id }` and container-local CSS pointer coordinates plus pointer type. Background events omit the hit. Lightweight activity events pause autosave during gestures and their quiet period. Error events expose the shared fallback, and an optional recovery event clears it after WebGL restoration. Adapters own picking, camera controls, gesture recognition, simulation/layout and all GPU resources. They suppress touch hover and prevent drag, cancellation or multiple-pointer gestures from becoming selections. `graph/defaultAdapter.ts` selects the default factory, while `GraphView.adapterFactory` permits an injected adapter; another renderer uses exactly the same React interaction surface.
 
-The force adapter clones incoming render data because the engine mutates positions and link endpoints. It preserves simulation identity and coordinates on presentation-only changes. Shared low-poly geometries distinguish transactions (cubes), outputs (spheres), and addresses (octahedra). A single points layer draws glow. Ordinary links use thin lines, with directional arrows on selected incident transaction/output links. Pixel density is capped and simulation work cools after bounded ticks/time. Dispose releases the halo buffers, shared geometry/material caches, listeners and engine.
+The force adapter clones incoming render data because the engine mutates positions and link endpoints. It preserves simulation identity and coordinates on presentation-only changes. Shared low-poly geometries distinguish transactions (cubes), outputs (spheres), and addresses (octahedra). A single points layer draws glow. Ordinary links use thin lines, with directional arrows on all transaction/output links and larger arrows on selected incident links. Pixel density is capped and simulation work cools after bounded ticks/time. Dispose releases the halo buffers, shared geometry/material caches, listeners and engine.
 
 2D constrains depth and maps mouse/one-finger dragging to pan; 3D maps those gestures to orbit. Both modes retain two-finger pan/pinch and pointer-directed zoom. Empty data does not consume automatic fitting. Hidden canvases keep their last nonzero viewport and defer fit/focus until reveal, preventing a 1-pixel viewport from consuming first-data framing. New graphs receive an early fit once initial coordinates are valid and a final fit after layout settlement. Manual camera interaction cancels pending automatic fitting and completed gestures can save the current view before settlement. Restored snapshots bypass initial fitting. Reduced motion disables damping and camera transitions.
 
@@ -177,3 +177,13 @@ selection locking. Requests wait for finite node coordinates and run once; manua
 navigation or Fit cancels pending focus. Input loading and failed tracing do not
 refit the camera. Value sizing uses an absolute bounded logarithmic radius, stable
 across filtering and later additions, with slightly larger selected flow arrows.
+
+Amount presets use strict greater-than semantics. `filterSmallAmounts` compares
+reachability from independent transaction roots and the selection before/after
+filtering. This removes automatic branches detached by filtered outputs, including
+branches with their own retained outputs. Previously disconnected investigations
+stay independent. A final canvas pass drops isolated transaction/address nodes
+while amount filters are active, including legacy records without provenance.
+These passes never mutate cached data, annotations or manual visibility. All flow
+links have low-poly arrows; selected incident links have larger arrows and thicker
+accent lines. Address associations remain arrowless.

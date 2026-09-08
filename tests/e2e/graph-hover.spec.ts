@@ -114,6 +114,8 @@ async function visibleMeshes(page: Page) {
                 g = pixels[i + 1],
                 b = pixels[i + 2];
               if (Math.max(r, g, b) < 60) continue;
+              // Address meshes are distinctly violet-blue. Muted flow arrows
+              // must not enter the node silhouette or shift its picking center.
               const kind =
                 r > g * 1.1 && r > b * 1.2
                   ? x < width / 2
@@ -121,7 +123,7 @@ async function visibleMeshes(page: Page) {
                     : 'spending'
                   : g > r * 1.13 && g > b * 1.03
                     ? 'output'
-                    : b > r * 1.15 && b > g * 1.13
+                    : b > r * 1.3 && b > g * 1.23
                       ? 'address'
                       : undefined;
               if (!kind) continue;

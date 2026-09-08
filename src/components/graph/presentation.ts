@@ -134,7 +134,7 @@ export function presentGraph(
         target: link.target,
         color: selected ? palette.accent : palette.muted,
         width: selected ? 0.65 : 0,
-        arrowLength: selected && link.kind !== 'address' ? 3.6 : 0,
+        arrowLength: link.kind === 'address' ? 0 : selected ? 4.5 : 3.6,
       };
     }),
   };
