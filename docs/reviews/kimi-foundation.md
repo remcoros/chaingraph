@@ -37,6 +37,41 @@ verification, or network publication are involved.
    output exists. Primary source recorded in
    `docs/research/transaction-inspection.md`.
 
+## Backend transport fix (after merge of frozen main 6a62434)
+
+3. **Stale keep-alive Core socket caused sporadic offline status**
+   (`server/core.ts`). Root reproduced against the configured live Core with a
+   standalone `CoreClient(loadConfig())` probe: `getblockchaininfo` after idle
+   intervals [0, 15000, 30000, 1000, 30000] ms gave success (63 ms), success
+   (7 ms), ECONNRESET with `reusedSocket: true` (4 ms), success (51 ms),
+   ECONNRESET with `reusedSocket: true` (2 ms). Only `error.code` and
+   `ClientRequest.reusedSocket` were inspected; no messages, URLs or
+   credentials. Cause: the pooled keep-alive agent hands out a socket the
+   peer already closed while idle (Node documents this for pooled agents);
+   the request fails with ECONNRESET before any response and surfaced as a
+   generic connection failure, flipping the UI to offline after idle.
+
+   Fix: exactly one bounded retry, on a fresh non-pooled socket
+   (`agent: false`), only when all of these hold: the request failed with
+   `ECONNRESET`, `request.reusedSocket` is true, no response callback had
+   fired, the combined abort signal is not aborted, and the client is not
+   closing. The retry reuses the same overall `AbortSignal.timeout` deadline
+   and limiter slot, gets its own connect-timer cleanup, and its failure is
+   final (no recursion). Authentication, HTTP status, JSON-RPC rejections,
+   response-size limits, mid-response failures, aborts, timeouts, and
+   fresh-socket transport errors are never retried. Keep-alive, TLS
+   verification, and the RPC method allowlist are unchanged. Primary source:
+   Node http documentation for `request.reusedSocket` and `agent: false`,
+   logged in `docs/research/backend.md`.
+
+   Deterministic regressions in `server/app.test.ts` drive a raw-TCP HTTP/1.1
+   stub so the real transport and agent pooling are exercised: a reset of the
+   reused pooled socket retries once over a new connection and succeeds;
+   a reset on a fresh socket is not retried; a retry that also fails surfaces
+   the error after exactly one retry; a 401 on a reused socket, a mid-response
+   failure, and an aborted request are not retried (attempt and connection
+   counts asserted).
+
 ## Verified with no findings
 
 - Raw/witness inspection limits: hex is size- and format-checked before
@@ -71,9 +106,11 @@ verification, or network publication are involved.
 
 ## Test scope
 
-- Independent `npm ci`; full unit suite: 209 passed (203 existing plus 6 new
-  regressions covering both fixes). `npm run build` and `npm run
-  format:check` passed.
+- Independent `npm ci`; full unit suite after the transport fix: 215 passed
+  (209 before, plus 6 new Core transport regressions). `npm run build` and
+  `npm run format:check` passed. Transport-only change: browser suite not
+  re-run for this fix; root's live idle probe and container rebuild verify
+  the live path.
 - Focused browser suite on ports 4207/4208
   (`CHAINGRAPH_E2E_PORT`/`CHAINGRAPH_GRAPH_TEST_PORT`): all 6
   `wallet-refresh` tests passed after the corrections (cancellation,

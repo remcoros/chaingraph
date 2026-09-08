@@ -5,6 +5,12 @@ import type { ServerConfig } from './config';
 import { SafeError } from './errors';
 import { Limiter } from './limit';
 
+/** A pooled keep-alive socket reset by the peer before any response arrived.
+ * Node documents that servers may close idle pooled connections; a request
+ * written to such a stale socket fails with ECONNRESET and `reusedSocket`
+ * set. Only that exact transport condition is eligible for one retry. */
+class StaleSocketReset extends Error {}
+
 export class CoreClient {
   private limiter: Limiter;
   private id = 0;
@@ -44,72 +50,19 @@ export class CoreClient {
       )
         throw new SafeError('Bitcoin RPC authentication cookie is malformed');
       const id = ++this.id;
+      const body = JSON.stringify({ jsonrpc: '2.0', id, method, params });
       try {
-        const text = await new Promise<string>((resolve, reject) => {
-          const url = new URL(this.config.coreUrl);
-          const body = JSON.stringify({ jsonrpc: '2.0', id, method, params });
-          const transport = url.protocol === 'https:' ? https : http;
-          const request = transport.request(
-            url,
-            {
-              method: 'POST',
-              signal: combined,
-              agent: this.agent,
-              headers: {
-                'content-type': 'application/json',
-                'content-length': Buffer.byteLength(body),
-                authorization: `Basic ${Buffer.from(auth).toString('base64')}`,
-              },
-            },
-            (response) => {
-              clearTimeout(connectTimer);
-              const chunks: Buffer[] = [];
-              let size = 0;
-              response.on('data', (chunk: Buffer) => {
-                size += chunk.length;
-                if (size > this.config.maxResponseBytes) {
-                  reject(new SafeError('Upstream response exceeds configured size limit', 413));
-                  request.destroy();
-                  response.destroy();
-                  return;
-                }
-                chunks.push(chunk);
-              });
-              response.on('error', reject);
-              response.on('end', () => {
-                if (response.statusCode === 401 || response.statusCode === 403) {
-                  reject(new SafeError('Bitcoin RPC authentication failed'));
-                  return;
-                }
-                if (
-                  !response.statusCode ||
-                  response.statusCode < 200 ||
-                  response.statusCode >= 300
-                ) {
-                  reject(new SafeError('Bitcoin RPC request failed'));
-                  return;
-                }
-                resolve(Buffer.concat(chunks).toString('utf8'));
-              });
-            },
-          );
-          const connectTimer = setTimeout(() => {
-            reject(new SafeError('Bitcoin RPC connection timed out', 504));
-            request.destroy();
-          }, this.config.connectTimeoutMs);
-          request.once('socket', (socket) => {
-            if (!socket.connecting) clearTimeout(connectTimer);
-            else
-              socket.once(url.protocol === 'https:' ? 'secureConnect' : 'connect', () =>
-                clearTimeout(connectTimer),
-              );
-          });
-          request.on('error', (error) => {
-            clearTimeout(connectTimer);
-            reject(error);
-          });
-          request.end(body);
-        });
+        let text: string;
+        try {
+          text = await this.post(auth, body, combined, this.agent);
+        } catch (error) {
+          // One bounded retry, on a fresh non-pooled socket, only when a stale
+          // keep-alive connection was reset before any response. The retry
+          // keeps the same overall deadline and limiter slot, and its own
+          // failure is final: no recursion, no further attempts.
+          if (!(error instanceof StaleSocketReset) || combined.aborted || this.closed) throw error;
+          text = await this.post(auth, body, combined, false);
+        }
         const value = JSON.parse(text);
         if (!value || value.id !== id || typeof value !== 'object')
           throw new SafeError('Invalid Bitcoin RPC response');
@@ -123,6 +76,82 @@ export class CoreClient {
         throw new SafeError('Bitcoin RPC connection failed');
       }
     }, signal);
+  }
+  /** One HTTP attempt. `agent: false` forces a fresh non-pooled socket. */
+  private post(
+    auth: string,
+    body: string,
+    combined: AbortSignal,
+    agent: http.Agent | https.Agent | false,
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const url = new URL(this.config.coreUrl);
+      const transport = url.protocol === 'https:' ? https : http;
+      let responded = false;
+      const request = transport.request(
+        url,
+        {
+          method: 'POST',
+          signal: combined,
+          agent,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': Buffer.byteLength(body),
+            authorization: `Basic ${Buffer.from(auth).toString('base64')}`,
+          },
+        },
+        (response) => {
+          responded = true;
+          clearTimeout(connectTimer);
+          const chunks: Buffer[] = [];
+          let size = 0;
+          response.on('data', (chunk: Buffer) => {
+            size += chunk.length;
+            if (size > this.config.maxResponseBytes) {
+              reject(new SafeError('Upstream response exceeds configured size limit', 413));
+              request.destroy();
+              response.destroy();
+              return;
+            }
+            chunks.push(chunk);
+          });
+          response.on('error', reject);
+          response.on('end', () => {
+            if (response.statusCode === 401 || response.statusCode === 403) {
+              reject(new SafeError('Bitcoin RPC authentication failed'));
+              return;
+            }
+            if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+              reject(new SafeError('Bitcoin RPC request failed'));
+              return;
+            }
+            resolve(Buffer.concat(chunks).toString('utf8'));
+          });
+        },
+      );
+      const connectTimer = setTimeout(() => {
+        reject(new SafeError('Bitcoin RPC connection timed out', 504));
+        request.destroy();
+      }, this.config.connectTimeoutMs);
+      request.once('socket', (socket) => {
+        if (!socket.connecting) clearTimeout(connectTimer);
+        else
+          socket.once(url.protocol === 'https:' ? 'secureConnect' : 'connect', () =>
+            clearTimeout(connectTimer),
+          );
+      });
+      request.on('error', (error) => {
+        clearTimeout(connectTimer);
+        reject(
+          !responded &&
+            (error as NodeJS.ErrnoException).code === 'ECONNRESET' &&
+            request.reusedSocket
+            ? new StaleSocketReset()
+            : error,
+        );
+      });
+      request.end(body);
+    });
   }
   async chainInfo(signal?: AbortSignal): Promise<{ chain: string; blocks: number }> {
     const info = (await this.call('getblockchaininfo', [], signal)) as {
