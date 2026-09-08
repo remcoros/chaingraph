@@ -3,9 +3,10 @@ import net from 'node:net';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app';
 import { loadConfig } from './config';
+import { CoreClient } from './core';
 import { ElectrumClient } from './electrum';
 import { Limiter } from './limit';
 
@@ -532,5 +533,201 @@ describe('configuration and resource bounds', () => {
     await expect(client.call('server.version', [], hash)).rejects.toThrow('busy');
     await cancelled;
     await expect(client.call('server.version', [], hash)).resolves.toEqual(['mock', '1.4']);
+  });
+});
+
+describe('Core stale keep-alive transport', () => {
+  interface StubRequest {
+    rpc: Rpc;
+    connection: number;
+    onConnection: number;
+    socket: net.Socket;
+  }
+  /** Minimal HTTP/1.1 Core stub over raw TCP so tests control socket resets. */
+  async function rawCore(
+    behavior: (request: StubRequest) => 'respond' | 'reset' | 'hold' | 401,
+    env: NodeJS.ProcessEnv = {},
+  ) {
+    const sockets = new Set<net.Socket>();
+    const requests: StubRequest[] = [];
+    let connections = 0;
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.on('error', () => {});
+      socket.on('close', () => sockets.delete(socket));
+      const connection = ++connections;
+      let onConnection = 0;
+      let buffer = Buffer.alloc(0);
+      socket.on('data', (chunk: Buffer) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        for (;;) {
+          const headEnd = buffer.indexOf('\r\n\r\n');
+          if (headEnd < 0) return;
+          const length = Number(
+            /content-length: (\d+)/i.exec(buffer.slice(0, headEnd).toString('latin1'))?.[1] ?? 0,
+          );
+          if (buffer.length < headEnd + 4 + length) return;
+          const rpc = JSON.parse(
+            buffer.slice(headEnd + 4, headEnd + 4 + length).toString('utf8'),
+          ) as Rpc;
+          buffer = buffer.slice(headEnd + 4 + length);
+          const request: StubRequest = { rpc, connection, onConnection: ++onConnection, socket };
+          requests.push(request);
+          const action = behavior(request);
+          if (action === 'reset') socket.destroy();
+          else if (action === 'hold') continue;
+          else {
+            const payload = JSON.stringify(
+              action === 401 ? { error: 'Unauthorized' } : { id: rpc.id, result: hash },
+            );
+            socket.write(
+              `HTTP/1.1 ${action === 401 ? '401 Unauthorized' : '200 OK'}\r\ncontent-type: application/json\r\nconnection: keep-alive\r\ncontent-length: ${Buffer.byteLength(payload)}\r\n\r\n${payload}`,
+            );
+          }
+        }
+      });
+    });
+    const port = await listen(server);
+    cleanups.push(() => {
+      for (const socket of sockets) socket.destroy();
+    });
+    const config = loadConfig({
+      BITCOIN_RPC_USER: 'test',
+      BITCOIN_RPC_PASSWORD: 'secret',
+      BITCOIN_RPC_URL: `http://127.0.0.1:${port}`,
+      ...env,
+    });
+    const client = new CoreClient(config);
+    cleanups.push(() => client.close());
+    return { client, requests, sockets, connections: () => connections };
+  }
+
+  it('retries a stale pooled socket reset once on a fresh connection', async () => {
+    const stub = await rawCore((r) =>
+      r.connection === 1 && r.onConnection === 2 ? 'reset' : 'respond',
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    // The second call reuses the pooled keep-alive socket; the peer resets it
+    // before any response, so exactly one retry runs over a new connection.
+    await expect(stub.client.call('getblockhash', [1])).resolves.toBe(hash);
+    expect(stub.connections()).toBe(2);
+    expect(stub.requests).toHaveLength(3);
+    expect(stub.requests[2].connection).toBe(2);
+  });
+
+  it('does not retry a reset on a freshly opened socket', async () => {
+    const stub = await rawCore(() => 'reset');
+    await expect(stub.client.call('getblockhash', [0])).rejects.toThrow('connection failed');
+    expect(stub.connections()).toBe(1);
+    expect(stub.requests).toHaveLength(1);
+  });
+
+  it('makes at most one retry attempt when the fresh connection also fails', async () => {
+    const stub = await rawCore((r) =>
+      r.onConnection === 2 || r.connection === 2 ? 'reset' : 'respond',
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    await expect(stub.client.call('getblockhash', [1])).rejects.toThrow('connection failed');
+    expect(stub.connections()).toBe(2);
+    expect(stub.requests).toHaveLength(3);
+  });
+
+  it('does not retry authentication or HTTP error responses on a reused socket', async () => {
+    const stub = await rawCore((r) => (r.onConnection === 2 ? 401 : 'respond'));
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    await expect(stub.client.call('getblockhash', [1])).rejects.toThrow('authentication failed');
+    expect(stub.connections()).toBe(1);
+    expect(stub.requests).toHaveLength(2);
+  });
+
+  it('does not retry a failure after the response started', async () => {
+    const stub = await rawCore((r) => {
+      if (r.onConnection !== 2) return 'respond';
+      r.socket.write(
+        'HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 100\r\n\r\n{"id":',
+      );
+      setTimeout(() => r.socket.destroy(), 5);
+      return 'hold';
+    });
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    await expect(stub.client.call('getblockhash', [1])).rejects.toThrow('connection failed');
+    expect(stub.connections()).toBe(1);
+    expect(stub.requests).toHaveLength(2);
+  });
+
+  it('does not retry an aborted request', async () => {
+    const stub = await rawCore((r) => (r.onConnection === 2 ? 'hold' : 'respond'));
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const controller = new AbortController();
+    const pending = stub.client.call('getblockhash', [1], controller.signal);
+    const cancelled = expect(pending).rejects.toThrow('timed out or was cancelled');
+    await vi.waitFor(() => expect(stub.requests).toHaveLength(2));
+    controller.abort();
+    await cancelled;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stub.connections()).toBe(1);
+    expect(stub.requests).toHaveLength(2);
+  });
+
+  it('close promptly cancels a held fresh retry without further attempts', async () => {
+    const stub = await rawCore((r) =>
+      r.onConnection === 2 ? 'reset' : r.connection === 2 ? 'hold' : 'respond',
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const pending = stub.client.call('getblockhash', [1]);
+    const failed = expect(pending).rejects.toThrow('timed out or was cancelled');
+    // Wait until the retry is actually held on its fresh non-pooled socket.
+    await vi.waitFor(() => expect(stub.requests).toHaveLength(3));
+    const retrySocket = stub.requests[2].socket;
+    const started = Date.now();
+    stub.client.close();
+    await failed;
+    // The default request deadline is 30s; close must release far sooner.
+    expect(Date.now() - started).toBeLessThan(5000);
+    await vi.waitFor(() => expect(retrySocket.destroyed).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stub.requests).toHaveLength(3);
+    expect(stub.connections()).toBe(2);
+  });
+
+  it('aborting during the fresh retry cancels it promptly', async () => {
+    const stub = await rawCore((r) =>
+      r.onConnection === 2 ? 'reset' : r.connection === 2 ? 'hold' : 'respond',
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const controller = new AbortController();
+    const pending = stub.client.call('getblockhash', [1], controller.signal);
+    const cancelled = expect(pending).rejects.toThrow('timed out or was cancelled');
+    await vi.waitFor(() => expect(stub.requests).toHaveLength(3));
+    const retrySocket = stub.requests[2].socket;
+    const started = Date.now();
+    controller.abort();
+    await cancelled;
+    expect(Date.now() - started).toBeLessThan(5000);
+    await vi.waitFor(() => expect(retrySocket.destroyed).toBe(true));
+    expect(stub.requests).toHaveLength(3);
+  });
+
+  it('a delayed stale reset followed by a held retry keeps the original deadline', async () => {
+    const stub = await rawCore(
+      (r) => {
+        if (r.onConnection === 2) {
+          // The peer closes the idle pooled socket only after a delay.
+          setTimeout(() => r.socket.destroy(), 600);
+          return 'hold';
+        }
+        return r.connection === 2 ? 'hold' : 'respond';
+      },
+      { UPSTREAM_REQUEST_TIMEOUT_MS: '1000' },
+    );
+    await expect(stub.client.call('getblockhash', [0])).resolves.toBe(hash);
+    const started = Date.now();
+    await expect(stub.client.call('getblockhash', [1])).rejects.toThrow(
+      'timed out or was cancelled',
+    );
+    // One 1000ms deadline covers both attempts; the retry starts its own
+    // connect timer but never extends the overall request budget.
+    expect(Date.now() - started).toBeLessThan(1400);
+    expect(stub.requests).toHaveLength(3);
   });
 });
