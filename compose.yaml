@@ -10,7 +10,7 @@ services:
     # Compose 2.30+: raw preserves literal dollar signs in RPC passwords.
     # Use unquoted KEY=value lines in this explicitly selected runtime file.
     env_file:
-      - path: ${CHAINGRAPH_ENV_FILE:-./.env}
+      - path: ${CHAINGRAPH_ENV_FILE:-./.env.container}
         required: true
         format: raw
     environment:

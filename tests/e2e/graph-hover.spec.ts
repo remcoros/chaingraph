@@ -8,7 +8,10 @@ import { createServer, type ViteDevServer } from 'vite';
 // It never reads workspace storage, user environment files, or a live node.
 let fixtureRoot: string;
 let server: ViteDevServer;
-const origin = 'http://127.0.0.1:4184';
+const port = Number(process.env.CHAINGRAPH_GRAPH_TEST_PORT ?? 4184);
+if (!Number.isInteger(port) || port < 1024 || port > 65535)
+  throw new Error('CHAINGRAPH_GRAPH_TEST_PORT must be an integer between 1024 and 65535.');
+const origin = `http://127.0.0.1:${port}`;
 const outputId = `out:${'a'.repeat(64)}:0`;
 
 test.beforeAll(async () => {
@@ -51,7 +54,7 @@ onTrace={id=>setAction('trace:'+id)} onEdit={id=>{setAction('edit:'+id);document
     cacheDir: path.join(fixtureRoot, '.vite'),
     server: {
       host: '127.0.0.1',
-      port: 4184,
+      port,
       strictPort: true,
       fs: { allow: [fixtureRoot, process.cwd()] },
     },

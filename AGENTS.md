@@ -16,6 +16,8 @@ not when scaffolding this upstream application.
 - Keep observations, human annotations, and heuristic hypotheses distinct. Never call
   a cluster proof of common ownership; preserve evidence and allow removal.
 - Use subagents for independent modules/reviews with explicit file ownership.
+- Explicitly requested clean reviews must not inherit skills, memory or this guide;
+  supply the essential product/privacy constraints in their standalone task.
 
 ## Working safely
 
@@ -42,8 +44,13 @@ not when scaffolding this upstream application.
   merely repeat implementation. Exercise real services read-only when available.
 - State exactly what was validated. A build or mocked RPC test is not live validation.
 - Keep README and user instructions in sync with changes. Preserve unrelated files.
+- Do not assume that passing checks makes a UI usable. Inspect screenshots and trace
+  real editing/navigation tasks. Explicit redesign requests may change the layout
+  and renderer; preserve data contracts and compare isolated working proposals.
+- Do not use em dashes in authored copy.
 
 For substantial UI work, use the local review checklist in
 `.agents/skills/chaingraph-ui-review/SKILL.md`, inspect fresh-context screenshots,
-and run browser suites serially. Release commands and validation are documented
-in `docs/deployment.md`; do not assume a publication destination.
+and run browser suites serially within a checkout. See `CONTRIBUTING.md` for separate
+worktree dependencies and preview/test ports. Release commands and validation are
+documented in `docs/deployment.md`; do not assume a publication destination.

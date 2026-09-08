@@ -69,6 +69,8 @@ See [the curated testnet4 examples and verification sources](docs/research/testn
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for isolated worktrees, configurable browser-test ports, frontend-only previews and review expectations. Security reporting and deployment boundaries are in [SECURITY.md](SECURITY.md).
+
 ```sh
 npm run build     # TypeScript check and frontend build
 npm test          # Unit and integration tests
@@ -84,6 +86,6 @@ See [verified results and limits](docs/validation.md) for automated, live testne
 
 The dependency license notices are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); regenerate them with `npm run licenses` after dependency updates.
 
-The [independent review and resolved findings](docs/reviews/2026-09-08-response.md) record the release review performed in a clean Codex session without skills or memory.
+The [review records](docs/reviews/2026-09-08-response.md) and [validation report](docs/validation.md) distinguish implemented features, tested behavior and release limitations.
 
 Read [architecture and extension points](docs/architecture.md), [user instructions](instructions.md), and the [research log](docs/research/2026-09-08-discovery.md). Research notes credit upstream specifications, papers, and libraries; third-party code retains its own license. Chaingraph is MIT-licensed.

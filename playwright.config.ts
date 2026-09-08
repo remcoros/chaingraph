@@ -3,6 +3,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+const port = Number(process.env.CHAINGRAPH_E2E_PORT ?? 4173);
+if (!Number.isInteger(port) || port < 1024 || port > 65535)
+  throw new Error('CHAINGRAPH_E2E_PORT must be an integer between 1024 and 65535.');
+const origin = `http://127.0.0.1:${port}`;
 const cache = path.join(os.homedir(), '.cache/ms-playwright');
 const cachedChromium = existsSync(cache)
   ? readdirSync(cache)
@@ -21,7 +25,7 @@ export default defineConfig({
   expect: { timeout: 10000 },
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: origin,
     viewport: { width: 1440, height: 1000 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -31,9 +35,9 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npm exec vite -- --host 127.0.0.1 --port 4173 --strictPort',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    command: `npm exec vite -- --host 127.0.0.1 --port ${port} --strictPort`,
+    url: origin,
+    reuseExistingServer: false,
     timeout: 60000,
   },
 });

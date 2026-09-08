@@ -45,6 +45,14 @@ The repository has no assumed GitHub owner or published image. When an owner int
 
 Supply `CHAINGRAPH_SOURCE_URL=https://github.com/<owner>/<repository>` as a public build argument to include the project's GitHub link in the UI; the release workflow supplies the actual repository automatically. `VCS_REF` records the source commit in image metadata. Credentials must only be provided at runtime, never as build arguments, because build provenance may expose build arguments.
 
-After a release exists, set `CHAINGRAPH_IMAGE` to its GHCR tag or preferably its verified digest, then use `docker compose --env-file /dev/null up -d --no-build` with the same explicit `CHAINGRAPH_ENV_FILE`. Preserve browser exports before upgrades. Rollback selects the previous image; future workspace format changes may require restoring a compatible encrypted export. No backend database migration or Docker volume backup is needed.
+After a release exists, set `CHAINGRAPH_IMAGE` to its GHCR tag or preferably its verified digest. Keep the same explicit `CHAINGRAPH_ENV_FILE`, then pull and start it:
+
+```sh
+# CHAINGRAPH_IMAGE and CHAINGRAPH_ENV_FILE are exported in this shell.
+docker compose --env-file /dev/null pull chaingraph
+docker compose --env-file /dev/null up -d --no-build --wait
+```
+
+Pulling matters when a tag already exists in the local image cache. Preserve browser exports before upgrades. Rollback selects and pulls the previous image; future workspace format changes may require restoring a compatible encrypted export. No backend database migration or Docker volume backup is needed. The Compose default runtime file is `.env.container`; select another file explicitly with `CHAINGRAPH_ENV_FILE`.
 
 Local image checks do not prove a future GitHub publication or native ARM behavior. Record those separately when the actual tag is published and the ARM image is exercised.

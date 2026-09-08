@@ -2,6 +2,11 @@ name: Check
 on:
   push:
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,7 +18,11 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run format:check
+      - run: node scripts/release-check.mjs
       - run: npm run check
+      - name: Verify runtime license notices
+        run: npm run licenses && git diff --exit-code -- THIRD_PARTY_NOTICES.md
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: Test built application with production security headers
@@ -26,4 +35,13 @@ jobs:
             if curl --fail --silent http://127.0.0.1:4300/ >/dev/null; then break; fi
             sleep 1
           done
+          curl --fail --silent http://127.0.0.1:4300/ >/dev/null
           npm run test:production
+      - name: Retain failed browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: browser-failure-${{ github.run_id }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
