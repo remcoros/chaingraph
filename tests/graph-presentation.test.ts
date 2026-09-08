@@ -114,19 +114,40 @@ describe('shared graph semantics and presentation', () => {
     const render = (items: GraphNode[]) =>
       presentGraph({ ...input, nodes: items, links: [], sizeBy: 'value' }, palette).nodes;
     const radii = render(valueNodes).map((node) => node.radius);
-    expect(
-      radii.every((radius) => Number.isFinite(radius) && radius >= 2.4 && radius <= 14.4),
-    ).toBe(true);
+    expect(radii.every((radius) => Number.isFinite(radius) && radius >= 2.4 && radius <= 20)).toBe(
+      true,
+    );
     for (let index = 1; index < radii.length; index++)
       expect(radii[index]).toBeGreaterThan(radii[index - 1]);
-    expect(radii[8] / radii[2]).toBeGreaterThan(5);
-    expect(radii[8] / radii[2]).toBeLessThan(6);
+    expect(radii[8] / radii[2]).toBeGreaterThan(2.5);
+    expect(radii[8] / radii[2]).toBeLessThan(3);
     // Filtering or adding an unrelated whale must not resize existing values.
     expect(render([valueNodes[2], valueNodes[8]]).map((node) => node.radius)).toEqual([
       radii[2],
       radii[8],
     ]);
-    expect(render([{ ...valueNodes[0], value: Number.MAX_VALUE }])[0].radius).toBe(14.4);
+    expect(render([{ ...valueNodes[0], value: Number.MAX_VALUE }])[0].radius).toBe(20);
+  });
+  it('keeps a majority output visibly larger across the reported high-value range without an early plateau', () => {
+    const amounts = [59_849_955_894, 340_000_000_000, 1_000_000_000_000, 10_000_000_000_000];
+    const valueNodes: GraphNode[] = amounts.map((value, index) => ({
+      id: String(index),
+      kind: 'output',
+      label: 'Output',
+      value,
+    }));
+    const render = (items: GraphNode[]) =>
+      presentGraph({ ...input, nodes: items, links: [], sizeBy: 'value' }, palette).nodes;
+    const radii = render(valueNodes).map((node) => node.radius);
+    const diameterRatio = radii[1] / radii[0];
+    expect(diameterRatio).toBeGreaterThan(1.7);
+    expect(diameterRatio).toBeLessThan(2.4);
+    expect(diameterRatio ** 2).toBeGreaterThan(2.9);
+    for (let index = 1; index < radii.length; index++)
+      expect(radii[index]).toBeGreaterThan(radii[index - 1]);
+    expect(radii.every((radius) => radius < 20)).toBe(true);
+    // The same pair retains its proportions after unrelated large nodes disappear.
+    expect(render(valueNodes.slice(0, 2)).map((node) => node.radius)).toEqual(radii.slice(0, 2));
   });
   it('keeps missing and malformed values renderable and preserves intentional visual scale overrides', () => {
     for (const value of [undefined, NaN, Infinity, -1]) {

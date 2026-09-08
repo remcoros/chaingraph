@@ -162,7 +162,7 @@ function TransactionRows({
       observer.disconnect();
       panel.removeEventListener('scroll', rememberScroll);
     };
-  }, [selected?.id, expandedInputs, expandedOutputs, workspace.view.smallAmountThreshold]);
+  }, [selected?.id, expandedInputs, expandedOutputs, workspace.view.flowAmountThreshold]);
   const inputRows: Row[] = tx.vin.map((input, index) => ({
     id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
     index,
@@ -195,7 +195,7 @@ function TransactionRows({
         const belowThreshold = (row: Row) =>
           isSmallAmount(
             row.output ? sats(row.output.value) : undefined,
-            workspace.view.smallAmountThreshold,
+            workspace.view.flowAmountThreshold,
           );
         const retained = rows.filter((row) => matches(row) || !belowThreshold(row));
         const filteredCount = rows.length - retained.length;
@@ -512,10 +512,10 @@ export function TransactionView(props: Props) {
       <summary>
         <span className="transaction-summary-content">
           <span>Transaction flow</span>
-          {props.onSmallAmountThresholdChange && (
+          {(state?.open ?? true) && props.onSmallAmountThresholdChange && (
             <SmallAmountControl
               context="flow"
-              threshold={workspace.view.smallAmountThreshold}
+              threshold={workspace.view.flowAmountThreshold}
               onChange={props.onSmallAmountThresholdChange}
             />
           )}

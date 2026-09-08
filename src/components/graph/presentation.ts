@@ -52,10 +52,12 @@ const DEFAULT_NODE_RADIUS = 3.2;
 function valueRadius(satoshis: number | undefined): number {
   if (satoshis === undefined || !Number.isFinite(satoshis) || satoshis < 0)
     return DEFAULT_NODE_RADIUS;
-  // Apply logarithmic compression to the radius itself. A further cube root
-  // made dust and hundreds of BTC look nearly identical. Keep small outputs
-  // pickable and cap large ones so they do not overwhelm adjacent branches.
-  return Math.min(14.4, 2.4 + 1.4 * Math.log10(1 + satoshis / 1000));
+  // A square-root response makes area differences easier to see. The fixed
+  // 10,000 BTC reference smoothly limits growth instead of making large outputs
+  // hit the same hard cap. Keep dust pickable and all radii between 2.4 and 20.
+  // This absolute scale does not change when nodes are added or filtered out.
+  const fraction = satoshis / (satoshis + 1_000_000_000_000);
+  return 2.4 + 17.6 * Math.sqrt(fraction);
 }
 export function presentGraph(
   input: {

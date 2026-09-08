@@ -98,21 +98,29 @@ describe('small amount presentation', () => {
     expect(ids(transactions)).toContain('tx:unknown');
   });
 
-  it('persists valid integer satoshi thresholds and rejects malformed saved values', () => {
-    const workspace = newWorkspace('Amount filter', 'mainnet');
-    expect(parseWorkspace(workspace).view.smallAmountThreshold).toBeUndefined();
-    for (const value of [0, 546, 1000, 10000, 100000, 1234]) {
-      expect(
-        parseWorkspace({ ...workspace, view: { ...workspace.view, smallAmountThreshold: value } })
-          .view.smallAmountThreshold,
-      ).toBe(value);
-    }
-    for (const value of [-1, 0.5, '546', Infinity, 2_100_000_000_000_001]) {
-      expect(() =>
-        parseWorkspace({ ...workspace, view: { ...workspace.view, smallAmountThreshold: value } }),
-      ).toThrow();
-    }
-  });
+  it.each(['smallAmountThreshold', 'flowAmountThreshold'] as const)(
+    'persists and validates independent %s values',
+    (field) => {
+      const workspace = newWorkspace('Amount filter', 'mainnet');
+      expect(parseWorkspace(workspace).view[field]).toBeUndefined();
+      for (const value of [0, 546, 1000, 10000, 100000, 1234]) {
+        expect(
+          parseWorkspace({ ...workspace, view: { ...workspace.view, [field]: value } }).view[field],
+        ).toBe(value);
+      }
+      for (const value of [-1, 0.5, '546', Infinity, 2_100_000_000_000_001]) {
+        expect(() =>
+          parseWorkspace({ ...workspace, view: { ...workspace.view, [field]: value } }),
+        ).toThrow();
+      }
+      const legacy = parseWorkspace({
+        ...workspace,
+        view: { ...workspace.view, smallAmountThreshold: 1000 },
+      });
+      expect(legacy.view.smallAmountThreshold).toBe(1000);
+      expect(legacy.view.flowAmountThreshold).toBeUndefined();
+    },
+  );
 });
 
 it('hides a prefetched branch cut off by a small connecting output, even with large siblings', () => {

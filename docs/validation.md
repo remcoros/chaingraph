@@ -500,3 +500,35 @@ the nine detached small-input branches. Remaining unknown-value input placeholde
 stay visible on the connected branch. Switching to All amounts and back succeeded,
 encrypted autosave completed and no browser runtime errors occurred. See the
 [expanded ancestry screenshot](screenshots/mainnet-direction-filter.png).
+
+## Value contrast and independent amount filters, 2026-09-08
+
+The reported outputs of transaction
+`a6d697a25266ce3c78774fd1d75f896b7af522ada209b0f6228ea497bc49a46d`
+were loaded through the live mainnet bridge in a fresh browser workspace. Their
+observed values were 59,849,955,894 and 340,000,000,000 sats. The previous radius
+curve gave only 1.079 times the diameter. The new bounded square-root curve gives
+radii of 6.582 and 11.265, or 1.711 times the diameter and 2.929 times the projected
+area at equal depth. The actual 3D screenshot was inspected and the difference is
+visible: [mainnet value comparison](screenshots/mainnet-value-contrast.png).
+
+This is a visual emphasis scale, not a proportional volume representation. The
+minimum radius keeps small outputs selectable, so smaller absolute amounts remain
+compressed: 1 BTC versus 10 BTC differs by about 1.15 times the diameter. Perspective
+also changes apparent sizes. The scale is independent of which nodes are visible,
+and its smooth upper limit replaces the old early hard cap.
+
+The live workspace retained different canvas and flow thresholds (10,000 and
+1,000 sats). Collapsing the flow removed its control; reopening retained its value.
+Encrypted autosave completed and no browser runtime errors occurred. Desktop and
+phone browser regressions also cover independent controls, exact boundaries,
+unknown inputs, selected-output exceptions, recovery actions, and lock/unlock
+persistence. A separate read-only agent review found no integration blocker.
+
+Final checks passed: build, formatting, 406 unit/backend tests, and five targeted
+browser scenarios. These include the two amount-control journeys plus dense
+navigation with deferred autosaves and latest-camera export/lock flushing,
+encryption-worker failure recovery, and real node picking/card/keyboard actions.
+The renderer tests cover the reported high-value pair, monotonic growth, invalid
+values, and stable sizes when unrelated nodes are filtered away. Browser rendering
+was checked in Chromium with software WebGL, not benchmarked on physical phones.

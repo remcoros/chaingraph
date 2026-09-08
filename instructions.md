@@ -47,7 +47,7 @@ Scans use a gap of unused addresses, a maximum index, and a bounded number of tr
 
 Drag the background to orbit in 3D, pan with the camera controls, and scroll or pinch to zoom. Use the fit control to bring loaded activity back into view. Individual nodes cannot currently be dragged. Switch to 2D for a flat layout with rotation disabled; both views use WebGL. On smaller screens or without WebGL, use the entity list to select and inspect items.
 
-Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize different properties. Value sizing is compressed logarithmically so large outputs do not overwhelm small ones. Degree describes the number of graph connections, not transaction importance or ownership confidence. Cluster colors and glow are visual aids. The **Show labels**, **Show tags**, and **Show icons** buttons independently control graph captions without deleting annotations.
+Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize different properties. Value sizing uses a bounded square-root curve, with a selectable minimum size and a smooth upper limit. Degree describes the number of graph connections, not transaction importance or ownership confidence. Cluster colors and glow are visual aids. The **Show labels**, **Show tags**, and **Show icons** buttons independently control graph captions without deleting annotations.
 
 Transactions are cubes, outputs are spheres, and optional addresses are diamonds. Hover a node for identifiers, values, available details, and compact actions at the top of its card. Connection lines do not open cards, reducing interruptions in dense graphs. **Load previous level** expands that path; **Edit label / notes** opens and focuses the inspector. The inspector and entity list provide the same tracing workflow without hover.
 
@@ -193,14 +193,16 @@ or loaded spending transaction. Expand OP_RETURN data to select or copy the deco
 
 Use **All amounts** in either the graph toolbar or the transaction flow to show
 outputs greater than 546, 1,000, 10,000 or 100,000 sats. An amount exactly equal to
-the selected threshold is filtered out. Both controls share one saved
-setting. These are display thresholds, not a classification of dust attacks or
+the selected threshold is filtered out. Each control affects only its own view,
+and both settings are saved independently. Collapsing the transaction flow hides
+its filter; reopening restores it. These are display thresholds, not a classification of dust attacks or
 Bitcoin relay policy. Unknown values and the selected output stay visible. A
 **filtered · Show** control restores omitted flow rows. You can also choose a
 filtered output from Entities without resetting the threshold.
 
-**Size by → Value** makes large outputs more prominent using a bounded logarithmic
-scale. New lookups focus the requested transaction, output or address automatically.
+**Size by → Value** makes large outputs more prominent using a bounded square-root
+curve. The sizes are visual emphasis, not a proportional volume scale; perspective
+and minimum/maximum sizes affect apparent ratios. New lookups focus the requested transaction, output or address automatically.
 Lock to selection additionally follows selections made throughout the workbench.
 
 **Load previous** can reveal a cached parent's full inputs and outputs without

@@ -169,14 +169,20 @@ late parent results after its displayed transaction was removed.
 expansion. It preserves unknown values, selected outputs and outputs associated
 with the selected address. It never modifies cached observations, manual hidden
 IDs or analysis inputs. The entity list remains available for recovery. The flow
-uses the same encrypted `view.smallAmountThreshold`, reports omitted rows, and
-keeps selected rows visible even beyond the collapsed window.
+uses its own encrypted `view.flowAmountThreshold`; the canvas retains
+`view.smallAmountThreshold`. Missing preferences mean All amounts, including the
+flow preference in older workspaces. The flow control unmounts while collapsed,
+reports omitted rows while open, and keeps selected rows visible even beyond
+the collapsed window.
 
 New successful lookups issue an explicit adapter focus request, independently of
 selection locking. Requests wait for finite node coordinates and run once; manual
 navigation or Fit cancels pending focus. Input loading and failed tracing do not
-refit the camera. Value sizing uses an absolute bounded logarithmic radius, stable
-across filtering and later additions, with slightly larger selected flow arrows.
+refit the camera. Value sizing uses an absolute bounded square-root radius, stable across filtering
+and later additions: `2.4 + 17.6 * sqrt(sats / (sats + 1e12))`. Zero retains a
+selectable radius of 2.4; unknown amounts use the default 3.2. The smooth upper
+limit of 20 avoids an abrupt plateau for large outputs. This is visual emphasis,
+not proportional sphere volume or projected area. Selected flow arrows are larger.
 
 Amount presets use strict greater-than semantics. `filterSmallAmounts` compares
 reachability from independent transaction roots and the selection before/after

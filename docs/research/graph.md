@@ -10,12 +10,12 @@ Reviewed 2026-09-08. These are implementation references, not claims about Bitco
 ## Decisions
 
 - The canonical graph contains transaction, output and address entities. Cluster membership changes appearance but does not change the underlying links or establish ownership.
-- Node size can encode uniform size, logarithmically scaled satoshi value, or degree.
-- Ordinary edges are thin lines; selected incident edges show direction arrows. This avoids rendering cylinders and arrows for every edge in large graphs.
+- Node size can encode uniform size, bounded square-root satoshi value, or degree. The current curve and its visual limits are documented in the architecture guide.
+- Ordinary edges are thin lines. All funding/spending edges show four-sided direction arrows; selected incident edges have larger arrows and thicker lines. Address associations stay undirected.
 - Selection and inferred clusters receive inexpensive halos. Distinct clusters use deterministic colors. Color is supplemental to the entity inspector, not a confidence scale.
 - 2D constrains simulation depth and camera rotation in the same renderer. It still requires WebGL. The app's entity list is the accessible fallback when WebGL is unavailable.
 - Resizing follows the actual panel, pixel density is capped at 1.5, and the force simulation cools after 120 ticks or six seconds. Existing layouts survive annotation and selection changes. A newly expanded graph continues its layout from existing coordinates.
-- Hover cards use React text interpolation, because graph labels and imported annotations are untrusted text. Native HTML-string tooltips are disabled. Node and link cards show identifiers, available values, saved confirmations, and funding-data gaps; create/spend links act on their output, while address links act on their address.
+- Hover cards use React text interpolation, because graph labels and imported annotations are untrusted text. Native HTML-string tooltips are disabled. Node cards show identifiers, available values, saved confirmations, and funding-data gaps. Lines do not open hover cards; clicking create/spend links selects their output, while address links select their address.
 - Cards remain open while hovered or focused, with a short leave delay. They expose previous-level loading and label/notes editing; address cards omit previous-level loading because that operation has no unambiguous address meaning. A selected entity's card also opens with Enter or Space on the canvas and closes with Escape. Touch users can use the parent entity list and inspector.
 - The installed renderer retains its picked object while the pointer is over an HTML card. Reopening after an action therefore waits for actual canvas pointer movement and a renderer update, avoiding stale cards when the HTML card disappears.
 - Unmount disconnects observers and calls the installed library's destructor to release controls, scene resources, and renderer. Context loss pauses rendering and explains the available fallback.

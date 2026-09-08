@@ -228,6 +228,7 @@ const workspaceSchema = z.object({
     hiddenNodeIds: hiddenNodeIdsSchema.optional(),
     entityVisibility: z.enum(['visible', 'hidden', 'all']).optional(),
     smallAmountThreshold: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
+    flowAmountThreshold: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
     showLabels: z.boolean().optional(),
     showTags: z.boolean().optional(),
     showIcons: z.boolean().optional(),

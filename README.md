@@ -133,14 +133,16 @@ addresses also offer removal. Removing annotated or tagged data asks for confirm
 and Undo restores a removal. Stopping an address watch retains shared transaction data.
 Individual inputs and outputs can be hidden, while complete transaction records stay intact.
 
-**All amounts** in the graph toolbar and transaction flow switches the same saved
-filter. Choose a satoshi threshold to show amounts strictly greater than it; the
+**All amounts** in the graph toolbar and transaction flow controls each view
+independently. Both preferences are saved; the flow control hides when its panel
+is collapsed. Choose a satoshi threshold to show amounts strictly greater than it; the
 selected output and unknown values remain visible. Isolated transaction/address
 nodes and prefetched branches cut off by the amount filter are omitted from the
 canvas; their data stays in the workspace. The flow reports omitted rows
 and offers **Show** to restore them. The entity list stays available for selecting
-filtered outputs. **Size by Value** uses a bounded logarithmic radius so small
-outputs remain selectable while large transfers stand out.
+filtered outputs. **Size by Value** uses a bounded square-root curve so small
+outputs remain selectable while large transfers stand out. Sizes stay stable
+when filtering or adding data.
 
 Successful transaction, output and address lookups focus their target even with
 Lock to selection off. **Load previous** distinguishes new downloads from expanding

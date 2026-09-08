@@ -52,7 +52,7 @@ async function openFixture(page: Page) {
   await expect(page.getByLabel('Hide small amounts in flow')).toBeVisible();
 }
 
-test('shared amount filters retain selections and unknown inputs, restore all amounts, and survive locking', async ({
+test('independent amount filters retain selections and unknown inputs, collapse and survive locking', async ({
   page,
 }) => {
   await openFixture(page);
@@ -64,7 +64,10 @@ test('shared amount filters retain selections and unknown inputs, restore all am
   const graphFilter = page.getByLabel('Hide small amounts in graph');
   const flowFilter = page.getByLabel('Hide small amounts in flow');
   await graphFilter.selectOption('1000');
-  await expect(flowFilter).toHaveValue('1000');
+  await expect(flowFilter).toHaveValue('0');
+  await expect(input(0)).toBeVisible();
+  await expect(output(0)).toBeVisible();
+  await flowFilter.selectOption('1000');
   await expect(flow).toHaveAttribute('open', '');
   await expect(input(0)).toHaveCount(0);
   await expect(input(2)).toBeVisible(); // Missing amount is unknown, not small.
@@ -82,7 +85,7 @@ test('shared amount filters retain selections and unknown inputs, restore all am
   await expect(output(0)).toContainText('Selected · outside filter');
   await expect(output(0)).toHaveAttribute('aria-pressed', 'true');
   await flowFilter.selectOption('546');
-  await expect(graphFilter).toHaveValue('546');
+  await expect(graphFilter).toHaveValue('1000');
   await expect(flow).toHaveAttribute('open', ''); // Editing the summary control must not collapse it.
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
@@ -90,13 +93,20 @@ test('shared amount filters retain selections and unknown inputs, restore all am
   await page.getByRole('dialog').getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(flowFilter).toHaveValue('546');
-  await expect(graphFilter).toHaveValue('546');
+  await expect(graphFilter).toHaveValue('1000');
   await expect(output(0)).toHaveAttribute('aria-pressed', 'true');
   await flow.getByRole('button', { name: 'Show 1 amount-filtered inputs', exact: true }).click();
   await expect(flowFilter).toHaveValue('0');
-  await expect(graphFilter).toHaveValue('0');
+  await expect(graphFilter).toHaveValue('1000');
   await expect(input(0)).toBeVisible();
   await expect(output(0)).not.toContainText('Selected · outside filter');
+  await flowFilter.selectOption('10000');
+  await flow.locator('summary').getByText('Transaction flow', { exact: true }).click();
+  await expect(flowFilter).toHaveCount(0);
+  await expect(graphFilter).toBeVisible();
+  await flow.locator('summary').getByText('Transaction flow', { exact: true }).click();
+  await expect(flowFilter).toHaveValue('10000');
+  await expect(graphFilter).toHaveValue('1000');
 });
 
 test('amount controls and entity metadata stay readable on a phone', async ({ page }) => {
@@ -104,7 +114,7 @@ test('amount controls and entity metadata stay readable on a phone', async ({ pa
   await openFixture(page);
   const flowFilter = page.getByLabel('Hide small amounts in flow');
   await flowFilter.selectOption('1000');
-  await expect(page.getByLabel('Hide small amounts in graph')).toHaveValue('1000');
+  await expect(page.getByLabel('Hide small amounts in graph')).toHaveValue('0');
   await expect(flowFilter).toBeInViewport({ ratio: 1 });
   const box = await flowFilter.boundingBox();
   expect(box?.height).toBeGreaterThanOrEqual(32);

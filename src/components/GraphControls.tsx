@@ -48,6 +48,7 @@ export function GraphControls({
         <span>Size by</span>
         <select
           aria-label="Size nodes by"
+          title="Value emphasizes larger amounts using a bounded square-root scale. Sizes remain stable when filtering; perspective also affects apparent size."
           value={view.sizeBy}
           onChange={(e) =>
             onChange((current) => ({

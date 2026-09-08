@@ -18,7 +18,7 @@ export function SmallAmountControl({
     <span className={`small-amount-control ${threshold ? 'is-active' : ''}`}>
       <select
         aria-label={`Hide small amounts in ${context}`}
-        title="Show input and output amounts strictly above this threshold in the graph and flow. Selected outputs remain visible. This is not a dust policy."
+        title={`Show input and output amounts strictly above this threshold in the ${context === 'flow' ? 'transaction flow' : '3D/flat graph'} only. Selected outputs remain visible. This is not a dust policy.`}
         value={threshold}
         onChange={(event) => onChange(Number(event.target.value))}
       >

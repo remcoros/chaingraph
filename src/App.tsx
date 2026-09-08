@@ -1596,11 +1596,11 @@ export default function App() {
                       )
                     }
                     renderMetadata={renderEntityMetadata}
-                    onSmallAmountThresholdChange={(smallAmountThreshold) =>
+                    onSmallAmountThresholdChange={(flowAmountThreshold) =>
                       change(
                         (current) => ({
                           ...current,
-                          view: { ...current.view, smallAmountThreshold },
+                          view: { ...current.view, flowAmountThreshold },
                         }),
                         false,
                       )
