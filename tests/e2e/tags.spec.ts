@@ -63,7 +63,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   expect(addTagBounds!.height).toBeLessThanOrEqual(30);
 
   await exchange.getByRole('button', { name: 'Show on graph' }).click();
-  await expect(page.locator('.group-filter')).toContainText('Exchange');
+  await expect(page.getByLabel('Graph visibility', { exact: true })).toContainText('Exchange');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.locator('.entity-list .entity-row').first().click();
   await expect(page.locator('.transaction-row.is-selected .entity-badges')).toContainText(

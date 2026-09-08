@@ -238,7 +238,7 @@ test('exports encrypted data and reimports a copy with annotations intact', asyn
   await expect(page.getByLabel('Node label')).toHaveValue('A portable label');
 });
 
-test('renders a saved 150-input fixture and runs, excludes, restores and clears analysis overlays', async ({
+test('renders a saved 150-input fixture and scans, excludes, restores and refreshes analysis evidence', async ({
   page,
 }) => {
   await mockBitcoin(page);
@@ -270,52 +270,40 @@ test('renders a saved 150-input fixture and runs, excludes, restores and clears 
   await page.getByLabel('Size nodes by').selectOption('value');
   await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
   await page.getByRole('button', { name: 'Fit graph' }).click();
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
-  await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
-    .click();
-  await page
-    .locator('.analysis-tool')
-    .filter({ has: page.getByRole('heading', { name: 'Equal-output detection' }) })
-    .getByRole('button')
-    .click();
-  await expect(page.locator('.finding')).toHaveCount(3);
-  await page.locator('.finding').first().getByRole('button', { name: 'Exclude' }).click();
-  await expect(page.locator('.finding.excluded')).toHaveCount(1);
-  await page
-    .locator('.analysis-tool')
-    .filter({ has: page.getByRole('heading', { name: 'Equal-output detection', exact: true }) })
-    .getByRole('button', { name: 'Run analysis' })
-    .click();
-  await expect(page.locator('.finding.excluded')).toHaveCount(1);
-  await page.locator('.finding.excluded').getByRole('button', { name: 'Restore' }).click();
-  await expect(page.locator('.finding.excluded')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
+  const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  const analysis = page.locator('.analysis-workbench');
+  await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  const results = analysis.locator('.scan-result-list > button');
+  const equal = results.filter({ hasText: 'equal outputs' });
+  await expect(equal).toHaveCount(3);
+  await equal.first().click();
+  const title = await analysis.locator('.scan-detail h2').textContent();
+  await analysis.getByRole('button', { name: 'Exclude finding', exact: true }).click();
+  await expect(results.filter({ hasText: 'Excluded' })).toHaveCount(1);
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  await expect(results.filter({ hasText: 'Excluded' })).toHaveCount(1);
+  await results.filter({ hasText: 'Excluded' }).click();
+  await expect(analysis.locator('.scan-detail h2')).toHaveText(title!);
+  await analysis.getByRole('button', { name: 'Restore finding', exact: true }).click();
+  await expect(results.filter({ hasText: 'Excluded' })).toHaveCount(0);
   // An ordinary chain-data addition invalidates prior analysis evidence.
+  await modes.getByRole('button', { name: 'Graph', exact: true }).click();
   await page.getByLabel('Transaction, output, or address').fill(addedTransaction);
   await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
   await expect(page.locator('.statusbar')).toContainText('544 transactions');
-  await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
-    .click();
-  await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(3);
-  await page.getByRole('button', { name: 'Clear all', exact: true }).click();
-  await expect(page.locator('.finding')).toHaveCount(0);
-  for (const name of ['Common-input ownership', 'Address reuse']) {
-    await page
-      .locator('.analysis-tool')
-      .filter({ has: page.getByRole('heading', { name, exact: true }) })
-      .getByRole('button')
-      .click();
-    await expect(
-      page
-        .locator('.analysis-tool')
-        .filter({ has: page.getByRole('heading', { name, exact: true }) })
-        .getByRole('status'),
-    ).toBeVisible();
-    await expect(page.locator('.finding')).toHaveCount(0);
-  }
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  await expect(equal.filter({ hasText: 'Needs rerun' })).toHaveCount(3);
+  await equal.first().click();
+  await expect(analysis.locator('.scan-detail')).toContainText(
+    'Loaded data changed after this finding.',
+  );
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  await expect(results.filter({ hasText: 'Needs rerun' })).toHaveCount(0);
+  await analysis.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await expect(results).toHaveCount(0);
 });
 
 test('CIOH and address-reuse findings operate on loaded wallet history', async ({ page }) => {
@@ -324,19 +312,17 @@ test('CIOH and address-reuse findings operate on loaded wallet history', async (
   await createWorkspace(page);
   await addAndScanWallet(page);
   await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
+    .getByRole('navigation', { name: 'Workbench', exact: true })
+    .getByRole('button', { name: 'Analysis', exact: true })
     .click();
-  for (const name of ['Common-input ownership', 'Address reuse']) {
-    await page
-      .locator('.analysis-tool')
-      .filter({ has: page.getByRole('heading', { name, exact: true }) })
-      .getByRole('button')
-      .click();
-    await expect(page.locator('.finding')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Clear all', exact: true }).click();
-  }
-  await expect(page.locator('.finding')).toHaveCount(0);
+  const analysis = page.locator('.analysis-workbench');
+  await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  const results = analysis.locator('.scan-result-list > button');
+  await expect(results.filter({ hasText: 'Tentative input group' })).toHaveCount(1);
+  await expect(results.filter({ hasText: 'Address repeated on' })).toHaveCount(1);
+  await results.filter({ hasText: 'Tentative input group' }).click();
+  await expect(analysis.locator('.scan-detail')).toContainText('PayJoin');
 });
 
 for (const width of [320, 375, 414, 768])

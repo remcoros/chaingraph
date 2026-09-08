@@ -77,7 +77,7 @@ const rightTab = (page: Page, name: string) =>
 
 async function expectWalletTabsReachable(page: Page) {
   const tabs = page.locator('.right-panel .panel-tabs');
-  await expect(tabs.getByRole('button')).toHaveCount(5);
+  await expect(tabs.getByRole('button')).toHaveCount(4);
   // A wrapped tab header must contain both rows so panel content cannot cover them.
   await expect
     .poll(() =>
@@ -107,7 +107,6 @@ test('wallet addresses show loaded output counts and remain selectable without l
   const tabs = page.locator('.right-panel .panel-tabs');
   await expect(tabs.getByRole('button')).toHaveText([
     'Inspector',
-    'Analysis 0',
     'Addresses',
     'Transactions',
     'UTXOs',

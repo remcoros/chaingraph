@@ -93,17 +93,11 @@ The entity list remains the alternative interaction path for keyboard access and
 
 The seven built-in tools cover privacy patterns, value/structure and imported wallet intersections. Each finding records stable identity, algorithm version, explanation, affected nodes and supporting transactions. Exact equal-value groups control highlighting. CIOH exclusions are deliberately incomplete; missing input data is explicit, and change-like script patterns remain hypotheses. See [analysis methods and research](research/analysis-tools.md).
 
-The browser passes the visible graph's loaded transaction IDs or the selected transaction as scope. Loaded parents may supply evidence without becoming analysis targets. Reruns replace that tool's results and preserve exclusions only for unchanged node/transaction evidence. Wallet evidence or transaction mutations mark findings stale and remove their overlays. Labels remain independent. Scan completion merges only scan-owned fields into the current wallet, preserving newer user labels. Annotation editor identity is stable across unrelated view/data changes and dirty conflicts require explicit reconciliation.
+`domain/analysisScan.ts` resolves the selected transaction, output, address or wallet into loaded transaction IDs, or uses the complete loaded workspace. It runs the existing registry with independent reports and cancellation between tools. Loaded parents can supply evidence without becoming targets. Exclusions survive reruns only with matching node/transaction evidence. Wallet evidence or transaction mutations mark findings stale; labels remain independent.
 
-`useAnalysisUiState` retains temporary scope, parameter drafts, searches and panel
-expansion per unlocked workspace outside the conditional Analysis panel mount.
-Locking or closing a workspace prunes its entry; nothing is added to plaintext
-storage. Run reports separately snapshot scope, options and time, and the panel
-compares their transaction IDs and parameters with current controls. Selecting an
-address without a transaction does not silently widen selected-transaction scope.
-Persisted findings remain separate from these temporary controls and reports.
+The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Analysis and Trace consume the same workspace and selection as Graph, with transient reports and trail state. They introduce no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Trace history is temporary to the active workspace. Locking cancels pending work.
 
-There is no runtime plugin loader, user-script execution, custom IDE, or Boltzmann computation in this implementation. Any future Boltzmann integration needs algorithm/performance work and a license-compatible implementation decision. Research references are catalogued separately from shipped code in [the discovery log](research/2026-09-08-discovery.md).
+`domain/traceWorkbench.ts` performs bounded, network-scoped output lookups using existing API primitives. Trace records exact creating/spending outpoints separately from explicit continuation choices. The UI only commits fetched data while the initiating workspace and source still exist. Pending work cancels on mode change or lock. Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. See [Trace semantics and limits](research/simple-trace.md).
 
 ## Verification boundaries
 

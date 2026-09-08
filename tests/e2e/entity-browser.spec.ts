@@ -97,12 +97,12 @@ test('shows nonmatching canvas context explicitly and clears it with the shared 
   const { total } = await openEntities(page);
   await page.getByLabel('Filter graph entities').fill('Unique pagination investigation');
   await expect(page.locator('.entity-browser .entity-row')).toHaveCount(1);
-  await expect(page.locator('.view-summary')).toBeHidden();
+  await expect(page.getByLabel('Graph visibility', { exact: true })).toContainText('Text match');
   await page.locator('.entity-advanced summary').click();
   await page.getByLabel('Show connected context on canvas').check();
   await expect(page.locator('.entity-browser .entity-row')).toHaveCount(1);
   await expect(page.locator('.entity-context-note')).toContainText('2 connected context entities');
-  await expect(page.locator('.view-summary')).toBeHidden();
+  await expect(page.getByLabel('Graph visibility', { exact: true })).toContainText('Text match');
   await page.getByRole('button', { name: 'Clear entity and graph filters' }).click();
   await expect(page.getByLabel('Show connected context on canvas')).not.toBeChecked();
   await expect(page.locator('.entity-context-note')).toHaveCount(0);

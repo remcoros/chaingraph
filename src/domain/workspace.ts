@@ -257,6 +257,7 @@ const workspaceSchema = z.object({
       })
       .optional(),
     leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
+    workbench: z.enum(['graph', 'analysis', 'trace']).optional(),
     rightTab: z.enum(['inspect', 'analysis', 'addresses', 'transactions', 'utxos']).optional(),
     focusGraph: z.boolean().optional(),
     prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),

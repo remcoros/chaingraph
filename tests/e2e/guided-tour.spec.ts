@@ -120,7 +120,7 @@ test('tour previews panels but restores focused graph, prior tabs and selected a
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page
     .locator('.right-panel .panel-tabs')
-    .getByRole('button', { name: /^Analysis/ })
+    .getByRole('button', { name: 'Inspector', exact: true })
     .click();
   await page.getByRole('button', { name: 'Focus graph', exact: true }).click();
   await expect(page.locator('.left-panel')).toBeHidden();
@@ -142,7 +142,9 @@ test('tour previews panels but restores focused graph, prior tabs and selected a
     page.locator('.left-panel .panel-tabs').getByRole('button', { name: 'Entities', exact: true }),
   ).toHaveClass(/active/);
   await expect(
-    page.locator('.right-panel .panel-tabs').getByRole('button', { name: /^Analysis/ }),
+    page
+      .locator('.right-panel .panel-tabs')
+      .getByRole('button', { name: 'Inspector', exact: true }),
   ).toHaveClass(/active/);
   await page
     .locator('.right-panel .panel-tabs')
@@ -240,7 +242,7 @@ test('a flow showcase leaves collapsed flow and prior tabs unchanged after encry
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page
     .locator('.right-panel .panel-tabs')
-    .getByRole('button', { name: /^Analysis/ })
+    .getByRole('button', { name: 'Inspector', exact: true })
     .click();
   await restart(page);
   await (await contents(page)).getByRole('button', { name: /Transaction flow/ }).click();
@@ -261,7 +263,9 @@ test('a flow showcase leaves collapsed flow and prior tabs unchanged after encry
     page.locator('.left-panel .panel-tabs').getByRole('button', { name: 'Entities', exact: true }),
   ).toHaveClass(/active/);
   await expect(
-    page.locator('.right-panel .panel-tabs').getByRole('button', { name: /^Analysis/ }),
+    page
+      .locator('.right-panel .panel-tabs')
+      .getByRole('button', { name: 'Inspector', exact: true }),
   ).toHaveClass(/active/);
   expect(calls).toEqual([]);
 });

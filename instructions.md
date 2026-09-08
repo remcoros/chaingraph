@@ -72,13 +72,11 @@ Navigation floats at the top of the graph canvas once transactions are loaded. O
 
 ## Run analysis
 
-Open **Analysis**, choose **Visible graph** or **Selected transaction**, and find a tool by name. Open **Parameters and method** to inspect thresholds and the source reference. Loaded parent transactions can supply input evidence even when outside the selected scope; running analysis makes no additional network requests.
+The compact **Graph**, **Analysis** and **Trace** navigation belongs to the unlocked workspace, below the workspace tabs. Graph keeps its camera, layout, Inspector and wallet tabs when you move between workbenches.
 
-Scope, parameters and searches stay with each unlocked workspace when you visit
-Inspector or switch workspace tabs. Locking a workspace clears these temporary
-controls; saved findings remain encrypted with its data. **Last run** describes
-the scope and parameters used for that result, separately from your current
-controls. Select a transaction before running a tool scoped to the selection.
+Open **Analysis** and press **Scan** to run every applicable existing tool. The scope follows the selected transaction, output, address or wallet. Without one, it covers the loaded workspace, including data outside graph filters. Outputs include their creating transaction and loaded exact spenders. Read the scope before scanning. Optional settings expose the registry defaults. No analysis request downloads chain data.
+
+Results use the main screen, with a readable evidence and limits view. The scan report accounts for every tool, including skipped tools, missing context and no matches. Current selection can change without changing the last scan's evidence. Temporary controls and reports stay with each unlocked workspace, including workspace tab switches. Locking clears these controls; saved findings remain encrypted.
 
 | Tool                          | What it explains                                                                                                                                                 |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,9 +88,17 @@ controls. Select a transaction before running a tool scoped to the selection.
 | Script-type comparisons       | Observed input/output script patterns and optionally change-like hypotheses, with their limitations.                                                             |
 | Imported-wallet intersections | Transactions touching multiple imported wallet records, distinguishing overlapping imports from independent coverage.                                            |
 
-The **Tools** and **Findings** controls jump between configuration and results. Each run reports its coverage and skipped records, including when it has no findings. Search findings or filter by tool, observation/hypothesis/incomplete evidence, and active/excluded/stale status. **Show on graph** isolates a finding's evidence with connected context; **Focus** centers its first node. **All paths** returns to the complete graph.
+**Show on graph** selects and reveals a finding without isolating it. **Isolate** explicitly limits the view. Graph shows active filters with **Reset filters**, including saved isolation and path filters. Manual hiding is reported separately and remains in place until you choose **Show hidden**. Use **Back to Analysis** to return to the finding.
 
-Exclude a finding to remove its overlay without deleting the result. Rerunning the same tool preserves exclusions when the finding's node and transaction evidence is unchanged. Loading or changing wallet/transaction data marks prior results **Needs rerun** and removes stale overlays. User annotations stay separate from algorithm results.
+Exclude a finding to remove its overlay, or restore it later. New wallet or transaction evidence marks old findings stale. Annotations remain independent from analysis.
+
+## Trace an output
+
+Select an output, or an input that references a previous output, then open **Trace**. Other selection kinds offer an explicit output choice. The compact previous/current/next view follows only the chosen branch. Backward and forward actions inspect one hop with explicit request and history limits; cancel an outstanding request from Trace. Switching workbenches or locking cancels pending Trace work.
+
+Creating and spending links reference an exact outpoint. Continuing through a transaction is a hypothesis or a manual choice: Bitcoin does not record an authoritative input-to-output satoshi mapping. Trace explains sole-output and consolidation hints. Multiple choices require your decision, and collaborative-spend ambiguity prevents automatic continuation. Missing spending evidence means unknown, not unspent. Current UTXO checks are timestamped observations, not permanent guarantees.
+
+The trail stays in memory while this workspace is active. **Label**, **Tags** and **Icon** open the same Inspector controls as Graph; **Back to Trace** returns to the trail. These annotations use the existing encrypted workspace storage.
 
 ## Hide, restore and remove entities
 
