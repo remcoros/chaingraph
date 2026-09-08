@@ -101,10 +101,16 @@ export function createApp(
     });
     return controller.signal;
   };
+  // The genesis hash is immutable for a chain; chainInfo still revalidates the
+  // configured network on every request. Caching halves Core round-trips while
+  // scanning. A failed lookup is never cached, so the next request retries.
+  let cachedGenesis: string | undefined;
   async function genesis(signal: AbortSignal) {
+    if (cachedGenesis) return cachedGenesis;
     const result = await core.call('getblockhash', [0], signal);
     if (typeof result !== 'string' || !/^[0-9a-f]{64}$/i.test(result))
       throw new SafeError('Invalid Bitcoin genesis block');
+    cachedGenesis = result;
     return result;
   }
   app.get('/api/status', async (_req, res) => {

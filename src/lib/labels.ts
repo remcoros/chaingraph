@@ -1,4 +1,5 @@
 import type { Annotation, Workspace } from '../domain/types';
+import { addressToScriptHash, isExtendedPublicKey, type WalletNetwork } from './wallet';
 export function exportLabels(w: Workspace): string {
   const lines: string[] = [];
   for (const [id, a] of Object.entries(w.annotations)) {
@@ -15,6 +16,17 @@ export function exportLabels(w: Workspace): string {
     lines.push(JSON.stringify({ type: 'xpub', ref: wallet.key, label: wallet.name }));
   return lines.join('\n');
 }
+function isKnownAddress(ref: string): boolean {
+  return (['mainnet', 'testnet4'] as WalletNetwork[]).some((network) => {
+    try {
+      addressToScriptHash(ref, network);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 export function importLabels(content: string): {
   annotations: Record<string, Annotation>;
   skipped: number;
@@ -22,7 +34,11 @@ export function importLabels(content: string): {
   if (content.length > 5_000_000) throw new Error('Label file exceeds 5 MB.');
   const annotations: Record<string, Annotation> = {};
   let skipped = 0;
-  const lines = content.split(/\r?\n/).filter((l) => l.trim());
+  // Tolerate one UTF-8 byte-order mark; some editors prepend it to JSON Lines.
+  const lines = content
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((l) => l.trim());
   if (lines.length > 10000) throw new Error('Label file exceeds 10,000 records.');
   for (let i = 0; i < lines.length; i++) {
     let item;
@@ -31,31 +47,48 @@ export function importLabels(content: string): {
     } catch {
       throw new Error(`Invalid JSON on label line ${i + 1}.`);
     }
+    const prefix = (
+      { tx: 'tx', output: 'out', addr: 'addr', xpub: 'xpub' } as Record<string, string>
+    )[
+      item && typeof item.type === 'string' && ['tx', 'output', 'addr', 'xpub'].includes(item.type)
+        ? item.type
+        : ''
+    ];
+    // Unknown BIP329 types (pubkey, input, spscan, future records) are ignored.
+    if (!prefix) {
+      skipped++;
+      continue;
+    }
+    // BIP329 labels are optional; a record without a usable label must not
+    // alter or erase an existing label.
+    if (item.label === undefined || (typeof item.label === 'string' && !item.label.trim())) {
+      skipped++;
+      continue;
+    }
     if (
-      !item ||
       typeof item.label !== 'string' ||
       item.label.length > 200 ||
       typeof item.ref !== 'string' ||
       item.ref.length > 150
     )
       throw new Error(`Invalid label on line ${i + 1}.`);
-    const prefix = (
-      { tx: 'tx', output: 'out', addr: 'addr', xpub: 'xpub' } as Record<string, string>
-    )[
-      typeof item.type === 'string' && ['tx', 'output', 'addr', 'xpub'].includes(item.type)
-        ? item.type
-        : ''
-    ];
-    if (!prefix) {
-      skipped++;
-      continue;
+    let ref: string = item.ref;
+    if (item.type === 'tx') {
+      if (!/^[0-9a-f]{64}$/i.test(ref)) throw new Error(`Invalid reference on line ${i + 1}.`);
+      ref = ref.toLowerCase();
+    } else if (item.type === 'output') {
+      const outpoint = /^([0-9a-f]{64}):(\d+)$/i.exec(ref);
+      if (!outpoint || Number(outpoint[2]) > 0xffffffff)
+        throw new Error(`Invalid reference on line ${i + 1}.`);
+      ref = `${outpoint[1].toLowerCase()}:${Number(outpoint[2])}`;
+    } else if (item.type === 'xpub') {
+      // BIP329 defines no private key types; never retain private key material.
+      if (!isExtendedPublicKey(ref)) throw new Error(`Invalid reference on line ${i + 1}.`);
+    } else if (item.type === 'addr') {
+      if (!isKnownAddress(ref)) throw new Error(`Invalid reference on line ${i + 1}.`);
+      if (/^(?:bc|tb)1/i.test(ref)) ref = ref.toLowerCase();
     }
-    if (
-      (item.type === 'tx' && !/^[0-9a-f]{64}$/.test(item.ref)) ||
-      (item.type === 'output' && !/^[0-9a-f]{64}:\d+$/.test(item.ref))
-    )
-      throw new Error(`Invalid reference on line ${i + 1}.`);
-    annotations[`${prefix}:${item.ref}`] = {
+    annotations[`${prefix}:${ref}`] = {
       label: item.label,
       note: '',
       icon: '',

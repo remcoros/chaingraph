@@ -100,6 +100,21 @@ export function validateExtendedPublicKey(key: string, network: WalletNetwork): 
   parseKey(key, network);
 }
 
+/** Structural check for untrusted key references (for example BIP329 xpub records).
+ * Accepts only the known public version bytes, so private material is never stored. */
+export function isExtendedPublicKey(key: unknown): boolean {
+  if (typeof key !== 'string' || key.length < 100 || key.length > 120) return false;
+  let raw: Uint8Array;
+  try {
+    raw = base58.decode(key);
+  } catch {
+    return false;
+  }
+  if (raw.length !== 78) return false;
+  const version = new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getUint32(0);
+  return versions.some((item) => item.public === version);
+}
+
 export function inspectExtendedPublicKey(
   key: string,
   network: WalletNetwork,

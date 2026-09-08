@@ -192,6 +192,13 @@ describe('read-only proxy', () => {
       network: 'testnet4',
     });
   });
+  it('verifies the immutable genesis block once while revalidating the chain per request', async () => {
+    const f = await fixture();
+    expect((await f.rpc('blockchain.scripthash.get_history', [hash])).status).toBe(200);
+    expect((await f.rpc('blockchain.scripthash.get_balance', [hash])).status).toBe(200);
+    expect(f.coreCalls.filter((rpc) => rpc.method === 'getblockhash')).toHaveLength(1);
+    expect(f.coreCalls.filter((rpc) => rpc.method === 'getblockchaininfo')).toHaveLength(2);
+  });
   it('rejects Electrum on another genesis chain', async () => {
     const f = await fixture({ genesis: otherHash });
     expect((await f.rpc('blockchain.scripthash.get_history', [hash])).status).toBe(503);
