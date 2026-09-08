@@ -108,3 +108,9 @@ Encrypted workspace payloads have a 32 MiB limit, while browser storage may fill
 Use **About** for the version, license and source/release links when configured. Click the connection indicator for network details and a fresh status check. Help contains workflow guidance, shortcuts and a restartable tour.
 
 For Docker setup, see [deployment](docs/deployment.md). For server setup and development commands, see [README.md](README.md).
+
+## Transaction and script inspection
+
+Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, and the selected row remains visible. Use a row’s pencil to edit its annotation, or load missing previous outputs one level at a time. Missing spending data does not prove an output is unspent.
+
+The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. The laboratory has no serialized raw data. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).

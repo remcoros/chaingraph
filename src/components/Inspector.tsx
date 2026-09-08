@@ -23,6 +23,7 @@ import {
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
 import { CopyButton } from './CopyButton';
+import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from './IconPicker';
 
 export function AnnotationEditor({
@@ -532,6 +533,12 @@ export function NodeInspector({
           </div>
         </details>
       )}
+      <ScriptInspector
+        key={`scripts:${w.id}:${selected.id}`}
+        workspace={w}
+        selected={selected}
+        canQuery={canQuery && !busy}
+      />
       {(showRefresh || showRemove) && (
         <div className="panel-section selection-footer">
           {showRefresh && (
