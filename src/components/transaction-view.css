@@ -1,0 +1,223 @@
+.graph-stage-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.graph-renderer-region {
+  position: relative;
+  flex: 1;
+  min-height: 150px;
+  overflow: hidden;
+}
+.graph-renderer-region > .graph-view {
+  min-height: 0;
+}
+.graph-renderer-region .graph-controls {
+  flex-wrap: wrap;
+}
+.transaction-view {
+  position: relative;
+  flex: 0 1 auto;
+  max-height: min(45%, 430px);
+  margin: 8px 8px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--color-paper) 97%, transparent);
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  box-shadow: 0 5px 22px #0002;
+  font-size: 12px;
+}
+.transaction-view > summary {
+  padding: 10px 12px;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-paper);
+  font-weight: 600;
+}
+.transaction-view > summary small {
+  float: right;
+  color: var(--color-muted);
+  font-weight: 400;
+}
+.transaction-view-body {
+  padding: 0 12px 10px;
+}
+.transaction-view-identity,
+.transaction-choice,
+.transaction-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.transaction-view-identity {
+  justify-content: space-between;
+}
+.transaction-choice {
+  flex-direction: row;
+  margin: 2px 0 6px;
+  font-size: 11px;
+}
+.transaction-choice select {
+  flex: 1;
+  min-width: 0;
+}
+.transaction-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+.transaction-columns h4 {
+  margin: 8px 0;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.transaction-rows {
+  display: grid;
+  gap: 4px;
+}
+.transaction-row {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.transaction-row {
+  scroll-margin-top: 44px;
+  scroll-margin-bottom: 8px;
+}
+.transaction-row.is-selected {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+}
+.transaction-row-select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  border: 0;
+  background: none;
+  padding: 7px;
+  text-align: left;
+  justify-content: flex-start;
+  gap: 7px;
+  border-radius: 0;
+}
+.transaction-row-select:disabled {
+  opacity: 1;
+}
+.transaction-row-index {
+  color: var(--color-muted);
+  font-size: 10px;
+  padding-top: 2px;
+}
+.transaction-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.transaction-row-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.transaction-row-main span {
+  font-size: 11px;
+}
+.transaction-row-main small {
+  font-size: 9px;
+  color: var(--color-muted);
+}
+.transaction-row-edit {
+  align-self: center;
+  flex-shrink: 0;
+  padding: 6px;
+  min-width: 26px;
+}
+.transaction-expand {
+  margin: 5px 0;
+}
+.transaction-view-actions {
+  margin-top: 8px;
+}
+.transaction-coverage {
+  margin: 8px 0 0;
+}
+.script-inspector > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.script-inspector-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+.script-inspector-body > p {
+  margin: 0;
+}
+.script-field {
+  min-width: 0;
+  margin: 8px 0;
+}
+.script-field h4 {
+  font-size: 11px;
+  margin: 0;
+}
+.script-field pre {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow: auto;
+  padding: 8px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: 4px;
+}
+.script-inspector-body details summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.witness-items {
+  max-height: 320px;
+  overflow: auto;
+}
+@media (max-width: 700px) {
+  .transaction-view {
+    max-height: 48%;
+  }
+  .transaction-view > summary small {
+    display: none;
+  }
+  .transaction-columns {
+    gap: 6px;
+  }
+  .transaction-row-edit {
+    min-width: 28px;
+    padding: 4px;
+  }
+  .transaction-row-select {
+    padding: 6px 3px;
+    gap: 3px;
+    min-height: 64px;
+  }
+  .transaction-row-index {
+    font-size: 9px;
+  }
+  .transaction-row-main strong {
+    font-size: 10px;
+  }
+  .transaction-row-main span {
+    font-size: 10px;
+  }
+}

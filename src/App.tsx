@@ -46,6 +46,7 @@ import {
   WorkspaceDetailsDialog,
   Modal,
 } from './components/Dialogs';
+import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { AboutDialog } from './components/AboutDialog';
 import { filterGraph, type GraphFilters } from './domain/graphFilters';
@@ -1025,168 +1026,184 @@ export default function App() {
               bookmarks={bookmarks}
             />
             <section className="graph-stage" data-tour="graph-stage" aria-label="Graph workspace">
-              <div className="graph-controls">
-                <div className="view-toggle">
-                  <button
-                    className={w.view.dimensions === 3 ? 'active' : ''}
-                    onClick={() =>
-                      change((c) => ({
-                        ...c,
-                        view: { ...c.view, dimensions: 3 },
-                      }))
-                    }
-                  >
-                    3D
-                  </button>
-                  <button
-                    className={w.view.dimensions === 2 ? 'active' : ''}
-                    onClick={() =>
-                      change((c) => ({
-                        ...c,
-                        view: { ...c.view, dimensions: 2 },
-                      }))
-                    }
-                  >
-                    Flat
-                  </button>
-                </div>
-                <label className="size-control">
-                  <span>Size by</span>
-                  <select
-                    aria-label="Size nodes by"
-                    value={w.view.sizeBy}
-                    onChange={(e) =>
-                      change((c) => ({
-                        ...c,
-                        view: {
-                          ...c.view,
-                          sizeBy: e.target.value as Workspace['view']['sizeBy'],
-                        },
-                      }))
-                    }
-                  >
-                    <option value="uniform">Uniform</option>
-                    <option value="value">Value</option>
-                    <option value="degree">Connections</option>
-                  </select>
-                </label>
-                <button
-                  className={`icon-button ${w.view.glow ? 'active' : ''}`}
-                  title="Toggle highlight glow"
-                  aria-label="Toggle highlight glow"
-                  onClick={() =>
-                    change((c) => ({
-                      ...c,
-                      view: { ...c.view, glow: !c.view.glow },
-                    }))
+              <div className="graph-stage-content">
+                <TransactionView
+                  workspace={w}
+                  selected={selected}
+                  onSelect={select}
+                  onEdit={editNode}
+                  onTrace={(direction, id) => void expand(direction, id)}
+                  disabledReason={
+                    operation ? 'Wait for the current operation to finish.' : queryDisabledReason
                   }
-                >
-                  <Sparkles size={16} />
-                </button>
-                <button
-                  className={`icon-button ${w.view.showAddresses ? 'active' : ''}`}
-                  title="Show address nodes"
-                  aria-label="Show address nodes"
-                  onClick={() =>
-                    change((c) => ({
-                      ...c,
-                      view: { ...c.view, showAddresses: !c.view.showAddresses },
-                    }))
-                  }
-                >
-                  <Layers size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  title="Fit graph"
-                  aria-label="Fit graph"
-                  onClick={() => setFitToken((t) => t + 1)}
-                >
-                  <Expand size={16} />
-                </button>
-              </div>
-              {graph.nodes.length ? (
-                <Suspense
-                  fallback={
-                    <div className="graph-empty">
-                      <LoaderCircle className="spin" />
-                      <p>Loading graph renderer…</p>
+                />
+                <div className="graph-renderer-region">
+                  <div className="graph-controls">
+                    <div className="view-toggle">
+                      <button
+                        className={w.view.dimensions === 3 ? 'active' : ''}
+                        onClick={() =>
+                          change((c) => ({
+                            ...c,
+                            view: { ...c.view, dimensions: 3 },
+                          }))
+                        }
+                      >
+                        3D
+                      </button>
+                      <button
+                        className={w.view.dimensions === 2 ? 'active' : ''}
+                        onClick={() =>
+                          change((c) => ({
+                            ...c,
+                            view: { ...c.view, dimensions: 2 },
+                          }))
+                        }
+                      >
+                        Flat
+                      </button>
                     </div>
-                  }
-                >
-                  <GraphView
-                    nodes={visibleGraph.nodes}
-                    links={visibleGraph.links}
-                    focusRequest={focusRequest}
-                    selectedId={selectedId}
-                    onSelect={select}
-                    dimensions={w.view.dimensions}
-                    sizeBy={w.view.sizeBy}
-                    glow={w.view.glow}
-                    fitToken={fitToken}
-                    transactions={w.transactions}
-                    onTrace={(id) => void expand('funding', id)}
-                    onEdit={editNode}
-                    busy={!!operation}
-                    traceDisabledReason={queryDisabledReason}
-                  />
-                </Suspense>
-              ) : (
-                <div className="graph-empty">
-                  <div className="graph-empty-mark">
-                    <GitBranch size={38} />
+                    <label className="size-control">
+                      <span>Size by</span>
+                      <select
+                        aria-label="Size nodes by"
+                        value={w.view.sizeBy}
+                        onChange={(e) =>
+                          change((c) => ({
+                            ...c,
+                            view: {
+                              ...c.view,
+                              sizeBy: e.target.value as Workspace['view']['sizeBy'],
+                            },
+                          }))
+                        }
+                      >
+                        <option value="uniform">Uniform</option>
+                        <option value="value">Value</option>
+                        <option value="degree">Connections</option>
+                      </select>
+                    </label>
+                    <button
+                      className={`icon-button ${w.view.glow ? 'active' : ''}`}
+                      title="Toggle highlight glow"
+                      aria-label="Toggle highlight glow"
+                      onClick={() =>
+                        change((c) => ({
+                          ...c,
+                          view: { ...c.view, glow: !c.view.glow },
+                        }))
+                      }
+                    >
+                      <Sparkles size={16} />
+                    </button>
+                    <button
+                      className={`icon-button ${w.view.showAddresses ? 'active' : ''}`}
+                      title="Show address nodes"
+                      aria-label="Show address nodes"
+                      onClick={() =>
+                        change((c) => ({
+                          ...c,
+                          view: { ...c.view, showAddresses: !c.view.showAddresses },
+                        }))
+                      }
+                    >
+                      <Layers size={16} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      title="Fit graph"
+                      aria-label="Fit graph"
+                      onClick={() => setFitToken((t) => t + 1)}
+                    >
+                      <Expand size={16} />
+                    </button>
                   </div>
-                  <span className="eyebrow">AN OPEN FIELD</span>
-                  <h2>
-                    Start with a wallet.
-                    <br />
-                    Or follow a transaction.
-                  </h2>
-                  <p>
-                    Import a public key or paste a transaction, output, or address above. Expand
-                    only the paths that matter to you.
-                  </p>
-                  <button onClick={() => setWalletDialog(true)} className="primary">
-                    <Plus size={16} />
-                    Add your first wallet
-                  </button>
-                  {!connected && (
-                    <p className="small">Backend offline. You can still work with saved data.</p>
+                  {graph.nodes.length ? (
+                    <Suspense
+                      fallback={
+                        <div className="graph-empty">
+                          <LoaderCircle className="spin" />
+                          <p>Loading graph renderer…</p>
+                        </div>
+                      }
+                    >
+                      <GraphView
+                        nodes={visibleGraph.nodes}
+                        links={visibleGraph.links}
+                        focusRequest={focusRequest}
+                        selectedId={selectedId}
+                        onSelect={select}
+                        dimensions={w.view.dimensions}
+                        sizeBy={w.view.sizeBy}
+                        glow={w.view.glow}
+                        fitToken={fitToken}
+                        transactions={w.transactions}
+                        onTrace={(id) => void expand('funding', id)}
+                        onEdit={editNode}
+                        busy={!!operation}
+                        traceDisabledReason={queryDisabledReason}
+                      />
+                    </Suspense>
+                  ) : (
+                    <div className="graph-empty">
+                      <div className="graph-empty-mark">
+                        <GitBranch size={38} />
+                      </div>
+                      <span className="eyebrow">AN OPEN FIELD</span>
+                      <h2>
+                        Start with a wallet.
+                        <br />
+                        Or follow a transaction.
+                      </h2>
+                      <p>
+                        Import a public key or paste a transaction, output, or address above. Expand
+                        only the paths that matter to you.
+                      </p>
+                      <button onClick={() => setWalletDialog(true)} className="primary">
+                        <Plus size={16} />
+                        Add your first wallet
+                      </button>
+                      {!connected && (
+                        <p className="small">
+                          Backend offline. You can still work with saved data.
+                        </p>
+                      )}
+                    </div>
                   )}
+                  {!!graph.nodes.length && !visibleGraph.nodes.length && (
+                    <div className="filtered-graph-empty">
+                      <h3>No nodes match these filters</h3>
+                      <p>Adjust the entity filters or restore the complete loaded graph.</p>
+                      <button onClick={() => updateFilters({})}>Show all loaded paths</button>
+                    </div>
+                  )}
+                  {w.demo && (
+                    <div className="demo-badge">
+                      LABORATORY <span>Synthetic CoinJoin fixture</span>
+                    </div>
+                  )}
+                  <div className="graph-legend">
+                    <span>
+                      <i className="entity-dot transaction" />
+                      Transaction
+                    </span>
+                    <span>
+                      <i className="entity-dot output" />
+                      Output
+                    </span>
+                    {w.view.showAddresses && (
+                      <span>
+                        <i className="entity-dot address" />
+                        Address
+                      </span>
+                    )}
+                    <span className="graph-help">
+                      {w.view.dimensions === 3
+                        ? 'Drag to orbit · scroll to zoom'
+                        : 'Drag to pan · scroll to zoom'}
+                    </span>
+                  </div>
                 </div>
-              )}
-              {!!graph.nodes.length && !visibleGraph.nodes.length && (
-                <div className="filtered-graph-empty">
-                  <h3>No nodes match these filters</h3>
-                  <p>Adjust the entity filters or restore the complete loaded graph.</p>
-                  <button onClick={() => updateFilters({})}>Show all loaded paths</button>
-                </div>
-              )}
-              {w.demo && (
-                <div className="demo-badge">
-                  LABORATORY <span>Synthetic CoinJoin fixture</span>
-                </div>
-              )}
-              <div className="graph-legend">
-                <span>
-                  <i className="entity-dot transaction" />
-                  Transaction
-                </span>
-                <span>
-                  <i className="entity-dot output" />
-                  Output
-                </span>
-                {w.view.showAddresses && (
-                  <span>
-                    <i className="entity-dot address" />
-                    Address
-                  </span>
-                )}
-                <span className="graph-help">
-                  {w.view.dimensions === 3
-                    ? 'Drag to orbit · scroll to zoom'
-                    : 'Drag to pan · scroll to zoom'}
-                </span>
               </div>
             </section>
             <aside className="right-panel" data-tour="analysis-panel">
