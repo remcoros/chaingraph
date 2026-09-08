@@ -95,8 +95,11 @@ export function decodeRawTransaction(raw: unknown, expected: Transaction): RawIn
         ? BitcoinTransaction.isCoinbaseHash(input.hash) &&
             input.index === 0xffffffff &&
             bytesToHex(input.script) === saved.coinbase.toLowerCase()
-        : // The all-zero hash is the coinbase sentinel, never a real prevout txid.
-          !BitcoinTransaction.isCoinbaseHash(input.hash) &&
+        : // Reject the exact null outpoint (COutPoint::IsNull: zero hash and
+          // n == UINT32_MAX), which is the coinbase sentinel, not a prevout a
+          // saved non-coinbase input may claim. A zero hash at any other index
+          // binds structurally like any other txid; no UTXO existence is implied.
+          !(BitcoinTransaction.isCoinbaseHash(input.hash) && input.index === 0xffffffff) &&
             bytesToHex(Uint8Array.from(input.hash).reverse()) === saved.txid &&
             input.index === saved.vout;
     });

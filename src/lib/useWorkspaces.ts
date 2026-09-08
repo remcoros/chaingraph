@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Workspace } from '../domain/types';
 import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
-import { walletEvidenceChanged } from '../domain/walletActivity';
+import { carryScanMetadata, walletEvidenceChanged } from '../domain/walletActivity';
 import {
   encryptWorkspace,
   decryptWorkspace,
@@ -178,7 +178,8 @@ export class WorkspaceSessionStore {
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
     // Chain refreshes are not undoable. Older snapshots are invalidated only when
-    // evidence changed; a quiet check must not discard the user's undo history.
+    // evidence changed; a quiet check retains them, with the latest scan-owned
+    // metadata carried in so undo restores user edits, never stale check state.
     this.patch({
       sessions: this.state.sessions.map((s) =>
         s !== current
@@ -187,7 +188,11 @@ export class WorkspaceSessionStore {
               ...s,
               data,
               revision: s.revision + 1,
-              history: undo ? [...s.history.slice(-14), s.data] : evidenceChanged ? [] : s.history,
+              history: undo
+                ? [...s.history.slice(-14), s.data]
+                : evidenceChanged
+                  ? []
+                  : s.history.map((snapshot) => carryScanMetadata(snapshot, data)),
             },
       ),
     });

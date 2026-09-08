@@ -119,7 +119,23 @@ describe('workspace persistence state transitions', () => {
     expect(store.getSnapshot().sessions[0].data.name).toBe('Labeled investigation');
   });
 
-  it('keeps undo history and revision across quiet refreshes and no-op updates', () => {
+  it('ignores no-op updates without touching revision or undo history', () => {
+    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const w = newWorkspace('No-op refresh', 'mainnet');
+    store.open(w, password);
+    store.update(w.id, (current) => ({ ...current, name: 'Labeled investigation' }));
+    const before = store.getSnapshot().sessions[0];
+    expect(before.history).toHaveLength(1);
+    // A scan result for a wallet that no longer exists merges nothing at all.
+    store.update(w.id, (current) => current, false);
+    const unchanged = store.getSnapshot().sessions[0];
+    expect(unchanged.revision).toBe(before.revision);
+    expect(unchanged.history).toHaveLength(1);
+    store.undo(w.id);
+    expect(store.getSnapshot().sessions[0].data.name).toBe('No-op refresh');
+  });
+
+  it('keeps the latest scan metadata through quiet checks while undo restores user edits', () => {
     const store = new WorkspaceSessionStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
@@ -131,32 +147,117 @@ describe('workspace persistence state transitions', () => {
     };
     const w = { ...newWorkspace('Quiet refresh', 'mainnet'), wallets: [wallet] };
     store.open(w, password);
-    store.update(w.id, (current) => ({ ...current, name: 'Labeled investigation' }));
-    const before = store.getSnapshot().sessions[0];
-    expect(before.history).toHaveLength(1);
-    // A scan result for a wallet that no longer exists merges nothing at all.
-    store.update(w.id, (current) => current, false);
-    const unchanged = store.getSnapshot().sessions[0];
-    expect(unchanged.revision).toBe(before.revision);
-    expect(unchanged.history).toHaveLength(1);
-    // A quiet refresh only records check metadata; undo history stays intact.
+    store.update(w.id, (current) => ({ ...current, name: 'First edit' }));
+    store.update(w.id, (current) => ({ ...current, description: 'Second edit' }));
+    // A quiet check advances only scan-owned metadata; it must not invalidate
+    // undo history, and undo must never roll that metadata back.
+    const scannedAt = new Date().toISOString();
+    const lastActivity = {
+      newTransactionIds: [] as string[],
+      refreshedTransactionCount: 0,
+      missingTransactionCount: 2,
+    };
     store.update(
       w.id,
       (current) => ({
         ...current,
         wallets: current.wallets.map((item) => ({
           ...item,
-          scannedAt: new Date().toISOString(),
+          scannedAt,
+          scanComplete: true,
+          scanLimit: 200,
+          scanGap: 20,
+          pendingTransactionIds: ['b'.repeat(64)],
+          lastActivity,
         })),
       }),
       false,
     );
     const quiet = store.getSnapshot().sessions[0];
-    expect(quiet.revision).toBe(before.revision + 1);
-    expect(quiet.history).toHaveLength(1);
+    expect(quiet.history).toHaveLength(2);
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.name).toBe('Quiet refresh');
-    expect(store.getSnapshot().sessions[0].data.wallets[0].scannedAt).toBeUndefined();
+    store.undo(w.id);
+    const restored = store.getSnapshot().sessions[0];
+    expect(restored.data.name).toBe('Quiet refresh');
+    expect(restored.data.description).toBeUndefined();
+    expect(restored.data.wallets[0]).toMatchObject({
+      name: 'Watch only',
+      scannedAt,
+      scanComplete: true,
+      scanLimit: 200,
+      scanGap: 20,
+      pendingTransactionIds: ['b'.repeat(64)],
+      lastActivity,
+    });
+  });
+
+  it('does not unacknowledge reviewed activity when undoing an earlier user edit', () => {
+    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const wallet = {
+      id: crypto.randomUUID(),
+      name: 'Watch only',
+      key: 'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs',
+      scriptType: 'p2wpkh' as const,
+      color: '#aabbcc',
+      addresses: [],
+      unreviewedTransactionIds: ['c'.repeat(64)],
+    };
+    const w = { ...newWorkspace('Review activity', 'mainnet'), wallets: [wallet] };
+    store.open(w, password);
+    store.update(w.id, (current) => ({ ...current, name: 'Renamed investigation' }));
+    // Reviewing new activity is a non-undoable acknowledgment.
+    store.update(
+      w.id,
+      (current) => ({
+        ...current,
+        wallets: current.wallets.map((item) => ({
+          ...item,
+          unreviewedTransactionIds: [],
+          activityOverflow: false,
+        })),
+      }),
+      false,
+    );
+    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    store.undo(w.id);
+    const restored = store.getSnapshot().sessions[0];
+    expect(restored.data.name).toBe('Review activity');
+    expect(restored.data.wallets[0].unreviewedTransactionIds).toEqual([]);
+  });
+
+  it('still invalidates undo history when a refresh changes chain evidence', () => {
+    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const wallet = {
+      id: crypto.randomUUID(),
+      name: 'Watch only',
+      key: 'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs',
+      scriptType: 'p2wpkh' as const,
+      color: '#aabbcc',
+      addresses: [],
+    };
+    const w = { ...newWorkspace('Evidence refresh', 'mainnet'), wallets: [wallet] };
+    store.open(w, password);
+    store.update(w.id, (current) => ({ ...current, name: 'Edited before refresh' }));
+    const txid = '5'.repeat(64);
+    store.update(
+      w.id,
+      (current) => ({
+        ...current,
+        transactions: {
+          ...current.transactions,
+          [txid]: {
+            txid,
+            vin: [{ coinbase: '0101' }],
+            vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
+          },
+        },
+      }),
+      false,
+    );
+    expect(store.getSnapshot().sessions[0].history).toHaveLength(0);
+    store.undo(w.id);
+    expect(store.getSnapshot().sessions[0].data.name).toBe('Edited before refresh');
+    expect(store.getSnapshot().sessions[0].data.transactions[txid]).toBeDefined();
   });
 
   it('saves same-turn edits before lock, blocks update and undo immediately, and unlocks the latest state', async () => {

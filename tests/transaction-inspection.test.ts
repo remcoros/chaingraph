@@ -47,9 +47,10 @@ describe('display-only raw transaction inspection', () => {
     };
     expect(decodeRawTransaction(raw.toHex(), tx).wtxid).toBe(raw.getId());
   });
-  it('rejects a coinbase-shaped raw input bound to a claimed regular prevout', () => {
-    // The all-zero hash is the coinbase sentinel, never a real transaction ID.
-    // A crafted record must not present a coinbase input as spending it.
+  it('rejects the null outpoint when the saved input claims an ordinary prevout', () => {
+    // COutPoint::IsNull is a zero hash AND n == UINT32_MAX (Bitcoin Core
+    // src/primitives/transaction.h). A crafted record must not present that
+    // coinbase sentinel as spending a regular transaction.
     const raw = new BitcoinTransaction();
     raw.addInput(new Uint8Array(32), 0xffffffff, 0xffffffff, Uint8Array.of(0x51));
     raw.addOutput(Uint8Array.of(0x51), 5000000000n);
@@ -59,6 +60,22 @@ describe('display-only raw transaction inspection', () => {
       vout: [{ n: 0, value: 50, scriptPubKey: { hex: '51' } }],
     };
     expect(() => decodeRawTransaction(raw.toHex(), crafted)).toThrow(/disagrees/);
+  });
+  it('binds a zero hash at a non-null index structurally, without claiming UTXO existence', () => {
+    // Only the exact null outpoint is the coinbase sentinel; a zero hash with
+    // another index is serialized like any other prevout. Binding it to the
+    // saved record is structural agreement, not consensus or UTXO validation.
+    const raw = new BitcoinTransaction();
+    raw.addInput(new Uint8Array(32), 0, 0xffffffff, Uint8Array.of(0x51));
+    raw.addOutput(Uint8Array.of(0x51), 1000n);
+    const transaction: Transaction = {
+      txid: raw.getId(),
+      vin: [{ txid: '00'.repeat(32), vout: 0 }],
+      vout: [{ n: 0, value: 0.00001, scriptPubKey: { hex: '51' } }],
+    };
+    const result = decodeRawTransaction(raw.toHex(), transaction);
+    expect(result.txid).toBe(transaction.txid);
+    expect(result.inputs[0].script).toBe('51');
   });
   it('rejects mismatched IDs, inconsistent observations and malformed/oversized data', () => {
     const { raw, transaction } = fixture();

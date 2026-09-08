@@ -9,23 +9,33 @@ verification, or network publication are involved.
 ## Fixed issues
 
 1. **Quiet refreshes destroyed undo history and forced autosave**
-   (`src/lib/useWorkspaces.ts`). Every non-undoable `update` cleared all undo
-   snapshots and bumped the revision, even when the merge changed nothing
-   (scan result for a deleted wallet) or only advanced check metadata
-   (`scannedAt`, unchanged evidence). With live monitoring this ran every 30
-   seconds, making the undo control effectively unusable. Now an identical
-   result is ignored entirely, and snapshots are invalidated only when chain
-   evidence actually changed (transaction records or wallet identity/keys/
-   script type/address bindings), matching the stated intent that undo must
-   never erase newly refreshed transaction data.
+   (`src/lib/useWorkspaces.ts`, `src/domain/walletActivity.ts`). Every
+   non-undoable `update` cleared all undo snapshots and bumped the revision,
+   even when the merge changed nothing (scan result for a deleted wallet) or
+   only advanced check metadata (`scannedAt`, unchanged evidence). With live
+   monitoring this ran every 30 seconds, making the undo control effectively
+   unusable. Now an identical result is ignored entirely; snapshots are
+   invalidated only when chain evidence actually changed (transaction records
+   or wallet identity/keys/script type/address bindings), matching the stated
+   intent that undo must never erase newly refreshed transaction data; and
+   retained snapshots carry the latest scan-owned metadata (`scannedAt`, scan
+   bounds/completeness, pending queue, `lastActivity`, review state) via the
+   `carryScanMetadata` projection, so quiet checks and activity
+   acknowledgment remain non-undoable while undo still restores user edits
+   (names, colors, tags, annotations, views). Deleted wallets are never
+   resurrected and newly discovered activity is never hidden.
 
-2. **Coinbase sentinel accepted as a regular prevout in raw binding**
+2. **Null outpoint accepted as a regular prevout in raw binding**
    (`src/domain/transactionInspection.ts`). The non-coinbase input branch
    compared only hash and index, so a crafted record claiming an input from
-   `00…00:4294967295` bound successfully to a real coinbase input (the
-   all-zero hash is the coinbase sentinel, never a real transaction ID).
-   The branch now rejects coinbase-shaped raw inputs, keeping the decoded
-   raw transaction honestly bound to the loaded observations.
+   the all-zero hash at index 4294967295 bound successfully to a real
+   coinbase input. Per Bitcoin Core `src/primitives/transaction.h`,
+   `COutPoint::IsNull` is exactly `hash.IsNull() && n == UINT32_MAX`; the
+   branch now rejects that null outpoint when the saved input claims an
+   ordinary prevout, and still binds a zero hash at any other index
+   structurally (serialized bytes agree), without implying the referenced
+   output exists. Primary source recorded in
+   `docs/research/transaction-inspection.md`.
 
 ## Verified with no findings
 
@@ -54,18 +64,23 @@ verification, or network publication are involved.
   the shared abort signal without partial commits.
 - Workspace/session storage: encrypted envelope shape, public-name handling,
   cross-tab write guards, lock/persist serialization and history budget
-  (15 snapshots) behave as tested.
+  (15 snapshots) behave as tested. New regressions cover multi-edit + quiet
+  scan + double undo retaining the latest scan metadata, acknowledgment
+  surviving undo of an earlier user edit, no-op merges leaving revision and
+  history untouched, and evidence-changing refreshes still clearing history.
 
 ## Test scope
 
-- Independent `npm ci`; full unit suite: 205 passed (203 existing plus 2 new
+- Independent `npm ci`; full unit suite: 209 passed (203 existing plus 6 new
   regressions covering both fixes). `npm run build` and `npm run
   format:check` passed.
 - Focused browser suite on ports 4207/4208
-  (`CHAINGRAPH_E2E_PORT`/`CHAINGRAPH_GRAPH_TEST_PORT`): all 10 tests in
-  `wallet-refresh`, `transaction-inspection`, and `tags` specs passed,
-  including cancellation, quiet-evidence preservation, raw/witness
-  inspection, and wallet-match filtering without requests.
+  (`CHAINGRAPH_E2E_PORT`/`CHAINGRAPH_GRAPH_TEST_PORT`): all 6
+  `wallet-refresh` tests passed after the corrections (cancellation,
+  quiet-evidence preservation, acknowledgment persistence, opt-in
+  monitoring, wallet-match filtering without requests). Before the
+  corrections, all 10 tests in `wallet-refresh`, `transaction-inspection`,
+  and `tags` specs passed on the same ports.
 - No UI markup changed, so no new screenshot review was needed.
 
 ## Remaining limits (unchanged)

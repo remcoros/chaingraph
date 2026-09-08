@@ -67,6 +67,44 @@ export function applyWalletScan(
   };
 }
 
+/** Refresh a retained undo snapshot with the latest scan-owned metadata.
+ * Quiet checks and activity acknowledgment are not undoable: undo may restore
+ * user edits (names, colors, tags, annotations, views) but must not roll back
+ * scan timestamps, bounds, work queues, or review state, and must not
+ * resurrect a wallet the user deleted after the snapshot was taken. */
+export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Workspace {
+  const latestById = new Map(latest.wallets.map((wallet) => [wallet.id, wallet]));
+  let changed = false;
+  const wallets = snapshot.wallets.map((wallet) => {
+    const current = latestById.get(wallet.id);
+    if (!current) return wallet;
+    if (
+      wallet.scannedAt === current.scannedAt &&
+      wallet.scanComplete === current.scanComplete &&
+      wallet.scanLimit === current.scanLimit &&
+      wallet.scanGap === current.scanGap &&
+      wallet.pendingTransactionIds === current.pendingTransactionIds &&
+      wallet.lastActivity === current.lastActivity &&
+      wallet.unreviewedTransactionIds === current.unreviewedTransactionIds &&
+      wallet.activityOverflow === current.activityOverflow
+    )
+      return wallet;
+    changed = true;
+    return {
+      ...wallet,
+      scannedAt: current.scannedAt,
+      scanComplete: current.scanComplete,
+      scanLimit: current.scanLimit,
+      scanGap: current.scanGap,
+      pendingTransactionIds: current.pendingTransactionIds,
+      lastActivity: current.lastActivity,
+      unreviewedTransactionIds: current.unreviewedTransactionIds,
+      activityOverflow: current.activityOverflow,
+    };
+  });
+  return changed ? { ...snapshot, wallets } : snapshot;
+}
+
 export function walletCheckAge(scannedAt?: string, now = Date.now()): string {
   if (!scannedAt) return 'Not checked yet';
   const minutes = Math.max(0, Math.floor((now - Date.parse(scannedAt)) / 60_000));
