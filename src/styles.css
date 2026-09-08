@@ -417,6 +417,12 @@ small,
   font-size: var(--text-sm);
   line-height: 1.9;
 }
+.saved-list {
+  max-height: min(22rem, 45dvh);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 2px;
+}
 .saved-row {
   width: 100%;
   padding: 19px 8px;
