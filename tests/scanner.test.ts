@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchTransaction,
+  fetchHistory,
   loadAddress,
   mapLimit,
   scanWallet,
@@ -43,6 +44,12 @@ function mockRpc(
 afterEach(() => vi.unstubAllGlobals());
 
 describe('browser-side wallet scanner', () => {
+  it('rejects history heights that would make the encrypted workspace invalid', async () => {
+    for (const height of [-2, 0x80000000, 1.5]) {
+      mockRpc(() => [{ tx_hash: txid(1), height }]);
+      await expect(fetchHistory(txid(2))).rejects.toThrow('Invalid or oversized address history');
+    }
+  });
   it('scans both branches, extends after activity, deduplicates transactions and uses bounded concurrency', async () => {
     const receive = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 40);
     const change = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 1, 0, 40);
@@ -282,6 +289,64 @@ describe('browser-side wallet scanner', () => {
     const capped = await scanWallet(imported, 'mainnet', {}, { gap: 20, maxIndex: 20 });
     expect(capped.wallet.scanComplete).toBe(false);
     expect(capped.wallet.addresses).toContainEqual(imported.addresses[0]);
+  });
+
+  it('reports new, refreshed and disappeared history without erasing the saved snapshot', async () => {
+    const first = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1)[0];
+    const imported = {
+      ...wallet,
+      addresses: [
+        {
+          ...first,
+          history: [
+            { tx_hash: txid(1), height: 0 },
+            { tx_hash: txid(2), height: 100 },
+            { tx_hash: txid(3), height: 101 },
+          ],
+        },
+      ],
+    };
+    const existing = {
+      [txid(1)]: transaction(txid(1), 0),
+      [txid(2)]: transaction(txid(2), 3),
+      [txid(3)]: transaction(txid(3), 2),
+    };
+    mockRpc((request) =>
+      request.method === 'blockchain.scripthash.get_history'
+        ? request.params[0] === first.scripthash
+          ? [
+              { tx_hash: txid(1), height: 103 },
+              { tx_hash: txid(2), height: 102 },
+              { tx_hash: txid(4), height: 0 },
+            ]
+          : []
+        : transaction(request.params[0] as string, 1),
+    );
+    const result = await scanWallet(imported, 'mainnet', existing, { gap: 10, maxIndex: 30 });
+    expect(result.wallet.lastActivity).toEqual({
+      newTransactionIds: [txid(4)],
+      refreshedTransactionCount: 2,
+      missingTransactionCount: 1,
+    });
+    expect(result.wallet.scanGap).toBe(10);
+    expect(existing[txid(3)]).toEqual(transaction(txid(3), 2));
+    expect(imported.addresses[0].history).toHaveLength(3);
+  });
+
+  it('does not commit a completed download batch after cancellation', async () => {
+    const first = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1)[0];
+    const controller = new AbortController();
+    mockRpc((request) => {
+      if (request.method === 'blockchain.scripthash.get_history')
+        return request.params[0] === first.scripthash ? [{ tx_hash: txid(1), height: 100 }] : [];
+      controller.abort();
+      return transaction(txid(1));
+    });
+    await expect(
+      scanWallet(wallet, 'mainnet', {}, { gap: 10, maxIndex: 30, signal: controller.signal }),
+    ).rejects.toThrow();
+    expect(wallet.addresses).toEqual([]);
+    expect(wallet.scannedAt).toBeUndefined();
   });
 
   it('uses Electrum when Core cannot retrieve a transaction and validates the returned identity', async () => {

@@ -140,7 +140,17 @@ const walletSchema = z.object({
   scannedAt: timestamp.optional(),
   scanComplete: z.boolean().optional(),
   scanLimit: z.number().int().min(1).max(0x80000000).optional(),
+  scanGap: z.number().int().min(1).max(100).optional(),
   pendingTransactionIds: z.array(txid).max(10000).optional(),
+  unreviewedTransactionIds: z.array(txid).max(10000).optional(),
+  activityOverflow: z.boolean().optional(),
+  lastActivity: z
+    .object({
+      newTransactionIds: z.array(txid).max(500),
+      refreshedTransactionCount: z.number().int().min(0).max(500),
+      missingTransactionCount: z.number().int().min(0).max(100_000_000),
+    })
+    .optional(),
 });
 const workspaceSchema = z.object({
   version: z.literal(1),

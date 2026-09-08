@@ -61,7 +61,14 @@ export async function fetchHistory(
   if (
     !Array.isArray(data) ||
     data.length > 10000 ||
-    data.some((x) => !x || !/^[0-9a-f]{64}$/.test(x.tx_hash) || !Number.isInteger(x.height))
+    data.some(
+      (x) =>
+        !x ||
+        !/^[0-9a-f]{64}$/.test(x.tx_hash) ||
+        !Number.isInteger(x.height) ||
+        x.height < -1 ||
+        x.height > 0x7fffffff,
+    )
   )
     throw new Error('Invalid or oversized address history.');
   return data;
@@ -110,6 +117,17 @@ export async function scanWallet(
   transactions: Transaction[];
   truncated: boolean;
 }> {
+  if (
+    !Number.isInteger(options.gap) ||
+    options.gap < 1 ||
+    options.gap > 100 ||
+    !Number.isInteger(options.maxIndex) ||
+    options.maxIndex < 1 ||
+    options.maxIndex > 1000
+  )
+    throw new Error(
+      'Use a gap between 1 and 100 and an address limit between 1 and 1,000 per branch.',
+    );
   const addresses: Wallet['addresses'] = [];
   const historyIds = new Set<string>();
   const heights = new Map<string, number>();
@@ -195,6 +213,13 @@ export async function scanWallet(
     return tx;
   });
   const truncated = pending.length > MAX_SCAN_TRANSACTIONS;
+  options.signal?.throwIfAborted();
+  const newTransactionIds = transactions.filter((tx) => !existing[tx.txid]).map((tx) => tx.txid);
+  // Absence from a refreshed history is an observation, not authorization to
+  // erase the user's graph or conclude that an output is unspent.
+  const missingTransactionCount = [...oldHeights.keys()].filter(
+    (id) => !relevantHistoryIds.has(id),
+  ).length;
   return {
     wallet: {
       ...wallet,
@@ -202,7 +227,13 @@ export async function scanWallet(
       scannedAt: new Date().toISOString(),
       scanComplete: complete && !truncated,
       scanLimit: options.maxIndex,
+      scanGap: options.gap,
       pendingTransactionIds: pending.slice(MAX_SCAN_TRANSACTIONS),
+      lastActivity: {
+        newTransactionIds,
+        refreshedTransactionCount: transactions.length - newTransactionIds.length,
+        missingTransactionCount,
+      },
     },
     transactions,
     truncated,
