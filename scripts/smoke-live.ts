@@ -58,6 +58,15 @@ try {
         const blockHash = await rpc('core', 'getblockhash', [Math.max(0, status.height - 6)]);
         if (typeof blockHash !== 'string' || !/^[0-9a-f]{64}$/.test(blockHash)) throw new Error();
         passed++;
+        stage = 'confirmed block header height';
+        const header = await rpc('core', 'getblockheader', [blockHash, true]);
+        if (
+          header.hash !== blockHash ||
+          header.height !== Math.max(0, status.height - 6) ||
+          !(header.confirmations > 0)
+        )
+          throw new Error();
+        passed++;
         stage = 'confirmed block transactions';
         const block = await rpc('core', 'getblock', [blockHash, 1]);
         if (!Array.isArray(block.tx) || typeof block.tx[0] !== 'string') throw new Error();

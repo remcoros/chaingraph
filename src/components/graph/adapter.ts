@@ -49,6 +49,8 @@ export interface GraphAdapterEvents {
   recovered?(): void;
   /** Settled geometry and camera only; consumers decide where to persist it. */
   snapshot?(snapshot: GraphSnapshot): void;
+  /** Lightweight activity signal; includes the quiet period before snapshot publication. */
+  activity?(active: boolean): void;
 }
 export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;
@@ -56,6 +58,8 @@ export interface GraphAdapter {
   resize(width: number, height: number): void;
   focus(id: string): void;
   fit(): void;
+  /** Synchronously publish the current view before an explicit save or workspace transition. */
+  flushSnapshot?(): void;
   /** Optional initial view restoration; adapters without persistence remain valid. */
   restoreSnapshot?(snapshot: GraphSnapshot): void;
   dispose(): void;

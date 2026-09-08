@@ -14,6 +14,7 @@ import {
   type GraphNode,
   type Wallet,
   type Workspace,
+  type Transaction,
 } from '../domain/types';
 import { walletCheckAge } from '../domain/walletActivity';
 import type { GraphFilters } from '../domain/graphFilters';
@@ -48,6 +49,15 @@ interface Props {
   onGraphFiltersChange?: (filters: GraphFilters) => void;
   entityTotalCount?: number;
   contextCount?: number;
+  hiddenNodeIds?: readonly string[];
+  onSetHidden?: (ids: string[], hidden: boolean) => void;
+  visibility?: 'visible' | 'hidden' | 'all';
+  onVisibilityChange?: (visibility: 'visible' | 'hidden' | 'all') => void;
+  hiddenCount?: number;
+  onShowAllHidden?: () => void;
+  transactions?: Record<string, Transaction>;
+  removableNodeIds?: readonly string[];
+  onRemoveNode?: (id: string) => void;
 }
 export function WorkspacePanel({
   w,
@@ -79,6 +89,15 @@ export function WorkspacePanel({
   onGraphFiltersChange,
   entityTotalCount,
   contextCount,
+  hiddenNodeIds,
+  onSetHidden,
+  visibility,
+  onVisibilityChange,
+  hiddenCount,
+  onShowAllHidden,
+  transactions,
+  removableNodeIds,
+  onRemoveNode,
 }: Props) {
   return (
     <aside className="left-panel" data-tour="wallet-panel">
@@ -230,6 +249,15 @@ export function WorkspacePanel({
           onSelect={onSelectNode}
           totalCount={entityTotalCount}
           contextCount={contextCount}
+          hiddenNodeIds={hiddenNodeIds}
+          onSetHidden={onSetHidden}
+          visibility={visibility}
+          onVisibilityChange={onVisibilityChange}
+          hiddenCount={hiddenCount}
+          onShowAllHidden={onShowAllHidden}
+          transactions={transactions ?? w.transactions}
+          removableNodeIds={removableNodeIds}
+          onRemoveNode={onRemoveNode}
         />
       ) : (
         <div className="entity-list">

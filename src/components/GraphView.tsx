@@ -1,7 +1,9 @@
+import { transactionStatus } from '../domain/transactionStatus';
 import { ArrowLeftFromLine, Crosshair, Pencil, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
+import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
 import {
   graphSnapshotSchema,
   mergeGraphSnapshot,
@@ -16,11 +18,13 @@ import {
   type NodePresentation,
 } from './graph/presentation';
 
-export interface GraphViewProps {
+export interface GraphViewProps extends VisibilityProps {
   adapterFactory?: GraphAdapterFactory;
   /** Initial view for this mounted workspace. Own saves never reapply the camera. */
   snapshot?: GraphSnapshot;
   onSnapshot?: (snapshot: GraphSnapshot) => void;
+  onActivity?: (active: boolean) => void;
+  onRegisterSnapshotFlush?: (flush: (() => void) | undefined) => void;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
   toolbar?: ReactNode;
   /** Shared controls floating over the viewport, outside the renderer event surface. */
@@ -58,6 +62,7 @@ export default function GraphView(props: GraphViewProps) {
   const pointer = useRef({ x: 0, y: 0, touch: false });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cardEntered = useRef(false);
+  const visibilityOpen = useRef(false);
   const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingNode = useRef<string | undefined>(undefined);
   const visibleNode = useRef<string | undefined>(undefined);
@@ -65,7 +70,14 @@ export default function GraphView(props: GraphViewProps) {
   const [error, setError] = useState(false);
   const savedSnapshot = useRef(props.snapshot);
   const lastFitToken = useRef(props.fitToken);
-  const snapshotSignature = useRef(props.snapshot ? JSON.stringify(props.snapshot) : '');
+  const immutableNodeSource = useRef<GraphSnapshot['nodes'] | undefined>(undefined);
+  const snapshotSignatures = useRef<{ camera: string; nodes: string } | undefined>(undefined);
+  snapshotSignatures.current ??= {
+    camera: props.snapshot
+      ? JSON.stringify([props.snapshot.dimensions, props.snapshot.camera])
+      : '',
+    nodes: props.snapshot ? JSON.stringify(props.snapshot.nodes) : '',
+  };
 
   function keepCardOpen() {
     clearTimeout(closeTimer.current);
@@ -78,7 +90,11 @@ export default function GraphView(props: GraphViewProps) {
     cancelCardOpen();
     keepCardOpen();
     closeTimer.current = setTimeout(() => {
-      if (!cardEntered.current && !cardRef.current?.contains(document.activeElement)) {
+      if (
+        !visibilityOpen.current &&
+        !cardEntered.current &&
+        !cardRef.current?.contains(document.activeElement)
+      ) {
         visibleNode.current = undefined;
         setHover(undefined);
       }
@@ -89,6 +105,7 @@ export default function GraphView(props: GraphViewProps) {
       !keyboard &&
       (pointer.current.touch ||
         cardEntered.current ||
+        visibilityOpen.current ||
         cardRef.current?.contains(document.activeElement))
     )
       return;
@@ -116,6 +133,7 @@ export default function GraphView(props: GraphViewProps) {
     if (
       pointer.current.touch ||
       cardEntered.current ||
+      visibilityOpen.current ||
       cardRef.current?.contains(document.activeElement)
     )
       return;
@@ -170,19 +188,48 @@ export default function GraphView(props: GraphViewProps) {
         dismiss: () => dismissCard(),
         error: () => setError(true),
         recovered: () => setError(false),
+        activity: (active) => current.current.onActivity?.(active),
         snapshot: (next) => {
-          const parsed = graphSnapshotSchema.safeParse(next);
-          if (!parsed.success) return;
-          const merged = mergeGraphSnapshot(savedSnapshot.current, parsed.data);
-          const signature = JSON.stringify(merged);
-          if (signature === snapshotSignature.current) return;
+          if (!next || typeof next !== 'object') return;
+          let merged: GraphSnapshot;
+          let nodesSignature = snapshotSignatures.current!.nodes;
+          // The default adapter freezes validated position records. Camera-only
+          // changes can reuse the accepted geometry without allocating it again.
+          if (
+            next.version === 1 &&
+            immutableNodeSource.current !== undefined &&
+            next.nodes === immutableNodeSource.current &&
+            savedSnapshot.current?.dimensions === next.dimensions
+          ) {
+            const camera = graphSnapshotSchema.shape.camera.safeParse(next.camera);
+            if (!camera.success) return;
+            merged = { ...savedSnapshot.current, camera: camera.data };
+          } else {
+            const parsed = graphSnapshotSchema.safeParse(next);
+            if (!parsed.success) return;
+            merged = mergeGraphSnapshot(savedSnapshot.current, parsed.data);
+            nodesSignature = JSON.stringify(merged.nodes);
+            immutableNodeSource.current =
+              Object.isFrozen(next.nodes) && next.nodes.every(Object.isFrozen)
+                ? next.nodes
+                : undefined;
+          }
+          const cameraSignature = JSON.stringify([merged.dimensions, merged.camera]);
+          if (
+            cameraSignature === snapshotSignatures.current!.camera &&
+            nodesSignature === snapshotSignatures.current!.nodes
+          )
+            return;
           savedSnapshot.current = merged;
-          snapshotSignature.current = signature;
+          snapshotSignatures.current = { camera: cameraSignature, nodes: nodesSignature };
           current.current.onSnapshot?.(merged);
         },
       });
       if (savedSnapshot.current) adapter.restoreSnapshot?.(savedSnapshot.current);
       graphRef.current = adapter;
+      current.current.onRegisterSnapshotFlush?.(
+        adapter.flushSnapshot ? () => adapter?.flushSnapshot?.() : undefined,
+      );
       adapter.canvas.tabIndex = 0;
       adapter.canvas.setAttribute(
         'aria-label',
@@ -207,6 +254,7 @@ export default function GraphView(props: GraphViewProps) {
       cancelCardOpen();
       adapter?.canvas.removeEventListener('keydown', onKeyDown);
       adapter?.dispose();
+      current.current.onRegisterSnapshotFlush?.(undefined);
       graphRef.current = null;
     };
   }, [adapterFactory]);
@@ -318,6 +366,20 @@ export default function GraphView(props: GraphViewProps) {
                 {hoveredNode.kind}
               </span>
               <div className="graph-card-actions" role="group" aria-label="Graph item actions">
+                <VisibilityActions
+                  nodeId={hoveredNode.id}
+                  transaction={
+                    hoveredNode.kind === 'transaction'
+                      ? props.transactions?.[hoveredNode.txid ?? '']
+                      : undefined
+                  }
+                  hiddenNodeIds={props.hiddenNodeIds}
+                  onSetHidden={props.onSetHidden}
+                  onOpenChange={(open) => {
+                    visibilityOpen.current = open;
+                    if (open) keepCardOpen();
+                  }}
+                />
                 <button
                   type="button"
                   aria-label="Select graph item"
@@ -421,6 +483,14 @@ export default function GraphView(props: GraphViewProps) {
                   <dd>
                     {transaction.vin.length} {transaction.vin.length === 1 ? 'input' : 'inputs'} ·{' '}
                     {transaction.vout.length} {transaction.vout.length === 1 ? 'output' : 'outputs'}
+                  </dd>
+                </div>
+              )}
+              {transaction && (
+                <div>
+                  <dt>Chain status</dt>
+                  <dd title={transactionStatus(transaction).title}>
+                    {transactionStatus(transaction).label}
                   </dd>
                 </div>
               )}

@@ -1,5 +1,6 @@
+import { transactionStatus } from '../domain/transactionStatus';
 import { useMemo, useState, useRef, useLayoutEffect, type ReactNode } from 'react';
-import { Pencil, ArrowLeft, ArrowRight, Box, Tags, Smile } from 'lucide-react';
+import { Pencil, ArrowLeft, ArrowRight, Box, Tags, Smile, Eye, EyeOff } from 'lucide-react';
 import {
   type GraphNode,
   type Transaction,
@@ -19,8 +20,9 @@ import { outputAddress } from '../domain/workspace';
 import { CopyButton } from './CopyButton';
 import { OpReturnData } from './OpReturnData';
 import './transaction-view.css';
+import type { VisibilityProps } from './VisibilityActions';
 
-interface Props {
+interface Props extends VisibilityProps {
   workspace: Workspace;
   selected?: GraphNode;
   onSelect: (id: string) => void;
@@ -51,6 +53,8 @@ function TransactionRows({
   onTrace,
   disabledReason,
   inputLoading,
+  hiddenNodeIds = [],
+  onSetHidden,
   renderMetadata,
   state,
   onStateChange,
@@ -67,6 +71,7 @@ function TransactionRows({
   previous: ReactNode;
   next: ReactNode;
 }) {
+  const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
   const flow = useRef<HTMLDivElement>(null);
   const selectedRow = useRef<HTMLDivElement>(null);
   const [localInputs, setLocalInputs] = useState(false);
@@ -194,7 +199,8 @@ function TransactionRows({
           >
             <div className="transaction-lane-header">
               <h4>
-                {rows.length} {name.toLowerCase()}
+                {rows.length}{' '}
+                {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
               </h4>
               {rows.length > 3 && (
                 <button
@@ -279,6 +285,11 @@ function TransactionRows({
                               ? 'Newly created coins'
                               : formatSats(row.output ? sats(row.output.value) : undefined)}
                           </span>
+                          {row.id && hidden.has(row.id) && (
+                            <span className="entity-hidden-badge">
+                              <EyeOff size={10} /> Hidden
+                            </span>
+                          )}
                           {row.id && renderMetadata?.(row.id)}
                         </span>
                       </button>
@@ -286,6 +297,16 @@ function TransactionRows({
                     </div>
                     {row.id && (
                       <div className="transaction-row-tools">
+                        {hidden.has(row.id) && onSetHidden && (
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label={`Show ${inputs ? 'input' : 'output'} ${row.index} in graph`}
+                            onClick={() => onSetHidden([row.id!], false)}
+                          >
+                            <Eye size={12} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="icon-button transaction-row-edit"
@@ -459,8 +480,8 @@ export function TransactionView(props: Props) {
     >
       <summary>
         <span>Transaction flow</span>
-        <small>
-          {current ? `${current.tx.vin.length} in → ${current.tx.vout.length} out` : 'Not loaded'}
+        <small title={current ? transactionStatus(current.tx).title : undefined}>
+          {current ? transactionStatus(current.tx).label : 'Not loaded'}
         </small>
       </summary>
       <div className="transaction-view-body">
@@ -490,7 +511,10 @@ export function TransactionView(props: Props) {
                   onClick={() => onSelect(txNodeId(current.tx.txid))}
                 >
                   <Box size={25} aria-hidden="true" />
-                  <span>{current.role} transaction</span>
+                  <span>
+                    <span>{current.role}</span>{' '}
+                    <span className="transaction-caption-noun">transaction</span>
+                  </span>
                   <strong className="mono">{short(current.tx.txid, 7)}</strong>
                   {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
                     <strong
@@ -536,6 +560,23 @@ export function TransactionView(props: Props) {
                   </button>
                   <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
                 </div>
+                {props.hiddenNodeIds?.includes(txNodeId(current.tx.txid)) && (
+                  <div className="transaction-hidden-state">
+                    <span className="entity-hidden-badge">
+                      <EyeOff size={10} /> Hidden
+                    </span>
+                    {props.onSetHidden && (
+                      <button
+                        type="button"
+                        className="text-button"
+                        aria-label="Show displayed transaction in graph"
+                        onClick={() => props.onSetHidden?.([txNodeId(current.tx.txid)], false)}
+                      >
+                        Show
+                      </button>
+                    )}
+                  </div>
+                )}
                 {related.length > 1 && (
                   <select
                     className="transaction-choice"

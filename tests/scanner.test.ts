@@ -268,7 +268,8 @@ describe('browser-side wallet scanner', () => {
       [owned]: transaction(owned, 10),
       [unrelated]: transaction(unrelated, 10),
     });
-    expect(result.transactions).toEqual([]);
+    expect(result.transactions).toMatchObject([{ txid: owned, blockHeight: 100 }]);
+    expect(result.transactions[0].confirmations).toBeUndefined();
     expect(result.observedTransactionIds).toEqual([owned]);
     expect(requests).toEqual(['blockchain.scripthash.get_history']);
   });
@@ -305,7 +306,7 @@ describe('browser-side wallet scanner', () => {
       { gap: 20, maxIndex: 60 },
     );
     expect(lookedUp).toContain(known.scripthash);
-    expect(result.transactions).toEqual([transaction(txid(7), 2)]);
+    expect(result.transactions).toMatchObject([{ txid: txid(7), blockHeight: 101 }]);
     expect(result.wallet.scanComplete).toBe(true);
     const capped = await scanWallet(imported, 'mainnet', {}, { gap: 20, maxIndex: 20 });
     expect(capped.wallet.scanComplete).toBe(false);

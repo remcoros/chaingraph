@@ -106,6 +106,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   const retainedPositions = new Map<string, GraphSnapshot['nodes'][number]>();
   let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
   let lastSnapshot = '';
+  let idleSnapshot: number | undefined;
+  let interactionActive = false;
+  let positionsDirty = true;
+  let cachedPositions: GraphSnapshot['nodes'] | undefined;
+  let layoutRevision = 0;
   let hit: GraphHit | undefined;
   let point: GraphPointer = { x: 0, y: 0, pointerType: 'mouse' };
   const pointers = new Set<number>();
@@ -113,10 +118,26 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let selectable = false;
   const raycaster = new Raycaster();
   const cleanups: (() => void)[] = [];
-  const emitSnapshot = () => {
+  const cancelSnapshot = () => {
     clearTimeout(snapshotTimer);
-    // A completed gesture owns the camera immediately, even while physics runs.
-    // Capture it before a quick lock/switch; automatic initial framing waits.
+    if (idleSnapshot !== undefined) window.cancelIdleCallback?.(idleSnapshot);
+    idleSnapshot = undefined;
+  };
+  const setActivity = (active: boolean) => {
+    if (interactionActive === active) return;
+    interactionActive = active;
+    events.activity?.(active);
+  };
+  const beginInteraction = () => {
+    if (dead) return;
+    cancelSnapshot();
+    if (!interactionActive) events.dismiss();
+    setActivity(true);
+  };
+  const emitSnapshot = () => {
+    cancelSnapshot();
+    // Explicit flush can capture a manual view before layout settlement. Ordinary
+    // gestures wait for quiet time; initial automatic framing still waits to settle.
     if (dead || (!settled && needsFit) || !dimensions || !events.snapshot) return;
     const data = graph.graphData().nodes;
     if (!data.length) return;
@@ -127,35 +148,64 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       z: round(value.z),
     });
     const controls = graph.controls() as { target: Vector3 };
-    const parsed = graphSnapshotSchema.safeParse({
-      version: 1,
-      dimensions,
-      camera: {
-        position: point(graph.cameraPosition()),
-        target: point(controls.target),
-        up: point(graph.camera().up),
-      },
-      nodes: data
-        // three-forcegraph removes the unused z coordinate in Flat mode.
-        // Canonical snapshots retain z=0; invalid 3D coordinates still fail validation.
-        .map((node) => ({
-          id: node.id,
-          ...point({ x: node.x!, y: node.y!, z: dimensions === 2 ? 0 : node.z! }),
-        }))
-        .sort((a, b) => a.id.localeCompare(b.id)),
+    const camera = graphSnapshotSchema.shape.camera.safeParse({
+      position: point(graph.cameraPosition()),
+      target: point(controls.target),
+      up: point(graph.camera().up),
     });
-    if (!parsed.success) return;
-    for (const node of parsed.data.nodes) retainedPositions.set(node.id, node);
-    while (retainedPositions.size > GRAPH_SNAPSHOT_NODE_LIMIT)
-      retainedPositions.delete(retainedPositions.keys().next().value!);
-    const signature = JSON.stringify(parsed.data);
+    if (!camera.success) return;
+    if (positionsDirty || !cachedPositions) {
+      const positions = graphSnapshotSchema.shape.nodes.safeParse(
+        data
+          .map((node) => ({
+            id: node.id,
+            ...point({ x: node.x!, y: node.y!, z: dimensions === 2 ? 0 : node.z! }),
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      );
+      if (!positions.success) return;
+      cachedPositions = positions.data;
+      // Frozen node records can safely share identity across camera-only updates.
+      cachedPositions.forEach(Object.freeze);
+      Object.freeze(cachedPositions);
+      positionsDirty = false;
+      layoutRevision++;
+      for (const node of cachedPositions) retainedPositions.set(node.id, node);
+      while (retainedPositions.size > GRAPH_SNAPSHOT_NODE_LIMIT)
+        retainedPositions.delete(retainedPositions.keys().next().value!);
+    }
+    const signature = JSON.stringify([dimensions, camera.data, layoutRevision]);
     if (signature === lastSnapshot) return;
     lastSnapshot = signature;
-    events.snapshot(parsed.data);
+    events.snapshot({ version: 1, dimensions, camera: camera.data, nodes: cachedPositions });
+  };
+  const flushSnapshot = () => {
+    // An explicit checkpoint captures the current geometry even before settlement.
+    positionsDirty = true;
+    try {
+      emitSnapshot();
+    } finally {
+      if (!pointers.size) setActivity(false);
+    }
   };
   const scheduleSnapshot = () => {
-    clearTimeout(snapshotTimer);
-    snapshotTimer = setTimeout(emitSnapshot, duration() + 150);
+    if (dead) return;
+    cancelSnapshot();
+    snapshotTimer = setTimeout(() => {
+      if (dead || pointers.size) return;
+      const publish = () => {
+        idleSnapshot = undefined;
+        if (dead || pointers.size) return;
+        try {
+          emitSnapshot();
+        } finally {
+          setActivity(false);
+        }
+      };
+      if (window.requestIdleCallback)
+        idleSnapshot = window.requestIdleCallback(publish, { timeout: 2000 });
+      else snapshotTimer = setTimeout(publish, 0);
+    }, 1200);
   };
   const listen = <K extends keyof (HTMLElementEventMap & { webglcontextlost: Event })>(
     name: K,
@@ -370,9 +420,10 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   const dispose = () => {
     if (dead) return;
     // Deliver the final settled camera before releasing this workspace's adapter.
-    emitSnapshot();
+    flushSnapshot();
+    setActivity(false);
     dead = true;
-    clearTimeout(snapshotTimer);
+    cancelSnapshot();
     cleanups.forEach((cleanup) => cleanup());
     graph.scene().remove(halos);
     halos.geometry.dispose();
@@ -426,6 +477,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .onLinkClick((link, event) => select({ type: 'link', id: link.id }, event))
       .onBackgroundClick((event) => select(undefined, event))
       .onEngineTick(() => {
+        positionsDirty = true;
         positionHalos();
         if (earlyFitTicks > 0) earlyFitTicks--;
         tryEarlyFit();
@@ -454,11 +506,13 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     orbit.screenSpacePanning = true;
     orbit.enableDamping = duration() !== 0;
     orbit.dampingFactor = 0.18;
+    orbit.addEventListener('start', beginInteraction);
     orbit.addEventListener('change', scheduleSnapshot);
-    orbit.addEventListener('end', emitSnapshot);
+    orbit.addEventListener('end', scheduleSnapshot);
     cleanups.push(() => {
+      orbit.removeEventListener('start', beginInteraction);
       orbit.removeEventListener('change', scheduleSnapshot);
-      orbit.removeEventListener('end', emitSnapshot);
+      orbit.removeEventListener('end', scheduleSnapshot);
     });
     const track = (event: PointerEvent) => {
       const rect = element.getBoundingClientRect();
@@ -469,6 +523,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       };
     };
     listen('pointerdown', (event) => {
+      beginInteraction();
       track(event);
       needsFit = false;
       selectable = false;
@@ -493,6 +548,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         Math.hypot(event.clientX - down.x, event.clientY - down.y) <= 5,
       );
       pointers.delete(event.pointerId);
+      scheduleSnapshot();
       down = undefined;
       // Forcegraph's asynchronous click callback can see the previous RAF pick
       // when touch-down/up occur between frames. Resolve taps at their coordinates.
@@ -503,6 +559,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     });
     listen('pointercancel', (event) => {
       pointers.delete(event.pointerId);
+      scheduleSnapshot();
       down = undefined;
       selectable = false;
       hit = undefined;
@@ -513,6 +570,8 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       events.hover({ point: { ...point } });
     });
     listen('wheel', () => {
+      beginInteraction();
+      scheduleSnapshot();
       needsFit = false;
     });
     listen('webglcontextlost', (event) => {
@@ -554,6 +613,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   };
   return {
     canvas,
+    flushSnapshot,
     restoreSnapshot(snapshot) {
       if (dead) return;
       const parsed = graphSnapshotSchema.safeParse(snapshot);
@@ -601,6 +661,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           earlyFitTicks = 3;
         }
         topology = signature;
+        positionsDirty = true;
         settled = false;
         graph.cooldownTicks(restoredLayout ? 0 : 120);
         graph.graphData({ nodes, links });
@@ -615,6 +676,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       }
       graph.backgroundColor(frame.background);
       if (dimensions !== frame.dimensions) {
+        positionsDirty = true;
         if (dimensions !== undefined) {
           // Initial restoration suppresses simulation; subsequent mode changes must not.
           settled = false;

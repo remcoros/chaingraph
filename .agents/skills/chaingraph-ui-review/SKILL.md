@@ -17,6 +17,8 @@ Use for substantive graph, panel, navigation or workspace interactions. Verify b
 - Verify wallet refresh preserves the camera, selection, labels and tags; new activity must remain discoverable until reviewed. Do not infer unspent status from missing loaded spends.
 - Confirm annotation and trace controls are fully inside the visible panel, not merely within the browser viewport behind a clipped ancestor. Expand and collapse large transaction lists without moving the whole page.
 - Edit a note and immediately change selection or lock. Verify the edit survives reopening without a Save action, and that graph restoration does not mix workspaces.
+- Exercise continuous graph gestures with pending edits. Saves must wait for idle input, and immediate lock/export/switch must capture the latest view. Distinguish actual browser event timing from slow automation round trips.
+- Restore hidden entities with other filters or address display disabled. Explain why an entity stays off the canvas and provide an explicit recovery action. Row removal must preserve unrelated selection and identify targets even when labels collide.
 - Keep private workspace content out of URLs, logs and plaintext storage. Public workspace names are the intentional exception.
 - Run browser suites serially within a checkout. Parallel worktrees need separate dependencies, preview/test ports and artifact directories; use the port overrides described in CONTRIBUTING.md.
 - Record actionable findings and fixes in the release review, along with what was actually tested.

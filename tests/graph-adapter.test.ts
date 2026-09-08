@@ -107,6 +107,7 @@ function setup() {
     dismiss: vi.fn(),
     error: vi.fn(),
     snapshot: vi.fn(),
+    activity: vi.fn(),
   };
   const adapter = createForceAdapter(container, events);
   adapter.resize(900, 600);
@@ -189,6 +190,8 @@ describe('force adapter contract', () => {
     manual.graph.cameraPosition({ x: 80, y: -15, z: 250 }, { x: 30, y: -15, z: 0 }, 0);
     manual.pointer('pointerup');
     manual.controls.dispatchEvent(new Event('end'));
+    expect(manual.events.snapshot).not.toHaveBeenCalled();
+    manual.adapter.flushSnapshot?.();
     expect(manual.events.snapshot).toHaveBeenCalledTimes(1);
     expect(vi.mocked(manual.events.snapshot!).mock.calls[0][0].camera).toMatchObject({
       position: { x: 80, y: -15, z: 250 },
@@ -287,10 +290,10 @@ describe('force adapter contract', () => {
     const { adapter, graph, callbacks, events, controls } = setup();
     adapter.update(frame());
     controls.dispatchEvent(new Event('change'));
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     expect(events.snapshot).not.toHaveBeenCalled();
     callbacks.onEngineStop();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     expect(events.snapshot).toHaveBeenCalledTimes(1);
     expect(events.snapshot).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -301,7 +304,7 @@ describe('force adapter contract', () => {
     // Saving or annotating produces a presentation update, not a new camera snapshot.
     adapter.update(frame());
     callbacks.onEngineStop();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     expect(events.snapshot).toHaveBeenCalledTimes(1);
     graph.cameraPosition({ x: 70, y: -20, z: 450 }, { x: 70, y: -20, z: 0 }, 0);
     controls.dispatchEvent(new Event('change'));
@@ -309,7 +312,7 @@ describe('force adapter contract', () => {
     controls.dispatchEvent(new Event('change'));
     vi.advanceTimersByTime(300);
     expect(events.snapshot).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(1000);
     expect(events.snapshot).toHaveBeenCalledTimes(2);
     graph.graphData().nodes[0].x = 999;
     expect(vi.mocked(events.snapshot!).mock.calls[0][0].nodes[0].x).toBe(20);
@@ -317,7 +320,7 @@ describe('force adapter contract', () => {
     adapter.dispose();
     expect(events.snapshot).toHaveBeenCalledTimes(3);
     expect(vi.mocked(events.snapshot!).mock.calls[2][0].nodes[0].x).toBe(999);
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     controls.dispatchEvent(new Event('end'));
     expect(events.snapshot).toHaveBeenCalledTimes(3);
   });
@@ -327,7 +330,7 @@ describe('force adapter contract', () => {
     adapter.update(frame(2));
     expect(graph.graphData().nodes.every((node: any) => node.z === undefined)).toBe(true);
     callbacks.onEngineStop();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     expect(events.snapshot).toHaveBeenCalledTimes(1);
     expect(vi.mocked(events.snapshot!).mock.calls[0][0].nodes.every((node) => node.z === 0)).toBe(
       true,
@@ -335,7 +338,7 @@ describe('force adapter contract', () => {
     adapter.update(frame(3));
     graph.graphData().nodes[0].z = NaN;
     callbacks.onEngineStop();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     expect(events.snapshot).toHaveBeenCalledTimes(1);
     adapter.dispose();
   });
@@ -385,10 +388,10 @@ describe('force adapter contract', () => {
     adapter.update(frame());
     graph.graphData().nodes[1].x = 450;
     callbacks.onEngineStop();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     adapter.update({ ...frame(), nodes: [frame().nodes[0]], links: [] });
     callbacks.onEngineStop();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1500);
     adapter.update(frame());
     expect(graph.graphData().nodes[1].x).toBe(450);
     expect(graph.cooldownTicks).toHaveBeenLastCalledWith(120);
@@ -520,6 +523,81 @@ describe('force adapter contract', () => {
     });
     adapter.dispose();
   });
+  it('does no snapshot work during wheel bursts, then publishes one camera update after quiet time', () => {
+    vi.useFakeTimers();
+    const { adapter, graph, controls, callbacks, events, pointer } = setup();
+    adapter.update(frame(3));
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1500);
+    const initialNodes = vi.mocked(events.snapshot!).mock.calls[0][0].nodes;
+    vi.mocked(events.snapshot!).mockClear();
+    for (let step = 0; step < 20; step++) {
+      // OrbitControls dispatches start/end for every wheel event.
+      controls.dispatchEvent(new Event('start'));
+      graph.cameraPosition({ x: step, y: 0, z: 250 }, { x: 0, y: 0, z: 0 }, 0);
+      controls.dispatchEvent(new Event('change'));
+      controls.dispatchEvent(new Event('end'));
+      pointer('wheel');
+      vi.advanceTimersByTime(80);
+    }
+    expect(events.snapshot).not.toHaveBeenCalled();
+    expect(events.activity).toHaveBeenCalledTimes(1);
+    expect(events.activity).toHaveBeenLastCalledWith(true);
+    vi.advanceTimersByTime(1000);
+    expect(events.snapshot).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(250);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    expect(events.activity).toHaveBeenLastCalledWith(false);
+    const saved = vi.mocked(events.snapshot!).mock.calls[0][0];
+    expect(saved.camera.position.x).toBe(19);
+    expect(saved.nodes).toBe(initialNodes);
+    expect(Object.isFrozen(saved.nodes)).toBe(true);
+    expect(saved.nodes.every(Object.isFrozen)).toBe(true);
+    adapter.dispose();
+  });
+
+  it('defers pending idle work during a held pointer and flushes a quick exit explicitly', () => {
+    vi.useFakeTimers();
+    const { adapter, graph, callbacks, controls, events, pointer } = setup();
+    adapter.update(frame(3));
+    callbacks.onEngineStop();
+    pointer('pointerdown');
+    graph.cameraPosition({ x: 60, y: -15, z: 250 }, { x: 20, y: -15, z: 0 }, 0);
+    controls.dispatchEvent(new Event('change'));
+    vi.advanceTimersByTime(5000);
+    expect(events.snapshot).not.toHaveBeenCalled();
+    expect(events.activity).toHaveBeenLastCalledWith(true);
+    pointer('pointerup');
+    adapter.flushSnapshot?.();
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(events.snapshot!).mock.calls[0][0].camera.position.x).toBe(60);
+    expect(events.activity).toHaveBeenLastCalledWith(false);
+    vi.advanceTimersByTime(5000);
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    adapter.dispose();
+  });
+
+  it('cancels a queued browser idle callback when a new gesture begins', () => {
+    vi.useFakeTimers();
+    const idle = vi.fn();
+    const cancel = vi.fn();
+    Object.assign(window, { requestIdleCallback: idle, cancelIdleCallback: cancel });
+    idle.mockReturnValue(73);
+    const { adapter, callbacks, events, pointer } = setup();
+    adapter.update(frame(3));
+    callbacks.onEngineStop();
+    vi.advanceTimersByTime(1500);
+    expect(idle).toHaveBeenCalledTimes(1);
+    expect(events.snapshot).not.toHaveBeenCalled();
+    pointer('pointerdown');
+    expect(cancel).toHaveBeenCalledWith(73);
+    pointer('pointerup');
+    vi.advanceTimersByTime(1500);
+    idle.mock.calls.at(-1)![0]();
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    adapter.dispose();
+  });
+
   it('suppresses connection hover while preserving deliberate connection selection', () => {
     const { adapter, events, pointer, callbacks } = setup();
     adapter.update(frame());

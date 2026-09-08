@@ -10,6 +10,8 @@ import {
 } from './crypto';
 
 import { indexedEnvelopeStorage, type EnvelopeStorage } from './envelopeStorage';
+import { validateAndEncryptWorkspace } from './workspaceEncryption';
+import { encryptWorkspaceOffThread } from './workspaceEncryptionClient';
 
 export const INLINE_INDEX_LIMIT = 1024 * 1024;
 export const STORAGE_KEY = 'chaingraph.encrypted-workspaces.v1';
@@ -113,6 +115,8 @@ export class WorkspaceSessionStore {
   private storageInvalid = false;
   private options: StoreOptions;
   private envelopes?: EnvelopeStorage;
+  private autosavePaused = new Set<string>();
+  private idleWaiters = new Map<string, Set<() => void>>();
 
   constructor(options: StoreOptions = {}) {
     this.options = options;
@@ -184,11 +188,16 @@ export class WorkspaceSessionStore {
   }
   private async publish(saved: SavedWorkspace[], hasWebLock: boolean): Promise<SavedWorkspace[]> {
     this.assertStorageUnchanged();
-    const raw = JSON.stringify(saved);
+    // Ciphertext is base64, so its string length is exact without serializing it.
+    // Public metadata is bounded; 1 KiB per entry safely overestimates JSON escaping.
+    const estimatedLength = saved.reduce(
+      (length, entry) => length + (entry.envelope?.ciphertext.length ?? 0) + 1024,
+      2,
+    );
     const alreadyExternal = this.state.saved.some((entry) => entry.envelopeRef);
-    if (!this.envelopes || (raw.length <= INLINE_INDEX_LIMIT && !alreadyExternal)) {
+    if (estimatedLength <= INLINE_INDEX_LIMIT && !alreadyExternal) {
       try {
-        await this.commitIndex(raw, hasWebLock);
+        await this.commitIndex(JSON.stringify(saved), hasWebLock);
         return saved;
       } catch (error) {
         if (
@@ -199,6 +208,8 @@ export class WorkspaceSessionStore {
           throw error;
       }
     }
+    if (!this.envelopes)
+      throw new Error('Large encrypted workspaces require IndexedDB browser storage.');
     const blobs: { reference: string; envelope: EncryptedEnvelope }[] = [];
     const external = saved.map((entry) => {
       if (!entry.envelope) return entry;
@@ -259,10 +270,22 @@ export class WorkspaceSessionStore {
     this.add(data, password, false);
   };
   unlock = async (entry: SavedWorkspace, password: string) => {
-    this.assertStorageUnchanged();
-    const indexAtStart = this.storedRaw;
     if (!this.state.saved.includes(entry))
       throw new Error('Saved workspace changed; reload before unlocking.');
+    // Leaving another open workspace may still be publishing its save. Wait before
+    // capturing the index so our own queued write cannot invalidate this unlock.
+    let pending: Promise<void>;
+    do {
+      pending = this.writing;
+      await pending.catch(() => {});
+    } while (pending !== this.writing);
+    this.assertStorageUnchanged();
+    // An inline-to-IndexedDB migration can replace this entry without editing its
+    // workspace. Resolve its current reference only after our queued writes settle.
+    const currentEntry = this.state.saved.find((candidate) => candidate.id === entry.id);
+    if (!currentEntry) throw new Error('Saved workspace changed; reload before unlocking.');
+    entry = currentEntry;
+    const indexAtStart = this.storedRaw;
     const envelope = entry.envelopeRef
       ? await this.envelopes?.read(entry.envelopeRef)
       : entry.envelope;
@@ -324,7 +347,7 @@ export class WorkspaceSessionStore {
                   ? []
                   : s.history.map((snapshot) => ({
                       ...carryScanMetadata(snapshot, data),
-                      view: data.view,
+                      view: { ...data.view, hiddenNodeIds: snapshot.view.hiddenNodeIds },
                     })),
             },
       ),
@@ -347,10 +370,50 @@ export class WorkspaceSessionStore {
     });
   };
 
-  persist = (id: string): Promise<void> => {
+  getSaved = (id: string) => this.state.saved.find((entry) => entry.id === id);
+  getSession = (id: string) => this.state.sessions.find((session) => session.data.id === id);
+  private resumeAutosave(id: string) {
+    this.autosavePaused.delete(id);
+    for (const resume of this.idleWaiters.get(id) ?? []) resume();
+    this.idleWaiters.delete(id);
+  }
+  pauseAutosave = (id: string, paused: boolean) => {
+    if (paused) this.autosavePaused.add(id);
+    else {
+      this.resumeAutosave(id);
+      const session = this.getSession(id);
+      if (session && session.revision !== session.savedRevision)
+        void this.persist(id, true).catch(() => {});
+    }
+  };
+  private async waitForIdle(id: string) {
+    while (this.autosavePaused.has(id))
+      await new Promise<void>((resolve) => {
+        const waiters = this.idleWaiters.get(id) ?? new Set();
+        waiters.add(resolve);
+        this.idleWaiters.set(id, waiters);
+      });
+  }
+  private prepareEnvelope(data: Workspace, password: string, beforeStart?: () => Promise<void>) {
+    return this.options.encrypt
+      ? validateAndEncryptWorkspace(data, password, this.options.encrypt)
+      : encryptWorkspaceOffThread(data, password, beforeStart);
+  }
+  exportEncrypted = async (id: string) => {
+    this.resumeAutosave(id);
+    const session = this.getSession(id);
+    if (!session) throw new Error('This workspace is no longer unlocked.');
+    return {
+      name: session.data.name,
+      envelope: await this.prepareEnvelope(session.data, session.password),
+    };
+  };
+  persist = (id: string, automatic = false): Promise<void> => {
+    if (!automatic) this.resumeAutosave(id);
     const operation = this.writing
       .catch(() => {})
       .then(async () => {
+        if (automatic) await this.waitForIdle(id);
         const session = this.state.sessions.find((s) => s.data.id === id);
         if (!session) return;
         this.patch({ saving: true });
@@ -371,11 +434,12 @@ export class WorkspaceSessionStore {
             throw new Error('Workspace description must contain at most 10,000 characters.');
           // Full shape/semantic validation keeps a save readable. Imported wallet bindings
           // are cryptographically verified at unlock/import; local derivation owns scan writes.
-          parseWorkspace(session.data, false);
-          const envelope = await (this.options.encrypt ?? encryptWorkspace)(
+          const envelope = await this.prepareEnvelope(
             session.data,
             session.password,
+            automatic ? () => this.waitForIdle(id) : undefined,
           );
+          if (automatic) await this.waitForIdle(id);
           const commit = async (hasWebLock: boolean) => {
             this.assertStorageUnchanged();
             const entry = {
@@ -479,7 +543,7 @@ export function useWorkspaces() {
     const ids = state.sessions.filter((s) => s.revision !== s.savedRevision).map((s) => s.data.id);
     if (!ids.length) return;
     const timer = setTimeout(() => {
-      for (const id of ids) void store.persist(id).catch(() => {});
+      for (const id of ids) void store.persist(id, true).catch(() => {});
     }, 900);
     return () => clearTimeout(timer);
   }, [state.sessions, store]);
@@ -503,6 +567,10 @@ export function useWorkspaces() {
     undo: store.undo,
     lock: store.lock,
     persist: store.persist,
+    getSession: store.getSession,
+    getSaved: store.getSaved,
+    exportEncrypted: store.exportEncrypted,
+    pauseAutosave: store.pauseAutosave,
     removeSaved: store.removeSaved,
   };
 }

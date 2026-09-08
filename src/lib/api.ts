@@ -4,6 +4,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
 import { parseTransaction, outputAddress, validateTransactionAddresses } from '../domain/workspace';
 import { addressToScriptHash, deriveAddresses } from './wallet';
+import { withHistoryHeight } from '../domain/transactionStatus';
 export interface BackendStatus {
   network: Network;
   connected: boolean;
@@ -76,17 +77,71 @@ export async function backendStatus(
     throw new Error('Backend status belongs to a different Bitcoin network.');
   return parsed.data;
 }
+// A block hash fixes its height. Keep only bounded immutable coordinates in
+// browser memory, never cached active-chain status or backend workspace state.
+const blockHeights = new Map<string, number>();
+type HeaderObservation = { height: number; active: boolean };
+const headerRequests = new WeakMap<
+  AbortSignal,
+  Map<string, Promise<HeaderObservation | undefined>>
+>();
+const uncancelledHeaderRequests = new Map<string, Promise<HeaderObservation | undefined>>();
+const headerSchema = z.object({
+  hash: z.string().regex(/^[0-9a-f]{64}$/),
+  height: z.number().int().min(0).max(0x7fffffff),
+  confirmations: z.number().int().min(-1).max(0x7fffffff),
+});
+async function fetchBlockHeight(
+  network: Network,
+  hash: string,
+  signal?: AbortSignal,
+): Promise<HeaderObservation | undefined> {
+  signal?.throwIfAborted();
+  const key = `${network}:${hash}`;
+  const cached = blockHeights.get(key);
+  // The caller requires fresh positive confirmations from verbose RPC. Only
+  // the immutable height is cached; active status comes from that fresh lookup.
+  if (cached !== undefined) return { height: cached, active: true };
+  let requests = signal ? headerRequests.get(signal) : uncancelledHeaderRequests;
+  if (!requests) {
+    requests = new Map();
+    headerRequests.set(signal!, requests);
+  }
+  const pending = requests.get(key);
+  if (pending) return pending;
+  const request = (async () => {
+    try {
+      const data = await rpc(network, 'core', 'getblockheader', [hash, true], signal);
+      const parsed = headerSchema.safeParse(data);
+      if (!parsed.success || parsed.data.hash !== hash) return undefined;
+      blockHeights.set(key, parsed.data.height);
+      if (blockHeights.size > 512) blockHeights.delete(blockHeights.keys().next().value!);
+      return { height: parsed.data.height, active: parsed.data.confirmations > 0 };
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      // Optional metadata must not discard a successfully loaded transaction.
+      return undefined;
+    } finally {
+      requests.delete(key);
+    }
+  })();
+  requests.set(key, request);
+  return request;
+}
 export async function fetchTransaction(
   network: Network,
   txid: string,
   signal?: AbortSignal,
+  historyHeight?: number,
 ): Promise<Transaction> {
   if (!/^[0-9a-f]{64}$/i.test(txid)) throw new Error('Enter a 64-character transaction ID.');
   let data: unknown;
+  let fromCore = true;
   try {
     data = await rpc(network, 'core', 'getrawtransaction', [txid.toLowerCase(), 1], signal);
   } catch (e) {
     if (signal?.aborted) throw e;
+    fromCore = false;
     data = await rpc(
       network,
       'electrum',
@@ -98,6 +153,40 @@ export async function fetchTransaction(
   const tx = parseTransaction(data);
   if (tx.txid !== txid.toLowerCase()) throw new Error('Upstream returned a different transaction.');
   validateTransactionAddresses(tx, network);
+  // These are application observations, not fields supplied by verbose RPC.
+  delete tx.blockHeight;
+  delete tx.mempool;
+  if ((tx.confirmations ?? 0) < 0) return tx;
+  // Core's no-blockhash lookup returns mempool transactions without a blockhash.
+  // A bare zero confirmation count from imported or Electrum verbose data is
+  // insufficient evidence. Coinbase transactions can never enter the mempool.
+  if (
+    fromCore &&
+    !tx.blockhash &&
+    (tx.confirmations === undefined || tx.confirmations === 0) &&
+    !tx.vin.some((input) => input.coinbase !== undefined)
+  )
+    return { ...tx, confirmations: 0, mempool: true };
+  if (tx.blockhash && (tx.confirmations ?? 0) > 0 && (fromCore || historyHeight === undefined)) {
+    const header = await fetchBlockHeight(network, tx.blockhash, signal);
+    signal?.throwIfAborted();
+    if (header)
+      return header.active ? { ...tx, blockHeight: header.height } : { ...tx, confirmations: -1 };
+  }
+  if (historyHeight !== undefined && !(historyHeight <= 0 && (tx.confirmations ?? 0) > 0)) {
+    // History and a later verbose fetch can straddle a reorganization. History
+    // gives an actual height but cannot bind it to the verbose blockhash.
+    return withHistoryHeight(
+      {
+        ...tx,
+        blockhash: undefined,
+        blocktime: undefined,
+        time: undefined,
+        confirmations: undefined,
+      },
+      historyHeight,
+    );
+  }
   return tx;
 }
 export async function fetchHistory(
@@ -245,7 +334,9 @@ export async function scanWallet(
       ...allIds.filter(
         (id) =>
           existing[id] &&
-          ((existing[id].confirmations ?? 0) <= 0 ||
+          ((existing[id].blockHeight === undefined && (existing[id].confirmations ?? 0) <= 0) ||
+            (existing[id].blockHeight !== undefined &&
+              existing[id].blockHeight !== heights.get(id)) ||
             heights.get(id) !== oldHeights.get(id) ||
             (heights.get(id) ?? 0) <= 0),
       ),
@@ -259,13 +350,19 @@ export async function scanWallet(
   const toLoad = pending.slice(0, MAX_SCAN_TRANSACTIONS);
   let loaded = 0;
   const transactions = await mapLimit(toLoad, 4, async (id) => {
-    const tx = await fetchTransaction(network, id, options.signal);
+    const tx = await fetchTransaction(network, id, options.signal, heights.get(id));
     options.onProgress?.({
       done: checked,
       message: `${wallet.name}: loading transactions ${++loaded}/${toLoad.length}`,
     });
     return tx;
   });
+  const pendingSet = new Set(pending);
+  for (const id of allIds) {
+    if (!existing[id] || pendingSet.has(id)) continue;
+    const observed = withHistoryHeight(existing[id], heights.get(id)!);
+    if (observed !== existing[id]) transactions.push(observed);
+  }
   const truncated = pending.length > MAX_SCAN_TRANSACTIONS;
   options.signal?.throwIfAborted();
   const newTransactionIds = transactions.filter((tx) => !existing[tx.txid]).map((tx) => tx.txid);
@@ -307,7 +404,11 @@ export async function loadAddress(
     ...allIds.filter((id) => !existing[id]),
     ...allIds.filter(
       (id) =>
-        existing[id] && ((existing[id].confirmations ?? 0) <= 0 || (heights.get(id) ?? 0) <= 0),
+        existing[id] &&
+        ((existing[id].blockHeight === undefined && (existing[id].confirmations ?? 0) <= 0) ||
+          (existing[id].blockHeight !== undefined &&
+            existing[id].blockHeight !== heights.get(id)) ||
+          (heights.get(id) ?? 0) <= 0),
     ),
   ];
   let loaded = 0;
@@ -316,8 +417,14 @@ export async function loadAddress(
       done: loaded,
       message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
     });
-    return fetchTransaction(network, id, signal);
+    return fetchTransaction(network, id, signal, heights.get(id));
   });
+  const requested = new Set(ids);
+  for (const id of allIds) {
+    if (!existing[id] || requested.has(id)) continue;
+    const observed = withHistoryHeight(existing[id], heights.get(id)!);
+    if (observed !== existing[id]) transactions.push(observed);
+  }
   return {
     transactions,
     truncated: ids.length > MAX_SCAN_TRANSACTIONS,
@@ -357,6 +464,9 @@ export async function loadSpending(
       'Load the creating transaction first: these outputs have no script data to search.',
     );
   const histories = await mapLimit(scripts, 4, (hash) => fetchHistory(w.network, hash, signal));
+  const heights = new Map(
+    histories.flatMap((history) => history.map((entry) => [entry.tx_hash, entry.height] as const)),
+  );
   const ids = [...new Set(histories.flatMap((h) => h.map((e) => e.tx_hash)))]
     .filter((id) => id !== tx.txid)
     .sort();
@@ -364,8 +474,8 @@ export async function loadSpending(
   const nextOffset = offset + 500 < ids.length ? offset + 500 : undefined;
   const candidates = await mapLimit(ids.slice(offset, offset + 500), 4, (id) =>
     w.transactions[id]
-      ? Promise.resolve(w.transactions[id])
-      : fetchTransaction(w.network, id, signal),
+      ? Promise.resolve(withHistoryHeight(w.transactions[id], heights.get(id)!))
+      : fetchTransaction(w.network, id, signal, heights.get(id)),
   );
   return {
     transactions: candidates.filter((t) =>

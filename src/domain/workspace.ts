@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { graphSnapshotSchema } from './graphSnapshot';
+import { assertHiddenNodeBudget, hiddenNodeIdsSchema, parseHiddenNodeIds } from './visibility';
 import type { Workspace, Transaction, GraphData, GraphNode, Network } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
 import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
@@ -63,6 +64,8 @@ const transactionSchema = z
     vin: z.array(inputSchema).min(1).max(10000),
     vout: z.array(outputSchema).min(1).max(10000),
     confirmations: z.number().int().min(-0x7fffffff).max(0x7fffffff).optional(),
+    blockHeight: z.number().int().min(0).max(0x7fffffff).optional(),
+    mempool: z.boolean().optional(),
     blocktime: uint32.optional(),
     time: uint32.optional(),
     size: z.number().int().min(1).max(4_000_000).optional(),
@@ -70,6 +73,27 @@ const transactionSchema = z
     blockhash: txid.optional(),
   })
   .superRefine((transaction, context) => {
+    if (
+      transaction.mempool &&
+      (transaction.blockHeight !== undefined ||
+        transaction.blockhash !== undefined ||
+        (transaction.confirmations ?? 0) !== 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['mempool'],
+        message: 'Mempool observations cannot include a block or nonzero confirmations.',
+      });
+    if (
+      transaction.blockHeight !== undefined &&
+      transaction.confirmations !== undefined &&
+      transaction.confirmations <= 0
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['blockHeight'],
+        message: 'A confirmed block height cannot have zero or negative confirmations.',
+      });
     if (
       transaction.vin.some((input) => input.coinbase !== undefined) &&
       transaction.vin.length !== 1
@@ -200,6 +224,8 @@ const workspaceSchema = z.object({
     sizeBy: z.enum(['uniform', 'value', 'degree']),
     glow: z.boolean(),
     showAddresses: z.boolean(),
+    hiddenNodeIds: hiddenNodeIdsSchema.optional(),
+    entityVisibility: z.enum(['visible', 'hidden', 'all']).optional(),
     showLabels: z.boolean().optional(),
     showTags: z.boolean().optional(),
     showIcons: z.boolean().optional(),
@@ -291,6 +317,9 @@ export function assertWorkspaceBudget(data: unknown) {
     }
   }
   assertTagBudget(raw.tags);
+  const view = (data as { view?: unknown }).view;
+  if (view && typeof view === 'object')
+    assertHiddenNodeBudget((view as { hiddenNodeIds?: unknown }).hiddenNodeIds);
   if (
     raw.transactions &&
     typeof raw.transactions === 'object' &&
@@ -372,6 +401,8 @@ export function parseTransaction(data: unknown): Transaction {
 export function parseWorkspace(data: unknown, verifyDerivation = true): Workspace {
   assertWorkspaceBudget(data);
   const parsed = workspaceSchema.parse(data);
+  if (parsed.view.hiddenNodeIds !== undefined)
+    parsed.view.hiddenNodeIds = parseHiddenNodeIds(parsed.view.hiddenNodeIds, parsed.network);
   if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
   if (Object.entries(parsed.transactions).some(([id, transaction]) => id !== transaction.txid))
     throw new Error('Workspace has invalid transaction records.');

@@ -25,6 +25,9 @@ First testable release of the MIT-licensed, self-hosted Bitcoin analysis workben
 - Transaction cards select across the whole block and expose label/tag/icon shortcuts; input/output expand controls remain above their rows.
 - Network-aware curated samples: four independently verified mainnet transactions and three testnet4 output paths.
 - Encrypted IndexedDB backing for large workspaces and localStorage quota recovery, preserving small-save behavior and portable encrypted exports.
+- Saved manual entity visibility, hidden/all entity views, compact row actions, grouped input/output visibility and guarded transaction/address-watch removal with Undo.
+- Compact transaction input/output counts and observed block-height or mempool status across entities, flow and inspection.
+- Deferred graph snapshots and worker-based validation/encryption, with latest-view checkpoints on lock, export and workspace switching.
 - Bounded recovery of stale read-only Bitcoin RPC connections, retaining request deadlines and cancellation.
 - Production container and local Compose deployment, plus a tag-gated multi-architecture GHCR release workflow.
 

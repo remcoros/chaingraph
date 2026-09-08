@@ -25,6 +25,8 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors: string[] = [];
+  const workerUrls: string[] = [];
+  page.on('worker', (worker) => workerUrls.push(worker.url()));
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
@@ -58,6 +60,16 @@ try {
   await expect(picker.getByRole('checkbox', { name: 'Production saved tag' })).toBeChecked();
   await page.keyboard.press('Escape');
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  expect(
+    workerUrls.some((url) => {
+      const parsed = new URL(url);
+      return (
+        parsed.origin === new URL(base).origin &&
+        /\/assets\/workspaceEncryption\.worker-[^/]+\.js$/.test(parsed.pathname)
+      );
+    }),
+    'production encrypted saves use the bundled same-origin worker under CSP',
+  ).toBe(true);
   const stored = await page.evaluate(() => JSON.stringify(localStorage));
   expect(stored).not.toContain('Production saved label');
   expect(stored).not.toContain('Production saved tag');
@@ -83,7 +95,7 @@ try {
   await expect(page.locator('.tag-card')).toContainText(/1 loaded entit(?:y|ies)/);
   expect(errors, 'production browser errors').toEqual([]);
   console.log(
-    'Production browser smoke passed: built WebGL, CSP, transaction view, annotation, tags, encrypted save and reload/unlock.',
+    'Production browser smoke passed: built WebGL, CSP, bundled encryption worker, transaction view, annotation, tags, encrypted save and reload/unlock.',
   );
 } finally {
   await browser.close();

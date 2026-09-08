@@ -29,6 +29,9 @@ not when scaffolding this upstream application.
 - Workspace names are intentionally public in the saved index. Descriptions, xpubs,
   graph data and notes belong inside the encrypted envelope.
   Passwords and decrypted state live only in memory. Do not log them.
+- Keep workspace validation/encryption off the browser UI thread. Camera gestures
+  must defer snapshots and autosaves; lock/export/switch must capture the latest view.
+  Renderer changes need gesture, flush and save-failure regression checks.
 - Prefer vetted Bitcoin primitives and WebCrypto to custom cryptography. Test vectors,
   tampering, network mismatch, cancellations, and storage failure paths matter.
 - MIT application code only. Check dependency and source licenses before reuse.

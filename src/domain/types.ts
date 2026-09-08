@@ -23,6 +23,10 @@ export interface Transaction {
   vin: TxInput[];
   vout: TxOutput[];
   confirmations?: number;
+  /** Actual containing-block height observed from Core or Electrum history. */
+  blockHeight?: number;
+  /** Present only when an upstream observed the transaction in its mempool. */
+  mempool?: boolean;
   blocktime?: number;
   time?: number;
   size?: number;
@@ -111,6 +115,9 @@ export interface Workspace {
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
     showAddresses: boolean;
+    /** Manual canvas visibility, independent of filters and cached Bitcoin observations. */
+    hiddenNodeIds?: string[];
+    entityVisibility?: 'visible' | 'hidden' | 'all';
     showLabels?: boolean;
     showTags?: boolean;
     showIcons?: boolean;

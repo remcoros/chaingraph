@@ -1,5 +1,73 @@
 # Validation results
 
+## Deferred autosave and entity visibility, 2026-09-08
+
+Graph navigation now coalesces camera snapshots after 1.2 seconds of quiet and
+pauses automatic save dispatch/publication during input. Workspace validation,
+JSON serialization and encryption run in a browser worker. Camera-only changes
+reuse immutable geometry and do not rebuild wallet script matches or node styling.
+Lock, export, workspace switching and unload checks synchronously capture the
+latest view before examining save state. The encrypted file format is unchanged.
+
+A 15,000-output workspace with 1,501 displayed nodes passed continuous browser-timed
+DOM wheel input through OrbitControls and a separate held-pointer mouse drag.
+Neither gesture started an encryption job. Saving resumed after idle; immediate
+export and lock preserved the changed camera and note. The recorded run's largest
+observed main-thread long task after gesture start was 212 ms under Chromium with
+SwiftShader. This is scheduling/regression evidence, not a universal frame-rate
+or latency guarantee. [Measurements and methodology](research/graph-autosave-performance.md).
+
+Entity rows have compact show/hide and eligible removal buttons, input/output
+counts, and observed block or mempool status. Hidden entities remain editable and
+persist through encrypted reopening. Grouped visibility leaves complete Bitcoin
+records intact. Removal confirms affected annotations and tags, identifies the
+canonical transaction/address even when labels collide, preserves unrelated
+selection, and supports Undo. Hidden addresses remain recoverable while address
+nodes are off; restoration explains the display setting and offers an explicit
+button to enable it. Mobile row targets are 40 by 40 pixels with 6-pixel separation.
+
+The full 96-case browser run passed 92 cases. Four affected cases passed after
+correcting an obsolete button selector, an offline-banner assertion, automation
+gesture timing, and a transient Chromium network-change interruption during Docker
+recreation. A subsequent 12-case run passed all cases, including two additional
+regressions for an already-open unlock modal during storage migration and explicit
+address-display recovery. All **98 browser scenarios** have therefore passed across
+the full run and targeted follow-up. The final dense performance rerun also passed
+and saved its measurement artifact. **369 unit/backend tests**, TypeScript,
+production build and formatting passed; the final outside-active-chain wording
+also passed the 11 transaction-status tests.
+
+Two independent Herdr Codex reviews checked persistence and actual desktop/phone
+journeys in separate worktrees. Their findings led to stable queued-save draining
+before unlock, refreshed saved-entry references after IndexedDB migration,
+unrelated-selection preservation, unique removal identities and hidden-address
+recovery. A browser security error in the independent fixture was reproduced on
+Chromium's opaque failed-navigation page; the same initialization on the app origin
+passed. No remaining confirmed product failure was reported in the exercised scope.
+
+Read-only native checks passed for both configured networks, including block-header
+height and matching Core/Electrum transaction bytes. Real credentials were loaded
+only by runtime configuration, never inspected or copied. Block-height provenance,
+network-scoped bounded reuse, cancellation and reorganization handling also have
+focused regression coverage. [Transaction status limits](research/transaction-status.md).
+
+The final local amd64 container built and ran through Compose as the node user with
+a read-only filesystem and reported healthy. The production browser smoke verified
+the actual bundled same-origin encryption worker under server CSP, plus built WebGL,
+labels/tags and encrypted save/reload/unlock. Container configuration used public
+synthetic upstream fixtures; real upstream connectivity was verified natively.
+
+The native preview was restarted on port 3001 with its isolated mainnet/testnet4
+backend on port 4000. A public testnet4 transaction walkthrough confirmed actual
+block height, direct input loading, row hide/restore, label/tag editing, desktop and
+phone controls, and encrypted lock/reopen without page errors or horizontal overflow.
+
+- [Live transaction flow and graph on desktop](screenshots/visibility-live-desktop.png)
+- [Live transaction flow on phone](screenshots/visibility-live-phone.png)
+- [Compact entity rows on desktop](screenshots/visibility-entities-desktop.png)
+- [Phone entity actions](screenshots/visibility-entities-phone.png)
+- [Removal identity and metadata confirmation](screenshots/visibility-removal-confirmation.png)
+
 ## Tracing interaction and dense workspace refinement, 2026-09-08
 
 Two independent Codex sessions in Herdr reviewed the application in separate
@@ -242,16 +310,16 @@ No release was published. Native ARM runtime, physical-device GPU performance an
 
 ## Release polish, version 0.2.0, 2026-09-08
 
-| Check | Result |
-| --- | --- |
-| Full unit/integration suite | 145 passed, 0 failed |
-| Final serial browser suite | 29 passed, 0 failed, 2.2 minutes |
-| TypeScript, production build, formatting, release metadata, diff whitespace | Passed |
-| Dependency audit | 0 known vulnerabilities at check time |
-| Native Docker build and hardened runtime | Passed on linux/amd64 |
-| Docker Compose startup and shutdown | Healthy startup, clean shutdown |
-| Final production-container Chromium smoke | Passed with actual built assets and CSP |
-| GitHub workflows | Both passed actionlint 1.7.12 |
+| Check                                                                       | Result                                  |
+| --------------------------------------------------------------------------- | --------------------------------------- |
+| Full unit/integration suite                                                 | 145 passed, 0 failed                    |
+| Final serial browser suite                                                  | 29 passed, 0 failed, 2.2 minutes        |
+| TypeScript, production build, formatting, release metadata, diff whitespace | Passed                                  |
+| Dependency audit                                                            | 0 known vulnerabilities at check time   |
+| Native Docker build and hardened runtime                                    | Passed on linux/amd64                   |
+| Docker Compose startup and shutdown                                         | Healthy startup, clean shutdown         |
+| Final production-container Chromium smoke                                   | Passed with actual built assets and CSP |
+| GitHub workflows                                                            | Both passed actionlint 1.7.12           |
 
 The [independent review](reviews/2026-09-08-independent.md) ran in a new Codex session without skills, memory, user configuration or inherited conversation. The [response matrix](reviews/2026-09-08-response.md) records fixes. Regression coverage includes imported wallet address/key binding, 200-character wallet labels surviving concurrent scan completion and encrypted reopening, annotation drafts surviving view changes and conflicting undo, preserved exclusions, stale findings, entity pagination beyond 200 records, shared canvas filters, locked-copy deletion, and selection history after graph removal.
 
@@ -275,13 +343,13 @@ No release was tagged or published: this checkout has no configured GitHub remot
 
 ## Tracing and workspace refinement, 2026-09-08
 
-| Check | Passed | Failed |
-| --- | ---: | ---: |
-| Unit/integration suite, including ancestry, spending continuation and public-name migration | 112 | 0 |
-| Final isolated browser suite, including actual WebGL picking and responsive workflows | 21 | 0 |
-| Live browser example loading and previous/spending expansion, across three testnet4 examples | 9 | 0 |
-| Curated example verification through the configured Core/Fulcrum proxy | 3 | 0 |
-| Actual frontend funding/spending helper checks against the live proxy | 6 | 0 |
+| Check                                                                                        | Passed | Failed |
+| -------------------------------------------------------------------------------------------- | -----: | -----: |
+| Unit/integration suite, including ancestry, spending continuation and public-name migration  |    112 |      0 |
+| Final isolated browser suite, including actual WebGL picking and responsive workflows        |     21 |      0 |
+| Live browser example loading and previous/spending expansion, across three testnet4 examples |      9 |      0 |
+| Curated example verification through the configured Core/Fulcrum proxy                       |      3 |      0 |
+| Actual frontend funding/spending helper checks against the live proxy                        |      6 |      0 |
 
 TypeScript, production build, formatting, and `git diff --check` passed. The final browser suite took 1.6 minutes and used isolated synthetic API fixtures except for its renderer tests, which exercise actual canvas picking. Its viewport coverage includes 320, 375, 414 and 768 pixels. The live example browser used three separate fresh workspaces, loaded each selected output, and added its verified parents and spender. No uncaught browser errors or horizontal overflow were observed.
 
@@ -311,14 +379,14 @@ The 3,001-node renderer smoke remains functional evidence using software WebGL, 
 
 ## Initial version validation
 
-| Check | Passed | Failed |
-| --- | ---: | ---: |
-| Unit/integration suite (protocol, crypto, wallet, scanner, domain, persistence) | 95 | 0 |
-| Deterministic browser suite, including the two-wallet round-trip regression | 12 | 0 |
-| Read-only live testnet4 backend smoke, with system CAs | 5 | 0 |
-| Complete live testnet4 browser flow | 8 | 0 |
-| Immediate local status readiness probes | 8 | 0 |
-| Follow-up local API probes, 20 sequential requests at 2-second intervals | 20 | 0 |
+| Check                                                                           | Passed | Failed |
+| ------------------------------------------------------------------------------- | -----: | -----: |
+| Unit/integration suite (protocol, crypto, wallet, scanner, domain, persistence) |     95 |      0 |
+| Deterministic browser suite, including the two-wallet round-trip regression     |     12 |      0 |
+| Read-only live testnet4 backend smoke, with system CAs                          |      5 |      0 |
+| Complete live testnet4 browser flow                                             |      8 |      0 |
+| Immediate local status readiness probes                                         |      8 |      0 |
+| Follow-up local API probes, 20 sequential requests at 2-second intervals        |     20 |      0 |
 
 The live browser flow checked connected status, bounded transaction selection, encrypted workspace creation, real transaction graph loading, output inspection, address history, funding expansion, and spending expansion. Selection used 10 direct read-only proxy calls. Uncaught browser errors: **0**.
 
@@ -329,7 +397,6 @@ The follow-up probe made **20 sequential requests**, separated by **2 seconds**.
 The browser used an isolated ephemeral context. Saved browser profiles, traces and screenshots: **0**. Environment-file reads by the browser test: **0**. Credentials, upstream endpoints, transaction identifiers, addresses and passwords recorded in this report: **0**.
 
 The production build was also exercised through the real static server in Chromium. An initial check caught a blocked embedded graph font; the policy was adjusted narrowly to allow data fonts while retaining same-origin script restrictions. The rerun passed: one WebGL canvas rendered the 1,623-node / 1,620-link synthetic laboratory, encrypted autosave completed, and no console or page errors occurred. Production JavaScript is split into a 481 kB application chunk and a lazily loaded 1,381 kB graph chunk (uncompressed).
-
 
 The final browser regression rerun passed all **12 tests** after component extraction,
 scan continuation changes, domain validation, graph stylesheet scoping, and tour

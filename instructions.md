@@ -51,7 +51,7 @@ Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize d
 
 Transactions are cubes, outputs are spheres, and optional addresses are diamonds. Hover a node for identifiers, values, available details, and compact actions at the top of its card. Connection lines do not open cards, reducing interruptions in dense graphs. **Load previous level** expands that path; **Edit label / notes** opens and focuses the inspector. The inspector and entity list provide the same tracing workflow without hover.
 
-Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row symbol palette with keyboard arrow navigation and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Remove a transaction from its inspector to reduce the graph; its saved annotations remain, and descendant inputs may still show output placeholders.
+Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row symbol palette with keyboard arrow navigation and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Removing a transaction includes its annotations and asks for confirmation when user data is attached. Descendant inputs may still show output placeholders.
 
 ## Filter and navigate
 
@@ -59,7 +59,7 @@ The **Entities** panel filters both the list and canvas. Search identifiers, lab
 
 Navigation floats at the top of the graph canvas once transactions are loaded. On narrow screens, navigation uses compact icons with accessible names and tooltips.
 
-**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Focus graph**, beside 3D/Flat, hides desktop side panels until you choose **Restore panels**. It is hidden on mobile, where panels already occupy separate views.
+**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Focus graph**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
 
 ## Run analysis
 
@@ -79,9 +79,30 @@ The **Tools** and **Findings** controls jump between configuration and results. 
 
 Exclude a finding to remove its overlay without deleting the result. Rerunning the same tool preserves exclusions when the finding's node and transaction evidence is unchanged. Loading or changing wallet/transaction data marks prior results **Needs rerun** and removes stale overlays. User annotations stay separate from algorithm results.
 
+## Hide, restore and remove entities
+
+Use the eye buttons in Entities, the Inspector or a node card to hide or show an entity.
+The Entities visibility filter offers **Visible**, **Hidden** and **All**; the hidden-count
+shortcut clears other filters so you can find everything manually hidden. **Show all hidden**
+restores manual visibility. Other graph filters and loaded context still apply.
+Hidden entities retain their notes, labels, tags and icons, and can still be inspected.
+Hidden addresses remain recoverable while address display is off; restoring one offers
+an explicit action to enable address display.
+Transaction visibility controls can hide or show its input/output groups together.
+
+The remove button deletes a loaded transaction from the workspace or stops watching an
+explicitly watched address. Annotated or tagged data requires confirmation. Transaction
+removal includes its output annotations; stopping an address watch retains shared loaded
+transactions. Undo restores either action. Individual inputs and outputs are hideable,
+not separately deleted from Bitcoin transaction records.
+
 ## Autosave, lock, and exchange data
 
-Workspace autosave writes encrypted contents to this browser's storage. Small saves use localStorage; larger saves use IndexedDB while the localStorage index keeps only public metadata and encrypted-payload references. Existing saves migrate automatically when needed, and encrypted export files keep the same format. Lock the workspace to close its unlocked session. Reopening requires its password. On the Workspaces screen, search saved public names or use the trash button to delete a locked browser copy. The confirmation affects only that copy, not exported files; lock an open workspace first. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
+Workspace autosave writes encrypted contents to this browser's storage. Navigation pauses
+automatic saves and coalesces camera changes until the graph is idle. Validation and
+encryption run in a worker to keep the interface responsive. Lock, export and workspace
+switching capture the latest camera first. Wait for the saved status before closing the
+browser; an abrupt browser or device shutdown can still lose pending edits. Small saves use localStorage; larger saves use IndexedDB while the localStorage index keeps only public metadata and encrypted-payload references. Existing saves migrate automatically when needed, and encrypted export files keep the same format. Lock the workspace to close its unlocked session. Reopening requires its password. On the Workspaces screen, search saved public names or use the trash button to delete a locked browser copy. The confirmation affects only that copy, not exported files; lock an open workspace first. Browser storage is tied to the exact origin: development at port 3001 and a built app at another port have separate saved workspaces.
 
 Export an encrypted workspace file for backup or transfer to another browser. On narrow screens, Export and Undo are in **Workspace menu** beside the lookup controls. Import it and supply the password to reopen it. If its network is not configured on this backend, the workspace still opens for offline inspection and editing. A clear backend-network error appears and live queries stay disabled until the matching pair is configured. The same applies when unlocking an existing browser workspace. Keep the password separately: there is no reset or recovery service. Exported files preserve workspace contents, not a live blockchain connection. Camera position and node coordinates are included with your view settings.
 
@@ -112,6 +133,10 @@ Use **Help and samples → About Chaingraph** for the version, license and sourc
 For Docker setup, see [deployment](docs/deployment.md). For server setup and development commands, see [README.md](README.md).
 
 ## Transaction and script inspection
+
+Transaction rows show input/output counts and a compact confirmation status. Block heights
+come from recorded chain observations. **Unconfirmed** means a mempool observation was
+loaded; missing information stays **Status unknown**. Refresh to check the current state.
 
 Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, with expand/collapse controls above each list and the selected row kept visible. Direct input transactions load automatically while the panel is open; unavailable or bounded results provide retry or continuation. Click the central transaction block to select it, or use its label, tag and icon toolbar to edit that transaction. Row pencils open the corresponding output annotation. Missing spending data does not prove an output is unspent.
 

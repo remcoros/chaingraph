@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
+import { canonicalAddress, canonicalEntityNodeId } from './entityReferences';
 import type { GraphData, GraphNode, Network, Workspace, WorkspaceTag } from './types';
 import { outputNodeId } from './types';
 
@@ -19,24 +20,8 @@ const tagSchema = z.object({
 });
 export const workspaceTagsSchema = z.array(tagSchema).max(MAX_WORKSPACE_TAGS);
 
-/** Public entity identifiers only, including valid references not loaded yet. */
-export function canonicalTagNodeId(id: string, network: Network): string {
-  const transaction = /^tx:([0-9a-f]{64})$/i.exec(id);
-  if (transaction) return `tx:${transaction[1].toLowerCase()}`;
-  const output = /^out:([0-9a-f]{64}):(\d{1,10})$/i.exec(id);
-  if (output && Number(output[2]) <= 0xffffffff)
-    return outputNodeId(output[1].toLowerCase(), Number(output[2]));
-  if (id.startsWith('addr:')) {
-    const address = id.slice(5);
-    addressToScriptHash(address, network);
-    return `addr:${canonicalAddress(address)}`;
-  }
-  throw new Error('Tags accept transaction, output, or network-valid address references.');
-}
-
-function canonicalAddress(address: string): string {
-  return /^(bc|tb)1/i.test(address) ? address.toLowerCase() : address;
-}
+/** Kept as a named tag boundary for existing callers. */
+export const canonicalTagNodeId = canonicalEntityNodeId;
 
 /** Count the supplied records before allocating or normalizing their contents. */
 export function assertTagBudget(tags: unknown): void {
@@ -181,6 +166,7 @@ export function buildWalletMatches(
       walletsByScript.set(hash, wallets);
     }
   }
+  if (!walletsByScript.size) return new Map();
   const outputWallets = new Map<string, Set<string>>();
   const transactionWallets = new Map<string, Set<string>>();
   const associate = (txid: string, wallets: Set<string>) => {

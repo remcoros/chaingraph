@@ -1,4 +1,5 @@
 import type { Annotation, GraphData, GraphNode } from './types';
+import type { EntityVisibility } from './visibility';
 
 export interface GraphFilters {
   tagId?: string;
@@ -43,12 +44,19 @@ export function filterGraph(
   graph: GraphData,
   filters: GraphFilters = {},
   annotations: Record<string, Annotation> = {},
+  visibility: { hiddenNodeIds?: readonly string[]; mode?: EntityVisibility } = {},
 ): FilteredGraph {
   if (valueFilterError(filters))
     return { nodes: [], links: [], matchedNodes: [], contextNodeIds: [] };
+  const hidden = new Set(visibility.hiddenNodeIds ?? []);
+  const mode = visibility.mode ?? 'visible';
   const visible = new Set(
     graph.nodes
-      .filter((node) => filters.showAddresses !== false || node.kind !== 'address')
+      .filter(
+        (node) =>
+          (filters.showAddresses !== false || node.kind !== 'address') &&
+          (mode === 'all' || hidden.has(node.id) === (mode === 'hidden')),
+      )
       .map((node) => node.id),
   );
   const neighbors = new Map<string, Set<string>>();

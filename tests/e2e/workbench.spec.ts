@@ -474,7 +474,9 @@ test('selection history preserves path depth and skips removed transaction nodes
     page.locator(`.selection-heading .selection-facts code[title="${TX_FUNDING}"]`),
   ).toBeVisible();
   await expect(page.getByLabel('Focus graph paths')).toHaveValue('1');
-  await page.getByRole('button', { name: 'Remove transaction from graph', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Remove transaction from workspace', exact: true })
+    .click();
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
   await page.getByRole('button', { name: 'Next selection', exact: true }).click();
   await expect(

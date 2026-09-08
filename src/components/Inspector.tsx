@@ -1,9 +1,11 @@
+import { transactionStatus } from '../domain/transactionStatus';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronDown,
   Crosshair,
+  EyeOff,
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
@@ -22,6 +24,7 @@ import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
 import { walletActivitySummary, walletCheckAge } from '../domain/walletActivity';
 import { CopyButton } from './CopyButton';
+import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from './IconPicker';
 import { OpReturnData } from './OpReturnData';
@@ -271,7 +274,7 @@ export const emptyAnnotation: Annotation = {
   icon: '',
   bookmarked: false,
 };
-interface NodeInspectorProps {
+interface NodeInspectorProps extends VisibilityProps {
   tagsPanel?: ReactNode;
   w: Workspace;
   selected: GraphNode;
@@ -287,6 +290,8 @@ interface NodeInspectorProps {
   onExpand: (direction: 'funding' | 'spending') => void;
   onSelectNode?: (id: string) => void;
   onCenter?: () => void;
+  onShowAndCenter?: () => void;
+  canRemove?: boolean;
   onRefresh: () => void;
   onRemove: () => void;
   onSave: (annotation: Annotation, group?: string) => void;
@@ -307,11 +312,16 @@ export function NodeInspector({
   onExpand,
   onSelectNode,
   onCenter,
+  onShowAndCenter,
+  canRemove,
+  hiddenNodeIds = [],
+  onSetHidden,
   onRefresh,
   onRemove,
   onSave,
 }: NodeInspectorProps) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const selectedHidden = hiddenNodeIds.includes(selected.id);
   const unavailable = busy
     ? 'Wait for the current operation to finish.'
     : queryDisabledReason ||
@@ -374,7 +384,10 @@ export function NodeInspector({
   const relatedNav = !!onSelectNode && (spendingCount > 0 || (selected.kind === 'output' && !!tx));
   const hasEvidence = selected.kind === 'output' || !!tx || !!selected.address;
   const showRefresh = !!selected.txid && !!tx && !w.demo;
-  const showRemove = selected.kind === 'transaction' && !!tx;
+  const showRemove =
+    selected.kind === 'transaction'
+      ? !!tx && canRemove !== false
+      : selected.kind === 'address' && canRemove === true;
   return (
     <>
       <div className="panel-section selection-heading">
@@ -382,18 +395,39 @@ export function NodeInspector({
           <span className="eyebrow">
             {selected.kind === 'output' ? 'TRANSACTION OUTPUT' : selected.kind.toUpperCase()}
           </span>
-          {onCenter && (
-            <button
-              type="button"
-              className="icon-button"
-              title="Center this node in graph"
-              aria-label="Center this node in graph"
-              onClick={onCenter}
-            >
-              <Crosshair size={15} />
-            </button>
-          )}
+          <div className="selection-node-actions">
+            <VisibilityActions
+              nodeId={selected.id}
+              transaction={selected.kind === 'transaction' ? tx : undefined}
+              hiddenNodeIds={hiddenNodeIds}
+              onSetHidden={onSetHidden}
+            />
+            {onCenter && (
+              <button
+                type="button"
+                className="icon-button"
+                title="Center this node in graph"
+                aria-label="Center this node in graph"
+                onClick={onCenter}
+                disabled={selectedHidden}
+              >
+                <Crosshair size={15} />
+              </button>
+            )}
+          </div>
         </div>
+        {selectedHidden && (
+          <div className="selection-hidden-state">
+            <span className="entity-hidden-badge">
+              <EyeOff size={12} /> Hidden from graph
+            </span>
+            {onShowAndCenter && (
+              <button type="button" className="text-button" onClick={onShowAndCenter}>
+                Show and center
+              </button>
+            )}
+          </div>
+        )}
         {w.annotations[selected.id]?.label && <h2>{w.annotations[selected.id].label}</h2>}
         <dl className="selection-facts">
           {selected.address && selected.kind !== 'address' && (
@@ -443,6 +477,12 @@ export function NodeInspector({
             <dt>Value</dt>
             <dd>{formatSats(selected.value)}</dd>
           </div>
+          {tx && (
+            <div>
+              <dt>Chain status</dt>
+              <dd title={transactionStatus(tx).title}>{transactionStatus(tx).label}</dd>
+            </div>
+          )}
         </dl>
         {selectedOutput && <OpReturnData hex={selectedOutput.scriptPubKey.hex} />}
         {cautions.length > 0 && (
@@ -556,12 +596,10 @@ export function NodeInspector({
                 </div>
                 <div>
                   <dt>State at fetch</dt>
-                  <dd>
-                    {(tx.confirmations ?? 0) < 0
-                      ? 'Conflicted at fetch'
-                      : tx.confirmations
-                        ? `${tx.confirmations} confirmations`
-                        : 'Unconfirmed / unknown'}
+                  <dd title={transactionStatus(tx).title}>
+                    {tx.confirmations && tx.confirmations > 0
+                      ? `${tx.confirmations} confirmations`
+                      : transactionStatus(tx).label}
                   </dd>
                 </div>
                 {tx.vsize && (
@@ -602,7 +640,9 @@ export function NodeInspector({
           )}
           {showRemove && (
             <button className="text-button danger" disabled={busy} onClick={onRemove}>
-              Remove transaction from graph
+              {selected.kind === 'address'
+                ? 'Stop watching address'
+                : 'Remove transaction from workspace'}
             </button>
           )}
         </div>

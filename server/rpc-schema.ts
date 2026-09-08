@@ -12,6 +12,7 @@ const methods: Record<string, z.ZodType> = {
     hash.optional(),
   ]),
   'core:getblockhash': z.tuple([index]),
+  'core:getblockheader': z.tuple([hash, z.boolean().optional()]),
   'core:getblock': z.tuple([
     hash,
     z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),

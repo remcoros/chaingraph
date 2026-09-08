@@ -98,6 +98,10 @@ Read [architecture and extension points](docs/architecture.md), [user instructio
 
 ## Transaction and script inspection
 
+Transaction rows show input/output counts and a compact confirmation status. Block heights
+come from recorded chain observations. **Unconfirmed** means a mempool observation was
+loaded; missing information stays **Status unknown**. Refresh to check the current state.
+
 Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, with expand/collapse controls above the rows and the selected row kept visible. Direct input transactions load automatically while the flow panel is open, with explicit retry or continuation for unavailable or bounded results. Click the central transaction block to select it, or use its label, tag and icon controls to edit it. Missing spending data does not prove an output is unspent.
 
 The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. The laboratory has no serialized raw data. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).
@@ -106,7 +110,9 @@ Edits to labels, notes, icons, bookmarks, tags and workspace details save automa
 The status bar confirms when the encrypted copy has reached browser storage; locking
 flushes pending edits first. Graph camera/layout, filters, selection and transaction-flow
 expansion are encrypted and restored when reopening. Export remains an explicit action
-for keeping a portable backup.
+for keeping a portable backup. Camera snapshots wait until navigation is idle; workspace
+validation and encryption run in a browser worker. Locking, exporting or switching
+workspaces captures the latest view first.
 
 The compact transaction flow places inputs and outputs around the current transaction.
 Select an output to see adjacent creating/spending transactions and use its arrows to
@@ -119,3 +125,10 @@ Tags can be searched, created and assigned from **Add or choose tags** in the in
 workbench. Graph controls independently show or hide labels, tags and icons. On
 desktop, **Focus graph** sits beside the 3D/Flat toggle and temporarily hides the
 side panels; it is hidden on mobile, where panels already have separate views.
+
+Use the eye buttons in **Entities**, the Inspector or graph cards to hide individual
+entities without losing their annotations. **Hidden** lists them for quick restoration;
+**Show all hidden** restores manual visibility. Transactions and explicitly watched
+addresses also offer removal. Removing annotated or tagged data asks for confirmation,
+and Undo restores a removal. Stopping an address watch retains shared transaction data.
+Individual inputs and outputs can be hidden, while complete transaction records stay intact.

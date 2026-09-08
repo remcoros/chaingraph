@@ -61,7 +61,10 @@ describe('spending expansion', () => {
     expect(firstIds).toHaveLength(500);
     expect(new Set(firstIds)).toEqual(new Set(ids.slice(0, 500)));
     const second = await loadSpending(root, w, 0, undefined, first.nextOffset);
-    expect(second).toEqual({ transactions: [transactions.get(id(501))], truncated: false });
+    expect(second).toEqual({
+      transactions: [{ ...transactions.get(id(501)), confirmations: undefined, blockHeight: 1 }],
+      truncated: false,
+    });
     expect(requests.filter((r) => r.method === 'getrawtransaction')).toHaveLength(501);
   });
 
@@ -90,7 +93,9 @@ describe('spending expansion', () => {
     const w = workspace();
     w.transactions[id(1)] = spender;
     const result = await loadSpending(root, w, undefined);
-    expect(result.transactions).toEqual([spender]);
+    expect(result.transactions).toEqual([{ ...spender, confirmations: undefined, blockHeight: 1 }]);
+    expect(w.transactions[id(1)]).toBe(spender);
+    expect(spender.blockHeight).toBeUndefined();
     expect(requests.map((r) => r.params[0])).toEqual([scriptHash('51'), scriptHash('52')]);
   });
 

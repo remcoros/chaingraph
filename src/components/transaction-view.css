@@ -376,15 +376,24 @@
     column-gap: 7px;
   }
   .transaction-view-identity {
-    top: 78px;
-    margin-top: 48px;
+    top: 62px;
+    margin-top: 30px;
   }
   .transaction-view-identity::before,
   .transaction-view-identity::after {
     width: 7px;
   }
   .transaction-identity-select {
-    padding: 9px 3px;
+    min-height: 0;
+    padding: 6px 3px;
+    gap: 4px;
+  }
+  .transaction-identity-select > svg {
+    width: 20px;
+    height: 20px;
+  }
+  .transaction-identity-select .transaction-caption-noun {
+    display: none;
   }
   .transaction-identity-tools .icon-button {
     min-width: 38px;
@@ -542,4 +551,24 @@
 }
 .transaction-input-error > button {
   font-size: 10px;
+}
+
+.transaction-hidden-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 3px;
+}
+.transaction-hidden-state .text-button {
+  font-size: 10px;
+}
+.transaction-row-main .entity-hidden-badge {
+  font-size: 9px;
+}
+@media (max-width: 700px) {
+  .transaction-row-tools {
+    flex-wrap: wrap;
+  }
 }

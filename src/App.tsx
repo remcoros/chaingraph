@@ -4,6 +4,7 @@ import type { NodePresentation } from './components/graph/presentation';
 import { GraphLegend } from './components/GraphLegend';
 import { GraphControls } from './components/GraphControls';
 import { EntityBadges } from './components/EntityBadges';
+import { CopyButton } from './components/CopyButton';
 import TagsPanel, { SelectedTags } from './components/TagsPanel';
 import { buildWalletMatches, tagNodeIds, buildTagIndex, parseWorkspaceTags } from './domain/tags';
 import {
@@ -54,6 +55,8 @@ import { emptyAnnotation, NodeInspector, WalletInspector } from './components/In
 import { HelpMenu } from './components/HelpMenu';
 import { AboutDialog } from './components/AboutDialog';
 import { filterGraph, valueFilterError, type GraphFilters } from './domain/graphFilters';
+import { setNodesHidden, showAllNodes } from './domain/visibility';
+import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import {
   applyWalletScan,
   walletActivitySummary,
@@ -63,10 +66,11 @@ import { AnalysisPanel } from './components/AnalysisPanel';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { GuidedTour } from './components/GuidedTour';
-import { buildGraph, parseWorkspace, promoteInputContext } from './domain/workspace';
+import { buildGraph, promoteInputContext } from './domain/workspace';
 import { analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
+  addressNodeId,
   txNodeId,
   type Transaction,
   type Wallet,
@@ -77,9 +81,11 @@ import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/a
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { loadAncestors } from './lib/tracing';
 import { demoWorkspace } from './domain/demo';
-import { encryptWorkspace, MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
+import { MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
 import { useWorkspaces, type SavedWorkspace } from './lib/useWorkspaces';
+
+const ADDRESS_DISPLAY_NOTICE = 'This address is no longer hidden. Address nodes are switched off.';
 
 function download(name: string, content: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -94,6 +100,7 @@ export default function App() {
   const w = ws.active?.data;
   const [create, setCreate] = useState<'empty' | 'demo'>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
+  const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
   const [walletDialog, setWalletDialog] = useState(false);
   const [fileDialog, setFileDialog] = useState<File>();
   const [menu, setMenu] = useState(false);
@@ -142,6 +149,7 @@ export default function App() {
   const [fitToken, setFitToken] = useState(0);
   const [tour, setTour] = useState<number>();
   const [live, setLive] = useState(false);
+  const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const [scanLimit, setScanLimit] = useState(200);
   const [gap, setGap] = useState(20);
   const spendingOffsets = useRef(new Map<string, number>());
@@ -167,12 +175,43 @@ export default function App() {
   }, [w?.id, ws.sessions.length]);
   const wRef = useRef(w);
   wRef.current = w;
+  const graphFlush = useRef<{ workspaceId: string; flush: () => void } | undefined>(undefined);
+  const flushActiveGraph = useCallback(() => {
+    const id = wRef.current?.id;
+    if (id && graphFlush.current?.workspaceId === id) graphFlush.current.flush();
+    return id;
+  }, []);
+  const saveBeforeLeaving = () => {
+    const id = flushActiveGraph();
+    return id ? ws.persist(id) : Promise.resolve();
+  };
+  const activateWorkspace = (id?: string) => {
+    if (id !== wRef.current?.id) void saveBeforeLeaving().catch(() => {});
+    ws.setActiveId(id);
+  };
+  const openWorkspace = (data: Workspace, password: string) => {
+    void saveBeforeLeaving().catch(() => {});
+    ws.open(data, password);
+  };
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      const id = flushActiveGraph();
+      const session = id ? ws.getSession(id) : undefined;
+      if (session && session.revision !== session.savedRevision) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [flushActiveGraph, ws.getSession]);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
       const current = wRef.current;
       if (event.key.toLowerCase() === 's' && current) {
         event.preventDefault();
+        flushActiveGraph();
         void ws
           .persist(current.id)
           .catch((error) =>
@@ -189,15 +228,18 @@ export default function App() {
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [ws.persist]);
+  }, [ws.persist, flushActiveGraph]);
   const graph = useMemo(
     () => (w ? buildGraph(w) : { nodes: [], links: [] }),
     [w?.id, w?.transactions, w?.inputContext, w?.annotations, w?.findings, w?.view.showAddresses],
   );
-  const walletMatches = useMemo(() => (w ? buildWalletMatches(w, graph) : new Map()), [w, graph]);
+  const walletMatches = useMemo(
+    () => (w ? buildWalletMatches(w, graph) : new Map()),
+    [w?.network, w?.transactions, w?.wallets, graph],
+  );
   const tagIndex = useMemo(
     () => (w ? buildTagIndex(w, graph) : new Map<string, WorkspaceTag[]>()),
-    [w, graph],
+    [w?.tags, graph],
   );
   const nodePresentation = useMemo(() => {
     const presentation = new Map<string, NodePresentation>();
@@ -218,7 +260,7 @@ export default function App() {
       });
     }
     return presentation;
-  }, [w, graph, walletMatches, tagIndex]);
+  }, [w?.annotations, w?.wallets, w?.view.highlightMode, graph, walletMatches, tagIndex]);
   const effectiveFilters = useMemo(() => {
     if (graphFilters.walletId)
       return {
@@ -237,12 +279,74 @@ export default function App() {
         graph,
         { ...effectiveFilters, showAddresses: w?.view.showAddresses },
         w?.annotations,
+        { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
       ),
-    [graph, effectiveFilters, w?.view.showAddresses, w?.annotations],
+    [graph, effectiveFilters, w?.view.showAddresses, w?.view.hiddenNodeIds, w?.annotations],
   );
-  const graphIds = graph.nodes.map((node) => node.id).join('|');
+  const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
+  // Address visibility is a canvas preference. Manually hidden addresses must
+  // remain recoverable without enabling every address node in the renderer.
+  const recoveryGraph = useMemo(() => {
+    if (!w || w.view.showAddresses || !w.view.hiddenNodeIds?.some((id) => id.startsWith('addr:')))
+      return graph;
+    const expanded = buildGraph({ ...w, view: { ...w.view, showAddresses: true } });
+    const nodes = expanded.nodes.filter(
+      (node) => node.kind !== 'address' || hiddenIds.has(node.id),
+    );
+    const ids = new Set(nodes.map((node) => node.id));
+    return {
+      nodes,
+      links: expanded.links.filter((link) => ids.has(link.source) && ids.has(link.target)),
+    };
+  }, [graph, hiddenIds, w?.view.showAddresses]);
+  const hiddenCount = useMemo(
+    () => recoveryGraph.nodes.filter((node) => hiddenIds.has(node.id)).length,
+    [recoveryGraph, hiddenIds],
+  );
+  const visibleEntityCount = useMemo(
+    () => graph.nodes.filter((node) => !hiddenIds.has(node.id)).length,
+    [graph, hiddenIds],
+  );
+  const entityVisibility = w?.view.entityVisibility ?? 'visible';
+  const entityGraph = useMemo(() => {
+    const source = entityVisibility === 'visible' ? graph : recoveryGraph;
+    let filters = effectiveFilters;
+    if (source !== graph && graphFilters.walletId && w) {
+      filters = {
+        ...effectiveFilters,
+        includeIds: [...buildWalletMatches(w, source)]
+          .filter(([, match]) => match.walletIds.includes(graphFilters.walletId!))
+          .map(([id]) => id),
+      };
+    } else if (source !== graph && graphFilters.tagId) {
+      const tag = w?.tags?.find((tag) => tag.id === graphFilters.tagId);
+      filters = { ...effectiveFilters, includeIds: tag ? tagNodeIds(tag, source) : [] };
+    }
+    return filterGraph(
+      source,
+      { ...filters, showAddresses: entityVisibility === 'visible' ? w?.view.showAddresses : true },
+      w?.annotations,
+      { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
+    );
+  }, [
+    graph,
+    recoveryGraph,
+    effectiveFilters,
+    graphFilters.walletId,
+    graphFilters.tagId,
+    w?.wallets,
+    w?.tags,
+    w?.annotations,
+    w?.view.showAddresses,
+    w?.view.hiddenNodeIds,
+    entityVisibility,
+  ]);
+  const graphIds = useMemo(
+    () => recoveryGraph.nodes.map((node) => node.id).join('|'),
+    [recoveryGraph],
+  );
   useEffect(() => {
-    const available = new Set(graph.nodes.map((node) => node.id));
+    const available = new Set(recoveryGraph.nodes.map((node) => node.id));
     setNavigation((current) => {
       const ids = current.ids.filter((id) => available.has(id));
       if (ids.length === current.ids.length) return current;
@@ -266,7 +370,7 @@ export default function App() {
       />
     );
   };
-  const selected = graph.nodes.find((n) => n.id === selectedId);
+  const selected = recoveryGraph.nodes.find((n) => n.id === selectedId);
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
   }, [w?.id, selectedId, selectedWallet, rightTab]);
@@ -313,6 +417,7 @@ export default function App() {
     setLive(false);
     setSettingsOpen(false);
     setExamplesOpen(false);
+    setEntityRemoval(undefined);
     setEditToken(0);
     setQuery('');
     setFocusRequest(undefined);
@@ -388,6 +493,85 @@ export default function App() {
     focusGraph,
     prefetchDepth,
   ]);
+  const setEntityHidden = (ids: string[], hidden: boolean) => {
+    try {
+      change((current) => setNodesHidden(current, ids, hidden));
+      if (hidden && selectedId && ids.includes(selectedId)) setFocusRequest(undefined);
+      if (!hidden && !w?.view.showAddresses && ids.some((id) => id.startsWith('addr:')))
+        setNotice(ADDRESS_DISPLAY_NOTICE);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Entity visibility could not be updated.');
+    }
+  };
+  const showAllHidden = () => change(showAllNodes);
+  const removalPlan = useMemo(
+    () =>
+      w && entityRemoval?.workspaceId === w.id
+        ? planEntityRemoval(w, entityRemoval.nodeId)
+        : undefined,
+    [
+      w?.id,
+      w?.transactions,
+      w?.annotations,
+      w?.tags,
+      w?.watchedAddresses,
+      entityRemoval?.workspaceId,
+      entityRemoval?.nodeId,
+    ],
+  );
+  const selectedRemovalPlan = useMemo(
+    () => (w && selectedId ? planEntityRemoval(w, selectedId) : undefined),
+    [w?.id, w?.transactions, w?.annotations, w?.tags, w?.watchedAddresses, selectedId],
+  );
+  useEffect(() => {
+    if (entityRemoval && !removalPlan) setEntityRemoval(undefined);
+  }, [entityRemoval, Boolean(removalPlan)]);
+  const removableNodeIds = useMemo(
+    () =>
+      w
+        ? [...Object.keys(w.transactions).map(txNodeId), ...w.watchedAddresses.map(addressNodeId)]
+        : [],
+    [w?.transactions, w?.watchedAddresses],
+  );
+  const applyEntityRemoval = (workspaceId: string, nodeId: string) => {
+    const current = wRef.current;
+    if (!current || current.id !== workspaceId) {
+      setEntityRemoval(undefined);
+      return;
+    }
+    const plan = planEntityRemoval(current, nodeId);
+    if (!plan) {
+      setEntityRemoval(undefined);
+      return;
+    }
+    ws.update(workspaceId, (latest) => removeWorkspaceEntity(latest, nodeId));
+    setEntityRemoval(undefined);
+    const remaining = ws.getSession(workspaceId)?.data;
+    if (
+      plan.kind === 'transaction' &&
+      selectedId &&
+      (plan.affectedNodeIds.includes(selectedId) ||
+        !remaining ||
+        !buildGraph(remaining).nodes.some((node) => node.id === selectedId))
+    ) {
+      setSelectedId(undefined);
+      setFocusRequest(undefined);
+    }
+    setNotice(
+      plan.kind === 'transaction'
+        ? 'Transaction removed from this workspace. Undo restores its data and annotations.'
+        : 'Address is no longer watched. Loaded transactions remain. Undo restores the watch and annotations.',
+    );
+  };
+  const requestEntityRemoval = (nodeId = selectedId) => {
+    const current = wRef.current;
+    if (!current || !nodeId) return;
+    const plan = planEntityRemoval(current, nodeId);
+    if (!plan) return;
+    if (plan.requiresConfirmation)
+      setEntityRemoval({ workspaceId: current.id, nodeId: plan.nodeId });
+    else applyEntityRemoval(current.id, plan.nodeId);
+  };
   const changeTags = (update: (workspace: Workspace) => Workspace) => {
     try {
       change((current) => {
@@ -502,7 +686,10 @@ export default function App() {
           throw new Error('This output index does not exist in the transaction.');
         signal.throwIfAborted();
         mergeTransactions(w.id, [t]);
-        select(index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index)));
+        const requestedId =
+          index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index));
+        ws.update(w.id, (current) => setNodesHidden(current, [requestedId], false));
+        select(requestedId);
         setLeftTab('entities');
         if (prefetchDepth) {
           const result = await loadAncestors([t], w.transactions, prefetchDepth, {
@@ -532,6 +719,7 @@ export default function App() {
           }),
           false,
         );
+        ws.update(w.id, (current) => setNodesHidden(current, [addressNodeId(text)], false));
         setNotice(
           result.truncated
             ? 'Partial address history: 500-transaction limit reached. Search again to load more.'
@@ -673,15 +861,12 @@ export default function App() {
     });
   }
   async function exportWorkspace() {
-    if (!ws.active) return;
+    const id = flushActiveGraph();
+    if (!id) return;
     await run(async () => {
       setOperation('Encrypting workspace export…');
-      parseWorkspace(ws.active!.data, false);
-      const envelope = await encryptWorkspace(ws.active!.data, ws.active!.password);
-      download(
-        `${ws.active!.data.name.replace(/[^a-z0-9_-]/gi, '-')}.chaingraph`,
-        JSON.stringify(envelope),
-      );
+      const { name, envelope } = await ws.exportEncrypted(id);
+      download(`${name.replace(/[^a-z0-9_-]/gi, '-')}.chaingraph`, JSON.stringify(envelope));
       setNotice('Encrypted workspace exported. Keep the file and password safe.');
     });
   }
@@ -728,7 +913,7 @@ export default function App() {
       monitorOperation?.abort();
     };
   }, [live, canQuery, w?.id, gap, scanLimit]);
-  const entityNodes = visibleGraph.matchedNodes;
+  const entityNodes = entityGraph.matchedNodes;
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   const analysisEvidence = useRef<{ transactions?: Workspace['transactions']; wallets: Wallet[] }>({
     wallets: [],
@@ -744,7 +929,14 @@ export default function App() {
     analysisEvidence.current = next;
   }, [w?.transactions, w?.wallets]);
   useEffect(() => {
-    if (!w || viewOwner !== w.id || !w.view.lockToSelection || !selectedId) return;
+    if (
+      !w ||
+      viewOwner !== w.id ||
+      !w.view.lockToSelection ||
+      !selectedId ||
+      hiddenIds.has(selectedId)
+    )
+      return;
     if (!visibleGraph.nodes.some((node) => node.id === selectedId)) {
       setGraphFilters({});
       if (selectedId.startsWith('addr:') && !w.view.showAddresses)
@@ -755,12 +947,28 @@ export default function App() {
         );
     }
     setFocusRequest({ id: selectedId, token: Date.now() });
-  }, [w?.id, viewOwner, w?.view.lockToSelection, selectedId]);
-  function centerNode(id = selectedId, filters?: GraphFilters) {
+  }, [w?.id, viewOwner, w?.view.lockToSelection, selectedId, hiddenIds]);
+  function centerNode(id = selectedId, filters?: GraphFilters, showHidden = false) {
     if (!id) return;
-    const rendered = filters
-      ? filterGraph(graph, { ...filters, showAddresses: w?.view.showAddresses }, w?.annotations)
-      : visibleGraph;
+    if (hiddenIds.has(id) && !showHidden) {
+      setNotice('This entity is hidden from the graph. Show it in the inspector to center it.');
+      return;
+    }
+    if (showHidden) change((current) => setNodesHidden(current, [id], false));
+    const rendered =
+      filters || showHidden
+        ? filterGraph(
+            graph,
+            { ...(filters ?? effectiveFilters), showAddresses: w?.view.showAddresses },
+            w?.annotations,
+            {
+              hiddenNodeIds: showHidden
+                ? w?.view.hiddenNodeIds?.filter((hidden) => hidden !== id)
+                : w?.view.hiddenNodeIds,
+              mode: 'visible',
+            },
+          )
+        : visibleGraph;
     if (!rendered.nodes.some((node) => node.id === id)) {
       setGraphFilters({});
       if (id.startsWith('addr:'))
@@ -856,7 +1064,7 @@ export default function App() {
       <button
         aria-label="Center selection"
         title="Center selection"
-        disabled={!selected}
+        disabled={!selected || hiddenIds.has(selected.id)}
         onClick={() => centerNode()}
       >
         <Crosshair size={14} />
@@ -904,9 +1112,11 @@ export default function App() {
           <option value={2}>2 hops</option>
         </select>
       </label>
-      <button onClick={() => updateFilters({})} disabled={!Object.keys(graphFilters).length}>
-        All paths
-      </button>
+      {Object.values(graphFilters).some((value) => value !== undefined) && (
+        <button onClick={() => updateFilters({})} title="Clear active graph filters">
+          All paths
+        </button>
+      )}
       <span className="view-summary">
         {graphFilters.walletId && (
           <span className="group-filter">
@@ -926,7 +1136,9 @@ export default function App() {
           </span>
         )}
         {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
-          ? ' · selection hidden by filters'
+          ? hiddenIds.has(selected.id)
+            ? ' · selection hidden from graph'
+            : ' · selection hidden by filters'
           : ''}
       </span>
     </div>
@@ -942,7 +1154,7 @@ export default function App() {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            if (w) ws.setActiveId(undefined);
+            if (w) activateWorkspace(undefined);
           }}
           aria-label="Chaingraph home"
         >
@@ -960,7 +1172,7 @@ export default function App() {
           <button
             aria-label="Workspaces"
             className={!w ? 'home-tab active' : 'home-tab'}
-            onClick={() => ws.setActiveId(undefined)}
+            onClick={() => activateWorkspace(undefined)}
           >
             <FolderOpen size={15} />
             <span>Workspaces</span>
@@ -971,11 +1183,11 @@ export default function App() {
               key={s.data.id}
               title={s.data.name}
               aria-current={s.data.id === w?.id ? 'page' : undefined}
-              onClick={() => ws.setActiveId(s.data.id)}
+              onClick={() => activateWorkspace(s.data.id)}
             >
               <span className="tab-network">{s.data.network === 'mainnet' ? 'M' : 'T'}</span>
               <span>{s.data.name}</span>
-              {s.revision !== s.savedRevision && (
+              {(s.revision !== s.savedRevision || pendingGraphWorkspace === s.data.id) && (
                 <span aria-label="Unsaved changes" className="dirty-dot">
                   ●
                 </span>
@@ -1053,7 +1265,7 @@ export default function App() {
           onCreate={() => setCreate('empty')}
           onDemo={() => setCreate('demo')}
           onOpenFile={() => fileInput.current?.click()}
-          onActivate={ws.setActiveId}
+          onActivate={activateWorkspace}
           onUnlock={setUnlock}
           onDelete={setDeleteEntry}
         />
@@ -1177,6 +1389,7 @@ export default function App() {
                     onClick={() => {
                       setMenu(false);
                       operationRef.current?.abort();
+                      flushActiveGraph();
                       void ws.lock(w.id).catch((e) => setError(e.message));
                     }}
                   >
@@ -1217,6 +1430,9 @@ export default function App() {
           >
             <WorkspacePanel
               w={w}
+              transactions={w.transactions}
+              removableNodeIds={removableNodeIds}
+              onRemoveNode={requestEntityRemoval}
               tagsPanel={
                 <TagsPanel
                   key={w.id}
@@ -1267,8 +1483,25 @@ export default function App() {
               }
               graphFilters={graphFilters}
               onGraphFiltersChange={updateFilters}
-              entityTotalCount={graph.nodes.length}
-              contextCount={visibleGraph.contextNodeIds.length}
+              entityTotalCount={
+                entityVisibility === 'hidden'
+                  ? hiddenCount
+                  : entityVisibility === 'visible'
+                    ? visibleEntityCount
+                    : recoveryGraph.nodes.length
+              }
+              contextCount={entityVisibility === 'visible' ? visibleGraph.contextNodeIds.length : 0}
+              hiddenNodeIds={w.view.hiddenNodeIds}
+              onSetHidden={setEntityHidden}
+              visibility={entityVisibility}
+              onVisibilityChange={(entityVisibility) =>
+                change(
+                  (current) => ({ ...current, view: { ...current.view, entityVisibility } }),
+                  false,
+                )
+              }
+              hiddenCount={hiddenCount}
+              onShowAllHidden={showAllHidden}
               entityNodes={entityNodes}
               bookmarks={bookmarks}
             />
@@ -1288,6 +1521,8 @@ export default function App() {
                     renderMetadata={renderEntityMetadata}
                     workspace={w}
                     selected={selected}
+                    hiddenNodeIds={w.view.hiddenNodeIds}
+                    onSetHidden={setEntityHidden}
                     {...flowInputs}
                     onSelect={select}
                     onEdit={editNode}
@@ -1321,6 +1556,17 @@ export default function App() {
                       <GraphView
                         key={w.id}
                         snapshot={w.view.graphSnapshot}
+                        onActivity={(active) => {
+                          ws.pauseAutosave(w.id, active);
+                          setPendingGraphWorkspace((previous) =>
+                            active ? w.id : previous === w.id ? undefined : previous,
+                          );
+                        }}
+                        onRegisterSnapshotFlush={(flush) => {
+                          if (flush) graphFlush.current = { workspaceId: w.id, flush };
+                          else if (graphFlush.current?.workspaceId === w.id)
+                            graphFlush.current = undefined;
+                        }}
                         onSnapshot={(snapshot) =>
                           ws.update(
                             w.id,
@@ -1360,6 +1606,8 @@ export default function App() {
                         focusRequest={focusRequest}
                         selectedId={selectedId}
                         onSelect={select}
+                        hiddenNodeIds={w.view.hiddenNodeIds}
+                        onSetHidden={setEntityHidden}
                         dimensions={w.view.dimensions}
                         sizeBy={w.view.sizeBy}
                         glow={w.view.glow}
@@ -1402,9 +1650,20 @@ export default function App() {
                   )}
                   {!!graph.nodes.length && !visibleGraph.nodes.length && (
                     <div className="filtered-graph-empty">
-                      <h3>No nodes match these filters</h3>
-                      <p>Adjust the entity filters or restore the complete loaded graph.</p>
-                      <button onClick={() => updateFilters({})}>Show all loaded paths</button>
+                      <h3>
+                        {hiddenCount === graph.nodes.length
+                          ? 'All entities are hidden'
+                          : 'No visible nodes match these filters'}
+                      </h3>
+                      <p>Hidden entities remain saved and can be inspected in the entity list.</p>
+                      <div className="button-row">
+                        {!!Object.keys(graphFilters).length && (
+                          <button onClick={() => updateFilters({})}>Clear filters</button>
+                        )}
+                        {!!hiddenCount && (
+                          <button onClick={showAllHidden}>Show all hidden entities</button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1503,6 +1762,9 @@ export default function App() {
                     onEditHandled={() => setEditToken(0)}
                     onSelectNode={select}
                     onCenter={() => centerNode()}
+                    onShowAndCenter={() => centerNode(selected.id, undefined, true)}
+                    hiddenNodeIds={w.view.hiddenNodeIds}
+                    onSetHidden={setEntityHidden}
                     annotationKey={`${w.id}:${selected.id}`}
                     onExpand={(direction) => void expand(direction)}
                     onRefresh={() =>
@@ -1517,18 +1779,8 @@ export default function App() {
                         );
                       })
                     }
-                    onRemove={() => {
-                      change((current) => {
-                        const transactions = { ...current.transactions };
-                        delete transactions[tx!.txid];
-                        return {
-                          ...promoteInputContext(current, [tx!.txid]),
-                          transactions,
-                          findings: current.findings.filter((f) => !f.txids.includes(tx!.txid)),
-                        };
-                      });
-                      setSelectedId(undefined);
-                    }}
+                    canRemove={!!selectedRemovalPlan}
+                    onRemove={() => requestEntityRemoval()}
                     onSave={(annotation, group) => {
                       const previous = w.annotations[selected.id] ?? {
                         label: '',
@@ -1591,11 +1843,13 @@ export default function App() {
               <LockKeyhole size={12} />
               {ws.storageError
                 ? 'Save failed'
-                : ws.saving
-                  ? 'Encrypting…'
-                  : ws.active?.revision === ws.active?.savedRevision
-                    ? 'Encrypted · saved'
-                    : 'Unsaved changes'}
+                : pendingGraphWorkspace === w.id
+                  ? 'View pending'
+                  : ws.saving
+                    ? 'Encrypting…'
+                    : ws.active?.revision === ws.active?.savedRevision
+                      ? 'Encrypted · saved'
+                      : 'Unsaved changes'}
             </span>
           </footer>
         </>
@@ -1670,6 +1924,23 @@ export default function App() {
           role={error || ws.storageError ? 'alert' : 'status'}
         >
           <span>{error || ws.storageError || notice}</span>
+          {!error &&
+            !ws.storageError &&
+            notice === ADDRESS_DISPLAY_NOTICE &&
+            w &&
+            !w.view.showAddresses && (
+              <button
+                onClick={() => {
+                  change((current) => ({
+                    ...current,
+                    view: { ...current.view, showAddresses: true },
+                  }));
+                  setNotice('Address display enabled. Other graph filters still apply.');
+                }}
+              >
+                Enable address display
+              </button>
+            )}
           {!ws.storageError && (
             <button
               className="icon-button"
@@ -1742,16 +2013,70 @@ export default function App() {
           }
         }}
       />
+      {entityRemoval && removalPlan && (
+        <Modal
+          title={
+            removalPlan.kind === 'transaction' ? 'Remove transaction?' : 'Stop watching address?'
+          }
+          onClose={() => setEntityRemoval(undefined)}
+        >
+          <p>{removalPlan.title}</p>
+          <div className="selection-facts">
+            <span>{removalPlan.kind === 'transaction' ? 'Transaction ID' : 'Address'}</span>
+            <code className="mono wrap" style={{ userSelect: 'all', display: 'block' }}>
+              {removalPlan.nodeId.slice(removalPlan.kind === 'transaction' ? 3 : 5)}
+            </code>
+            <CopyButton
+              value={removalPlan.nodeId.slice(removalPlan.kind === 'transaction' ? 3 : 5)}
+              label={
+                removalPlan.kind === 'transaction'
+                  ? 'Copy transaction ID to remove'
+                  : 'Copy address to stop watching'
+              }
+            />
+          </div>
+          <p>
+            {removalPlan.kind === 'transaction'
+              ? 'Remove the cached transaction and its transaction/output annotations and tag memberships from this workspace. Outputs referenced by other loaded transactions may remain as placeholders.'
+              : 'Stop watching this address and clear its annotation and tag memberships. Loaded transaction data remains in the workspace.'}
+          </p>
+          <p>
+            This removes {removalPlan.annotationCount} annotated{' '}
+            {removalPlan.annotationCount === 1 ? 'entity' : 'entities'} and{' '}
+            {removalPlan.tagMembershipCount} tag{' '}
+            {removalPlan.tagMembershipCount === 1 ? 'membership' : 'memberships'}. Tag definitions
+            remain. Undo can restore this change during the current session.
+          </p>
+          <div className="button-row">
+            <button onClick={() => setEntityRemoval(undefined)}>Keep in workspace</button>
+            <button
+              className="danger"
+              onClick={() => applyEntityRemoval(entityRemoval.workspaceId, entityRemoval.nodeId)}
+            >
+              {removalPlan.kind === 'transaction' ? 'Remove transaction' : 'Stop watching address'}
+            </button>
+          </div>
+        </Modal>
+      )}
       {create && (
         <CreateDialog
           networks={discoveryError ? undefined : networks}
           demo={create === 'demo'}
-          onCreate={ws.open}
+          onCreate={openWorkspace}
           onClose={() => setCreate(undefined)}
         />
       )}
       {unlock && (
-        <UnlockDialog entry={unlock} onUnlock={ws.unlock} onClose={() => setUnlock(undefined)} />
+        <UnlockDialog
+          entry={unlock}
+          onUnlock={async (entry, password) => {
+            await saveBeforeLeaving();
+            const current = ws.getSaved(entry.id);
+            if (!current) throw new Error('Saved workspace changed; reload before unlocking.');
+            return ws.unlock(current, password);
+          }}
+          onClose={() => setUnlock(undefined)}
+        />
       )}
       {walletDialog && w && (
         <WalletDialog
@@ -1787,7 +2112,7 @@ export default function App() {
                 id: crypto.randomUUID(),
                 name: `${data.name.slice(0, 93)} (copy)`,
               };
-            ws.open(data, password);
+            openWorkspace(data, password);
           }}
           onClose={() => setFileDialog(undefined)}
         />

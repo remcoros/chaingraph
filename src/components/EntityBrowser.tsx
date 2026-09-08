@@ -1,15 +1,33 @@
+import { transactionStatus } from '../domain/transactionStatus';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bookmark, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
+import {
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   sortEntities,
   valueFilterError,
   type EntitySort,
   type GraphFilters,
 } from '../domain/graphFilters';
-import { formatSats, type Annotation, type GraphNode } from '../domain/types';
+import { formatSats, type Annotation, type GraphNode, type Transaction } from '../domain/types';
 import './entity-browser.css';
+import type { VisibilityProps } from './VisibilityActions';
 
-interface Props {
+interface Props extends VisibilityProps {
+  transactions?: Record<string, Transaction>;
+  removableNodeIds?: readonly string[];
+  onRemoveNode?: (id: string) => void;
+  visibility?: 'visible' | 'hidden' | 'all';
+  onVisibilityChange?: (visibility: 'visible' | 'hidden' | 'all') => void;
+  hiddenCount?: number;
+  onShowAllHidden?: () => void;
   nodes: GraphNode[];
   annotations: Record<string, Annotation>;
   filters: GraphFilters;
@@ -62,7 +80,18 @@ export default function EntityBrowser({
   onSelect,
   totalCount = nodes.length,
   contextCount = 0,
+  hiddenNodeIds = [],
+  transactions = {},
+  removableNodeIds = [],
+  onRemoveNode,
+  onSetHidden,
+  visibility = 'visible',
+  onVisibilityChange,
+  hiddenCount = 0,
+  onShowAllHidden,
 }: Props) {
+  const removable = useMemo(() => new Set(removableNodeIds), [removableNodeIds]);
+  const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
   const [sort, setSort] = useState<EntitySort>('graph');
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(0);
@@ -74,10 +103,10 @@ export default function EntityBrowser({
   const filterKey = JSON.stringify(filters);
   const error = valueFilterError(filters);
   const patch = (change: Partial<GraphFilters>) => onFiltersChange({ ...filters, ...change });
-  useEffect(() => setPage(0), [filterKey, sort, pageSize]);
+  useEffect(() => setPage(0), [filterKey, sort, pageSize, visibility]);
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
-  }, [activePage, filterKey, sort]);
+  }, [activePage, filterKey, sort, visibility]);
   useEffect(() => {
     if (!selectedId) return;
     const index = sorted.findIndex((node) => node.id === selectedId);
@@ -132,6 +161,34 @@ export default function EntityBrowser({
             <option value="type">Entity type</option>
           </select>
         </div>
+        {onVisibilityChange && (
+          <div className="entity-visibility-filter">
+            <select
+              aria-label="Entity visibility"
+              value={visibility}
+              onChange={(event) =>
+                onVisibilityChange(event.target.value as 'visible' | 'hidden' | 'all')
+              }
+            >
+              <option value="visible">Visible in graph</option>
+              <option value="hidden">Hidden from graph</option>
+              <option value="all">Visible and hidden</option>
+            </select>
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                className="text-button"
+                aria-label={`Browse ${hiddenCount} hidden entities`}
+                onClick={() => {
+                  onFiltersChange({});
+                  onVisibilityChange('hidden');
+                }}
+              >
+                <EyeOff size={12} /> {hiddenCount} hidden
+              </button>
+            )}
+          </div>
+        )}
         <details className="entity-advanced">
           <summary>
             <SlidersHorizontal size={13} /> More filters
@@ -238,6 +295,11 @@ export default function EntityBrowser({
             </button>
           )}
         </div>
+        {visibility === 'hidden' && hiddenCount > 0 && onShowAllHidden && (
+          <button type="button" className="text-button entity-show-all" onClick={onShowAllHidden}>
+            <Eye size={12} /> Show all {hiddenCount} hidden entities
+          </button>
+        )}
         {contextCount > 0 && (
           <p className="entity-context-note">
             Canvas also shows {contextCount.toLocaleString()} connected context entities that do not
@@ -258,22 +320,72 @@ export default function EntityBrowser({
       </div>
       <div ref={listRef} className="entity-list" aria-label="Matching graph entities">
         {sorted.slice(first, first + pageSize).map((node) => (
-          <button
+          <div
             key={node.id}
-            className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
-            aria-pressed={selectedId === node.id}
-            onClick={() => onSelect(node.id)}
-            title={node.id}
+            className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''}`}
           >
-            <span className={`entity-dot ${node.kind}`} />
-            <span>
-              <strong>{node.label}</strong>
-              <small>
-                {node.kind} · {formatSats(node.value)}
-                {annotations[node.id]?.bookmarked && <Bookmark size={11} aria-label="Bookmarked" />}
-              </small>
-            </span>
-          </button>
+            <button
+              className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
+              aria-pressed={selectedId === node.id}
+              onClick={() => onSelect(node.id)}
+              title={node.id}
+            >
+              <span className={`entity-dot ${node.kind}`} />
+              <span>
+                <strong>{node.label}</strong>
+                <small>
+                  {node.kind === 'transaction' && transactions[node.txid ?? '']
+                    ? `(${transactions[node.txid!].vin.length} in / ${transactions[node.txid!].vout.length} out)`
+                    : node.kind}
+                  {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
+                    <span
+                      className="entity-chain-status"
+                      title={transactionStatus(transactions[node.txid!]).title}
+                    >
+                      {transactionStatus(transactions[node.txid!]).label}
+                    </span>
+                  )}
+                  {hidden.has(node.id) && <EyeOff size={11} aria-label="Hidden from graph" />}
+                  {annotations[node.id]?.bookmarked && (
+                    <Bookmark size={11} aria-label="Bookmarked" />
+                  )}
+                </small>
+                <small>{formatSats(node.value)}</small>
+              </span>
+            </button>
+            <div className="entity-row-actions">
+              {onSetHidden && (
+                <button
+                  type="button"
+                  className="icon-button entity-row-restore"
+                  aria-label={`${hidden.has(node.id) ? 'Show' : 'Hide'} ${node.label} ${hidden.has(node.id) ? 'in' : 'from'} graph`}
+                  title={hidden.has(node.id) ? 'Show entity in graph' : 'Hide entity from graph'}
+                  onClick={() => onSetHidden([node.id], !hidden.has(node.id))}
+                >
+                  {hidden.has(node.id) ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+              )}
+              {removable.has(node.id) && onRemoveNode && (
+                <button
+                  type="button"
+                  className="icon-button danger entity-row-remove"
+                  aria-label={
+                    node.kind === 'address'
+                      ? `Stop watching ${node.label}`
+                      : `Remove ${node.label} from workspace`
+                  }
+                  title={
+                    node.kind === 'address'
+                      ? 'Stop watching address'
+                      : 'Remove transaction from workspace'
+                  }
+                  onClick={() => onRemoveNode(node.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
         ))}
         {!nodes.length && (
           <p className="empty-panel">
