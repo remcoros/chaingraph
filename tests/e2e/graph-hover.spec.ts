@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer, type ViteDevServer } from 'vite';
@@ -350,11 +350,10 @@ test('fits first data after an empty mount, pans in 2D, focuses and fits, then o
     ),
   ).toBeGreaterThan(10);
   await expect(page.getByTestId('selected')).toHaveText('none');
-  await mkdir('docs/experiments/graph-boundary', { recursive: true });
   await page.getByRole('button', { name: 'Fit graph' }).click();
   await page.waitForTimeout(800);
   expect(Object.keys(await visibleMeshes(page))).toHaveLength(4);
-  await page.screenshot({ path: 'docs/experiments/graph-boundary/desktop-force.png' });
+  await page.screenshot({ path: test.info().outputPath('desktop-force.png') });
   expect(errors).toEqual([]);
 });
 
@@ -429,8 +428,7 @@ test('mobile touch taps select without hover and touch drags pan without selecti
   const cardBounds = (await card.boundingBox())!;
   expect(cardBounds.x).toBeGreaterThanOrEqual(0);
   expect(cardBounds.x + cardBounds.width).toBeLessThanOrEqual(390);
-  await mkdir('docs/experiments/graph-boundary', { recursive: true });
-  await page.screenshot({ path: 'docs/experiments/graph-boundary/mobile-force.png' });
+  await page.screenshot({ path: test.info().outputPath('mobile-force.png') });
   await card.getByRole('button', { name: 'Edit label and notes' }).tap();
   await expect(page.getByLabel('Notes editor')).toBeFocused();
   expect(errors).toEqual([]);

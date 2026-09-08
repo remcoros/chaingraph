@@ -1,6 +1,8 @@
 import type { Annotation, GraphData, GraphNode } from './types';
 
 export interface GraphFilters {
+  tagId?: string;
+  walletId?: string;
   query?: string;
   kind?: 'all' | GraphNode['kind'];
   label?: 'all' | 'labeled' | 'unlabeled';

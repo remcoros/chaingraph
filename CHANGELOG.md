@@ -12,6 +12,11 @@ First testable release of the MIT-licensed, self-hosted Bitcoin analysis workben
 - Synthetic laboratory, guided tour, responsive layouts and regression coverage for wallet cryptography, persistence, proxy behavior and browser flows.
 - Help/about, connection details, selection history, graph focus and deliberate deletion of locked browser copies.
 - Import validation binds saved addresses to their wallet key; long BIP329 wallet labels reopen correctly and scans preserve newer labels.
+- Shared graph interaction surface with replaceable rendering adapters, mouse/touch tracing and framing fixes.
+- Conventional collapsible transaction inputs/outputs and advanced script, opcode, witness and verified raw transaction inspection.
+- Encrypted workspace tags, imported-label grouping and separate wallet-script match highlights across graph cards and transaction rows.
+- Returning-wallet refresh, persistent new-activity review, cancellation and preservation of unchanged analysis evidence.
+- Compact annotation saving and icon controls, themed selects, and graph controls outside the picking area.
 - Production container and local Compose deployment, plus a tag-gated multi-architecture GHCR release workflow.
 
 This is an initial release. It is not a full indexer, custodial wallet, transaction signer or public multi-user service. See the README and deployment guide for operational limits.

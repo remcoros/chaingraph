@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
 test('shared graph boundary preserves reviewed workbench controls on desktop and mobile', async ({
@@ -25,8 +24,7 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   await page.waitForTimeout(7000);
   await expect(page.locator('.graph-legend')).toContainText('Drag to pan');
   await expect(page.getByLabel('Size nodes by')).toBeVisible();
-  await mkdir('docs/experiments/graph-boundary', { recursive: true });
-  await page.screenshot({ path: 'docs/experiments/graph-boundary/desktop-workbench.png' });
+  await page.screenshot({ path: test.info().outputPath('desktop-workbench.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page
     .locator('.mobile-switch')
@@ -40,6 +38,6 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   await expect(page.getByLabel('Size nodes by')).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: 'docs/experiments/graph-boundary/mobile-workbench.png' });
+  await page.screenshot({ path: test.info().outputPath('mobile-workbench.png') });
   expect(errors).toEqual([]);
 });

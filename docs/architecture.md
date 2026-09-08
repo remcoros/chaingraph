@@ -60,11 +60,11 @@ The fundamental flow is `transaction → output → spending transaction`. Outpu
 
 The graph is derived from workspace transactions and annotations. Only active, non-stale analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
 
-`GraphView` owns semantic hit lookup, selection routing, keyboard details, React hover cards, trace/edit callbacks, pointer-to-card placement and resize observation. Optional `toolbar` and `legend` React slots keep shared chrome inside GraphView. The toolbar occupies layout space above the actual viewport, so picking and tooltip coordinates exclude its height. Existing reviewed workbench chrome remains in App until root integrates it through those slots; renderer implementations contain no toolbar or legend content. Transaction DOM views and inspector components remain independent consumers of domain data and selection callbacks.
+`GraphView` owns semantic hit lookup, selection routing, keyboard details, React hover cards, trace/edit callbacks, pointer-to-card placement and resize observation. Optional `toolbar` and `legend` React slots keep shared chrome inside GraphView. The toolbar occupies layout space above the actual viewport, so picking and tooltip coordinates exclude its height. The workbench supplies GraphControls through the toolbar slot; renderer implementations contain no toolbar or legend content. Transaction DOM views and inspector components remain independent consumers of domain data and selection callbacks.
 
-`graph/presentation.ts` projects the visible domain graph into a `GraphFrame`: nodes contain stable IDs, resolved shapes/colors/radii/highlights and optional transient coordinate hints; links contain stable IDs and string endpoints with resolved colors, widths and arrows. Neither workspace records nor domain action callbacks enter the engine. `GraphView.nodePresentation` accepts an optional `ReadonlyMap<string, NodePresentation>` with `color`, `highlight` and `scale` overrides. Callers interpret tags, wallet matches or findings. Selection color takes precedence, and the existing glow toggle gates halos. Missing overrides retain kind/cluster/value/degree defaults. The contract does not imply ownership from presentation.
+`graph/presentation.ts` projects the visible domain graph into a `GraphFrame`: nodes contain stable IDs, resolved shapes/colors/radii/highlights, optional display text and transient coordinate hints; links contain stable IDs and string endpoints with resolved colors, widths and arrows. Neither workspace records nor domain action callbacks enter the engine. `GraphView.nodePresentation` accepts an optional `ReadonlyMap<string, NodePresentation>` with `color`, `highlight` and `scale` overrides. Callers interpret tags, wallet matches or findings. Selection color takes precedence, and the existing glow toggle gates halos. Missing overrides retain kind/cluster/value/degree defaults. The contract does not imply ownership from presentation.
 
-`graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose` and a canvas reference for shared accessibility focus. Factories receive hover/select events containing only `{ type: 'node' | 'link', id }` and container-local CSS pointer coordinates plus pointer type. Background events omit the hit. Adapters own picking, camera controls, gesture recognition, simulation/layout and all GPU resources. They suppress touch hover and prevent drag, cancellation or multiple-pointer gestures from becoming selections. `GraphView.adapterFactory` defaults to forcegraph; another renderer uses exactly the same React interaction surface.
+`graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose` and a canvas reference for shared accessibility focus. Factories receive hover/select events containing only `{ type: 'node' | 'link', id }` and container-local CSS pointer coordinates plus pointer type. Background events omit the hit. Adapters own picking, camera controls, gesture recognition, simulation/layout and all GPU resources. They suppress touch hover and prevent drag, cancellation or multiple-pointer gestures from becoming selections. `graph/defaultAdapter.ts` selects the default factory, while `GraphView.adapterFactory` permits an injected adapter; another renderer uses exactly the same React interaction surface.
 
 The force adapter clones incoming render data because the engine mutates positions and link endpoints. It preserves simulation identity and coordinates on presentation-only changes. Shared low-poly geometries distinguish transactions (cubes), outputs (spheres), and addresses (octahedra). A single points layer draws glow. Ordinary links use thin lines, with directional arrows on selected incident transaction/output links. Pixel density is capped and simulation work cools after bounded ticks/time. Dispose releases the halo buffers, shared geometry/material caches, listeners and engine.
 
@@ -78,7 +78,7 @@ The entity list remains the alternative interaction path for keyboard access and
 
 The seven built-in tools cover privacy patterns, value/structure and imported wallet intersections. Each finding records stable identity, algorithm version, explanation, affected nodes and supporting transactions. Exact equal-value groups control highlighting. CIOH exclusions are deliberately incomplete; missing input data is explicit, and change-like script patterns remain hypotheses. See [analysis methods and research](research/analysis-tools.md).
 
-The browser passes the visible graph's loaded transaction IDs or the selected transaction as scope. Loaded parents may supply evidence without becoming analysis targets. Reruns replace that tool's results and preserve exclusions only for unchanged node/transaction evidence. Wallet/transaction mutations mark findings stale and remove their overlays. Labels remain independent. Scan completion merges only scan-owned fields into the current wallet, preserving newer user labels. Annotation editor identity is stable across unrelated view/data changes and dirty conflicts require explicit reconciliation.
+The browser passes the visible graph's loaded transaction IDs or the selected transaction as scope. Loaded parents may supply evidence without becoming analysis targets. Reruns replace that tool's results and preserve exclusions only for unchanged node/transaction evidence. Wallet evidence or transaction mutations mark findings stale and remove their overlays. Labels remain independent. Scan completion merges only scan-owned fields into the current wallet, preserving newer user labels. Annotation editor identity is stable across unrelated view/data changes and dirty conflicts require explicit reconciliation.
 
 There is no runtime plugin loader, user-script execution, custom IDE, or Boltzmann computation in this implementation. Any future Boltzmann integration needs algorithm/performance work and a license-compatible implementation decision. Research references are catalogued separately from shipped code in [the discovery log](research/2026-09-08-discovery.md).
 
@@ -93,3 +93,32 @@ Browser ancestry traversal in `src/lib/tracing.ts` is breadth-first, deduplicate
 ## Renderer-independent transaction inspection
 
 `TransactionView` projects loaded creating/spending relationships through `domain/transactionInspection.ts`. It uses shared selection, annotation and bounded tracing callbacks; an optional `renderMetadata(nodeId)` slot supports non-interactive tag or wallet badges. The panel occupies normal flow above the renderer and can collapse without changing selection. `ScriptInspector` is a separate inspector section. `lib/transactionInspection.ts` makes an explicit raw transaction request through the existing read-only RPC bridge, validates it against its ID and loaded input/output observations with bitcoinjs, and returns display data. Raw bytes and decoded witness stacks live only in the mounted inspector, with cancellation on transaction changes and unmount. No workspace schema or server cache is added. See [research and validation limits](research/transaction-inspection.md).
+
+## Manual groups and wallet presentation
+
+Optional version-1 workspace tags hold bounded named/color groups of canonical
+transaction, output and address references. References may precede loaded graph
+data. Address membership projects onto loaded outputs at that address; it does
+not propagate to whole transactions. Tags are independent of annotations so
+changing membership cannot overwrite an unsaved label/note draft. Import validates
+network addresses, unique identities and names, 200 tags and 50,000 total members.
+Tags remain inside authenticated encrypted workspace data.
+
+`src/domain/tags.ts` builds indexes for tag membership and verified wallet-script
+matches. Raw output scripts take precedence over decoded address text for wallet
+matches. Transactions are associated through matching outputs or loaded input
+prevouts, never from a common-input heuristic or a history entry alone. The App
+resolves optional node color/highlight presentation outside the renderer. Manual
+tag colors take precedence over wallet colors; selection stays visible. These
+projections do not mutate findings, labels or observed chain data.
+
+## Returning-wallet activity
+
+Successful browser scans record checked bounds, scan time, pending downloads and
+a bounded unreviewed-transaction queue. A quiet refresh preserves equal address
+evidence and transaction objects so analysis results remain usable. Changed
+history/transaction evidence invalidates findings. Acknowledging activity only
+updates review metadata. Disabling the optional monitor aborts its own pending
+requests; manual work remains independent. The graph never removes old annotated
+transactions merely because refreshed histories omit them. See
+[refresh behavior and verification](research/wallet-refresh.md).

@@ -299,3 +299,26 @@ test('turning monitoring off cancels its current history requests', async ({ pag
   await page.clock.fastForward(31_000);
   expect(fixture.calls.length).toBe(stopped);
 });
+
+test('shows wallet script matches without making requests or acknowledging new activity', async ({
+  page,
+}) => {
+  const fixture = await phaseFixture(page);
+  await createAndLoad(page);
+  const requests = fixture.calls.length;
+  await page.getByRole('button', { name: 'Show wallet matches', exact: true }).click();
+  await expect(page.locator('.group-filter')).toContainText('Public BIP84 wallet');
+  expect(fixture.calls).toHaveLength(requests);
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Entity type').selectOption('output');
+  await page.locator('.entity-list .entity-row').first().click();
+  await expect(page.getByRole('region', { name: 'Tags and wallet matches' })).toContainText(
+    'Wallet match: Public BIP84 wallet',
+  );
+  await expect(page.locator('.transaction-row.is-selected .entity-badges')).toContainText(
+    'Wallet: Public BIP84 wallet',
+  );
+  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await expect(page.locator('.group-filter')).toHaveCount(0);
+  expect(fixture.calls).toHaveLength(requests);
+});

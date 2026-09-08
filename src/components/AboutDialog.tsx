@@ -66,8 +66,9 @@ export function AboutDialog({
               changes.
             </li>
             <li>
-              <strong>Keep your context.</strong> Add notes and bookmarks. Export encrypted backups;
-              your public workspace name remains visible while locked.
+              <strong>Label what you know.</strong> Add notes, bookmarks and workspace tags for
+              known sources and destinations. Export encrypted backups; your public workspace name
+              remains visible while locked.
             </li>
           </ol>
           {onTour && (
@@ -81,6 +82,13 @@ export function AboutDialog({
               Restart guided tour
             </button>
           )}
+          <h3>Wallet matches and tags</h3>
+          <p>
+            Wallet highlights match loaded scripts to addresses derived from your imported wallets.
+            A related transaction can include other participants. Manual tags group your
+            observations independently from analysis findings. Use Tags to group imported labels or
+            apply a counterparty to an address and its outputs.
+          </p>
           <h3>
             <Keyboard size={15} /> Keyboard and graph controls
           </h3>
@@ -160,7 +168,7 @@ export function AboutDialog({
       ) : (
         <div className="help-content">
           <span className="eyebrow">CHAINGRAPH {__APP_VERSION__}</span>
-          <h3>Your coins. Your context.</h3>
+          <h3>About this workbench</h3>
           <p>
             A watch-only Bitcoin analysis workbench for personal wallets and independent
             investigations. Built for mainnet and testnet4, with client-owned encrypted workspaces.

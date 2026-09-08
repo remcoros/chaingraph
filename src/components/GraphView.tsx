@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
 import type { GraphAdapter, GraphAdapterFactory } from './graph/adapter';
-import { createForceAdapter } from './graph/forceAdapter';
+import { createDefaultAdapter } from './graph/defaultAdapter';
 import {
   presentGraph,
   readGraphPalette,
@@ -14,6 +14,7 @@ export interface GraphViewProps {
   adapterFactory?: GraphAdapterFactory;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
   toolbar?: ReactNode;
+  renderMetadata?: (nodeId: string) => ReactNode;
   legend?: ReactNode;
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
   nodes: GraphNode[];
@@ -90,7 +91,7 @@ export default function GraphView(props: GraphViewProps) {
     if (returnFocus) graphRef.current?.canvas.focus();
   }
 
-  const adapterFactory = props.adapterFactory ?? createForceAdapter;
+  const adapterFactory = props.adapterFactory ?? createDefaultAdapter;
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
@@ -261,6 +262,7 @@ export default function GraphView(props: GraphViewProps) {
               </button>
             </div>
             <strong className="graph-card-label">{hoveredNode.label}</strong>
+            {props.renderMetadata?.(hoveredNode.id)}
             {hoveredLink && (
               <p className="graph-card-explanation">
                 {

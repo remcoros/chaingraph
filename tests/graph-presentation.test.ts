@@ -50,6 +50,7 @@ describe('shared graph semantics and presentation', () => {
     });
     expect(frame.nodes[0]).toMatchObject({ shape: 'box', color: palette.transaction });
     expect(frame.nodes[3].shape).toBe('octahedron');
+    expect(frame.nodes[0].text).toBe('Transaction');
     for (const node of frame.nodes)
       for (const field of ['label', 'kind', 'cluster', 'value', 'txid', 'address'])
         expect(node).not.toHaveProperty(field);

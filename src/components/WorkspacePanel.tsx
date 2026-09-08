@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import {
+  Tag,
   Bookmark,
   ChevronRight,
   Plus,
@@ -18,8 +20,9 @@ import type { GraphFilters } from '../domain/graphFilters';
 import EntityBrowser from './EntityBrowser';
 interface Props {
   w: Workspace;
-  leftTab: 'wallets' | 'entities' | 'bookmarks';
-  setLeftTab: (tab: 'wallets' | 'entities' | 'bookmarks') => void;
+  tagsPanel?: ReactNode;
+  leftTab: 'wallets' | 'entities' | 'bookmarks' | 'tags';
+  setLeftTab: (tab: 'wallets' | 'entities' | 'bookmarks' | 'tags') => void;
   selectedWalletId?: string;
   selectedId?: string;
   onSelectWallet: (id: string) => void;
@@ -48,6 +51,7 @@ interface Props {
 }
 export function WorkspacePanel({
   w,
+  tagsPanel,
   leftTab,
   setLeftTab,
   selectedWalletId,
@@ -98,8 +102,18 @@ export function WorkspacePanel({
         >
           <Bookmark size={15} />
         </button>
+        <button
+          className={leftTab === 'tags' ? 'active icon-button' : 'icon-button'}
+          aria-label="Tags"
+          title="Tags"
+          onClick={() => setLeftTab('tags')}
+        >
+          <Tag size={15} />
+        </button>
       </div>
-      {leftTab === 'wallets' ? (
+      {leftTab === 'tags' ? (
+        tagsPanel
+      ) : leftTab === 'wallets' ? (
         <>
           <div className="panel-body wallet-list">
             {w.wallets.map((item) => (

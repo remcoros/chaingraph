@@ -61,6 +61,14 @@ export interface Annotation {
   icon: string;
   bookmarked: boolean;
 }
+/** A manual grouping, independent of labels and heuristic findings. */
+export interface WorkspaceTag {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+  nodeIds: string[];
+}
 export interface AnalysisFinding {
   id: string;
   algorithm: string;
@@ -84,6 +92,7 @@ export interface Workspace {
   wallets: Wallet[];
   transactions: Record<string, Transaction>;
   annotations: Record<string, Annotation>;
+  tags?: WorkspaceTag[];
   findings: AnalysisFinding[];
   watchedAddresses: string[];
   demo: boolean;
@@ -92,6 +101,7 @@ export interface Workspace {
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
     showAddresses: boolean;
+    highlightMode?: 'all' | 'wallets' | 'tags' | 'none';
   };
 }
 export interface GraphNode {

@@ -1,3 +1,8 @@
+import { GraphLegend } from './components/GraphLegend';
+import { GraphControls } from './components/GraphControls';
+import { EntityBadges } from './components/EntityBadges';
+import TagsPanel, { SelectedTags } from './components/TagsPanel';
+import { buildWalletMatches, tagNodeIds, buildTagIndex, parseWorkspaceTags } from './domain/tags';
 import {
   lazy,
   Suspense,
@@ -19,18 +24,15 @@ import {
   CircleHelp,
   Download,
   Ellipsis,
-  Expand,
   Eye,
   FolderOpen,
   GitBranch,
-  Layers,
   List,
   LoaderCircle,
   LockKeyhole,
   Network as NetworkIcon,
   Plus,
   Search,
-  Sparkles,
   Upload,
   Wallet as WalletIcon,
   X,
@@ -103,7 +105,7 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedWallet, setSelectedWallet] = useState<string>();
-  const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks'>('wallets');
+  const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
   const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
     ids: [],
@@ -168,10 +170,43 @@ export default function App() {
     return () => window.removeEventListener('keydown', keydown);
   }, [ws.persist]);
   const graph = useMemo(() => (w ? buildGraph(w) : { nodes: [], links: [] }), [w]);
+  const walletMatches = useMemo(() => (w ? buildWalletMatches(w, graph) : new Map()), [w, graph]);
+  const tagIndex = useMemo(() => (w ? buildTagIndex(w, graph) : new Map()), [w, graph]);
+  const nodePresentation = useMemo(() => {
+    const presentation = new Map<string, { color?: string; highlight?: boolean }>();
+    if (!w) return presentation;
+    const mode = w.view.highlightMode ?? 'all';
+    for (const node of graph.nodes) {
+      const tags = mode === 'all' || mode === 'tags' ? (tagIndex.get(node.id) ?? []) : [];
+      const match = mode === 'all' || mode === 'wallets' ? walletMatches.get(node.id) : undefined;
+      const walletColor = match
+        ? w.wallets.find((wallet) => match.walletIds.includes(wallet.id))?.color
+        : undefined;
+      if (tags.length || match)
+        presentation.set(node.id, { color: tags[0]?.color ?? walletColor, highlight: true });
+    }
+    return presentation;
+  }, [w, graph, walletMatches, tagIndex]);
+  const effectiveFilters = useMemo(() => {
+    if (graphFilters.walletId)
+      return {
+        ...graphFilters,
+        includeIds: [...walletMatches]
+          .filter(([, match]) => match.walletIds.includes(graphFilters.walletId!))
+          .map(([id]) => id),
+      };
+    if (!graphFilters.tagId) return graphFilters;
+    const tag = w?.tags?.find((tag) => tag.id === graphFilters.tagId);
+    return { ...graphFilters, includeIds: tag ? tagNodeIds(tag, graph) : [] };
+  }, [graphFilters, w?.tags, graph, walletMatches]);
   const visibleGraph = useMemo(
     () =>
-      filterGraph(graph, { ...graphFilters, showAddresses: w?.view.showAddresses }, w?.annotations),
-    [graph, graphFilters, w?.view.showAddresses, w?.annotations],
+      filterGraph(
+        graph,
+        { ...effectiveFilters, showAddresses: w?.view.showAddresses },
+        w?.annotations,
+      ),
+    [graph, effectiveFilters, w?.view.showAddresses, w?.annotations],
   );
   useEffect(() => {
     const available = new Set(graph.nodes.map((node) => node.id));
@@ -184,6 +219,20 @@ export default function App() {
     });
     if (selectedId && !available.has(selectedId)) setSelectedId(undefined);
   }, [graph.nodes, selectedId]);
+  const renderEntityMetadata = (id: string) => {
+    const match = walletMatches.get(id);
+    return (
+      <EntityBadges
+        tags={tagIndex.get(id) ?? []}
+        wallets={
+          w?.wallets
+            .filter((wallet) => match?.walletIds.includes(wallet.id))
+            .map((wallet) => wallet.name) ?? []
+        }
+        related={match?.kind === 'transaction'}
+      />
+    );
+  };
   const selected = graph.nodes.find((n) => n.id === selectedId);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
@@ -272,6 +321,16 @@ export default function App() {
     },
     [w, ws.update],
   );
+  const changeTags = (update: (workspace: Workspace) => Workspace) => {
+    try {
+      change((current) => {
+        const next = update(current);
+        return { ...next, tags: parseWorkspaceTags(next.tags ?? [], next.network) };
+      });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not update tags.');
+    }
+  };
   const connected = !!status?.connected && !statusError;
   const canQuery = connected && w?.network === status?.network && !w?.demo;
   const queryDisabledReason = w?.demo
@@ -998,8 +1057,26 @@ export default function App() {
               {visibleGraph.nodes.length.toLocaleString()} / {graph.nodes.length.toLocaleString()}{' '}
               nodes visible
               {visibleGraph.contextNodeIds.length
-                ? ` · ${visibleGraph.contextNodeIds.length} context`
+                ? ` · ${visibleGraph.contextNodeIds.length} connected nodes`
                 : ''}
+              {graphFilters.walletId && (
+                <span className="group-filter">
+                  Wallet:{' '}
+                  {w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name ??
+                    'Removed'}
+                  <button className="text-button" onClick={() => updateFilters({})}>
+                    Clear
+                  </button>
+                </span>
+              )}
+              {graphFilters.tagId && (
+                <span className="group-filter">
+                  Tag: {w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name ?? 'Removed'}
+                  <button className="text-button" onClick={() => updateFilters({})}>
+                    Clear
+                  </button>
+                </span>
+              )}
               {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
                 ? ' · selection hidden by filters'
                 : ''}
@@ -1012,6 +1089,23 @@ export default function App() {
           >
             <WorkspacePanel
               w={w}
+              tagsPanel={
+                <TagsPanel
+                  key={w.id}
+                  workspace={w}
+                  graph={graph}
+                  selected={selected}
+                  onChange={changeTags}
+                  onSelect={(id) => {
+                    select(id);
+                    setMobilePanel('right');
+                  }}
+                  onShow={(tag) => {
+                    updateFilters({ tagId: tag.id, preserveContext: true });
+                    setMobilePanel('graph');
+                  }}
+                />
+              }
               leftTab={leftTab}
               setLeftTab={setLeftTab}
               selectedWalletId={wallet?.id}
@@ -1053,6 +1147,7 @@ export default function App() {
             <section className="graph-stage" data-tour="graph-stage" aria-label="Graph workspace">
               <div className="graph-stage-content">
                 <TransactionView
+                  renderMetadata={renderEntityMetadata}
                   workspace={w}
                   selected={selected}
                   onSelect={select}
@@ -1063,86 +1158,15 @@ export default function App() {
                   }
                 />
                 <div className="graph-renderer-region">
-                  <div className="graph-controls">
-                    <div className="view-toggle">
-                      <button
-                        className={w.view.dimensions === 3 ? 'active' : ''}
-                        onClick={() =>
-                          change((c) => ({
-                            ...c,
-                            view: { ...c.view, dimensions: 3 },
-                          }))
-                        }
-                      >
-                        3D
-                      </button>
-                      <button
-                        className={w.view.dimensions === 2 ? 'active' : ''}
-                        onClick={() =>
-                          change((c) => ({
-                            ...c,
-                            view: { ...c.view, dimensions: 2 },
-                          }))
-                        }
-                      >
-                        Flat
-                      </button>
-                    </div>
-                    <label className="size-control">
-                      <span>Size by</span>
-                      <select
-                        aria-label="Size nodes by"
-                        value={w.view.sizeBy}
-                        onChange={(e) =>
-                          change((c) => ({
-                            ...c,
-                            view: {
-                              ...c.view,
-                              sizeBy: e.target.value as Workspace['view']['sizeBy'],
-                            },
-                          }))
-                        }
-                      >
-                        <option value="uniform">Uniform</option>
-                        <option value="value">Value</option>
-                        <option value="degree">Connections</option>
-                      </select>
-                    </label>
-                    <button
-                      className={`icon-button ${w.view.glow ? 'active' : ''}`}
-                      title="Toggle highlight glow"
-                      aria-label="Toggle highlight glow"
-                      onClick={() =>
-                        change((c) => ({
-                          ...c,
-                          view: { ...c.view, glow: !c.view.glow },
-                        }))
+                  {!graph.nodes.length && (
+                    <GraphControls
+                      view={w.view}
+                      onChange={(update) =>
+                        change((current) => ({ ...current, view: update(current.view) }))
                       }
-                    >
-                      <Sparkles size={16} />
-                    </button>
-                    <button
-                      className={`icon-button ${w.view.showAddresses ? 'active' : ''}`}
-                      title="Show address nodes"
-                      aria-label="Show address nodes"
-                      onClick={() =>
-                        change((c) => ({
-                          ...c,
-                          view: { ...c.view, showAddresses: !c.view.showAddresses },
-                        }))
-                      }
-                    >
-                      <Layers size={16} />
-                    </button>
-                    <button
-                      className="icon-button"
-                      title="Fit graph"
-                      aria-label="Fit graph"
-                      onClick={() => setFitToken((t) => t + 1)}
-                    >
-                      <Expand size={16} />
-                    </button>
-                  </div>
+                      onFit={() => setFitToken((token) => token + 1)}
+                    />
+                  )}
                   {graph.nodes.length ? (
                     <Suspense
                       fallback={
@@ -1153,6 +1177,24 @@ export default function App() {
                       }
                     >
                       <GraphView
+                        legend={
+                          <GraphLegend
+                            dimensions={w.view.dimensions}
+                            showAddresses={w.view.showAddresses}
+                            demo={w.demo}
+                          />
+                        }
+                        toolbar={
+                          <GraphControls
+                            view={w.view}
+                            onChange={(update) =>
+                              change((current) => ({ ...current, view: update(current.view) }))
+                            }
+                            onFit={() => setFitToken((token) => token + 1)}
+                          />
+                        }
+                        nodePresentation={nodePresentation}
+                        renderMetadata={renderEntityMetadata}
                         nodes={visibleGraph.nodes}
                         links={visibleGraph.links}
                         focusRequest={focusRequest}
@@ -1202,32 +1244,6 @@ export default function App() {
                       <button onClick={() => updateFilters({})}>Show all loaded paths</button>
                     </div>
                   )}
-                  {w.demo && (
-                    <div className="demo-badge">
-                      LABORATORY <span>Synthetic CoinJoin fixture</span>
-                    </div>
-                  )}
-                  <div className="graph-legend">
-                    <span>
-                      <i className="entity-dot transaction" />
-                      Transaction
-                    </span>
-                    <span>
-                      <i className="entity-dot output" />
-                      Output
-                    </span>
-                    {w.view.showAddresses && (
-                      <span>
-                        <i className="entity-dot address" />
-                        Address
-                      </span>
-                    )}
-                    <span className="graph-help">
-                      {w.view.dimensions === 3
-                        ? 'Drag to orbit · scroll to zoom'
-                        : 'Drag to pan · scroll to zoom'}
-                    </span>
-                  </div>
                 </div>
               </div>
             </section>
@@ -1283,6 +1299,10 @@ export default function App() {
                     canQuery={canQuery}
                     onScan={() => void scan(wallet)}
                     onShowActivity={() => showWalletActivity(wallet)}
+                    onShowWallet={() => {
+                      updateFilters({ walletId: wallet.id, preserveContext: true });
+                      setMobilePanel('graph');
+                    }}
                     onRemove={() => {
                       change((c) => ({
                         ...c,
@@ -1293,6 +1313,19 @@ export default function App() {
                   />
                 ) : selected ? (
                   <NodeInspector
+                    tagsPanel={
+                      <SelectedTags
+                        key={selected.id}
+                        workspace={w}
+                        selected={selected}
+                        graph={graph}
+                        onChange={changeTags}
+                        onManage={() => {
+                          setLeftTab('tags');
+                          setMobilePanel('left');
+                        }}
+                      />
+                    }
                     w={w}
                     selected={selected}
                     tx={tx}
@@ -1343,8 +1376,8 @@ export default function App() {
                     <h3>A closer look</h3>
                     {w.description && <p className="workspace-description">{w.description}</p>}
                     <p>
-                      Select a node in the graph or an item in Entities to inspect it, add context,
-                      and follow its paths.
+                      Select a node in the graph or an item in Entities to inspect it, add labels
+                      and notes, and follow its paths.
                     </p>
                     <button className="text-button" onClick={() => setRightTab('analysis')}>
                       Explore analysis tools <ChevronRight size={15} />

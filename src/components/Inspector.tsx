@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Bookmark,
   Check,
   ChevronDown,
   Crosshair,
@@ -164,6 +163,7 @@ export function WalletInspector({
   canQuery,
   onScan,
   onShowActivity,
+  onShowWallet,
   onRemove,
 }: {
   wallet: Wallet;
@@ -172,6 +172,7 @@ export function WalletInspector({
   canQuery: boolean;
   onScan: () => void;
   onShowActivity: () => void;
+  onShowWallet?: () => void;
   onRemove: () => void;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -239,6 +240,11 @@ export function WalletInspector({
           </p>
         )}
       </div>
+      {onShowWallet && (
+        <button className="text-button" onClick={onShowWallet}>
+          Show wallet matches
+        </button>
+      )}
       <details className="wallet-key-details">
         <summary>Extended public key</summary>
         <p className="mono muted wrap small">{wallet.key}</p>
@@ -311,6 +317,7 @@ export const emptyAnnotation: Annotation = {
   bookmarked: false,
 };
 interface NodeInspectorProps {
+  tagsPanel?: ReactNode;
   w: Workspace;
   selected: GraphNode;
   tx?: Transaction;
@@ -329,6 +336,7 @@ interface NodeInspectorProps {
   onSave: (annotation: Annotation) => void;
 }
 export function NodeInspector({
+  tagsPanel,
   w,
   selected,
   tx,
@@ -516,6 +524,7 @@ export function NodeInspector({
         onEditHandled={onEditHandled}
         onSave={onSave}
       />
+      {tagsPanel}
       {hasEvidence && (
         <details
           className="panel-section selection-evidence"

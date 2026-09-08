@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Workspace, Transaction, GraphData, GraphNode } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
+import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
 import {
   addressToScriptHash,
   inspectExtendedPublicKey,
@@ -171,6 +172,7 @@ const workspaceSchema = z.object({
       bookmarked: z.boolean(),
     }),
   ),
+  tags: workspaceTagsSchema.optional(),
   findings: z
     .array(
       z.object({
@@ -194,6 +196,7 @@ const workspaceSchema = z.object({
     sizeBy: z.enum(['uniform', 'value', 'degree']),
     glow: z.boolean(),
     showAddresses: z.boolean(),
+    highlightMode: z.enum(['all', 'wallets', 'tags', 'none']).optional(),
   }),
 });
 
@@ -215,7 +218,8 @@ export class WorkspaceValidationError extends Error {
 // Count cheap structural records before parsing/allocating every imported node.
 export function assertWorkspaceBudget(data: unknown) {
   if (!data || typeof data !== 'object') return;
-  const raw = data as { transactions?: unknown; wallets?: unknown };
+  const raw = data as { transactions?: unknown; wallets?: unknown; tags?: unknown };
+  assertTagBudget(raw.tags);
   if (
     raw.transactions &&
     typeof raw.transactions === 'object' &&
@@ -265,6 +269,7 @@ export function parseTransaction(data: unknown): Transaction {
 export function parseWorkspace(data: unknown, verifyDerivation = true): Workspace {
   assertWorkspaceBudget(data);
   const parsed = workspaceSchema.parse(data);
+  if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
   if (Object.entries(parsed.transactions).some(([id, transaction]) => id !== transaction.txid))
     throw new Error('Workspace has invalid transaction records.');
   const walletIds = new Set<string>();

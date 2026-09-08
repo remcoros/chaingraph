@@ -114,3 +114,43 @@ For Docker setup, see [deployment](docs/deployment.md). For server setup and dev
 Select a transaction or output to open the collapsible inputs/outputs view above the graph. Selecting an input follows its previous output while retaining the transaction being examined. For a selected output, the transaction chooser includes its creating transaction and all loaded spending transactions. Large lists start collapsed, and the selected row remains visible. Use a row’s pencil to edit its annotation, or load missing previous outputs one level at a time. Missing spending data does not prove an output is unspent.
 
 The Inspector’s **Scripts and raw transaction** section shows saved output script hex and normalized opcodes. **Load raw transaction** explicitly fetches and verifies serialized bytes for scriptSig, witness, version, locktime and size inspection. Raw data stays in memory only for that inspected selection. The laboratory has no serialized raw data. Script decoding does not execute scripts or verify signatures. See [inspection research and limits](docs/research/transaction-inspection.md).
+
+## Tags and wallet matches
+
+Open **Tags** beside Wallets and Entities to create named groups for sources,
+destinations, or other entities. A new tag includes the current selection. Use
+**Add selection** for individual transactions or outputs, or open **Tags** in the
+inspector and choose **This address and its outputs** to apply a group to every
+loaded output at that address. Address membership also applies to outputs loaded
+later. It does not assign the entire creating or spending transaction to that tag.
+
+**Group existing labels** creates tags from matching nonempty labels, including
+BIP329 imports. It leaves labels, notes, and existing tag memberships alone. Labels
+longer than 100 characters and references outside transaction/output/address types
+are not grouped. Review these groups before treating them as known counterparties.
+Use **Show on graph** to isolate a tag with its connected transactions; **Clear** or
+**All paths** restores the graph. Removing a tag keeps its members and annotations.
+
+The graph highlight selector can show wallet matches, manual tags, both, or neither.
+A wallet match means a loaded output script matches an address derived from an
+imported wallet. Related transactions include those creating or spending matching
+outputs; they are not labeled as entirely wallet-owned. Manual tag colors take
+precedence when both are shown. Analysis findings remain separate hypotheses or
+observations. Tags and highlight preferences are encrypted with the workspace.
+
+## Returning to a wallet
+
+Unlock your saved workspace to resume its loaded snapshot. **Refresh wallet** checks
+receive and change histories with the configured bounds; **Refresh all wallets**
+checks each imported wallet. Last checked and partial-scan details stay visible.
+Refresh adds new transactions while preserving your selection, tags, labels and
+camera. It does not silently remove old annotated transactions missing from a
+new history response. Confirmation counts are saved observations, not a live tip
+calculation.
+
+**Show new activity** reveals newly loaded transactions and marks that notification
+as reviewed. The notification persists through later quiet checks and encrypted
+reopen. **Show wallet matches** reveals all loaded script matches and their connected
+transactions without acknowledging new activity. **All paths** clears these filters.
+The optional **Check activity every 30s** monitor runs only while unlocked and must
+be enabled again after reopen. Turning it off cancels its in-flight check.

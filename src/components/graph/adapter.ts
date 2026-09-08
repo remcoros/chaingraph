@@ -1,6 +1,8 @@
 /** Renderer-only contract. No workspace objects or mutable renderer objects cross it. */
 export interface RenderNode {
   id: string;
+  /** Display text for engines that draw labels; has no entity semantics. */
+  text?: string;
   shape: 'box' | 'sphere' | 'octahedron';
   color: string;
   radius: number;

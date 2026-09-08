@@ -1,0 +1,155 @@
+.tags-panel {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  padding: 16px;
+  scrollbar-gutter: stable;
+}
+.tags-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tags-heading h3,
+.tags-heading h4 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tags-heading h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.tags-panel > p {
+  margin: 8px 0 14px;
+}
+.tags-panel > input {
+  width: 100%;
+}
+.tag-form {
+  padding: 10px 0;
+}
+.tag-form label {
+  margin-bottom: 8px;
+}
+.tag-colors {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.tag-colors button {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 2px solid transparent;
+  color: #101b1f;
+}
+.tag-colors button[aria-pressed='true'] {
+  border-color: var(--color-ink);
+}
+.tag-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-form-actions button {
+  padding-inline: 10px;
+}
+.tag-card {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.tag-card > p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.tag-dot,
+.tag-badges i,
+.wallet-match-dot {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.tag-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+.tag-badges span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-rule);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.selected-tags {
+  padding-block: 12px;
+}
+.selected-tags summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.tag-assignment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  margin: 0;
+  cursor: pointer;
+}
+.tag-assignment input {
+  width: auto;
+}
+.tag-assignment small {
+  display: block;
+  color: var(--color-muted);
+}
+.tag-members {
+  max-height: 210px;
+  overflow: auto;
+  margin: 5px 0;
+}
+.tag-members > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+.tags-panel details {
+  margin: 12px 0;
+}
+.tags-panel summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.wallet-match {
+  font-size: 11px;
+  margin-bottom: 9px;
+  overflow-wrap: anywhere;
+}
+.wallet-match-dot {
+  background: var(--color-output);
+  box-shadow: 0 0 7px var(--color-output);
+  margin-right: 5px;
+}
+.highlight-control select {
+  max-width: 145px;
+}
+.group-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-output);
+}

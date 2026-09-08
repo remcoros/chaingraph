@@ -79,6 +79,7 @@ export function presentGraph(
       const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
       return {
         id: node.id,
+        text: node.label,
         shape: shapes[node.kind],
         color: selected
           ? palette.accent

@@ -154,3 +154,18 @@
   align-items: center;
   gap: 8px;
 }
+
+.graph-shared-toolbar .graph-controls {
+  position: static;
+  width: 100%;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+.graph-shared-toolbar {
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.graph-viewport .demo-badge {
+  top: 12px;
+}

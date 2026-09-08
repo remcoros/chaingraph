@@ -95,6 +95,8 @@ export default function EntityBrowser({
     (filters.funding && filters.funding !== 'all') ||
     filters.focus ||
     filters.includeIds ||
+    filters.tagId ||
+    filters.walletId ||
     filters.preserveContext,
   );
   return (
