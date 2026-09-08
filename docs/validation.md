@@ -1,5 +1,23 @@
 # Validation results
 
+## Final local proposals, 2026-09-08
+
+The [comparison report](experiments/comparison.md) identifies the three isolated
+branches and four running previews. The root reviewer completed the same live
+public-testnet4 tracing, annotation, transaction-row, raw-inspection and phone
+journey on all four, with no uncaught browser errors or horizontal page overflow.
+All four final proxy status checks reported connected testnet4 at height 151459.
+
+Custom Three.js passed 225 unit/backend tests after proxy integration and recovery
+refinement, four transaction checks and the dense-scene context-recovery/disposal
+check. Its earlier full suite passed 59 tests. Studio passed 218 unit/backend and
+four transaction checks after proxy integration; its full 57-test and subsequent
+28-test UI-foundation checks are recorded in its branch report. The combined
+proposal passed a complete 72-test browser run after its background-recovery fix,
+then 225 unit/backend and four transaction checks after final proxy integration.
+Shared domain, crypto/storage, proxy, graph interactions and transaction/script
+views were compared against main, preserving separate renderer/layout changes.
+
 ## Final transport integration, 2026-09-08
 
 Main `a47123b` adds the independently reviewed stale-socket correction to the UI
@@ -20,7 +38,8 @@ root, no capabilities and no-new-privileges. Its health check passed. The extend
 production-browser smoke passed against its built assets and CSP: WebGL,
 transaction rows, annotations, tags, encrypted save, reload and unlock. These
 container chain requests were synthetic; the live checks above used the host
-proxy. No publication or native ARM runtime validation is implied.
+proxy. The owned test container exited with code 0 on SIGTERM and was removed. No
+publication or native ARM runtime validation is implied.
 
 ## Shared analysis foundation, 2026-09-08
 

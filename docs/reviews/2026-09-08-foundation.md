@@ -3,7 +3,8 @@
 The reviewed main foundation combines the independent Opus UI review, Kimi label
 and proxy corrections, shared graph boundary, conventional transaction inspection,
 returning-wallet refresh, and workspace tags. The renderer proposals remain local
-experiments and are being rebased on this shared behavior.
+experiments on this shared behavior. See the [local comparison](../experiments/comparison.md)
+for running previews, independent walkthroughs and the remaining design tradeoffs.
 
 ## Integrated behavior
 
@@ -76,3 +77,7 @@ errors, including tags, parents, exact spending discovery and raw inspection.
 Updated desktop and phone screenshots show the selected tagged output fully
 inside its panel. A separate Core idle-socket investigation and its final
 verification are recorded in the backend review and validation report.
+
+The final proxy integration passed 218 unit/backend tests, five live checks, the
+original idle-time reproduction and the rebuilt container browser journey. The
+complete 48-test UI suite predates only backend and documentation changes.
