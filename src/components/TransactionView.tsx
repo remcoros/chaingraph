@@ -37,7 +37,57 @@ function TransactionRows({
   const [expandedInputs, setExpandedInputs] = useState(false);
   const [expandedOutputs, setExpandedOutputs] = useState(false);
   useLayoutEffect(() => {
-    selectedRow.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const row = selectedRow.current;
+    const panel = row?.closest<HTMLDetailsElement>('.transaction-view');
+    if (!row || !panel) return;
+    let followSelection = true;
+    let frame = 0;
+    const visibleBounds = () => {
+      if (!panel.open || !panel.getClientRects().length) return;
+      const bounds = panel.getBoundingClientRect();
+      const heading = panel.querySelector(':scope > summary')?.getBoundingClientRect();
+      return {
+        top: (heading?.bottom ?? bounds.top) + 4,
+        bottom: bounds.bottom - 8,
+        row: row.getBoundingClientRect(),
+      };
+    };
+    const keepVisible = () => {
+      const bounds = visibleBounds();
+      if (!bounds || !followSelection) return;
+      const delta =
+        bounds.row.height > bounds.bottom - bounds.top || bounds.row.top < bounds.top
+          ? bounds.row.top - bounds.top
+          : Math.max(0, bounds.row.bottom - bounds.bottom);
+      // Scroll this panel only. scrollIntoView can also move outer page containers.
+      panel.scrollTop += delta;
+    };
+    const rememberScroll = () => {
+      const bounds = visibleBounds();
+      if (!bounds) return;
+      // Browsing away from the selection is intentional. Geometry changes must
+      // not pull the user back. Scrolling the selection into view resumes following.
+      followSelection =
+        bounds.row.top >= bounds.top - 1 &&
+        (bounds.row.bottom <= bounds.bottom + 1 ||
+          (bounds.row.height > bounds.bottom - bounds.top && bounds.row.top <= bounds.top + 1));
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(keepVisible);
+    };
+    keepVisible();
+    panel.addEventListener('scroll', rememberScroll, { passive: true });
+    const observer = new ResizeObserver(schedule);
+    observer.observe(row);
+    observer.observe(panel);
+    const body = panel.querySelector('.transaction-view-body');
+    if (body) observer.observe(body);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      panel.removeEventListener('scroll', rememberScroll);
+    };
   }, [selected?.id, expandedInputs, expandedOutputs]);
   const inputRows = tx.vin.map((input, index) => {
     const id = input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined;
@@ -172,7 +222,11 @@ export function TransactionView(props: Props) {
             >
               {related.map(({ tx, role }) => (
                 <option key={tx.txid} value={tx.txid}>
-                  {role}: {short(tx.txid, 8)}
+                  {role}:{' '}
+                  {workspace.annotations[txNodeId(tx.txid)]?.label
+                    ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
+                    : ''}
+                  {short(tx.txid, 8)}
                 </option>
               ))}
             </select>
@@ -195,6 +249,15 @@ export function TransactionView(props: Props) {
         {current && (
           <>
             <div className="transaction-view-identity">
+              {(workspace.annotations[txNodeId(current.tx.txid)]?.label ||
+                props.renderMetadata) && (
+                <div className="transaction-view-metadata">
+                  {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
+                    <strong>{workspace.annotations[txNodeId(current.tx.txid)].label}</strong>
+                  )}
+                  {props.renderMetadata?.(txNodeId(current.tx.txid))}
+                </div>
+              )}
               <button
                 type="button"
                 className="text-button mono"
