@@ -11,6 +11,7 @@ body {
   overflow-x: clip;
   background: var(--color-paper);
   color: var(--color-ink);
+  color-scheme: dark;
 }
 body {
   font: var(--text-base)/1.6 var(--font-body);
@@ -90,6 +91,19 @@ select {
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-sm);
   padding: 9px 10px;
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23a1adb0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 13px;
+}
+select:hover {
+  border-color: var(--color-faint);
 }
 input::placeholder,
 textarea::placeholder {
@@ -706,9 +720,9 @@ small,
   font-size: var(--text-xs);
 }
 .scan-settings select {
-  padding: 4px 6px;
+  padding: 4px 24px 4px 6px;
   font-size: var(--text-xs);
-  max-width: 83px;
+  max-width: 92px;
 }
 .switch-label {
   display: flex;
@@ -742,6 +756,9 @@ small,
 .entity-filters select {
   font-size: var(--text-xs);
   padding: 7px;
+}
+.entity-filters select {
+  padding-right: 26px;
 }
 .entity-list {
   overflow: auto;
@@ -835,11 +852,11 @@ small,
   display: none;
 }
 .size-control select {
-  padding: 6px;
+  padding: 6px 26px 6px 8px;
   font-size: 10px;
   border-color: transparent;
-  background: var(--color-paper);
-  max-width: 107px;
+  background-color: var(--color-paper);
+  max-width: 118px;
 }
 .graph-controls .icon-button {
   background: var(--color-paper);
@@ -937,6 +954,10 @@ small,
   padding: 20px 17px;
   border-bottom: 1px solid var(--color-rule);
 }
+.inspector-scroll > .panel-section:not(.selection-evidence) {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
 .panel-section > .eyebrow {
   margin-bottom: 10px;
 }
@@ -957,11 +978,103 @@ small,
   color: var(--color-muted);
   line-height: 1.8;
 }
+.selection-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.selection-top .eyebrow {
+  margin-top: 5px;
+}
+.selection-top .icon-button {
+  margin: -4px -6px 0 0;
+}
+.selection-heading h2 {
+  margin-bottom: 8px;
+}
 .selection-value {
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 450;
   letter-spacing: -0.05em;
-  margin: 20px 0;
+  margin: 4px 0;
+}
+.selection-caution {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  margin: 0 0 8px;
+}
+.selection-caution svg {
+  flex-shrink: 0;
+}
+.spending-note {
+  margin-bottom: 10px;
+}
+.selection-trace {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 7px;
+  margin-top: 2px;
+}
+.selection-trace > button {
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 5px;
+  padding: 7px 8px;
+  min-height: 38px;
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: normal;
+}
+.trace-reason {
+  margin-top: 8px;
+}
+.selection-evidence {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.selection-evidence > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.selection-evidence > summary::-webkit-details-marker {
+  display: none;
+}
+.selection-evidence > summary:hover {
+  color: var(--color-ink);
+}
+.selection-evidence > summary svg {
+  transition: transform var(--dur-ui) var(--ease-ui);
+}
+.selection-evidence[open] > summary svg {
+  transform: rotate(180deg);
+}
+.selection-evidence:focus-within > summary {
+  color: var(--color-ink);
+}
+.evidence-body {
+  padding-bottom: 16px;
+}
+.evidence-body > .details:first-child,
+.evidence-body > .detail-label:first-child {
+  margin-top: 0;
+}
+.selection-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 .detail-label {
   margin-bottom: 15px;
@@ -1001,7 +1114,7 @@ small,
 .annotation-editor {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 9px;
 }
 .annotation-editor label {
   font-size: 10px;
@@ -1010,15 +1123,18 @@ small,
 .annotation-editor textarea {
   font-size: var(--text-xs);
 }
-.annotation-options {
+.annotation-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-end;
+  gap: 12px;
 }
-.annotation-options select {
-  font-size: 10px;
-  padding: 6px;
+.annotation-actions .switch-label {
+  margin-bottom: 11px;
+}
+.annotation-save {
+  margin-left: auto;
+  min-height: 40px;
+  padding-inline: 20px;
 }
 .inspector-empty {
   color: var(--color-muted);
@@ -1503,7 +1619,7 @@ small,
   gap: 9px;
 }
 .trace-options select {
-  padding: 5px 8px;
+  padding: 5px 26px 5px 8px;
 }
 .trace-options button {
   font-size: 11px;

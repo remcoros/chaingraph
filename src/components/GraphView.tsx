@@ -8,10 +8,12 @@ import {
   Color,
   Mesh,
   MeshLambertMaterial,
+  MOUSE,
   OctahedronGeometry,
   Points,
   ShaderMaterial,
   SphereGeometry,
+  TOUCH,
 } from 'three';
 import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
@@ -307,6 +309,18 @@ export default function GraphView(props: Props) {
           }
         });
       graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      // Camera feel: zoom toward the pointer, pan in screen space, and add gentle
+      // damping so orbiting and panning dense laboratory graphs is less abrupt.
+      const orbit = graph.controls() as unknown as {
+        zoomToCursor: boolean;
+        screenSpacePanning: boolean;
+        enableDamping: boolean;
+        dampingFactor: number;
+      };
+      orbit.zoomToCursor = true;
+      orbit.screenSpacePanning = true;
+      orbit.enableDamping = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      orbit.dampingFactor = 0.18;
       const resize = () => {
         if (!graph) return;
         const { width, height } = element.getBoundingClientRect();
@@ -439,8 +453,21 @@ export default function GraphView(props: Props) {
     }
     if (props.dimensions === 3) savedDepth.current.clear();
     graph.numDimensions(props.dimensions);
-    const controls = graph.controls() as { enableRotate: boolean };
+    const controls = graph.controls() as {
+      enableRotate: boolean;
+      mouseButtons: { LEFT: MOUSE; MIDDLE: MOUSE; RIGHT: MOUSE };
+      touches: { ONE: TOUCH; TWO: TOUCH };
+    };
     controls.enableRotate = props.dimensions === 3;
+    // Flat mode has no orbit, so left-drag and one-finger drag should pan the
+    // camera (matching the on-screen hint) instead of doing nothing.
+    if (props.dimensions === 2) {
+      controls.mouseButtons = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+      controls.touches = { ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_PAN };
+    } else {
+      controls.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+      controls.touches = { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN };
+    }
     if (props.dimensions === 2) {
       const position = graph.cameraPosition();
       graph.camera().up.set(0, 1, 0);

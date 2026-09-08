@@ -1,25 +1,23 @@
 .icon-picker {
   min-width: 0;
-  flex: 1;
+  flex: 0 0 auto;
 }
 .icon-picker-label {
   display: block;
   margin-bottom: 7px;
 }
 .icon-picker-trigger {
-  display: flex;
-  gap: 8px;
-  width: 100%;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  min-height: 39px;
-}
-.icon-picker-trigger > svg {
-  margin-left: auto;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
 }
 .icon-picker-preview {
-  font-size: 1.15rem;
-  width: 24px;
+  font-size: 1.3rem;
+  line-height: 1;
   text-align: center;
 }
 .icon-picker-backdrop {
@@ -93,20 +91,10 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  margin: 8px 0 12px;
+  margin: 10px 0 0;
 }
 .related-transactions > button {
   max-width: 100%;
   text-align: left;
   overflow-wrap: anywhere;
-}
-.node-path-action {
-  margin: 14px 0;
-}
-.node-path-action > button {
-  width: 100%;
-  justify-content: flex-start;
-}
-.node-path-action > p {
-  margin: 6px 0 0;
 }

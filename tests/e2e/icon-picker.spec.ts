@@ -39,7 +39,7 @@ test('icon palette supports selection, clearing, arrow keys, Escape and focus re
   page,
 }) => {
   await openWorkspace(page);
-  const trigger = page.getByRole('button', { name: 'Node icon', exact: true });
+  const trigger = page.getByRole('button', { name: /Node icon/ });
   await trigger.click();
   const picker = page.getByRole('dialog', { name: 'Choose node icon' });
   await expect(picker.getByRole('group', { name: 'Icon choices' }).getByRole('button')).toHaveCount(
@@ -53,19 +53,19 @@ test('icon palette supports selection, clearing, arrow keys, Escape and focus re
   await expect(trigger).toBeFocused();
   await trigger.click();
   await picker.getByRole('button', { name: 'Cold storage', exact: true }).click();
-  await expect(trigger).toContainText('Cold storage');
+  await expect(trigger).toHaveAccessibleName('Node icon: Cold storage');
   await expect(trigger).toBeFocused();
   await page.getByRole('button', { name: 'Save context', exact: true }).click();
   await trigger.click();
   await picker.getByRole('button', { name: 'Clear icon', exact: true }).click();
-  await expect(trigger).toContainText('None');
+  await expect(trigger).toHaveAccessibleName('Node icon: None');
 });
 
 test('an arbitrary imported icon stays selected until explicitly replaced or cleared', async ({
   page,
 }) => {
   await openWorkspace(page, '🪐');
-  const trigger = page.getByRole('button', { name: 'Node icon', exact: true });
+  const trigger = page.getByRole('button', { name: /Node icon/ });
   await expect(trigger).toContainText('🪐');
   await trigger.click();
   const picker = page.getByRole('dialog', { name: 'Choose node icon' });
