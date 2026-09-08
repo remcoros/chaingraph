@@ -83,6 +83,12 @@ controls. The [demonstration case](docs/research/demo-patterns-and-hypotheses.md
 follows an equal-output transaction into its spender and compares heuristic
 assumptions without attributing ownership.
 
+## Renderer experiment
+
+This isolated branch uses a purpose-built Three.js adapter with stable directed
+stages, bounded camera damping, cursor zoom and decluttered captions. The rest of
+the workbench remains shared. See the [scope, review and limitations](docs/experiments/flow-renderer-v2.md).
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for isolated worktrees, configurable browser-test ports, frontend-only previews and review expectations. Security reporting and deployment boundaries are in [SECURITY.md](SECURITY.md).

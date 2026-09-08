@@ -8,6 +8,8 @@ export interface RenderNode {
   color: string;
   radius: number;
   highlight: boolean;
+  /** Selection emphasis independent of optional glow; older adapters may ignore it. */
+  selected?: boolean;
   x?: number;
   y?: number;
   z?: number;

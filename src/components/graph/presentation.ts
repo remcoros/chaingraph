@@ -119,6 +119,7 @@ export function presentGraph(
           ? palette.accent
           : (override?.color ?? (node.cluster ? clusterColor(node.cluster) : palette[node.kind])),
         radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
+        selected,
         highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
         x: node.x,
         y: node.y,

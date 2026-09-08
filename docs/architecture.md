@@ -303,3 +303,12 @@ pass over loaded transactions, without RPC. Selecting an address enables address
 display and adds it to the watched-address set, allowing an isolated node even when
 no matching transaction is loaded. The graph memo includes that set so subsequent
 address selections appear immediately.
+
+### Isolated flow renderer v2 experiment
+
+On this experiment branch, `graph/defaultAdapter.ts` selects `FlowRenderer`. A
+layout worker owns stable directed shelves; instanced shapes and GPU-projected
+edges own drawing. Pooled captions are visual only. `RenderNode.selected` is an
+optional presentation hint independent of glow. Shared GraphView still owns every
+entity action, and version-1 graph snapshots and persistence scheduling retain
+their existing boundary. See the [decision and limitations](experiments/flow-renderer-v2.md).

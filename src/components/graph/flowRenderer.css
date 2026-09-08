@@ -1,0 +1,41 @@
+.flow-renderer-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.flow-renderer-labels span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+}
+.flow-node-caption {
+  font:
+    500 11px/16px 'IBM Plex Mono',
+    monospace;
+  color: var(--color-ink, #e7eeeb);
+  background: color-mix(in srgb, var(--color-paper, #111a20) 93%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--node-tint) 65%, transparent);
+  border-radius: 3px;
+  padding: 3px 6px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-node-caption.selected {
+  border-left-color: var(--node-tint);
+  color: var(--color-accent);
+}
+.flow-node-ring {
+  border: 1px solid color-mix(in srgb, var(--node-tint) 65%, transparent);
+  border-radius: 50%;
+}
+.flow-node-ring.selected {
+  border: 2px solid var(--node-tint);
+  border-radius: 4px;
+}
+.flow-node-ring.glow {
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--node-tint) 24%, transparent);
+}
