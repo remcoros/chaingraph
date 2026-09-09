@@ -4,6 +4,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { analysisTools } from '../src/domain/analysis';
 import { outputNodeId, type Transaction, type TxOutput, type Wallet } from '../src/domain/types';
 import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import { outputScriptHex } from '../src/domain/prevouts';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const addrA = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu';
 const addrB = 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g';
@@ -66,7 +67,7 @@ describe('scoped analysis and honest evidence', () => {
       [3, 4, 5].map((n) => outputNodeId(tx.txid, n)),
     ]);
     expect(results.every((result) => result.kind === 'observation')).toBe(true);
-    expect(results[0].description).toContain('neither a CoinJoin identification');
+    expect(results[0].description).toContain('does not identify a CoinJoin');
     expect(
       tool('equal-outputs').run(workspace(tx), undefined, { minEqualOutputs: 4 }),
     ).toHaveLength(0);
@@ -107,6 +108,58 @@ describe('scoped analysis and honest evidence', () => {
     expect(tool('address-reuse').run(w, [a.txid], { acrossTransactionsOnly: true })).toEqual([]);
     expect(tool('address-reuse').run(w, [b.txid])).toEqual([]);
     expect(tool('address-reuse').analyze(w, []).emptyReason).toContain('No loaded transactions');
+  });
+  it('reports missing evidence only for the co-spent group it belongs to', () => {
+    const complete = transaction(10, [1, 2]);
+    complete.vin[0].prevout = { value: 1, scriptPubKey: { hex: '51' } };
+    complete.vin[1].prevout = { value: 1, scriptPubKey: { hex: '52' } };
+    const incomplete = transaction(11, [3, 4]);
+    const report = tool('cioh').analyze(workspace(complete, incomplete));
+    expect(report.findings).toHaveLength(2);
+    expect(report.findings.find((f) => f.txids.includes(complete.txid))?.description).not.toContain(
+      'lack usable',
+    );
+    expect(report.findings.find((f) => f.txids.includes(incomplete.txid))?.description).toContain(
+      '2 outputs in this group lack usable previous-output details',
+    );
+    expect(stat(report, 'Missing previous-output details')).toBe(2);
+  });
+  it('joins address-only and raw-script inputs without learning script mappings from other records', () => {
+    const first = transaction(10, [1, 2]);
+    const second = transaction(11, [3, 4]);
+    first.vin[0].prevout = output(0, 1, addrA);
+    first.vin[1].prevout = { value: 1, scriptPubKey: { hex: '51' } };
+    second.vin[0].prevout = {
+      value: 1,
+      scriptPubKey: { hex: outputScriptHex(output(0, 1, addrA), 'mainnet') },
+    };
+    second.vin[1].prevout = { value: 1, scriptPubKey: { hex: '52' } };
+    expect(tool('cioh').run(workspace(first, second))).toHaveLength(1);
+    // A conflicting address label on another script cannot establish a connection.
+    second.vin[0].prevout.scriptPubKey = { hex: '53', address: addrA };
+    expect(tool('cioh').run(workspace(first, second))).toHaveLength(2);
+  });
+  it('keeps a partial script comparison visible and retains its ID when evidence resolves', () => {
+    const spend = transaction(10, [1]);
+    const w = workspace(spend);
+    const partial = tool('script-types').run(w)[0];
+    expect(partial).toMatchObject({ kind: 'incomplete', title: 'Script comparison incomplete' });
+    expect(partial.nodeIds).toContain(outputNodeId(id(1), 0));
+    spend.vin[0].prevout = output(0, 1, addrA, 'pubkeyhash');
+    const resolved = tool('script-types').run(w)[0];
+    expect(resolved).toMatchObject({ id: partial.id, kind: 'observation' });
+    expect(resolved.description).not.toContain('unavailable');
+    spend.vin[0].prevout = output(0, 1);
+    expect(tool('script-types').run(w)).toEqual([]);
+  });
+  it('includes unknown outputs and malformed input references in incomplete script evidence', () => {
+    const spend = transaction(10, [1], [{ n: 0, value: 1, scriptPubKey: {} }]);
+    spend.vin = [{}];
+    const report = tool('script-types').analyze(workspace(spend));
+    expect(report.findings[0].kind).toBe('incomplete');
+    expect(report.findings[0].nodeIds).toContain(outputNodeId(spend.txid, 0));
+    expect(stat(report, 'Unavailable input types')).toBe(1);
+    expect(stat(report, 'Unavailable output types')).toBe(1);
   });
   it('reconciles exact satoshi totals using parents outside the scope', () => {
     const a = transaction(1, [], [output(0, 0.10000001)]),
@@ -214,9 +267,13 @@ describe('scoped analysis and honest evidence', () => {
     const a = transaction(1, [], [output(0, 0.1, addrA, 'pubkeyhash')]);
     const spend = transaction(10, [1, 2], [output(0)]);
     const report = tool('script-types').analyze(workspace(a, spend), [spend.txid]);
-    expect(report.findings[0].title).toBe('Known input and output script types differ');
-    expect(report.findings[0].description).toContain('1 input and 0 output types are unavailable');
-    expect(report.findings[0].description).toContain('identify neither change');
+    expect(report.findings[0].title).toBe(
+      'Known input and output script types differ (partial data)',
+    );
+    expect(report.findings[0].description).toContain(
+      '1 input and 0 output types are unavailable or unrecognized',
+    );
+    expect(report.findings[0].description).toContain('do not identify change');
     expect(
       tool('script-types').run(workspace(a, spend), [spend.txid], { scriptMode: 'outputs' }),
     ).toEqual([]);
@@ -243,6 +300,21 @@ describe('scoped analysis and honest evidence', () => {
     expect(result.title).toContain('overlapping coverage');
     expect(result.description).toContain('not necessarily distinct participants');
     expect(result.nodeIds).toEqual([outputNodeId(tx.txid, 0)]);
+  });
+  it('matches attached wallet inputs and avoids distinct-wallet priority for overlapping imports', () => {
+    const tx = transaction(10, [1, 2]);
+    tx.vin[0].prevout = output(0, 1, addrA);
+    tx.vin[1].prevout = output(0, 1, addrB);
+    const w = workspace(tx);
+    w.wallets = [wallet(1, addrA), wallet(2, addrB)];
+    const result = tool('wallet-intersections').run(w, [tx.txid], { walletMode: 'co-spent' })[0];
+    expect(result.reviewRule).toBe('distinct-wallet-inputs');
+    expect(result.nodeIds).toEqual([outputNodeId(id(1), 0), outputNodeId(id(2), 0)]);
+    w.wallets.push(wallet(3, addrA));
+    const overlap = tool('wallet-intersections').run(w, [tx.txid], { walletMode: 'co-spent' })[0];
+    expect(overlap.id).toBe(result.id);
+    expect(overlap.reviewRule).toBeUndefined();
+    expect(overlap.title).toContain('overlapping coverage');
   });
   it('provides serializable findings, rejects invalid parameters and does not mutate workspace data', () => {
     const tx = transaction(10, [1, 2], [output(0), output(1), output(2)]),

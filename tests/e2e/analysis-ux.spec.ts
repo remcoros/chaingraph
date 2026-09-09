@@ -152,7 +152,7 @@ test('keyboard multiselect, zero counts, help, priority chips and reset filter r
   ).toHaveText('0');
   await dialog.getByRole('button', { name: 'Clear types', exact: true }).click();
   await dialog.getByRole('checkbox', { name: 'Value flow and fees', exact: true }).check();
-  await dialog.getByRole('checkbox', { name: 'Common-input ownership', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Co-spent inputs', exact: true }).check();
   await page.screenshot({ path: `${shots}/after-desktop-types.png` });
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();

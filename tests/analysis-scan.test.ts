@@ -161,5 +161,13 @@ describe('scan-all registry orchestration', () => {
     expect(
       mergeScanFindings([changed], scan).find((finding) => finding.id === existing.id)?.excluded,
     ).toBeUndefined();
+    for (const changed of [
+      { ...existing, kind: 'incomplete' as const },
+      { ...existing, reviewRule: 'fee-threshold' as const },
+      { ...existing, description: 'Earlier, incomplete evidence' },
+    ])
+      expect(
+        mergeScanFindings([changed], scan).find((finding) => finding.id === existing.id)?.excluded,
+      ).toBeUndefined();
   });
 });

@@ -41,11 +41,16 @@ export function analysisDataGaps(workspace: Workspace, txids: readonly string[],
     if (!tx || tx.vin.some((input) => input.coinbase !== undefined)) return [];
     return tx.vin.flatMap((input, inputIndex) => {
       const result = resolvePreviousOutput(workspace, input, index);
-      if (
-        (result.status === 'loaded' || result.status === 'attached') &&
-        satoshiValue(result.output.value) !== undefined &&
-        (!scripts || analysisScriptType(result.output))
-      )
+      const output =
+        result.status === 'loaded' || result.status === 'attached' ? result.output : undefined;
+      const script = output && outputScriptHex(output, workspace.network);
+      // Complete bytes can still be unsupported by the script comparison. Fetching
+      // the same immutable output again cannot make this check understand them.
+      const scriptAvailable =
+        output &&
+        (analysisScriptType(output) ||
+          (script !== undefined && /^(?:[0-9a-f]{2})*$/i.test(script)));
+      if (output && satoshiValue(output.value) !== undefined && (!scripts || scriptAvailable))
         return [];
       return [
         {
@@ -190,7 +195,7 @@ export async function recoverAnalysisData(
         for (const gap of unresolved.filter((gap) => gap.input.txid!.toLowerCase() === parentId)) {
           const output = parent.vout.find((output) => output.n === gap.input.vout);
           const hex = output && outputScriptHex(output, workspace.network);
-          if (!output || hex === undefined) {
+          if (!output || satoshiValue(output.value) === undefined) {
             failed++;
             continue;
           }
@@ -201,7 +206,13 @@ export async function recoverAnalysisData(
               i === gap.inputIndex
                 ? {
                     ...input,
-                    prevout: { value: output.value, scriptPubKey: { ...output.scriptPubKey, hex } },
+                    prevout: {
+                      value: output.value,
+                      scriptPubKey: {
+                        ...output.scriptPubKey,
+                        ...(hex === undefined ? {} : { hex }),
+                      },
+                    },
                   }
                 : input,
             ),

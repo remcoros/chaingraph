@@ -97,7 +97,7 @@ export const walletTool = defineTool({
           overlap
             ? `${wallets.size} imported wallets have overlapping coverage`
             : `${wallets.size} imported wallets touch this transaction`,
-          `Matching wallet records: ${[...wallets].map((id) => names.get(id)).join(', ')}. Inputs match ${inputWallets.size} imported wallets; outputs match ${outputWallets.size}. ${overlap ? 'At least one output belongs to the derived coverage of multiple imports; these are not necessarily distinct participants. ' : ''}Matches use only already derived addresses or locking scripts. This does not identify real owners or assign particular inputs to particular outputs. Check wallet scan coverage and load missing previous transactions.`,
+          `Inputs match ${inputWallets.size} imported wallets; outputs match ${outputWallets.size}. Matching records: ${[...wallets].map((id) => names.get(id)).join(', ')}. ${overlap ? 'Some derived addresses or scripts appear in multiple imports; these are not necessarily distinct participants. ' : ''}Matches use your already derived addresses and scripts. They do not identify owners or assign inputs to outputs. Compare the linked records and your labels.`,
           candidates.filter((record) => record.ids.size).map((record) => record.nodeId),
           [
             tx.txid,
@@ -119,7 +119,7 @@ export const walletTool = defineTool({
       emptyReason:
         context.workspace.wallets.length < 2
           ? 'Import and scan at least two wallets to compare their derived address coverage.'
-          : 'No transaction in this scope matches multiple imported wallets under this mode. Derive or scan more addresses and load previous transactions to expand known coverage.',
+          : 'No transaction in this scope matches multiple imported wallets under this mode. Missing input data and unscanned wallet addresses limit this comparison.',
       stats: [
         { label: 'Imported wallets', value: context.workspace.wallets.length },
         { label: 'Known addresses', value: addresses.size },

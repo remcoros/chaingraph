@@ -1,6 +1,7 @@
 import { outputNodeId } from '../types';
 import { outputAddress } from '../workspace';
 import type { Transaction } from '../types';
+import { outputScriptHex } from '../prevouts';
 import {
   booleanOption,
   defineTool,
@@ -79,7 +80,7 @@ export const equalOutputTool = defineTool({
             `${tx.txid}:${amount}`,
             'observation',
             `${outputs.length} equal outputs of ${formatAmount(amount)}`,
-            `Exactly ${outputs.length} spendable outputs share ${formatAmount(amount)}. Only these outputs are highlighted. Repeated amounts can arise from batching, collaborative transactions or other activity. This is neither a CoinJoin identification nor a Boltzmann linkability probability. Compare the remaining outputs and input history.`,
+            `${outputs.length} spendable outputs share ${formatAmount(amount)}. Batching and collaborative transactions can both produce repeated amounts; this does not identify a CoinJoin. Compare the highlighted outputs with the remaining outputs and input history.`,
             outputs.map((output) => outputNodeId(tx.txid, output.n)),
             [tx.txid],
           ),
@@ -101,11 +102,11 @@ export const equalOutputTool = defineTool({
 
 export const ciohTool = defineTool({
   id: 'cioh',
-  name: 'Common-input ownership',
+  name: 'Co-spent inputs',
   group: 'Privacy patterns',
   kind: 'hypothesis',
   description:
-    'Build tentative input groups with explicit collaboration exclusions. Inspect supporting transactions before treating a group as a wallet.',
+    'Group outputs spent together. Shared addresses or scripts can connect groups across transactions, but shared ownership remains a hypothesis.',
   source: {
     title: 'BIP78: why PayJoin breaks common-input ownership',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0078.mediawiki',
@@ -133,17 +134,7 @@ export const ciohTool = defineTool({
     const union = new Map<string, string>();
     const nodes = new Map<string, Set<string>>(),
       evidence = new Map<string, Set<string>>();
-    const scriptsByAddress = new Map<string, string>();
-    for (const tx of context.transactions)
-      for (const input of referencedInputs(context.workspace, tx, context.prevouts)) {
-        const output =
-          input.resolution.status === 'loaded' || input.resolution.status === 'attached'
-            ? input.resolution.output
-            : undefined;
-        const address = output && outputAddress(output),
-          script = output?.scriptPubKey.hex;
-        if (address && script !== undefined) scriptsByAddress.set(address, script.toLowerCase());
-      }
+    const unavailableNodes = new Set<string>();
     let eligible = 0,
       skippedEqual = 0,
       skippedSmall = 0,
@@ -179,11 +170,12 @@ export const ciohTool = defineTool({
           input.resolution.status === 'loaded' || input.resolution.status === 'attached'
             ? input.resolution.output
             : undefined;
-        if (!output) missingPrevouts++;
+        if (!output) {
+          missingPrevouts++;
+          unavailableNodes.add(input.nodeId);
+        }
         const address = output && outputAddress(output);
-        const script =
-          output?.scriptPubKey.hex?.toLowerCase() ??
-          (address ? scriptsByAddress.get(address) : undefined);
+        const script = output && outputScriptHex(output, context.workspace.network);
         return {
           ...input,
           key:
@@ -220,13 +212,14 @@ export const ciohTool = defineTool({
       .map((group, index) => {
         const nodeIds = [...group.nodes].sort(),
           txids = [...group.txids].sort();
+        const unavailable = nodeIds.filter((id) => unavailableNodes.has(id)).length;
         return finding(
           context,
           'cioh',
           nodeIds.join('|'),
           'hypothesis',
           `Tentative input group ${index + 1}: ${nodeIds.length} outputs`,
-          `${nodeIds.length} referenced outputs were co-spent across ${txids.length} transactions in this scope, with transitive grouping through known addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were skipped (${skippedEqual} skipped in this run).` : 'Equal-output exclusion was disabled for this run.'} PayJoin and variable-amount CoinJoins can pass the equal-output screen and invalidate this grouping. ${missingPrevouts ? `${missingPrevouts} input references in this run have missing previous-output details; those links use outpoints and cannot establish address-level continuity. ` : ''}Load the supporting transactions and compare your own labels. This does not establish a person's identity.`,
+          `${nodeIds.length} outputs are linked by co-spending across ${txids.length} transaction${txids.length === 1 ? '' : 's'}, including connections through shared addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were excluded.` : 'Equal-output exclusion was disabled.'} PayJoin and other collaborative transactions can still invalidate the assumption of shared ownership. ${unavailable ? `${unavailable} output${unavailable === 1 ? '' : 's'} in this group ${unavailable === 1 ? 'lacks' : 'lack'} usable previous-output details. ` : ''}Compare the supporting transactions and your labels before treating this as one wallet.`,
           nodeIds,
           txids,
         );

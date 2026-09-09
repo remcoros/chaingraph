@@ -831,9 +831,7 @@ export function AnalysisWorkbench({
                 </button>
               </div>
               <h3>Evidence</h3>
-              <p className="muted">
-                Open an affected entity or supporting transaction to inspect it on the graph.
-              </p>
+              <p className="muted">Select an item to inspect it on the graph.</p>
               {detail.nodeIds.length > 0 && (
                 <>
                   <h4>Affected entities</h4>
@@ -879,19 +877,20 @@ export function AnalysisWorkbench({
                   </dl>
                 </details>
               )}
-              <h3>Interpretation and limits</h3>
-              <p>
-                These checks use the loaded snapshot. Missing previous-output details, undiscovered
-                addresses and unloaded spenders limit coverage. A hypothesis does not prove common
-                ownership. Collaborative transactions, including CoinJoin and PayJoin, can
-                invalidate ownership assumptions. Bitcoin does not record which input funded a
-                particular output.
-              </p>
-              {tool && (
-                <a href={tool.source.url} target="_blank" rel="noreferrer">
-                  Method reference: {tool.source.title}
-                </a>
-              )}
+              <details>
+                <summary>Interpretation and limits</summary>
+                <p>
+                  Checks use the available workspace data. Missing input details, unscanned wallet
+                  addresses and unloaded transactions limit coverage. Co-spending does not prove
+                  shared ownership: CoinJoin and PayJoin can invalidate that assumption. Bitcoin
+                  does not record which input funded a particular output.
+                </p>
+                {tool && (
+                  <a href={tool.source.url} target="_blank" rel="noreferrer">
+                    Method reference: {tool.source.title}
+                  </a>
+                )}
+              </details>
             </article>
           )}
         </div>

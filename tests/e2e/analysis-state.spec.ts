@@ -112,7 +112,7 @@ test('an invalid optional setting reports that tool error while the rest of the 
   await analysis.locator('.scan-coverage > summary').click();
   const reports = analysis.locator('.scan-coverage > ul > li');
   await expect(reports.filter({ hasText: 'Equal-output detection' })).toContainText('Error');
-  await expect(reports.filter({ hasText: 'Common-input ownership' })).toContainText('Ran');
+  await expect(reports.filter({ hasText: 'Co-spent inputs' })).toContainText('Ran');
   await expect(analysis.locator('.scan-result-list button').first()).toBeVisible();
   expect(calls).toHaveLength(0);
 });

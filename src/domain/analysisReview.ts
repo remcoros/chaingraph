@@ -15,7 +15,7 @@ export function findingReview(finding: AnalysisFinding): {
   if (finding.kind === 'incomplete')
     return {
       priority: 'low',
-      reason: 'Missing or inconsistent evidence needs data, not a risk rating.',
+      reason: 'The available data is incomplete or cannot be reconciled.',
     };
   if (finding.reviewRule === 'fee-threshold')
     return { priority: 'high', reason: 'The reconciled fee rate meets your scan threshold.' };
@@ -35,7 +35,7 @@ export function findingReview(finding: AnalysisFinding): {
   return {
     priority: 'low',
     reason:
-      'Contextual observation without a specific review trigger. Older findings may need a rerun.',
+      'Useful context with no higher-priority review trigger. Older findings may need a rerun.',
   };
 }
 

@@ -89,6 +89,35 @@ describe('bounded Analysis missing-data recovery', () => {
     expect(done.remaining).toBe(0);
     expect(Object.keys(done.workspace.transactions)).toHaveLength(2);
   });
+  it('retains usable parent amounts even when script details remain unavailable', async () => {
+    for (const scripts of [false, true]) {
+      const w = workspace(spend());
+      const valueOnly = { ...parent(), vout: [{ ...output, scriptPubKey: {} }] };
+      const fetch = vi.fn(async (_network, txid: string) => w.transactions[txid] ?? valueOnly);
+      const result = await recoverAnalysisData(
+        w,
+        [id(10)],
+        fetch,
+        new AbortController().signal,
+        scripts,
+      );
+      expect(result.failed).toBe(0);
+      expect(result.remaining).toBe(scripts ? 1 : 0);
+      expect(result.workspace.transactions[id(10)].vin[0].prevout?.value).toBe(1);
+      expect(fees(result.workspace)[0].kind).toBe('observation');
+      expect(Object.keys(result.workspace.transactions)).toEqual([id(10)]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      const retry = vi.fn();
+      await recoverAnalysisData(
+        result.workspace,
+        [id(10)],
+        retry,
+        new AbortController().signal,
+        false,
+      );
+      expect(retry).not.toHaveBeenCalled();
+    }
+  });
   it('rejects conflicting enrichment and never converts missing evidence to zero', async () => {
     const tx = spend(10, [1, 2]);
     tx.vin[0].prevout = output;
@@ -109,7 +138,7 @@ describe('bounded Analysis missing-data recovery', () => {
   it('fills missing script details from attachments even when the parent is loaded', async () => {
     const incomplete = {
       ...parent(),
-      vout: [{ ...output, scriptPubKey: { hex: output.scriptPubKey.hex } }],
+      vout: [{ ...output, scriptPubKey: {} }],
     };
     const w = workspace(spend(), incomplete);
     const incoming = spend();

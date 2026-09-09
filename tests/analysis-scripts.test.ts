@@ -47,9 +47,27 @@ it('compares available script bytes without unnecessary recovery requests or cha
   expect(report.findings[0].kind).toBe('observation');
   expect(report.findings[0].description).toContain('Known input types: P2WPKH');
   expect(report.findings[0].description).toContain('Known output types: Taproot');
-  expect(report.findings[0].description).toContain('neither change outputs');
+  expect(report.findings[0].description).toContain('do not identify change');
   expect(report.stats.find((stat) => stat.label === 'Unavailable input types')?.value).toBe(0);
   const fetch = vi.fn();
   await recoverAnalysisData(w, [txid], fetch, new AbortController().signal);
   expect(fetch).not.toHaveBeenCalled();
+});
+it('does not request complete script bytes again when the comparison cannot recognize their type', async () => {
+  const w = newWorkspace('Public unsupported script fixture', 'mainnet');
+  const txid = 'a'.repeat(64);
+  w.transactions[txid] = {
+    txid,
+    vin: [{ txid: 'b'.repeat(64), vout: 0, prevout: output('51') }],
+    vout: [output('5120' + 'cd'.repeat(32))],
+  };
+  const tool = analysisTools.find((tool) => tool.id === 'script-types')!;
+  expect(tool.run(w)[0]).toMatchObject({
+    kind: 'incomplete',
+    title: 'Script comparison incomplete',
+  });
+  const fetch = vi.fn();
+  const result = await recoverAnalysisData(w, [txid], fetch, new AbortController().signal);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(result.workspace).toBe(w);
 });

@@ -31,7 +31,7 @@ export const valueFlowTool = defineTool({
       defaultValue: 'all',
       choices: [
         { value: 'all', label: 'Every transaction' },
-        { value: 'attention', label: 'Missing data or high fees' },
+        { value: 'attention', label: 'Unknown fees or threshold reached' },
       ],
     },
     {
@@ -102,7 +102,7 @@ export const valueFlowTool = defineTool({
             tx.txid,
             'incomplete',
             'Value data cannot be reconciled',
-            'An amount is invalid or outputs are unavailable. Reload the transaction and its parents before calculating a fee.',
+            'An amount is invalid or outputs are unavailable. Refresh the affected transaction before reviewing its fee.',
             [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
@@ -122,7 +122,7 @@ export const valueFlowTool = defineTool({
             tx.txid,
             'incomplete',
             'Inconsistent values: outputs exceed inputs',
-            `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. Refresh the transaction and parents. These records do not support a valid fee calculation.`,
+            `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. These records disagree. Refresh the affected transaction before reviewing its fee.`,
             [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
@@ -146,7 +146,7 @@ export const valueFlowTool = defineTool({
           tx.txid,
           'observation',
           `${exceeds ? 'Fee threshold reached' : 'Fee'}: ${formatAmount(fee)}`,
-          `Known inputs total ${formatAmount(inputTotal)}; all outputs total ${formatAmount(outputTotal)}; their difference is ${formatAmount(fee)}. ${rate === undefined ? 'Fee rate is unknown because a usable virtual size is unavailable.' : `Fee rate: ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB (${tx.vsize} vB). Review threshold: ${threshold} sat/vB.`} This reconciles totals, without assigning individual inputs to specific outputs.`,
+          `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. The difference is the fee. ${rate === undefined ? 'Fee rate is unknown because virtual size is unavailable.' : `Fee rate: ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB (${tx.vsize} vB).`}${exceeds ? ` This meets your ${threshold} sat/vB review threshold; it does not establish overpayment at the time.` : ''}`,
           [txNodeId(tx.txid)],
           evidence,
           [tx.txid],
@@ -327,11 +327,12 @@ export const scriptTool = defineTool({
       const outputTypes = new Set(
         outputs.map((output) => analysisScriptType(output)).filter(Boolean),
       );
-      const missingInputs = inputs.filter(
-        (input) =>
-          (input.resolution.status !== 'loaded' && input.resolution.status !== 'attached') ||
-          !analysisScriptType(input.resolution.output),
-      ).length;
+      const missingInputs =
+        inputs.filter(
+          (input) =>
+            (input.resolution.status !== 'loaded' && input.resolution.status !== 'attached') ||
+            !analysisScriptType(input.resolution.output),
+        ).length + (mode === 'outputs' || isCoinbase(tx) ? 0 : tx.vin.length - inputs.length);
       const missingOutputs = outputs.filter((output) => !analysisScriptType(output)).length;
       unknownInputs += missingInputs;
       unknownOutputs += missingOutputs;
@@ -339,30 +340,37 @@ export const scriptTool = defineTool({
         inputTypes.size === 1 &&
         outputTypes.size === 1 &&
         [...inputTypes][0] !== [...outputTypes][0];
-      if (inputTypes.size < 2 && outputTypes.size < 2 && !difference) continue;
+      const partial = missingInputs > 0 || missingOutputs > 0;
+      if (inputTypes.size < 2 && outputTypes.size < 2 && !difference && !partial) continue;
+      const title =
+        outputTypes.size > 1
+          ? 'Mixed output script types'
+          : inputTypes.size > 1
+            ? 'Mixed input script types'
+            : difference
+              ? 'Known input and output script types differ'
+              : 'Script comparison incomplete';
       findings.push(
         finding(
           context,
           'script-types',
           tx.txid,
-          'observation',
-          outputTypes.size > 1
-            ? 'Mixed output script types'
-            : inputTypes.size > 1
-              ? 'Mixed input script types'
-              : 'Known input and output script types differ',
-          `${mode === 'outputs' ? 'Input scripts were not compared.' : `Known input types: ${[...inputTypes].join(', ') || 'none'}.`} Known output types: ${[...outputTypes].join(', ') || 'none'}. ${missingInputs} input and ${missingOutputs} output types are unavailable. Script differences alone identify neither change outputs, wallet software nor owners. Compare other evidence; missing input details can be loaded from Analysis.`,
+          partial ? 'incomplete' : 'observation',
+          partial && title !== 'Script comparison incomplete' ? `${title} (partial data)` : title,
+          `${mode === 'outputs' ? 'Input scripts were not compared.' : `Known input types: ${[...inputTypes].sort().join(', ') || 'none'}.`} Known output types: ${[...outputTypes].sort().join(', ') || 'none'}.${partial ? ` ${missingInputs} input and ${missingOutputs} output types are unavailable or unrecognized.` : ''} Different script types can be normal. They do not identify change or owners. Inspect the linked outputs for context.`,
           [
+            txNodeId(tx.txid),
             ...inputs
               .filter(
                 (input) =>
-                  (input.resolution.status === 'loaded' ||
+                  partial ||
+                  ((input.resolution.status === 'loaded' ||
                     input.resolution.status === 'attached') &&
-                  analysisScriptType(input.resolution.output),
+                    analysisScriptType(input.resolution.output)),
               )
               .map((input) => input.nodeId),
             ...outputs
-              .filter((output) => analysisScriptType(output))
+              .filter((output) => partial || analysisScriptType(output))
               .map((output) => outputNodeId(tx.txid, output.n)),
           ],
           [
@@ -380,7 +388,7 @@ export const scriptTool = defineTool({
     }
     return {
       findings,
-      summary: `${findings.length} script comparisons found; ${unknownInputs} input types are unavailable.`,
+      summary: `${findings.length} script comparisons found; ${unknownInputs} input and ${unknownOutputs} output types are unavailable or unrecognized.`,
       emptyReason:
         'No mixed known types or known input/output type differences were found. Missing script types cannot establish a match or a difference.',
       stats: [

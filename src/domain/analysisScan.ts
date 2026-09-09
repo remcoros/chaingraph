@@ -42,7 +42,7 @@ export function analysisScanScope(
     return {
       kind: 'transaction',
       label: `Transaction ${short(selected.txid ?? '')}`,
-      explanation: 'This transaction, using any loaded parents as input evidence.',
+      explanation: 'This transaction, using loaded or attached previous-output data.',
       txids: loaded(selected.txid ? [selected.txid] : []),
     };
   if (selected?.kind === 'output')
@@ -191,7 +191,13 @@ export function mergeScanFindings(
       const old = previous.find(
         (item) => item.id === finding.id && item.algorithm === finding.algorithm,
       );
-      return old && sameIds(old.nodeIds, finding.nodeIds) && sameIds(old.txids, finding.txids)
+      return old &&
+        old.kind === finding.kind &&
+        old.reviewRule === finding.reviewRule &&
+        old.title === finding.title &&
+        old.description === finding.description &&
+        sameIds(old.nodeIds, finding.nodeIds) &&
+        sameIds(old.txids, finding.txids)
         ? { ...finding, excluded: old.excluded }
         : finding;
     }),
