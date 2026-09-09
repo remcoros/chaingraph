@@ -1,6 +1,33 @@
 # Wallet tabs, direct relationships and explicit editing
 
-## Latest manual refinement
+## Review guidance and detail polish
+
+This pass follows the merged prevout integration (`2ce0675`). The transaction
+chooser no longer has a redundant Context caption, and its copy control stays on
+the same line. Flow columns now give the transaction a comparable card width.
+Related-record graph actions sit directly beside their references.
+
+The side panel groups information in a labelled details card: address/outpoint,
+wallet relationship, activity, amount and tags. A short review sentence explains
+the missing context and next action, updating after labels or tags change.
+Known source addresses no longer appear unresolved before a flow context is chosen.
+The initial review waits for its first UTXO observation before picking a default.
+
+Used wallet addresses now have independent address-only reviews, without queuing
+unused gap-discovery addresses or acknowledging their UTXOs. New individual
+funding/counterparty output tasks are removed; compatible saved decisions remain
+as history under Previous output decisions rather than reappearing as new work.
+No Parties/Entities model was introduced.
+
+TypeScript and 62 focused review/category/row/guidance tests passed after adapting
+the old output-task expectations to the new workflow. Fresh public-fixture
+screenshots at 1440 x 900 and 390 x 844 are under
+`artifacts/wallet-guidance-polish/`. The chooser/copy vertical centres align and
+the related graph action is 3 px from its reference controls on both viewports.
+No page errors or horizontal document overflow appeared in those sessions.
+This was a bounded visual pass, not a full browser suite or live-wallet scan.
+
+## Earlier counterparty refinement
 
 The side toolbar now follows Label / Tags / Icon, review decisions, Select related,
 then Show / Isolate. Inspect and Scan are removed from the side toolbar; the

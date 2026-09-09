@@ -125,6 +125,9 @@ and continuation messages describe the checked snapshot; use **Load more** when
 pending items remain outside the displayed batch. One tab row contains **To review**,
 **UTXOs**, **Transactions**, **Addresses**, **Sources** and **Destinations**.
 Each tab shares the same list, single-item details and explicit batch details.
+Start with current UTXOs and used wallet addresses. A short sentence under the
+toolbar explains the review and suggests the next step. Unused derived addresses
+are not queued.
 
 Select a row to label it or record its source or destination. The side toolbar has
 Label, Tags and Icon, review actions, Select related, Show and Isolate.
@@ -138,6 +141,9 @@ returns to that magnifier. Actions stay at the top of the detail panel, above th
 collapsible flow. Identifiers and tags remain visible in common information.
 If an address has several verified loaded transaction matches, choose its
 transaction context explicitly.
+Its copy control stays beside the chooser. The details card groups the address or
+outpoint, wallet relationship, observed activity and tags. Related transaction and
+outpoint actions sit beside their references.
 
 Use checkboxes to select several items, then the batch detail panel to label, tag or
 set their icons together. It replaces single-item details without widening the list.
@@ -176,6 +182,8 @@ tooltips and copy controls. Source input lookups start in a bounded background b
 Load next and Retry handle remaining or failed lookups. Missing and non-address
 outputs are counted separately instead of appearing as unidentified address rows.
 A label is user context, not a proven counterparty identity.
+New counterparty reviews target addresses, not individual outputs. Compatible
+saved output decisions remain available under Previous output decisions.
 
 Use **Scan** for the supported analysis on loaded data; **Refresh** checks for
 new chain activity. Visible

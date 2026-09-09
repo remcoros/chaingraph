@@ -23,6 +23,8 @@ export interface WalletReviewCategory {
 const reasonDescriptions: Record<ReviewReason, string> = {
   'current-utxo':
     'All outputs reported unspent at the last verified UTXO check, regardless of metadata.',
+  'wallet-address':
+    'Used receiving and change addresses in this wallet. Label their purpose without having to label unused derived addresses.',
   source:
     'Earlier wallet receipts directly spent in transactions creating the checked current UTXOs, not sender or exchange identities.',
   'source-address':
@@ -96,6 +98,8 @@ function algorithmFor(workspace: Workspace, item: WalletReviewItem): string | un
 
 function categoryIds(workspace: Workspace, item: WalletReviewItem): Set<string> {
   const ids = new Set<string>([item.reason]);
+  if (item.reason === 'counterparty' || item.reason === 'funding-source')
+    ids.add('saved-output-reviews');
   const { labelled, tagged } = effectiveMetadata(workspace, item);
   if (item.reason === 'current-utxo') {
     if (!labelled) ids.add('utxo-missing-label');
@@ -123,11 +127,26 @@ export function walletReviewCategories(
   for (const item of items)
     for (const id of categoryIds(workspace, item)) counts.set(id, (counts.get(id) ?? 0) + 1);
   const definitions: Omit<WalletReviewCategory, 'count'>[] = [
-    ...REVIEW_REASONS.map((reason) => ({
+    ...REVIEW_REASONS.filter(
+      (reason) => reason !== 'counterparty' && reason !== 'funding-source',
+    ).map((reason) => ({
       id: reason,
       label: reason === 'current-utxo' ? 'All current UTXOs' : REASON_LABELS[reason],
       description: reasonDescriptions[reason],
     })),
+    ...(items.some((item) => item.reason === 'counterparty' || item.reason === 'funding-source') ||
+    Object.keys(workspace.walletReviews ?? {}).some(
+      (key) => key.includes('|counterparty|') || key.includes('|funding-source|'),
+    )
+      ? [
+          {
+            id: 'saved-output-reviews',
+            label: 'Previous output decisions',
+            description:
+              'Earlier saved output reviews are retained here. New source and destination reviews target addresses.',
+          },
+        ]
+      : []),
     ...metadataCategories,
     ...analysisTools.map((tool) => ({
       id: `heuristic:${tool.id}`,

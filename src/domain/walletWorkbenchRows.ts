@@ -98,6 +98,7 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
     contextTransactionIds:
       kind === 'address' ? (item.transactionIds ?? []) : item.txid ? [item.txid] : [],
     outpointIds: item.outpointIds,
+    ownership: item.ownership,
     relationshipDirection:
       kind === 'address' && item.relationshipKinds?.length === 1
         ? item.relationshipKinds[0]
@@ -261,6 +262,13 @@ export function buildWalletRecordRows(
 
 export function matchesWalletStatus(row: WalletRow, filter: WalletStatusFilter): boolean {
   if (filter === 'all') return true;
+  if (row.reviews.length && row.reviews.every((item) => item.legacyOutputReview)) {
+    if (filter === 'open') return false;
+    if (filter === 'later') return row.reviews.some((item) => item.status === 'later');
+    return row.reviews.every(
+      (item) => item.status !== 'open' && isCompletedReview({ status: item.status }),
+    );
+  }
   if (filter === 'open') return row.changed || row.status === 'open';
   if (filter === 'later') return !row.changed && row.status === 'later';
   return !row.changed && row.status !== 'open' && isCompletedReview({ status: row.status });

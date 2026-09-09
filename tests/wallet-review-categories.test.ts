@@ -55,11 +55,13 @@ describe('discoverable wallet finding categories', () => {
     ).toBe(false);
   });
 
-  it('includes every reason and actual registry tool, with definitions and zero counts', () => {
+  it('includes actionable review types and registry tools, not output-only compatibility types', () => {
     const workspace = newWorkspace('Categories', 'mainnet');
     const catalog = walletReviewCategories(workspace, []);
     expect(catalog.map((category) => category.id)).toEqual([
-      ...REVIEW_REASONS,
+      ...REVIEW_REASONS.filter(
+        (reason) => reason !== 'counterparty' && reason !== 'funding-source',
+      ),
       'unidentified-sources',
       'unidentified-destinations',
       'utxo-missing-label',

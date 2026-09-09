@@ -19,6 +19,7 @@ import { addressToScriptHash } from '../src/lib/wallet';
 import type { WalletUtxoRecord } from '../src/domain/walletRecords';
 import { applyBatchIcon, applyBatchLabel, applyBatchTag } from '../src/domain/batchMetadata';
 import { walletReviewCategories } from '../src/domain/walletReviewCategories';
+import { groupWalletRelationships } from '../src/domain/walletRelationships';
 
 const mine = (fill: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(fill), 0, 'bc');
 const MINE_A = mine(1);
@@ -132,7 +133,7 @@ describe('wallet review queue', () => {
       find(items, 'source-address').find((item) => item.address === THEIRS)!,
       ...find(items, 'funding-source'),
     ];
-    expect(funding).toHaveLength(2);
+    expect(funding).toHaveLength(1);
     expect(funding[0]).toMatchObject({
       key: reviewKey(wallet.id, 'source-address', `addr:${THEIRS}`),
       nodeId: `addr:${THEIRS}`,
@@ -145,8 +146,12 @@ describe('wallet review queue', () => {
       status: 'open',
     });
     expect(funding[0].detail).toContain('not a flow allocation');
-    expect(funding[1].amountSats).toBeUndefined();
-    expect(funding[1].detail).toContain('previous output is missing');
+    expect(find(items, 'funding-source')).toEqual([]);
+    expect(groupWalletRelationships(workspace, wallet).sourceExceptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: `out:${id(9)}:2`, amountSats: undefined }),
+      ]),
+    );
     expect(find(items, 'source')).toHaveLength(1);
     const reviewed = applyReviewDecisions(workspace, wallet, funding, 'unknown');
     reviewed.annotations[funding[0].nodeId] = {
@@ -155,23 +160,35 @@ describe('wallet review queue', () => {
       icon: '',
       bookmarked: false,
     };
-    for (const entry of find(build(reviewed).items, 'funding-source')) {
+    for (const entry of find(build(reviewed).items, 'source-address').filter(
+      (item) => item.address === THEIRS,
+    )) {
       expect(entry.status).toBe('unknown');
       expect(entry.changed).toBe(false);
     }
     expect(
-      openReviewItems(build(reviewed).items).some((entry) => entry.reason === 'funding-source'),
+      openReviewItems(build(reviewed).items).some((entry) => entry.key === funding[0].key),
     ).toBe(false);
     const labelledOnly = {
       ...workspace,
       annotations: reviewed.annotations,
     };
-    expect(find(build(labelledOnly).items, 'funding-source')[0].status).toBe('open');
+    expect(
+      find(build(labelledOnly).items, 'source-address').find((item) => item.address === THEIRS)
+        ?.status,
+    ).toBe('open');
   });
 
-  it('reopens a missing funding input when the actual previous-output evidence loads', () => {
+  it('reopens an existing missing-output decision when the actual previous-output evidence loads', () => {
     const receiving = { ...receipt, vin: [{ txid: id(9), vout: 0 }] };
     const workspace = fixture({ transactions: { [id(1)]: receiving } });
+    workspace.walletReviews = {
+      [reviewKey(wallet.id, 'funding-source', `${id(9)}:0`)]: {
+        status: 'reviewed',
+        at: '2026-09-09T00:00:00Z',
+        evidence: 'previously-saved',
+      },
+    };
     const item = find(build(workspace, []).items, 'funding-source')[0];
     const decided = applyReviewDecisions(workspace, wallet, [item], 'reviewed');
     decided.transactions = {
@@ -282,7 +299,15 @@ describe('wallet review queue', () => {
       const workspace = fixture();
       workspace.transactions = structuredClone(workspace.transactions);
       workspace.transactions[id(2)].vout[1].scriptPubKey = { hex, address: THEIRS };
+      workspace.walletReviews = {
+        [reviewKey(wallet.id, 'counterparty', `${id(2)}:1`)]: {
+          status: 'unknown',
+          at: '2026-09-09T00:00:00Z',
+          evidence: 'previously-saved',
+        },
+      };
       expect(find(build(workspace).items, 'counterparty')[0].address).toBeUndefined();
+      expect(find(build(workspace).items, 'destination-address')).toEqual([]);
     },
   );
 
@@ -296,7 +321,15 @@ describe('wallet review queue', () => {
     workspace.transactions[id(2)].vout[1].scriptPubKey = {
       address: bitcoinAddress.toBech32(new Uint8Array(20).fill(9), 0, 'tb'),
     };
+    workspace.walletReviews = {
+      [reviewKey(wallet.id, 'counterparty', `${id(2)}:1`)]: {
+        status: 'unknown',
+        at: '2026-09-09T00:00:00Z',
+        evidence: 'previously-saved',
+      },
+    };
     expect(find(build(workspace).items, 'counterparty')[0].address).toBeUndefined();
+    expect(find(build(workspace).items, 'destination-address')).toEqual([]);
   });
 
   it('reports unloaded UTXO sources instead of inventing them', () => {
@@ -834,10 +867,11 @@ describe('deferral and bounded queues', () => {
     }));
     const workspace = fixture({ transactions: {} });
     const all = buildWalletReview(workspace, wallet, { utxos });
-    expect(all.items).toHaveLength(400);
+    expect(find(all.items, 'current-utxo')).toHaveLength(400);
+    expect(find(all.items, 'wallet-address')).toHaveLength(2);
     expect(all.omittedItems).toBe(1);
     expect(all.omittedPendingItems).toBe(1);
-    // Complete the first 400, exactly the reviewer's reproduction.
+    // Complete the first 400 coins and their used-address reviews.
     const reviewed = applyReviewDecisions(workspace, wallet, all.items, 'reviewed');
     const after = buildWalletReview(reviewed, wallet, { utxos });
     const open = after.items.filter((item) => item.status === 'open');

@@ -16,6 +16,7 @@ import { WalletReviewFlow } from './WalletReviewFlow';
 import { WalletHelp } from './WalletHelp';
 import type { WalletWorkbenchProps } from './WalletWorkbench';
 import { walletRelatedRecords } from '../domain/walletRelatedRecords';
+import { walletReviewGuidance, walletSubjectTitle } from '../domain/walletReviewGuidance';
 
 export type WalletDecisionAction = 'reviewed' | 'later' | 'reopen';
 
@@ -28,31 +29,36 @@ export function WalletDecisionButtons({
   busy: boolean;
   onDecide: (items: readonly WalletReviewItem[], action: WalletDecisionAction) => void;
 }) {
-  if (!items.length) return null;
-  const completed = items.every(
+  const actionable = items.filter((item) => !item.legacyOutputReview);
+  if (!actionable.length) return null;
+  const completed = actionable.every(
     (item) => !item.changed && item.status !== 'open' && isCompletedReview({ status: item.status }),
   );
-  const later = items.every((item) => !item.changed && item.status === 'later');
+  const later = actionable.every((item) => !item.changed && item.status === 'later');
   return (
     <div className="button-row wallet-review-decisions">
       {completed ? (
         <button
           disabled={busy}
           title="Return these decisions to To review"
-          onClick={() => onDecide(items, 'reopen')}
+          onClick={() => onDecide(actionable, 'reopen')}
         >
           <Undo2 size={14} /> Reopen
         </button>
       ) : (
         <>
-          <button className="primary" disabled={busy} onClick={() => onDecide(items, 'reviewed')}>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => onDecide(actionable, 'reviewed')}
+          >
             Mark reviewed
           </button>
           <button
             disabled={busy}
             aria-pressed={later}
             title={later ? 'Return to To review' : 'Set aside without completing the review'}
-            onClick={() => onDecide(items, later ? 'reopen' : 'later')}
+            onClick={() => onDecide(actionable, later ? 'reopen' : 'later')}
           >
             <Clock3 size={14} /> {later ? 'Return to review' : 'Review later'}
           </button>
@@ -171,9 +177,23 @@ export function WalletItemDetail({
       ? 'wallet'
       : context?.role === 'possible-counterparty'
         ? 'external'
-        : undefined);
+        : row.reviews.some((item) => item.reason === 'current-utxo' || item.reason === 'source')
+          ? 'wallet'
+          : undefined);
   const changed = row.reviews.find((item) => item.changed);
   const outpoints = row.outpointIds ?? [];
+  const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
+  const subjectTitle = walletSubjectTitle(row);
+  const guidance = walletReviewGuidance(row, { label: annotation?.label, tagCount: tags.length });
+  const statusLabel = changed
+    ? 'Evidence changed'
+    : row.status === 'unknown'
+      ? 'Source unknown'
+      : row.status === 'reviewed'
+        ? 'Reviewed'
+        : row.status === 'later'
+          ? 'Review later'
+          : 'To review';
   const related = useMemo(
     () => walletRelatedRecords(workspace, row),
     [
@@ -199,11 +219,11 @@ export function WalletItemDetail({
           onChange={onChange}
           onNotice={onNotice}
         />
-        {row.reviews.length > 0 && (
+        {actionableReviews.length > 0 && (
           <div className="wallet-action-group" aria-label="Review decision">
             <WalletDecisionButtons items={row.reviews} busy={busy} onDecide={onDecide} />
-            {row.reviews.length > 1 && (
-              <span className="small muted">{row.reviews.length} decisions</span>
+            {actionableReviews.length > 1 && (
+              <span className="small muted">{actionableReviews.length} decisions</span>
             )}
           </div>
         )}
@@ -226,6 +246,9 @@ export function WalletItemDetail({
           </button>
         </div>
       </div>
+      <p className="wallet-review-guidance" role="note">
+        {guidance}
+      </p>
       {(context || row.contextTransactionIds.length > 0) && (
         <details
           className="wallet-flow-disclosure"
@@ -236,8 +259,7 @@ export function WalletItemDetail({
           {flowOpen && (
             <>
               {row.contextTransactionIds.length > 1 && (
-                <label className="wallet-context-chooser">
-                  Context
+                <div className="wallet-context-chooser">
                   <select
                     aria-label="Transaction context"
                     title={contextId}
@@ -256,7 +278,7 @@ export function WalletItemDetail({
                     ))}
                   </select>
                   {contextId && <CopyButton value={contextId} label="Copy transaction ID" />}
-                </label>
+                </div>
               )}
               {context ? (
                 <WalletReviewFlow
@@ -293,49 +315,32 @@ export function WalletItemDetail({
           )}
         </details>
       )}
-      <div className="wallet-detail-heading">
-        <h2 className="wallet-item-title">
-          {annotation?.icon && (
-            <span className="wallet-entity-icon" aria-hidden="true">
-              {annotation.icon}
-            </span>
-          )}
-          {annotation?.label || (
-            <WalletReference
-              value={row.identifier}
-              kind={
-                row.kind === 'output'
-                  ? 'outpoint'
-                  : row.kind === 'transaction'
-                    ? 'transaction ID'
-                    : 'address'
-              }
-            />
-          )}
-        </h2>
-      </div>
-      <div
-        className={`wallet-context-badge ${role === 'wallet' ? 'is-wallet' : ''}`}
-        title={
-          role === 'wallet'
-            ? 'Matches a discovered address of this wallet'
-            : "No match among this wallet's discovered addresses. This does not prove who controls the address."
-        }
-      >
-        {role === 'wallet'
-          ? 'Wallet match'
-          : role === 'external'
-            ? 'No wallet match'
-            : row.kind === 'transaction'
-              ? 'Wallet-related transaction'
-              : 'Unresolved script'}
-        {outpoints.length > 0 ? ` · ${outpoints.length} outpoints` : ''}
-        {changed ? ' · evidence changed' : ''}
-      </div>
-      <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
-        {annotation?.label && (
+      <section className="wallet-subject-card" aria-label={`${subjectTitle} details`}>
+        <header className="wallet-subject-header">
           <div>
-            <dt>{row.kind === 'output' ? 'Outpoint' : row.kind}</dt>
+            {annotation?.label && <span className="wallet-subject-kind">{subjectTitle}</span>}
+            <h2 className="wallet-item-title">
+              {annotation?.icon && (
+                <span className="wallet-entity-icon" aria-hidden="true">
+                  {annotation.icon}
+                </span>
+              )}
+              {annotation?.label || subjectTitle}
+            </h2>
+          </div>
+          {row.reviews.length > 0 && (
+            <span className={`wallet-subject-status status-${row.status}`}>{statusLabel}</span>
+          )}
+        </header>
+        <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
+          <div className="wallet-subject-identifier">
+            <dt>
+              {row.kind === 'output'
+                ? 'Outpoint'
+                : row.kind === 'transaction'
+                  ? 'Transaction ID'
+                  : 'Address'}
+            </dt>
             <dd className="wallet-copy-value">
               <WalletReference
                 value={row.identifier}
@@ -350,87 +355,129 @@ export function WalletItemDetail({
               />
             </dd>
           </div>
-        )}
-        {row.address && row.kind !== 'address' && (
+          {row.address && row.kind !== 'address' && (
+            <div>
+              <dt>Address</dt>
+              <dd className="wallet-copy-value">
+                <WalletReference value={row.address} kind="address" length={14} />
+              </dd>
+            </div>
+          )}
           <div>
-            <dt>Address</dt>
-            <dd className="wallet-copy-value">
-              <WalletReference value={row.address} kind="address" length={14} />
+            <dt>Wallet relationship</dt>
+            <dd className={`wallet-match-value ${role === 'wallet' ? 'is-wallet' : ''}`}>
+              {role === 'wallet'
+                ? 'In this wallet'
+                : role === 'external'
+                  ? 'No match in this wallet'
+                  : row.kind === 'transaction'
+                    ? 'Wallet activity'
+                    : 'Not determined'}
+              <WalletHelp title="Wallet relationship" active={active}>
+                Matched against this wallet's discovered addresses. No match does not rule out an
+                undiscovered wallet address or identify its owner.
+              </WalletHelp>
             </dd>
           </div>
-        )}
-        {row.amountSats !== undefined && (
+          {row.kind === 'address' && row.contextTransactionIds.length > 0 && (
+            <div>
+              <dt>Seen in</dt>
+              <dd>
+                {row.contextTransactionIds.length} transaction
+                {row.contextTransactionIds.length === 1 ? '' : 's'}
+              </dd>
+            </div>
+          )}
+          {row.amountSats !== undefined && (
+            <div>
+              <dt>
+                {row.kind === 'address'
+                  ? `Observed total (${outpoints.length} output${outpoints.length === 1 ? '' : 's'})`
+                  : 'Amount'}
+              </dt>
+              <dd>{formatSats(row.amountSats)}</dd>
+            </div>
+          )}
           <div>
-            <dt>{outpoints.length ? 'Observed output total' : 'Amount'}</dt>
-            <dd>{formatSats(row.amountSats)}</dd>
+            <dt>Tags</dt>
+            <dd className="wallet-item-tags">
+              {tags.length ? (
+                tags.map((tag) => (
+                  <span className="wallet-review-record-tag" key={tag.id} title={tag.name}>
+                    <span className="tag-dot" style={{ backgroundColor: tag.color }} />
+                    {tag.name}
+                  </span>
+                ))
+              ) : (
+                <span className="muted">No tags</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+        {annotation?.note && (
+          <div className="wallet-subject-note">
+            <h3>Note</h3>
+            <p className="wallet-detail-note">{annotation.note}</p>
           </div>
         )}
-        <div>
-          <dt>Tags</dt>
-          <dd className="wallet-item-tags">
-            {tags.length ? (
-              tags.map((tag) => (
-                <span className="wallet-review-record-tag" key={tag.id} title={tag.name}>
-                  <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-                  {tag.name}
-                </span>
-              ))
-            ) : (
-              <span className="muted">No tags</span>
-            )}
-          </dd>
-        </div>
-      </dl>
-      {annotation?.note && <p className="wallet-detail-note">{annotation.note}</p>}
-      {(
-        [
-          ['inputs', 'Input outpoints', related.inputs],
+      </section>
+      <div className="wallet-related-grid">
+        {(
           [
-            'outputs',
-            row.kind === 'transaction' ? 'Output outpoints' : 'Related outpoints',
-            related.outputs,
-          ],
-          ['transactions', 'Related transactions', related.transactions],
-        ] as const
-      )
-        .filter(([, , ids]) => ids.length)
-        .map(([key, title, ids]) => (
-          <section className="wallet-related-records" aria-label={title} key={title}>
-            <h3>
-              {title} ({ids.length})
-            </h3>
-            {ids.slice(0, evidenceLimits[key]).map((id) => (
-              <div key={id} className="wallet-evidence-outpoint">
-                <WalletReference
-                  value={id.replace(/^(out|tx):/, '')}
-                  kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
-                  length={12}
-                />
-                {workspace.annotations[id]?.label && <span>{workspace.annotations[id].label}</span>}
+            ['inputs', 'Input outpoints', related.inputs],
+            [
+              'outputs',
+              row.kind === 'transaction' ? 'Output outpoints' : 'Related outpoints',
+              related.outputs,
+            ],
+            ['transactions', 'Related transactions', related.transactions],
+          ] as const
+        )
+          .filter(([, , ids]) => ids.length)
+          .map(([key, title, ids]) => (
+            <section className="wallet-related-records" aria-label={title} key={title}>
+              <h3>
+                {title} ({ids.length})
+              </h3>
+              {ids.slice(0, evidenceLimits[key]).map((id) => (
+                <div key={id} className="wallet-evidence-outpoint">
+                  <div className="wallet-reference-actions">
+                    <WalletReference
+                      value={id.replace(/^(out|tx):/, '')}
+                      kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
+                      length={12}
+                    />
+                    <button
+                      className="icon-button"
+                      title="Show on graph"
+                      aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
+                      onClick={() => onShowInGraph(id)}
+                    >
+                      <Search size={13} />
+                    </button>
+                  </div>
+                  {workspace.annotations[id]?.label && (
+                    <span className="wallet-related-label" title={workspace.annotations[id].label}>
+                      {workspace.annotations[id].label}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {ids.length > evidenceLimits[key] && (
                 <button
-                  className="icon-button"
-                  title="Show on graph"
-                  aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
-                  onClick={() => onShowInGraph(id)}
+                  onClick={() =>
+                    setEvidenceLimits((value) => ({
+                      ...value,
+                      [key]: value[key] + 20,
+                    }))
+                  }
                 >
-                  <Search size={13} />
+                  Show more
                 </button>
-              </div>
-            ))}
-            {ids.length > evidenceLimits[key] && (
-              <button
-                onClick={() =>
-                  setEvidenceLimits((value) => ({
-                    ...value,
-                    [key]: value[key] + 20,
-                  }))
-                }
-              >
-                Show more
-              </button>
-            )}
-          </section>
-        ))}
+              )}
+            </section>
+          ))}
+      </div>
     </>
   );
 }

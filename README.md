@@ -99,10 +99,9 @@ known transactions, and the current UTXO count and balance from a verified check
 There is no completeness percentage; when no UTXO check has run, the workbench
 says so and offers the action.
 
-**To review** is a queue derived from your own data, in priority order: current
-UTXOs, receipts that were spent into them, other direct funding inputs of
-wallet-receiving transactions, activity found by a refresh,
-counterparties, and grouping findings from your last analysis scan. Each
+**To review** starts with current UTXOs and used wallet addresses, followed by
+earlier receipts, source addresses, refreshed activity, destination addresses and
+findings from your last analysis scan. Each
 item explains its reason and shows its evidence. Review filters include counts;
 larger lists offer an explicit Show more action. The compact transaction flow
 separates verified wallet-script matches from **No wallet match** and unknown
@@ -125,6 +124,14 @@ does not complete a review or remove an item. Decisions are stored inside the en
 refresh keeps them. Only an item whose underlying observations actually changed is
 flagged for another look, with the date of your earlier decision. A scan never
 resets the queue.
+
+A short sentence under the actions explains why each item is here and what to do
+next. Used wallet addresses can be labelled by purpose; unused gap-discovery
+addresses are not added to the queue. Source and destination guidance asks for a
+sender, exchange, shop or recipient the user recognizes, not an inferred identity.
+Individual counterparty outputs are no longer offered as new review tasks.
+Compatible older output decisions remain as history under **Previous output decisions**,
+not as new work to complete.
 
 One Wallet navigation row offers **To review**, **UTXOs**, **Transactions**,
 **Addresses**, **Sources** and **Destinations**. All six tabs use the same selectable

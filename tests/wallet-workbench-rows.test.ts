@@ -107,6 +107,13 @@ describe('shared Wallet rows', () => {
 
   it('retains the resolved subject when a missing outpoint becomes an address group', () => {
     const { workspace, wallet } = fixture();
+    workspace.walletReviews = {
+      [`${wallet.id}|funding-source|${'9'.repeat(64)}:0`]: {
+        status: 'later',
+        at: '2026-09-09T00:00:00Z',
+        evidence: 'previously-saved',
+      },
+    };
     const missing = reviewRow(
       buildWalletReview(workspace, wallet).items.find(
         (item) => item.reason === 'funding-source' && !item.address,

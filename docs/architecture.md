@@ -338,7 +338,7 @@ address selections appear immediately.
 
 `domain/walletReview.ts` derives a review queue for one wallet from loaded
 observations and an optional verified UTXO check. Reasons are ordered: current
-UTXOs, receipts spent into them, other direct funding inputs, refresh activity,
+UTXOs, used wallet addresses, receipts spent into them, source addresses, refresh activity,
 counterparties, and active non-stale findings covering verified wallet outputs.
 Counterparty items come only from transactions the wallet funded through loaded
 prevouts, so the outputs of a batch that merely paid the wallet are never
@@ -357,6 +357,13 @@ acknowledge it. The UI separates deferred items into Review later; changed evide
 returns an item to To review. Annotation changes do not remove candidates or change
 their evidence fingerprint. Removing a wallet
 prunes its decisions.
+
+Used wallet addresses have address-only review keys based on their verified
+derivation slot, so new receipts do not undo an already recorded address purpose.
+Unused gap-discovery addresses are not queued. Source/destination address reviews
+remain independent of older output decisions. New output-only counterparty tasks
+are no longer generated; existing saved output decisions remain compatible and
+are exposed separately as history.
 
 `domain/batchMetadata.ts` plans and applies label, tag and icon edits over an
 explicit list of canonical entity references. Each helper returns one workspace,

@@ -363,7 +363,11 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
     ],
   );
   const displayedRows = filteredRows.slice(0, limit);
-  const currentRow = resolveWalletRow(filteredRows, selectedKey, previousRow.current);
+  const initialReviewLoading =
+    tab === 'review' && !selectedKey && !previousRow.current && canQuery && !utxos && !utxoError;
+  const currentRow = initialReviewLoading
+    ? undefined
+    : resolveWalletRow(filteredRows, selectedKey, previousRow.current);
   const selectedRow = useMemo(
     () => (currentRow ? walletRowWithContext(workspace, currentRow) : undefined),
     [workspace.transactions, workspace.network, currentRow],
@@ -383,7 +387,12 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
     })
     .join(' · ');
   const selectedReviews = [
-    ...new Map(selectedRows.flatMap((row) => row.reviews).map((item) => [item.key, item])).values(),
+    ...new Map(
+      selectedRows
+        .flatMap((row) => row.reviews)
+        .filter((item) => !item.legacyOutputReview)
+        .map((item) => [item.key, item]),
+    ).values(),
   ];
   const hiddenSelected = selectedRows.filter((row) => !filteredKeys.has(row.key)).length;
   const missingSelected = selection.ids.filter((id) => !rowKeys.has(id)).length;
@@ -917,13 +926,15 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
               />
             ) : (
               <p className="wallet-empty-note">
-                {tab === 'transactions'
-                  ? 'Select a transaction.'
-                  : tab === 'utxos'
-                    ? 'Select a UTXO.'
-                    : tab === 'review'
-                      ? 'Select a review item.'
-                      : 'Select an address.'}
+                {initialReviewLoading
+                  ? 'Checking current UTXOs...'
+                  : tab === 'transactions'
+                    ? 'Select a transaction.'
+                    : tab === 'utxos'
+                      ? 'Select a UTXO.'
+                      : tab === 'review'
+                        ? 'Select a review item.'
+                        : 'Select an address.'}
               </p>
             )}
           </article>
