@@ -96,6 +96,10 @@ export interface WalletReviewCoverage {
 
 export interface WalletReview {
   items: WalletReviewItem[];
+  /** Candidates beyond the current bound, reachable by requesting a later page. */
+  omittedItems: number;
+  /** Unresolved candidates beyond the bound, so a count can be shown as partial. */
+  omittedPendingItems: number;
   coverage: WalletReviewCoverage;
   /** Loaded ancestry was missing for some current UTXOs, so sources are incomplete. */
   missingSourceTransactions: number;
@@ -122,6 +126,11 @@ const MAX_ITEMS_PER_REASON: Record<ReviewReason, number> = {
   counterparty: 100,
   link: 20,
 };
+
+/** Only these statuses complete a review. `later` stays pending work. */
+export function isCompletedReview(decision?: ReviewDecision): boolean {
+  return decision?.status === 'reviewed' || decision?.status === 'unknown';
+}
 
 export function reviewKey(walletId: string, reason: ReviewReason, subject: string): string {
   return `${walletId}|${reason}|${subject}`;
@@ -229,6 +238,8 @@ export function buildWalletReview(
     utxoCheckedAddresses?: number;
     utxoTotalAddresses?: number;
     utxoPartial?: boolean;
+    /** Multiplies the per-reason bound for an explicit continuation. */
+    page?: number;
   } = {},
 ): WalletReview {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
@@ -254,31 +265,27 @@ export function buildWalletReview(
     const transaction = workspace.transactions[record.txid];
     return !transaction || verifyWalletUtxo(record, transaction, workspace.network);
   });
-  const items: WalletReviewItem[] = [];
-  const counts = new Map<ReviewReason, number>();
-  const push = (item: WalletReviewItem) => {
-    const used = counts.get(item.reason) ?? 0;
-    if (used >= MAX_ITEMS_PER_REASON[item.reason]) return;
-    counts.set(item.reason, used + 1);
-    items.push(item);
+  const candidates = new Map<ReviewReason, ReviewSubject[]>();
+  const push = (subject: ReviewSubject) => {
+    const list = candidates.get(subject.reason);
+    if (list) list.push(subject);
+    else candidates.set(subject.reason, [subject]);
   };
 
   for (const record of verifiedUtxos) {
     const nodeId = outputNodeId(record.txid, record.vout);
-    push(
-      decorate(workspace, {
-        key: reviewKey(wallet.id, 'current-utxo', `${record.txid}:${record.vout}`),
-        reason: 'current-utxo',
-        title: `Unspent output ${short(record.txid, 6)}:${record.vout}`,
-        detail: 'Unspent at the last check. Give it a label or tag so a future spend has context.',
-        nodeId,
-        nodeIds: [nodeId],
-        txid: record.txid,
-        amountSats: record.valueSats,
-        address: record.address,
-        evidence: fingerprint(`utxo|${record.txid}|${record.vout}|${record.valueSats}`),
-      }),
-    );
+    push({
+      key: reviewKey(wallet.id, 'current-utxo', `${record.txid}:${record.vout}`),
+      reason: 'current-utxo',
+      title: `Unspent output ${short(record.txid, 6)}:${record.vout}`,
+      detail: 'Unspent at the last check. Give it a label or tag so a future spend has context.',
+      nodeId,
+      nodeIds: [nodeId],
+      txid: record.txid,
+      amountSats: record.valueSats,
+      address: record.address,
+      evidence: fingerprint(`utxo|${record.txid}|${record.vout}|${record.valueSats}`),
+    });
   }
 
   let missingSourceTransactions = 0;
@@ -302,43 +309,39 @@ export function buildWalletReview(
     (a, b) => b.output.valueSats - a.output.valueSats,
   )) {
     if (annotationOf(workspace, output.nodeId)?.label) continue;
-    push(
-      decorate(workspace, {
-        key: reviewKey(wallet.id, 'source', `${output.txid}:${output.vout}`),
-        reason: 'source',
-        title: `Unlabeled receipt of ${output.valueSats.toLocaleString('en-US')} sats`,
-        detail: `This wallet output was spent into ${utxos.length} current UTXO${
-          utxos.length === 1 ? '' : 's'
-        }. Recording where it came from explains today's balance.`,
-        nodeId: output.nodeId,
-        nodeIds: [output.nodeId],
-        txid: output.txid,
-        amountSats: output.valueSats,
-        address: output.address,
-        evidence: fingerprint(`source|${output.nodeId}|${utxos.sort().join(',')}`),
-      }),
-    );
+    push({
+      key: reviewKey(wallet.id, 'source', `${output.txid}:${output.vout}`),
+      reason: 'source',
+      title: `Unlabeled receipt of ${output.valueSats.toLocaleString('en-US')} sats`,
+      detail: `This wallet output was spent into ${utxos.length} current UTXO${
+        utxos.length === 1 ? '' : 's'
+      }. Recording where it came from explains today's balance.`,
+      nodeId: output.nodeId,
+      nodeIds: [output.nodeId],
+      txid: output.txid,
+      amountSats: output.valueSats,
+      address: output.address,
+      evidence: fingerprint(`source|${output.nodeId}|${utxos.sort().join(',')}`),
+    });
   }
 
   for (const txid of wallet.unreviewedTransactionIds ?? []) {
     const nodeId = txNodeId(txid);
     const transaction = workspace.transactions[txid];
-    push(
-      decorate(workspace, {
-        key: reviewKey(wallet.id, 'new-activity', txid),
-        reason: 'new-activity',
-        title: 'New activity since your last review',
-        detail: transaction
-          ? `Discovered by a wallet refresh with ${transaction.vin.length} input${
-              transaction.vin.length === 1 ? '' : 's'
-            } and ${transaction.vout.length} output${transaction.vout.length === 1 ? '' : 's'}.`
-          : 'Discovered in an address history. Open it in Graph to load the transaction.',
-        nodeId,
-        nodeIds: [nodeId],
-        txid,
-        evidence: fingerprint(`activity|${txid}`),
-      }),
-    );
+    push({
+      key: reviewKey(wallet.id, 'new-activity', txid),
+      reason: 'new-activity',
+      title: 'New activity since your last review',
+      detail: transaction
+        ? `Discovered by a wallet refresh with ${transaction.vin.length} input${
+            transaction.vin.length === 1 ? '' : 's'
+          } and ${transaction.vout.length} output${transaction.vout.length === 1 ? '' : 's'}.`
+        : 'Discovered in an address history. Open it in Graph to load the transaction.',
+      nodeId,
+      nodeIds: [nodeId],
+      txid,
+      evidence: fingerprint(`activity|${txid}`),
+    });
   }
 
   // Only transactions this wallet funded can identify a counterparty I paid.
@@ -362,42 +365,63 @@ export function buildWalletReview(
     }
   }
   for (const entry of counterparties.sort((a, b) => b.valueSats - a.valueSats))
-    push(
-      decorate(workspace, {
-        key: reviewKey(wallet.id, 'counterparty', entry.nodeId.slice(4)),
-        reason: 'counterparty',
-        title: `Payment of ${entry.valueSats.toLocaleString('en-US')} sats to an unknown address`,
-        detail:
-          'This wallet funded the transaction and this output is not a verified wallet address. It may be a counterparty you paid; it is not proof of who controls it.',
-        nodeId: entry.nodeId,
-        nodeIds: [entry.nodeId],
-        txid: entry.txid,
-        amountSats: entry.valueSats,
-        address: entry.address,
-        evidence: fingerprint(`counterparty|${entry.nodeId}|${entry.valueSats}`),
-      }),
-    );
+    push({
+      key: reviewKey(wallet.id, 'counterparty', entry.nodeId.slice(4)),
+      reason: 'counterparty',
+      title: `Payment of ${entry.valueSats.toLocaleString('en-US')} sats to an unknown address`,
+      detail:
+        'This wallet funded the transaction and this output is not a verified wallet address. It may be a counterparty you paid; it is not proof of who controls it.',
+      nodeId: entry.nodeId,
+      nodeIds: [entry.nodeId],
+      txid: entry.txid,
+      amountSats: entry.valueSats,
+      address: entry.address,
+      evidence: fingerprint(`counterparty|${entry.nodeId}|${entry.valueSats}`),
+    });
 
   for (const finding of workspace.findings) {
     if (finding.excluded || finding.stale) continue;
     if (!findingCoversWallet(finding, owned)) continue;
     const nodeIds = finding.nodeIds.filter((id) => owned.has(id));
-    push(
-      decorate(workspace, {
-        key: reviewKey(wallet.id, 'link', finding.id),
-        reason: 'link',
-        title: finding.title,
-        detail: finding.description,
-        nodeId: nodeIds[0] ?? finding.nodeIds[0],
-        nodeIds: finding.nodeIds,
-        txid: finding.txids[0],
-        evidence: fingerprint(
-          `link|${finding.algorithm}|${[...finding.nodeIds].sort().join(',')}|${[...finding.txids]
-            .sort()
-            .join(',')}`,
-        ),
-      }),
-    );
+    push({
+      key: reviewKey(wallet.id, 'link', finding.id),
+      reason: 'link',
+      title: finding.title,
+      detail: finding.description,
+      nodeId: nodeIds[0] ?? finding.nodeIds[0],
+      nodeIds: finding.nodeIds,
+      txid: finding.txids[0],
+      evidence: fingerprint(
+        `link|${finding.algorithm}|${[...finding.nodeIds].sort().join(',')}|${[...finding.txids]
+          .sort()
+          .join(',')}`,
+      ),
+    });
+  }
+
+  // Bounded processing must never claim completion. Unresolved candidates are
+  // selected before settled ones, and anything left over is reported with a real
+  // continuation instead of being silently dropped.
+  const page = Math.max(1, Math.trunc(options.page ?? 1));
+  const settled = (subject: ReviewSubject) => {
+    const decision = workspace.walletReviews?.[subject.key];
+    return isCompletedReview(decision) && decision!.evidence === subject.evidence;
+  };
+  const items: WalletReviewItem[] = [];
+  let omittedItems = 0;
+  let omittedPendingItems = 0;
+  for (const reason of REVIEW_REASONS) {
+    const list = candidates.get(reason) ?? [];
+    const limit = MAX_ITEMS_PER_REASON[reason] * page;
+    if (list.length <= limit) {
+      for (const subject of list) items.push(decorate(workspace, subject));
+      continue;
+    }
+    const pending = list.filter((subject) => !settled(subject));
+    const chosen = [...pending, ...list.filter(settled)].slice(0, limit);
+    omittedItems += list.length - chosen.length;
+    omittedPendingItems += Math.max(0, pending.length - limit);
+    for (const subject of chosen) items.push(decorate(workspace, subject));
   }
 
   items.sort(
@@ -411,6 +435,8 @@ export function buildWalletReview(
   const loadedTransactions = [...history].filter((id) => workspace.transactions[id]).length;
   return {
     items,
+    omittedItems,
+    omittedPendingItems,
     missingSourceTransactions,
     coverage: {
       scannedAt: wallet.scannedAt,
@@ -477,7 +503,10 @@ export function applyReviewDecisions(
     if (previous?.status === status && previous.evidence === item.evidence) continue;
     reviews[item.key] = { status, at: now, evidence: item.evidence };
     changed = true;
-    if (item.reason === 'new-activity' && item.txid) acknowledged.add(item.txid);
+    // Deferral is not completion: refreshed activity stays in the wallet queue so
+    // the item remains discoverable instead of disappearing from every view.
+    if (item.reason === 'new-activity' && item.txid && status !== 'later')
+      acknowledged.add(item.txid);
   }
   if (!changed) return workspace;
   const wallets = acknowledged.size

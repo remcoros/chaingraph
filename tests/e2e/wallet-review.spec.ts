@@ -281,9 +281,8 @@ test('batch labels, tags and icons apply to the explicit selection in one undoab
   const tagEditor = page.getByRole('dialog', { name: 'Tag selected records' });
   await tagEditor.getByLabel('Find or create tag').fill('Savings');
   await tagEditor.getByRole('button', { name: 'Create and assign' }).click();
-  await expect(tagEditor).toContainText('2 of 2 selected');
-  await tagEditor.getByRole('button', { name: 'Close tag editor' }).click();
-  // Tag membership is visible on the rows it was applied to.
+  // Applying the batch closes its editor; membership is visible on the rows.
+  await expect(tagEditor).toBeHidden();
   await expect(page.locator('.wallet-review-records')).toContainText('Savings');
 
   await bar.getByRole('button', { name: /^Set icon/ }).click();
@@ -397,4 +396,130 @@ test('keyboard handoff reaches Graph and returns focus to the exact Wallet invok
   await page.keyboard.press('Enter');
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
   await expect(invoker).toBeFocused();
+});
+
+// RUX-002: a deferral is not a completed review.
+test('Review later keeps refreshed activity discoverable across views and a reload', async ({
+  page,
+}) => {
+  await seed(page);
+  await waitForUtxoCheck(page);
+  const chain = await mockChain(page);
+  chain.newActivity = true;
+  await page.getByRole('button', { name: 'Refresh wallet' }).click();
+  await expect(page.locator('.wallet-coverage')).toContainText('3 unspent', { timeout: 20000 });
+  await reviewList(page).getByRole('listitem').filter({ hasText: 'New receipt' }).click();
+  await expect(detail(page)).toContainText('New activity since your last review');
+  await detail(page).getByRole('button', { name: 'Review later' }).click();
+
+  // Still pending in the queue, and still present under All items.
+  await expect(reviewList(page)).toContainText('New receipt');
+  await page.getByLabel('Review filter').selectOption('all');
+  await expect(reviewList(page)).toContainText('Review later');
+  await page.getByLabel('Review filter').selectOption('decided');
+  // Nothing is completed, so the deferred item must not appear as reviewed.
+  await expect(reviewList(page)).toHaveCount(0);
+  await expect(page.locator('.wallet-empty-note')).toContainText('Nothing has been reviewed yet');
+  await page.getByLabel('Review filter').selectOption('open');
+  await expect(reviewList(page)).toContainText('New receipt');
+
+  // Records agrees: a deferred record is unreviewed, not reviewed.
+  await page.getByRole('button', { name: /Records/ }).click();
+  await page.getByRole('button', { name: 'Transactions', exact: true }).click();
+  await page.getByLabel('Review state filter').selectOption('open');
+  await expect(page.locator('.wallet-review-records')).toContainText(TX_NEW.slice(0, 12));
+  await page.getByLabel('Review state filter').selectOption('decided');
+  await expect(page.locator('.wallet-review-records')).not.toContainText(TX_NEW.slice(0, 12));
+
+  // Locking flushes the encrypted save, so persistence is checked on real storage.
+  await page.getByRole('button', { name: 'Workspace menu' }).click();
+  await page.getByRole('button', { name: 'Lock workspace' }).click();
+  await expect(page.locator('.saved-row').first()).toBeVisible();
+  const workspace = await saved(page);
+  expect(workspace.wallets[0].unreviewedTransactionIds).toContain(TX_NEW);
+  expect(
+    Object.entries(workspace.walletReviews ?? {}).filter(
+      ([key, value]) => key.includes('|new-activity|') && value.status === 'later',
+    ),
+  ).toHaveLength(1);
+
+  await page.reload();
+  await unlock(page, 'Old public wallet');
+  await expect(reviewList(page)).toContainText('New receipt', { timeout: 20000 });
+  await expect(reviewList(page)).toContainText('Review later');
+});
+
+// RUX-004: batch editors are mutually exclusive and return focus after applying.
+test('batch editors never stack and the icon palette stays keyboard usable', async ({ page }) => {
+  await seed(page);
+  await waitForUtxoCheck(page);
+  await page.getByRole('button', { name: /Records/ }).click();
+  await page.getByRole('button', { name: /Select 2 matching/ }).click();
+  const bar = page.getByRole('group', { name: 'Batch metadata editing' });
+  const tagButton = bar.getByRole('button', { name: 'Tag', exact: true });
+  await tagButton.click();
+  const tagEditor = page.getByRole('dialog', { name: 'Tag selected records' });
+  await tagEditor.getByLabel('Find or create tag').fill('Savings');
+  await tagEditor.getByRole('button', { name: 'Create and assign' }).click();
+  // Applying the batch closes the editor and returns focus to its trigger.
+  await expect(tagEditor).toBeHidden();
+  await expect(tagButton).toBeFocused();
+
+  await tagButton.click();
+  await expect(tagEditor).toBeVisible();
+  await bar.getByRole('button', { name: /^Set icon/ }).click();
+  const palette = page.getByRole('dialog', { name: 'Choose node icon' });
+  await expect(palette).toBeVisible();
+  await expect(tagEditor).toBeHidden();
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+
+  // The palette grid is reachable and arrow keys move within it.
+  await page.keyboard.press('ArrowRight');
+  await expect(palette.getByRole('button', { name: 'Diamond' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(palette).toBeHidden();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+// RUX-005: Inspect reveals the Inspector, so focus must land there, not on a hidden canvas.
+test('keyboard Inspect on a phone focuses the revealed Inspector', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seed(page);
+  await waitForUtxoCheck(page);
+  await reviewList(page).getByRole('listitem').first().click();
+  const invoker = detail(page).getByRole('button', { name: 'Inspect', exact: true });
+  await invoker.focus();
+  await page.keyboard.press('Enter');
+  await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.right-panel')).toBeVisible();
+  const landed = await page.evaluate(() => {
+    const active = document.activeElement as HTMLElement | null;
+    return {
+      tag: active?.tagName ?? 'NONE',
+      inPanel: !!active && !!document.querySelector('.right-panel')?.contains(active),
+    };
+  });
+  expect(landed.tag).not.toBe('BODY');
+  expect(landed.inPanel).toBe(true);
+  // The accepted return contract still restores the exact invoker.
+  const back = page.getByRole('button', { name: 'Back to Wallet' });
+  await back.focus();
+  await page.keyboard.press('Enter');
+  await expect(invoker).toBeFocused();
+});
+
+// RUX-P02: queue rows keep real button semantics inside their list items.
+test('review rows expose button semantics with a pressed state', async ({ page }) => {
+  await seed(page);
+  await waitForUtxoCheck(page);
+  const rows = reviewList(page).getByRole('listitem');
+  const firstButton = rows.first().getByRole('button');
+  const secondButton = rows.nth(1).getByRole('button');
+  await expect(firstButton).toHaveCount(1);
+  // The queue opens on its first row, so the pressed state must track selection.
+  await expect(firstButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(secondButton).toHaveAttribute('aria-pressed', 'false');
+  await secondButton.click();
+  await expect(secondButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(firstButton).toHaveAttribute('aria-pressed', 'false');
 });

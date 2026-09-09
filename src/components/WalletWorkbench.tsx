@@ -29,6 +29,7 @@ import {
 import {
   buildWalletReview,
   applyReviewDecisions,
+  isCompletedReview,
   REASON_LABELS,
   reviewKey,
   spendGuidance,
@@ -160,6 +161,7 @@ function WalletReview({
   const [recordReview, setRecordReview] = useState<'all' | 'open' | 'decided'>('all');
   const [tagFilter, setTagFilter] = useState('all');
   const [selection, setSelection] = useState<string[]>([]);
+  const [itemPage, setItemPage] = useState(1);
   const [notice, setNotice] = useState('');
   const {
     utxos,
@@ -198,8 +200,9 @@ function WalletReview({
         utxoCheckedAddresses: utxos?.checkedAddresses,
         utxoTotalAddresses: utxos?.totalAddresses,
         utxoPartial: utxos?.nextCursor !== undefined || (utxos?.failed ?? 0) > 0,
+        page: itemPage,
       }),
-    [workspace, wallet, utxos, currentUtxos],
+    [workspace, wallet, utxos, currentUtxos, itemPage],
   );
   const openItems = review.items.filter(
     (item) => item.status === 'open' || item.status === 'later' || item.changed,
@@ -208,7 +211,10 @@ function WalletReview({
     reviewFilter === 'open'
       ? openItems
       : reviewFilter === 'decided'
-        ? review.items.filter((item) => item.status !== 'open' && !item.changed)
+        ? // Deferred items are outstanding work, so they never read as reviewed.
+          review.items.filter(
+            (item) => isCompletedReview(workspace.walletReviews?.[item.key]) && !item.changed,
+          )
         : review.items;
   const selectedItem = visibleItems.find((item) => item.key === selectedKey) ?? visibleItems[0];
   useEffect(
@@ -295,9 +301,10 @@ function WalletReview({
     if (tagFilter !== 'all' && !rowTags(row).some((tag) => tag.id === tagFilter)) return false;
 
     if (recordReview !== 'all' && row.reviewKey) {
-      const decided = workspace.walletReviews?.[row.reviewKey] !== undefined;
-      if (recordReview === 'open' && decided) return false;
-      if (recordReview === 'decided' && !decided) return false;
+      // A deferred record is still outstanding work, so it stays under Unreviewed.
+      const completed = isCompletedReview(workspace.walletReviews?.[row.reviewKey]);
+      if (recordReview === 'open' && completed) return false;
+      if (recordReview === 'decided' && !completed) return false;
     } else if (recordReview !== 'all' && !row.reviewKey) return false;
     return true;
   });
@@ -455,7 +462,10 @@ function WalletReview({
           onClick={() => setTab('review')}
         >
           <ListChecks size={14} /> To review
-          <span className="wallet-count">{openItems.length}</span>
+          <span className="wallet-count">
+            {openItems.length}
+            {review.omittedPendingItems ? '+' : ''}
+          </span>
         </button>
         <button
           aria-pressed={tab === 'records'}
@@ -492,6 +502,21 @@ function WalletReview({
                 ? ` · ${review.missingSourceTransactions} UTXO sources not loaded`
                 : ''}
             </span>
+            {review.omittedItems > 0 && (
+              <span className="small wallet-review-bound">
+                {review.omittedItems} more record{review.omittedItems === 1 ? '' : 's'} not listed
+                yet
+                {review.omittedPendingItems
+                  ? `, including ${review.omittedPendingItems} still to review`
+                  : ''}
+                .
+              </span>
+            )}
+            {review.omittedItems > 0 && (
+              <button onClick={() => setItemPage((current) => current + 1)}>
+                Load more records
+              </button>
+            )}
             {openItems.length > 0 && reviewFilter === 'open' && (
               <button
                 onClick={() => decide(openItems.slice(0, limit), 'later')}
@@ -513,41 +538,43 @@ function WalletReview({
             <p className="wallet-empty-note">
               {reviewFilter === 'decided'
                 ? 'Nothing has been reviewed yet.'
-                : coverage.utxoCount === undefined
-                  ? 'Check current UTXOs to build the review queue from your live coins.'
-                  : 'Nothing to review. Refresh the wallet or check UTXOs again after new activity.'}
+                : review.omittedItems > 0
+                  ? 'No items in this view yet. More records are not listed; load more records to continue.'
+                  : coverage.utxoCount === undefined
+                    ? 'Check current UTXOs to build the review queue from your live coins.'
+                    : 'Nothing to review. Refresh the wallet or check UTXOs again after new activity.'}
             </p>
           ) : (
             <div className="wallet-review-grid">
               <div className="wallet-review-list" role="list" aria-label="Review queue">
                 {visibleItems.slice(0, limit).map((item) => (
-                  <button
-                    key={item.key}
-                    role="listitem"
-                    className={selectedItem?.key === item.key ? 'active' : ''}
-                    aria-pressed={selectedItem?.key === item.key}
-                    onClick={() => setSelectedKey(item.key)}
-                  >
-                    <span className="wallet-review-reason">
-                      {REASON_LABELS[item.reason]}
-                      <span className={`wallet-review-status status-${item.status}`}>
-                        {statusLabel(item)}
+                  <div className="wallet-review-item" role="listitem" key={item.key}>
+                    <button
+                      className={selectedItem?.key === item.key ? 'active' : ''}
+                      aria-pressed={selectedItem?.key === item.key}
+                      onClick={() => setSelectedKey(item.key)}
+                    >
+                      <span className="wallet-review-reason">
+                        {REASON_LABELS[item.reason]}
+                        <span className={`wallet-review-status status-${item.status}`}>
+                          {statusLabel(item)}
+                        </span>
                       </span>
-                    </span>
-                    <strong>{item.label || item.title}</strong>
-                    <span className="muted">
-                      {[
-                        item.amountSats !== undefined ? formatSats(item.amountSats) : undefined,
-                        item.address
-                          ? short(item.address, 8)
-                          : item.txid && item.amountSats === undefined
-                            ? short(item.txid, 8)
-                            : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </button>
+                      <strong>{item.label || item.title}</strong>
+                      <span className="muted">
+                        {[
+                          item.amountSats !== undefined ? formatSats(item.amountSats) : undefined,
+                          item.address
+                            ? short(item.address, 8)
+                            : item.txid && item.amountSats === undefined
+                              ? short(item.txid, 8)
+                              : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </button>
+                  </div>
                 ))}
                 {visibleItems.length > limit && (
                   <button onClick={() => setLimit((current) => current + PAGE)}>

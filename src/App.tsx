@@ -163,9 +163,10 @@ export default function App() {
   const workbenchInvokers = useRef<
     Partial<Record<'analysis' | 'wallet', { workspaceId: string; element: HTMLElement }>>
   >({});
-  const pendingWorkbenchFocus = useRef<{ workspaceId: string; mode: WorkbenchMode } | undefined>(
-    undefined,
-  );
+  const pendingWorkbenchFocus = useRef<
+    { workspaceId: string; mode: WorkbenchMode; destination?: 'inspector' } | undefined
+  >(undefined);
+  const rightPanelRef = useRef<HTMLElement>(null);
   const workbenchSection = (mode: WorkbenchMode) =>
     mode === 'graph'
       ? graphWorkspaceRef.current
@@ -178,10 +179,15 @@ export default function App() {
     pendingWorkbenchFocus.current = undefined;
     if (!pending || pending.workspaceId !== w?.id || pending.mode !== workbench) return;
     if (workbench === 'graph') {
-      const destination = graphWorkspaceRef.current?.querySelector<HTMLElement>(
-        '.graph-canvas:not([aria-hidden="true"]) canvas',
-      );
-      (destination ?? graphWorkspaceRef.current)?.focus({ preventScroll: true });
+      // A handoff that reveals the Inspector must land there; the canvas can be
+      // hidden behind the mobile panel switch and would drop focus to the body.
+      const destination =
+        pending.destination === 'inspector'
+          ? (rightPanelRef.current ?? graphWorkspaceRef.current)
+          : (graphWorkspaceRef.current?.querySelector<HTMLElement>(
+              '.graph-canvas:not([aria-hidden="true"]) canvas',
+            ) ?? graphWorkspaceRef.current);
+      destination?.focus({ preventScroll: true });
     } else {
       const section = workbenchSection(workbench);
       const invoker = workbenchInvokers.current[workbench];
@@ -876,7 +882,7 @@ export default function App() {
   ) {
     recordHandoffInvoker('wallet');
     setReturnWorkbench('wallet');
-    switchWorkbench('graph', true);
+    switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
     setMobilePanel(mode === 'graph' ? 'graph' : 'right');
     selectWalletRecord(nodeId, utxo, { tab: 'inspect', center: mode === 'graph' });
   }
@@ -1262,9 +1268,9 @@ export default function App() {
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
-  function switchWorkbench(next: WorkbenchMode, handoffFocus = false) {
+  function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {
     pendingWorkbenchFocus.current =
-      handoffFocus && w ? { workspaceId: w.id, mode: next } : undefined;
+      handoffFocus && w ? { workspaceId: w.id, mode: next, destination } : undefined;
     flushActiveGraph();
     setWorkbench(next);
   }
@@ -2018,7 +2024,12 @@ export default function App() {
                 </div>
               </div>
             </section>
-            <aside className="right-panel" data-tour="analysis-panel">
+            <aside
+              className="right-panel"
+              ref={rightPanelRef}
+              tabIndex={-1}
+              data-tour="analysis-panel"
+            >
               <div className={`panel-tabs ${wallet ? 'has-wallet-tabs' : ''}`}>
                 <button
                   className={shownRightTab === 'inspect' ? 'active' : ''}

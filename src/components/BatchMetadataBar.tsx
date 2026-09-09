@@ -87,23 +87,35 @@ export function BatchMetadataBar({
             />
           )}
         </div>
-        <IconPicker
-          value=""
-          fieldLabel="Set icon"
-          onChange={(icon) => {
-            const plan = planBatchIcon(workspace, ids, replaceIcons);
-            if (!plan.targets.length) {
-              onNotice('Every selected record already has an icon. Enable Replace to change them.');
-              return;
-            }
-            onChange((current) => applyBatchIcon(current, ids, icon, replaceIcons));
-            onNotice(
-              `${icon ? 'Icon set on' : 'Icon cleared on'} ${plan.targets.length} record${
-                plan.targets.length === 1 ? '' : 's'
-              }.${plan.preserved ? ` ${plan.preserved} kept an existing icon.` : ''}`,
-            );
+        <div
+          className="batch-icon"
+          // The icon palette is a batch editor too: opening it closes the others
+          // instead of stacking a second focus trap over this bar.
+          onPointerDownCapture={() => setOpen(undefined)}
+          onKeyDownCapture={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') setOpen(undefined);
           }}
-        />
+        >
+          <IconPicker
+            value=""
+            fieldLabel="Set icon"
+            onChange={(icon) => {
+              const plan = planBatchIcon(workspace, ids, replaceIcons);
+              if (!plan.targets.length) {
+                onNotice(
+                  'Every selected record already has an icon. Enable Replace to change them.',
+                );
+                return;
+              }
+              onChange((current) => applyBatchIcon(current, ids, icon, replaceIcons));
+              onNotice(
+                `${icon ? 'Icon set on' : 'Icon cleared on'} ${plan.targets.length} record${
+                  plan.targets.length === 1 ? '' : 's'
+                }.${plan.preserved ? ` ${plan.preserved} kept an existing icon.` : ''}`,
+              );
+            }}
+          />
+        </div>
         <label className="batch-replace">
           <input
             type="checkbox"
@@ -268,6 +280,8 @@ function BatchTagEditor({
             );
             setQuery('');
             setError('');
+            // The batch is applied, so close and return focus to the Tag control.
+            onClose();
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'Could not create this tag.');
           }

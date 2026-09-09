@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyReviewDecisions,
   buildWalletReview,
+  isCompletedReview,
   pruneWalletReviews,
   reviewKey,
   spendGuidance,
@@ -288,5 +289,77 @@ describe('spend guidance', () => {
       'no recorded source',
     );
     expect(spendGuidance(fixture(), [`out:${id(1)}:0`, `out:${id(2)}:0`])).toBeUndefined();
+  });
+});
+
+describe('deferral and bounded queues', () => {
+  // RUX-002: Review later must not acknowledge refreshed activity.
+  it('keeps a deferred new-activity item pending and discoverable', () => {
+    const withActivity: Workspace = {
+      ...fixture(),
+      wallets: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
+    };
+    const activity = find(build(withActivity).items, 'new-activity');
+    expect(activity).toHaveLength(1);
+    const deferred = applyReviewDecisions(withActivity, wallet, activity, 'later');
+    // The wallet's own activity queue still holds it, so the item still exists.
+    expect(deferred.wallets[0].unreviewedTransactionIds).toEqual([id(2)]);
+    const rebuilt = find(build(deferred).items, 'new-activity');
+    expect(rebuilt).toHaveLength(1);
+    expect(rebuilt[0].status).toBe('later');
+    expect(deferred.walletReviews?.[activity[0].key].status).toBe('later');
+    // Completing it afterwards does acknowledge it.
+    const completed = applyReviewDecisions(deferred, wallet, rebuilt, 'reviewed');
+    expect(completed.wallets[0].unreviewedTransactionIds).toEqual([]);
+    // Unrelated decisions survive both steps.
+    expect(Object.keys(completed.walletReviews ?? {})).toHaveLength(1);
+  });
+
+  it('treats only reviewed and unknown as completed reviews', () => {
+    expect(isCompletedReview({ status: 'reviewed', at: '', evidence: '' })).toBe(true);
+    expect(isCompletedReview({ status: 'unknown', at: '', evidence: '' })).toBe(true);
+    expect(isCompletedReview({ status: 'later', at: '', evidence: '' })).toBe(false);
+    expect(isCompletedReview(undefined)).toBe(false);
+  });
+
+  // RUX-003: a bound must never be reported as an empty queue.
+  it('keeps unresolved records reachable when reviewed candidates fill the bound', () => {
+    const utxos = Array.from({ length: 401 }, (_, index) => ({
+      ...utxo,
+      txid: id(1000 + index),
+      vout: 0,
+      valueSats: 60_000_000 - index,
+    }));
+    const workspace = fixture({ transactions: {} });
+    const all = buildWalletReview(workspace, wallet, { utxos });
+    expect(all.items).toHaveLength(400);
+    expect(all.omittedItems).toBe(1);
+    expect(all.omittedPendingItems).toBe(1);
+    // Complete the first 400, exactly the reviewer's reproduction.
+    const reviewed = applyReviewDecisions(workspace, wallet, all.items, 'reviewed');
+    const after = buildWalletReview(reviewed, wallet, { utxos });
+    const open = after.items.filter((item) => item.status === 'open');
+    expect(open).toHaveLength(1);
+    expect(open[0].nodeId).toBe(`out:${id(1400)}:0`);
+    expect(after.omittedPendingItems).toBe(0);
+    // The remaining settled records stay reachable through an explicit continuation.
+    expect(after.omittedItems).toBe(1);
+    expect(buildWalletReview(reviewed, wallet, { utxos, page: 2 }).omittedItems).toBe(0);
+  });
+
+  it('does not hide a deferred record behind completed ones', () => {
+    const utxos = Array.from({ length: 401 }, (_, index) => ({
+      ...utxo,
+      txid: id(2000 + index),
+      vout: 0,
+      valueSats: 60_000_000 - index,
+    }));
+    const workspace = fixture({ transactions: {} });
+    const first = buildWalletReview(workspace, wallet, { utxos });
+    const deferred = applyReviewDecisions(workspace, wallet, [first.items[0]], 'later');
+    const reviewed = applyReviewDecisions(deferred, wallet, first.items.slice(1), 'reviewed');
+    const after = buildWalletReview(reviewed, wallet, { utxos });
+    const pending = after.items.filter((item) => item.status !== 'reviewed');
+    expect(pending.map((item) => item.status).sort()).toEqual(['later', 'open']);
   });
 });

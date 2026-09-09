@@ -129,11 +129,42 @@ the Wallet section gained a focus target so its handoffs and `Back to Wallet` us
 the same behaviour. The upstream focus regressions in `analysis-state.spec.ts` and
 `simple-workbenches.spec.ts` pass unchanged on the rebased snapshot.
 
+## Review round one
+
+Independent acceptance on `a9758be` reported five wallet-owned issues. All are
+fixed in one batch, with the reviewer's identifiers retained.
+
+- **RUX-002.** Review later acknowledged refreshed activity, so a deferred item
+  left the wallet's unreviewed queue and disappeared from every view. Deferral is
+  now explicitly not completion: only `reviewed` and `unknown` acknowledge. A new
+  `isCompletedReview` predicate drives both the queue's Reviewed filter and the
+  Records Reviewed/Unreviewed filters, so a deferred record reads as outstanding.
+- **RUX-003.** The per-reason bound was applied before decisions were considered,
+  so 401 current UTXOs with the first 400 reviewed produced an empty queue while
+  Records still listed one unreviewed record. Candidates are now collected first,
+  unresolved ones are selected ahead of settled ones, and anything beyond the
+  bound is reported as an explicit count with a Load more records continuation.
+  The empty state can no longer claim completion while records remain unlisted.
+- **RUX-004.** Batch editors are mutually exclusive: opening the icon palette
+  closes the label or tag popover instead of stacking a second focus trap, and
+  creating and assigning a tag closes its editor and returns focus to the trigger.
+- **RUX-005.** A Wallet Inspect handoff reveals the Inspector, so its focus
+  destination is the Inspector rather than the graph canvas, which is hidden
+  behind the mobile panel switch at phone widths. The accepted Analysis and Graph
+  focus contract is untouched.
+- **RUX-P02.** Queue rows keep real button semantics with their pressed state
+  inside a list item wrapper.
+
+Regressions added: four domain cases covering deferral versus completion, the
+completion predicate, the 401-record bound with its continuation, and a deferred
+record kept ahead of settled ones; four browser journeys covering deferral across
+queue filters, Records filters, a flushed save and reload, non-stacking batch
+editors with keyboard palette navigation, phone keyboard Inspect focus, and row
+button semantics.
+
 ## Reported, not fixed here
 
-Two `workbench.spec.ts` checks fail identically on the unmodified `56eecb3` base
-and on this branch: `compact header keeps workspace tabs and lookup controls
-reachable with keyboard-accessible help and samples` (measured header-to-lookup
-gap 45 against an expected maximum of 20) and `inspector keeps trace actions and
-label editing reachable on a 150-output selection`. They are pre-existing base
-issues outside this slice and were left alone.
+Two `workbench.spec.ts` checks failed identically on the unmodified `56eecb3`
+base and on this branch. They are pre-existing base issues outside this slice and
+were left alone; the shared owner corrected those test assertions separately in
+`eb47b39`, which root will bring into a later integration.
