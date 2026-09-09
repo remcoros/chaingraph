@@ -55,6 +55,8 @@ import {
 import { WalletRelatedSelection } from './WalletRelatedSelection';
 import { WalletHelp } from './WalletHelp';
 import { WalletReference } from './WalletReference';
+import { TransactionBlockTime } from './TransactionBlockTime';
+import { walletRecordBlockObservation } from '../domain/transactionTime';
 import { CopyButton } from './CopyButton';
 import { buildTagIndex } from '../domain/tags';
 import {
@@ -874,7 +876,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                             className="mono muted wallet-review-record-id"
                             title={row.identifier}
                           >
-                            {short(row.identifier, 12)}
+                            {short(row.identifier)}
                           </span>
                         )}
                       </button>
@@ -906,9 +908,24 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                         </span>
                       )}
                       <div className="wallet-row-values muted">
+                        {row.kind !== 'address' && row.txid && (
+                          <TransactionBlockTime
+                            timestampOnly
+                            transaction={
+                              row.utxo
+                                ? walletRecordBlockObservation(
+                                    row.txid,
+                                    workspace.transactions[row.txid],
+                                    row.utxo.height,
+                                    row.utxo.height <= 0,
+                                  )
+                                : workspace.transactions[row.txid]
+                            }
+                          />
+                        )}
                         {row.amountSats !== undefined && <span>{formatSats(row.amountSats)}</span>}
                         {row.address && row.kind !== 'address' && (
-                          <WalletReference value={row.address} kind="address" length={8} />
+                          <WalletReference value={row.address} kind="address" />
                         )}
                       </div>
                     </div>

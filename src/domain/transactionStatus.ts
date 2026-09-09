@@ -17,7 +17,7 @@ export function transactionStatus(transaction?: Transaction): TransactionStatus 
   if (transaction?.blockHeight !== undefined)
     return {
       kind: 'confirmed',
-      label: `Block ${transaction.blockHeight.toLocaleString('en-US')}`,
+      label: `#${transaction.blockHeight}`,
       title: 'Containing block height from the last saved chain observation.',
     };
   if (transaction?.mempool === true)

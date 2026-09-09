@@ -4,12 +4,19 @@ import { transactionBlockTime } from '../domain/transactionTime';
 import './transaction-block-time.css';
 
 /** Metadata for this transaction only, never its input parents or descendants. */
-export function TransactionBlockTime({ transaction }: { transaction?: Transaction }) {
+export function TransactionBlockTime({
+  transaction,
+  timestampOnly = false,
+}: {
+  transaction?: Transaction;
+  timestampOnly?: boolean;
+}) {
   const status = transactionStatus(transaction);
   const time = transactionBlockTime(transaction);
+  if (timestampOnly && !time) return null;
   return (
     <span className="transaction-block-time">
-      <span title={status.title}>{status.label}</span>
+      {!timestampOnly && <span title={status.title}>{status.label}</span>}
       {time && (
         <time
           dateTime={time.iso}

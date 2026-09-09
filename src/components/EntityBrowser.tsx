@@ -1,4 +1,4 @@
-import { transactionStatus } from '../domain/transactionStatus';
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bookmark,
@@ -292,11 +292,8 @@ export default function EntityBrowser({
                     ? `(${transactions[node.txid!].vin.length} in / ${transactions[node.txid!].vout.length} out)`
                     : node.kind}
                   {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
-                    <span
-                      className="entity-chain-status"
-                      title={transactionStatus(transactions[node.txid!]).title}
-                    >
-                      {transactionStatus(transactions[node.txid!]).label}
+                    <span className="entity-chain-status">
+                      <TransactionBlockTime transaction={transactions[node.txid!]} />
                     </span>
                   )}
                   {hidden.has(node.id) && <EyeOff size={11} aria-label="Hidden from graph" />}

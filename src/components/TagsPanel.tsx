@@ -291,7 +291,7 @@ function TagMembers({
                   title={id}
                   onClick={() => onSelect(id)}
                 >
-                  {short(workspace.annotations[id]?.label || id, 10)}
+                  {workspace.annotations[id]?.label || short(id)}
                 </button>
                 <button
                   className="icon-button"

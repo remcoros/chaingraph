@@ -179,8 +179,16 @@ export interface GraphData {
 export const txNodeId = (txid: string) => `tx:${txid}`;
 export const outputNodeId = (txid: string, vout: number) => `out:${txid}:${vout}`;
 export const addressNodeId = (address: string) => `addr:${address}`;
-export const short = (s: string, n = 8) =>
-  s.length > n * 2 + 3 ? `${s.slice(0, n)}…${s.slice(-n)}` : s;
+/** Display references consistently; canonical IDs and clipboard values stay complete.
+ * Outpoint indices are separate from the transaction hash and never truncated. */
+export const short = (value: string) => {
+  const reference = value.replace(/^(?:tx|out|addr):/, '');
+  const outpoint = /^([0-9a-f]{64}):(\d+)$/i.exec(reference);
+  const identifier = outpoint?.[1] ?? reference;
+  const abbreviated =
+    identifier.length > 17 ? `${identifier.slice(0, 7)}...${identifier.slice(-7)}` : identifier;
+  return `${abbreviated}${outpoint ? `:${outpoint[2]}` : ''}`;
+};
 export const sats = (btc: number) => Math.round(btc * 100_000_000);
 export const formatSats = (value?: number) =>
   value === undefined ? 'Unknown value' : `${value.toLocaleString()} sats`;

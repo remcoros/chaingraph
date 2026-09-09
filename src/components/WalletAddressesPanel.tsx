@@ -75,9 +75,9 @@ export function WalletAddressesPanel({
             >
               <span className="wallet-record-title">
                 <span aria-hidden="true">{annotation?.icon}</span>
-                <strong>{annotation?.label || short(record.address, 12)}</strong>
+                <strong>{annotation?.label || short(record.address)}</strong>
               </span>
-              {annotation?.label && <span className="mono muted">{short(record.address, 12)}</span>}
+              {annotation?.label && <span className="mono muted">{short(record.address)}</span>}
               <span className="wallet-record-meta">
                 <span>
                   {record.branch ? 'Change' : 'Receive'} / {record.index}

@@ -14,7 +14,7 @@ export function walletScanScope(workspace: Workspace, wallet: Wallet, row?: Wall
   if (row?.relationshipDirection)
     return {
       kind: row.kind,
-      label: `${row.relationshipDirection === 'source' ? 'Source' : 'Destination'} ${short(row.address ?? row.identifier, 8)}`,
+      label: `${row.relationshipDirection === 'source' ? 'Source' : 'Destination'} ${short(row.address ?? row.identifier)}`,
       explanation: 'Loaded one-hop transaction contexts for this address in the selected wallet.',
       txids: row.contextTransactionIds.filter((id) => !!workspace.transactions[id]),
     };

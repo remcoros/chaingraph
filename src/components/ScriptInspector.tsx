@@ -1,3 +1,4 @@
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode, Workspace } from '../domain/types';
 import { short } from '../domain/types';
@@ -100,8 +101,9 @@ export function ScriptInspector({
       <div className="script-inspector-body">
         <p className="small mono" title={transaction?.txid}>
           {related.find(({ tx }) => tx.txid === transaction?.txid)?.role} transaction:{' '}
-          {short(transaction?.txid ?? '', 8)}
+          {short(transaction?.txid ?? '')}
         </p>
+        <TransactionBlockTime transaction={transaction} />
         {related.length > 1 && (
           <label>
             Inspect transaction
@@ -112,7 +114,7 @@ export function ScriptInspector({
             >
               {related.map(({ tx, role }) => (
                 <option key={tx.txid} value={tx.txid}>
-                  {role}: {short(tx.txid, 8)}
+                  {role}: {short(tx.txid)}
                 </option>
               ))}
             </select>

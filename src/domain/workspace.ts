@@ -641,7 +641,7 @@ export function buildGraph(workspace: Workspace): GraphData {
         kind: 'output',
         txid: tx.txid,
         vout: output.n,
-        label: `${short(tx.txid, 5)}:${output.n}`,
+        label: `${short(tx.txid)}:${output.n}`,
         value: sats(output.value),
         address,
       });
@@ -669,7 +669,7 @@ export function buildGraph(workspace: Workspace): GraphData {
           kind: 'output',
           txid: input.txid,
           vout: input.vout,
-          label: `${short(input.txid, 5)}:${input.vout}`,
+          label: `${short(input.txid)}:${input.vout}`,
           value: output ? sats(output.value) : undefined,
           address: output ? outputAddress(output) : undefined,
         });

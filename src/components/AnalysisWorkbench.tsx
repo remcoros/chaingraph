@@ -1,3 +1,4 @@
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -138,7 +139,7 @@ function EvidenceReference({
         >
           <span>{kind}</span>
           <span className="mono">
-            {prefix === 'out' ? `${short(txid, 12)}:${index}` : short(reference, 12)}
+            {prefix === 'out' ? `${short(txid)}:${index}` : short(reference)}
           </span>
         </button>
         {prefix === 'out' && (
@@ -147,6 +148,7 @@ function EvidenceReference({
           </span>
         )}
       </div>
+      {prefix === 'tx' && <TransactionBlockTime transaction={workspace.transactions[txid]} />}
       {label && <span className="scan-evidence-label">{label}</span>}
       {address && (
         <button
@@ -156,7 +158,7 @@ function EvidenceReference({
           onClick={() => onGraph([addressNodeId(address)])}
         >
           <span>Address</span>
-          <span className="mono">{short(address, 12)}</span>
+          <span className="mono">{short(address)}</span>
         </button>
       )}
     </li>

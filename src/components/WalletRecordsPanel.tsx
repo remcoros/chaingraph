@@ -201,9 +201,9 @@ export function WalletRecordsPanel({
             >
               <span className="wallet-record-title">
                 <span aria-hidden="true">{annotation?.icon}</span>
-                <strong>{annotation?.label || short(identifier, 12)}</strong>
+                <strong>{annotation?.label || short(identifier)}</strong>
               </span>
-              {annotation?.label && <span className="mono muted">{short(identifier, 12)}</span>}
+              {annotation?.label && <span className="mono muted">{short(identifier)}</span>}
               <span className="wallet-record-meta">
                 <TransactionBlockTime
                   transaction={walletRecordBlockObservation(
@@ -223,7 +223,7 @@ export function WalletRecordsPanel({
               </span>
               {row.utxo && (
                 <span className="mono muted" title={row.utxo.address}>
-                  {short(row.utxo.address, 12)}
+                  {short(row.utxo.address)}
                 </span>
               )}
             </button>

@@ -72,7 +72,7 @@ describe('saved block times in GMT', () => {
     const missing = walletRecordBlockObservation(tx.txid, undefined, undefined, false);
     expect(transactionStatus(missing).kind).toBe('unknown');
     const heightOnly = walletRecordBlockObservation(tx.txid, undefined, 800000, false);
-    expect(transactionStatus(heightOnly).label).toBe('Block 800,000');
+    expect(transactionStatus(heightOnly).label).toBe('#800000');
     expect(transactionBlockTime(heightOnly)).toBeUndefined();
     const conflicted = walletRecordBlockObservation(
       tx.txid,

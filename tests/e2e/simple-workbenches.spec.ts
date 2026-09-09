@@ -208,6 +208,10 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
 }) => {
   const { calls } = await seed(page, (workspace) => {
     const tx = workspace.transactions[TX_SPENDING];
+    tx.blockHeight = 800124;
+    tx.blocktime = 1690169229;
+    workspace.transactions[TX_FUNDING].blockHeight = 800123;
+    workspace.transactions[TX_FUNDING].blocktime = 1690168629;
     tx.vout = Array.from({ length: 6 }, (_, n) => ({ ...tx.vout[0], n, value: 20 }));
     tx.vout[5].scriptPubKey = { ...transactions[TX_SPENDING].vout[1].scriptPubKey };
     workspace.inputContext = { [TX_SPENDING]: [0] };
@@ -227,6 +231,12 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   const evidence = analysis.getByRole('list', { name: 'Related transactions and outputs' });
   await expect(evidence.getByRole('button', { name: /^Show output/ })).toHaveCount(6);
   await expect(evidence).toContainText('2,000,000,000');
+  const supporting = analysis.getByRole('list', { name: 'Supporting transactions' });
+  await expect(supporting).toContainText('#800124');
+  await expect(supporting.locator('time')).toHaveAttribute('title', /2023-07-24 03:27:09 GMT/);
+  await expect(evidence.locator('time')).toHaveCount(0);
+  await supporting.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'artifacts/wallet-polish/analysis-metadata-desktop.png' });
   await screenshot(page, 'six-outputs-evidence-desktop');
   await evidence
     .getByRole('button', { name: `Show address ${CHANGE_ADDRESS} on graph`, exact: true })
@@ -263,6 +273,8 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   await page.setViewportSize({ width: 390, height: 844 });
   await evidence.scrollIntoViewIfNeeded();
   await screenshot(page, 'six-outputs-evidence-mobile');
+  await supporting.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'artifacts/wallet-polish/analysis-metadata-phone.png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(calls).toEqual([]);
 });

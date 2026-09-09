@@ -372,7 +372,7 @@ export function buildWalletReview(
     push({
       key: reviewKey(wallet.id, 'current-utxo', `${record.txid}:${record.vout}`),
       reason: 'current-utxo',
-      title: `Unspent output ${short(record.txid, 6)}:${record.vout}`,
+      title: `Unspent output ${short(record.txid)}:${record.vout}`,
       detail: 'Unspent at the last check. Give it a label or tag so a future spend has context.',
       nodeId,
       nodeIds: [nodeId],
@@ -399,7 +399,7 @@ export function buildWalletReview(
     push({
       key: reviewKey(wallet.id, 'wallet-address', address.address),
       reason: 'wallet-address',
-      title: `${address.branch === 0 ? 'Receive' : 'Change'} address ${short(address.address, 10)}`,
+      title: `${address.branch === 0 ? 'Receive' : 'Change'} address ${short(address.address)}`,
       detail: `Used ${address.branch === 0 ? 'receiving' : 'change'} address in this wallet.`,
       nodeId,
       nodeIds: [nodeId],
@@ -457,7 +457,7 @@ export function buildWalletReview(
       push({
         key: reviewKey(wallet.id, reason, group.id),
         reason,
-        title: `${direction === 'source' ? 'Source' : 'Destination'} address ${short(group.address, 10)}`,
+        title: `${direction === 'source' ? 'Source' : 'Destination'} address ${short(group.address)}`,
         detail: `${group.count} distinct observed output${group.count === 1 ? '' : 's'} ${
           direction === 'source'
             ? 'used as inputs of loaded transactions paying verified wallet scripts'
@@ -505,7 +505,7 @@ export function buildWalletReview(
     push({
       key,
       reason: 'funding-source',
-      title: `${source.address ? 'Saved funding-output review' : 'Funding output without address'} ${short(source.txid, 6)}:${source.vout}`,
+      title: `${source.address ? 'Saved funding-output review' : 'Funding output without address'} ${short(source.txid)}:${source.vout}`,
       detail: source.address
         ? 'Saved output-only review. This decision does not review the entire source address or its other outputs. The whole output value is not an allocation to a particular wallet output.'
         : source.missing
@@ -574,7 +574,7 @@ export function buildWalletReview(
     push({
       key,
       reason: 'counterparty',
-      title: `${entry.address ? 'Saved destination-output review' : 'Destination output without address'} ${short(entry.txid, 6)}:${entry.nodeId.split(':')[2]}`,
+      title: `${entry.address ? 'Saved destination-output review' : 'Destination output without address'} ${short(entry.txid)}:${entry.nodeId.split(':')[2]}`,
       detail: entry.address
         ? 'Saved output-only review. This decision does not review the entire destination address or its other outputs. No controller is identified.'
         : 'This output was created by a transaction spending verified wallet outputs, but no address is established. It remains an explicit output exception, not an identified counterparty.',

@@ -133,7 +133,13 @@ for (const phone of [false, true]) {
       await expect(output).toContainText('Withdrawal');
       await expect(output.locator('.ownership-wallet')).toHaveCount(1);
       await expect(output.locator('.wallet-flow-node')).toHaveCount(2);
-      await expect(flow.locator('.wallet-flow-transaction-node')).toContainText('Block 800,000');
+      await expect(flow.locator('.wallet-flow-transaction-node')).toContainText('#800000');
+      await expect(flow.locator('.wallet-flow-transaction-node')).toContainText(
+        'Transaction (1 in/11 out)',
+      );
+      await expect(flow.locator('.wallet-flow-transaction-node code')).toHaveText(
+        'bbbbbbb...bbbbbbb',
+      );
       await expect(flow.locator('.wallet-flow-transaction-node')).toContainText('GMT');
       await output.getByRole('button', { name: 'Expand outputs', exact: true }).click();
       await expect(output.locator('.wallet-flow-node')).toHaveCount(11);
@@ -155,8 +161,17 @@ for (const phone of [false, true]) {
     if ((await graphFlow.getAttribute('open')) === null)
       await graphFlow.locator('summary').click({ position: { x: 10, y: 12 } });
     await expect(graphFlow).toBeVisible();
+    await expect(graphFlow.locator('.transaction-identity-select')).toContainText(
+      'Creating transaction (1 in/11 out)',
+    );
+    await expect(graphFlow.locator('.transaction-view-identity time')).toHaveAttribute(
+      'title',
+      /2023-07-24 03:17:09 GMT/,
+    );
     await page.keyboard.press('Escape');
     await page.waitForTimeout(700);
+    if (phone)
+      await expect(graphFlow.locator('.transaction-identity-select')).toBeInViewport({ ratio: 1 });
     await page.screenshot({
       path: `artifacts/wallet-polish/${phase}-graph-${phone ? 'phone' : 'desktop'}.png`,
     });
@@ -183,7 +198,7 @@ for (const phone of [false, true]) {
         .click();
       await page.locator('.wallet-row-button').filter({ hasText: 'My withdrawal' }).click();
       await expect(flow.locator('.ownership-wallet.is-selected')).toContainText('Editing output');
-      await expect(page.locator('.wallet-subject-card')).toContainText('Block 800,000');
+      await expect(page.locator('.wallet-subject-card')).toContainText('#800000');
       await expect(page.locator('.wallet-subject-card time')).toHaveAttribute(
         'title',
         /2023-07-24 03:17:09 GMT/,

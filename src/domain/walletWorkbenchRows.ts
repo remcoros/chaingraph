@@ -151,7 +151,7 @@ export function buildWalletRelationshipRows(
             key: group.id,
             nodeId: group.id,
             identifier: group.address,
-            title: short(group.address, 12),
+            title: short(group.address),
             kind: 'address',
             address: group.address,
             description: `${group.count} distinct observed outputs in ${group.transactionIds.length} one-hop transaction contexts. Labels, tags and review decisions apply to this address only. The observed total is not an allocated payment or balance.`,
@@ -219,14 +219,11 @@ export function buildWalletRecordRows(
                 key: nodeId,
                 nodeId,
                 identifier,
-                title: short(identifier, 12),
+                title: short(identifier),
                 description:
                   'Reported unspent at the last UTXO check. This is an observation, not a spendability guarantee.',
                 kind: 'output',
-                meta:
-                  record.height > 0
-                    ? `Block ${record.height.toLocaleString('en-US')}`
-                    : 'Unconfirmed',
+                meta: record.height > 0 ? `#${record.height}` : 'Unconfirmed',
                 amountSats: record.valueSats,
                 address: record.address,
                 txid: record.txid,
@@ -247,7 +244,7 @@ export function buildWalletRecordRows(
                 key: nodeId,
                 nodeId,
                 identifier: record.txid,
-                title: short(record.txid, 12),
+                title: short(record.txid),
                 description: record.transaction
                   ? `${record.transaction.vin.length} inputs and ${record.transaction.vout.length} outputs. Wallet association does not make every input or output yours.`
                   : 'Reported in wallet history, but not loaded. Open in Graph to load this transaction.',
@@ -255,7 +252,7 @@ export function buildWalletRecordRows(
                 meta: record.mempool
                   ? 'Unconfirmed'
                   : record.height
-                    ? `Block ${record.height.toLocaleString('en-US')}`
+                    ? `#${record.height}`
                     : 'Height unknown',
                 txid: record.txid,
                 contextTransactionIds: [record.txid],
@@ -272,7 +269,7 @@ export function buildWalletRecordRows(
               key: nodeId,
               nodeId,
               identifier: record.address,
-              title: short(record.address, 12),
+              title: short(record.address),
               description: `${record.loadedOutputCount} loaded outputs; ${record.history?.length ?? 0} history entries. Flow contexts require a verified loaded input or output match, not history membership alone.`,
               kind: 'address',
               address: record.address,

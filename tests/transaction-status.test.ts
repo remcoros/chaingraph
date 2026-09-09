@@ -38,7 +38,7 @@ describe('saved transaction status', () => {
     expect(transactionStatus(tx(1, { confirmations: 0 }))).toMatchObject({ kind: 'unknown' });
     expect(transactionStatus(tx(1, { confirmations: 123 }))).toMatchObject({ label: 'Confirmed' });
     expect(transactionStatus(tx(1, { blockHeight: 900001 }))).toMatchObject({
-      label: 'Block 900,001',
+      label: '#900001',
     });
     expect(transactionStatus(tx(1, { mempool: true }))).toMatchObject({ label: 'Unconfirmed' });
     expect(transactionStatus(tx(1, { confirmations: -1 }))).toMatchObject({

@@ -11,6 +11,7 @@ test('saved block heights and explicit mempool observations are distinct from un
   const workspace = newWorkspace('Public transaction status fixture', 'mainnet');
   workspace.transactions = structuredClone(transactions);
   workspace.transactions[TX_FUNDING].blockHeight = 800123;
+  workspace.transactions[TX_FUNDING].blocktime = 1690168629;
   workspace.transactions[TX_SPENDING].confirmations = 0;
   workspace.transactions[TX_SPENDING].mempool = true;
   workspace.transactions[unknown] = {
@@ -45,18 +46,31 @@ test('saved block heights and explicit mempool observations are distinct from un
   await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   for (const [id, status] of [
-    [TX_FUNDING, 'Block 800,123'],
+    [TX_FUNDING, '#800123'],
     [TX_SPENDING, 'Unconfirmed'],
     [unknown, 'Status unknown'],
   ]) {
     const row = page.locator(`.entity-row[title="tx:${id}"]`);
-    await expect(row.locator('.entity-chain-status')).toHaveText(status);
+    await expect(row.locator('.entity-chain-status')).toContainText(status);
     await row.click();
     await expect(page.locator('.transaction-view > summary small')).toHaveText(status);
     const chainStatus = page
       .locator('.selection-facts > div')
       .filter({ has: page.locator('dt', { hasText: /^Chain status$/ }) });
-    await expect(chainStatus.locator('dd')).toHaveText(status);
+    await expect(chainStatus.locator('dd')).toContainText(status);
+    if (id === TX_FUNDING) {
+      await expect(page.locator('.transaction-identity-select')).toContainText(
+        'Transaction (1 in/2 out)',
+      );
+      await expect(chainStatus.locator('time')).toContainText('24 Jul 2023 · 03:17 GMT');
+      await expect(page.locator('.transaction-view-identity time')).toHaveAttribute(
+        'title',
+        /03:17:09 GMT/,
+      );
+    } else {
+      await expect(chainStatus.locator('time')).toHaveCount(0);
+      await expect(page.locator('.transaction-view-identity time')).toHaveCount(0);
+    }
   }
   await expect(page.locator('.selection-heading')).not.toContainText('Unconfirmed');
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();

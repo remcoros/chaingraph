@@ -9,3 +9,6 @@
 .transaction-block-time time {
   overflow-wrap: anywhere;
 }
+.scan-evidence > li > .transaction-block-time {
+  padding-inline: 10px;
+}

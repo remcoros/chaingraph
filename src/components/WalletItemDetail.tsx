@@ -283,7 +283,7 @@ export function WalletItemDetail({
                     )}
                     {row.contextTransactionIds.map((txid) => (
                       <option value={txid} key={txid} title={txid}>
-                        {workspace.annotations[`tx:${txid}`]?.label || short(txid, 12)}
+                        {workspace.annotations[`tx:${txid}`]?.label || short(txid)}
                       </option>
                     ))}
                   </select>
@@ -361,7 +361,6 @@ export function WalletItemDetail({
                       ? 'transaction ID'
                       : 'address'
                 }
-                length={14}
               />
             </dd>
           </div>
@@ -369,7 +368,7 @@ export function WalletItemDetail({
             <div>
               <dt>Address</dt>
               <dd className="wallet-copy-value">
-                <WalletReference value={row.address} kind="address" length={14} />
+                <WalletReference value={row.address} kind="address" />
               </dd>
             </div>
           )}
@@ -459,7 +458,6 @@ export function WalletItemDetail({
                     <WalletReference
                       value={id.replace(/^(out|tx):/, '')}
                       kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
-                      length={12}
                     />
                     <button
                       className="icon-button"

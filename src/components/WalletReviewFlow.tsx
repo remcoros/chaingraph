@@ -84,7 +84,9 @@ export function WalletReviewFlow({
               .join(' · ')}
           >
             <Box className="wallet-flow-transaction-icon" size={25} aria-hidden="true" />
-            <span className="wallet-flow-role">Transaction</span>
+            <span className="wallet-flow-role">
+              Transaction ({context.inputs.length} in/{context.outputs.length} out)
+            </span>
             {editingTransaction && (
               <span className="wallet-flow-editing">
                 <Pencil size={10} aria-hidden="true" /> Editing transaction
@@ -96,7 +98,7 @@ export function WalletReviewFlow({
                 {transactionAnnotation.label}
               </strong>
             )}
-            <WalletReference value={context.transactionId!} kind="transaction ID" length={4} />
+            <WalletReference value={context.transactionId!} kind="transaction ID" />
             <FlowTags
               workspace={workspace}
               node={{ id: context.transactionNodeId!, kind: 'transaction', label: '' }}
@@ -355,7 +357,6 @@ function FlowColumn({
                         ? 'outpoint'
                         : 'transaction ID'
                   }
-                  length={4}
                 />
               )}
               {addressPrimary ? (

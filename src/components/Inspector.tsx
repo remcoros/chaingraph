@@ -1,5 +1,6 @@
 import { useUtxoStatus } from '../lib/useUtxoStatus';
 import './utxo-status.css';
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { transactionStatus } from '../domain/transactionStatus';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -427,7 +428,7 @@ export function NodeInspector({
             <div>
               <dt>Address</dt>
               <dd>
-                <code title={selected.address}>{short(selected.address, 12)}</code>
+                <code title={selected.address}>{short(selected.address)}</code>
                 <CopyButton value={selected.address} label="Copy address" />
               </dd>
             </div>
@@ -447,11 +448,11 @@ export function NodeInspector({
               >
                 {selected.kind === 'output' ? (
                   <>
-                    <span>{short(selected.txid ?? '', 8)}</span>
+                    <span>{short(selected.txid ?? '')}</span>
                     <span>:{selected.vout}</span>
                   </>
                 ) : (
-                  short(identifier, 12)
+                  short(identifier)
                 )}
               </code>
               <CopyButton
@@ -473,7 +474,9 @@ export function NodeInspector({
           {tx && (
             <div>
               <dt>Chain status</dt>
-              <dd title={transactionStatus(tx).title}>{transactionStatus(tx).label}</dd>
+              <dd>
+                <TransactionBlockTime transaction={tx} />
+              </dd>
             </div>
           )}
         </dl>
@@ -578,7 +581,7 @@ export function NodeInspector({
                 title={tx.txid}
                 onClick={() => onSelectNode?.(txNodeId(tx.txid))}
               >
-                Creating transaction: {short(tx.txid, 6)}
+                Creating transaction: {short(tx.txid)}
               </button>
             )}
             {spendingNodes.slice(0, 5).map((id) => (
@@ -589,7 +592,7 @@ export function NodeInspector({
                 title={id.slice(3)}
                 onClick={() => onSelectNode?.(id)}
               >
-                Spending transaction: {short(id.slice(3), 6)}
+                Spending transaction: {short(id.slice(3))}
               </button>
             ))}
             {spendingCount > 5 && (

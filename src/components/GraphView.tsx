@@ -1,4 +1,4 @@
-import { transactionStatus } from '../domain/transactionStatus';
+import { TransactionBlockTime } from './TransactionBlockTime';
 import {
   ArrowLeftFromLine,
   CheckSquare,
@@ -11,7 +11,13 @@ import {
   RotateCw,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { formatSats, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
+import {
+  short,
+  formatSats,
+  type GraphLink,
+  type GraphNode,
+  type Transaction,
+} from '../domain/types';
 import './graph.css';
 import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
 import {
@@ -525,9 +531,11 @@ export default function GraphView(props: GraphViewProps) {
                       : hoveredNode.txid || hoveredNode.address || hoveredNode.id
                   }
                 >
-                  {hoveredNode.kind === 'output' && hoveredNode.txid
-                    ? `${hoveredNode.txid}:${hoveredNode.vout}`
-                    : hoveredNode.txid || hoveredNode.address || hoveredNode.id}
+                  {short(
+                    hoveredNode.kind === 'output' && hoveredNode.txid
+                      ? `${hoveredNode.txid}:${hoveredNode.vout}`
+                      : hoveredNode.txid || hoveredNode.address || hoveredNode.id,
+                  )}
                 </dd>
               </div>
               {hoveredNode.value !== undefined && (
@@ -540,7 +548,7 @@ export default function GraphView(props: GraphViewProps) {
                 <div>
                   <dt>Address</dt>
                   <dd className="graph-card-identifier" title={hoveredNode.address}>
-                    {hoveredNode.address}
+                    {short(hoveredNode.address)}
                   </dd>
                 </div>
               )}
@@ -556,8 +564,8 @@ export default function GraphView(props: GraphViewProps) {
               {transaction && (
                 <div>
                   <dt>Chain status</dt>
-                  <dd title={transactionStatus(transaction).title}>
-                    {transactionStatus(transaction).label}
+                  <dd>
+                    <TransactionBlockTime transaction={transaction} />
                   </dd>
                 </div>
               )}

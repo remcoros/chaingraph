@@ -1,6 +1,7 @@
 import { SmallAmountControl } from './SmallAmountControl';
 import { isSmallAmount } from '../domain/smallAmounts';
 import { transactionStatus } from '../domain/transactionStatus';
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { useMemo, useState, useRef, useLayoutEffect, type ReactNode } from 'react';
 import { Pencil, ArrowLeft, ArrowRight, Box, Tags, Smile, Eye, EyeOff } from 'lucide-react';
 import {
@@ -334,7 +335,7 @@ function TransactionRows({
                                 (opReturn
                                   ? 'OP_RETURN'
                                   : address
-                                    ? short(address, 8)
+                                    ? short(address)
                                     : !row.output
                                       ? inputLoading && matches(row)
                                         ? 'Loading previous output…'
@@ -493,9 +494,7 @@ export function TransactionView(props: Props) {
                       ? 'Loaded spend alternative'
                       : 'Spending transaction'}
                 </small>
-                <strong>
-                  {workspace.annotations[txNodeId(tx.txid)]?.label || short(tx.txid, 6)}
-                </strong>
+                <strong>{workspace.annotations[txNodeId(tx.txid)]?.label || short(tx.txid)}</strong>
               </span>
               {direction === 'next' && <ArrowRight size={15} />}
             </button>
@@ -616,10 +615,10 @@ export function TransactionView(props: Props) {
                 >
                   <Box size={25} aria-hidden="true" />
                   <span>
-                    <span>{current.role}</span>{' '}
-                    <span className="transaction-caption-noun">transaction</span>
+                    {current.role === 'Selected' ? 'Transaction' : `${current.role} transaction`} (
+                    {current.tx.vin.length} in/{current.tx.vout.length} out)
                   </span>
-                  <strong className="mono">{short(current.tx.txid, 7)}</strong>
+                  <strong className="mono">{short(current.tx.txid)}</strong>
                   {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
                     <strong
                       className="transaction-identity-label"
@@ -630,6 +629,7 @@ export function TransactionView(props: Props) {
                   )}
                   {props.renderMetadata?.(txNodeId(current.tx.txid))}
                 </button>
+                <TransactionBlockTime transaction={current.tx} />
                 <div
                   className="transaction-identity-tools"
                   role="group"
@@ -694,7 +694,7 @@ export function TransactionView(props: Props) {
                         {workspace.annotations[txNodeId(tx.txid)]?.label
                           ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
                           : ''}
-                        {short(tx.txid, 6)}
+                        {short(tx.txid)}
                       </option>
                     ))}
                   </select>
