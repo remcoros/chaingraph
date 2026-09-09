@@ -20,7 +20,7 @@ flowchart LR
 | `src/domain/workspace.ts`                                | Input schema validation and derivation of graph nodes/links from loaded transactions                              |
 | `src/domain/analysis.ts`, `src/domain/analysis/`         | Local analysis registry, parameter contracts, scoped evidence and run reports                                     |
 | `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods and explicit connected context                                |
-| `src/domain/workspaceTemplates.ts`                                     | Supported-network catalog and lazy real-chain template snapshots                                                                   |
+| `src/domain/workspaceTemplates.ts`                       | Supported-network catalog and lazy real-chain template snapshots                                                  |
 | `src/lib/wallet.ts`                                      | Account-key validation, receive/change derivation, script construction, and Electrum script hashes                |
 | `src/lib/api.ts`                                         | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion                          |
 | `src/lib/crypto.ts`                                      | Versioned authenticated-encryption envelope and strict envelope decoding                                          |
@@ -93,17 +93,13 @@ The entity list remains the alternative interaction path for keyboard access and
 
 The seven built-in tools cover privacy patterns, value/structure and imported wallet intersections. Each finding records stable identity, algorithm version, explanation, affected nodes and supporting transactions. Exact equal-value groups control highlighting. CIOH exclusions are deliberately incomplete; missing input data is explicit, and change-like script patterns remain hypotheses. See [analysis methods and research](research/analysis-tools.md).
 
-The browser passes the visible graph's loaded transaction IDs or the selected transaction as scope. Loaded parents may supply evidence without becoming analysis targets. Reruns replace that tool's results and preserve exclusions only for unchanged node/transaction evidence. Wallet evidence or transaction mutations mark findings stale and remove their overlays. Labels remain independent. Scan completion merges only scan-owned fields into the current wallet, preserving newer user labels. Annotation editor identity is stable across unrelated view/data changes and dirty conflicts require explicit reconciliation.
+`domain/analysisScan.ts` resolves the selected transaction, output, address or wallet into loaded transaction IDs, or uses the complete loaded workspace. It runs the existing registry with independent reports and cancellation between tools. Loaded parents can supply evidence without becoming targets. Exclusions survive reruns only with matching node/transaction evidence. Wallet evidence or transaction mutations mark findings stale; labels remain independent.
 
-`useAnalysisUiState` retains temporary scope, parameter drafts, searches and panel
-expansion per unlocked workspace outside the conditional Analysis panel mount.
-Locking or closing a workspace prunes its entry; nothing is added to plaintext
-storage. Run reports separately snapshot scope, options and time, and the panel
-compares their transaction IDs and parameters with current controls. Selecting an
-address without a transaction does not silently widen selected-transaction scope.
-Persisted findings remain separate from these temporary controls and reports.
+The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Graph and Analysis are the enabled modes. The Trace workbench is disabled, and saved `workbench: trace` opens Graph. Analysis consumes the shared workspace and selection, with no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Locking cancels pending work. The displayed **Current selection** scope retains the existing `context` session value for compatibility. Every affected entity and supporting transaction in a finding has an individual graph navigation control; output values and addresses come from the same loaded workspace records.
 
-There is no runtime plugin loader, user-script execution, custom IDE, or Boltzmann computation in this implementation. Any future Boltzmann integration needs algorithm/performance work and a license-compatible implementation decision. Research references are catalogued separately from shipped code in [the discovery log](research/2026-09-08-discovery.md).
+The dormant `domain/traceWorkbench.ts` and Trace component remain for a later iteration; they are not mounted or reachable through the current workbench navigation. Their original bounded lookup design and limitations remain documented in [Trace semantics and limits](research/simple-trace.md). Existing graph transaction traversal is independent of this disabled workbench.
+
+Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. **Isolate selection** reuses the existing Paths focus filter, defaults to one hop and follows shared selection changes. Paths can expand it to two hops. Turning the toggle off clears graph filters, leaving manual hiding intact. Finding isolation continues to use explicit include IDs, with the same visible reset.
 
 ## Verification boundaries
 
@@ -209,7 +205,6 @@ while amount filters are active, including legacy records without provenance.
 These passes never mutate cached data, annotations or manual visibility. All flow
 links have low-poly arrows; selected incident links have larger arrows and thicker
 accent lines. Address associations remain arrowless.
-
 
 ## Recording-driven interaction refinements
 

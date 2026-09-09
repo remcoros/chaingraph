@@ -84,11 +84,7 @@ Choose an example on the welcome screen or under **Help and samples → Example 
 
 See [template sources and verification](docs/research/workspace-templates.md). Examples are real chain observations, not attributed wallets or proof of ownership. The former synthetic laboratory is no longer offered; existing saved synthetic workspaces remain readable with live lookups disabled.
 
-Analysis controls stay with each unlocked workspace across panel and workspace
-tab switches. Last-run scope and parameters remain distinguishable from current
-controls. The [demonstration case](docs/research/demo-patterns-and-hypotheses.md)
-follows an equal-output transaction into its spender and compares heuristic
-assumptions without attributing ownership.
+This branch enables two compact workbenches: **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Current selection** or **Loaded workspace** scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate selection**, beside **Lock to selection**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
 
 ## Renderer experiment
 

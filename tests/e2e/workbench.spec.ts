@@ -1,6 +1,7 @@
+import { WORKSPACE_TEMPLATES } from '../../src/domain/workspaceTemplates';
 import { openLaboratoryFixture } from '../fixtures/open-workspace';
-import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { expect, test, type Page, type Locator } from '@playwright/test';
+import { readFile, mkdir } from 'node:fs/promises';
 import {
   mockBitcoin,
   PUBLIC_ZPUB,
@@ -240,7 +241,7 @@ test('exports encrypted data and reimports a copy with annotations intact', asyn
   await expect(page.getByLabel('Node label')).toHaveValue('A portable label');
 });
 
-test('renders a saved 150-input fixture and runs, excludes, restores and clears analysis overlays', async ({
+test('renders a saved 150-input fixture and scans, excludes, restores and refreshes analysis evidence', async ({
   page,
 }) => {
   await mockBitcoin(page);
@@ -272,52 +273,40 @@ test('renders a saved 150-input fixture and runs, excludes, restores and clears 
   await page.getByLabel('Size nodes by').selectOption('value');
   await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
   await page.getByRole('button', { name: 'Fit graph' }).click();
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
-  await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
-    .click();
-  await page
-    .locator('.analysis-tool')
-    .filter({ has: page.getByRole('heading', { name: 'Equal-output detection' }) })
-    .getByRole('button')
-    .click();
-  await expect(page.locator('.finding')).toHaveCount(3);
-  await page.locator('.finding').first().getByRole('button', { name: 'Exclude' }).click();
-  await expect(page.locator('.finding.excluded')).toHaveCount(1);
-  await page
-    .locator('.analysis-tool')
-    .filter({ has: page.getByRole('heading', { name: 'Equal-output detection', exact: true }) })
-    .getByRole('button', { name: 'Run analysis' })
-    .click();
-  await expect(page.locator('.finding.excluded')).toHaveCount(1);
-  await page.locator('.finding.excluded').getByRole('button', { name: 'Restore' }).click();
-  await expect(page.locator('.finding.excluded')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
+  const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  const analysis = page.locator('.analysis-workbench');
+  await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  const results = analysis.locator('.scan-result-list > button');
+  const equal = results.filter({ hasText: 'equal outputs' });
+  await expect(equal).toHaveCount(3);
+  await equal.first().click();
+  const title = await analysis.locator('.scan-detail h2').textContent();
+  await analysis.getByRole('button', { name: 'Exclude finding', exact: true }).click();
+  await expect(results.filter({ hasText: 'Excluded' })).toHaveCount(1);
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  await expect(results.filter({ hasText: 'Excluded' })).toHaveCount(1);
+  await results.filter({ hasText: 'Excluded' }).click();
+  await expect(analysis.locator('.scan-detail h2')).toHaveText(title!);
+  await analysis.getByRole('button', { name: 'Restore finding', exact: true }).click();
+  await expect(results.filter({ hasText: 'Excluded' })).toHaveCount(0);
   // An ordinary chain-data addition invalidates prior analysis evidence.
+  await modes.getByRole('button', { name: 'Graph', exact: true }).click();
   await page.getByLabel('Transaction, output, or address').fill(addedTransaction);
   await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
   await expect(page.locator('.statusbar')).toContainText('544 transactions');
-  await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
-    .click();
-  await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(3);
-  await page.getByRole('button', { name: 'Clear all', exact: true }).click();
-  await expect(page.locator('.finding')).toHaveCount(0);
-  for (const name of ['Common-input ownership', 'Address reuse']) {
-    await page
-      .locator('.analysis-tool')
-      .filter({ has: page.getByRole('heading', { name, exact: true }) })
-      .getByRole('button')
-      .click();
-    await expect(
-      page
-        .locator('.analysis-tool')
-        .filter({ has: page.getByRole('heading', { name, exact: true }) })
-        .getByRole('status'),
-    ).toBeVisible();
-    await expect(page.locator('.finding')).toHaveCount(0);
-  }
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  await expect(equal.filter({ hasText: 'Needs rerun' })).toHaveCount(3);
+  await equal.first().click();
+  await expect(analysis.locator('.scan-detail')).toContainText(
+    'Loaded data changed after this finding.',
+  );
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  await expect(results.filter({ hasText: 'Needs rerun' })).toHaveCount(0);
+  await analysis.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await expect(results).toHaveCount(0);
 });
 
 test('CIOH and address-reuse findings operate on loaded wallet history', async ({ page }) => {
@@ -326,19 +315,17 @@ test('CIOH and address-reuse findings operate on loaded wallet history', async (
   await createWorkspace(page);
   await addAndScanWallet(page);
   await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
+    .getByRole('navigation', { name: 'Workbench', exact: true })
+    .getByRole('button', { name: 'Analysis', exact: true })
     .click();
-  for (const name of ['Common-input ownership', 'Address reuse']) {
-    await page
-      .locator('.analysis-tool')
-      .filter({ has: page.getByRole('heading', { name, exact: true }) })
-      .getByRole('button')
-      .click();
-    await expect(page.locator('.finding')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Clear all', exact: true }).click();
-  }
-  await expect(page.locator('.finding')).toHaveCount(0);
+  const analysis = page.locator('.analysis-workbench');
+  await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  const results = analysis.locator('.scan-result-list > button');
+  await expect(results.filter({ hasText: 'Tentative input group' })).toHaveCount(1);
+  await expect(results.filter({ hasText: 'Address repeated on' })).toHaveCount(1);
+  await results.filter({ hasText: 'Tentative input group' }).click();
+  await expect(analysis.locator('.scan-detail')).toContainText('PayJoin');
 });
 
 for (const width of [320, 375, 414, 768])
@@ -543,6 +530,26 @@ test('selection history preserves path depth and skips removed transaction nodes
   ).toBeDisabled();
 });
 
+// Intersection alone misses overlays. Sample the center and four inset corners
+// without Playwright's action auto-scroll hiding a clipped or covered control.
+async function expectHitTarget(control: Locator) {
+  await expect(control).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(() =>
+      control.evaluate((element) => {
+        const r = element.getBoundingClientRect();
+        return [
+          [r.left + r.width / 2, r.top + r.height / 2],
+          [r.left + 4, r.top + 4],
+          [r.right - 4, r.top + 4],
+          [r.left + 4, r.bottom - 4],
+          [r.right - 4, r.bottom - 4],
+        ].every(([x, y]) => element.contains(document.elementFromPoint(x, y)));
+      }),
+    )
+    .toBe(true);
+}
+
 test('inspector keeps trace actions and label editing reachable on a 150-output selection', async ({
   page,
 }) => {
@@ -569,7 +576,7 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   const editor = page.locator('.annotation-editor');
   const evidence = page.locator('.selection-evidence');
 
-  // --- 1440x900: trace actions and automatic editing above the fold ---
+  // Desktop: actions remain exposed; the sidebar can reveal the complete editor.
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(loadPrevious).toBeVisible();
   await expect(findSpending).toBeVisible();
@@ -577,14 +584,24 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   await expect(notes).toBeVisible();
   const traceBox = await loadPrevious.boundingBox();
   const editorBox = await editor.boundingBox();
-  const notesBox = await notes.boundingBox();
   const evidenceBox = await evidence.boundingBox();
   // Common trace actions precede the editor; the evidence block stays below it.
   expect(traceBox!.y).toBeLessThan(editorBox!.y);
   expect(evidenceBox!.y).toBeGreaterThanOrEqual(editorBox!.y + editorBox!.height);
-  // Notes are fully reachable without scrolling the sidebar at this viewport.
-  expect(notesBox!.y + notesBox!.height).toBeLessThanOrEqual(900);
-  await expect(notes).toBeInViewport({ ratio: 1 });
+  // Workbench navigation and loaded-spender links consume real vertical space.
+  // A small native sidebar scroll must reveal the whole field, including its
+  // bottom hit targets, and Tab must still move from label to notes.
+  await expectHitTarget(loadPrevious);
+  await expectHitTarget(findSpending);
+  await page.locator('.inspector-scroll').hover();
+  await page.mouse.wheel(0, 120);
+  await label.focus();
+  await expectHitTarget(label);
+  await page.keyboard.press('Tab');
+  await expect(notes).toBeFocused();
+  await expectHitTarget(notes);
+  await mkdir('artifacts/shared-test-triage', { recursive: true });
+  await page.screenshot({ path: 'artifacts/shared-test-triage/inspector-desktop.png' });
 
   // Editing survives toggling the collapsible chain evidence.
   await notes.fill('Draft that must survive evidence toggles.');
@@ -601,18 +618,31 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   await page.keyboard.press('Tab');
   await expect(notes).toBeFocused();
 
-  // --- 390x844: editing stays above the evidence and notes remain reachable ---
+  // Phone: native scrolling and keyboard navigation reach the same complete fields.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Inspector' }).click();
   await expect(page.locator('.graph-navigation')).toBeHidden();
-  await expect(loadPrevious).toBeVisible();
-  await expect(label).toBeVisible();
-  await expect(notes).toBeVisible();
+  const scroll = page.locator('.inspector-scroll');
+  await scroll.hover();
+  await page.mouse.wheel(0, -2000);
+  await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBe(0);
+  await expectHitTarget(loadPrevious);
+  await expectHitTarget(findSpending);
   const editorMobile = await editor.boundingBox();
   const evidenceMobile = await evidence.boundingBox();
   expect(evidenceMobile!.y).toBeGreaterThan(editorMobile!.y);
-  await expect(notes).toBeInViewport({ ratio: 1 });
-  await expect(notes).toHaveValue('Draft that must survive evidence toggles.');
+  await scroll.hover();
+  await page.mouse.wheel(0, 200);
+  await label.focus();
+  await expectHitTarget(label);
+  await page.keyboard.press('Tab');
+  await expect(notes).toBeFocused();
+  await expectHitTarget(notes);
+  await notes.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type(' Phone edit.');
+  await expect(notes).toHaveValue('Draft that must survive evidence toggles. Phone edit.');
+  await page.screenshot({ path: 'artifacts/shared-test-triage/inspector-phone.png' });
 });
 
 test('compact header keeps workspace tabs and lookup controls reachable with keyboard-accessible help and samples', async ({
@@ -628,10 +658,38 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   await expect(tabs.getByRole('button', { name: /Compact public study/ })).toBeVisible();
   const lookup = page.locator('.workbench-toolbar');
   await expect(lookup.getByLabel('Prefetch previous levels')).toHaveValue('0');
-  const headerBounds = (await header.boundingBox())!;
-  const lookupBounds = (await lookup.boundingBox())!;
-  expect(headerBounds.height).toBeLessThan(76);
-  expect(lookupBounds.y - headerBounds.y - headerBounds.height).toBeLessThan(20);
+  const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
+  async function expectGraphHeaderReachable() {
+    const headerBounds = (await header.boundingBox())!;
+    const modeBounds = (await modes.boundingBox())!;
+    const lookupBounds = (await lookup.boundingBox())!;
+    expect(headerBounds.height).toBeLessThan(76);
+    expect(modeBounds.height).toBeLessThan(60);
+    expect(lookupBounds.height).toBeLessThan(76);
+    // Navigation is an intentional row. Check each adjacent boundary for
+    // overlap or unused space, rather than treating navigation as a blank gap.
+    for (const [above, below] of [
+      [headerBounds, modeBounds],
+      [modeBounds, lookupBounds],
+    ]) {
+      const gap = below.y - above.y - above.height;
+      expect(gap).toBeGreaterThanOrEqual(-1);
+      expect(gap).toBeLessThan(20);
+    }
+    for (const control of [
+      tabs.getByRole('button', { name: /Compact public study/ }),
+      modes.getByRole('button', { name: 'Graph', exact: true }),
+      modes.getByRole('button', { name: 'Analysis', exact: true }),
+      lookup.getByLabel('Transaction, output, or address'),
+      lookup.getByLabel('Prefetch previous levels'),
+      lookup.getByRole('button', { name: 'Add to graph', exact: true }),
+      page.getByRole('button', { name: 'Help and samples', exact: true }),
+    ])
+      await expectHitTarget(control);
+  }
+  await expectGraphHeaderReachable();
+  await mkdir('artifacts/shared-test-triage', { recursive: true });
+  await page.screenshot({ path: 'artifacts/shared-test-triage/header-desktop.png' });
 
   const help = page.getByRole('button', { name: 'Help and samples', exact: true });
   await help.focus();
@@ -650,15 +708,24 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   await menu.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
   const examples = page.getByRole('dialog', { name: 'Example workspaces' });
   await expect(examples).toBeVisible();
-  await expect(examples.getByRole('button', { name: /^Create .+ workspace$/ })).toHaveCount(4);
-  for (const button of await examples
-    .getByRole('button', { name: /^Create .+ workspace$/ })
-    .all()) {
-    await expect(button).toBeEnabled();
+  // Both mocked networks are configured. Each current bundled example must be
+  // available by name; an old fixed catalog size hides new valid choices.
+  await expect(examples.getByRole('button', { name: /^Create .+ workspace$/ })).toHaveCount(
+    WORKSPACE_TEMPLATES.length,
+  );
+  for (const template of WORKSPACE_TEMPLATES) {
+    await expect(
+      examples.getByRole('button', {
+        name: `Create ${template.name} workspace`,
+        exact: true,
+      }),
+    ).toBeEnabled();
   }
   await page.keyboard.press('Escape');
   await expect(help).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
+  await expectGraphHeaderReachable();
+  await page.screenshot({ path: 'artifacts/shared-test-triage/header-phone.png' });
   await expect(tabs.getByRole('button', { name: /Compact public study/ })).toBeInViewport();
   await expect(lookup.getByLabel('Prefetch previous levels')).toBeInViewport({ ratio: 1 });
   await expect(lookup.getByRole('button', { name: 'Add to graph', exact: true })).toBeInViewport({

@@ -5,7 +5,6 @@ import {
   verifyWalletUtxo,
   type WalletUtxoRecord,
 } from './domain/walletRecords';
-import { useAnalysisUiState, type AnalysisUiRunReport } from './lib/useAnalysisUiState';
 import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
@@ -32,6 +31,7 @@ import {
   ArrowRight,
   Crosshair,
   Focus,
+  Filter,
   Download,
   Ellipsis,
   Eye,
@@ -65,12 +65,9 @@ import { AboutDialog } from './components/AboutDialog';
 import { filterGraph, valueFilterError, type GraphFilters } from './domain/graphFilters';
 import { setNodesHidden, showAllNodes } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
-import {
-  applyWalletScan,
-  walletActivitySummary,
-  walletEvidenceChanged,
-} from './domain/walletActivity';
-import { AnalysisPanel } from './components/AnalysisPanel';
+import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
+import { AnalysisWorkbench, type AnalysisWorkbenchSession } from './components/AnalysisWorkbench';
+import './components/workbenches.css';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { GuidedTour } from './components/GuidedTour';
@@ -79,9 +76,9 @@ import {
   clearContextProvenance,
   markContextTransactions,
   promoteInputContext,
+  outputAddress,
 } from './domain/workspace';
 import { filterSmallAmounts, omitAmountOrphans } from './domain/smallAmounts';
-import { defaultsFor, analysisTools, type AnalysisOptions } from './domain/analysis';
 import {
   outputNodeId,
   addressNodeId,
@@ -184,27 +181,47 @@ export default function App() {
     discoveryError ||
     (unsupportedNetwork ? `Backend does not support ${w!.network}.` : (status?.error ?? ''));
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
-  const { state: analysisUiState, update: updateAnalysisUiState } = useAnalysisUiState(
-    w?.id,
-    ws.sessions.map((session) => session.data.id),
+  const analysisSessions = useRef(new Map<string, AnalysisWorkbenchSession>());
+  useEffect(() => {
+    const unlocked = new Set(ws.sessions.map((session) => session.data.id));
+    for (const id of analysisSessions.current.keys())
+      if (!unlocked.has(id)) analysisSessions.current.delete(id);
+  }, [ws.sessions]);
+  const [lockingWorkspace, setLockingWorkspace] = useState(false);
+  const [workbench, setWorkbench] = useState<'graph' | 'analysis'>('graph');
+  const [returnWorkbench, setReturnWorkbench] = useState<'analysis'>();
+  const graphWorkspaceRef = useRef<HTMLElement>(null);
+  const analysisWorkspaceRef = useRef<HTMLElement>(null);
+  const analysisInvoker = useRef<{ workspaceId: string; element: HTMLElement } | undefined>(
+    undefined,
   );
-  const [reportState, setReportState] = useState<{
-    workspaceId?: string;
-    reports: Record<string, AnalysisUiRunReport>;
-  }>({ reports: {} });
-  const runReports = reportState.workspaceId === w?.id ? reportState.reports : {};
-  const setRunReports = (
-    update:
-      | Record<string, AnalysisUiRunReport>
-      | ((current: Record<string, AnalysisUiRunReport>) => Record<string, AnalysisUiRunReport>),
-  ) =>
-    setReportState((current) => ({
-      workspaceId: w?.id,
-      reports:
-        typeof update === 'function'
-          ? update(current.workspaceId === w?.id ? current.reports : {})
-          : update,
-    }));
+  const pendingWorkbenchFocus = useRef<
+    { workspaceId: string; mode: 'graph' | 'analysis' } | undefined
+  >(undefined);
+  // Transfer focus only for explicit cross-workbench actions, never during graph gestures.
+  useLayoutEffect(() => {
+    const pending = pendingWorkbenchFocus.current;
+    pendingWorkbenchFocus.current = undefined;
+    if (!pending || pending.workspaceId !== w?.id || pending.mode !== workbench) return;
+    if (workbench === 'graph') {
+      const destination = graphWorkspaceRef.current?.querySelector<HTMLElement>(
+        '.graph-canvas:not([aria-hidden="true"]) canvas',
+      );
+      (destination ?? graphWorkspaceRef.current)?.focus({ preventScroll: true });
+    } else {
+      const invoker = analysisInvoker.current;
+      const element = invoker?.element;
+      if (
+        invoker?.workspaceId === w?.id &&
+        element?.isConnected &&
+        analysisWorkspaceRef.current?.contains(element) &&
+        !element.matches(':disabled') &&
+        element.getClientRects().length
+      )
+        element.focus();
+      else analysisWorkspaceRef.current?.focus();
+    }
+  }, [w?.id, workbench]);
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
@@ -527,6 +544,14 @@ export default function App() {
         promote.push(displayedId);
       if (active && promote.length)
         ws.update(active.id, (current) => promoteInputContext(current, promote), false);
+      if (active && id.startsWith('addr:')) {
+        const address = id.slice(5);
+        const creators = Object.keys(active.inputContext ?? {}).filter((txid) =>
+          active.transactions[txid]?.vout.some((output) => outputAddress(output) === address),
+        );
+        if (creators.length)
+          ws.update(active.id, (current) => promoteInputContext(current, creators), false);
+      }
       setSelectedId(id);
       setGraphFilters((filters) =>
         filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
@@ -550,7 +575,16 @@ export default function App() {
     setSelectedId(w?.view.selectionId);
     setSelectedWallet(w?.view.selectedWallet);
     setLeftTab(w?.view.leftTab ?? 'wallets');
-    setRightTab(w?.view.rightTab ?? 'inspect');
+    setRightTab(w?.view.rightTab === 'analysis' ? 'inspect' : (w?.view.rightTab ?? 'inspect'));
+    setWorkbench(
+      w?.view.workbench === 'analysis' || (!w?.view.workbench && w?.view.rightTab === 'analysis')
+        ? 'analysis'
+        : 'graph',
+    );
+    setReturnWorkbench(undefined);
+    analysisInvoker.current = undefined;
+    pendingWorkbenchFocus.current = undefined;
+    setLockingWorkspace(false);
     setMobilePanel(w?.view.mobilePanel ?? 'graph');
     setPrefetchDepth(w?.view.prefetchDepth ?? 0);
     setViewOwner(w?.id);
@@ -570,7 +604,6 @@ export default function App() {
       w?.view.selectionId ? { ids: [w.view.selectionId], index: 0 } : { ids: [], index: -1 },
     );
     setFocusGraph(w?.view.focusGraph ?? false);
-    setRunReports({});
     spendingOffsets.current.clear();
     if (!w?.view.graphSnapshot) setFitToken((t) => t + 1);
   }, [w?.id]);
@@ -602,6 +635,7 @@ export default function App() {
       filters: valueFilterError(graphFilters) ? (w.view.filters ?? {}) : graphFilters,
       leftTab,
       rightTab,
+      workbench,
       mobilePanel,
       focusGraph,
       prefetchDepth,
@@ -624,6 +658,7 @@ export default function App() {
     graphFilters,
     leftTab,
     rightTab,
+    workbench,
     mobilePanel,
     focusGraph,
     prefetchDepth,
@@ -741,7 +776,7 @@ export default function App() {
   const flowInputs = useFlowInputs({
     workspace: w,
     selected,
-    enabled: canTrace && !operation,
+    enabled: canTrace && !operation && workbench === 'graph',
     fetch: getTransaction,
     update: ws.update,
   });
@@ -1184,31 +1219,8 @@ export default function App() {
       monitorOperation?.abort();
     };
   }, [live, canQuery, w?.id, gap, scanLimit]);
-  const visibleAnalysisTxids = useMemo(
-    () => [
-      ...new Set(
-        visibleGraph.nodes.flatMap((node) =>
-          node.txid && w?.transactions[node.txid] ? [node.txid] : [],
-        ),
-      ),
-    ],
-    [visibleGraph.nodes, w?.transactions],
-  );
   const entityNodes = entityGraph.matchedNodes;
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
-  const analysisEvidence = useRef<{ transactions?: Workspace['transactions']; wallets: Wallet[] }>({
-    wallets: [],
-  });
-  useEffect(() => {
-    const previous = analysisEvidence.current;
-    const next = { transactions: w?.transactions, wallets: w?.wallets ?? [] };
-    if (
-      previous.transactions !== next.transactions ||
-      walletEvidenceChanged(previous.wallets, next.wallets)
-    )
-      setRunReports({});
-    analysisEvidence.current = next;
-  }, [w?.transactions, w?.wallets]);
   useEffect(() => {
     if (
       !w ||
@@ -1276,49 +1288,60 @@ export default function App() {
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
-  function findingRun(
-    id: string,
-    options: AnalysisOptions = {},
-    scope: 'graph' | 'selection' = 'graph',
-  ) {
-    if (!w) return;
-    const tool = analysisTools.find((t) => t.id === id)!;
-    const ids = scope === 'selection' ? (tx ? [tx.txid] : []) : visibleAnalysisTxids;
-    try {
-      const report = tool.analyze(w, ids, options);
-      setRunReports((current) => ({
-        ...current,
-        [id]: {
-          ...report,
-          inputScope: scope,
-          inputOptions: { ...defaultsFor(tool), ...options },
-          runAt: new Date().toISOString(),
+  function switchWorkbench(next: 'graph' | 'analysis', handoffFocus = false) {
+    pendingWorkbenchFocus.current =
+      handoffFocus && w ? { workspaceId: w.id, mode: next } : undefined;
+    flushActiveGraph();
+    setWorkbench(next);
+  }
+  function prepareIsolation(ids: string[]) {
+    const transactionIds = [
+      ...new Set(
+        ids.flatMap((nodeId) => {
+          const match = /^(?:tx|out):([0-9a-f]{64})/.exec(nodeId);
+          return match ? [match[1]] : [];
+        }),
+      ),
+    ];
+    change(
+      (current) => ({
+        ...promoteInputContext(current, transactionIds),
+        view: {
+          ...current.view,
+          smallAmountThreshold: undefined,
+          showAddresses:
+            ids.some((nodeId) => nodeId.startsWith('addr:')) || current.view.showAddresses,
         },
-      }));
-      change((c) => ({
-        ...c,
-        findings: [
-          ...c.findings.filter((finding) => !finding.algorithm.startsWith(id)),
-          ...report.findings.map((finding) => {
-            const previous = c.findings.find(
-              (old) => old.id === finding.id && old.algorithm === finding.algorithm,
-            );
-            const sameEvidence =
-              previous &&
-              JSON.stringify([...previous.nodeIds].sort()) ===
-                JSON.stringify([...finding.nodeIds].sort()) &&
-              JSON.stringify([...previous.txids].sort()) ===
-                JSON.stringify([...finding.txids].sort());
-            return sameEvidence ? { ...finding, excluded: previous.excluded } : finding;
-          }),
-        ],
-      }));
-      setNotice(
-        `${tool.name}: ${report.findings.length} findings. ${report.emptyReason ?? report.summary}`,
-      );
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Analysis failed.');
+      }),
+      false,
+    );
+  }
+  function showFindingOnGraph(ids: string[], isolate = false) {
+    const invoker = document.activeElement;
+    analysisInvoker.current =
+      w && invoker instanceof HTMLElement && analysisWorkspaceRef.current?.contains(invoker)
+        ? { workspaceId: w.id, element: invoker }
+        : undefined;
+    setReturnWorkbench('analysis');
+    switchWorkbench('graph', true);
+    const id = ids.find((candidate) => !hiddenIds.has(candidate)) ?? ids[0];
+    if (isolate) {
+      prepareIsolation(ids);
+      updateFilters({ includeIds: ids, preserveContext: true });
     }
+    if (id) {
+      select(id);
+      if (isolate) setFocusRequest({ id, token: Date.now() });
+      else centerNode(id);
+    }
+    setMobilePanel('graph');
+  }
+  function resetGraphFilters() {
+    updateFilters({});
+    change(
+      (current) => ({ ...current, view: { ...current.view, smallAmountThreshold: undefined } }),
+      false,
+    );
   }
   const graphNavigation = w ? (
     <div className="graph-navigation">
@@ -1365,6 +1388,23 @@ export default function App() {
         <Focus size={14} />
         <span className="graph-nav-caption">Lock to selection</span>
       </button>
+      <button
+        aria-label="Isolate selection"
+        title="Show the selection and connected entities; Paths sets the hop limit"
+        aria-pressed={!!graphFilters.focus}
+        className={`graph-isolate-selection ${graphFilters.focus ? 'active' : ''}`}
+        disabled={!graphFilters.focus && (!selected || hiddenIds.has(selected.id))}
+        onClick={() => {
+          if (graphFilters.focus) resetGraphFilters();
+          else if (selectedId) {
+            prepareIsolation([selectedId]);
+            updateFilters({ focus: { id: selectedId, hops: 1 } });
+          }
+        }}
+      >
+        <Filter size={14} />
+        <span className="graph-nav-caption">Isolate selection</span>
+      </button>
       <label>
         <span className="graph-path-label">Paths</span>
         <select
@@ -1389,46 +1429,57 @@ export default function App() {
           <option value={2}>2 hops</option>
         </select>
       </label>
-      {Object.values(graphFilters).some((value) => value !== undefined) && (
-        <button onClick={() => updateFilters({})} title="Clear active graph filters">
-          All paths
-        </button>
-      )}
     </div>
   ) : null;
+  const activeGraphFilters = [
+    graphFilters.includeIds !== undefined && 'Isolated result',
+    graphFilters.focus && `${graphFilters.focus.hops}-hop paths`,
+    graphFilters.walletId &&
+      `Wallet: ${w?.wallets.find((item) => item.id === graphFilters.walletId)?.name ?? 'Removed'}`,
+    graphFilters.tagId &&
+      `Tag: ${w?.tags?.find((item) => item.id === graphFilters.tagId)?.name ?? 'Removed'}`,
+    graphFilters.query?.trim() && 'Text match',
+    graphFilters.kind && graphFilters.kind !== 'all' && `Type: ${graphFilters.kind}`,
+    graphFilters.label && graphFilters.label !== 'all' && graphFilters.label,
+    graphFilters.bookmarkedOnly && 'Bookmarks',
+    (graphFilters.minSats !== undefined || graphFilters.maxSats !== undefined) && 'Value range',
+    graphFilters.spend && graphFilters.spend !== 'all' && 'Spending evidence',
+    graphFilters.funding && graphFilters.funding !== 'all' && 'Funding evidence',
+    w?.view.smallAmountThreshold && `Above ${w.view.smallAmountThreshold.toLocaleString()} sats`,
+    graphFilters.showAddresses === false && 'Address filter',
+  ].filter(Boolean);
   const graphNavigationStatus =
     w &&
-    (graphFilters.walletId ||
-      graphFilters.tagId ||
+    (activeGraphFilters.length > 0 ||
+      hiddenCount > 0 ||
       (selected && !visibleGraph.nodes.some((node) => node.id === selected.id))) ? (
-      <span className="view-summary">
-        {graphFilters.walletId && (
-          <span className="group-filter">
-            Wallet:{' '}
-            {w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name ?? 'Removed'}
-            <button className="text-button" onClick={() => updateFilters({})}>
-              Clear
-            </button>
+      <div className="view-summary graph-filter-status" aria-label="Graph visibility">
+        {activeGraphFilters.length > 0 && (
+          <>
+            <span>Filters: {activeGraphFilters.join(' · ')}</span>
+            <button onClick={resetGraphFilters}>Reset filters</button>
+          </>
+        )}
+        {hiddenCount > 0 && (
+          <span>
+            {hiddenCount} manually hidden <button onClick={showAllHidden}>Show hidden</button>
           </span>
         )}
-        {graphFilters.tagId && (
-          <span className="group-filter">
-            Tag: {w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name ?? 'Removed'}
-            <button className="text-button" onClick={() => updateFilters({})}>
-              Clear
-            </button>
+        {selected && !visibleGraph.nodes.some((node) => node.id === selected.id) && (
+          <span>
+            {hiddenIds.has(selected.id)
+              ? 'Selection is manually hidden.'
+              : 'Selection is outside the current view.'}
           </span>
         )}
-        {selected && !visibleGraph.nodes.some((node) => node.id === selected.id)
-          ? hiddenIds.has(selected.id)
-            ? 'selection hidden from graph'
-            : 'selection hidden by filters'
-          : ''}
-      </span>
+      </div>
     ) : null;
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-workspace">
+      <a
+        className="skip-link"
+        href={workbench === 'graph' || !w ? '#main-workspace' : `#${workbench}-workspace`}
+      >
         Skip to workspace
       </a>
       <header className="topbar">
@@ -1531,7 +1582,29 @@ export default function App() {
         />
       ) : (
         <>
-          <div className="workbench-toolbar">
+          <nav className="workbench-nav" aria-label="Workbench">
+            {(['graph', 'analysis'] as const).map((mode) => (
+              <button
+                key={mode}
+                aria-pressed={workbench === mode}
+                className={workbench === mode ? 'active' : ''}
+                onClick={() => switchWorkbench(mode)}
+              >
+                {mode === 'graph' ? <GitBranch size={15} /> : <Search size={15} />}
+                {mode === 'graph' ? 'Graph' : 'Analysis'}
+              </button>
+            ))}
+            {workbench === 'graph' && returnWorkbench && (
+              <button
+                className="workbench-return"
+                onClick={() => switchWorkbench(returnWorkbench, true)}
+              >
+                <ArrowLeft size={14} />
+                Back to Analysis
+              </button>
+            )}
+          </nav>
+          <div className={`workbench-toolbar mode-${workbench}`}>
             <div className="lookup-controls" data-tour="chain-lookup">
               <form className="search-form" onSubmit={search}>
                 <Search size={17} />
@@ -1672,7 +1745,8 @@ export default function App() {
                         setMenu(false);
                         operationRef.current?.abort();
                         flushActiveGraph();
-                        void ws.lock(w.id).catch((e) => setError(e.message));
+                        setLockingWorkspace(true);
+                        void ws.lock(w.id).catch((e) => setError(e.message)).finally(() => setLockingWorkspace(false));
                       }}
                     >
                       <LockKeyhole size={15} />
@@ -1688,7 +1762,7 @@ export default function App() {
               {queryError}
             </div>
           )}
-          <div className="mobile-switch">
+          <div className="mobile-switch" hidden={workbench !== 'graph' && !tourStep}>
             <button
               className={shownMobilePanel === 'left' ? 'active' : ''}
               onClick={() => setMobilePanel('left')}
@@ -1709,7 +1783,7 @@ export default function App() {
             >
               <List size={15} />
               {shownRightTab === 'analysis'
-                ? 'Analysis'
+                ? 'Inspector'
                 : shownRightTab === 'addresses'
                   ? 'Addresses'
                   : shownRightTab === 'transactions'
@@ -1720,6 +1794,8 @@ export default function App() {
             </button>
           </div>
           <main
+            hidden={workbench !== 'graph' && !tourStep}
+            ref={graphWorkspaceRef}
             id="main-workspace"
             tabIndex={-1}
             className={`workbench show-${shownMobilePanel} ${shownFocusGraph ? 'focus-graph' : ''}`}
@@ -1990,12 +2066,6 @@ export default function App() {
                 >
                   Inspector
                 </button>
-                <button
-                  className={shownRightTab === 'analysis' ? 'active' : ''}
-                  onClick={() => setRightTab('analysis')}
-                >
-                  Analysis <span>{w.findings.length}</span>
-                </button>
                 {wallet && (
                   <>
                     <button
@@ -2043,38 +2113,9 @@ export default function App() {
                 )}
                 {shownRightTab === 'addresses' ||
                 shownRightTab === 'transactions' ||
-                shownRightTab === 'utxos' ? null : shownRightTab === 'analysis' ? (
-                  <AnalysisPanel
-                    uiState={analysisUiState}
-                    onUiStateChange={updateAnalysisUiState}
-                    findings={w.findings}
-                    hasNodes={!!visibleGraph.nodes.length}
-                    selectedTxids={tx ? [tx.txid] : []}
-                    graphTxids={visibleAnalysisTxids}
-                    runReports={runReports}
-                    onIsolate={(ids) => {
-                      updateFilters({ includeIds: ids, preserveContext: true });
-                      setMobilePanel('graph');
-                    }}
-                    busy={!!operation}
-                    onRun={findingRun}
-                    onSelect={select}
-                    onClear={() => change((c) => ({ ...c, findings: [] }))}
-                    onFocus={(id) => {
-                      select(id);
-                      setRightTab('analysis');
-                      centerNode(id);
-                    }}
-                    onToggle={(id) =>
-                      change((c) => ({
-                        ...c,
-                        findings: c.findings.map((f) =>
-                          f.id === id ? { ...f, excluded: !f.excluded } : f,
-                        ),
-                      }))
-                    }
-                  />
-                ) : wallet && !selected && tourStep?.view?.rightTab !== 'inspect' ? (
+                shownRightTab === 'utxos' ? null : wallet &&
+                  !selected &&
+                  tourStep?.view?.rightTab !== 'inspect' ? (
                   <WalletInspector
                     wallet={wallet}
                     workspace={w}
@@ -2168,14 +2209,33 @@ export default function App() {
                       Select a node in the graph or an item in Entities to inspect it, add labels
                       and notes, and follow its paths.
                     </p>
-                    <button className="text-button" onClick={() => setRightTab('analysis')}>
-                      Explore analysis tools <ChevronRight size={15} />
+                    <button className="text-button" onClick={() => switchWorkbench('analysis')}>
+                      Scan loaded data <ChevronRight size={15} />
                     </button>
                   </div>
                 )}
               </div>
             </aside>
           </main>
+          <section
+            className="workbench-page"
+            hidden={workbench !== 'analysis' || !!tourStep}
+            ref={analysisWorkspaceRef}
+            id="analysis-workspace"
+            tabIndex={-1}
+            aria-label="Analysis workspace"
+          >
+            <AnalysisWorkbench
+              key={w.id}
+              cache={analysisSessions.current}
+              workspace={w}
+              active={workbench === 'analysis' && !lockingWorkspace}
+              selected={selected}
+              wallet={wallet}
+              onFindings={(findings) => change((current) => ({ ...current, findings }))}
+              onGraph={showFindingOnGraph}
+            />
+          </section>
           <footer className="statusbar">
             <span>
               {operation ? (

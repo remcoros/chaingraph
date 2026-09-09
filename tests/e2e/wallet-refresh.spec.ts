@@ -180,7 +180,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await expect(
     page.getByText('Last check: 0 new to workspace · 1 transaction refreshed', { exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await page.screenshot({
     path: testInfo.outputPath('wallet-refreshed-desktop.png'),
     fullPage: true,
@@ -188,7 +188,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await page.getByRole('button', { name: 'Show new activity (2)', exact: true }).click();
   await expect(page.getByLabel('Filter graph entities')).toHaveValue('');
   await expect(page.locator('.entity-list')).toContainText(TX_SPENDING.slice(0, 8));
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await selectFunding(page);
   await expect(page.getByLabel('Node notes')).toHaveValue('Edited note remains during refresh.');
   await page
@@ -243,26 +243,27 @@ test('acknowledging new wallet activity keeps analysis reports and findings acti
   fixture.advance();
   await page.getByRole('button', { name: 'Refresh wallet', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeEnabled();
-  await page
-    .locator('.right-panel')
-    .getByRole('button', { name: /^Analysis/ })
-    .click();
-  const tool = page
-    .locator('.analysis-tool')
-    .filter({ has: page.getByRole('heading', { name: 'Value flow and fees', exact: true }) });
-  await tool.getByRole('button', { name: 'Run analysis' }).click();
-  await expect(tool.getByRole('status')).toBeVisible();
-  const report = await tool.getByRole('status').textContent();
-  await expect(page.locator('.finding')).toHaveCount(1);
+  const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  const analysis = page.locator('.analysis-workbench');
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  await expect(analysis.locator('.scan-run-note')).toBeVisible();
+  const report = await analysis.locator('.scan-run-note').textContent();
+  const resultTitles = await analysis.locator('.scan-result-list strong').allTextContents();
+  expect(resultTitles.length).toBeGreaterThan(0);
+  await modes.getByRole('button', { name: 'Graph', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh all wallets', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Refresh all wallets', exact: true }),
   ).toBeEnabled();
-  await expect(tool.getByRole('status')).toHaveText(report!);
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  await expect(analysis.locator('.scan-run-note')).toHaveText(report!);
+  await modes.getByRole('button', { name: 'Graph', exact: true }).click();
   await page.locator('.wallet-activity-link').click();
-  await expect(tool.getByRole('status')).toHaveText(report!);
-  await expect(page.locator('.finding')).toHaveCount(1);
-  await expect(page.locator('.finding').getByText('Needs rerun', { exact: true })).toHaveCount(0);
+  await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
+  await expect(analysis.locator('.scan-run-note')).toHaveText(report!);
+  await expect(analysis.locator('.scan-result-list strong')).toHaveText(resultTitles);
+  await expect(analysis.locator('.scan-result-list').getByText(/Needs rerun/)).toHaveCount(0);
 });
 
 test('monitoring only queries wallets after opt-in and preserves activity until reviewed', async ({
@@ -313,7 +314,9 @@ test('shows wallet script matches without making requests or acknowledging new a
   await createAndLoad(page);
   const requests = fixture.calls.length;
   await page.getByRole('button', { name: 'Show wallet matches', exact: true }).click();
-  await expect(page.locator('.group-filter')).toContainText('Public BIP84 wallet');
+  await expect(page.getByLabel('Graph visibility', { exact: true })).toContainText(
+    'Public BIP84 wallet',
+  );
   expect(fixture.calls).toHaveLength(requests);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('output');
@@ -324,7 +327,7 @@ test('shows wallet script matches without making requests or acknowledging new a
   await expect(page.locator('.transaction-row.is-selected .entity-badges')).toContainText(
     'Wallet: Public BIP84 wallet',
   );
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
-  await expect(page.locator('.group-filter')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
+  await expect(page.getByLabel('Graph visibility', { exact: true })).toHaveCount(0);
   expect(fixture.calls).toHaveLength(requests);
 });
