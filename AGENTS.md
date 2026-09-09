@@ -1,13 +1,15 @@
 # Chaingraph agent guide
 
-Chaingraph is an MIT-licensed application, not a StartOS package. The parent
-workspace's packaging instructions apply when creating a separate package wrapper,
-not when scaffolding this upstream application.
+Chaingraph is a standalone MIT-licensed Bitcoin application. This repository owns
+the application, tests and deployment configuration. Unrelated parent-folder
+packaging workflows do not apply here.
 
 ## Product and boundaries
 
 - Read `README.md`, `docs/architecture.md`, and the relevant module before changing it.
-- Build a self-hosted wallet analysis workbench, not a block explorer/dashboard.
+- Build a self-hosted personal wallet, UTXO and label-management tool with on-chain
+  analysis for individuals and hobbyists. Wallet, Graph and Analysis workbenches
+  share evidence, selection and metadata; keep their workflows coherent and compact.
 - Workspaces own multiple watch-only wallets. The browser owns derivation, discovery,
   loaded chain data, annotations, analysis, and encrypted persistence.
 - The backend only provides bounded read-only Core/Electrum access. No server database,
@@ -19,6 +21,9 @@ not when scaffolding this upstream application.
 - Use subagents for independent modules/reviews with explicit file ownership.
 - Explicitly requested clean reviews must not inherit skills, memory or this guide;
   supply the essential product/privacy constraints in their standalone task.
+- Keep experiments in their requested worktrees with separate preview ports. Treat
+  scope and test budgets as task instructions that the user can revise, not fixed
+  restrictions in an agent's startup configuration. Merge only when requested.
 
 ## Working safely
 
@@ -48,10 +53,12 @@ not when scaffolding this upstream application.
 
 ## Development
 
-- Node 24+, TypeScript, React/Vite, Three.js/3d-force-graph, Node HTTP proxy.
+- Node 24+, TypeScript, React/Vite, a Three.js graph renderer, and a Node HTTP proxy.
 - `npm run dev` starts the app and proxy; `npm run dev:live` uses the same isolated per-network file discovery as `dev`;
   `.env.live` is not a runtime fallback. Production: `npm run build && npm start`.
-- `npm run build`, `npm test`, `npm run test:e2e` are the verification gates.
+- `npm run build` checks types and builds; `npm test` runs domain/backend tests;
+  `npm run test:e2e` runs browser journeys. Match checks to the change and current
+  user instructions. Documentation-only edits do not need an application test suite.
 - Test complex domain/security logic and end-to-end user workflows; avoid tests that
   merely repeat implementation. Exercise real services read-only when available.
 - State exactly what was validated. A build or mocked RPC test is not live validation.
@@ -59,9 +66,12 @@ not when scaffolding this upstream application.
 - Do not assume that passing checks makes a UI usable. Inspect screenshots and trace
   real editing/navigation tasks. Explicit redesign requests may change the layout
   and renderer; preserve data contracts and compare isolated working proposals.
+- Keep renderer mechanics separate from selection, metadata and workspace logic.
+  Prefer loaded or attached prevout evidence before fetching parents; distinguish
+  missing evidence from zero values, unspent outputs or ownership conclusions.
 - Do not use em dashes in authored copy.
 
-For substantial UI work, use the local review checklist in
+For substantial UI work, when visual validation is in the requested scope, use the local review checklist in
 `.agents/skills/chaingraph-ui-review/SKILL.md`, inspect fresh-context screenshots,
 and run browser suites serially within a checkout. See `CONTRIBUTING.md` for separate
 worktree dependencies and preview/test ports. Release commands and validation are
