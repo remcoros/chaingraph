@@ -63,7 +63,7 @@ async function restart(page: Page) {
   await expect(page.getByRole('dialog', { name: 'Guided tour' })).toBeVisible();
 }
 
-test('an empty workspace skips wallet activity in sequence, keeps its index and can restart', async ({
+test('an empty workspace includes wallet activity in sequence, keeps its index and can restart', async ({
   page,
 }) => {
   const calls = await mockBitcoin(page);
@@ -72,18 +72,13 @@ test('an empty workspace skips wallet activity in sequence, keeps its index and 
   await create(page);
   const dialog = page.getByRole('dialog', { name: 'Guided tour' });
   await expect((await contents(page)).getByRole('button')).toHaveCount(steps.length);
-  const sequence = steps.filter((step) => !walletTopics.slice(1).includes(step));
+  const sequence = steps;
   for (let index = 0; index < sequence.length; index++) {
     const active = (await contents(page)).locator('[aria-current="step"]');
     await expect(active).toContainText(sequence[index]);
     await expect(dialog.getByRole('heading')).toBeVisible();
     const next = dialog.getByRole('button', {
-      name:
-        index === sequence.length - 1
-          ? 'Start exploring'
-          : sequence[index] === 'Wallets'
-            ? 'Continue tour'
-            : 'Next',
+      name: index === sequence.length - 1 ? 'Start exploring' : 'Next',
       exact: true,
     });
     await expect(next).toBeInViewport();
@@ -361,11 +356,12 @@ for (const viewport of [
             .getByRole('navigation', { name: 'Workbench', exact: true })
             .getByRole('button', { name: 'Wallet', exact: true }),
         ).toHaveAttribute('aria-pressed', 'true');
-        const selector = example
+        const hasPreview = !!example || index > 0;
+        const selector = hasPreview
           ? ['wallet-overview', 'wallet-sections', 'wallet-filters', 'wallet-item-actions'][index]
           : 'wallet-empty';
         const target = page.locator(
-          example
+          hasPreview
             ? `[data-tour="wallet-preview"] [data-tour="${selector}"]`
             : '[data-tour="wallet-empty"]',
         );
@@ -383,11 +379,9 @@ for (const viewport of [
             );
           })
           .toBe(true);
-        if (!example)
-          await expect(
-            page.getByRole('button', { name: 'Preview with public example', exact: true }),
-          ).toBeVisible();
-        if (example && index === 3) {
+        if (!example && index === 0) await expect(page.locator('.tour-prerequisite')).toBeVisible();
+        if (!example && index > 0) await expect(page.locator('.tour-preview-label')).toBeVisible();
+        if (index === 3) {
           await expect(target.locator('.single-metadata-bar')).toContainText('Label');
           await expect(target.locator('.single-metadata-bar')).toContainText('Notes');
           await expect(target).toContainText('Mark reviewed');
@@ -404,18 +398,23 @@ for (const viewport of [
     });
   }
 
-  test(`temporary public example previews real Wallet UI and restores empty state at ${viewport.width}px`, async ({
+  test(`public example automatically loads and unloads while preserving empty state at ${viewport.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     const calls = await mockBitcoin(page);
+    let loads = 0;
+    page.on('worker', (worker) => {
+      if (worker.url().includes('templateWorkspace.worker')) loads++;
+    });
     await create(page);
     const before = await savedTourWorkspace(page);
     const tour = page.getByRole('dialog', { name: 'Guided tour' });
     await jump(page, 'Wallets');
     await closeContents(page);
     await expect(page.locator('[data-tour="wallet-empty"]')).toBeVisible();
-    await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+    expect(loads).toBe(0);
+    await tour.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(tour.locator('.tour-preview-label')).toHaveText(
       'Public example · preview only (mainnet)',
     );
@@ -430,12 +429,16 @@ for (const viewport of [
       await expect(tour.locator('.tour-preview-label')).toBeVisible();
       expect(await tour.evaluate((el) => el.contains(document.activeElement))).toBe(true);
       if (index === 2) await expect(target).toContainText('Mark reviewed');
+      expect(loads).toBe(1);
       expect(await savedTourWorkspace(page)).toEqual(before);
       await tour.getByRole('button', { name: 'Next', exact: true }).click();
     }
     await expect(tour).toContainText('Start from an outpoint');
     await expect(tour.locator('.tour-preview-label')).toHaveCount(0);
+    await expect(page.locator('[data-tour="wallet-preview"]')).toHaveCount(0);
     await tour.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(page.locator('[data-tour="wallet-preview"]')).toBeVisible();
+    expect(loads).toBe(2);
     await expect(tour.locator('.tour-preview-label')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-tour="wallet-preview"]')).toHaveCount(0);
@@ -447,16 +450,16 @@ for (const viewport of [
       ),
     ).toBe(1);
 
-    // Restart discards the example; index topics still offer a deliberate preview.
+    // Restart and direct index jumps automatically load a new, temporary preview.
     await restart(page);
     await jump(page, 'Filter and select');
     await closeContents(page);
-    await expect(tour.locator('.tour-preview-label')).toHaveCount(0);
-    await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+
     await expect(
       page.locator('[data-tour="wallet-preview"] [data-tour="wallet-filters"]'),
     ).toBeInViewport({ ratio: 0.99 });
     await expect(tour.locator('.tour-preview-label')).toBeVisible();
+    expect(loads).toBe(3);
     await jump(page, 'Save and share');
     await tour.getByRole('button', { name: 'Start exploring', exact: true }).click();
     await expect(page.locator('#main-workspace')).toBeVisible();
@@ -555,23 +558,26 @@ for (const viewport of [
   });
 }
 
-test('public example loading can fail, retry and remain separate from a testnet4 workspace', async ({
+test('automatic public example loading can fail, retry and stay separate from testnet4', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const calls = await mockBitcoin(page, { networks: ['testnet4'] });
   await create(page);
   const before = await savedTourWorkspace(page);
   expect(before.network).toBe('testnet4');
-  await jump(page, 'Wallets');
-  await closeContents(page);
   const tour = page.getByRole('dialog', { name: 'Guided tour' });
   const worker = '**/templateWorkspace.worker.ts*';
   await page.context().route(worker, (route) => route.abort());
-  await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+  await jump(page, 'Review and addresses');
+  await closeContents(page);
   await expect(tour.getByRole('alert')).toContainText('The public example could not load');
-  await expect(tour.getByRole('button', { name: 'Continue tour', exact: true })).toBeEnabled();
+  await expect(page.locator('.tour-spotlight')).toHaveCount(0);
+  await expect(tour.getByRole('button', { name: 'Try again', exact: true })).toBeInViewport();
+  await expect(tour.getByRole('button', { name: 'Next', exact: true })).toBeEnabled();
   await page.context().unroute(worker);
-  await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+  await tour.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.locator('[data-tour="wallet-preview"]')).toBeVisible();
   await expect(tour.locator('.tour-preview-label')).toHaveText(
     'Public example · preview only (mainnet)',
   );
@@ -581,47 +587,51 @@ test('public example loading can fail, retry and remain separate from a testnet4
   expect(calls).toEqual([]);
 });
 
-test('leaving while the public example loads cancels the choice without reopening the tour', async ({
-  page,
-}) => {
-  const calls = await mockBitcoin(page);
-  await create(page);
-  const before = await savedTourWorkspace(page);
-  await jump(page, 'Wallets');
-  await closeContents(page);
-  const tour = page.getByRole('dialog', { name: 'Guided tour' });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
+for (const exit of ['Next', 'Escape'] as const) {
+  test(`${exit} cancels automatic loading without changing the destination or reopening the tour`, async ({
+    page,
+  }) => {
+    const calls = await mockBitcoin(page);
+    await create(page);
+    const before = await savedTourWorkspace(page);
+    const tour = page.getByRole('dialog', { name: 'Guided tour' });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let requested!: () => void;
+    const loading = new Promise<void>((resolve) => {
+      requested = resolve;
+    });
+    const worker = '**/templateWorkspace.worker.ts*';
+    await page.context().route(worker, async (route) => {
+      requested();
+      await gate;
+      await route.continue().catch(() => {});
+    });
+    await jump(page, 'Review and follow');
+    await closeContents(page);
+    await loading;
+    await expect(tour.getByRole('status')).toHaveText('Loading public example...');
+    await expect(page.locator('.tour-spotlight')).toHaveCount(0);
+    if (exit === 'Escape') await page.keyboard.press('Escape');
+    else await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    release();
+    await page.context().unroute(worker);
+    if (exit === 'Escape') await expect(tour).toBeHidden();
+    else {
+      await expect(tour).toContainText('Start from an outpoint');
+      await expect(tour.locator('.tour-preview-label')).toHaveCount(0);
+      await page.keyboard.press('Escape');
+    }
+    await expect(page.locator('[data-tour="wallet-preview"]')).toHaveCount(0);
+    await restart(page);
+    await jump(page, 'Wallets');
+    await closeContents(page);
+    await expect(page.locator('[data-tour="wallet-empty"]')).toBeVisible();
+    await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(page.locator('[data-tour="wallet-preview"]')).toBeVisible();
+    expect(await savedTourWorkspace(page)).toEqual(before);
+    expect(calls).toEqual([]);
   });
-  let requested!: () => void;
-  const loading = new Promise<void>((resolve) => {
-    requested = resolve;
-  });
-  const worker = '**/templateWorkspace.worker.ts*';
-  await page.context().route(worker, async (route) => {
-    requested();
-    await gate;
-    await route.continue().catch(() => {});
-  });
-  await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
-  await loading;
-  await expect(
-    tour.getByRole('button', { name: 'Loading public example...', exact: true }),
-  ).toBeDisabled();
-  await page.keyboard.press('Escape');
-  release();
-  await page.context().unroute(worker);
-  await expect(tour).toBeHidden();
-  await restart(page);
-  await jump(page, 'Wallets');
-  await closeContents(page);
-  await expect(
-    tour.getByRole('button', { name: 'Preview with public example', exact: true }),
-  ).toBeEnabled();
-  await tour.getByRole('button', { name: 'Continue tour', exact: true }).click();
-  await expect(tour).toContainText('Start from an outpoint');
-  await expect(page.locator('[data-tour="wallet-preview"]')).toHaveCount(0);
-  expect(await savedTourWorkspace(page)).toEqual(before);
-  expect(calls).toEqual([]);
-});
+}

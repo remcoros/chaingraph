@@ -1991,13 +1991,13 @@ small,
   font-size: 11px;
   flex-shrink: 0;
 }
-.tour-preview-offer {
+.tour-preview-error {
   margin-top: 12px;
 }
-.tour-preview-offer button {
+.tour-preview-error button {
   font-size: 12px;
 }
-.tour-preview-offer p[role='alert'] {
+.tour-preview-error p[role='alert'] {
   color: var(--color-warning);
   margin-top: 8px;
 }

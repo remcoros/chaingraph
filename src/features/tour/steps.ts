@@ -31,7 +31,7 @@ export interface TourStep {
   revealTarget?: boolean | 'start';
   missingTargetText?: string;
   when?: (context: TourContext) => boolean;
-  /** Skipped in sequential navigation without wallet data; still available in the index. */
+  /** Preview with a temporary public example when the workspace has no wallet. */
   requiresWallet?: boolean;
   /** Presentation only. App adapts these hints without changing saved workspace state. */
   view?: {
@@ -66,9 +66,9 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'review' },
-    text: 'Open Wallet, choose a wallet in the picker, or use Add wallet for a watch-only public key. Refresh discovers history; Check UTXOs checks unspent status; Analyse loaded runs local analysis.',
+    text: 'Open Wallet to select a wallet or use Add wallet. Refresh discovers history; Check UTXOs checks unspent status; Analyse loaded runs local analysis.',
     missingTargetText:
-      'No wallet yet. After the tour, use Add a wallet or choose the public demo wallet from Example workspaces in Help. You can skip ahead without importing.',
+      'No wallet yet. Add a watch-only public key after the tour. Next, a temporary public example shows the three activity topics.',
     tip: 'This tour only previews loaded data. It does not refresh, check UTXOs, run analysis or save edits.',
   },
   {
