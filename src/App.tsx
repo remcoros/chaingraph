@@ -948,8 +948,9 @@ export default function App() {
     const transactionId = nodeId.split(':')[1];
     const generation = selectionGeneration.current;
     void run(async (signal) => {
+      const cachedTransaction = ws.getSession(ownerId)?.data.transactions[transactionId];
       const transaction =
-        w.transactions[transactionId] ?? (await fetchTransaction(w.network, transactionId, signal));
+        cachedTransaction ?? (await fetchTransaction(w.network, transactionId, signal));
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation) return;
       const current = ws.getSession(ownerId)?.data;
@@ -963,7 +964,9 @@ export default function App() {
         throw new Error(
           'The UTXO response does not match its transaction. Refresh the wallet UTXOs and retry.',
         );
-      mergeTransactions(ownerId, [transaction]);
+      // Cached navigation promotes graph context without replacing chain evidence.
+      // A new transaction still takes the normal history/findings invalidation path.
+      mergeTransactions(ownerId, cachedTransaction ? [] : [transaction], [transactionId]);
       ws.update(ownerId, (value) => setNodesHidden(value, [nodeId], false), false);
       select(nodeId);
       setRightTab(tab);

@@ -50,3 +50,26 @@ The two batch domain modules still have different planning APIs for graph and
 wallet workflows. Consolidating their shared primitives can be a later
 maintenance change; this integration preserves their independently tested limits
 and metadata semantics.
+
+## RUX-007: cached wallet navigation
+
+Independent combined acceptance found that navigating to a cached wallet record
+cleared Undo and marked findings stale without making a network request. This was
+inherited from main, not introduced by the workbench merge or the batch Undo fix.
+The cached path unconditionally re-merged the transaction and replaced the
+transaction-map reference, which the session store correctly treats as changed
+evidence.
+
+Wallet record navigation now reads the latest session cache. Cached records pass
+only their context-promotion IDs to the merge helper, preserving the chain-data
+reference, Undo and findings. Newly fetched records still follow the original
+merge and evidence-invalidation path. Context promotion, manual visibility,
+selection guards and UTXO validation are unchanged.
+
+The phone regression failed on the disabled Undo control before the fix. Both
+phone and desktop regressions now pass: label a current UTXO, Inspect it with zero
+RPC, retain findings and promotion, undo the label, edit a note, select its cached
+transaction with zero RPC, then fetch new chain evidence and verify invalidation
+without losing the note. The build and 29 focused domain tests across storage,
+wallet activity and observation context pass. Independent RUX-007 retesting is
+still required before accepting this candidate.

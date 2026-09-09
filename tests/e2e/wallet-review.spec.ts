@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Transaction, Wallet, Workspace } from '../../src/domain/types';
+import { analysisTools } from '../../src/domain/analysis';
 import { newWorkspace, parseWorkspace } from '../../src/domain/workspace';
 import { deriveAddresses } from '../../src/lib/wallet';
 import { decryptWorkspace, encryptWorkspace } from '../../src/lib/crypto';
@@ -523,3 +524,67 @@ test('review rows expose button semantics with a pressed state', async ({ page }
   await expect(secondButton).toHaveAttribute('aria-pressed', 'true');
   await expect(firstButton).toHaveAttribute('aria-pressed', 'false');
 });
+
+for (const phone of [false, true]) {
+  test(`cached wallet navigation preserves Undo and findings, new evidence invalidates them (${phone ? 'phone' : 'desktop'})`, async ({
+    page,
+  }) => {
+    if (phone) await page.setViewportSize({ width: 390, height: 844 });
+    const { chain } = await seed(page, (workspace) => {
+      workspace.findings = analysisTools.flatMap((tool) => tool.run(workspace));
+      expect(workspace.findings.length).toBeGreaterThan(0);
+      workspace.inputContext = { [TX_MID]: [0] };
+      workspace.contextTransactionIds = [TX_MID];
+    });
+    await waitForUtxoCheck(page);
+    await reviewList(page).getByRole('listitem').first().click();
+    await detail(page).getByRole('button', { name: 'Label', exact: true }).click();
+    const labelEditor = page.getByRole('dialog', { name: 'Label selected records' });
+    await labelEditor.getByLabel('Batch label').fill('Cached coin label');
+    await labelEditor.getByRole('button', { name: 'Apply label' }).click();
+    const checkUndo = async (enabled: boolean, apply = false) => {
+      if (phone) await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+      const undo = phone ? page.locator('.mobile-workspace-undo') : page.locator('.workspace-undo');
+      if (enabled) await expect(undo).toBeEnabled();
+      else await expect(undo).toBeDisabled();
+      if (apply) await undo.click();
+      else if (phone) await page.keyboard.press('Escape');
+    };
+    await checkUndo(true);
+    const callsBeforeInspect = chain.calls.length;
+    await detail(page).getByRole('button', { name: 'Inspect', exact: true }).click();
+    await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('Cached coin label');
+    await checkUndo(true);
+    expect(chain.calls).toHaveLength(callsBeforeInspect);
+    await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+    let stored = await saved(page);
+    expect(stored.findings.every((finding) => !finding.stale)).toBe(true);
+    expect(stored.inputContext?.[TX_MID]).toBeUndefined();
+    expect(stored.contextTransactionIds ?? []).not.toContain(TX_MID);
+    await checkUndo(true, true);
+    await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('');
+    await page.getByLabel('Node notes', { exact: true }).fill('Keep this note while navigating');
+    const tabs = page.locator('.right-panel .panel-tabs');
+    await tabs.getByRole('button', { name: 'Transactions', exact: true }).click();
+    const callsBeforeTransaction = chain.calls.length;
+    await page
+      .getByRole('button', { name: `Select wallet transaction ${TX_MID}`, exact: true })
+      .click();
+    await checkUndo(true);
+    expect(chain.calls).toHaveLength(callsBeforeTransaction);
+    await workbench(page, 'Analysis').click();
+    await expect(page.locator('.analysis-workbench')).not.toContainText('Needs rerun');
+    await workbench(page, 'Graph').click();
+    await page.getByLabel('Transaction, output, or address', { exact: true }).fill(TX_NEW);
+    await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
+    await expect(page.locator('.statusbar')).toContainText('4 transactions');
+    await checkUndo(false);
+    await workbench(page, 'Analysis').click();
+    await expect(page.locator('.analysis-workbench')).toContainText('Needs rerun');
+    await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+    stored = await saved(page);
+    expect(stored.findings.every((finding) => finding.stale)).toBe(true);
+    expect(stored.annotations[`out:${TX_MID}:0`].note).toBe('Keep this note while navigating');
+    expect(stored.transactions[TX_NEW]).toBeDefined();
+  });
+}
