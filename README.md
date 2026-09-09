@@ -89,7 +89,11 @@ This branch enables three compact workbenches: **Wallet**, **Graph** and **Analy
 ### Review a wallet (experimental)
 
 **Wallet** works on one imported wallet at a time and reuses the existing import,
-scan and record code. A switcher moves between wallets. The coverage strip states
+scan and record code. A switcher moves between wallets; **Add wallet** imports
+another one. The pencil beside a wallet name, here or in the Graph sidebar, opens
+a name-only editor. Names autosave encrypted; the read-only public key stays masked
+until explicitly shown. Derivation settings and existing data are unchanged.
+The coverage strip states
 the last check, partial discovery, used and discovered addresses, loaded versus
 known transactions, and the current UTXO count and balance from a verified check.
 There is no completeness percentage; when no UTXO check has run, the workbench
@@ -98,7 +102,12 @@ says so and offers the action.
 **To review** is a queue derived from your own data, in priority order: current
 UTXOs, receipts that were spent into them, activity found by a refresh,
 counterparties, and grouping findings from your last analysis scan. Each
-item explains its reason and shows its evidence. Mark reviewed, **Reviewed, source
+item explains its reason and shows its evidence. All Show options include counts;
+a `+` marks a partial list with more records available. The compact transaction flow
+separates verified wallet-script matches from **No wallet match** and unknown
+prevouts. Unmatched scripts may be undiscovered wallet addresses; transaction
+links do not prove who controls an output or exactly which input funded it.
+Select a flow node to inspect it, then use Back to Wallet. Mark reviewed, **Reviewed, source
 unknown** or **Review later**. Unknown is a valid, completed answer. Review later
 advances to the next item and sets the deferred item aside in **Show → Review later**;
 it remains pending, but is excluded from **To review**. Reopen returns it to To review.
@@ -111,7 +120,11 @@ resets the queue.
 **Records** lists this wallet's UTXOs, transactions and addresses with filters for
 text, labelled or unlabelled, To review, Review later, Reviewed, and tag, plus visible counts.
 Tick rows, Ctrl/⌘ click to toggle, Shift click to select a displayed range, or use
-**Select N matching**. The selection bar shows the number of targets and lets you
+**Select all N results**. This replaces the selection with the current filtered
+results, including rows under Show more. **Select related** offers exact address
+and creating-transaction matches within those same results, with counts shown
+before selection. Same transaction can include both wallet outputs and possible
+counterparties; it is not an ownership grouping. The selection bar shows the number of targets and lets you
 label, tag or set an icon directly. Review queue checkboxes offer the same batch
 controls, plus marking the selected items reviewed or deferring them together.
 A single item's label editor starts with its current label and replaces it when applied.

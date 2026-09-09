@@ -114,17 +114,29 @@ an editor without changing anything.
 
 ## Review a wallet
 
-Open **Wallet** and choose an imported watch-only wallet. The review queue combines
+Open **Wallet** and choose an imported watch-only wallet, or use **Add wallet**.
+The pencil beside its name opens the name editor, also available in the Graph
+sidebar. Names save automatically. The public key is read-only and masked until
+you choose Show; renaming never changes the key or derived addresses.
+
+The review queue combines
 current UTXO observations, their sources and newly discovered activity. Coverage
 and continuation messages describe the checked snapshot; use **Load more** when
 pending items remain outside the displayed batch. **Records** provides addresses,
 transactions and outputs with review filters and explicit batch selection.
 
 Select an item to label it, record its source or destination, or open it in Graph,
-the Inspector or Analysis. Use **Back to Wallet** to return to the same review item.
+the Inspector or Analysis. The flow diagram highlights verified wallet matches
+and the selected output. **No wallet match** means no match to discovered addresses,
+not proof that someone else owns it. Select a flow node to inspect it, and use
+**Back to Wallet** to return to the same review item.
 Use checkboxes to select several items, then the selection bar to label, tag or
 set their icons together. Ctrl/⌘ click toggles a row; Shift click selects a range.
-Batch edits apply only to that selection. Existing labels and icons are kept unless
+**Select all N results** selects the full filtered list, including results under
+Show more. **Select related** selects exact same-address or same-transaction
+results based on the current item or selection. It replaces the selection and
+never reaches outside this filtered list. A shared transaction can include both
+your outputs and other participants. Batch edits apply only to that selection. Existing labels and icons are kept unless
 you choose Replace. Single-item editing starts from the current value. Metadata
 updates appear in the list and details without completing the review.
 

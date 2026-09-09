@@ -9,6 +9,7 @@ import {
   pruneWalletReviews,
   reviewKey,
   spendGuidance,
+  walletOwnedOutputs,
   type WalletReviewItem,
 } from '../src/domain/walletReview';
 import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
@@ -121,6 +122,69 @@ describe('wallet review queue', () => {
     expect(find(withBatch.items, 'counterparty').map((item) => item.nodeId)).toEqual([
       `out:${id(2)}:1`,
     ]);
+  });
+
+  it('decodes source and counterparty addresses from raw scripts without changing review evidence', () => {
+    const workspace = fixture();
+    const original = build(workspace);
+    const source = find(original.items, 'source')[0];
+    const counterparty = find(original.items, 'counterparty')[0];
+    expect(source.address).toBe(MINE_A);
+    expect(counterparty.address).toBe(THEIRS);
+    expect(walletOwnedOutputs(workspace, wallet).get(source.nodeId)?.address).toBe(MINE_A);
+    const decided = applyReviewDecisions(workspace, wallet, [source, counterparty], 'reviewed');
+    // Imported display claims must not alter script-derived address identity.
+    decided.transactions = structuredClone(decided.transactions);
+    decided.transactions[id(1)].vout[0].scriptPubKey.address = THEIRS;
+    decided.transactions[id(2)].vout[1].scriptPubKey.address = MINE_A;
+    const rebuilt = build(decided);
+    for (const before of [source, counterparty]) {
+      const after = rebuilt.items.find((item) => item.key === before.key)!;
+      expect(after.address).toBe(before.address);
+      expect(after.evidence).toBe(before.evidence);
+      expect(after.status).toBe('reviewed');
+      expect(after.changed).toBe(false);
+    }
+  });
+
+  it('decodes network-neutral raw scripts into testnet4 review addresses', () => {
+    const testAddress = (fill: number) =>
+      bitcoinAddress.toBech32(new Uint8Array(20).fill(fill), 0, 'tb');
+    const testWallet = {
+      ...wallet,
+      addresses: wallet.addresses.map((entry, index) => ({
+        ...entry,
+        address: testAddress(index + 1),
+        scripthash: addressToScriptHash(testAddress(index + 1), 'testnet4'),
+      })),
+    };
+    const workspace = fixture({ network: 'testnet4', wallets: [testWallet] });
+    const review = build(workspace, [{ ...utxo, address: testAddress(2) }]);
+    expect(find(review.items, 'source')[0].address).toBe(testAddress(1));
+    expect(find(review.items, 'counterparty')[0].address).toBe(testAddress(9));
+  });
+
+  it.each(['broken', '6a00'])(
+    'does not fall back from raw script %s to a claimed counterparty address',
+    (hex) => {
+      const workspace = fixture();
+      workspace.transactions = structuredClone(workspace.transactions);
+      workspace.transactions[id(2)].vout[1].scriptPubKey = { hex, address: THEIRS };
+      expect(find(build(workspace).items, 'counterparty')[0].address).toBeUndefined();
+    },
+  );
+
+  it('uses a validated address-only fallback and rejects a different network', () => {
+    const workspace = fixture();
+    workspace.transactions = structuredClone(workspace.transactions);
+    workspace.transactions[id(1)].vout[0].scriptPubKey = { addresses: [MINE_A] };
+    workspace.transactions[id(2)].vout[1].scriptPubKey = { address: THEIRS };
+    expect(find(build(workspace).items, 'source')[0].address).toBe(MINE_A);
+    expect(find(build(workspace).items, 'counterparty')[0].address).toBe(THEIRS);
+    workspace.transactions[id(2)].vout[1].scriptPubKey = {
+      address: bitcoinAddress.toBech32(new Uint8Array(20).fill(9), 0, 'tb'),
+    };
+    expect(find(build(workspace).items, 'counterparty')[0].address).toBeUndefined();
   });
 
   it('reports unloaded UTXO sources instead of inventing them', () => {

@@ -4,6 +4,7 @@ import {
   Bookmark,
   ChevronRight,
   Plus,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   Wallet as WalletIcon,
@@ -30,6 +31,7 @@ interface Props {
   onSelectWallet: (id: string) => void;
   onSelectNode: (id: string) => void;
   onAddWallet: () => void;
+  onEditWallet?: (walletId: string) => void;
   busy: boolean;
   onRefreshAll: () => void;
   onShowActivity: (wallet: Wallet) => void;
@@ -74,6 +76,7 @@ export function WorkspacePanel({
   onSelectWallet,
   onSelectNode,
   onAddWallet,
+  onEditWallet,
   busy,
   onRefreshAll,
   onShowActivity,
@@ -145,27 +148,41 @@ export function WorkspacePanel({
           <div className="panel-body wallet-list">
             {w.wallets.map((item) => (
               <div className="wallet-card" key={item.id}>
-                <button
-                  className={`wallet-row ${selectedWalletId === item.id ? 'selected' : ''}`}
-                  key={item.id}
-                  onClick={() => onSelectWallet(item.id)}
-                >
-                  <WalletIcon size={19} />
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>
-                      {item.addresses.filter((a) => a.history?.length).length} used addresses ·{' '}
-                      {item.scriptType}
-                    </small>
-                    <small
-                      title={item.scannedAt ? new Date(item.scannedAt).toLocaleString() : undefined}
+                <div className="wallet-card-heading">
+                  <button
+                    className={`wallet-row ${selectedWalletId === item.id ? 'selected' : ''}`}
+                    key={item.id}
+                    onClick={() => onSelectWallet(item.id)}
+                  >
+                    <WalletIcon size={19} />
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {item.addresses.filter((a) => a.history?.length).length} used addresses ·{' '}
+                        {item.scriptType}
+                      </small>
+                      <small
+                        title={
+                          item.scannedAt ? new Date(item.scannedAt).toLocaleString() : undefined
+                        }
+                      >
+                        {walletCheckAge(item.scannedAt)}
+                        {item.scannedAt && !item.scanComplete ? ' · partial' : ''}
+                      </small>
+                    </span>
+                    <ChevronRight size={14} />
+                  </button>
+                  {onEditWallet && (
+                    <button
+                      className="icon-button wallet-name-edit"
+                      aria-label={`Edit wallet name: ${item.name}`}
+                      title="Edit wallet name"
+                      onClick={() => onEditWallet(item.id)}
                     >
-                      {walletCheckAge(item.scannedAt)}
-                      {item.scannedAt && !item.scanComplete ? ' · partial' : ''}
-                    </small>
-                  </span>
-                  <ChevronRight size={14} />
-                </button>
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                </div>
                 {!!item.unreviewedTransactionIds?.length && (
                   <button
                     className="wallet-activity-link"

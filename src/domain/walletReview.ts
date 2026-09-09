@@ -15,6 +15,7 @@ import {
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
+import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const REVIEW_REASONS = [
@@ -140,19 +141,33 @@ function fingerprint(value: string): string {
   return stableKey(value).slice(0, 16);
 }
 
-/** Kept local so the review module stays independent of graph derivation. */
-function outputAddress(output: TxOutput): string | undefined {
-  return (
-    output.scriptPubKey.address ??
-    (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined)
-  );
+/** Raw scripts are authoritative, including when imported address text conflicts.
+ * Address-only observations must encode a valid script on this workspace network. */
+function outputAddress(output: TxOutput, network: Workspace['network']): string | undefined {
+  try {
+    const bitcoinNetwork = network === 'mainnet' ? networks.bitcoin : networks.testnet;
+    if (output.scriptPubKey.hex !== undefined)
+      return bitcoinAddress.fromOutputScript(hexToBytes(output.scriptPubKey.hex), bitcoinNetwork);
+    const address =
+      output.scriptPubKey.address ??
+      (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined);
+    if (!address) return undefined;
+    addressToScriptHash(address, network);
+    return bitcoinAddress.fromOutputScript(
+      bitcoinAddress.toOutputScript(address, bitcoinNetwork),
+      bitcoinNetwork,
+    );
+  } catch {
+    // A non-address or malformed raw script never falls back to claimed metadata.
+    return undefined;
+  }
 }
 
 function outputScriptHash(output: TxOutput, network: Workspace['network']): string | undefined {
   try {
     if (output.scriptPubKey.hex !== undefined)
       return bytesToHex(sha256(hexToBytes(output.scriptPubKey.hex)).reverse());
-    const address = outputAddress(output);
+    const address = outputAddress(output, network);
     return address ? addressToScriptHash(address, network) : undefined;
   } catch {
     return undefined;
@@ -185,7 +200,7 @@ export function walletOwnedOutputs(workspace: Workspace, wallet: Wallet): Map<st
         txid: transaction.txid,
         vout: output.n,
         valueSats: Math.round(output.value * 100_000_000),
-        address: outputAddress(output),
+        address: outputAddress(output, workspace.network),
       });
     }
   return owned;
@@ -317,7 +332,7 @@ export function buildWalletReview(
         utxos.length === 1 ? '' : 's'
       }. Recording where it came from explains today's balance.`,
       nodeId: output.nodeId,
-      nodeIds: [output.nodeId],
+      nodeIds: [output.nodeId, ...utxos.map((point) => `out:${point}`)],
       txid: output.txid,
       amountSats: output.valueSats,
       address: output.address,
@@ -358,7 +373,7 @@ export function buildWalletReview(
         nodeId,
         txid,
         valueSats: Math.round(output.value * 100_000_000),
-        address: outputAddress(output),
+        address: outputAddress(output, workspace.network),
       });
     }
   }

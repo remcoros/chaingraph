@@ -263,7 +263,7 @@ test('batch labels, tags and icons apply to the explicit selection in one undoab
     'aria-pressed',
     'true',
   );
-  await page.getByRole('button', { name: /Select 2 matching/ }).click();
+  await page.getByRole('button', { name: /Select all 2 results/ }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
   await expect(bar).toContainText('2 UTXOs selected');
   // Evidence-based guidance, not a score or a guarantee.
@@ -365,7 +365,7 @@ test('stays usable on a phone viewport', async ({ page }) => {
   await expect(detail(page).getByRole('button', { name: 'Mark reviewed' })).toBeVisible();
   await screenshot(page, 'review-queue-phone');
   await page.getByRole('button', { name: /Records/ }).click();
-  await page.getByRole('button', { name: /Select 2 matching/ }).click();
+  await page.getByRole('button', { name: /Select all 2 results/ }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
   await bar.getByRole('button', { name: 'Label' }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
@@ -460,7 +460,7 @@ test('batch editors never stack and the icon palette stays keyboard usable', asy
   await seed(page);
   await waitForUtxoCheck(page);
   await page.getByRole('button', { name: /Records/ }).click();
-  await page.getByRole('button', { name: /Select 2 matching/ }).click();
+  await page.getByRole('button', { name: /Select all 2 results/ }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
   const tagButton = bar.getByRole('button', { name: 'Tag', exact: true });
   await tagButton.click();
@@ -624,7 +624,7 @@ for (const viewport of [
     ).toBe(true);
     await screenshot(page, `polish-${viewport.name}-label-editor`);
     await apply.click();
-    await expect(detail(page).getByRole('heading')).toHaveText('Cold storage');
+    await expect(detail(page).getByRole('heading', { level: 2 })).toHaveText('Cold storage');
     await expect(reviewList(page)).toContainText('Cold storage');
     await expect(reviewList(page).getByRole('listitem')).toHaveCount(initialCount);
     await bar.getByRole('button', { name: 'Label', exact: true }).click();
@@ -644,9 +644,12 @@ for (const viewport of [
         .getByRole('button', { name, exact: true })
         .click();
     }
-    await expect(detail(page).getByRole('heading')).toContainText('❄️');
+    await expect(detail(page).getByRole('heading', { level: 2 })).toContainText('❄️');
     await expect(reviewList(page)).toContainText('❄️');
     if (viewport.name === 'desktop') {
+      await detail(page)
+        .getByRole('button', { name: 'Analyze', exact: true })
+        .scrollIntoViewIfNeeded();
       const actions = await detail(page)
         .getByRole('button', { name: 'Analyze', exact: true })
         .boundingBox();
@@ -767,3 +770,122 @@ for (const kind of ['Label', 'Tag'] as const) {
     await expect(page.locator('.wallet-metadata-popover')).toHaveCount(0);
   });
 }
+
+for (const phone of [false, true]) {
+  test(`wallet review context distinguishes wallet outputs from counterparties (${phone ? 'phone' : 'desktop'})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1440, height: 900 });
+    await seed(page);
+    await waitForUtxoCheck(page);
+    const filter = page.getByLabel('Review filter');
+    await expect(filter.locator('option[value="open"]')).toHaveText('To review (4)');
+    await expect(filter.locator('option[value="later"]')).toHaveText('Review later (0)');
+    await expect(filter.locator('option[value="decided"]')).toHaveText('Reviewed (0)');
+    await expect(filter.locator('option[value="all"]')).toHaveText('All items (4)');
+    const flow = detail(page).getByRole('figure', { name: 'Wallet transaction flow' });
+    await expect(flow).toBeVisible();
+    await expect(detail(page).locator('.wallet-context-badge')).toHaveText('Your wallet output');
+    await expect(flow.locator('.ownership-wallet')).toHaveCount(2);
+    await expect(flow.locator('.ownership-external')).toHaveCount(1);
+    await expect(flow.locator('.is-selected')).toContainText('60,000,000 sats');
+    await reviewList(page).getByRole('listitem').first().getByRole('button').click();
+    await screenshot(page, `wallet-context-${phone ? 'phone' : 'desktop'}`);
+    const input = flow.getByRole('button', { name: `Inspect input ${TX_OLD}:0`, exact: true });
+    await input.click();
+    await expect(page.getByLabel('Node label', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to Wallet', exact: true }).click();
+    await expect(input).toBeFocused();
+    await reviewList(page)
+      .getByRole('listitem')
+      .filter({ hasText: 'Counterparty' })
+      .getByRole('button')
+      .click();
+    await expect(detail(page).locator('.wallet-context-badge')).toHaveText('Possible counterparty');
+    await expect(flow.locator('.is-selected')).toHaveClass(/ownership-external/);
+    await expect(flow.locator('.is-selected')).toContainText('No wallet match');
+    await screenshot(page, `wallet-counterparty-${phone ? 'phone' : 'desktop'}`);
+    await expect(
+      detail(page).getByRole('region', { name: 'Selected entity metadata' }),
+    ).toContainText('shop or recipient');
+    await detail(page).getByRole('button', { name: 'Mark reviewed', exact: true }).click();
+    await expect(filter.locator('option[value="open"]')).toHaveText('To review (3)');
+    await expect(filter.locator('option[value="decided"]')).toHaveText('Reviewed (1)');
+    await page.getByRole('button', { name: 'Add wallet', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Add a wallet', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+}
+
+test('related selection uses exact addresses and transactions within the current results', async ({
+  page,
+}) => {
+  await seed(page, (workspace) => {
+    workspace.transactions[TX_MID].vout.push({
+      n: 2,
+      value: 0.001,
+      scriptPubKey: { hex: script(EXTERNAL) },
+    });
+  });
+  await waitForUtxoCheck(page);
+  const rows = reviewList(page).getByRole('listitem');
+  await expect(rows).toHaveCount(5);
+  await rows.filter({ hasText: 'Counterparty' }).first().getByRole('button').click();
+  await page.getByRole('button', { name: 'Select related', exact: true }).click();
+  const menu = page.getByRole('dialog', { name: 'Select related results' });
+  await expect(menu.getByRole('button', { name: 'Same address 2' })).toBeEnabled();
+  await expect(menu.getByRole('button', { name: 'Same transaction 3' })).toBeEnabled();
+  await menu.getByRole('button', { name: 'Same address 2' }).click();
+  const bar = page.getByRole('group', { name: 'Batch metadata editing' });
+  await expect(bar).toContainText('2 entities selected');
+  await expect(rows.filter({ hasText: 'Counterparty' }).getByRole('checkbox')).toHaveCount(2);
+  await expect(rows.first().getByRole('checkbox')).not.toBeChecked();
+  await bar.getByRole('button', { name: 'Label', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Label selected records' });
+  await editor.getByLabel('Batch label').fill('Neighborhood shop');
+  await editor.getByRole('button', { name: 'Apply label' }).click();
+  await expect(rows.filter({ hasText: 'Neighborhood shop' })).toHaveCount(2);
+  await expect(rows.first()).not.toContainText('Neighborhood shop');
+  await page.getByRole('button', { name: 'Select all 5 results', exact: true }).click();
+  await expect(bar).toContainText('5 entities selected');
+  await screenshot(page, 'wallet-related-selection');
+});
+
+test('compact wallet flow keeps a late selected output visible and expands a bounded list', async ({
+  page,
+}) => {
+  await seed(page, (workspace) => {
+    for (let n = 2; n < 9; n++)
+      workspace.transactions[TX_MID].vout.push({
+        n,
+        value: 0.001,
+        scriptPubKey: { hex: script(EXTERNAL) },
+      });
+    workspace.annotations[`out:${TX_MID}:8`] = {
+      label: 'Final shop payment',
+      note: '',
+      icon: '',
+      bookmarked: false,
+    };
+  });
+  await waitForUtxoCheck(page);
+  await reviewList(page)
+    .getByRole('listitem')
+    .filter({ hasText: 'Final shop payment' })
+    .getByRole('button')
+    .click();
+  const flow = detail(page).getByRole('figure', { name: 'Wallet transaction flow' });
+  await expect(flow.locator('.is-selected')).toContainText('Final shop payment');
+  await expect(flow.locator('.wallet-flow-node')).toHaveCount(3);
+  await flow.getByRole('button', { name: 'All 9', exact: true }).click();
+  await expect(flow.locator('.wallet-flow-node')).toHaveCount(10);
+  const outputColumn = flow.locator('.wallet-flow-column').last();
+  await expect(outputColumn.getByRole('button', { name: 'Collapse', exact: true })).toBeVisible();
+  const entries = outputColumn.locator('.wallet-flow-entries');
+  const first = outputColumn.locator('.wallet-flow-node').first();
+  const top = (await entries.boundingBox())!.y;
+  expect((await first.boundingBox())!.y).toBeGreaterThanOrEqual(top);
+  await outputColumn.getByRole('button', { name: 'Collapse', exact: true }).click();
+  await expect(flow.locator('.wallet-flow-node')).toHaveCount(3);
+  await expect(flow.locator('.is-selected')).toContainText('Final shop payment');
+});

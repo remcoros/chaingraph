@@ -370,6 +370,22 @@ start with the current annotation; batch editors keep existing metadata by defau
 Wallet metadata popovers render through a viewport-bounded portal, outside the
 workbench scroll clipping boundary.
 
+`walletReviewContext` projects the creating transaction into full input/output
+arrays with selected-output markers. Membership uses verified discovered wallet
+scripts, never labels or transaction-history membership. Script hex is authoritative
+for displayed/related-selection addresses; address-only observations are validated
+against the workspace network. Missing prevouts remain unknown. Source items carry
+explicit descendant output IDs, and the projection verifies direct spending links
+and wallet matches before showing them. These edges do not allocate individual
+inputs to outputs or independently establish unspent status.
+
+`WalletReviewFlow` bounds visible rows without altering counts, keeps a selected
+output visible, and delegates Inspect to the existing Wallet handoff. Exact related
+selection runs only over supplied filtered candidates, including undisplayed pages.
+All-results and related selection replace the explicit selection. The wallet name
+dialog is workspace/wallet scoped, updates only `name`, and masks its read-only key
+again each time it opens.
+
 `useWalletUtxos` holds the transient Electrum observations shared by the wallet
 record panel and the wallet workbench. They are discarded when discovered
 addresses or the scan time change and never enter storage.

@@ -1529,6 +1529,18 @@ small,
 }
 .wallet-card .wallet-row {
   border-bottom: 0;
+  min-width: 0;
+}
+.wallet-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.wallet-card-heading .wallet-name-edit {
+  flex-shrink: 0;
+  width: 28px;
+  min-height: 32px;
+  padding: 5px;
 }
 .wallet-activity-link {
   margin: 0 8px 6px 40px;

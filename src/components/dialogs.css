@@ -30,3 +30,27 @@
 .password-field input[aria-invalid='true'] {
   border-color: var(--color-error);
 }
+
+.wallet-name-key {
+  display: grid;
+  gap: 7px;
+}
+
+.wallet-name-key-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wallet-name-key-heading button {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 5px 8px;
+}
+
+.wallet-name-key textarea {
+  width: 100%;
+  resize: none;
+  overflow-wrap: anywhere;
+}

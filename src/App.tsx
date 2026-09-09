@@ -56,6 +56,7 @@ import {
   ImportDialog,
   UnlockDialog,
   WalletDialog,
+  WalletNameDialog,
   WorkspaceDetailsDialog,
   Modal,
 } from './components/Dialogs';
@@ -134,6 +135,10 @@ export default function App() {
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
   const [walletDialog, setWalletDialog] = useState(false);
+  const [walletNameDialog, setWalletNameDialog] = useState<{
+    workspaceId: string;
+    walletId: string;
+  }>();
   const [fileDialog, setFileDialog] = useState<File>();
   const [menu, setMenu] = useState(false);
   const workspaceMenu = useRef<HTMLDivElement>(null);
@@ -575,6 +580,10 @@ export default function App() {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
   }, [w?.id, selectedId, selectedWallet, rightTab]);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
+  const editingWallet =
+    w?.id === walletNameDialog?.workspaceId
+      ? w?.wallets.find((item) => item.id === walletNameDialog?.walletId)
+      : undefined;
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
     (id: string) => {
@@ -658,6 +667,7 @@ export default function App() {
     setNotice('');
     setLive(false);
     setSettingsOpen(false);
+    setWalletNameDialog(undefined);
     setExamplesOpen(false);
     setEntityRemoval(undefined);
     setEditToken(0);
@@ -2022,6 +2032,7 @@ export default function App() {
                 setMobilePanel('right');
               }}
               onAddWallet={() => setWalletDialog(true)}
+              onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
               busy={!!operation}
               onRefreshAll={() => void scan()}
               onShowActivity={showWalletActivity}
@@ -2437,6 +2448,7 @@ export default function App() {
               }}
               onAddWallet={() => setWalletDialog(true)}
               onChange={(update) => change(update)}
+              onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
               onRefresh={() => void scan(wallet ?? w.wallets[0])}
               onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
               onInspect={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'inspect')}
@@ -2739,6 +2751,30 @@ export default function App() {
             return ws.unlock(current, password);
           }}
           onClose={() => setUnlock(undefined)}
+        />
+      )}
+      {w && editingWallet && !lockingWorkspace && (
+        <WalletNameDialog
+          key={`${w.id}:${editingWallet.id}`}
+          wallet={editingWallet}
+          onChange={(name) =>
+            change(
+              (current) => {
+                const target = current.wallets.find((item) => item.id === editingWallet.id);
+                if (current.id !== walletNameDialog?.workspaceId || !target || target.name === name)
+                  return current;
+                return {
+                  ...current,
+                  wallets: current.wallets.map((item) =>
+                    item.id === target.id ? { ...item, name } : item,
+                  ),
+                };
+              },
+              true,
+              `wallet-name:${editingWallet.id}`,
+            )
+          }
+          onClose={() => setWalletNameDialog(undefined)}
         />
       )}
       {walletDialog && w && (
