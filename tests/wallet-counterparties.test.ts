@@ -202,6 +202,25 @@ describe('bounded counterparty input resolution', () => {
     run.loader.stop();
   });
 
+  it('does not load parents when attached evidence already resolves counterparty inputs', async () => {
+    const workspace = fixture();
+    workspace.transactions[id(1)].vin[0].prevout = {
+      value: 1,
+      scriptPubKey: output().scriptPubKey,
+    };
+    const fetch = vi.fn(async (_network, txid: string) => transaction(txid));
+    const run = harness(workspace, fetch);
+    await Promise.resolve();
+    expect(run.loader.getSnapshot()).toMatchObject({
+      missingCount: 0,
+      unavailableCount: 0,
+      nonAddressCount: 0,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(run.workspace.transactions[id(100)]).toBeUndefined();
+    run.loader.stop();
+  });
+
   it('skips parents cached by another loader while requests are queued, without cache-only context edits', async () => {
     const releases: (() => void)[] = [];
     const fetch = vi.fn(async (_network, txid: string) => {

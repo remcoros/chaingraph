@@ -23,7 +23,7 @@ import {
   type WalletRelationship,
   type WalletRelationshipContext,
 } from './walletRelationships';
-import { indexPreviousOutputs, outputScriptHash } from './prevouts';
+import { indexPreviousOutputs, outputScriptHash, resolvePreviousOutput } from './prevouts';
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const REVIEW_REASONS = [
@@ -293,6 +293,7 @@ export function buildWalletReview(
     ],
   };
   const loaded = loadedWalletTransactions(workspace);
+  const prevouts = indexPreviousOutputs(workspace);
   const directSources = new Map(relationships.sources.map((entry) => [entry.id, entry]));
   const directDestinations = new Map(relationships.destinations.map((entry) => [entry.id, entry]));
   const history = new Set<string>();
@@ -467,7 +468,11 @@ export function buildWalletReview(
     const key = reviewKey(wallet.id, 'funding-source', source.id.slice(4));
     const saved = workspace.walletReviews?.[key];
     if (source.address ? !saved : representedSources.has(source.id) && !saved) continue;
-    const output = loaded.get(source.txid)?.vout.find((entry) => entry.n === source.vout);
+    const resolution = resolvePreviousOutput(workspace, source, prevouts);
+    const output =
+      resolution.status === 'loaded' || resolution.status === 'attached'
+        ? resolution.output
+        : undefined;
     push({
       key,
       reason: 'funding-source',

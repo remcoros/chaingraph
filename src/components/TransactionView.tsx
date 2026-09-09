@@ -427,6 +427,7 @@ export function TransactionView(props: Props) {
     [workspace.transactions, selected?.id],
   );
   const spends = useMemo(() => indexLoadedSpends(workspace.transactions), [workspace.transactions]);
+  const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const [choice, setChoice] = useState('');
   const current =
     related.find(({ tx }) => tx.txid === (state?.transactionId ?? choice)) ?? related[0];
@@ -445,9 +446,13 @@ export function TransactionView(props: Props) {
     : undefined;
   const missingCreating =
     selected.kind === 'output' && !workspace.transactions[selected.txid ?? ''];
+  const selectedResolution =
+    selected.kind === 'output' && selected.txid !== undefined && selected.vout !== undefined
+      ? resolvePreviousOutput(workspace, selected, previousOutputs)
+      : undefined;
   const selectedOutput =
-    selected.kind === 'output'
-      ? workspace.transactions[selected.txid ?? '']?.vout[selected.vout ?? -1]
+    selectedResolution?.status === 'loaded' || selectedResolution?.status === 'attached'
+      ? selectedResolution.output
       : undefined;
   const selectedUnspendable = !!decodeOpReturn(selectedOutput?.scriptPubKey.hex);
   const loadedSpenders = selected.kind === 'output' ? (spends.get(selected.id) ?? []) : [];
