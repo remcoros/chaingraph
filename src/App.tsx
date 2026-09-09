@@ -109,6 +109,7 @@ import { fetchTransaction, loadAddress, loadSpending, scanWallet } from './lib/a
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { ancestryNotice, loadAncestors, traceSourceExists } from './lib/tracing';
 import { WORKBENCH_TOUR, availableTourSteps } from './features/tour/steps';
+import { useWalletTourExample } from './features/tour/useWalletTourExample';
 import { WORKSPACE_TEMPLATES } from './domain/workspaceTemplates';
 import { MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
@@ -292,6 +293,11 @@ export default function App() {
   });
   const tourStep =
     tour === undefined ? undefined : (tourSteps.find((step) => step.id === tour) ?? tourSteps[0]);
+  const walletTourExample = useWalletTourExample(w?.id, tour);
+  const tourExample =
+    !w?.wallets.length && tourStep?.requiresWallet ? walletTourExample.snapshot : undefined;
+  const offerTourExample =
+    !w?.wallets.length && tourStep?.view?.workbench === 'wallet' && !tourExample;
   // Tour previews never feed the persisted presentation effect or selection history.
   const shownWorkbench = tourStep ? (tourStep.view?.workbench ?? 'graph') : workbench;
   const shownLeftTab = tourStep?.view?.leftTab ?? leftTab;
@@ -2501,7 +2507,7 @@ export default function App() {
             <WalletWorkbench
               tourPreview={
                 tourStep?.view?.workbench === 'wallet'
-                  ? { tab: tourStep.view.walletTab ?? 'review' }
+                  ? { tab: tourStep.view.walletTab ?? 'review', example: tourExample }
                   : undefined
               }
               active={workbench === 'wallet' && !lockingWorkspace && !tourStep}
@@ -2906,7 +2912,33 @@ export default function App() {
         />
       )}
       {tour !== undefined && !!w && (
-        <GuidedTour steps={tourSteps} activeId={tour} onStepChange={setTour} />
+        <GuidedTour
+          steps={tourSteps}
+          activeId={tour}
+          onStepChange={setTour}
+          skipStepIds={
+            !w.wallets.length && !walletTourExample.snapshot
+              ? tourSteps.filter((step) => step.requiresWallet).map((step) => step.id)
+              : []
+          }
+          previewLabel={tourExample ? 'Public example · preview only (mainnet)' : undefined}
+          previewOffer={
+            offerTourExample
+              ? {
+                  text:
+                    tourStep?.id === 'wallets'
+                      ? 'Use Add a wallet to bring a watch-only public key into this workspace. Or preview the next three topics with a public example.'
+                      : 'This topic needs wallet activity. Preview it with the public example, or continue the tour.',
+                  onSelect: () =>
+                    void walletTourExample.preview(() =>
+                      setTour(tourStep?.requiresWallet ? tourStep.id : 'wallet-activity'),
+                    ),
+                  loading: walletTourExample.loading,
+                  error: walletTourExample.error,
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

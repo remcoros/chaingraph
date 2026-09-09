@@ -63,7 +63,7 @@ async function restart(page: Page) {
   await expect(page.getByRole('dialog', { name: 'Guided tour' })).toBeVisible();
 }
 
-test('a first empty workspace tours all showcases without fetching data and can restart', async ({
+test('an empty workspace skips wallet activity in sequence, keeps its index and can restart', async ({
   page,
 }) => {
   const calls = await mockBitcoin(page);
@@ -72,12 +72,18 @@ test('a first empty workspace tours all showcases without fetching data and can 
   await create(page);
   const dialog = page.getByRole('dialog', { name: 'Guided tour' });
   await expect((await contents(page)).getByRole('button')).toHaveCount(steps.length);
-  for (let index = 0; index < steps.length; index++) {
+  const sequence = steps.filter((step) => !walletTopics.slice(1).includes(step));
+  for (let index = 0; index < sequence.length; index++) {
     const active = (await contents(page)).locator('[aria-current="step"]');
-    await expect(active).toContainText(steps[index]);
+    await expect(active).toContainText(sequence[index]);
     await expect(dialog.getByRole('heading')).toBeVisible();
     const next = dialog.getByRole('button', {
-      name: index === steps.length - 1 ? 'Start exploring' : 'Next',
+      name:
+        index === sequence.length - 1
+          ? 'Start exploring'
+          : sequence[index] === 'Wallets'
+            ? 'Continue tour'
+            : 'Next',
       exact: true,
     });
     await expect(next).toBeInViewport();
@@ -377,7 +383,10 @@ for (const viewport of [
             );
           })
           .toBe(true);
-        if (!example) await expect(page.locator('.tour-prerequisite')).toBeVisible();
+        if (!example)
+          await expect(
+            page.getByRole('button', { name: 'Preview with public example', exact: true }),
+          ).toBeVisible();
         if (example && index === 3) {
           await expect(target.locator('.single-metadata-bar')).toContainText('Label');
           await expect(target.locator('.single-metadata-bar')).toContainText('Notes');
@@ -394,6 +403,66 @@ for (const viewport of [
       expect(calls).toEqual([]);
     });
   }
+
+  test(`temporary public example previews real Wallet UI and restores empty state at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    const calls = await mockBitcoin(page);
+    await create(page);
+    const before = await savedTourWorkspace(page);
+    const tour = page.getByRole('dialog', { name: 'Guided tour' });
+    await jump(page, 'Wallets');
+    await closeContents(page);
+    await expect(page.locator('[data-tour="wallet-empty"]')).toBeVisible();
+    await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+    await expect(tour.locator('.tour-preview-label')).toHaveText(
+      'Public example · preview only (mainnet)',
+    );
+    for (const [index, targetId] of [
+      'wallet-sections',
+      'wallet-filters',
+      'wallet-item-actions',
+    ].entries()) {
+      const target = page.locator(`[data-tour="wallet-preview"] [data-tour="${targetId}"]`);
+      await expect(target).toBeInViewport({ ratio: 0.99 });
+      await expect(page.locator('[data-tour="wallet-preview"]')).toHaveAttribute('inert', '');
+      await expect(tour.locator('.tour-preview-label')).toBeVisible();
+      expect(await tour.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+      if (index === 2) await expect(target).toContainText('Mark reviewed');
+      expect(await savedTourWorkspace(page)).toEqual(before);
+      await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await expect(tour).toContainText('Start from an outpoint');
+    await expect(tour.locator('.tour-preview-label')).toHaveCount(0);
+    await tour.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(tour.locator('.tour-preview-label')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-tour="wallet-preview"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Help and samples', exact: true })).toBeFocused();
+    expect(await savedTourWorkspace(page)).toEqual(before);
+    expect(
+      await page.evaluate(
+        () => JSON.parse(localStorage.getItem('chaingraph.encrypted-workspaces.v1')!).length,
+      ),
+    ).toBe(1);
+
+    // Restart discards the example; index topics still offer a deliberate preview.
+    await restart(page);
+    await jump(page, 'Filter and select');
+    await closeContents(page);
+    await expect(tour.locator('.tour-preview-label')).toHaveCount(0);
+    await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+    await expect(
+      page.locator('[data-tour="wallet-preview"] [data-tour="wallet-filters"]'),
+    ).toBeInViewport({ ratio: 0.99 });
+    await expect(tour.locator('.tour-preview-label')).toBeVisible();
+    await jump(page, 'Save and share');
+    await tour.getByRole('button', { name: 'Start exploring', exact: true }).click();
+    await expect(page.locator('#main-workspace')).toBeVisible();
+    expect(await savedTourWorkspace(page)).toEqual(before);
+    expect(calls).toEqual([]);
+  });
 
   test(`wallet tour returns filters, batch, wallet and graph handoff at ${viewport.width}px`, async ({
     page,
@@ -485,3 +554,74 @@ for (const viewport of [
     expect(calls).toEqual([]);
   });
 }
+
+test('public example loading can fail, retry and remain separate from a testnet4 workspace', async ({
+  page,
+}) => {
+  const calls = await mockBitcoin(page, { networks: ['testnet4'] });
+  await create(page);
+  const before = await savedTourWorkspace(page);
+  expect(before.network).toBe('testnet4');
+  await jump(page, 'Wallets');
+  await closeContents(page);
+  const tour = page.getByRole('dialog', { name: 'Guided tour' });
+  const worker = '**/templateWorkspace.worker.ts*';
+  await page.context().route(worker, (route) => route.abort());
+  await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+  await expect(tour.getByRole('alert')).toContainText('The public example could not load');
+  await expect(tour.getByRole('button', { name: 'Continue tour', exact: true })).toBeEnabled();
+  await page.context().unroute(worker);
+  await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+  await expect(tour.locator('.tour-preview-label')).toHaveText(
+    'Public example · preview only (mainnet)',
+  );
+  expect(await savedTourWorkspace(page)).toEqual(before);
+  await page.keyboard.press('Escape');
+  expect(await savedTourWorkspace(page)).toEqual(before);
+  expect(calls).toEqual([]);
+});
+
+test('leaving while the public example loads cancels the choice without reopening the tour', async ({
+  page,
+}) => {
+  const calls = await mockBitcoin(page);
+  await create(page);
+  const before = await savedTourWorkspace(page);
+  await jump(page, 'Wallets');
+  await closeContents(page);
+  const tour = page.getByRole('dialog', { name: 'Guided tour' });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requested!: () => void;
+  const loading = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const worker = '**/templateWorkspace.worker.ts*';
+  await page.context().route(worker, async (route) => {
+    requested();
+    await gate;
+    await route.continue().catch(() => {});
+  });
+  await tour.getByRole('button', { name: 'Preview with public example', exact: true }).click();
+  await loading;
+  await expect(
+    tour.getByRole('button', { name: 'Loading public example...', exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press('Escape');
+  release();
+  await page.context().unroute(worker);
+  await expect(tour).toBeHidden();
+  await restart(page);
+  await jump(page, 'Wallets');
+  await closeContents(page);
+  await expect(
+    tour.getByRole('button', { name: 'Preview with public example', exact: true }),
+  ).toBeEnabled();
+  await tour.getByRole('button', { name: 'Continue tour', exact: true }).click();
+  await expect(tour).toContainText('Start from an outpoint');
+  await expect(page.locator('[data-tour="wallet-preview"]')).toHaveCount(0);
+  expect(await savedTourWorkspace(page)).toEqual(before);
+  expect(calls).toEqual([]);
+});

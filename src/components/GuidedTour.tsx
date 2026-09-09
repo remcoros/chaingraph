@@ -8,16 +8,32 @@ export function GuidedTour({
   steps,
   activeId,
   onStepChange,
+  skipStepIds = [],
+  previewOffer,
+  previewLabel,
 }: {
   steps: readonly TourStep[];
   activeId: string;
   onStepChange: (id: string | undefined) => void;
+  skipStepIds?: readonly string[];
+  previewOffer?: {
+    text: string;
+    onSelect: () => void;
+    loading: boolean;
+    error: string;
+  };
+  previewLabel?: string;
 }) {
   const index = Math.max(
     0,
     steps.findIndex((step) => step.id === activeId),
   );
   const step = steps[index];
+  const previousStep = steps
+    .slice(0, index)
+    .reverse()
+    .find((item) => !skipStepIds.includes(item.id));
+  const nextStep = steps.slice(index + 1).find((item) => !skipStepIds.includes(item.id));
   const [contentsOpen, setContentsOpen] = useState(false);
   const [spotlight, setSpotlight] = useState<{
     left: number;
@@ -31,7 +47,7 @@ export function GuidedTour({
   const copyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     copyRef.current?.scrollTo({ top: 0, behavior: 'instant' });
-  }, [step?.id]);
+  }, [step?.id, previewLabel]);
   useEffect(() => {
     if (!contentsOpen) return;
     const navigation = navigationRef.current;
@@ -46,6 +62,10 @@ export function GuidedTour({
     () => onStepChange(undefined),
     '[aria-label="Help and samples"]',
   );
+  useEffect(() => {
+    if (!dialogRef.current?.contains(document.activeElement))
+      contentsButton.current?.focus({ preventScroll: true });
+  }, [step?.id, previewLabel, previewOffer?.loading]);
   useEffect(() => {
     if (!step) return;
     let frame = 0;
@@ -130,7 +150,7 @@ export function GuidedTour({
         if (element.isConnected) element.scrollTo({ top, left, behavior: 'instant' });
       }
     };
-  }, [step]);
+  }, [step, previewLabel]);
   if (!step) return null;
   const Icon = step.icon;
   const onLeft = spotlight && spotlight.left + spotlight.width / 2 > innerWidth * 0.6;
@@ -201,18 +221,31 @@ export function GuidedTour({
             ))}
           </nav>
         )}
+        {previewLabel && <p className="tour-preview-label">{previewLabel}</p>}
         <div ref={copyRef} className="tour-copy" aria-live="polite" aria-atomic="true">
           <h2>
             <Icon size={22} aria-hidden="true" />
             {step.title}
           </h2>
-          <p id="tour-description">{step.text}</p>
-          {(!spotlight || spotlight.fallback) && step.missingTargetText && (
+          <p id="tour-description">{previewOffer?.text ?? step.text}</p>
+          {!previewOffer && (!spotlight || spotlight.fallback) && step.missingTargetText && (
             <p className="tour-prerequisite">{step.missingTargetText}</p>
+          )}
+          {previewOffer && (
+            <div className="tour-preview-offer">
+              <button disabled={previewOffer.loading} onClick={previewOffer.onSelect}>
+                {previewOffer.loading ? 'Loading public example...' : 'Preview with public example'}
+              </button>
+              {previewOffer.error && <p role="alert">{previewOffer.error}</p>}
+            </div>
           )}
           <div className="tour-tip">
             <Lightbulb size={16} aria-hidden="true" />
-            <p>{step.tip}</p>
+            <p>
+              {previewOffer
+                ? 'The example is temporary. Nothing is added to your workspace, and no wallet checks or edits run.'
+                : step.tip}
+            </p>
           </div>
         </div>
         <div className="tour-bottom">
@@ -220,14 +253,18 @@ export function GuidedTour({
           <div className="button-row">
             <button
               aria-label="Back"
-              disabled={index === 0}
-              onClick={() => onStepChange(steps[index - 1].id)}
+              disabled={!previousStep}
+              onClick={() => onStepChange(previousStep?.id)}
             >
               <ChevronLeft size={14} />
               Back
             </button>
-            <button className="primary" onClick={() => onStepChange(steps[index + 1]?.id)}>
-              {index === steps.length - 1 ? 'Start exploring' : 'Next'}
+            <button
+              className="primary"
+              aria-label={previewOffer ? 'Continue tour' : undefined}
+              onClick={() => onStepChange(nextStep?.id)}
+            >
+              {!nextStep ? 'Start exploring' : previewOffer ? 'Continue' : 'Next'}
               <ChevronRight size={15} />
             </button>
           </div>

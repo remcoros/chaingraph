@@ -31,6 +31,8 @@ export interface TourStep {
   revealTarget?: boolean | 'start';
   missingTargetText?: string;
   when?: (context: TourContext) => boolean;
+  /** Skipped in sequential navigation without wallet data; still available in the index. */
+  requiresWallet?: boolean;
   /** Presentation only. App adapts these hints without changing saved workspace state. */
   view?: {
     workbench?: 'graph' | 'wallet';
@@ -71,6 +73,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
   },
   {
     id: 'wallet-activity',
+    requiresWallet: true,
     label: 'Review and addresses',
     title: 'Recognise your activity',
     icon: ListChecks,
@@ -85,6 +88,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
   },
   {
     id: 'wallet-filter',
+    requiresWallet: true,
     label: 'Filter and select',
     title: 'Work through a useful subset',
     icon: ListFilter,
@@ -99,6 +103,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
   },
   {
     id: 'wallet-decisions',
+    requiresWallet: true,
     label: 'Review and follow',
     title: 'Decide, then follow the context',
     icon: GitBranch,

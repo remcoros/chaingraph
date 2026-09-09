@@ -9,6 +9,7 @@ import { walletDiscoveryStatus } from '../domain/walletCoverageStatus';
 
 export function WalletOverview({
   workspace,
+  tourPreview,
   wallet,
   coverage,
   utxos,
@@ -29,6 +30,7 @@ export function WalletOverview({
 }: Pick<
   WalletWorkbenchProps,
   | 'workspace'
+  | 'tourPreview'
   | 'canQuery'
   | 'busy'
   | 'queryDisabledReason'
@@ -139,7 +141,9 @@ export function WalletOverview({
           <dt>Current UTXOs</dt>
           <dd>
             {coverage.utxoCount === undefined ? (
-              canQuery ? (
+              tourPreview ? (
+                'Not checked in preview'
+              ) : canQuery ? (
                 'Not checked yet'
               ) : (
                 'Backend unavailable'

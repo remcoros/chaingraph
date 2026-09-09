@@ -1985,6 +1985,22 @@ small,
   color: var(--color-warning);
   font-size: 12px;
 }
+.tour-preview-label {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.tour-preview-offer {
+  margin-top: 12px;
+}
+.tour-preview-offer button {
+  font-size: 12px;
+}
+.tour-preview-offer p[role='alert'] {
+  color: var(--color-warning);
+  margin-top: 8px;
+}
 .tour-bottom {
   border-top: 1px solid var(--color-rule);
   padding-top: 12px;

@@ -62,7 +62,7 @@ import './wallet-workbench.css';
 export interface WalletWorkbenchProps {
   active: boolean;
   /** Disposable presentation using real loaded rows, with all background work inactive. */
-  tourPreview?: { tab: 'review' | 'sources' };
+  tourPreview?: { tab: 'review' | 'sources'; example?: Workspace };
   workspace: Workspace;
   wallet?: Wallet;
   canQuery: boolean;
@@ -99,9 +99,28 @@ const STATUS_LABELS = {
   all: 'All items',
 } as const;
 
+// Even programmatic events in a preview cannot reach workspace edits or network actions.
+const noop = () => {};
+const PREVIEW_ACTIONS = {
+  updateEvidence: noop,
+  onScanComplete: noop,
+  onSelectWallet: noop,
+  onAddWallet: noop,
+  onEditWallet: noop,
+  onChange: noop,
+  onRefresh: noop,
+  onShowInGraph: noop,
+  onIsolateInGraph: noop,
+  onShowSelection: noop,
+  onInspect: noop,
+  onAnalyze: noop,
+};
+
 export const WalletWorkbench = memo(
   function WalletWorkbench(props: WalletWorkbenchProps) {
-    if (!props.wallet)
+    const previewWorkspace = props.tourPreview?.example ?? props.workspace;
+    const previewWallet = props.tourPreview?.example?.wallets[0] ?? props.wallet;
+    if (!props.wallet && !previewWallet)
       return (
         <section className="wallet-workbench" aria-label="Wallet review workbench">
           <div className="wallet-empty" data-tour="wallet-empty">
@@ -119,19 +138,30 @@ export const WalletWorkbench = memo(
       );
     return (
       <>
-        <WalletReview
-          key={`${props.workspace.id}:${props.wallet.id}`}
-          {...props}
-          tourPreview={undefined}
-          hidden={!!props.tourPreview}
-          wallet={props.wallet}
-        />
-        {props.tourPreview && (
+        {props.wallet && (
           <WalletReview
-            key={`tour:${props.workspace.id}:${props.wallet.id}:${props.tourPreview.tab}`}
+            key={`${props.workspace.id}:${props.wallet.id}`}
             {...props}
-            active={false}
+            tourPreview={undefined}
+            hidden={!!props.tourPreview}
             wallet={props.wallet}
+          />
+        )}
+        {props.tourPreview && previewWallet && (
+          <WalletReview
+            key={`tour:${previewWorkspace.id}:${previewWallet.id}:${props.tourPreview.tab}`}
+            {...props}
+            {...PREVIEW_ACTIONS}
+            active={false}
+            workspace={previewWorkspace}
+            wallet={previewWallet}
+            analysisScan={props.tourPreview.example ? undefined : props.analysisScan}
+            canQuery={props.tourPreview.example ? false : props.canQuery}
+            queryDisabledReason={
+              props.tourPreview.example
+                ? 'Public example · preview only'
+                : props.queryDisabledReason
+            }
           />
         )}
       </>
@@ -503,7 +533,9 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
         coverage={review.coverage}
         utxos={utxos}
         utxoLoading={utxoLoading}
-        onCheck={(cursor) => void check(cursor)}
+        onCheck={(cursor) => {
+          if (active) void check(cursor);
+        }}
         onScan={() => void walletScan.run()}
         scanLoading={walletScan.loading}
         scanStatus={
