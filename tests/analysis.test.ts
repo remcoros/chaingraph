@@ -145,7 +145,7 @@ describe('scoped analysis and honest evidence', () => {
     expect(report.findings[0].kind).toBe('incomplete');
     expect(report.findings[0].title).toContain('Fee unknown');
     expect(report.findings[0].nodeIds).toEqual([outputNodeId(id(2), 0)]);
-    expect(report.findings[0].description).toContain('1 of 2');
+    expect(report.findings[0].description).toContain('1/2 input values available');
     expect(stat(report, 'Reconciled transactions')).toBe(0);
   });
   it('flags inconsistent totals, skips coinbase, and does not substitute byte size for vsize', () => {

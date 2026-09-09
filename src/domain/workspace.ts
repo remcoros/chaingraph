@@ -241,6 +241,9 @@ const workspaceSchema = z.object({
         kind: z.enum(['observation', 'hypothesis', 'incomplete']).optional(),
         scopeTxids: z.array(txid).max(10000).optional(),
         stale: z.boolean().optional(),
+        reviewRule: z
+          .enum(['fee-threshold', 'repeated-address', 'distinct-wallet-inputs'])
+          .optional(),
       }),
     )
     .max(10000),

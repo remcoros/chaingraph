@@ -226,7 +226,7 @@ export const ciohTool = defineTool({
           nodeIds.join('|'),
           'hypothesis',
           `Tentative input group ${index + 1}: ${nodeIds.length} outputs`,
-          `${nodeIds.length} referenced outputs were co-spent across ${txids.length} transactions in this scope, with transitive grouping through known addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were skipped (${skippedEqual} skipped in this run).` : 'Equal-output exclusion was disabled for this run.'} PayJoin and other collaboration can invalidate this grouping. ${missingPrevouts ? `${missingPrevouts} input references in this run have missing previous-output details; those links use outpoints and cannot establish address-level continuity. ` : ''}Load the supporting transactions and compare your own labels. This does not establish a person's identity.`,
+          `${nodeIds.length} referenced outputs were co-spent across ${txids.length} transactions in this scope, with transitive grouping through known addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were skipped (${skippedEqual} skipped in this run).` : 'Equal-output exclusion was disabled for this run.'} PayJoin and variable-amount CoinJoins can pass the equal-output screen and invalidate this grouping. ${missingPrevouts ? `${missingPrevouts} input references in this run have missing previous-output details; those links use outpoints and cannot establish address-level continuity. ` : ''}Load the supporting transactions and compare your own labels. This does not establish a person's identity.`,
           nodeIds,
           txids,
         );
@@ -308,6 +308,8 @@ export const reuseTool = defineTool({
           `${address} appears on ${group.nodes.length} outputs across ${group.txids.size} transaction${group.txids.size === 1 ? '' : 's'} in the scoped loaded history. ${group.txids.size === 1 ? 'These repeats occur within one transaction.' : 'The same address recurs in separate transactions.'} Outputs may already be spent; the occurrence count is not a balance. Inspect the linked outputs and label their context.`,
           group.nodes,
           [...group.txids],
+          [...group.txids],
+          group.txids.size > 1 ? 'repeated-address' : undefined,
         ),
       );
     return {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Focus, Network, X } from 'lucide-react';
+import { Activity, Focus, Network, X, ChevronsUp, ChevronUp, Minus } from 'lucide-react';
 import { analysisTools } from '../domain/analysis';
 import {
   analysisScanScope,
@@ -26,7 +26,31 @@ import {
   resolvePreviousOutput,
   type PreviousOutputIndex,
 } from '../domain/prevouts';
+import { WalletCategoryFilter } from './WalletCategoryFilter';
+import { WalletHelp } from './WalletHelp';
+import {
+  findingReview,
+  findingToolId,
+  filterAnalysisFindings,
+  reviewPriorities,
+  type ReviewPriority,
+} from '../domain/analysisReview';
+import { analysisDataGaps, recoverAnalysisData, recoveryLimits } from '../domain/analysisRecovery';
+import { fetchTransaction } from '../lib/api';
 import './analysis-workbench.css';
+
+const allTypes = () => analysisTools.map((tool) => tool.id);
+const priorityIcons = { high: ChevronsUp, medium: ChevronUp, low: Minus };
+function PriorityIcon({ priority }: { priority: ReviewPriority }) {
+  const Icon = priorityIcons[priority];
+  return (
+    <Icon
+      size={14}
+      aria-label={`${priority} review priority`}
+      className={`scan-priority-icon ${priority}`}
+    />
+  );
+}
 
 export interface AnalysisWorkbenchSession {
   scopeMode: string;
@@ -34,6 +58,9 @@ export interface AnalysisWorkbenchSession {
   scan?: AnalysisScan;
   selectedId?: string;
   kind: string;
+  types?: string[];
+  priorities?: ReviewPriority[];
+  notice?: string;
   limit: number;
 }
 
@@ -44,6 +71,7 @@ export interface AnalysisWorkbenchProps {
   selected?: GraphNode;
   wallet?: Wallet;
   onFindings: (findings: AnalysisFinding[]) => void;
+  onRecovered: (before: Workspace, next: Workspace) => void;
   onGraph: (ids: string[], isolate?: boolean) => void;
 }
 
@@ -112,6 +140,7 @@ export function AnalysisWorkbench({
   selected,
   wallet,
   onFindings,
+  onRecovered,
   onGraph,
   active,
   cache,
@@ -122,14 +151,31 @@ export function AnalysisWorkbench({
   const [scan, setScan] = useState<AnalysisScan | undefined>(saved?.scan);
   const [selectedId, setSelectedId] = useState<string | undefined>(saved?.selectedId);
   const [kind, setKind] = useState(saved?.kind ?? 'all');
+  const [types, setTypes] = useState(saved?.types ?? [...allTypes(), 'unregistered']);
+  const [priorities, setPriorities] = useState<ReviewPriority[]>(
+    saved?.priorities ?? [...reviewPriorities],
+  );
+  const [recovering, setRecovering] = useState(false);
   const [limit, setLimit] = useState(saved?.limit ?? 40);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(saved?.notice ?? '');
   const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const pending = useRef<AbortController | undefined>(undefined);
   const latest = useRef(workspace);
   latest.current = workspace;
-  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(
+    () => () => {
+      if (!pending.current) return;
+      pending.current.abort();
+      const previous = cache?.get(workspace.id);
+      if (previous)
+        cache?.set(workspace.id, {
+          ...previous,
+          notice: 'Operation cancelled. This attempt was not saved.',
+        });
+    },
+    [cache, workspace.id],
+  );
   const evidence = useRef(workspace);
   useEffect(() => {
     const dataChanged =
@@ -142,12 +188,37 @@ export function AnalysisWorkbench({
       pending.current.abort();
       pending.current = undefined;
       setBusy(false);
-      setNotice('Scan cancelled. Existing findings are retained. Scan again when ready.');
+      setRecovering(false);
+      setNotice('Operation cancelled. Existing findings are retained. Retry when ready.');
     }
   }, [active, workspace.id, workspace.network, workspace.transactions, workspace.wallets]);
   useEffect(() => {
-    if (active) cache?.set(workspace.id, { scopeMode, options, scan, selectedId, kind, limit });
-  }, [active, cache, workspace.id, scopeMode, options, scan, selectedId, kind, limit]);
+    if (active)
+      cache?.set(workspace.id, {
+        scopeMode,
+        options,
+        scan,
+        selectedId,
+        kind,
+        types,
+        priorities,
+        notice,
+        limit,
+      });
+  }, [
+    active,
+    cache,
+    workspace.id,
+    scopeMode,
+    options,
+    scan,
+    selectedId,
+    kind,
+    types,
+    priorities,
+    notice,
+    limit,
+  ]);
   const scope = useMemo(
     () =>
       analysisScanScope(
@@ -172,22 +243,69 @@ export function AnalysisWorkbench({
   );
   const changed =
     scan &&
-    (scan.scope.kind !== scope.kind ||
+    ((scan.evidenceTransactions !== undefined &&
+      scan.evidenceTransactions !== workspace.transactions) ||
+      scan.scope.kind !== scope.kind ||
       scan.scope.label !== scope.label ||
       JSON.stringify(scan.scope.txids) !== JSON.stringify(scope.txids) ||
-      JSON.stringify(scan.options) !== JSON.stringify(options));
+      JSON.stringify(scan.options) !== JSON.stringify(options) ||
+      scan.findings.some(
+        (finding) => workspace.findings.find((current) => current.id === finding.id)?.stale,
+      ));
   const currentIds = scan ? new Set(scan.findings.map((finding) => finding.id)) : undefined;
-  const findings = workspace.findings.filter(
-    (finding) =>
-      (!currentIds || currentIds.has(finding.id)) && (kind === 'all' || finding.kind === kind),
+  const currentFindings = workspace.findings.filter(
+    (finding) => !currentIds || currentIds.has(finding.id),
   );
+  const filtered = filterAnalysisFindings(currentFindings, { types, priorities, kind });
+  const findings = filtered.findings;
+  const hasLegacy = currentFindings.some((finding) => !findingToolId(finding));
+  const categories = analysisTools.map((tool) => {
+    const report = scan?.reports.find((report) => report.toolId === tool.id);
+    const stale =
+      changed ||
+      currentFindings.some((finding) => findingToolId(finding) === tool.id && finding.stale);
+    const status = report
+      ? stale
+        ? 'Needs rerun'
+        : report.status === 'complete'
+          ? 'Scanned'
+          : report.status === 'skipped'
+            ? 'Not scanned: skipped'
+            : 'Not scanned: error'
+      : 'Not scanned this session';
+    return {
+      id: tool.id,
+      label: tool.name,
+      description: tool.description,
+      count: filtered.types.get(tool.id) ?? 0,
+      note: status + '. A zero count is not proof of absence.',
+    };
+  });
+  if (hasLegacy)
+    categories.push({
+      id: 'unregistered',
+      label: 'Older unregistered findings',
+      description:
+        'Stored findings whose check is no longer registered. Rerun to use current checks.',
+      count: filtered.types.get('unregistered') ?? 0,
+      note: 'Not scanned.',
+    });
+  const filteredResults =
+    kind !== 'all' ||
+    priorities.length !== reviewPriorities.length ||
+    categories.some((category) => !types.includes(category.id));
+  function resetFilters() {
+    setTypes([...allTypes(), 'unregistered']);
+    setPriorities([...reviewPriorities]);
+    setKind('all');
+    setLimit(40);
+  }
   const detail = findings.find((finding) => finding.id === selectedId) ?? findings[0];
   const tool =
     detail && analysisTools.find((candidate) => detail.algorithm.startsWith(`${candidate.id}-`));
   const report = tool && scan?.reports.find((item) => item.toolId === tool.id)?.report;
   async function run() {
-    if (!active) return;
-    pending.current?.abort();
+    if (!active || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
     setBusy(true);
@@ -205,7 +323,6 @@ export function AnalysisWorkbench({
       onFindings(mergeScanFindings(latest.current.findings, next));
       setScan(next);
       setSelectedId(next.findings[0]?.id);
-      setKind('all');
       setLimit(40);
     } catch {
       if (!controller.signal.aborted)
@@ -214,6 +331,73 @@ export function AnalysisWorkbench({
       if (pending.current === controller) {
         pending.current = undefined;
         setBusy(false);
+      }
+    }
+  }
+  const recoveryScope = scan?.scope ?? scope;
+  const recoverScripts = (scan?.options ?? options)['script-types']?.scriptMode !== 'outputs';
+  const scopeGaps = useMemo(
+    () => analysisDataGaps(workspace, recoveryScope.txids, recoverScripts),
+    [workspace.transactions, recoveryScope, recoverScripts],
+  );
+  const detailTxids =
+    detail?.scopeTxids ?? detail?.txids.filter((id) => workspace.transactions[id]) ?? [];
+  const detailGaps = detail ? scopeGaps.filter((gap) => detailTxids.includes(gap.txid)) : [];
+  async function recover(txids: string[]) {
+    if (!active || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setRecovering(true);
+    setNotice('Loading missing input data…');
+    const timeout = setTimeout(() => controller.abort(), recoveryLimits.timeoutMs);
+    try {
+      const result = await recoverAnalysisData(
+        workspace,
+        txids,
+        fetchTransaction,
+        controller.signal,
+        recoverScripts,
+      );
+      // Rerun all checks in the last scan scope with its recorded options. Result filters never choose checks.
+      const next = await scanAnalysis(
+        result.workspace,
+        recoveryScope,
+        scan?.options ?? options,
+        controller.signal,
+      );
+      if (
+        controller.signal.aborted ||
+        latest.current.id !== workspace.id ||
+        latest.current.network !== workspace.network ||
+        latest.current.transactions !== workspace.transactions ||
+        walletEvidenceChanged(workspace.wallets, latest.current.wallets)
+      )
+        return;
+      const merged = mergeScanFindings(
+        result.workspace.transactions === workspace.transactions
+          ? latest.current.findings
+          : latest.current.findings.map((finding) => ({ ...finding, stale: true })),
+        next,
+      );
+      onRecovered(workspace, { ...result.workspace, findings: merged });
+      setScan(next);
+      setNotice(
+        `${result.resolved} input details resolved. ${result.remaining ? `${result.remaining} still unavailable. ${result.budgetReached ? 'Request limit reached. Retry for more.' : 'Retry when node data is available.'}` : 'Findings current.'} ${result.conflicts ? 'Conflicting observations were rejected; existing evidence retained. ' : ''}Reran the last scope with its scan settings.`,
+      );
+    } catch {
+      if (pending.current === controller)
+        setNotice(
+          controller.signal.aborted
+            ? 'Loading cancelled or timed out. This attempt was not saved. Retry when ready.'
+            : 'Data unavailable. Existing findings are retained. Retry when ready.',
+        );
+    } finally {
+      clearTimeout(timeout);
+      if (pending.current === controller) {
+        pending.current = undefined;
+        setBusy(false);
+        setRecovering(false);
       }
     }
   }
@@ -227,7 +411,7 @@ export function AnalysisWorkbench({
         <div className="button-row">
           <button className="primary" disabled={busy || !active} onClick={() => void run()}>
             <Activity size={15} />
-            {busy ? 'Scanning…' : 'Scan'}
+            {recovering ? 'Loading…' : busy ? 'Scanning…' : 'Scan'}
           </button>
           {busy && (
             <button
@@ -235,7 +419,10 @@ export function AnalysisWorkbench({
                 pending.current?.abort();
                 pending.current = undefined;
                 setBusy(false);
-                setNotice('Scan cancelled. Existing findings are retained.');
+                setRecovering(false);
+                setNotice(
+                  'Operation cancelled. This attempt was not saved. Existing findings are retained.',
+                );
               }}
             >
               <X size={14} />
@@ -264,7 +451,7 @@ export function AnalysisWorkbench({
           <p>{scope.explanation}</p>
           <p className="muted">
             Loaded data only · {scope.txids.length} transaction{scope.txids.length === 1 ? '' : 's'}
-            . No network requests.
+            . Scan makes no network requests.
           </p>
         </div>
       </div>
@@ -406,8 +593,39 @@ export function AnalysisWorkbench({
           </ul>
         </details>
       )}
+      {scopeGaps.length > 0 && (
+        <div className="scan-recovery-scope">
+          <span>
+            {scopeGaps.length} input details unavailable in {scan ? 'last scan' : 'current'} scope
+          </span>
+          <button
+            disabled={busy || !active || !scopeGaps.some((gap) => gap.recoverable)}
+            onClick={() => void recover(recoveryScope.txids)}
+          >
+            Load scope data and rerun
+          </button>
+          <WalletHelp title="Missing input data" active={active}>
+            Reuses loaded and attached outputs. Refreshes affected spends, then unresolved parents
+            only. Up to 20 transaction lookups, three at once, with a 30-second timeout. Parent
+            outputs are attached without adding graph branches. Reruns all checks with the last scan
+            scope and settings. Nodes may lack pruned or unconfirmed parent data. Unavailable data
+            stays unknown; cancellation discards this attempt.
+          </WalletHelp>
+        </div>
+      )}
       <div className="scan-results-heading">
         <h2>Findings</h2>
+        <WalletCategoryFilter
+          active={active}
+          title="Analysis finding types"
+          categories={categories}
+          selected={types.filter((id) => categories.some((category) => category.id === id))}
+          onChange={(ids) => {
+            setTypes(ids);
+            setLimit(40);
+          }}
+          countHelp="Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status."
+        />
         <label>
           Evidence
           <select
@@ -418,7 +636,7 @@ export function AnalysisWorkbench({
               setLimit(40);
             }}
           >
-            <option value="all">All types</option>
+            <option value="all">All evidence</option>
             <option value="observation">Observations</option>
             <option value="hypothesis">Hypotheses</option>
             <option value="incomplete">Incomplete data</option>
@@ -440,10 +658,46 @@ export function AnalysisWorkbench({
           </button>
         )}
       </div>
+      <div className="scan-priorities" aria-label="Review priority filters">
+        <span>Review priority</span>
+        {reviewPriorities.map((priority) => (
+          <button
+            key={priority}
+            aria-pressed={priorities.includes(priority)}
+            onClick={() => {
+              setPriorities((current) =>
+                current.includes(priority)
+                  ? current.filter((item) => item !== priority)
+                  : [...current, priority],
+              );
+              setLimit(40);
+            }}
+          >
+            <PriorityIcon priority={priority} />
+            {priority[0].toUpperCase() + priority.slice(1)}{' '}
+            <span className="wallet-count">{filtered.priorities[priority]}</span>
+          </button>
+        ))}
+        <WalletHelp title="Review priority rules" active={active}>
+          Review order, not confidence, ownership certainty or a danger rating. High: reconciled fee
+          rate at or above your threshold. Medium: hypotheses, address repeats across transactions,
+          or distinct wallet-record inputs without overlapping imports. Low: other observations and
+          missing data. Counts match type and evidence filters, ignoring priority selection. Older
+          findings use evidence kind until rerun.
+        </WalletHelp>
+        {filteredResults && (
+          <button className="text-button" onClick={resetFilters}>
+            Reset filters
+          </button>
+        )}
+      </div>
+      <p className="scan-filter-note muted">
+        Filters affect results only. Scan runs all checks. Counts use the other filters.
+      </p>
       {!findings.length ? (
         <p className="scan-empty">
-          {kind !== 'all'
-            ? 'No findings match this evidence filter.'
+          {filteredResults
+            ? 'No findings match these filters. Reset filters to show available results.'
             : scan
               ? 'No findings in this scan. Review Scan coverage for skipped records, missing data and tools with no matches.'
               : 'Scan the current selection or loaded workspace to inspect its patterns and limits.'}
@@ -459,6 +713,7 @@ export function AnalysisWorkbench({
                 onClick={() => setSelectedId(finding.id)}
               >
                 <span className="scan-result-kind">
+                  <PriorityIcon priority={findingReview(finding).priority} />
                   {finding.kind ?? 'hypothesis'}
                   {finding.excluded ? ' · Excluded' : ''}
                   {finding.stale ? ' · Needs rerun' : ''}
@@ -479,11 +734,30 @@ export function AnalysisWorkbench({
           {detail && (
             <article key={detail.id} className="scan-detail" aria-label="Selected finding">
               <span className="scan-result-kind">
-                {detail.kind ?? 'hypothesis'}
+                <PriorityIcon priority={findingReview(detail).priority} />
+                {findingReview(detail).priority} priority · {detail.kind ?? 'hypothesis'}
                 {detail.excluded ? ' · Excluded finding' : ''}
+                <WalletHelp title="Why this priority" active={active}>
+                  {findingReview(detail).reason}
+                </WalletHelp>
               </span>
               <h2>{detail.title}</h2>
               <p>{detail.description}</p>
+              {detailGaps.length > 0 && (
+                <div className="scan-recovery-detail">
+                  <button
+                    disabled={busy || !active || !detailGaps.some((gap) => gap.recoverable)}
+                    onClick={() => void recover(detailTxids)}
+                  >
+                    {recovering ? 'Loading…' : 'Load missing data and rerun'}
+                  </button>
+                  <span className="muted">
+                    {detailGaps.some((gap) => gap.conflict)
+                      ? 'Conflicting observations need review; they will not be replaced.'
+                      : `For ${new Set(detailGaps.map((gap) => gap.txid)).size} affected transaction(s).`}
+                  </span>
+                </div>
+              )}
               {detail.stale && (
                 <p className="scan-notice">
                   Loaded data changed after this finding. Scan again to refresh its evidence.

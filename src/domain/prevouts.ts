@@ -24,7 +24,7 @@ function validVout(value: number | undefined): value is number {
   return Number.isSafeInteger(value) && value! >= 0 && value! <= 0xffffffff;
 }
 
-function outputScriptHex(output: TxOutput, network: Network): string | undefined {
+export function outputScriptHex(output: TxOutput, network: Network): string | undefined {
   if (output.scriptPubKey.hex !== undefined) return output.scriptPubKey.hex.toLowerCase();
   const reported =
     output.scriptPubKey.address ??
@@ -57,6 +57,16 @@ export function previousOutputsConflict(
   network: Network,
 ): boolean {
   if (sats(left.value) !== sats(right.value)) return true;
+  const leftType = left.scriptPubKey.type,
+    rightType = right.scriptPubKey.type;
+  if (
+    leftType &&
+    rightType &&
+    leftType !== 'nonstandard' &&
+    rightType !== 'nonstandard' &&
+    leftType !== rightType
+  )
+    return true;
   const leftScript = outputScriptHex(left, network);
   const rightScript = outputScriptHex(right, network);
   return leftScript !== undefined && rightScript !== undefined && leftScript !== rightScript;
@@ -95,6 +105,22 @@ export function indexPreviousOutputs(workspace: Pick<Workspace, 'network' | 'tra
         previousOutputsConflict(current.output, output, workspace.network)
       ) {
         result.set(id, { status: 'conflict' });
+      } else if (current && (current.status === 'loaded' || current.status === 'attached')) {
+        result.set(id, {
+          ...current,
+          output: {
+            ...current.output,
+            scriptPubKey: {
+              ...output.scriptPubKey,
+              ...current.output.scriptPubKey,
+              type:
+                current.output.scriptPubKey.type &&
+                current.output.scriptPubKey.type !== 'nonstandard'
+                  ? current.output.scriptPubKey.type
+                  : output.scriptPubKey.type,
+            },
+          },
+        });
       } else if (!current) {
         result.set(id, { status: 'attached', output });
       }

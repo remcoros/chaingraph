@@ -109,6 +109,7 @@ export const walletTool = defineTool({
               .map((input) => input.txid),
           ],
           [tx.txid],
+          !overlap && inputWallets.size > 1 ? 'distinct-wallet-inputs' : undefined,
         ),
       );
     }

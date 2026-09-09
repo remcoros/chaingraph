@@ -159,10 +159,12 @@ export function finding(
   nodeIds: string[],
   txids: string[],
   scopeTxids = txids,
+  reviewRule?: AnalysisFinding['reviewRule'],
 ): AnalysisFinding {
   return {
     id: `${tool}:${stableKey(key)}`,
     algorithm: `${tool}-v2`,
+    ...(reviewRule ? { reviewRule } : {}),
     kind,
     title,
     description,

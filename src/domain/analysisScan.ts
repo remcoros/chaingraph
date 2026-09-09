@@ -27,6 +27,7 @@ export interface AnalysisScan {
   reports: ScanToolReport[];
   findings: AnalysisFinding[];
   runAt: string;
+  evidenceTransactions?: Workspace['transactions'];
 }
 
 /** Graph filters and manual visibility never limit analysis observations. */
@@ -161,6 +162,7 @@ export async function scanAnalysis(
     reports,
     findings: reports.flatMap((item) => item.report?.findings ?? []),
     runAt: new Date().toISOString(),
+    evidenceTransactions: workspace.transactions,
   };
 }
 

@@ -1,4 +1,5 @@
 import { outputNodeId, txNodeId } from '../types';
+import { analysisScriptType } from './scripts';
 import {
   choiceOption,
   defineTool,
@@ -72,8 +73,10 @@ export const valueFlowTool = defineTool({
             'value-flow',
             tx.txid,
             'incomplete',
-            'Fee unknown: previous output data is missing',
-            `${inputs.length - absent.length} of ${tx.vin.length} input values are available. A fee cannot be calculated without every previous output. Load missing parent transactions, then rerun this check. No missing input is treated as zero.`,
+            absent.some((input) => input.resolution.status === 'conflict')
+              ? 'Fee unknown: conflicting evidence'
+              : 'Fee unknown: missing input data',
+            `${inputs.length - absent.length}/${tx.vin.length} input values available. ${absent.some((input) => input.resolution.status === 'conflict') ? 'Conflicting observations need review before a fee can be calculated.' : 'Load missing data to calculate the fee.'} Unknown inputs are never zero.`,
             absent.length ? absent.map((input) => input.nodeId) : [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
@@ -147,6 +150,7 @@ export const valueFlowTool = defineTool({
           [txNodeId(tx.txid)],
           evidence,
           [tx.txid],
+          exceeds ? 'fee-threshold' : undefined,
         ),
       );
     }
@@ -274,25 +278,13 @@ export const structureTool = defineTool({
   },
 });
 
-const typeNames: Record<string, string> = {
-  pubkeyhash: 'P2PKH',
-  scripthash: 'P2SH',
-  witness_v0_keyhash: 'P2WPKH',
-  witness_v0_scripthash: 'P2WSH',
-  witness_v1_taproot: 'Taproot',
-  pubkey: 'P2PK',
-  multisig: 'bare multisig',
-  anchor: 'anchor',
-};
-const knownType = (type?: string) =>
-  type && type !== 'nonstandard' ? (typeNames[type] ?? type) : undefined;
 export const scriptTool = defineTool({
   id: 'script-types',
   name: 'Script-type comparisons',
   group: 'Value and structure',
   kind: 'observation',
   description:
-    'Compare known input and output script types. Highlight mixed types and differences without guessing which output is change.',
+    'Compare reported types or standard types decoded from loaded script hex. Highlight mixed types and differences without guessing which output is change.',
   source: {
     title: 'BIP78: limitations of script-type heuristics',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0078.mediawiki',
@@ -327,22 +319,20 @@ export const scriptTool = defineTool({
         inputs
           .map((input) =>
             input.resolution.status === 'loaded' || input.resolution.status === 'attached'
-              ? knownType(input.resolution.output.scriptPubKey.type)
+              ? analysisScriptType(input.resolution.output)
               : undefined,
           )
           .filter(Boolean),
       );
       const outputTypes = new Set(
-        outputs.map((output) => knownType(output.scriptPubKey.type)).filter(Boolean),
+        outputs.map((output) => analysisScriptType(output)).filter(Boolean),
       );
       const missingInputs = inputs.filter(
         (input) =>
           (input.resolution.status !== 'loaded' && input.resolution.status !== 'attached') ||
-          !knownType(input.resolution.output.scriptPubKey.type),
+          !analysisScriptType(input.resolution.output),
       ).length;
-      const missingOutputs = outputs.filter(
-        (output) => !knownType(output.scriptPubKey.type),
-      ).length;
+      const missingOutputs = outputs.filter((output) => !analysisScriptType(output)).length;
       unknownInputs += missingInputs;
       unknownOutputs += missingOutputs;
       const difference =
@@ -361,18 +351,18 @@ export const scriptTool = defineTool({
             : inputTypes.size > 1
               ? 'Mixed input script types'
               : 'Known input and output script types differ',
-          `${mode === 'outputs' ? 'Input scripts were not compared.' : `Known input types: ${[...inputTypes].join(', ') || 'none'}.`} Known output types: ${[...outputTypes].join(', ') || 'none'}. ${missingInputs} input and ${missingOutputs} output types are unavailable. Script differences alone identify neither change outputs, wallet software nor owners. Load missing parents and compare other evidence.`,
+          `${mode === 'outputs' ? 'Input scripts were not compared.' : `Known input types: ${[...inputTypes].join(', ') || 'none'}.`} Known output types: ${[...outputTypes].join(', ') || 'none'}. ${missingInputs} input and ${missingOutputs} output types are unavailable. Script differences alone identify neither change outputs, wallet software nor owners. Compare other evidence; missing input details can be loaded from Analysis.`,
           [
             ...inputs
               .filter(
                 (input) =>
                   (input.resolution.status === 'loaded' ||
                     input.resolution.status === 'attached') &&
-                  knownType(input.resolution.output.scriptPubKey.type),
+                  analysisScriptType(input.resolution.output),
               )
               .map((input) => input.nodeId),
             ...outputs
-              .filter((output) => knownType(output.scriptPubKey.type))
+              .filter((output) => analysisScriptType(output))
               .map((output) => outputNodeId(tx.txid, output.n)),
           ],
           [

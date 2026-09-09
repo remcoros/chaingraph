@@ -91,6 +91,7 @@ export interface AnalysisFinding {
   kind?: 'observation' | 'hypothesis' | 'incomplete';
   scopeTxids?: string[];
   stale?: boolean;
+  reviewRule?: import('./analysisReview').ReviewRule;
 }
 export interface TransactionFlowState {
   transactionId?: string;

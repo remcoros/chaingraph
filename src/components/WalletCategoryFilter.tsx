@@ -16,8 +16,12 @@ export function WalletCategoryFilter({
   categories,
   selected,
   onChange,
+  title = 'Wallet finding types',
+  countHelp = 'Match any selected type. Counts overlap and describe rows matching the other filters.',
 }: {
   active: boolean;
+  title?: string;
+  countHelp?: string;
   categories: readonly WalletCategoryOption[];
   selected: readonly string[];
   onChange: (ids: string[]) => void;
@@ -46,7 +50,7 @@ export function WalletCategoryFilter({
         <AnchoredPopover
           id={id}
           anchor={trigger.current!}
-          title="Wallet finding types"
+          title={title}
           width={390}
           onClose={() => setOpen(false)}
         >
@@ -59,7 +63,7 @@ export function WalletCategoryFilter({
             </button>
             <button onClick={() => onChange([])}>Clear types</button>
             <WalletHelp title="Finding type counts" active={active && open}>
-              Match any selected type. Counts overlap and describe rows matching the other filters.
+              {countHelp}
             </WalletHelp>
           </div>
           <fieldset className="wallet-category-options">
