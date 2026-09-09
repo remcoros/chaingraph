@@ -342,7 +342,6 @@ small,
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 50px;
-  max-width: 1270px;
   width: 100%;
   margin: auto;
   padding: 44px 24px;
@@ -1372,7 +1371,7 @@ small,
   .welcome {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
     gap: 90px;
-    padding: 75px 60px;
+    padding: 75px max(60px, calc((100% - 1150px) / 2));
   }
   .workbench {
     grid-template-columns: 238px minmax(0, 1fr) 280px;
