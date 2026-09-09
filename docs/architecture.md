@@ -19,7 +19,9 @@ flowchart LR
 | `src/domain/types.ts`                                    | Workspace, transaction, wallet, annotation, finding, and graph contracts                                          |
 | `src/domain/workspace.ts`                                | Input schema validation and derivation of graph nodes/links from loaded transactions                              |
 | `src/domain/analysis.ts`, `src/domain/analysis/`         | Local analysis registry, parameter contracts, scoped evidence and run reports                                     |
-| `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods and explicit connected context                                |
+| `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods, explicit connected context and active-filter descriptions    |
+| `src/domain/batchEdits.ts`                               | Pure label/icon/tag batch plans and appliers over explicit entity identifiers                                     |
+| `src/lib/useEntitySelection.ts`                          | Shared multiple-selection UI state: mode, explicit identifiers, pruning and workspace isolation                    |
 | `src/domain/workspaceTemplates.ts`                                     | Supported-network catalog and lazy real-chain template snapshots                                                                   |
 | `src/lib/wallet.ts`                                      | Account-key validation, receive/change derivation, script construction, and Electrum script hashes                |
 | `src/lib/api.ts`                                         | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion                          |
@@ -66,6 +68,34 @@ Transaction loading tries Bitcoin Core and then Fulcrum. Spending discovery quer
 The fundamental flow is `transaction → output → spending transaction`. Outputs persist as entities after spending. A missing funding transaction can still have an output placeholder referenced by a loaded input. The open transaction flow automatically fetches its direct parent transactions, in batches of at most 500 with four concurrent requests and cancellation on workspace or displayed-selection changes. This is independent of the lookup Previous setting, which defaults to Off. Optional encrypted `inputContext` maps automatically fetched parents to the outputs used by the displayed flow. `buildGraph` renders those parent transactions and relevant outputs without their unrelated branches. The full observed transactions remain available for analysis and inspection; explicit parent navigation promotes the transaction to its full graph context. Context validation bounds references and requires each referenced output to exist. Optional address nodes describe destinations; they do not imply a wallet or person.
 
 The graph is derived from workspace transactions and annotations. Only active, non-stale analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
+
+## Shared filtering, selection and batch actions
+
+Filtering, multiple selection and batch metadata form one small layer over explicit
+entity identifiers. `GraphFilters` keeps every user-visible dimension, including
+entity type, label state, tag state or one tag, wallet membership or one wallet,
+satoshi bounds, loaded spend and funding evidence, bookmarks, focus hops, isolation
+and connected context. `activeFilterChips` and `clearFilterKey` describe and remove
+one dimension at a time, so the workbench renders removable chips and a filters-only
+reset. Membership dimensions resolve to `includeIds` intersections and `excludeIds`
+unions in the workbench, using the existing wallet-match and tag indexes; the domain
+filter never derives membership itself. Manual hiding stays in `view.hiddenNodeIds`
+and is unaffected by any filter reset. Wallet membership is derived-address evidence,
+not an ownership claim, and an output without a loaded spend remains unknown.
+
+`useEntitySelection` holds selection mode and an ordered set of identifiers as shared
+UI state. It is cleared when the active workspace changes, is pruned only for entities
+that no longer exist, and never grows because results changed. Renderers stay free of
+selection semantics: adapters report modifier keys on their pointer events, and
+`GraphView` decides whether a click inspects or toggles. Batch highlighting is
+projected through the existing neutral `NodePresentation` overrides.
+
+`src/domain/batchEdits.ts` contains the pure batch operations. Each returns the same
+workspace object when nothing changes, canonicalizes supplied identifiers, writes only
+the targeted field, and respects the existing tag and membership budgets. The workbench
+applies one batch through a single workspace update, so an applied batch is exactly one
+Undo step and one autosave. `describeMatchScope` produces the exact wording used before
+selecting a filtered scope, for example "28 matching outputs".
 
 `GraphView` owns semantic hit lookup, selection routing, keyboard details, node-only React hover cards with compact header actions, trace/edit callbacks, pointer-to-card placement and resize observation. Optional `toolbar`, `navigation` and `legend` React slots keep shared chrome inside GraphView. The display toolbar occupies layout space above the actual viewport, so picking and tooltip coordinates exclude its height. Navigation floats inside the viewport as a separate React overlay: only its controls accept pointer events, and entering them dismisses stale hover cards. The renderer canvas retains its full viewport and coordinate origin. The workbench supplies GraphControls through the toolbar slot; renderer implementations contain no toolbar or legend content. Transaction DOM views and inspector components remain independent consumers of domain data and selection callbacks.
 

@@ -77,11 +77,40 @@ Select an item to add a label, note, icon, or bookmark in its inspector. The ico
 
 ## Filter and navigate
 
-The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
+The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, tag state or one tag, wallet membership, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. The graph navigation has the same **Filters** popover. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
+
+Active filters appear as removable chips under the graph navigation. Remove one chip to drop one restriction, or choose **Reset filters** to clear all of them. Manual hiding is deliberately separate: a dashed chip counts manually hidden entities and restores them, and resetting filters never unhides anything. Isolating a selection or a finding shows an **Isolated N entities** chip that returns you to the full canvas. Wallet membership comes from derived addresses and is not proof of ownership. An output with no loaded spend is unknown, never proven unspent.
 
 Navigation floats at the top of the graph canvas once transactions are loaded. On narrow screens, navigation uses compact icons with accessible names and tooltips.
 
-**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Hide panels**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
+**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. Context entities are never included in a batch edit. **Paths** restricts the view to one or two connections around the current selection. **Reset filters** clears these restrictions. **Center selection** reveals a hidden selection and moves the camera. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Hide panels**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
+
+## Select several entities and edit them together
+
+**Select** in the graph navigation or in **Entities** turns on selection mode. Checkboxes
+appear on entity rows and transaction flow rows, and Ctrl or Cmd click toggles an entity
+on the canvas, in the list or in the flow. A plain click keeps inspecting and navigating
+as before. The floating selection toolbar reports how many entities are selected and how
+many of them are not currently on the canvas.
+
+**Select N matching …** takes exactly the entities matching your current filters, stating
+the count and the entity type before you use it. Selections never grow because results
+changed, are cleared when you switch workspaces, and lose an entity only when it is
+actually removed from the workspace.
+
+**Label**, **Tag** and **Icon** open small editors anchored to the toolbar. The label
+editor offers **Only unlabeled**, reports how many entities it will change and how many
+existing labels it would replace, and lists differing existing labels so a mixed value is
+never overwritten by simply opening the control. The tag editor adds or removes direct
+membership with explicit counts, or creates a tag for the selection. Icons use the shared
+palette, including an explicit **Clear icon**. Notes, bookmarks and untargeted fields stay
+unchanged.
+
+**Hide** removes the selected entities from the canvas while keeping their data, and the
+hidden chip restores them. **Isolate** shows only the selection. **Clear** empties the
+selection. Every applied batch saves automatically and is a single Undo step, from the
+toolbar's **Undo** or the header. Escape, the close button or clicking outside dismisses
+an editor without changing anything.
 
 ## Run analysis
 
@@ -103,7 +132,7 @@ controls. Select a transaction before running a tool scoped to the selection.
 | Script-type comparisons       | Observed input/output script patterns and optionally change-like hypotheses, with their limitations.                                                             |
 | Imported-wallet intersections | Transactions touching multiple imported wallet records, distinguishing overlapping imports from independent coverage.                                            |
 
-The **Tools** and **Findings** controls jump between configuration and results. Each run reports its coverage and skipped records, including when it has no findings. Search findings or filter by tool, observation/hypothesis/incomplete evidence, and active/excluded/stale status. **Show on graph** isolates a finding's evidence with connected context; **Focus** centers its first node. **All paths** returns to the complete graph.
+The **Tools** and **Findings** controls jump between configuration and results. Each run reports its coverage and skipped records, including when it has no findings. Search findings or filter by tool, observation/hypothesis/incomplete evidence, and active/excluded/stale status. **Show on graph** isolates a finding's evidence with connected context; **Focus** centers its first node. The **Isolated N entities** chip or **Reset filters** returns to the complete graph.
 
 Exclude a finding to remove its overlay without deleting the result. Rerunning the same tool preserves exclusions when the finding's node and transaction evidence is unchanged. Loading or changing wallet/transaction data marks prior results **Needs rerun** and removes stale overlays. User annotations stay separate from algorithm results.
 
@@ -205,7 +234,7 @@ calculation.
 **Show new activity** reveals newly loaded transactions and marks that notification
 as reviewed. The notification persists through later quiet checks and encrypted
 reopen. **Show wallet matches** reveals all loaded script matches and their connected
-transactions without acknowledging new activity. **All paths** clears these filters.
+transactions without acknowledging new activity. **Reset filters** clears these filters.
 The optional **Check activity every 30s** monitor runs only while unlocked and must
 be enabled again after reopen. Turning it off cancels its in-flight check.
 
@@ -252,7 +281,6 @@ canvas, including retained context. This follows graph amount filters and manual
 visibility, and is saved per workspace. Choose **Not hidden** or **All entities**
 to inspect observations omitted by the graph amount filter, or **Hidden** to
 restore manually hidden items. Changing this list mode does not remove chain data.
-
 
 **Center selection** frames the selected node with its immediate connections.
 **Fit graph** frames all displayed nodes. Both account for node sizes, displayed

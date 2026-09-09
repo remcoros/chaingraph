@@ -579,6 +579,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,
         pointerType: event.pointerType,
+        modifiers: {
+          ctrl: Boolean(event.ctrlKey),
+          meta: Boolean(event.metaKey),
+          shift: Boolean(event.shiftKey),
+        },
       };
     };
     listen('pointerdown', (event) => {

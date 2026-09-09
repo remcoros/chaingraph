@@ -60,8 +60,18 @@ interface Props {
   openToken?: number;
   onOpenHandled?: () => void;
   onChange: (value: string) => void;
+  /** Visible caption; batch controls describe their own scope. */
+  caption?: string;
+  ariaLabel?: string;
 }
-export function IconPicker({ value, onChange, openToken, onOpenHandled }: Props) {
+export function IconPicker({
+  value,
+  onChange,
+  openToken,
+  onOpenHandled,
+  caption,
+  ariaLabel,
+}: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -75,13 +85,13 @@ export function IconPicker({ value, onChange, openToken, onOpenHandled }: Props)
     icons.find(([symbol]) => symbol === value)?.[1] ?? (value ? 'Imported icon' : 'None');
   return (
     <div className="icon-picker">
-      <span className="icon-picker-label">Icon</span>
+      <span className="icon-picker-label">{caption ?? 'Icon'}</span>
       <button
         ref={trigger}
         type="button"
         className="icon-picker-trigger"
-        aria-label={`Node icon: ${label}`}
-        title={`Node icon: ${label}`}
+        aria-label={ariaLabel ?? `Node icon: ${label}`}
+        title={ariaLabel ?? `Node icon: ${label}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}

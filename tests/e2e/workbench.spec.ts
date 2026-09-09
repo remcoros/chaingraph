@@ -272,7 +272,7 @@ test('renders a saved 150-input fixture and runs, excludes, restores and clears 
   await page.getByLabel('Size nodes by').selectOption('value');
   await page.getByRole('button', { name: 'Toggle highlight glow' }).click();
   await page.getByRole('button', { name: 'Fit graph' }).click();
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await page
     .locator('.right-panel')
     .getByRole('button', { name: /^Analysis/ })

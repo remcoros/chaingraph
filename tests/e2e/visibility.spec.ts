@@ -267,7 +267,7 @@ for (const width of [1440, 390])
     const status = page.locator('.graph-navigation-status');
     const row = page.locator('.graph-navigation-row');
     const camera = page.getByRole('group', { name: 'Graph camera and layout' });
-    await expect(status).toHaveText('selection hidden by filters');
+    await expect(status).toContainText('selection hidden by filters');
     const assertOrder = async () => {
       const message = (await status.boundingBox())!,
         controls = (await row.boundingBox())!,
@@ -292,7 +292,7 @@ for (const width of [1440, 390])
     await page.screenshot({
       path: `artifacts/flow-renderer-v2/compact/hidden-by-filters-${width}.png`,
     });
-    await row.getByRole('button', { name: 'All paths', exact: true }).click();
+    await status.getByRole('button', { name: 'Reset filters', exact: true }).click();
     await expect(status).toHaveCount(0);
     if (width === 390)
       await page
@@ -308,7 +308,7 @@ for (const width of [1440, 390])
         .locator('.mobile-switch')
         .getByRole('button', { name: 'Graph', exact: true })
         .click();
-    await expect(status).toHaveText('selection hidden from graph');
+    await expect(status).toContainText('selection hidden from graph');
     await assertOrder();
     await page.screenshot({
       path: `artifacts/flow-renderer-v2/compact/hidden-from-graph-${width}.png`,

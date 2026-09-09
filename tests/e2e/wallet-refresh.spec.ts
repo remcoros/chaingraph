@@ -180,7 +180,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await expect(
     page.getByText('Last check: 0 new to workspace · 1 transaction refreshed', { exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await page.screenshot({
     path: testInfo.outputPath('wallet-refreshed-desktop.png'),
     fullPage: true,
@@ -188,7 +188,7 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await page.getByRole('button', { name: 'Show new activity (2)', exact: true }).click();
   await expect(page.getByLabel('Filter graph entities')).toHaveValue('');
   await expect(page.locator('.entity-list')).toContainText(TX_SPENDING.slice(0, 8));
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await selectFunding(page);
   await expect(page.getByLabel('Node notes')).toHaveValue('Edited note remains during refresh.');
   await page
@@ -313,7 +313,10 @@ test('shows wallet script matches without making requests or acknowledging new a
   await createAndLoad(page);
   const requests = fixture.calls.length;
   await page.getByRole('button', { name: 'Show wallet matches', exact: true }).click();
-  await expect(page.locator('.group-filter')).toContainText('Public BIP84 wallet');
+  await expect(page.locator('.filter-chip')).toContainText([
+    'Wallet: Public BIP84 wallet',
+    'Connected context shown',
+  ]);
   expect(fixture.calls).toHaveLength(requests);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('output');
@@ -324,7 +327,7 @@ test('shows wallet script matches without making requests or acknowledging new a
   await expect(page.locator('.transaction-row.is-selected .entity-badges')).toContainText(
     'Wallet: Public BIP84 wallet',
   );
-  await page.getByRole('button', { name: 'All paths', exact: true }).click();
-  await expect(page.locator('.group-filter')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
+  await expect(page.locator('.filter-chip')).toHaveCount(0);
   expect(fixture.calls).toHaveLength(requests);
 });
