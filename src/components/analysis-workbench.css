@@ -301,9 +301,6 @@
   .scan-results-heading {
     gap: 10px;
   }
-  .scan-results-heading > .muted {
-    display: none;
-  }
   .scan-results-heading select {
     width: 108px;
   }

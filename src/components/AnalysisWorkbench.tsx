@@ -450,6 +450,20 @@ export function AnalysisWorkbench({
             <Activity size={15} />
             {recovering ? 'Loading…' : busy ? 'Scanning…' : 'Scan'}
           </button>
+          {workspace.findings.length > 0 && (
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => {
+                onFindings([]);
+                setScan(undefined);
+                setSelectedId(undefined);
+                setKind('all');
+              }}
+            >
+              Clear findings
+            </button>
+          )}
           {busy && (
             <button
               onClick={() => {
@@ -704,11 +718,6 @@ export function AnalysisWorkbench({
             observations and missing data. Counts match type and evidence filters, ignoring priority
             selection. Older findings use evidence kind until rerun.
           </WalletHelp>
-          {filteredResults && (
-            <button className="text-button" onClick={resetFilters}>
-              Reset filters
-            </button>
-          )}
         </div>
         <label>
           Evidence
@@ -726,19 +735,14 @@ export function AnalysisWorkbench({
             <option value="incomplete">Incomplete data</option>
           </select>
         </label>
-        {findings.length > 0 && <span className="muted">{findings.length} results</span>}
-        {workspace.findings.length > 0 && (
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              onFindings([]);
-              setScan(undefined);
-              setSelectedId(undefined);
-              setKind('all');
-            }}
-          >
-            Clear all
+        {(scan || workspace.findings.length > 0) && (
+          <span className="muted">
+            {findings.length} result{findings.length === 1 ? '' : 's'}
+          </span>
+        )}
+        {filteredResults && (
+          <button className="text-button" onClick={resetFilters}>
+            Reset filters
           </button>
         )}
       </div>
