@@ -247,3 +247,52 @@ test('context entities shown to explain links never become batch targets', async
     .click();
   await expect(page.locator('.selection-toolbar').getByRole('status')).toContainText('2 selected');
 });
+
+test('a batch Undo retires when a later edit owns the undo step, protecting that edit', async ({
+  page,
+}) => {
+  await seed(page);
+  const toolbar = page.locator('.selection-toolbar');
+  await page.locator('.graph-navigation').getByRole('button', { name: 'Selection mode' }).click();
+  const rows = page.locator('.entity-list .entity-list-entry');
+  await rows.nth(1).getByRole('checkbox').check();
+  await rows.nth(2).getByRole('checkbox').check();
+  await expect(toolbar.getByRole('status')).toContainText('2 selected');
+
+  // Apply a batch tag; its Undo is offered while the batch owns the undo step.
+  await toolbar.getByRole('button', { name: 'Tag', exact: true }).click();
+  const tagEditor = page.getByRole('dialog', { name: 'Tag selected entities' });
+  await tagEditor.getByLabel('Find or create a tag for the selection').fill('Equal-value review');
+  await tagEditor.getByRole('button', { name: /^Create “Equal-value review”/ }).click();
+  const batchUndo = toolbar.getByRole('button', { name: /^Undo: Tag Equal-value review/ });
+  await expect(batchUndo).toBeVisible();
+
+  // A later unrelated annotation edit takes over the undo step.
+  await rows.nth(2).locator('.entity-row').click();
+  await page.getByLabel('Node notes').fill('Note written after the batch');
+  await expect(batchUndo).toHaveCount(0);
+  await expect(toolbar.getByRole('status')).toContainText('2 selected');
+  let workspace = await saved(page);
+  expect(workspace.annotations[fundingSibling].note).toBe('Note written after the batch');
+  expect(workspace.tags?.[1].nodeIds).toHaveLength(2);
+
+  // The header Undo remains the general history control and restores that note only.
+  await page.locator('.workspace-undo').click();
+  workspace = await saved(page);
+  expect(workspace.annotations[fundingSibling]?.note ?? '').toBe('');
+  expect(workspace.tags?.[1].nodeIds).toHaveLength(2);
+
+  // A batch that changes nothing never advertises an undo step.
+  await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
+  const labelEditor = page.getByRole('dialog', { name: 'Label selected entities' });
+  await labelEditor.getByLabel(/^Label for/).fill('Repeated label');
+  await labelEditor.getByRole('button', { name: 'Apply to 2' }).click();
+  await expect(toolbar.getByRole('button', { name: /^Undo: Label/ })).toBeVisible();
+  await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
+  await labelEditor.getByLabel(/^Label for/).fill('Repeated label');
+  await labelEditor.getByRole('button', { name: 'Apply to 2' }).click();
+  await expect(page.locator('.toast')).toContainText('left every selected entity unchanged');
+  await expect(toolbar.getByRole('button', { name: /^Undo:/ })).toHaveCount(0);
+  workspace = await saved(page);
+  expect(workspace.annotations[fundingSibling].label).toBe('Repeated label');
+});

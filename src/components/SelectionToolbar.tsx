@@ -24,7 +24,11 @@ export interface SelectionToolbarProps {
   hiddenSelectedCount: number;
   /** Explicit match scope offered for one-step selection, without context nodes. */
   matching?: { label: string; ids: string[] };
-  onApply: (summary: string, update: (workspace: Workspace) => Workspace) => void;
+  /** Applies one batch and returns the undo head it created, or undefined when
+   * nothing changed or the edit failed. */
+  onApply: (summary: string, update: (workspace: Workspace) => Workspace) => number | undefined;
+  /** Current undo head of the workspace session. */
+  undoToken: number;
   onSetHidden: (ids: string[], hidden: boolean) => void;
   onIsolate: (ids: string[]) => void;
   onUndo: () => void;
@@ -37,34 +41,40 @@ export function SelectionToolbar({
   hiddenSelectedCount,
   matching,
   onApply,
+  undoToken,
   onSetHidden,
   onIsolate,
   onUndo,
 }: SelectionToolbarProps) {
   const [editor, setEditor] = useState<'label' | 'tag'>();
-  const [undoable, setUndoable] = useState<string>();
+  const [undoable, setUndoable] = useState<{
+    summary: string;
+    token: number;
+    workspaceId: string;
+  }>();
   const labelButton = useRef<HTMLButtonElement>(null);
   const tagButton = useRef<HTMLButtonElement>(null);
   const labelId = useId();
   const tagId = useId();
   const ids = selection.ids;
   const count = ids.length;
-  const selectionKey = `${workspace.id}:${ids.join(',')}`;
-  const undoOwner = useRef(selectionKey);
+  // The batch action stays available only while its own edit is the undo head.
+  // Any later undoable edit, an undo, a lock or a workspace change retires it, so
+  // it can never discard an unrelated newer edit.
+  const owned =
+    undoable?.token === undoToken && undoable?.workspaceId === workspace.id ? undoable : undefined;
   useEffect(() => {
-    // A later selection change makes an older batch summary misleading.
-    if (undoOwner.current === selectionKey) return;
-    undoOwner.current = selectionKey;
-    setUndoable(undefined);
-  }, [selectionKey]);
+    if (undoable && !owned) setUndoable(undefined);
+  }, [owned, undoable]);
   const hiddenIds = useMemo(
     () => new Set(workspace.view.hiddenNodeIds ?? []),
     [workspace.view.hiddenNodeIds],
   );
   const manuallyHidden = ids.filter((id) => hiddenIds.has(id)).length;
   const apply = (summary: string, update: (workspace: Workspace) => Workspace) => {
-    onApply(summary, update);
-    setUndoable(summary);
+    const token = onApply(summary, update);
+    // A batch that changed nothing, or failed, never advertises an undo step.
+    setUndoable(token === undefined ? undefined : { summary, token, workspaceId: workspace.id });
     setEditor(undefined);
   };
   if (!selection.mode && !count) return null;
@@ -130,10 +140,7 @@ export function SelectionToolbar({
           <button
             type="button"
             title="Hide the selected entities from the canvas. Their data and annotations remain."
-            onClick={() => {
-              onSetHidden(ids, true);
-              setUndoable(undefined);
-            }}
+            onClick={() => onSetHidden(ids, true)}
           >
             <EyeOff size={13} /> Hide
           </button>
@@ -158,12 +165,12 @@ export function SelectionToolbar({
           </button>
         </>
       )}
-      {undoable && (
+      {owned && (
         <button
           type="button"
           className="selection-toolbar-undo"
-          aria-label={`Undo: ${undoable}`}
-          title={`Undo: ${undoable}`}
+          aria-label={`Undo: ${owned.summary}`}
+          title={`Undo: ${owned.summary}`}
           onClick={() => {
             onUndo();
             setUndoable(undefined);

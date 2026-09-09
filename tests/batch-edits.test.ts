@@ -9,6 +9,7 @@ import {
   tagBatchPlan,
 } from '../src/domain/batchEdits';
 import { outputNodeId, txNodeId, type Transaction, type Workspace } from '../src/domain/types';
+import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
 
 const a = 'a'.repeat(64),
   b = 'b'.repeat(64);
@@ -146,5 +147,47 @@ describe('batch tag edits', () => {
     expect(Object.keys(updated.annotations).filter((id) => id.startsWith('tx:'))).toEqual([
       txNodeId(a),
     ]);
+  });
+});
+
+describe('batch undo ownership', () => {
+  const session = () => {
+    const store = new WorkspaceSessionStore({
+      storage: { getItem: () => null, setItem: () => {} },
+    });
+    const data = workspace();
+    store.open(data, 'public batch undo fixture password');
+    return { store, id: data.id };
+  };
+  const head = (store: WorkspaceSessionStore, id: string) => store.getSession(id)!.undoRevision;
+
+  it('advances the undo head for an applied batch and for later unrelated edits', () => {
+    const { store, id } = session();
+    const start = head(store, id);
+    store.update(id, (w) => applyBatchLabel(w, [second, third], 'Batch reviewed'));
+    const batch = head(store, id);
+    expect(batch).toBe(start + 1);
+    // A later annotation edit takes ownership of the undo head.
+    store.update(id, (w) => ({
+      ...w,
+      annotations: { ...w.annotations, [third]: { ...w.annotations[third], note: 'Later note' } },
+    }));
+    expect(head(store, id)).not.toBe(batch);
+    // Undoing restores that later note only, and retires the older claim again.
+    store.undo(id);
+    expect(store.getSession(id)!.data.annotations[third].note).toBe('');
+    expect(store.getSession(id)!.data.annotations[third].label).toBe('Batch reviewed');
+    expect(head(store, id)).not.toBe(batch);
+  });
+
+  it('leaves the undo head untouched for presentation writes and no-op batches', () => {
+    const { store, id } = session();
+    store.update(id, (w) => applyBatchIcon(w, [first, second], '🤝'));
+    const batch = head(store, id);
+    store.update(id, (w) => ({ ...w, view: { ...w.view, selectionId: second } }), false);
+    expect(head(store, id)).toBe(batch);
+    // An identical batch changes nothing, so it creates no new undo step.
+    store.update(id, (w) => applyBatchIcon(w, [first, second], '🤝'));
+    expect(head(store, id)).toBe(batch);
   });
 });

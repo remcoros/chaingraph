@@ -30,6 +30,10 @@ export interface Session {
   revision: number;
   savedRevision: number;
   history: Workspace[];
+  /** Increments whenever the undo head changes, so a caller can tell whether its
+   * own edit is still the step that Undo would restore. Presentation-only writes
+   * leave it untouched. */
+  undoRevision: number;
 }
 interface StoreState {
   saved: SavedWorkspace[];
@@ -262,6 +266,7 @@ export class WorkspaceSessionStore {
           revision: 0,
           savedRevision: alreadySaved ? 0 : -1,
           history: [],
+          undoRevision: 0,
         },
       ],
       activeId: data.id,
@@ -340,6 +345,8 @@ export class WorkspaceSessionStore {
               ...s,
               data,
               revision: s.revision + 1,
+              undoRevision:
+                s.undoRevision + ((undo && !coalesce) || (!undo && evidenceChanged) ? 1 : 0),
               history: undo
                 ? coalesce
                   ? s.history
@@ -369,6 +376,7 @@ export class WorkspaceSessionStore {
               data: s.history[s.history.length - 1],
               history: s.history.slice(0, -1),
               revision: s.revision + 1,
+              undoRevision: s.undoRevision + 1,
             }
           : s,
       ),

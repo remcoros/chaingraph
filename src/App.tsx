@@ -1250,16 +1250,26 @@ export default function App() {
     }),
     [visibleGraph],
   );
+  const undoToken = ws.getSession(w?.id ?? '')?.undoRevision ?? 0;
   const applyBatch = (summary: string, update: (data: Workspace) => Workspace) => {
-    if (!w) return;
+    if (!w) return undefined;
+    const before = ws.getSession(w.id)?.undoRevision;
     try {
       // A single workspace update keeps one Undo step for the whole batch.
       change(update);
-      setError('');
-      setNotice(`${summary}. Undo restores the previous values.`);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'The batch edit could not be applied.');
+      return undefined;
     }
+    const after = ws.getSession(w.id)?.undoRevision;
+    setError('');
+    if (after === undefined || after === before) {
+      // Nothing changed, so no undo step exists and none is offered.
+      setNotice('That batch left every selected entity unchanged.');
+      return undefined;
+    }
+    setNotice(`${summary}. Undo restores the previous values.`);
+    return after;
   };
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   const analysisEvidence = useRef<{ transactions?: Workspace['transactions']; wallets: Wallet[] }>({
@@ -2261,6 +2271,7 @@ export default function App() {
             hiddenSelectedCount={selection.count - selectionOnCanvas}
             matching={matchingScope}
             onApply={applyBatch}
+            undoToken={undoToken}
             onSetHidden={setEntityHidden}
             onIsolate={(ids) => {
               updateFilters({ includeIds: ids, preserveContext: true });

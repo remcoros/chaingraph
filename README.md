@@ -177,8 +177,9 @@ which adds checkboxes to entity rows and transaction flow rows. Ctrl or Cmd clic
 toggles an entity on the canvas, in the list and in the flow; a plain click still
 inspects and navigates. The floating selection toolbar reports the count, how many
 selected entities are not on the canvas, and offers **Select N matching …** for the
-current filter scope. Connected context entities are never included in that scope,
-and results changing never grows a selection. Selections are cleared when you
+current filter scope. Select matching excludes connected context, while a context
+entity you select explicitly stays a batch target, and results changing never
+grows a selection. Selections are cleared when you
 switch workspaces and pruned only when an entity is actually removed.
 
 Label, Tag and Icon open small anchored editors instead of the single-entity

@@ -222,8 +222,8 @@ export function FilterFields({
         Show connected context on canvas
       </label>
       <p>
-        Context adds directly connected neighbors outside the matches. Context entities are never
-        included in a batch edit.
+        Context adds directly connected neighbors outside the matches. Select matching excludes
+        connected context; a context entity you select explicitly stays a batch target.
       </p>
     </div>
   );
