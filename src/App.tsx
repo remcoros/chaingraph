@@ -293,6 +293,7 @@ export default function App() {
   const tourStep =
     tour === undefined ? undefined : (tourSteps.find((step) => step.id === tour) ?? tourSteps[0]);
   // Tour previews never feed the persisted presentation effect or selection history.
+  const shownWorkbench = tourStep ? (tourStep.view?.workbench ?? 'graph') : workbench;
   const shownLeftTab = tourStep?.view?.leftTab ?? leftTab;
   const shownRightTab =
     tourStep?.view?.rightTab ??
@@ -1834,8 +1835,8 @@ export default function App() {
             {(['wallet', 'graph', 'analysis'] as const).map((mode) => (
               <button
                 key={mode}
-                aria-pressed={workbench === mode}
-                className={workbench === mode ? 'active' : ''}
+                aria-pressed={shownWorkbench === mode}
+                className={shownWorkbench === mode ? 'active' : ''}
                 onClick={() => switchWorkbench(mode)}
               >
                 {mode === 'wallet' ? (
@@ -1848,7 +1849,7 @@ export default function App() {
                 {WORKBENCH_LABELS[mode]}
               </button>
             ))}
-            {returnWorkbench && returnWorkbench !== workbench && (
+            {!tourStep && returnWorkbench && returnWorkbench !== workbench && (
               <button
                 className="workbench-return"
                 onClick={() => switchWorkbench(returnWorkbench, true)}
@@ -1858,7 +1859,7 @@ export default function App() {
               </button>
             )}
           </nav>
-          <div className={`workbench-toolbar mode-${workbench}`}>
+          <div className={`workbench-toolbar mode-${shownWorkbench}`}>
             <div className="lookup-controls" data-tour="chain-lookup">
               <form className="search-form" onSubmit={search}>
                 <Search size={17} />
@@ -2019,7 +2020,7 @@ export default function App() {
               {queryError}
             </div>
           )}
-          <div className="mobile-switch" hidden={workbench !== 'graph' && !tourStep}>
+          <div className="mobile-switch" hidden={shownWorkbench !== 'graph'}>
             <button
               className={shownMobilePanel === 'left' ? 'active' : ''}
               onClick={() => setMobilePanel('left')}
@@ -2051,7 +2052,7 @@ export default function App() {
             </button>
           </div>
           <main
-            hidden={workbench !== 'graph' && !tourStep}
+            hidden={shownWorkbench !== 'graph'}
             ref={graphWorkspaceRef}
             id="main-workspace"
             tabIndex={-1}
@@ -2491,13 +2492,18 @@ export default function App() {
           </main>
           <section
             className="workbench-page"
-            hidden={workbench !== 'wallet' || !!tourStep}
+            hidden={shownWorkbench !== 'wallet'}
             ref={walletWorkspaceRef}
             id="wallet-workspace"
             tabIndex={-1}
             aria-label="Wallet workspace"
           >
             <WalletWorkbench
+              tourPreview={
+                tourStep?.view?.workbench === 'wallet'
+                  ? { tab: tourStep.view.walletTab ?? 'review' }
+                  : undefined
+              }
               active={workbench === 'wallet' && !lockingWorkspace && !tourStep}
               workspace={w}
               analysisScan={analysisSessions.current.get(w.id)?.scan}

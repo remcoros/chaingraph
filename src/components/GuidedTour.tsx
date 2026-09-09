@@ -49,10 +49,16 @@ export function GuidedTour({
   useEffect(() => {
     if (!step) return;
     let frame = 0;
-    const primary = document.querySelector<HTMLElement>(step.target);
+    const visibleTarget = (selector?: string) =>
+      selector
+        ? [...document.querySelectorAll<HTMLElement>(selector)].find(
+            (element) => element.getClientRects().length > 0,
+          )
+        : undefined;
+    const revealed = visibleTarget(step.target) ?? visibleTarget(step.fallbackTarget);
     const scrollPositions: { element: HTMLElement; top: number; left: number }[] = [];
-    if (step.revealTarget && primary) {
-      for (let element = primary.parentElement; element; element = element.parentElement) {
+    if (step.revealTarget && revealed) {
+      for (let element = revealed.parentElement; element; element = element.parentElement) {
         if (
           element.scrollHeight > element.clientHeight ||
           element.scrollWidth > element.clientWidth
@@ -62,18 +68,30 @@ export function GuidedTour({
     }
     const reveal = () => {
       if (step.revealTarget)
-        primary?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+        revealed?.scrollIntoView({
+          block: step.revealTarget === 'start' ? 'start' : 'nearest',
+          inline: 'nearest',
+          behavior: 'instant',
+        });
     };
     reveal();
     const measure = () => {
-      const primary = document.querySelector<HTMLElement>(step.target);
-      const visible = (element: HTMLElement | null) => !!element?.getClientRects().length;
-      const target = visible(primary)
-        ? primary
-        : step.fallbackTarget
-          ? document.querySelector<HTMLElement>(step.fallbackTarget)
-          : null;
-      const rect = visible(target) ? target!.getBoundingClientRect() : undefined;
+      const inViewport = (element?: HTMLElement) => {
+        const rect = element?.getBoundingClientRect();
+        return (
+          rect &&
+          rect.right > 4 &&
+          rect.left < innerWidth - 4 &&
+          rect.bottom > 4 &&
+          rect.top < innerHeight - 4 &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      const primary = visibleTarget(step.target);
+      const fallback = visibleTarget(step.fallbackTarget);
+      const target = inViewport(primary) ? primary : inViewport(fallback) ? fallback : undefined;
+      const rect = target?.getBoundingClientRect();
       setSpotlight(
         rect && rect.bottom > 0 && rect.top < innerHeight
           ? {

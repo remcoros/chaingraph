@@ -52,7 +52,7 @@ export function WalletOverview({
   const missingHistory = Math.max(0, coverage.knownTransactions - coverage.loadedTransactions);
   return (
     <>
-      <header className="wallet-review-header">
+      <header className="wallet-review-header" data-tour="wallet-overview">
         <div className="wallet-identity">
           <span className="wallet-eyebrow">Watch-only wallet</span>
           <div className="wallet-picker-row">

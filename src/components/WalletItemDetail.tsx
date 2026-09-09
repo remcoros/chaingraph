@@ -77,6 +77,7 @@ export function WalletItemDetail({
   workspace,
   wallet,
   active,
+  tourPreview,
   busy,
   canQuery,
   updateEvidence,
@@ -90,6 +91,7 @@ export function WalletItemDetail({
 }: Pick<
   WalletWorkbenchProps,
   | 'active'
+  | 'tourPreview'
   | 'busy'
   | 'canQuery'
   | 'updateEvidence'
@@ -202,9 +204,13 @@ export function WalletItemDetail({
   );
   return (
     <>
-      <div className="wallet-detail-toolbar" aria-label="Selected item actions">
+      <div
+        className="wallet-detail-toolbar"
+        aria-label="Selected item actions"
+        data-tour="wallet-item-actions"
+      >
         <BatchMetadataBar
-          active={active}
+          active={active || !!tourPreview}
           workspace={workspace}
           ids={[row.nodeId]}
           single

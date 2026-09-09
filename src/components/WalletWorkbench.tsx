@@ -61,6 +61,8 @@ import './wallet-workbench.css';
 
 export interface WalletWorkbenchProps {
   active: boolean;
+  /** Disposable presentation using real loaded rows, with all background work inactive. */
+  tourPreview?: { tab: 'review' | 'sources' };
   workspace: Workspace;
   wallet?: Wallet;
   canQuery: boolean;
@@ -102,7 +104,7 @@ export const WalletWorkbench = memo(
     if (!props.wallet)
       return (
         <section className="wallet-workbench" aria-label="Wallet review workbench">
-          <div className="wallet-empty">
+          <div className="wallet-empty" data-tour="wallet-empty">
             <WalletIcon size={30} />
             <h1>Wallet review</h1>
             <p>
@@ -116,21 +118,34 @@ export const WalletWorkbench = memo(
         </section>
       );
     return (
-      <WalletReview
-        key={`${props.workspace.id}:${props.wallet.id}`}
-        {...props}
-        wallet={props.wallet}
-      />
+      <>
+        <WalletReview
+          key={`${props.workspace.id}:${props.wallet.id}`}
+          {...props}
+          tourPreview={undefined}
+          hidden={!!props.tourPreview}
+          wallet={props.wallet}
+        />
+        {props.tourPreview && (
+          <WalletReview
+            key={`tour:${props.workspace.id}:${props.wallet.id}:${props.tourPreview.tab}`}
+            {...props}
+            active={false}
+            wallet={props.wallet}
+          />
+        )}
+      </>
     );
   },
   (before, after) =>
+    before.tourPreview === after.tourPreview &&
     !before.active &&
     !after.active &&
     before.workspace.id === after.workspace.id &&
     before.wallet?.id === after.wallet?.id,
 );
 
-function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
+function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: boolean }) {
   const { workspace, wallet, active, busy, canQuery, onChange } = props;
   const walletScan = useWalletScan({
     workspace,
@@ -139,8 +154,10 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
     onChange,
     onComplete: props.onScanComplete,
   });
-  const [tab, setTab] = useState<WalletTab>('review');
-  const [status, setStatus] = useState<WalletStatusFilter>('open');
+  const [tab, setTab] = useState<WalletTab>(props.tourPreview?.tab ?? 'review');
+  const [status, setStatus] = useState<WalletStatusFilter>(
+    props.tourPreview?.tab === 'sources' ? 'all' : 'open',
+  );
   const [selectedKey, setSelectedKey] = useState<string>();
   const selection = useRecordSelection();
   const [limit, setLimit] = useState(PAGE);
@@ -364,7 +381,13 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
   );
   const displayedRows = filteredRows.slice(0, limit);
   const initialReviewLoading =
-    tab === 'review' && !selectedKey && !previousRow.current && canQuery && !utxos && !utxoError;
+    !props.tourPreview &&
+    tab === 'review' &&
+    !selectedKey &&
+    !previousRow.current &&
+    canQuery &&
+    !utxos &&
+    !utxoError;
   const currentRow = initialReviewLoading
     ? undefined
     : resolveWalletRow(filteredRows, selectedKey, previousRow.current);
@@ -468,7 +491,13 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
       />
     ) : undefined;
   return (
-    <section className="wallet-workbench" aria-label="Wallet review workbench">
+    <section
+      className="wallet-workbench"
+      aria-label="Wallet review workbench"
+      hidden={props.hidden}
+      inert={!!props.tourPreview}
+      data-tour={props.tourPreview ? 'wallet-preview' : undefined}
+    >
       <WalletOverview
         {...props}
         coverage={review.coverage}
@@ -507,7 +536,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
           </p>
         )}
       </div>
-      <nav className="wallet-review-tabs" aria-label="Wallet sections">
+      <nav className="wallet-review-tabs" aria-label="Wallet sections" data-tour="wallet-sections">
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -528,7 +557,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
         {notice && <p className="small wallet-review-notice">{notice}</p>}
       </div>
       <div className="wallet-review-body">
-        <div className="wallet-record-filters">
+        <div className="wallet-record-filters" data-tour="wallet-filters">
           {tab !== 'addresses' && (
             <label>
               {tab === 'review' ? 'Show' : 'Review'}

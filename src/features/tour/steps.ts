@@ -4,6 +4,7 @@ import {
   FolderOpen,
   GitBranch,
   ListFilter,
+  ListChecks,
   LockKeyhole,
   Pencil,
   Search,
@@ -27,12 +28,14 @@ export interface TourStep {
   icon: LucideIcon;
   target: string;
   fallbackTarget?: string;
-  revealTarget?: boolean;
+  revealTarget?: boolean | 'start';
   missingTargetText?: string;
   when?: (context: TourContext) => boolean;
   /** Presentation only. App adapts these hints without changing saved workspace state. */
   view?: {
-    panel: 'graph' | 'left' | 'right';
+    workbench?: 'graph' | 'wallet';
+    walletTab?: 'review' | 'sources';
+    panel?: 'graph' | 'left' | 'right';
     leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
     rightTab?: 'inspect' | 'analysis';
     flowOpen?: boolean;
@@ -57,10 +60,57 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     label: 'Wallets',
     title: 'Bring your wallets together',
     icon: Wallet,
-    target: '[data-tour="wallet-panel"]',
-    view: { panel: 'left', leftTab: 'wallets' },
-    text: 'Add watch-only account public keys, then scan receive and change addresses. Several wallets can belong to the same investigation.',
-    tip: 'Returning after a few days? Refresh your wallets, review new activity, then show the transactions you want on the graph. No private keys are needed.',
+    target: '[data-tour="wallet-preview"] [data-tour="wallet-overview"]',
+    fallbackTarget: '[data-tour="wallet-empty"]',
+    revealTarget: 'start',
+    view: { workbench: 'wallet', walletTab: 'review' },
+    text: 'Open Wallet, choose a wallet in the picker, or use Add wallet for a watch-only public key. Refresh discovers history; Check UTXOs checks unspent status; Analyse loaded runs local analysis.',
+    missingTargetText:
+      'No wallet yet. After the tour, use Add a wallet or choose the public demo wallet from Example workspaces in Help. You can skip ahead without importing.',
+    tip: 'This tour only previews loaded data. It does not refresh, check UTXOs, run analysis or save edits.',
+  },
+  {
+    id: 'wallet-activity',
+    label: 'Review and addresses',
+    title: 'Recognise your activity',
+    icon: ListChecks,
+    target: '[data-tour="wallet-preview"] [data-tour="wallet-sections"]',
+    fallbackTarget: '[data-tour="wallet-empty"]',
+    revealTarget: 'start',
+    view: { workbench: 'wallet', walletTab: 'sources' },
+    text: 'To review gathers observations needing attention. Sources and Destinations list addresses linked directly to wallet transactions. Select an address to annotate a known or uncertain counterparty.',
+    missingTargetText:
+      'These lists appear after adding a wallet. With no loaded activity they stay empty; try the public demo wallet after the tour.',
+    tip: 'Wallet matches identify your side. Counterparty links do not prove ownership or allocate CoinJoin funds. Missing inputs leave source evidence incomplete.',
+  },
+  {
+    id: 'wallet-filter',
+    label: 'Filter and select',
+    title: 'Work through a useful subset',
+    icon: ListFilter,
+    target: '[data-tour="wallet-preview"] [data-tour="wallet-filters"]',
+    fallbackTarget: '[data-tour="wallet-empty"]',
+    revealTarget: 'start',
+    view: { workbench: 'wallet', walletTab: 'review' },
+    text: 'Try Labels: Unlabeled, a tag, or Search to narrow the list. Click a row for one item, tick checkboxes for several, or use Select all for every match.',
+    missingTargetText:
+      'Add a wallet after the tour to reveal these filters. If a list has no matches, clear its filters or load wallet history before selecting.',
+    tip: 'Use Label, Tags or the icon picker on one item or a batch; Notes is for one item. Annotations follow the same entities across Wallet and Graph.',
+  },
+  {
+    id: 'wallet-decisions',
+    label: 'Review and follow',
+    title: 'Decide, then follow the context',
+    icon: GitBranch,
+    target: '[data-tour="wallet-preview"] [data-tour="wallet-item-actions"]',
+    fallbackTarget:
+      '[data-tour="wallet-preview"] [data-tour="wallet-filters"], [data-tour="wallet-empty"]',
+    revealTarget: 'start',
+    view: { workbench: 'wallet', walletTab: 'review' },
+    text: 'Mark reviewed completes a review decision. Review later sets it aside. Use Show to open the item in Graph, then Back to Wallet to return to your list and selection.',
+    missingTargetText:
+      'No review item is available to preview. After the tour, choose a row in To review to reveal its actions, or use the Review filter to revisit Reviewed and Review later items.',
+    tip: 'Label, Tags, Notes and the icon picker record your context. The item’s Transaction flow shows loaded inputs and outputs; a review decision records your judgment, not proof of ownership.',
   },
   {
     id: 'lookup',
