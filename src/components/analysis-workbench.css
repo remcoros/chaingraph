@@ -340,10 +340,6 @@
   align-items: center;
   gap: 5px;
 }
-.analysis-workbench .scan-filter-note {
-  font-size: 11px;
-  margin: 8px 0 12px;
-}
 .scan-recovery-scope {
   padding: 8px 0;
   border-bottom: 1px solid var(--color-rule);
@@ -360,4 +356,9 @@
   .wallet-category-option .wallet-help {
     min-height: 32px;
   }
+}
+
+.scan-settings .scan-auto-load {
+  margin-top: 12px;
+  align-items: center;
 }

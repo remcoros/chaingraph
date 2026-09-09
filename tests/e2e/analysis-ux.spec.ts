@@ -15,7 +15,7 @@ const password = 'public-analysis-recovery-fixture';
 const shots = 'artifacts/analysis-ux';
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Workbench', exact: true });
 
-async function prepare(page: Page, attached = false, rawScripts = false) {
+async function prepare(page: Page, attached = false, rawScripts = false, automatic = false) {
   const w = newWorkspace('Public Analysis recovery', 'mainnet');
   const tx: Transaction = structuredClone(transactions[TX_SPENDING]);
   if (attached)
@@ -40,6 +40,7 @@ async function prepare(page: Page, attached = false, rawScripts = false) {
   };
   w.view = {
     ...w.view,
+    dimensions: 2,
     selectionId: `tx:${TX_SPENDING}`,
     rightTab: 'analysis',
     graphSnapshot: {
@@ -66,13 +67,13 @@ async function prepare(page: Page, attached = false, rawScripts = false) {
   await mockNetworkDiscovery(page);
   const calls: MockCall[] = [];
   const state = {
-    mode: 'attached' as 'attached' | 'partial' | 'complete' | 'wait',
+    mode: 'attached' as 'attached' | 'partial' | 'complete' | 'wait' | 'slow-parent',
     release: undefined as (() => void) | undefined,
   };
   await page.route('**/api/rpc', async (route) => {
     const call = route.request().postDataJSON() as MockCall;
     calls.push(call);
-    if (state.mode === 'wait')
+    if (state.mode === 'wait' || (state.mode === 'slow-parent' && call.params[0] !== TX_SPENDING))
       await new Promise<void>((resolve) => {
         state.release = resolve;
       });
@@ -83,7 +84,8 @@ async function prepare(page: Page, attached = false, rawScripts = false) {
         result.vin.forEach((input) => {
           input.prevout = transactions[TX_FUNDING].vout[input.vout!];
         });
-      if (state.mode === 'partial') result.vin[0].prevout = transactions[TX_FUNDING].vout[0];
+      if (state.mode === 'partial' || state.mode === 'slow-parent')
+        result.vin[0].prevout = transactions[TX_FUNDING].vout[0];
     } else if (call.params[0] === TX_FUNDING && state.mode === 'complete')
       result = structuredClone(transactions[TX_FUNDING]);
     else {
@@ -97,7 +99,12 @@ async function prepare(page: Page, attached = false, rawScripts = false) {
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(page.locator('.analysis-workbench')).toBeVisible();
-  await mkdir(shots, { recursive: true });
+  if (!automatic) {
+    await page.getByText('Optional settings', { exact: true }).click();
+    await page.getByLabel('Load missing input data before scanning', { exact: true }).uncheck();
+    await page.getByText('Optional settings', { exact: true }).click();
+  }
+  await mkdir(shots + '/followup', { recursive: true });
   return { w, calls, state };
 }
 async function scan(page: Page) {
@@ -311,4 +318,93 @@ test('standard script bytes improve comparisons without fetching omitted type la
   ).toHaveCount(0);
   expect(calls).toHaveLength(0);
   await page.screenshot({ path: `${shots}/after-desktop-script-evidence.png` });
+});
+
+test('Scan automatically resolves missing inputs and keeps the compact toolbar and navigation cache', async ({
+  page,
+}) => {
+  const { calls } = await prepare(page, false, false, true);
+  const before = await exportData(page);
+  await scan(page);
+  await expect(page.locator('.scan-result-list')).not.toContainText('Fee unknown');
+  await page.locator('.scan-result-list > button').filter({ hasText: 'Fee:' }).click();
+  expect(calls.map((call) => [call.method, ...call.params])).toEqual([
+    ['getrawtransaction', TX_SPENDING, 2],
+  ]);
+  await expect(page.locator('.scan-results-heading .scan-priorities')).toBeVisible();
+  await expect(page.getByText('Review priority', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.scan-filter-note')).toHaveCount(0);
+  const trigger = page.getByRole('button', { name: /Finding types/ });
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Analysis finding types' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await page.screenshot({ path: `${shots}/followup/after-desktop.png` });
+  const after = await exportData(page);
+  expect(after.view.graphSnapshot?.camera).toEqual(before.view.graphSnapshot?.camera);
+  expect(after.view.selectionId).toEqual(before.view.selectionId);
+  expect(Object.keys(after.transactions)).toEqual([TX_SPENDING]);
+  await nav(page).getByRole('button', { name: 'Graph', exact: true }).click();
+  await nav(page).getByRole('button', { name: 'Analysis', exact: true }).click();
+  await scan(page);
+  expect(calls).toHaveLength(1);
+});
+
+test('automatic loading times out with partial evidence and leaves manual recovery available', async ({
+  page,
+}) => {
+  const { calls, state } = await prepare(page, false, false, true);
+  state.mode = 'slow-parent';
+  await scan(page);
+  await page.locator('.scan-result-list > button').filter({ hasText: 'Fee unknown' }).click();
+  await expect(page.locator('.scan-detail')).toContainText('1/2 input values available');
+  await expect(page.locator('.scan-notice').first()).toContainText('Automatic loading timed out');
+  await expect(
+    page.getByRole('button', { name: 'Load missing data and rerun', exact: true }),
+  ).toBeEnabled();
+  expect(calls).toHaveLength(2);
+  state.release!();
+  await page.screenshot({ path: `${shots}/followup/after-partial.png` });
+});
+
+test('cancelling automatic loading does not replace saved findings or start parent lookups', async ({
+  page,
+}) => {
+  const { calls, state } = await prepare(page, false, false, true);
+  state.mode = 'wait';
+  await page
+    .locator('.analysis-workbench')
+    .getByRole('button', { name: 'Scan', exact: true })
+    .click();
+  await expect.poll(() => !!state.release).toBe(true);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  state.release!();
+  await expect(page.locator('.scan-notice').first()).toContainText('cancelled');
+  await expect(page.locator('.scan-result-list')).toHaveCount(0);
+  expect(calls).toHaveLength(1);
+});
+
+test.describe('automatic phone scan', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test('touch Scan enriches missing inputs and the compact filters stay reachable', async ({
+    page,
+  }) => {
+    const { calls } = await prepare(page, false, false, true);
+    await scan(page);
+    await page.locator('.scan-result-list > button').filter({ hasText: 'Fee:' }).tap();
+    await page.getByRole('button', { name: /Finding types/ }).tap();
+    await page
+      .getByRole('dialog', { name: 'Analysis finding types' })
+      .getByRole('button', { name: 'Clear types', exact: true })
+      .tap();
+    await page.getByRole('button', { name: 'Close analysis finding types', exact: true }).tap();
+    await page.getByRole('button', { name: 'Reset filters', exact: true }).tap();
+    await expect(page.locator('.scan-result-list')).not.toContainText('Fee unknown');
+    await page.screenshot({ path: `${shots}/followup/after-phone.png` });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
 });

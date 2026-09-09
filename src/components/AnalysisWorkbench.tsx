@@ -62,6 +62,7 @@ export interface AnalysisWorkbenchSession {
   priorities?: ReviewPriority[];
   notice?: string;
   limit: number;
+  autoLoad?: boolean;
 }
 
 export interface AnalysisWorkbenchProps {
@@ -155,6 +156,7 @@ export function AnalysisWorkbench({
   const [priorities, setPriorities] = useState<ReviewPriority[]>(
     saved?.priorities ?? [...reviewPriorities],
   );
+  const [autoLoad, setAutoLoad] = useState(saved?.autoLoad ?? true);
   const [recovering, setRecovering] = useState(false);
   const [limit, setLimit] = useState(saved?.limit ?? 40);
   const [busy, setBusy] = useState(false);
@@ -196,6 +198,7 @@ export function AnalysisWorkbench({
     if (active)
       cache?.set(workspace.id, {
         scopeMode,
+        autoLoad,
         options,
         scan,
         selectedId,
@@ -210,6 +213,7 @@ export function AnalysisWorkbench({
     cache,
     workspace.id,
     scopeMode,
+    autoLoad,
     options,
     scan,
     selectedId,
@@ -311,7 +315,27 @@ export function AnalysisWorkbench({
     setBusy(true);
     setNotice('');
     try {
-      const next = await scanAnalysis(workspace, scope, options, controller.signal);
+      const gaps = autoLoad
+        ? analysisDataGaps(
+            workspace,
+            scope.txids,
+            options['script-types']?.scriptMode !== 'outputs',
+          )
+        : [];
+      setRecovering(gaps.some((gap) => gap.recoverable));
+      const enriched = gaps.some((gap) => gap.recoverable)
+        ? await recoverAnalysisData(
+            workspace,
+            scope.txids,
+            fetchTransaction,
+            controller.signal,
+            options['script-types']?.scriptMode !== 'outputs',
+            'automatic',
+          )
+        : undefined;
+      setRecovering(false);
+      const snapshot = enriched?.workspace ?? workspace;
+      const next = await scanAnalysis(snapshot, scope, options, controller.signal);
       if (
         controller.signal.aborted ||
         latest.current.id !== workspace.id ||
@@ -320,7 +344,19 @@ export function AnalysisWorkbench({
         walletEvidenceChanged(workspace.wallets, latest.current.wallets)
       )
         return;
-      onFindings(mergeScanFindings(latest.current.findings, next));
+      if (snapshot.transactions !== workspace.transactions) {
+        onRecovered(workspace, {
+          ...snapshot,
+          findings: mergeScanFindings(
+            latest.current.findings.map((finding) => ({ ...finding, stale: true })),
+            next,
+          ),
+        });
+      } else onFindings(mergeScanFindings(latest.current.findings, next));
+      if (enriched?.remaining)
+        setNotice(
+          `${enriched.remaining} input details still unavailable.${enriched.timedOut ? ' Automatic loading timed out.' : ''}${enriched.conflicts ? ' Conflicting evidence retained.' : ''}`,
+        );
       setScan(next);
       setSelectedId(next.findings[0]?.id);
       setLimit(40);
@@ -331,6 +367,7 @@ export function AnalysisWorkbench({
       if (pending.current === controller) {
         pending.current = undefined;
         setBusy(false);
+        setRecovering(false);
       }
     }
   }
@@ -450,17 +487,25 @@ export function AnalysisWorkbench({
           )}
           <p>{scope.explanation}</p>
           <p className="muted">
-            Loaded data only · {scope.txids.length} transaction{scope.txids.length === 1 ? '' : 's'}
-            . Scan makes no network requests.
+            {scope.txids.length} loaded transaction{scope.txids.length === 1 ? '' : 's'}
           </p>
         </div>
       </div>
       <details className="scan-settings">
         <summary>Optional settings</summary>
-        <p className="muted">
-          Defaults run every applicable analysis. Parameters change matching criteria, not loaded
-          coverage.
-        </p>
+        <label className="scan-checkbox scan-auto-load">
+          <input
+            type="checkbox"
+            checked={autoLoad}
+            onChange={(event) => setAutoLoad(event.target.checked)}
+          />
+          Load missing input data before scanning
+          <WalletHelp title="Automatic input loading" active={active}>
+            Refreshes affected transactions, then unresolved parents, reusing loaded and attached
+            data first. Up to eight transaction lookups, three at a time, for five seconds. Partial
+            results remain available; no parent branches are added. Turn off to scan offline.
+          </WalletHelp>
+        </label>
         <div className="scan-settings-grid">
           {analysisTools.map((item) => (
             <fieldset key={item.id}>
@@ -540,7 +585,14 @@ export function AnalysisWorkbench({
             </fieldset>
           ))}
         </div>
-        <button onClick={() => setOptions(scanDefaults())}>Restore defaults</button>
+        <button
+          onClick={() => {
+            setOptions(scanDefaults());
+            setAutoLoad(true);
+          }}
+        >
+          Restore defaults
+        </button>
       </details>
       <div aria-live="polite">
         {notice && <p className="scan-notice">{notice}</p>}
@@ -626,6 +678,38 @@ export function AnalysisWorkbench({
           }}
           countHelp="Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status."
         />
+        <div className="scan-priorities" aria-label="Review priority filters">
+          {reviewPriorities.map((priority) => (
+            <button
+              key={priority}
+              aria-pressed={priorities.includes(priority)}
+              onClick={() => {
+                setPriorities((current) =>
+                  current.includes(priority)
+                    ? current.filter((item) => item !== priority)
+                    : [...current, priority],
+                );
+                setLimit(40);
+              }}
+            >
+              <PriorityIcon priority={priority} />
+              {priority[0].toUpperCase() + priority.slice(1)}{' '}
+              <span className="wallet-count">{filtered.priorities[priority]}</span>
+            </button>
+          ))}
+          <WalletHelp title="Review priority rules" active={active}>
+            Review order, not confidence, ownership certainty or a danger rating. High: reconciled
+            fee rate at or above your threshold. Medium: hypotheses, address repeats across
+            transactions, or distinct wallet-record inputs without overlapping imports. Low: other
+            observations and missing data. Counts match type and evidence filters, ignoring priority
+            selection. Older findings use evidence kind until rerun.
+          </WalletHelp>
+          {filteredResults && (
+            <button className="text-button" onClick={resetFilters}>
+              Reset filters
+            </button>
+          )}
+        </div>
         <label>
           Evidence
           <select
@@ -658,42 +742,6 @@ export function AnalysisWorkbench({
           </button>
         )}
       </div>
-      <div className="scan-priorities" aria-label="Review priority filters">
-        <span>Review priority</span>
-        {reviewPriorities.map((priority) => (
-          <button
-            key={priority}
-            aria-pressed={priorities.includes(priority)}
-            onClick={() => {
-              setPriorities((current) =>
-                current.includes(priority)
-                  ? current.filter((item) => item !== priority)
-                  : [...current, priority],
-              );
-              setLimit(40);
-            }}
-          >
-            <PriorityIcon priority={priority} />
-            {priority[0].toUpperCase() + priority.slice(1)}{' '}
-            <span className="wallet-count">{filtered.priorities[priority]}</span>
-          </button>
-        ))}
-        <WalletHelp title="Review priority rules" active={active}>
-          Review order, not confidence, ownership certainty or a danger rating. High: reconciled fee
-          rate at or above your threshold. Medium: hypotheses, address repeats across transactions,
-          or distinct wallet-record inputs without overlapping imports. Low: other observations and
-          missing data. Counts match type and evidence filters, ignoring priority selection. Older
-          findings use evidence kind until rerun.
-        </WalletHelp>
-        {filteredResults && (
-          <button className="text-button" onClick={resetFilters}>
-            Reset filters
-          </button>
-        )}
-      </div>
-      <p className="scan-filter-note muted">
-        Filters affect results only. Scan runs all checks. Counts use the other filters.
-      </p>
       {!findings.length ? (
         <p className="scan-empty">
           {filteredResults

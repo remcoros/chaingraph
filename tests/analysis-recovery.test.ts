@@ -3,6 +3,7 @@ import {
   analysisDataGaps,
   recoverAnalysisData,
   recoveryLimits,
+  automaticRecoveryLimits,
 } from '../src/domain/analysisRecovery';
 import { analysisTools } from '../src/domain/analysis';
 import { newWorkspace } from '../src/domain/workspace';
@@ -181,4 +182,106 @@ it('treats contradictory script-type observations as conflicts without replacing
     'witness_v0_keyhash',
   );
   expect(fees(result.workspace)[0].kind).toBe('incomplete');
+});
+
+it('automatic enrichment uses a smaller fixed budget and reuses resolved evidence on the next scan', async () => {
+  const w = workspace(...Array.from({ length: 6 }, (_, i) => spend(i + 100, [i + 1, i + 20])));
+  const fetch = vi.fn(
+    async (_network, txid: string) => w.transactions[txid] ?? parent(parseInt(txid, 16)),
+  );
+  const result = await recoverAnalysisData(
+    w,
+    Object.keys(w.transactions),
+    fetch,
+    new AbortController().signal,
+    true,
+    'automatic',
+  );
+  expect(fetch).toHaveBeenCalledTimes(automaticRecoveryLimits.transactions);
+  expect(fetch.mock.calls.filter((call) => w.transactions[call[1]])).toHaveLength(
+    automaticRecoveryLimits.spendingTransactions,
+  );
+  expect(result.budgetReached).toBe(true);
+  expect(result.remaining).toBeGreaterThan(0);
+  const resolved = workspace(spend());
+  resolved.transactions[id(10)].vin[0].prevout = output;
+  fetch.mockClear();
+  const unchanged = await recoverAnalysisData(
+    resolved,
+    [id(10)],
+    fetch,
+    new AbortController().signal,
+    true,
+    'automatic',
+  );
+  expect(unchanged.workspace).toBe(resolved);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('the automatic deadline retains completed enrichment while explicit cancellation still rejects it', async () => {
+  for (const cancel of [false, true]) {
+    const deadline = new AbortController(),
+      user = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
+    try {
+      const w = workspace(spend(10), spend(11, [2]));
+      const fetch = vi.fn(async (_network, txid: string, signal: AbortSignal) => {
+        if (txid === id(10)) {
+          const tx = spend();
+          tx.vin[0].prevout = output;
+          return tx;
+        }
+        return new Promise<Transaction>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+        );
+      });
+      const attempt = recoverAnalysisData(
+        w,
+        [id(10), id(11)],
+        fetch,
+        user.signal,
+        true,
+        'automatic',
+      );
+      const result = attempt.then(
+        (value) => ({ value, error: undefined }),
+        (error: unknown) => ({ value: undefined, error }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (cancel) user.abort();
+      else deadline.abort();
+      const completed = await result;
+      if (cancel) expect(completed.error).toBeDefined();
+      else {
+        expect(completed.value?.resolved).toBe(1);
+        expect(completed.value?.remaining).toBe(1);
+        expect(completed.value?.timedOut).toBe(true);
+      }
+      expect(timeout).toHaveBeenCalledWith(automaticRecoveryLimits.timeoutMs);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(w.transactions[id(10)].vin[0].prevout).toBeUndefined();
+    } finally {
+      timeout.mockRestore();
+    }
+  }
+});
+
+it('uses remaining automatic capacity for more spends when verbosity 2 resolves the first batch', async () => {
+  const w = workspace(...Array.from({ length: 6 }, (_, i) => spend(i + 100, [i + 1])));
+  const fetch = vi.fn(async (_network, txid: string) => ({
+    ...w.transactions[txid],
+    vin: w.transactions[txid].vin.map((input) => ({ ...input, prevout: output })),
+  }));
+  const result = await recoverAnalysisData(
+    w,
+    Object.keys(w.transactions),
+    fetch,
+    new AbortController().signal,
+    true,
+    'automatic',
+  );
+  expect(result.remaining).toBe(0);
+  expect(result.resolved).toBe(6);
+  expect(fetch).toHaveBeenCalledTimes(6);
+  expect(Object.keys(result.workspace.transactions)).toHaveLength(6);
 });

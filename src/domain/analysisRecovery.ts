@@ -9,7 +9,18 @@ import {
 import { satoshiValue } from './analysis/shared';
 import { analysisScriptType } from './analysis/scripts';
 
-export const recoveryLimits = { transactions: 20, concurrency: 3, timeoutMs: 30_000 } as const;
+export const recoveryLimits = {
+  transactions: 20,
+  spendingTransactions: 10,
+  concurrency: 3,
+  timeoutMs: 30_000,
+} as const;
+export const automaticRecoveryLimits = {
+  transactions: 8,
+  spendingTransactions: 4,
+  concurrency: 3,
+  timeoutMs: 5_000,
+} as const;
 type FetchTransaction = (
   network: Network,
   txid: string,
@@ -52,6 +63,8 @@ export function analysisDataGaps(workspace: Workspace, txids: readonly string[],
 /** Isolated, bounded enrichment. No new creating transactions enter the workspace.
  * Partial success is returned for one atomic data + findings commit. Cancellation
  * discards this attempt so switching/locking can never publish a late response.
+ * The automatic deadline returns completed enrichment so a slow node does not
+ * prevent a local scan; user cancellation still discards the entire attempt.
  */
 export async function recoverAnalysisData(
   workspace: Workspace,
@@ -59,7 +72,11 @@ export async function recoverAnalysisData(
   fetchTransaction: FetchTransaction,
   signal: AbortSignal,
   scripts = true,
+  mode: 'manual' | 'automatic' = 'manual',
 ) {
+  const limits = mode === 'automatic' ? automaticRecoveryLimits : recoveryLimits;
+  const deadline = mode === 'automatic' ? AbortSignal.timeout(limits.timeoutMs) : undefined;
+  const requestSignal = deadline ? AbortSignal.any([signal, deadline]) : signal;
   const transactions = { ...workspace.transactions };
   const snapshot = () => ({ ...workspace, transactions });
   const requested = new Map<string, Promise<Transaction | undefined>>();
@@ -69,10 +86,10 @@ export async function recoverAnalysisData(
     signal.throwIfAborted();
     const id = txid.toLowerCase();
     if (requested.has(id)) return requested.get(id)!;
-    if (requested.size >= recoveryLimits.transactions) return undefined;
-    const request = fetchTransaction(workspace.network, id, signal)
+    if (deadline?.aborted || requested.size >= limits.transactions) return undefined;
+    const request = fetchTransaction(workspace.network, id, requestSignal)
       .then((tx) => {
-        signal.throwIfAborted();
+        requestSignal.throwIfAborted();
         if (tx.txid !== id) throw new Error('Unexpected transaction.');
         return tx;
       })
@@ -87,9 +104,10 @@ export async function recoverAnalysisData(
   async function pool<T>(items: T[], fn: (item: T) => Promise<void>) {
     let next = 0;
     await Promise.all(
-      Array.from({ length: Math.min(recoveryLimits.concurrency, items.length) }, async () => {
+      Array.from({ length: Math.min(limits.concurrency, items.length) }, async () => {
         while (next < items.length) {
           signal.throwIfAborted();
+          if (deadline?.aborted) return;
           await fn(items[next++]);
         }
       }),
@@ -144,43 +162,54 @@ export async function recoverAnalysisData(
     }
   }
   const initial = analysisDataGaps(workspace, txids, scripts);
-  const spendingIds = [
-    ...new Set(initial.filter((gap) => gap.recoverable).map((gap) => gap.txid)),
-  ].slice(0, recoveryLimits.transactions / 2);
-  await pool(spendingIds, async (txid) => {
-    const incoming = await fetchOne(txid);
-    if (incoming) attach(txid, incoming);
-  });
-  const unresolved = analysisDataGaps(snapshot(), spendingIds, scripts).filter(
-    (gap) => gap.recoverable,
-  );
-  await pool(
-    [...new Set(unresolved.map((gap) => gap.input.txid!.toLowerCase()))].sort(),
-    async (parentId) => {
-      const parent = await fetchOne(parentId);
-      if (!parent) return;
-      for (const gap of unresolved.filter((gap) => gap.input.txid!.toLowerCase() === parentId)) {
-        const output = parent.vout.find((output) => output.n === gap.input.vout);
-        const hex = output && outputScriptHex(output, workspace.network);
-        if (!output || hex === undefined) {
-          failed++;
-          continue;
+  const consideredSpends = new Set<string>();
+  do {
+    const spendingIds = [
+      ...new Set(
+        analysisDataGaps(snapshot(), txids, scripts)
+          .filter(
+            (gap) => gap.recoverable && !consideredSpends.has(gap.txid) && !requested.has(gap.txid),
+          )
+          .map((gap) => gap.txid),
+      ),
+    ].slice(0, limits.spendingTransactions);
+    if (!spendingIds.length) break;
+    for (const txid of spendingIds) consideredSpends.add(txid);
+    await pool(spendingIds, async (txid) => {
+      const incoming = await fetchOne(txid);
+      if (incoming) attach(txid, incoming);
+    });
+    const unresolved = analysisDataGaps(snapshot(), spendingIds, scripts).filter(
+      (gap) => gap.recoverable,
+    );
+    await pool(
+      [...new Set(unresolved.map((gap) => gap.input.txid!.toLowerCase()))].sort(),
+      async (parentId) => {
+        const parent = await fetchOne(parentId);
+        if (!parent) return;
+        for (const gap of unresolved.filter((gap) => gap.input.txid!.toLowerCase() === parentId)) {
+          const output = parent.vout.find((output) => output.n === gap.input.vout);
+          const hex = output && outputScriptHex(output, workspace.network);
+          if (!output || hex === undefined) {
+            failed++;
+            continue;
+          }
+          const before = transactions[gap.txid];
+          attach(gap.txid, {
+            ...before,
+            vin: before.vin.map((input, i) =>
+              i === gap.inputIndex
+                ? {
+                    ...input,
+                    prevout: { value: output.value, scriptPubKey: { ...output.scriptPubKey, hex } },
+                  }
+                : input,
+            ),
+          });
         }
-        const before = transactions[gap.txid];
-        attach(gap.txid, {
-          ...before,
-          vin: before.vin.map((input, i) =>
-            i === gap.inputIndex
-              ? {
-                  ...input,
-                  prevout: { value: output.value, scriptPubKey: { ...output.scriptPubKey, hex } },
-                }
-              : input,
-          ),
-        });
-      }
-    },
-  );
+      },
+    );
+  } while (mode === 'automatic' && requested.size < limits.transactions && !deadline?.aborted);
   signal.throwIfAborted();
   const remaining = analysisDataGaps(snapshot(), txids, scripts);
   const changed = Object.keys(transactions).some(
@@ -193,10 +222,10 @@ export async function recoverAnalysisData(
     conflicts: conflicts + initial.filter((gap) => gap.conflict).length,
     remaining: remaining.length,
     resolved: Math.max(0, initial.length - remaining.length),
+    timedOut: deadline?.aborted ?? false,
     budgetReached:
       remaining.length > 0 &&
-      (requested.size >= recoveryLimits.transactions ||
-        new Set(initial.filter((gap) => gap.recoverable).map((gap) => gap.txid)).size >
-          spendingIds.length),
+      (requested.size >= limits.transactions ||
+        remaining.some((gap) => gap.recoverable && !consideredSpends.has(gap.txid))),
   };
 }
