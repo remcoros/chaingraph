@@ -21,6 +21,8 @@ flowchart LR
 | `src/domain/analysis.ts`, `src/domain/analysis/`         | Local analysis registry, parameter contracts, scoped evidence and run reports                                     |
 | `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods and explicit connected context                                |
 | `src/domain/workspaceTemplates.ts`                       | Supported-network catalog and lazy real-chain template snapshots                                                  |
+| `src/domain/walletReview.ts`                             | Wallet review queue derivation, encrypted review decisions and evidence invalidation                              |
+| `src/domain/batchMetadata.ts`                            | Identifier-based label, tag and icon batch edits returning one workspace per batch                                |
 | `src/lib/wallet.ts`                                      | Account-key validation, receive/change derivation, script construction, and Electrum script hashes                |
 | `src/lib/api.ts`                                         | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion                          |
 | `src/lib/crypto.ts`                                      | Versioned authenticated-encryption envelope and strict envelope decoding                                          |
@@ -95,7 +97,7 @@ The seven built-in tools cover privacy patterns, value/structure and imported wa
 
 `domain/analysisScan.ts` resolves the selected transaction, output, address or wallet into loaded transaction IDs, or uses the complete loaded workspace. It runs the existing registry with independent reports and cancellation between tools. Loaded parents can supply evidence without becoming targets. Exclusions survive reruns only with matching node/transaction evidence. Wallet evidence or transaction mutations mark findings stale; labels remain independent.
 
-The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Graph and Analysis are the enabled modes. The Trace workbench is disabled, and saved `workbench: trace` opens Graph. Analysis consumes the shared workspace and selection, with no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Locking cancels pending work. The displayed **Current selection** scope retains the existing `context` session value for compatibility. Every affected entity and supporting transaction in a finding has an individual graph navigation control; output values and addresses come from the same loaded workspace records.
+The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Wallet, Graph and Analysis are the enabled modes. The Trace workbench is disabled, and saved `workbench: trace` opens Graph. A saved `workbench: wallet` opens Graph when the workspace has no wallets. The return control appears whenever a workbench handoff recorded an origin, beside the mode buttons so the floating workspace actions cannot cover it. Analysis consumes the shared workspace and selection, with no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Locking cancels pending work. The displayed **Current selection** scope retains the existing `context` session value for compatibility. Every affected entity and supporting transaction in a finding has an individual graph navigation control; output values and addresses come from the same loaded workspace records.
 
 The dormant `domain/traceWorkbench.ts` and Trace component remain for a later iteration; they are not mounted or reachable through the current workbench navigation. Their original bounded lookup design and limitations remain documented in [Trace semantics and limits](research/simple-trace.md). Existing graph transaction traversal is independent of this disabled workbench.
 
@@ -298,6 +300,40 @@ pass over loaded transactions, without RPC. Selecting an address enables address
 display and adds it to the watched-address set, allowing an isolated node even when
 no matching transaction is loaded. The graph memo includes that set so subsequent
 address selections appear immediately.
+
+### Wallet review and batch metadata
+
+`domain/walletReview.ts` derives a review queue for one wallet from loaded
+observations and an optional verified UTXO check. Reasons are ordered: current
+UTXOs, unlabelled receipts spent into them, refresh activity, unknown
+counterparties, and active non-stale findings covering verified wallet outputs.
+Counterparty items come only from transactions the wallet funded through loaded
+prevouts, so the outputs of a batch that merely paid the wallet are never
+presented as the owner's counterparties. Item counts are bounded per reason and
+coverage reports unloaded UTXO sources instead of filling them in. A missing
+spend never implies an unspent output.
+
+Optional encrypted `walletReviews` maps `walletId|reason|subject` to a status of
+`reviewed`, `unknown` or `later`, a timestamp and a fingerprint of the item's
+evidence. Old workspaces without the field load unchanged, and the record is
+bounded at 20,000 decisions. A refresh keeps decisions; only a changed evidence
+fingerprint marks an item as needing review again, with its earlier decision date.
+Deciding a refresh-activity item also removes that transaction from the wallet's
+existing unreviewed queue in the same workspace transform. Removing a wallet
+prunes its decisions.
+
+`domain/batchMetadata.ts` plans and applies label, tag and icon edits over an
+explicit list of canonical entity references. Each helper returns one workspace,
+so a batch is a single undoable autosaved step, and returns the same workspace
+when nothing changes. Labels and icons are preserved unless replacement is
+requested, and plans expose the affected and preserved counts before applying.
+Tag membership reuses the existing tag budgets, canonical references and name
+uniqueness. Filtering in the workbench never widens a selection; it only offers a
+new explicit scope, and selected records outside the current filter are reported.
+
+`useWalletUtxos` holds the transient Electrum observations shared by the wallet
+record panel and the wallet workbench. They are discarded when discovered
+addresses or the scan time change and never enter storage.
 
 ### Isolated flow renderer v2 experiment
 

@@ -25,8 +25,13 @@
   color: var(--color-accent);
   border-color: var(--color-rule);
 }
+/* The workspace actions float over the right edge away from Graph, so the return
+ * control stays beside the mode buttons instead of underneath them. */
 .workbench-nav .workbench-return {
-  margin-left: auto;
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--color-rule);
+  border-radius: 0;
 }
 .workbench-page {
   flex: 1;

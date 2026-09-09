@@ -109,6 +109,11 @@ export interface Workspace {
   contextTransactionIds?: string[];
   annotations: Record<string, Annotation>;
   tags?: WorkspaceTag[];
+  /** Wallet review decisions keyed by `walletId|reason|subject`. */
+  walletReviews?: Record<
+    string,
+    { status: 'reviewed' | 'unknown' | 'later'; at: string; evidence: string }
+  >;
   findings: AnalysisFinding[];
   watchedAddresses: string[];
   demo: boolean;
@@ -132,7 +137,7 @@ export interface Workspace {
     selectionId?: string;
     filters?: GraphFilters;
     leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
-    workbench?: 'graph' | 'analysis' | 'trace';
+    workbench?: 'graph' | 'analysis' | 'trace' | 'wallet';
     rightTab?: 'inspect' | 'analysis' | 'addresses' | 'transactions' | 'utxos';
     focusGraph?: boolean;
     prefetchDepth?: 0 | 1 | 2;
