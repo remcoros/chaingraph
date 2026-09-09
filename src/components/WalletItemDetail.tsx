@@ -1,16 +1,12 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Clock3, Filter, Network, Search, Undo2 } from 'lucide-react';
-import { formatSats, short, type Wallet, type Workspace } from '../domain/types';
+import { formatSats, short, type Wallet, type Workspace, type WorkspaceTag } from '../domain/types';
 import { isCompletedReview, type WalletReviewItem } from '../domain/walletReview';
 import {
   buildWalletReviewContext,
   type WalletReviewFlowEntry,
 } from '../domain/walletReviewContext';
-import {
-  walletRowRelationship,
-  walletRowTags,
-  type WalletRow,
-} from '../domain/walletWorkbenchRows';
+import { walletRowRelationship, type WalletRow } from '../domain/walletWorkbenchRows';
 import { fetchTransaction } from '../lib/api';
 import { useWalletFlowInputs } from '../lib/useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
@@ -19,6 +15,10 @@ import { CopyButton } from './CopyButton';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import { WalletHelp } from './WalletHelp';
 import type { WalletWorkbenchProps } from './WalletWorkbench';
+import type {
+  WalletSelectionIndex,
+  WalletSelectionAddresses,
+} from '../domain/walletSelectionIndex';
 import { walletRelatedRecords } from '../domain/walletRelatedRecords';
 import { walletReviewGuidance, walletSubjectTitle } from '../domain/walletReviewGuidance';
 
@@ -74,6 +74,9 @@ export function WalletDecisionButtons({
 
 export function WalletItemDetail({
   row,
+  selectionIndex,
+  walletAddresses,
+  tags = [],
   workspace,
   wallet,
   active,
@@ -100,6 +103,9 @@ export function WalletItemDetail({
   | 'onIsolateInGraph'
 > & {
   row: WalletRow;
+  selectionIndex: WalletSelectionIndex;
+  walletAddresses: WalletSelectionAddresses;
+  tags?: WorkspaceTag[];
   workspace: Workspace;
   wallet: Wallet;
   onNotice: (message: string) => void;
@@ -134,12 +140,13 @@ export function WalletItemDetail({
               txid: row.txid,
             },
             contextId,
+            selectionIndex,
+            walletAddresses,
           )
         : undefined,
     [
-      workspace.transactions,
-      workspace.network,
-      wallet.addresses,
+      selectionIndex,
+      walletAddresses,
       row.nodeId,
       row.key,
       row.reviews.find((item) => item.key === row.key)?.evidence,
@@ -160,6 +167,7 @@ export function WalletItemDetail({
   );
   const flowInputs = useWalletFlowInputs({
     workspace,
+    prevouts: selectionIndex.prevouts,
     walletId: wallet.id,
     selectionKey: row.key,
     transactionId: contextId,
@@ -176,8 +184,13 @@ export function WalletItemDetail({
     canQuery &&
     !flowInputs.error &&
     context?.inputs.some((input) => input.id === row.nodeId && input.missing);
-  const tags = walletRowTags(workspace, row);
-  const relationship = walletRowRelationship(row, wallet, workspace.network, context?.selected);
+  const relationship = walletRowRelationship(
+    row,
+    wallet,
+    workspace.network,
+    context?.selected,
+    walletAddresses,
+  );
   const changed = row.reviews.find((item) => item.changed);
   const outpoints = row.outpointIds ?? [];
   const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
@@ -193,14 +206,8 @@ export function WalletItemDetail({
           ? 'Review later'
           : 'To review';
   const related = useMemo(
-    () => walletRelatedRecords(workspace, row),
-    [
-      workspace.transactions,
-      workspace.network,
-      row.nodeId,
-      row.contextTransactionIds,
-      row.outpointIds,
-    ],
+    () => walletRelatedRecords(workspace, row, selectionIndex),
+    [selectionIndex, row.nodeId, row.contextTransactionIds, row.outpointIds],
   );
   return (
     <>

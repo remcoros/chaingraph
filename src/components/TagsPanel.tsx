@@ -1,6 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Check, Plus, Tag, Trash2, X } from 'lucide-react';
+import { Plus, Tag, Trash2 } from 'lucide-react';
 import {
   addressNodeId,
   short,
@@ -17,29 +16,15 @@ import {
   MAX_TAG_MEMBERS,
   MAX_WORKSPACE_TAGS,
 } from '../domain/tags';
-import { useDialogFocus } from './Dialogs';
+import {
+  BatchTagEditor,
+  ColorPicker,
+  MetadataPopover,
+  TAG_COLORS as colors,
+} from './MetadataEditors';
 import './tags.css';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
-const colors = ['#65cbbb', '#e4af67', '#9c9aed', '#e888a5', '#85bce8', '#a4c977'];
-function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  return (
-    <div className="tag-colors" role="group" aria-label="Tag color">
-      {[...new Set([...colors, value])].map((color, index) => (
-        <button
-          key={color}
-          type="button"
-          aria-label={`Color ${index + 1}`}
-          aria-pressed={value === color}
-          style={{ backgroundColor: color }}
-          onClick={() => onChange(color)}
-        >
-          {value === color && <Check size={14} />}
-        </button>
-      ))}
-    </div>
-  );
-}
 function TagForm({
   tag,
   onSave,
@@ -133,6 +118,7 @@ export function SelectedTags({
   const match = matches.get(selected.id);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => setOpen(false), [workspace.id, selected.id]);
   useEffect(() => {
     if (!openToken) return;
     trigger.current?.focus();
@@ -178,27 +164,26 @@ export function SelectedTags({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? id : undefined}
-          onClick={() => setOpen(true)}
+          onClick={() => setOpen((current) => !current)}
         >
           <Plus size={13} /> Add tag
         </button>
       </div>
-      {open &&
-        createPortal(
-          <TagAssignmentPicker
-            id={id}
-            anchor={trigger.current!}
-            workspace={workspace}
-            selected={selected}
-            onChange={onChange}
-            onClose={() => setOpen(false)}
-            onManage={() => {
-              setOpen(false);
-              onManage();
-            }}
-          />,
-          document.body,
-        )}
+      {open && trigger.current && (
+        <TagAssignmentPicker
+          key={selected.id}
+          id={id}
+          anchor={trigger.current}
+          workspace={workspace}
+          selected={selected}
+          onChange={onChange}
+          onClose={() => setOpen(false)}
+          onManage={() => {
+            setOpen(false);
+            onManage();
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -220,127 +205,42 @@ function TagAssignmentPicker({
   onClose: () => void;
   onManage: () => void;
 }) {
-  const ref = useDialogFocus(onClose);
-  const search = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState('');
-  const [color, setColor] = useState(colors[0]);
   const [scope, setScope] = useState<'node' | 'address'>('node');
-  const [error, setError] = useState('');
-  const tags = workspace.tags ?? [];
   const effective = listTagsForNode(workspace, selected);
   const target =
     scope === 'address' && selected.address ? addressNodeId(selected.address) : selected.id;
-  const name = query.trim();
-  const duplicate = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
-  const memberCount = tags.reduce((total, tag) => total + tag.nodeIds.length, 0);
-  const full = memberCount >= MAX_TAG_MEMBERS;
-  const [viewport, setViewport] = useState(() => ({
-    width: window.visualViewport?.width ?? window.innerWidth,
-    height: window.visualViewport?.height ?? window.innerHeight,
-    top: window.visualViewport?.offsetTop ?? 0,
-    left: window.visualViewport?.offsetLeft ?? 0,
-  }));
-  const rect = anchor.getBoundingClientRect();
-  const width = Math.min(320, viewport.width - 24);
-  const left = Math.max(
-    viewport.left + 12,
-    Math.min(rect.left, viewport.left + viewport.width - width - 12),
-  );
-  const top = Math.max(
-    viewport.top + 12,
-    Math.min(rect.bottom + 6, viewport.top + viewport.height - 440),
-  );
-  useEffect(() => {
-    search.current?.focus();
-  }, []);
-  useEffect(() => {
-    // Keep the search usable when a phone keyboard changes the visible viewport.
-    const update = () =>
-      setViewport({
-        width: window.visualViewport?.width ?? window.innerWidth,
-        height: window.visualViewport?.height ?? window.innerHeight,
-        top: window.visualViewport?.offsetTop ?? 0,
-        left: window.visualViewport?.offsetLeft ?? 0,
-      });
-    window.addEventListener('resize', update);
-    window.visualViewport?.addEventListener('resize', update);
-    window.visualViewport?.addEventListener('scroll', update);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.visualViewport?.removeEventListener('resize', update);
-      window.visualViewport?.removeEventListener('scroll', update);
-    };
-  }, []);
-  function assign(tagId: string, checked: boolean) {
-    if (checked && full) {
-      setError('Workspace has reached the 50,000 tag membership limit.');
-      return;
-    }
-    onChange((current) => ({
-      ...current,
-      tags: (current.tags ?? []).map((tag) =>
-        tag.id === tagId
-          ? {
-              ...tag,
-              nodeIds: checked
-                ? [...new Set([...tag.nodeIds, target])]
-                : tag.nodeIds.filter((id) => id !== target),
-            }
-          : tag,
-      ),
-    }));
-    setError('');
-  }
-  function create() {
-    if (!name) return;
-    if (duplicate) {
-      if (!duplicate.nodeIds.includes(target)) assign(duplicate.id, true);
-      setQuery('');
-      return;
-    }
-    if (tags.length >= MAX_WORKSPACE_TAGS || full) {
-      setError(
-        full
-          ? 'Workspace has reached the 50,000 tag membership limit.'
-          : 'Workspace supports at most 200 tags.',
-      );
-      return;
-    }
-    onChange((current) => ({
-      ...current,
-      tags: [...(current.tags ?? []), { id: crypto.randomUUID(), name, color, nodeIds: [target] }],
-    }));
-    setError('');
-    setQuery('');
-    search.current?.focus();
-  }
   return (
-    <div
-      className="tag-picker-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={ref}
+    <MetadataPopover anchor={anchor} onClose={onClose}>
+      <BatchTagEditor
         id={id}
-        className="tag-picker"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Choose tags"
-        style={{ left, top, width, maxHeight: viewport.top + viewport.height - top - 12 }}
+        workspace={workspace}
+        ids={[target]}
+        single
+        onClose={onClose}
+        onApply={(_summary, update) => onChange(update)}
+        membershipHint={(tag) => {
+          const viaAddress =
+            selected.kind === 'output' &&
+            selected.address &&
+            tag.nodeIds.includes(addressNodeId(selected.address));
+          const viaOutput = selected.kind === 'output' && tag.nodeIds.includes(selected.id);
+          return scope === 'node' && viaAddress ? (
+            <small>Applied to address too</small>
+          ) : scope === 'address' && viaOutput ? (
+            <small>Applied to this output too</small>
+          ) : !tag.nodeIds.includes(target) && effective.some((item) => item.id === tag.id) ? (
+            <small>Applied through a related entity</small>
+          ) : null;
+        }}
+        footer={
+          <div className="metadata-editor-footer">
+            <span className="small muted">Manual groups do not establish ownership.</span>
+            <button type="button" onClick={onManage}>
+              Manage tags
+            </button>
+          </div>
+        }
       >
-        <div className="tags-heading">
-          <strong>Tags</strong>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Close tag picker"
-            onClick={onClose}
-          >
-            <X size={16} />
-          </button>
-        </div>
         {selected.kind === 'output' && selected.address && (
           <div className="tag-scope" role="group" aria-label="Tag assignment scope">
             <button type="button" aria-pressed={scope === 'node'} onClick={() => setScope('node')}>
@@ -355,105 +255,8 @@ function TagAssignmentPicker({
             </button>
           </div>
         )}
-        <form
-          className="tag-picker-search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            create();
-          }}
-        >
-          <input
-            ref={search}
-            type="search"
-            aria-label="Find or create tag"
-            placeholder="Find or create tag…"
-            maxLength={100}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setError('');
-            }}
-          />
-        </form>
-        <div className="tag-picker-options" role="group" aria-label="Existing tags">
-          {tags
-            .filter((tag) =>
-              `${tag.name} ${tag.description ?? ''}`.toLowerCase().includes(name.toLowerCase()),
-            )
-            .map((tag) => {
-              const direct = tag.nodeIds.includes(target);
-              const viaAddress =
-                selected.kind === 'output' &&
-                !!selected.address &&
-                tag.nodeIds.includes(addressNodeId(selected.address));
-              const viaOutput = selected.kind === 'output' && tag.nodeIds.includes(selected.id);
-              const inherited = !direct && effective.some((item) => item.id === tag.id);
-              return (
-                <label className="tag-assignment" key={tag.id}>
-                  <input
-                    type="checkbox"
-                    checked={direct}
-                    disabled={!direct && full}
-                    onChange={(event) => assign(tag.id, event.target.checked)}
-                  />
-                  <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-                  <span>
-                    {tag.name}
-                    {scope === 'node' && viaAddress ? (
-                      <small>Applied to address too</small>
-                    ) : scope === 'address' && viaOutput ? (
-                      <small>Applied to this output too</small>
-                    ) : inherited ? (
-                      <small>Applied to selection</small>
-                    ) : null}
-                  </span>
-                </label>
-              );
-            })}
-          {!tags.length && !name && (
-            <p className="small muted">Type a name to create your first tag.</p>
-          )}
-          {name &&
-            !tags.some((tag) =>
-              `${tag.name} ${tag.description ?? ''}`.toLowerCase().includes(name.toLowerCase()),
-            ) && <p className="small muted">No matching tags.</p>}
-        </div>
-        {name && !duplicate && (
-          <div className="tag-picker-create">
-            <ColorPicker value={color} onChange={setColor} />
-            <button
-              type="button"
-              className="primary"
-              disabled={tags.length >= MAX_WORKSPACE_TAGS || full}
-              onClick={create}
-            >
-              <Plus size={14} /> Create tag <span>“{name}”</span>
-            </button>
-          </div>
-        )}
-        {error && (
-          <p className="warning small" role="alert">
-            {error}
-          </p>
-        )}
-        {tags.length >= MAX_WORKSPACE_TAGS && (
-          <p className="small muted">200-tag limit reached. Existing tags can still be assigned.</p>
-        )}
-        {full && (
-          <p className="small muted">
-            Membership limit reached. Remove an assignment to add another.
-          </p>
-        )}
-        <div className="tag-picker-footer">
-          <span className="small muted" title="Manual groups do not establish ownership.">
-            Applied automatically
-          </span>
-          <button type="button" className="text-button" onClick={onManage}>
-            Manage tags
-          </button>
-        </div>
-      </div>
-    </div>
+      </BatchTagEditor>
+    </MetadataPopover>
   );
 }
 

@@ -1,20 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, CheckSquare, Eye, EyeOff, Focus, Plus, Tag, Type, Undo2, X } from 'lucide-react';
+import { CheckSquare, Eye, EyeOff, Focus, Plus, Tag, Type, Undo2, X } from 'lucide-react';
 import type { Workspace } from '../domain/types';
-import {
-  applyBatchIcon,
-  applyBatchLabel,
-  applyBatchTag,
-  createBatchTag,
-  labelBatchPlan,
-  tagBatchPlan,
-} from '../domain/batchEdits';
-import { AnchoredPopover } from './AnchoredPopover';
+import { labelBatchPlan } from '../domain/batchEdits';
+import { applyBatchIcon, planBatchIcon } from '../domain/batchMetadata';
+import { BatchLabelEditor, BatchTagEditor, MetadataPopover } from './MetadataEditors';
 import { IconPicker } from './IconPicker';
 import type { EntitySelection } from '../lib/useEntitySelection';
 import './selection-toolbar.css';
-
-const tagColors = ['#65cbbb', '#e4af67', '#9c9aed', '#e888a5', '#85bce8', '#a4c977'];
 
 export interface SelectionToolbarProps {
   active?: boolean;
@@ -49,6 +41,7 @@ export function SelectionToolbar({
   onUndo,
 }: SelectionToolbarProps) {
   const [editor, setEditor] = useState<'label' | 'tag'>();
+  const [replaceIcons, setReplaceIcons] = useState(false);
   const [undoable, setUndoable] = useState<{
     summary: string;
     token: number;
@@ -76,14 +69,20 @@ export function SelectionToolbar({
   );
   const manuallyHidden = ids.filter((id) => hiddenIds.has(id)).length;
   const apply = (summary: string, update: (workspace: Workspace) => Workspace) => {
-    const token = onApply(summary, update);
+    const token = onApply(summary, (current) => {
+      // Preserve the graph selection boundary's strict network/reference checks.
+      labelBatchPlan(current, ids);
+      return update(current);
+    });
     // A batch that changed nothing, or failed, never advertises an undo step.
     setUndoable(token === undefined ? undefined : { summary, token, workspaceId: workspace.id });
-    setEditor(undefined);
+    return token !== undefined || update(workspace) === workspace;
   };
   useEffect(() => {
     if (!active) setEditor(undefined);
   }, [active]);
+  const scopeKey = `${workspace.id}:${ids.join('|')}`;
+  useEffect(() => setEditor(undefined), [scopeKey]);
   if (!active || (!selection.mode && !count)) return null;
   return (
     <div className="selection-toolbar" role="group" aria-label="Selected entity actions">
@@ -129,7 +128,7 @@ export function SelectionToolbar({
             aria-controls={editor === 'tag' ? tagId : undefined}
             onClick={() => setEditor(editor === 'tag' ? undefined : 'tag')}
           >
-            <Tag size={13} /> Tag
+            <Tag size={13} /> Tags
           </button>
           <span
             className="selection-toolbar-icon"
@@ -139,6 +138,7 @@ export function SelectionToolbar({
             }}
           >
             <IconPicker
+              key={scopeKey}
               value={firstIcon}
               mixed={mixedIcons}
               compact
@@ -146,12 +146,22 @@ export function SelectionToolbar({
               ariaLabel={`Set an icon on ${count} selected entities`}
               onChange={(icon) =>
                 apply(
-                  icon ? `Icon set on ${count} entities` : `Icon cleared on ${count} entities`,
-                  (current) => applyBatchIcon(current, ids, icon),
+                  icon
+                    ? `Icon set on ${planBatchIcon(workspace, ids, replaceIcons).targets.length} records`
+                    : `Icon cleared on ${planBatchIcon(workspace, ids, replaceIcons).targets.length} records`,
+                  (current) => applyBatchIcon(current, ids, icon, replaceIcons),
                 )
               }
             />
           </span>
+          <label className="selection-toolbar-replace">
+            <input
+              type="checkbox"
+              checked={replaceIcons}
+              onChange={(event) => setReplaceIcons(event.target.checked)}
+            />
+            Replace icons
+          </label>
           <button
             type="button"
             title="Hide the selected entities from the canvas. Their data and annotations remain."
@@ -195,239 +205,28 @@ export function SelectionToolbar({
         </button>
       )}
       {editor === 'label' && labelButton.current && (
-        <LabelBatchEditor
-          id={labelId}
-          anchor={labelButton.current}
-          workspace={workspace}
-          ids={ids}
-          onClose={() => setEditor(undefined)}
-          onApply={apply}
-        />
+        <MetadataPopover anchor={labelButton.current} onClose={() => setEditor(undefined)}>
+          <BatchLabelEditor
+            id={labelId}
+            workspace={workspace}
+            ids={ids}
+            onClose={() => setEditor(undefined)}
+            onApply={apply}
+          />
+        </MetadataPopover>
       )}
       {editor === 'tag' && tagButton.current && (
-        <TagBatchEditor
-          id={tagId}
-          anchor={tagButton.current}
-          workspace={workspace}
-          ids={ids}
-          onClose={() => setEditor(undefined)}
-          onApply={apply}
-        />
+        <MetadataPopover anchor={tagButton.current} onClose={() => setEditor(undefined)}>
+          <BatchTagEditor
+            id={tagId}
+            workspace={workspace}
+            ids={ids}
+            onClose={() => setEditor(undefined)}
+            onApply={apply}
+          />
+        </MetadataPopover>
       )}
     </div>
-  );
-}
-
-interface EditorProps {
-  id: string;
-  anchor: HTMLElement;
-  workspace: Workspace;
-  ids: string[];
-  onClose: () => void;
-  onApply: (summary: string, update: (workspace: Workspace) => Workspace) => void;
-}
-
-function LabelBatchEditor({ id, anchor, workspace, ids, onClose, onApply }: EditorProps) {
-  const [value, setValue] = useState('');
-  const [onlyUnlabeled, setOnlyUnlabeled] = useState(false);
-  const plan = useMemo(
-    () => labelBatchPlan(workspace, ids, { onlyUnlabeled }),
-    [workspace, ids, onlyUnlabeled],
-  );
-  const targets = plan.targetIds.length;
-  const trimmed = value.trim();
-  return (
-    <AnchoredPopover
-      id={id}
-      anchor={anchor}
-      title="Label selected entities"
-      width={306}
-      onClose={onClose}
-    >
-      <label>
-        New label
-        <input
-          data-autofocus
-          type="text"
-          aria-label={`Label for ${targets} selected entities`}
-          maxLength={200}
-          placeholder="Leave empty to clear labels"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || !targets) return;
-            event.preventDefault();
-            onApply(
-              trimmed
-                ? `Label applied to ${targets} entities`
-                : `Label cleared on ${targets} entities`,
-              (current) => applyBatchLabel(current, ids, value, { onlyUnlabeled }),
-            );
-          }}
-        />
-      </label>
-      <label className="checkbox-label">
-        <input
-          type="checkbox"
-          checked={onlyUnlabeled}
-          onChange={(event) => setOnlyUnlabeled(event.target.checked)}
-        />
-        Only unlabeled ({plan.unlabeledCount.toLocaleString('en-US')})
-      </label>
-      <p role="status">
-        Applies to {targets.toLocaleString('en-US')} of {ids.length.toLocaleString('en-US')}{' '}
-        selected. {plan.replacedCount.toLocaleString('en-US')} existing{' '}
-        {plan.replacedCount === 1 ? 'label' : 'labels'} would be replaced.
-      </p>
-      {plan.distinctLabels.length > 1 && !onlyUnlabeled && (
-        <p>
-          Existing labels differ: {plan.distinctLabels.join(', ')}
-          {plan.labeledCount > plan.distinctLabels.length ? '…' : ''}
-        </p>
-      )}
-      <p>Notes, icons, bookmarks and tags stay unchanged.</p>
-      <div className="batch-editor-actions">
-        <button
-          type="button"
-          className="primary"
-          disabled={!targets}
-          onClick={() =>
-            onApply(
-              trimmed
-                ? `Label applied to ${targets} entities`
-                : `Label cleared on ${targets} entities`,
-              (current) => applyBatchLabel(current, ids, value, { onlyUnlabeled }),
-            )
-          }
-        >
-          {trimmed
-            ? `Apply to ${targets.toLocaleString('en-US')}`
-            : `Clear label on ${targets.toLocaleString('en-US')}`}
-        </button>
-        <button type="button" onClick={onClose}>
-          Cancel
-        </button>
-      </div>
-    </AnchoredPopover>
-  );
-}
-
-function TagBatchEditor({ id, anchor, workspace, ids, onClose, onApply }: EditorProps) {
-  const [query, setQuery] = useState('');
-  const [error, setError] = useState('');
-  const tags = workspace.tags ?? [];
-  const name = query.trim();
-  const shown = tags.filter((tag) => tag.name.toLowerCase().includes(name.toLowerCase()));
-  const duplicate = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
-  const run = (summary: string, update: (workspace: Workspace) => Workspace) => {
-    try {
-      const probe = update(workspace);
-      if (probe === workspace) {
-        setError('That change would not alter this selection.');
-        return;
-      }
-      setError('');
-      onApply(summary, update);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'The tag change could not be applied.');
-    }
-  };
-  return (
-    <AnchoredPopover
-      id={id}
-      anchor={anchor}
-      title="Tag selected entities"
-      width={318}
-      onClose={onClose}
-    >
-      <label>
-        Find or create a tag
-        <input
-          data-autofocus
-          type="search"
-          aria-label="Find or create a tag for the selection"
-          maxLength={100}
-          placeholder="Exchange, shop, savings…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </label>
-      {name && !duplicate && (
-        <button
-          type="button"
-          className="primary batch-tag-create"
-          onClick={() =>
-            run(`Tag ${name} added to ${ids.length} entities`, (current) =>
-              createBatchTag(current, ids, {
-                name,
-                color: tagColors[(current.tags?.length ?? 0) % tagColors.length],
-              }),
-            )
-          }
-        >
-          <Plus size={12} /> Create “{name}” and add {ids.length.toLocaleString('en-US')}
-        </button>
-      )}
-      <div className="batch-tag-list">
-        {shown.map((tag) => {
-          const plan = tagBatchPlan(workspace, ids, tag.id);
-          return (
-            <div key={tag.id} className="batch-tag-row">
-              <span className="batch-tag-name">
-                <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-                <span>{tag.name}</span>
-                <small>
-                  in {plan.memberCount.toLocaleString('en-US')} of{' '}
-                  {plan.total.toLocaleString('en-US')}
-                </small>
-              </span>
-              <button
-                type="button"
-                disabled={!plan.missingCount}
-                aria-label={`Add ${plan.missingCount} selected entities to ${tag.name}`}
-                onClick={() =>
-                  run(`Tag ${tag.name} added to ${plan.missingCount} entities`, (current) =>
-                    applyBatchTag(current, ids, tag.id, 'add'),
-                  )
-                }
-              >
-                <Plus size={12} /> Add {plan.missingCount.toLocaleString('en-US')}
-              </button>
-              <button
-                type="button"
-                disabled={!plan.memberCount}
-                aria-label={`Remove ${plan.memberCount} selected entities from ${tag.name}`}
-                onClick={() =>
-                  run(`Tag ${tag.name} removed from ${plan.memberCount} entities`, (current) =>
-                    applyBatchTag(current, ids, tag.id, 'remove'),
-                  )
-                }
-              >
-                <X size={12} /> Remove {plan.memberCount.toLocaleString('en-US')}
-              </button>
-            </div>
-          );
-        })}
-        {!shown.length && !name && (
-          <p>This workspace has no tags yet. Type a name to create one.</p>
-        )}
-        {!shown.length && name && duplicate === undefined && <p>No existing tag matches.</p>}
-      </div>
-      {error && (
-        <p className="batch-editor-error" role="alert">
-          {error}
-        </p>
-      )}
-      <p>
-        Adding or removing changes direct membership for the selected entities only. Other members
-        keep their tag.
-      </p>
-      <div className="batch-editor-actions">
-        <button type="button" onClick={onClose}>
-          <Check size={12} /> Done
-        </button>
-      </div>
-    </AnchoredPopover>
   );
 }
 

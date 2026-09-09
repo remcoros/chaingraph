@@ -63,6 +63,21 @@ describe('batch label and icon edits', () => {
     expect(plan.ids).toEqual([OUT_B]);
   });
 
+  it('keeps forgiving references and metadata length limits at the shared mutation boundary', () => {
+    const workspace = fixture();
+    const invalid = [
+      'invalid',
+      `addr:${bitcoinAddress.toBech32(new Uint8Array(20).fill(3), 0, 'tb')}`,
+    ];
+    const labeled = applyBatchLabel(workspace, [...invalid, OUT_B], 'L'.repeat(201));
+    expect(labeled.annotations[OUT_B].label).toHaveLength(200);
+    const icons = applyBatchIcon(labeled, [...invalid, OUT_A, OUT_B], 'I'.repeat(21));
+    expect(icons.annotations[OUT_A]).toEqual(workspace.annotations[OUT_A]);
+    expect(icons.annotations[OUT_B].icon).toHaveLength(20);
+    expect(Object.keys(icons.annotations).sort()).toEqual([OUT_A, OUT_B].sort());
+    expect(applyBatchIcon(icons, invalid, 'ignored')).toBe(icons);
+  });
+
   it('sets icons only where unset unless replacement is explicit', () => {
     const workspace = fixture();
     expect(planBatchIcon(workspace, [OUT_A, OUT_B]).targets).toEqual([OUT_B]);
@@ -105,6 +120,25 @@ describe('batch tag edits', () => {
     ]);
     expect(tagged.tags![0].nodeIds).toEqual([`addr:${ADDRESS}`]);
     expect(parseWorkspace(tagged, false).tags![0].name).toBe('Shop');
+  });
+
+  it('keeps descriptions on creation and preserves existing tag metadata when reusing a name', () => {
+    const tagged = createBatchTag(
+      fixture(),
+      { name: ' Merchant ', color: '#65cbbb', description: ' Reviewed evidence ' },
+      ['invalid', OUT_A],
+    );
+    expect(tagged.tags![0]).toMatchObject({
+      name: 'Merchant',
+      description: 'Reviewed evidence',
+      nodeIds: [OUT_A],
+    });
+    const reused = createBatchTag(
+      tagged,
+      { name: 'merchant', color: '#e4af67', description: 'Replacement' },
+      [OUT_B, 'invalid'],
+    );
+    expect(reused.tags![0]).toEqual({ ...tagged.tags![0], nodeIds: [OUT_A, OUT_B] });
   });
 
   it('refuses to edit a tag that no longer exists', () => {

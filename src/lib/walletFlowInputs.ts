@@ -1,6 +1,10 @@
 import type { Network, Transaction, Workspace } from '../domain/types';
 import type { WalletReviewFlowEntry } from '../domain/walletReviewContext';
-import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
+import {
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  type PreviousOutputIndex,
+} from '../domain/prevouts';
 import { parseTransaction, validateTransactionAddresses } from '../domain/workspace';
 import { mapLimit } from './api';
 import { mergeFlowInputs } from './useFlowInputs';
@@ -46,6 +50,7 @@ export function walletFlowInputPlan(
   transactionId: string | undefined,
   inputs: readonly WalletReviewFlowEntry[],
   attempted: ReadonlySet<string> = new Set(),
+  previousOutputs?: PreviousOutputIndex,
 ) {
   const refs: WalletFlowInputReference[] = [];
   const seen = new Set<string>();
@@ -69,7 +74,7 @@ export function walletFlowInputPlan(
   }
   const missing = new Set<string>();
   let missingOutputCount = 0;
-  const prevouts = indexPreviousOutputs(workspace);
+  const prevouts = previousOutputs ?? (refs.length ? indexPreviousOutputs(workspace) : undefined);
   for (const ref of refs) {
     const resolution = resolvePreviousOutput(workspace, ref, prevouts);
     if (resolution.status === 'loaded' || resolution.status === 'attached') continue;

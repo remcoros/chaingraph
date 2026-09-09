@@ -8,6 +8,8 @@ import {
   type Workspace,
 } from './types';
 import { listTagsForNode } from './tags';
+import { addressToScriptHash } from '../lib/wallet';
+import type { WalletSelectionAddresses, WalletSelectionIndex } from './walletSelectionIndex';
 import {
   verifiedWalletAddresses,
   listWalletAddresses,
@@ -65,10 +67,24 @@ export function walletRowTags(workspace: Workspace, row: WalletRow) {
   });
 }
 
-export function walletRowWithContext(workspace: Workspace, row: WalletRow): WalletRow {
-  return row.kind === 'address' && row.address && !row.relationshipDirection
-    ? { ...row, contextTransactionIds: listLoadedAddressTransactionIds(workspace, row.address) }
-    : row;
+export function walletRowWithContext(
+  workspace: Workspace,
+  row: WalletRow,
+  index?: WalletSelectionIndex,
+): WalletRow {
+  if (row.kind !== 'address' || !row.address || row.relationshipDirection) return row;
+  if (!index)
+    return {
+      ...row,
+      contextTransactionIds: listLoadedAddressTransactionIds(workspace, row.address),
+    };
+  let ids: readonly string[] = [];
+  try {
+    ids = index.scriptTransactionIds.get(addressToScriptHash(row.address, workspace.network)) ?? [];
+  } catch {
+    // Invalid or wrong-network addresses cannot acquire transaction contexts.
+  }
+  return { ...row, contextTransactionIds: [...ids] };
 }
 
 export function resolveWalletRow(
@@ -296,13 +312,18 @@ export function walletRowRelationship(
     ownership: 'wallet' | 'external' | 'unknown';
     address?: string;
   },
+  walletAddresses?: WalletSelectionAddresses,
 ): string {
   if (row.kind === 'transaction') return 'Wallet activity';
   if (selected?.prevoutStatus === 'conflict') return 'Conflicting evidence';
   const address =
     selected?.address ?? row.address ?? (row.kind === 'address' ? row.identifier : undefined);
   if (address) {
-    return verifiedWalletAddresses(wallet, network).some((entry) => entry.address === address)
+    return (
+      walletAddresses
+        ? walletAddresses.addresses.has(address)
+        : verifiedWalletAddresses(wallet, network).some((entry) => entry.address === address)
+    )
       ? 'In this wallet'
       : 'No match in this wallet';
   }

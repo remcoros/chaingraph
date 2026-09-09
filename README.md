@@ -4,7 +4,7 @@ A self-hosted Bitcoin analysis workbench for personal wallets and on-chain inves
 
 Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, browser-side receive/change scanning, labels, notes, a searchable icon palette, bookmarks, and BIP329 label exchange. Workspace tags group counterparties independently from labels and notes, while separate wallet-match highlights identify derived addresses and their loaded outputs. Seven analysis tools cover equal outputs, common-input ownership, address reuse, value flow and fees, consolidation and fan-out, script types, and imported-wallet intersections. Each tool exposes its scope, parameters, assumptions and coverage.
 
-Filter the graph by entity type, labels, tags, wallet membership, notes, bookmarks, value and loaded funding/spending evidence. The floating **Filters** popover collects those controls, and removable chips show every active filter beside a **Reset filters** action. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. Select several entities and apply a label, tag or icon to exactly that set. Nine example workspaces offer real transactions across six mainnet and three testnet4 cases with starter labels, tags, icons and bookmarks. Only examples for networks configured on your backend are shown.
+Filter the graph by entity type, labels, tags, wallet membership, notes, bookmarks, value and loaded funding/spending evidence. The floating **Filters** popover collects those controls, and removable chips show every active filter beside a **Reset filters** action. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. Select several entities and apply a label, tag or icon to exactly that set. Wallet and Graph share quick editors with searchable tags, explicit color choices, and responsive rows for long names. Batch labels and icons preserve existing values unless replacement is enabled. Nine example workspaces offer real transactions across six mainnet and three testnet4 cases with starter labels, tags, icons and bookmarks. Only examples for networks configured on your backend are shown.
 
 ![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)
 
@@ -98,6 +98,10 @@ the last check, partial discovery, used and discovered addresses, loaded versus
 known transactions, and the current UTXO count and balance from a verified check.
 There is no completeness percentage; when no UTXO check has run, the workbench
 says so and offers the action.
+
+Row navigation reuses a browser-memory index of loaded transactions and wallet
+scripts, avoiding repeated history scans when selecting records in larger wallets.
+Newly loaded evidence refreshes the index automatically.
 
 **To review** starts with current UTXOs and used wallet addresses, followed by
 earlier receipts, source addresses, refreshed activity, destination addresses and
@@ -291,12 +295,11 @@ entity you select explicitly stays a batch target, and results changing never
 grows a selection. Selections are cleared when you
 switch workspaces and pruned only when an entity is actually removed.
 
-Label, Tag and Icon open small anchored editors instead of the single-entity
-Inspector. The label editor offers **Only unlabeled** and states how many entities
-it affects and how many existing labels it would replace; mixed existing values are
-listed and are never overwritten merely by opening the control. The tag editor adds
-or removes direct membership with explicit counts, or creates a tag for the
-selection. Icons reuse the shared icon palette. Each applied batch saves
+Label, Tags and Icon share the Wallet quick editors. Batch labels and icons keep
+existing values unless you enable replacement. The label editor shows its target
+count and single-item editing starts with the current label. Tag rows show full
+names, colors and direct membership counts; choose a color before **Create and
+assign**. Existing-tag Add/Remove keeps the popup open. Each applied batch saves
 automatically and is one Undo step, available from the toolbar or the header.
 
 Choose **Entities → Match graph** to keep the list aligned with the filtered

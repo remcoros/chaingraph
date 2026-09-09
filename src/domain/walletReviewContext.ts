@@ -5,6 +5,7 @@ import {
   type PreviousOutputResolution,
 } from './prevouts';
 import { verifiedWalletAddresses } from './walletRecords';
+import type { WalletSelectionAddresses, WalletSelectionIndex } from './walletSelectionIndex';
 import {
   canonicalTransactionId,
   loadedWalletTransactions,
@@ -86,6 +87,8 @@ export function buildWalletReviewContext(
   wallet: Wallet,
   item: WalletReviewContextSubject,
   contextTransactionId?: string,
+  index?: WalletSelectionIndex,
+  walletAddresses?: WalletSelectionAddresses,
 ): WalletReviewContext {
   const selectedId = canonicalId(item.nodeId, workspace);
   const selectedPoint = selectedId ? outpoint(selectedId) : undefined;
@@ -98,12 +101,12 @@ export function buildWalletReviewContext(
         : (selectedPoint?.txid ??
           (selectedId?.startsWith('tx:') ? selectedId.slice(3) : undefined) ??
           canonicalTransactionId(item.txid));
-  const transactions = loadedWalletTransactions(workspace);
+  const transactions = index?.transactions ?? loadedWalletTransactions(workspace);
   const transaction = transactionId ? transactions.get(transactionId) : undefined;
-  const hashes = new Set(
-    verifiedWalletAddresses(wallet, workspace.network).map((entry) => entry.scripthash),
-  );
-  const prevouts = indexPreviousOutputs(workspace);
+  const hashes =
+    walletAddresses?.scripthashes ??
+    new Set(verifiedWalletAddresses(wallet, workspace.network).map((entry) => entry.scripthash));
+  const prevouts = index?.prevouts ?? indexPreviousOutputs(workspace);
 
   const entry = (
     txid: string,

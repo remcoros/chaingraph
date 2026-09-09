@@ -336,6 +336,18 @@ address selections appear immediately.
 
 ### Wallet review and batch metadata
 
+`domain/walletSelectionIndex.ts` projects loaded transaction contexts by script,
+address outputs, spending relationships and conflict-aware prevouts once per
+immutable transaction snapshot and network. `WalletReview` owns this memory above
+the keyed detail panel, alongside verified wallet addresses keyed by address array
+and network. Row selection and metadata edits reuse the indexes; new observations
+rebuild them. The context, related-record and visible-input planners accept these
+indexes while retaining their uncached paths for other callers. Empty visible-input
+plans skip prevout indexing entirely. No index is persisted or shared globally;
+locking or closing the workspace releases it with the component. Script authority,
+network validation and loaded/attached/conflicting evidence semantics are preserved.
+See [selection performance validation](reviews/2026-09-09-wallet-selection-performance.md).
+
 `domain/walletReview.ts` derives a review queue for one wallet from loaded
 observations and an optional verified UTXO check. Reasons are ordered: current
 UTXOs, used wallet addresses, receipts spent into them, source addresses, refresh activity,
@@ -376,8 +388,26 @@ new explicit scope, and selected records outside the current filter are reported
 beside the batch controls. `useRecordSelection` handles explicit toggles and ranges
 limited to the displayed ordering. Single-item editors opt into replacement and
 start with the current annotation; batch editors keep existing metadata by default.
-Wallet metadata popovers render through a viewport-bounded portal, outside the
-workbench scroll clipping boundary.
+`MetadataEditors` supplies the shared quick label, tag and note controls for
+Wallet and Graph. `MetadataPopover` also positions `IconPicker`, tracking content,
+scroll and visual viewport changes outside panel clipping boundaries. Its
+nonmodal focus lifecycle closes on focus leaving the editor, without pulling
+focus away from the next control; Escape and Done return focus to the invoker.
+Selection changes discard unfinished drafts and close icon palettes.
+
+The Inspector's tag adapter retains explicit output/address scope and inherited
+membership hints. All tag popups search names/descriptions and support explicit
+color selection, direct Add/Remove membership and create-and-assign in one update.
+Global tag management retains descriptions/member management and shares the color
+palette. The Inspector's always-visible label/note inputs still autosave per edit;
+graph hover, flow and retained Trace actions lead to that editor. Analysis owns
+no separate quick editor.
+
+`batchMetadata` keeps preservation defaults and its forgiving canonical-record
+adapter, delegating mutations to the bounded primitives in `batchEdits`. The
+Graph toolbar validates its full explicit selection strictly before calling the
+shared updates, retaining network validation and the supplied-reference cap.
+Its Undo remains tied to the specific undo-head token.
 
 `walletReviewContext` projects the creating transaction into full input/output
 arrays with selected-output markers. Membership uses verified discovered wallet

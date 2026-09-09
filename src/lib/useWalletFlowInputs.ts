@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { PreviousOutputIndex } from '../domain/prevouts';
 import type { Network, Transaction, Workspace } from '../domain/types';
 import type { WalletReviewFlowEntry } from '../domain/walletReviewContext';
 import {
@@ -12,6 +13,8 @@ export { mergeWalletFlowInputs } from './walletFlowInputs';
 
 interface Options {
   workspace: Workspace;
+  /** Must describe the same immutable transaction snapshot and network. */
+  prevouts?: PreviousOutputIndex;
   walletId: string;
   selectionKey: string;
   transactionId?: string;
@@ -67,6 +70,7 @@ export function useWalletFlowInputs(options: Options) {
     options.transactionId,
     options.inputs,
     scope.current.attempted,
+    options.prevouts,
   );
   const visibleKey = JSON.stringify(plan.refs);
   const cacheKey = JSON.stringify([plan.missing, plan.missingOutputCount]);
@@ -88,6 +92,8 @@ export function useWalletFlowInputs(options: Options) {
           walletId,
           transactionId,
           latest.current.inputs,
+          undefined,
+          latest.current.prevouts,
         ).refs,
       ) === visibleKey;
     const currentPlan = walletFlowInputPlan(
@@ -96,6 +102,7 @@ export function useWalletFlowInputs(options: Options) {
       transactionId,
       inputs,
       owned.attempted,
+      latest.current.prevouts,
     );
     const message = () => {
       const absent =

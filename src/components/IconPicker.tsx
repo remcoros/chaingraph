@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useDialogFocus } from './Dialogs';
+import { MetadataPopover } from './MetadataEditors';
 import './icon-picker.css';
 
 const icons = [
@@ -115,24 +115,23 @@ export function IconPicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen((current) => !current)}
       >
         <span className="icon-picker-preview" aria-hidden="true">
           {mixed ? '◐' : value || '∅'}
         </span>
         {compact && <span>{caption ?? 'Icon'}</span>}
       </button>
-      {open &&
-        createPortal(
+      {open && (
+        <MetadataPopover anchor={trigger.current!} onClose={() => setOpen(false)}>
           <IconPalette
             id={id}
             value={mixed ? '' : value}
-            anchor={trigger.current!}
             onChange={onChange}
             onClose={() => setOpen(false)}
-          />,
-          document.body,
-        )}
+          />
+        </MetadataPopover>
+      )}
     </div>
   );
 }
@@ -140,11 +139,10 @@ export function IconPicker({
 function IconPalette({
   id,
   value,
-  anchor,
   onChange,
   onClose,
-}: Props & { id: string; anchor: HTMLElement; onClose: () => void }) {
-  const ref = useDialogFocus(onClose);
+}: Props & { id: string; onClose: () => void }) {
+  const ref = useDialogFocus(onClose, undefined, false);
   const options: readonly (readonly [string, string])[] =
     value && !icons.some(([symbol]) => symbol === value)
       ? [[value, 'Imported icon'], ...icons]
@@ -155,17 +153,9 @@ function IconPalette({
       options.findIndex(([symbol]) => symbol === value),
     ),
   );
-  const rect = anchor.getBoundingClientRect();
-  const width = Math.min(336, window.innerWidth - 24);
-  const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-  const top = Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - 440));
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>(`[data-icon-index="${active}"]`)?.focus();
   }, [active, ref]);
-  useEffect(() => {
-    window.addEventListener('resize', onClose);
-    return () => window.removeEventListener('resize', onClose);
-  }, [onClose]);
   function keydown(event: KeyboardEvent<HTMLDivElement>) {
     if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute('data-icon-index'))
       return;
@@ -190,67 +180,59 @@ function IconPalette({
   }
   return (
     <div
-      className="icon-picker-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      ref={ref}
+      id={id}
+      className="icon-palette"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Choose node icon"
+      onKeyDown={keydown}
     >
-      <div
-        ref={ref}
-        id={id}
-        className="icon-palette"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Choose node icon"
-        style={{ left, top, width, maxHeight: window.innerHeight - top - 12 }}
-        onKeyDown={keydown}
-      >
-        <div className="icon-palette-heading">
-          <strong>Choose an icon</strong>
+      <div className="icon-palette-heading">
+        <strong>Choose an icon</strong>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Close icon picker"
+          onClick={onClose}
+        >
+          <X size={16} />
+        </button>
+      </div>
+      <p className="small muted">Choose a symbol, or clear the current icon.</p>
+      <div className="icon-palette-grid" role="group" aria-label="Icon choices">
+        {options.map(([symbol, label], index) => (
           <button
+            key={symbol}
             type="button"
-            className="icon-button"
-            aria-label="Close icon picker"
-            onClick={onClose}
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <p className="small muted">Choose a symbol, or clear the current icon.</p>
-        <div className="icon-palette-grid" role="group" aria-label="Icon choices">
-          {options.map(([symbol, label], index) => (
-            <button
-              key={symbol}
-              type="button"
-              className="icon-palette-choice"
-              data-icon-index={index}
-              tabIndex={index === active ? 0 : -1}
-              title={label}
-              aria-label={label}
-              aria-pressed={value === symbol}
-              onFocus={() => setActive(index)}
-              onClick={() => {
-                onChange(symbol);
-                onClose();
-              }}
-            >
-              <span aria-hidden="true">{symbol}</span>
-            </button>
-          ))}
-        </div>
-        <div className="icon-palette-footer">
-          <span>{options[active][1]}</span>
-          <button
-            type="button"
-            className="text-button"
+            className="icon-palette-choice"
+            data-icon-index={index}
+            tabIndex={index === active ? 0 : -1}
+            title={label}
+            aria-label={label}
+            aria-pressed={value === symbol}
+            onFocus={() => setActive(index)}
             onClick={() => {
-              onChange('');
+              onChange(symbol);
               onClose();
             }}
           >
-            Clear icon
+            <span aria-hidden="true">{symbol}</span>
           </button>
-        </div>
+        ))}
+      </div>
+      <div className="icon-palette-footer">
+        <span>{options[active][1]}</span>
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            onChange('');
+            onClose();
+          }}
+        >
+          Clear icon
+        </button>
       </div>
     </div>
   );

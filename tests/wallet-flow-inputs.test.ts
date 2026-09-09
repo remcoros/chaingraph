@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Transaction } from '../src/domain/types';
 import type { WalletReviewFlowEntry } from '../src/domain/walletReviewContext';
+import { indexPreviousOutputs } from '../src/domain/prevouts';
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import {
   loadWalletFlowInputWave,
@@ -54,6 +55,29 @@ const fixture = () => {
 };
 
 describe('visible Wallet input planning', () => {
+  it('reuses the loaded snapshot index and skips workspace scans for empty visible inputs', () => {
+    const workspace = fixture();
+    workspace.transactions[parent] = tx(parent);
+    const prevouts = indexPreviousOutputs(workspace);
+    const expected = walletFlowInputPlan(workspace, walletId, child, [input(), input(parent, 2)]);
+    workspace.transactions = new Proxy(workspace.transactions, {
+      ownKeys() {
+        throw new Error('Row selection must not enumerate the loaded transaction history.');
+      },
+    });
+    expect(
+      walletFlowInputPlan(
+        workspace,
+        walletId,
+        child,
+        [input(), input(parent, 2)],
+        undefined,
+        prevouts,
+      ),
+    ).toEqual(expected);
+    expect(walletFlowInputPlan(workspace, walletId, child, []).refs).toEqual([]);
+  });
+
   it('deduplicates known prevouts without deriving invented targets from missing addresses', () => {
     const workspace = fixture();
     const plan = walletFlowInputPlan(workspace, walletId, child, [

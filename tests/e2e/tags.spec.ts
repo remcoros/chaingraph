@@ -63,7 +63,9 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   expect(addTagBounds!.height).toBeLessThanOrEqual(30);
 
   await exchange.getByRole('button', { name: 'Show on graph' }).click();
-  await expect(page.getByLabel('Graph visibility', { exact: true })).toContainText('Exchange');
+  await expect(
+    page.getByRole('button', { name: 'Remove filter: Tag: Exchange', exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.locator('.entity-list .entity-row').first().click();
   await expect(page.locator('.transaction-row.is-selected .entity-badges')).toContainText(
@@ -72,32 +74,56 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await page.getByLabel('Node notes', { exact: true }).fill('Unsaved draft survives tag updates');
   const selectedTags = page.getByRole('region', { name: 'Tags and wallet matches' });
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
-  const picker = page.getByRole('dialog', { name: 'Choose tags' });
+  const picker = page.getByRole('dialog', { name: 'Tag selected records' });
   await expect(picker.getByLabel('Find or create tag')).toBeFocused();
   const assignmentGeometry = () =>
     picker
-      .locator('.tag-assignment')
+      .locator('.metadata-tag-option')
       .first()
       .evaluate((row) => {
-        const checkbox = row.querySelector('input')!.getBoundingClientRect();
-        const dot = row.querySelector('.tag-dot')!.getBoundingClientRect();
-        const text = row.querySelector('span:last-child')!.getBoundingClientRect();
+        const dot = row.querySelector('.metadata-tag-dot')!.getBoundingClientRect();
+        const text = row.querySelector('.metadata-tag-name')!.getBoundingClientRect();
         return {
-          ordered: checkbox.right < dot.left && dot.right < text.left,
-          aligned: Math.abs((checkbox.top + checkbox.bottom) / 2 - (dot.top + dot.bottom) / 2) < 2,
+          ordered: dot.right < text.left,
+          aligned: Math.abs((text.top + text.bottom) / 2 - (dot.top + dot.bottom) / 2) < 2,
           height: row.getBoundingClientRect().height,
+          overflow: row.scrollWidth > row.clientWidth,
         };
       });
-  expect(await assignmentGeometry()).toMatchObject({ ordered: true, aligned: true });
+  const expectNoHorizontalOverflow = async () => {
+    expect(await picker.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
+    expect(
+      await page
+        .locator('.metadata-popover')
+        .evaluate((popup) => popup.scrollWidth <= popup.clientWidth),
+    ).toBe(true);
+  };
+  expect(await assignmentGeometry()).toMatchObject({
+    ordered: true,
+    aligned: true,
+    overflow: false,
+  });
   expect((await assignmentGeometry()).height).toBeLessThan(60);
+  await expectNoHorizontalOverflow();
+  await page.screenshot({ path: 'artifacts/quick-edit-review/inline-tags-desktop.png' });
 
   await picker.getByRole('button', { name: 'Address + outputs', exact: true }).click();
   await picker.getByLabel('Find or create tag').fill('Shop');
   await picker.getByRole('button', { name: 'Color 3', exact: true }).click();
   await picker.getByLabel('Find or create tag').press('Enter');
-  await expect(picker.getByRole('checkbox', { name: /Shop/ })).toBeChecked();
+  await expect(picker).toHaveCount(0);
+  await expect(selectedTags.getByRole('button', { name: 'Add or choose tags' })).toBeFocused();
+  await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
+  await expect(picker.getByRole('button', { name: 'This output', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await picker.getByRole('button', { name: 'Address + outputs', exact: true }).click();
+  await expect(
+    picker.getByRole('button', { name: 'Add Shop to selected records', exact: true }),
+  ).toBeDisabled();
   await picker.getByLabel('Find or create tag').fill('shop');
-  await expect(picker.getByRole('button', { name: /Create tag/ })).toHaveCount(0);
+  await expect(picker.getByRole('button', { name: 'Create and assign' })).toHaveCount(0);
   await picker.getByLabel('Find or create tag').press('Enter');
   await page.keyboard.press('Escape');
   await expect(selectedTags.getByRole('button', { name: 'Add or choose tags' })).toBeFocused();
@@ -144,7 +170,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await expect(page.getByRole('button', { name: 'Save tag', exact: true })).toHaveCount(0);
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.locator('.graph-stage canvas')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('tags-desktop.png') });
+  await page.screenshot({ path: 'artifacts/quick-edit-review/tags-manager-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Browse' }).click();
   await expect(page.getByRole('button', { name: 'New tag', exact: true })).toBeInViewport({
@@ -158,20 +184,39 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
   await expect(picker).toBeInViewport({ ratio: 1 });
   expect(await assignmentGeometry()).toMatchObject({ ordered: true, aligned: true });
-  const inheritedShop = picker.getByRole('checkbox', { name: /Shop/ });
-  await expect(inheritedShop).not.toBeChecked();
+  await expectNoHorizontalOverflow();
+  const addShop = picker.getByRole('button', { name: 'Add Shop to selected records', exact: true });
+  const removeShop = picker.getByRole('button', {
+    name: 'Remove Shop from selected records',
+    exact: true,
+  });
+  await expect(addShop).toBeEnabled();
+  await expect(removeShop).toBeDisabled();
   await expect(picker).toContainText('Applied to address too');
-  await inheritedShop.check();
+  await addShop.click();
+  await expect(picker.getByLabel('Find or create tag')).toBeFocused();
+  await expect(addShop).toBeDisabled();
+  await expect(removeShop).toBeEnabled();
   await picker.getByRole('button', { name: 'Address + outputs', exact: true }).click();
-  await expect(inheritedShop).toBeChecked();
+  await expect(addShop).toBeDisabled();
+  await expect(removeShop).toBeEnabled();
   await expect(picker).toContainText('Applied to this output too');
-  await inheritedShop.uncheck();
+  await removeShop.click();
+  await expect(picker.getByLabel('Find or create tag')).toBeFocused();
+  await expect(addShop).toBeEnabled();
+  await expect(removeShop).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(
     selectedTags.getByRole('button', { name: 'Edit assignment for Shop' }),
   ).toBeVisible();
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
-  await expect(picker.getByRole('checkbox', { name: /Shop/ })).toBeChecked();
-  await page.screenshot({ path: test.info().outputPath('tags-mobile.png') });
+  await expect(picker.getByRole('button', { name: 'This output', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(addShop).toBeDisabled();
+  await expect(removeShop).toBeEnabled();
+  await expectNoHorizontalOverflow();
+  await page.screenshot({ path: 'artifacts/quick-edit-review/inline-tags-mobile.png' });
   await page.keyboard.press('Escape');
 });

@@ -2,6 +2,7 @@ import { outputNodeId, txNodeId, type Workspace } from './types';
 import { relatedTransactions } from './transactionInspection';
 import { walletOutputEvidence } from './walletRelationships';
 import type { WalletRow } from './walletWorkbenchRows';
+import type { WalletSelectionIndex } from './walletSelectionIndex';
 
 export interface WalletRelatedRecords {
   inputs: string[];
@@ -9,7 +10,11 @@ export interface WalletRelatedRecords {
   transactions: string[];
 }
 
-export function walletRelatedRecords(workspace: Workspace, row: WalletRow): WalletRelatedRecords {
+export function walletRelatedRecords(
+  workspace: Workspace,
+  row: WalletRow,
+  index?: WalletSelectionIndex,
+): WalletRelatedRecords {
   const inputs = new Set<string>();
   const outputs = new Set(row.outpointIds ?? []);
   const transactions = new Set(row.contextTransactionIds);
@@ -24,21 +29,40 @@ export function walletRelatedRecords(workspace: Workspace, row: WalletRow): Wall
   } else if (row.kind === 'output') {
     outputs.delete(row.nodeId);
     if (row.txid) transactions.add(row.txid);
-    for (const { tx } of relatedTransactions(workspace.transactions, {
-      id: row.nodeId,
-      kind: 'output',
-      label: '',
-      txid: row.txid,
-      vout: Number(row.nodeId.split(':')[2]),
-    }))
-      transactions.add(tx.txid);
+    if (index) {
+      const creating = workspace.transactions[row.txid ?? ''];
+      if (creating) transactions.add(creating.txid);
+      const point = outputNodeId(row.txid ?? '', Number(row.nodeId.split(':')[2]));
+      for (const txid of index.spendingTransactionIds.get(point) ?? []) transactions.add(txid);
+    } else
+      for (const { tx } of relatedTransactions(workspace.transactions, {
+        id: row.nodeId,
+        kind: 'output',
+        label: '',
+        txid: row.txid,
+        vout: Number(row.nodeId.split(':')[2]),
+      }))
+        transactions.add(tx.txid);
   } else if (!row.relationshipDirection && row.address) {
-    for (const txid of row.contextTransactionIds) {
-      const transaction = workspace.transactions[txid];
-      for (const output of transaction?.vout ?? [])
-        if (walletOutputEvidence(output, workspace.network).address === row.address)
-          outputs.add(outputNodeId(txid, output.n));
-    }
+    if (index) {
+      const contexts = new Set(row.contextTransactionIds);
+      const byTransaction = new Map<string, string[]>();
+      for (const id of index.addressOutputIds.get(row.address) ?? []) {
+        const txid = id.slice(4, id.lastIndexOf(':'));
+        if (!contexts.has(txid)) continue;
+        const ids = byTransaction.get(txid) ?? [];
+        ids.push(id);
+        byTransaction.set(txid, ids);
+      }
+      for (const txid of row.contextTransactionIds)
+        for (const id of byTransaction.get(txid) ?? []) outputs.add(id);
+    } else
+      for (const txid of row.contextTransactionIds) {
+        const transaction = workspace.transactions[txid];
+        for (const output of transaction?.vout ?? [])
+          if (walletOutputEvidence(output, workspace.network).address === row.address)
+            outputs.add(outputNodeId(txid, output.n));
+      }
   }
   return {
     inputs: [...inputs],

@@ -83,10 +83,10 @@ test('filters, batch selection and anchored batch editors keep other metadata in
 
   // Label only the unlabeled entities, with the affected and replacement counts shown.
   await toolbar.getByRole('button', { name: 'Label' }).click();
-  const labelEditor = page.getByRole('dialog', { name: 'Label selected entities' });
-  await expect(labelEditor.getByRole('status')).toContainText('Applies to 3 of 3 selected');
-  await labelEditor.getByLabel(/^Label for/).fill('Batch reviewed');
-  await labelEditor.getByRole('button', { name: 'Apply to 3' }).click();
+  const labelEditor = page.getByRole('dialog', { name: 'Label selected records' });
+  await expect(labelEditor.getByText('3 of 3 records change.')).toBeVisible();
+  await labelEditor.getByLabel('Batch label').fill('Batch reviewed');
+  await labelEditor.getByRole('button', { name: 'Apply label' }).click();
   await expect(labelEditor).toBeHidden();
   // Applying closes the editor and returns focus to its trigger.
   await expect(toolbar.getByRole('button', { name: 'Label', exact: true })).toBeFocused();
@@ -104,20 +104,21 @@ test('filters, batch selection and anchored batch editors keep other metadata in
   });
 
   // One Undo step restores the whole batch.
-  await toolbar.getByRole('button', { name: /^Undo: Label applied/ }).click();
+  await toolbar.getByRole('button', { name: /^Undo: Labelled/ }).click();
   workspace = await saved(page);
   expect(workspace.annotations[fundingSibling]?.label ?? '').toBe('');
   expect(workspace.annotations[fundingOutput].label).toBe('Keep this label');
 
   // Selection survives the undo; tag and icon batches use the same explicit scope.
   await expect(toolbar.getByRole('status')).toContainText('3 selected');
-  await toolbar.getByRole('button', { name: 'Tag', exact: true }).click();
-  const tagEditor = page.getByRole('dialog', { name: 'Tag selected entities' });
-  await expect(tagEditor.getByText('in 0 of 3')).toBeVisible();
+  await toolbar.getByRole('button', { name: 'Tags', exact: true }).click();
+  const tagEditor = page.getByRole('dialog', { name: 'Tag selected records' });
+  await expect(tagEditor.getByText('0 of 3 selected')).toBeVisible();
   // Only one batch editor is active at a time.
   await expect(page.getByRole('dialog')).toHaveCount(1);
-  await tagEditor.getByLabel('Find or create a tag for the selection').fill('Reviewed batch');
-  await tagEditor.getByRole('button', { name: /^Create “Reviewed batch”/ }).click();
+  await tagEditor.getByLabel('Find or create tag').fill('Reviewed batch');
+  await tagEditor.getByRole('button', { name: 'Color 3', exact: true }).click();
+  await tagEditor.getByRole('button', { name: 'Create and assign' }).click();
   await expect(tagEditor).toBeHidden();
   workspace = await saved(page);
   expect(workspace.tags?.map((tag) => tag.name)).toEqual(['Exchange', 'Reviewed batch']);
@@ -125,6 +126,7 @@ test('filters, batch selection and anchored batch editors keep other metadata in
     [fundingSibling, spendingOutput, spendingChange].sort(),
   );
   expect(workspace.tags?.[0].nodeIds).toEqual([fundingOutput]);
+  expect(workspace.tags?.[1].color).toBe('#9c9aed');
 
   await toolbar.getByRole('button', { name: /^Set an icon on 3/ }).click();
   await page.getByRole('dialog', { name: 'Choose node icon' }).getByLabel('CoinJoin').click();
@@ -222,7 +224,7 @@ test('batch controls stay reachable and tappable on a phone screen', async ({ pa
   await expect(toolbar).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath('batch-controls-phone.png') });
   await toolbar.getByRole('button', { name: 'Label' }).click();
-  const editor = page.getByRole('dialog', { name: 'Label selected entities' });
+  const editor = page.getByRole('dialog', { name: 'Label selected records' });
   await expect(editor).toBeInViewport();
   await page.keyboard.press('Escape');
   await expect(editor).toBeHidden();
@@ -261,11 +263,12 @@ test('a batch Undo retires when a later edit owns the undo step, protecting that
   await expect(toolbar.getByRole('status')).toContainText('2 selected');
 
   // Apply a batch tag; its Undo is offered while the batch owns the undo step.
-  await toolbar.getByRole('button', { name: 'Tag', exact: true }).click();
-  const tagEditor = page.getByRole('dialog', { name: 'Tag selected entities' });
-  await tagEditor.getByLabel('Find or create a tag for the selection').fill('Equal-value review');
-  await tagEditor.getByRole('button', { name: /^Create “Equal-value review”/ }).click();
-  const batchUndo = toolbar.getByRole('button', { name: /^Undo: Tag Equal-value review/ });
+  await toolbar.getByRole('button', { name: 'Tags', exact: true }).click();
+  const tagEditor = page.getByRole('dialog', { name: 'Tag selected records' });
+  await tagEditor.getByLabel('Find or create tag').fill('Equal-value review');
+  await tagEditor.getByRole('button', { name: 'Color 3', exact: true }).click();
+  await tagEditor.getByRole('button', { name: 'Create and assign' }).click();
+  const batchUndo = toolbar.getByRole('button', { name: /^Undo: Created tag Equal-value review/ });
   await expect(batchUndo).toBeVisible();
 
   // A later unrelated annotation edit takes over the undo step.
@@ -285,13 +288,15 @@ test('a batch Undo retires when a later edit owns the undo step, protecting that
 
   // A batch that changes nothing never advertises an undo step.
   await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
-  const labelEditor = page.getByRole('dialog', { name: 'Label selected entities' });
-  await labelEditor.getByLabel(/^Label for/).fill('Repeated label');
-  await labelEditor.getByRole('button', { name: 'Apply to 2' }).click();
+  const labelEditor = page.getByRole('dialog', { name: 'Label selected records' });
+  await labelEditor.getByLabel('Batch label').fill('Repeated label');
+  await labelEditor.getByLabel('Replace existing labels').check();
+  await labelEditor.getByRole('button', { name: 'Apply label' }).click();
   await expect(toolbar.getByRole('button', { name: /^Undo: Label/ })).toBeVisible();
   await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
-  await labelEditor.getByLabel(/^Label for/).fill('Repeated label');
-  await labelEditor.getByRole('button', { name: 'Apply to 2' }).click();
+  await labelEditor.getByLabel('Batch label').fill('Repeated label');
+  await labelEditor.getByLabel('Replace existing labels').check();
+  await labelEditor.getByRole('button', { name: 'Apply label' }).click();
   await expect(page.locator('.toast')).toContainText('left every selected entity unchanged');
   await expect(toolbar.getByRole('button', { name: /^Undo:/ })).toHaveCount(0);
   workspace = await saved(page);
@@ -310,9 +315,9 @@ test('combined workbench navigation retains batch Undo and isolation reveals amo
   await rows.nth(1).getByRole('checkbox').check();
   await rows.nth(2).getByRole('checkbox').check();
   await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: 'Label selected entities' });
-  await editor.getByLabel(/^Label for/).fill('Combined review');
-  await editor.getByRole('button', { name: /^Apply to/ }).click();
+  const editor = page.getByRole('dialog', { name: 'Label selected records' });
+  await editor.getByLabel('Batch label').fill('Combined review');
+  await editor.getByRole('button', { name: 'Apply label' }).click();
   const undo = toolbar.getByRole('button', { name: /^Undo: Label/ });
   await expect(undo).toBeVisible();
   const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
@@ -330,4 +335,127 @@ test('combined workbench navigation retains batch Undo and isolation reveals amo
   const workspace = await saved(page);
   expect(workspace.annotations[fundingOutput].label).toBe('Keep this label');
   expect(workspace.annotations[fundingSibling]?.label ?? '').toBe('');
+});
+
+for (const width of [1440, 390, 320]) {
+  test(`shared graph quick editors keep long tags readable and preserve scope (${width})`, async ({
+    page,
+  }) => {
+    const longName = 'Exchange withdrawal for long-term household savings and future expenses';
+    await seed(page, (workspace) => {
+      workspace.tags![0].name = longName;
+      workspace.tags![0].description = 'Public description searchable from every quick tag editor';
+    });
+    await page.setViewportSize({ width, height: 900 });
+    if (width < 1000)
+      await page
+        .locator('.mobile-switch')
+        .getByRole('button', { name: 'Browse', exact: true })
+        .click();
+    await page.locator('.left-panel').getByRole('button', { name: 'Select', exact: true }).click();
+    const rows = page.locator('.entity-list .entity-list-entry');
+    await rows.nth(1).getByRole('checkbox').check();
+    await rows.nth(2).getByRole('checkbox').check();
+    const toolbar = page.locator('.selection-toolbar');
+    const trigger = toolbar.getByRole('button', { name: 'Tags', exact: true });
+    await trigger.click();
+    const editor = page.getByRole('dialog', { name: 'Tag selected records' });
+    const popup = page.locator('.metadata-popover');
+    const input = editor.getByLabel('Find or create tag');
+    await expect(input).toBeFocused();
+    const row = editor.locator('.metadata-tag-option');
+    await expect(row).toContainText(longName);
+    expect(
+      await row.locator('.metadata-tag-dot').evaluate((el) => el.getBoundingClientRect().width),
+    ).toBe(8);
+    await expect(
+      row.getByRole('button', { name: `Add ${longName} to selected records`, exact: true }),
+    ).toBeVisible();
+    await input.fill('searchable');
+    await expect(row).toHaveCount(1);
+    await input.fill('');
+    await page.screenshot({
+      path: `artifacts/quick-edit-review/graph-tags-${width}.png`,
+      fullPage: true,
+    });
+    for (const name of ['S', 'x'.repeat(100)]) {
+      await input.fill(name);
+      await expect(editor.getByRole('button', { name: 'Create and assign' })).toBeVisible();
+      expect(await popup.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    }
+    await input.fill('Scoped savings');
+    await editor.getByRole('button', { name: 'Color 4', exact: true }).click();
+    await page.screenshot({
+      path: `artifacts/quick-edit-review/graph-create-${width}.png`,
+      fullPage: true,
+    });
+    await input.press('Enter');
+    await expect(editor).toBeHidden();
+    await expect(trigger).toBeFocused();
+    const workspace = await saved(page);
+    const tag = workspace.tags!.find((tag) => tag.name === 'Scoped savings')!;
+    expect(tag.color).toBe('#e888a5');
+    expect(tag.nodeIds.sort()).toEqual([fundingOutput, fundingSibling].sort());
+    await trigger.click();
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
+    const label = page.getByRole('dialog', { name: 'Label selected records' });
+    await expect(label.getByLabel('Replace existing labels')).not.toBeChecked();
+    await expect(label).toContainText('1 already labelled and kept as they are.');
+    await label.getByLabel('Batch label').fill('Preserve previous labels');
+    await label.getByRole('button', { name: 'Apply label' }).click();
+    const labelled = await saved(page);
+    expect(labelled.annotations[fundingOutput].label).toBe('Keep this label');
+    expect(labelled.annotations[fundingSibling].label).toBe('Preserve previous labels');
+  });
+}
+
+test('quick editors toggle, follow viewport changes and close on focus or scope changes', async ({
+  page,
+}) => {
+  await seed(page);
+  await page.locator('.left-panel').getByRole('button', { name: 'Select', exact: true }).click();
+  const rows = page.locator('.entity-list .entity-list-entry');
+  await rows.nth(1).getByRole('checkbox').check();
+  const toolbar = page.locator('.selection-toolbar');
+  for (const name of ['Label', 'Tags']) {
+    const trigger = toolbar.getByRole('button', { name, exact: true });
+    await trigger.click();
+    await expect(page.locator('.metadata-popover')).toBeVisible();
+    await trigger.click();
+    await expect(page.locator('.metadata-popover')).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+  const icon = toolbar.getByRole('button', { name: /^Set an icon/ });
+  await icon.click();
+  await expect(page.getByRole('dialog', { name: 'Choose node icon' })).toBeVisible();
+  await icon.click();
+  await expect(page.locator('.metadata-popover')).toHaveCount(0);
+  await icon.click();
+  await page.setViewportSize({ width: 390, height: 400 });
+  const popup = page.locator('.metadata-popover');
+  await expect(popup).toBeVisible();
+  await expect(popup).toBeInViewport({ ratio: 1 });
+  expect(await popup.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await toolbar.getByRole('button', { name: 'Tags', exact: true }).click();
+  await toolbar.getByRole('button', { name: 'Label', exact: true }).focus();
+  await expect(popup).toHaveCount(0);
+  await expect(toolbar.getByRole('button', { name: 'Label', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Label selected records' })).toBeVisible();
+  await page.getByLabel('Batch label').fill('Unapplied draft');
+  // A keyboard selection change dismisses the editor without applying its draft.
+  await rows.nth(2).getByRole('checkbox').focus();
+  await page.keyboard.press('Space');
+  await expect(popup).toHaveCount(0);
+  await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
+  await expect(page.getByLabel('Batch label')).toHaveValue('');
+  await page.keyboard.press('Escape');
+  await icon.click();
+  await rows.nth(2).getByRole('checkbox').focus();
+  await page.keyboard.press('Space');
+  await expect(popup).toHaveCount(0);
 });

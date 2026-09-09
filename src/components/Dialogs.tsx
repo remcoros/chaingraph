@@ -8,7 +8,11 @@ import { inspectExtendedPublicKey, deriveAddresses } from '../lib/wallet';
 import { decryptWorkspace } from '../lib/crypto';
 import type { SavedWorkspace } from '../lib/useWorkspaces';
 import './dialogs.css';
-export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: string) {
+export function useDialogFocus(
+  onClose: () => void,
+  fallbackFocusSelector?: string,
+  trapFocus = true,
+) {
   const ref = useRef<HTMLDivElement>(null);
   // Capture the invoker before children mount and React applies autoFocus.
   const [previous] = useState(() => document.activeElement as HTMLElement | null);
@@ -26,7 +30,7 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
         e.preventDefault();
         closeRef.current();
       }
-      if (e.key === 'Tab') {
+      if (e.key === 'Tab' && trapFocus) {
         const items = [
           ...el!.querySelectorAll<HTMLElement>(
             'button:not(:disabled),input:not(:disabled),select,textarea,a[href],[tabindex]:not([tabindex="-1"])',
@@ -50,9 +54,28 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
         }
       }
     };
+    const focusOutside = (event: FocusEvent) => {
+      if (
+        !trapFocus &&
+        event.target instanceof Node &&
+        !el?.contains(event.target) &&
+        !previous?.contains(event.target)
+      )
+        closeRef.current();
+    };
     document.addEventListener('keydown', key);
+    document.addEventListener('focusin', focusOutside);
     return () => {
       document.removeEventListener('keydown', key);
+      document.removeEventListener('focusin', focusOutside);
+      // Nonmodal quick editors allow focus to move to another app control.
+      // Escape/Done still return focus when it remained inside the editor.
+      if (
+        !trapFocus &&
+        document.activeElement !== document.body &&
+        !el?.contains(document.activeElement)
+      )
+        return;
       const target = previous?.isConnected
         ? previous
         : fallbackFocusSelector
@@ -60,7 +83,7 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
           : null;
       target?.focus({ preventScroll: true });
     };
-  }, [previous, fallbackFocusSelector]);
+  }, [previous, fallbackFocusSelector, trapFocus]);
   return ref;
 }
 export function Modal({

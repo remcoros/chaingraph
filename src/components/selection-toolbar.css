@@ -56,73 +56,14 @@
 .selection-toolbar .icon-picker-trigger {
   min-height: 30px;
 }
-.batch-editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-rule);
-}
-.batch-editor-actions button {
+.selection-toolbar-replace {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  min-height: 32px;
-}
-.batch-editor-error {
-  color: var(--color-danger, #e888a5);
-}
-.batch-tag-create {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  min-height: 32px;
-}
-.batch-tag-list {
-  display: flex;
-  flex-direction: column;
   gap: 4px;
-  max-height: 230px;
-  overflow: auto;
-  overscroll-behavior: contain;
 }
-.batch-tag-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 0;
-  border-top: 1px solid var(--color-rule);
-}
-.batch-tag-row:first-child {
-  border-top: 0;
-}
-.batch-tag-row button {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-height: 30px;
-  padding: 3px 6px;
-  font-size: 10px;
-}
-.batch-tag-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-.batch-tag-name > span:nth-child(2) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.batch-tag-name small {
-  color: var(--color-muted);
-  font-size: 9px;
-  white-space: nowrap;
+.selection-toolbar-replace input {
+  width: auto;
 }
 .selection-checkbox {
   display: inline-flex;
@@ -190,8 +131,7 @@
     padding: 5px;
     max-width: calc(100vw - 16px);
   }
-  .selection-toolbar button,
-  .batch-tag-row button {
+  .selection-toolbar button {
     min-height: 38px;
   }
   /* Keep touch targets while fitting the actions into fewer rows. */

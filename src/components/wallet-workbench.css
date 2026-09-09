@@ -407,73 +407,6 @@
 .batch-popover-anchor {
   position: relative;
 }
-.batch-popover {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 6px);
-  left: 0;
-  width: min(320px, calc(100vw - 32px));
-  max-height: min(440px, 70vh);
-  overflow: auto;
-  padding: 12px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 30px var(--color-shadow);
-}
-.batch-popover-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.batch-popover label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.batch-popover .batch-replace {
-  flex-direction: row;
-  align-items: center;
-}
-.batch-popover input[type='search'] {
-  width: 100%;
-  margin-bottom: 8px;
-}
-.batch-tag-create {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.batch-tag-options {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 200px;
-  overflow: auto;
-}
-.batch-tag-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  border-bottom: 1px solid var(--color-rule);
-}
-.batch-tag-name {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  font-size: 12px;
-}
-.batch-tag-name small {
-  font-size: 10px;
-}
 @media (max-width: 760px) {
   .wallet-workbench {
     padding: 16px 14px 32px;
@@ -502,14 +435,6 @@
   .wallet-review-record-actions {
     width: 100%;
     justify-content: flex-end;
-  }
-  .batch-popover {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    top: auto;
-    bottom: 12px;
-    width: auto;
   }
 }
 
@@ -911,21 +836,6 @@
   .wallet-first-use {
     font-size: 11px;
   }
-}
-
-.wallet-metadata-popover {
-  position: fixed;
-  z-index: 260;
-  overflow: auto;
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 30px var(--color-shadow);
-}
-.wallet-metadata-popover .batch-popover {
-  position: static;
-  width: 100%;
-  max-height: none;
-  overflow: visible;
-  box-shadow: none;
 }
 
 .wallet-picker-row {
@@ -1525,12 +1435,6 @@
   .wallet-detail-toolbar .batch-actions {
     gap: 6px;
   }
-}
-
-.wallet-metadata-popover textarea {
-  width: 100%;
-  min-width: 0;
-  resize: vertical;
 }
 
 .wallet-operation-hint {

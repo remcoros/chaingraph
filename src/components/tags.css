@@ -34,21 +34,6 @@
 .tag-form label {
   margin-bottom: 8px;
 }
-.tag-colors {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0;
-}
-.tag-colors button {
-  width: 28px;
-  min-height: 28px;
-  padding: 0;
-  border: 2px solid transparent;
-  color: #101b1f;
-}
-.tag-colors button[aria-pressed='true'] {
-  border-color: var(--color-ink);
-}
 .tag-form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -99,23 +84,6 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-}
-.tag-assignment {
-  display: flex;
-  flex-direction: row;
-  text-align: left;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  margin: 0;
-  cursor: pointer;
-}
-.tag-assignment input {
-  width: auto;
-}
-.tag-assignment small {
-  display: block;
-  color: var(--color-muted);
 }
 .tag-members {
   max-height: 210px;
@@ -187,25 +155,6 @@
   border-style: dashed;
   color: var(--color-muted);
 }
-.tag-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-}
-.tag-picker {
-  position: fixed;
-  box-sizing: border-box;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 12px;
-  border: 1px solid var(--color-rule);
-  border-radius: 9px;
-  background: var(--color-paper, #111a20);
-  box-shadow: 0 16px 50px #0009;
-}
-.tag-picker .tags-heading {
-  margin-bottom: 8px;
-}
 .tag-scope {
   display: flex;
   gap: 3px;
@@ -222,71 +171,6 @@
   color: var(--color-output);
   background: color-mix(in srgb, var(--color-output) 10%, transparent);
 }
-.tag-picker-search input {
-  width: 100%;
-}
-.tag-picker-options {
-  max-height: 190px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  margin: 7px 0;
-}
-.tag-picker .tag-assignment {
-  min-height: 38px;
-  padding: 7px 6px;
-  border-radius: 4px;
-}
-.tag-picker .tag-assignment:hover,
-.tag-picker .tag-assignment:focus-within {
-  background: color-mix(in srgb, var(--color-output) 8%, transparent);
-}
-.tag-picker .tag-assignment > span:last-child {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.tag-picker .tag-assignment input {
-  flex: none;
-  accent-color: var(--color-output);
-}
-.tag-picker-create {
-  border-top: 1px solid var(--color-rule);
-  padding-bottom: 8px;
-}
-.tag-picker-create > button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-  min-width: 0;
-  text-align: left;
-}
-.tag-picker-create > button > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tag-picker-create > button > svg {
-  flex: none;
-}
-.tag-picker-footer {
-  border-top: 1px solid var(--color-rule);
-  padding-top: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.tag-picker-footer .text-button {
-  padding: 3px;
-}
-
-@media (max-width: 700px) {
-  .tag-picker .tag-assignment {
-    min-height: 44px;
-  }
-}
-
 .tag-card-actions {
   flex-wrap: nowrap;
   gap: 5px;

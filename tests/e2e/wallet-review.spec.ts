@@ -435,7 +435,7 @@ for (const [tab, firstId, secondId] of [
     const second = rowFor(secondId);
     await expect(first).toHaveCount(1);
     await expect(second).toHaveCount(1);
-    await first.getByRole('button').click();
+    await first.locator('.wallet-row-button').click();
     const selected = tab === 'To review' ? detail(page) : walletDetail(page);
     await expect(selected).toBeVisible();
     await expect(batchDetail(page)).toHaveCount(0);
@@ -452,7 +452,7 @@ for (const [tab, firstId, secondId] of [
     await label.getByLabel('Batch label').fill(`${tab} single label`);
     await label.getByRole('button', { name: 'Apply label', exact: true }).click();
     await expect(first).toContainText(`${tab} single label`);
-    await single.getByRole('button', { name: 'Tag', exact: true }).click();
+    await single.getByRole('button', { name: 'Tags', exact: true }).click();
     const tags = page.getByRole('dialog', { name: 'Tag selected records' });
     await tags.getByLabel('Find or create tag').fill(`${tab} single tag`);
     await tags.getByRole('button', { name: 'Create and assign', exact: true }).click();
@@ -468,7 +468,7 @@ for (const [tab, firstId, secondId] of [
     await first.getByRole('checkbox').check();
     await second.getByRole('checkbox').check();
     const batch = batchDetail(page);
-    await expect(batch).toContainText('2 unique metadata targets');
+    await expect(batch.locator('.batch-scope')).toHaveText('2 selected');
     await expect(selected).toHaveCount(0);
     const bar = batch.getByRole('group', { name: 'Batch metadata editing' });
     await expect(page.getByRole('group', { name: 'Batch metadata editing' })).toHaveCount(1);
@@ -483,7 +483,7 @@ for (const [tab, firstId, secondId] of [
     await label.getByRole('button', { name: 'Apply label', exact: true }).click();
     await expect(first).toContainText(`${tab} batch label`);
     await expect(second).toContainText(`${tab} batch label`);
-    await bar.getByRole('button', { name: 'Tag', exact: true }).click();
+    await bar.getByRole('button', { name: 'Tags', exact: true }).click();
     await tags.getByLabel('Find or create tag').fill(`${tab} batch tag`);
     await tags.getByRole('button', { name: 'Create and assign', exact: true }).click();
     await bar.getByLabel('Replace icons').check();
@@ -495,7 +495,7 @@ for (const [tab, firstId, secondId] of [
     await expect(first).toContainText('❄️');
     await expect(second).toContainText('❄️');
     await screenshot(page, `${tab.toLowerCase().replaceAll(' ', '-')}-batch`);
-    await first.getByRole('button').click();
+    await first.locator('.wallet-row-button').click();
     await expect(batch).toHaveCount(0);
     await expect(selected.getByRole('heading', { level: 2 })).toContainText(`${tab} batch label`);
     await expect(rows.getByRole('checkbox', { checked: true })).toHaveCount(0);
@@ -552,7 +552,7 @@ test('batch labels, tags and icons apply to the explicit selection in one undoab
   // An existing label is preserved by default.
   await expect(page.locator('.wallet-review-records')).toContainText('Exchange A withdrawal');
 
-  await bar.getByRole('button', { name: 'Tag', exact: true }).click();
+  await bar.getByRole('button', { name: 'Tags', exact: true }).click();
   const tagEditor = page.getByRole('dialog', { name: 'Tag selected records' });
   await tagEditor.getByLabel('Find or create tag').fill('Savings');
   await tagEditor.getByRole('button', { name: 'Create and assign' }).click();
@@ -804,9 +804,9 @@ test('batch editors never stack and the icon palette stays keyboard usable', asy
   await seed(page);
   await waitForUtxoCheck(page);
   await walletTab(page, 'UTXOs').click();
-  await page.getByRole('button', { name: /Select all 2 results/ }).click();
+  await page.getByRole('button', { name: 'Select all (2)', exact: true }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
-  const tagButton = bar.getByRole('button', { name: 'Tag', exact: true });
+  const tagButton = bar.getByRole('button', { name: 'Tags', exact: true });
   await tagButton.click();
   const tagEditor = page.getByRole('dialog', { name: 'Tag selected records' });
   await tagEditor.getByLabel('Find or create tag').fill('Savings');
@@ -975,7 +975,7 @@ for (const viewport of [
     editor = page.getByRole('dialog', { name: 'Label selected records' });
     await expect(editor.getByLabel('Batch label')).toHaveValue('Cold storage');
     await page.keyboard.press('Escape');
-    await bar.getByRole('button', { name: 'Tag', exact: true }).click();
+    await bar.getByRole('button', { name: 'Tags', exact: true }).click();
     const tag = page.getByRole('dialog', { name: 'Tag selected records' });
     await tag.getByLabel('Find or create tag').fill('Long-term savings');
     await tag.getByRole('button', { name: 'Create and assign' }).click();
@@ -1082,15 +1082,15 @@ test('address details require an explicit verified transaction context and trans
   const chooser = walletDetail(page).getByLabel('Transaction context', { exact: true });
   await expect(chooser).toHaveValue('');
   await expect(chooser.locator('option')).toHaveCount(3);
-  await expect(chooser.locator('option[value=""]')).toHaveText('Choose a transaction');
+  await expect(chooser.locator('option[value=""]')).toHaveText('Choose transaction (2)');
   await expect(chooser.locator(`option[value="${TX_SECOND}"]`)).toHaveCount(0);
   await expect(walletFlow(page)).toHaveCount(0);
-  await expect(walletDetail(page)).toContainText('no one transaction represents the address');
+  await expect(walletDetail(page)).toContainText('Choose a transaction to show its flow.');
   await expect(
     walletDetail(page).getByRole('group', { name: 'Edit entity metadata' }),
   ).toBeVisible();
   await chooser.selectOption(TX_OLD);
-  await expect(walletFlow(page)).toContainText('previous outputs not loaded');
+  await expect(walletFlow(page)).toContainText('previous-output details unavailable');
   await expect(walletFlow(page)).toContainText('Value not loaded');
   await expect(walletFlow(page).locator('.ownership-wallet')).toHaveCount(1);
   await chooser.selectOption(TX_MID);
@@ -1109,9 +1109,18 @@ test('address details require an explicit verified transaction context and trans
     0,
   );
   await expect(walletFlow(page)).toContainText('Editing transaction');
+  const metadata = walletDetail(page).getByRole('group', { name: 'Edit entity metadata' });
+  await expect(metadata.locator('.batch-scope')).toHaveText('transaction');
+  await metadata.getByRole('button', { name: 'Label', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Label selected records' });
+  await editor.getByLabel('Batch label').fill('Verified transaction context');
+  await editor.getByRole('button', { name: 'Apply label' }).click();
+  await expect(walletFlow(page).locator('.wallet-flow-transaction-node')).toContainText(
+    'Verified transaction context',
+  );
   await expect(
-    walletDetail(page).getByRole('group', { name: 'Edit entity metadata' }),
-  ).toContainText('Edit transaction');
+    rows.filter({ has: page.locator(`.wallet-item-title[title="${TX_MID}"]`) }),
+  ).toContainText('Verified transaction context');
   await expect(
     walletFlow(page).locator('.wallet-flow-node[role="button"], button.wallet-flow-node'),
   ).toHaveCount(0);
@@ -1309,7 +1318,7 @@ test('queue selection batches metadata, defers to untouched work and reopens int
   await expect(detail(page)).toContainText('Wallet savings');
 });
 
-for (const kind of ['Label', 'Tag', 'Icon'] as const) {
+for (const kind of ['Label', 'Tags', 'Icon'] as const) {
   test(`wallet ${kind} editor closes when keyboard navigation leaves the workbench`, async ({
     page,
   }) => {
@@ -1318,7 +1327,7 @@ for (const kind of ['Label', 'Tag', 'Icon'] as const) {
     const editor =
       kind === 'Icon'
         ? page.getByRole('dialog', { name: 'Choose node icon' })
-        : page.locator('.wallet-metadata-popover');
+        : page.locator('.metadata-popover');
     await detail(page)
       .getByRole('button', {
         name: kind === 'Icon' ? /^Set icon/ : kind,
@@ -1335,9 +1344,7 @@ for (const kind of ['Label', 'Tag', 'Icon'] as const) {
     expect(
       await page.evaluate(
         () =>
-          !!document.activeElement?.closest(
-            '.wallet-metadata-popover, [aria-label="Choose node icon"]',
-          ),
+          !!document.activeElement?.closest('.metadata-popover, [aria-label="Choose node icon"]'),
       ),
     ).toBe(false);
     await workbench(page, 'Wallet').click();
@@ -1478,3 +1485,115 @@ test('compact wallet flow keeps a late selected output visible and expands a bou
   await expect(flow.locator('.wallet-flow-column .wallet-flow-node')).toHaveCount(3);
   await expect(flow.locator('.is-selected')).toContainText('Final shop payment');
 });
+
+for (const width of [1440, 390, 320]) {
+  test(`shared wallet quick editors keep tag names and colors readable at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const existingName = 'Existing counterparty with a long descriptive name '
+      .repeat(2)
+      .slice(0, 100);
+    const createdName = 'NewCounterparty'.repeat(8).slice(0, 100);
+    await seed(page, (workspace) => {
+      workspace.tags = [
+        {
+          id: '40000000-0000-4000-8000-000000000001',
+          name: existingName,
+          color: '#65cbbb',
+          nodeIds: [UTXO_SECOND],
+        },
+      ];
+    });
+    await waitForUtxoCheck(page);
+    await expect(detail(page)).toContainText('60,000,000 sats');
+    const trigger = detail(page).getByRole('button', { name: 'Tags', exact: true });
+    const popup = page.locator('.metadata-popover');
+    const tags = page.getByRole('dialog', { name: 'Tag selected records' });
+    const assertFits = async () => {
+      await expect(popup).toBeVisible();
+      expect(
+        await popup.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+      ).toBe(true);
+      expect(
+        await popup
+          .locator('.metadata-tag-options')
+          .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+      ).toBe(true);
+      const box = (await popup.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(11);
+      expect(box.x + box.width).toBeLessThanOrEqual(width - 11);
+    };
+    await trigger.click();
+    await expect(tags.getByLabel('Find or create tag')).toBeFocused();
+    await tags.getByLabel('Find or create tag').fill('N');
+    await expect(
+      tags.getByRole('button', { name: 'Create and assign', exact: true }),
+    ).toBeVisible();
+    await assertFits();
+    await tags.getByLabel('Find or create tag').fill(createdName);
+    await tags.getByRole('button', { name: 'Color 4', exact: true }).click();
+    await expect(tags.getByRole('button', { name: 'Color 4', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await assertFits();
+    await mkdir('artifacts/quick-edit-review', { recursive: true });
+    await page.screenshot({ path: `artifacts/quick-edit-review/wallet-create-${width}.png` });
+    await tags.getByRole('button', { name: 'Create and assign', exact: true }).click();
+    await expect(tags).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    const row = tags.locator('.metadata-tag-option').filter({ hasText: createdName });
+    await expect(row.locator('.metadata-tag-name')).toContainText(createdName);
+    await expect(row.locator('.metadata-tag-name')).toContainText('1 of 1 selected');
+    await expect(row.locator('.metadata-tag-dot')).toHaveCSS(
+      'background-color',
+      'rgb(232, 136, 165)',
+    );
+    const chip = (await row.locator('.metadata-tag-dot').boundingBox())!;
+    const name = (await row.locator('.metadata-tag-name').boundingBox())!;
+    expect(chip.width).toBeGreaterThanOrEqual(8);
+    expect(name.width).toBeGreaterThan(120);
+    expect(name.x).toBeGreaterThanOrEqual(chip.x + chip.width);
+    await expect(
+      row.getByRole('button', { name: `Remove ${createdName} from selected records`, exact: true }),
+    ).toBeEnabled();
+    await expect(
+      tags.locator('.metadata-tag-option').filter({ hasText: existingName }),
+    ).toContainText('0 of 1 selected');
+    await assertFits();
+    await page.screenshot({ path: `artifacts/quick-edit-review/wallet-tags-${width}.png` });
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+
+    const labelTrigger = detail(page).getByRole('button', { name: 'Label', exact: true });
+    await labelTrigger.click();
+    await expect(popup.getByRole('dialog', { name: 'Label selected records' })).toBeVisible();
+    const labelWidth = (await popup.boundingBox())!.width;
+    await page.keyboard.press('Escape');
+    await expect(labelTrigger).toBeFocused();
+    const iconTrigger = detail(page).getByRole('button', { name: /^Set icon/ });
+    await iconTrigger.click();
+    await expect(popup.getByRole('dialog', { name: 'Choose node icon' })).toBeVisible();
+    expect((await popup.boundingBox())!.width).toBe(labelWidth);
+    await page.keyboard.press('Escape');
+    await expect(iconTrigger).toBeFocused();
+
+    await detail(page).getByRole('button', { name: 'Notes', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Edit notes' })
+      .getByLabel('Entity notes')
+      .fill('Quick note survives immediate lock');
+    await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
+    await expect(page.locator('.saved-row')).toBeVisible();
+    const stored = await saved(page);
+    expect(stored.tags?.find((tag) => tag.name === createdName)).toMatchObject({
+      color: '#e888a5',
+      nodeIds: [UTXO_MID],
+    });
+    expect(stored.tags?.find((tag) => tag.name === existingName)?.nodeIds).toEqual([UTXO_SECOND]);
+    expect(stored.annotations[UTXO_MID].note).toBe('Quick note survives immediate lock');
+  });
+}

@@ -41,12 +41,13 @@ export function labelBatchPlan(
 ): LabelBatchPlan {
   const all = targets(workspace, ids);
   const labeled = all.filter((id) => Boolean(workspace.annotations[id]?.label.trim()));
-  const targetIds = options.onlyUnlabeled ? all.filter((id) => !labeled.includes(id)) : all;
+  const labeledIds = new Set(labeled);
+  const targetIds = options.onlyUnlabeled ? all.filter((id) => !labeledIds.has(id)) : all;
   return {
     targetIds,
     labeledCount: labeled.length,
     unlabeledCount: all.length - labeled.length,
-    replacedCount: targetIds.filter((id) => labeled.includes(id)).length,
+    replacedCount: targetIds.filter((id) => labeledIds.has(id)).length,
     distinctLabels: [
       ...new Set(labeled.map((id) => workspace.annotations[id]!.label.trim())),
     ].slice(0, 5),
@@ -128,8 +129,9 @@ export function applyBatchTag(
   const added = action === 'add' ? all.filter((id) => !members.has(id)) : [];
   if (action === 'add' && tagMemberCount(workspace) + added.length > MAX_TAG_MEMBERS)
     throw new Error('Workspace has reached the 50,000 tag membership limit.');
+  const selected = new Set(all);
   const nodeIds =
-    action === 'add' ? [...tag.nodeIds, ...added] : tag.nodeIds.filter((id) => !all.includes(id));
+    action === 'add' ? [...tag.nodeIds, ...added] : tag.nodeIds.filter((id) => !selected.has(id));
   if (nodeIds.length === tag.nodeIds.length) return workspace;
   return {
     ...workspace,
@@ -143,7 +145,7 @@ export function applyBatchTag(
 export function createBatchTag(
   workspace: Workspace,
   ids: Iterable<string>,
-  tag: { name: string; color: string },
+  tag: { name: string; color: string; description?: string },
 ): Workspace {
   const name = tag.name.trim().slice(0, 100);
   if (!name) throw new Error('Enter a tag name.');
@@ -156,6 +158,15 @@ export function createBatchTag(
     throw new Error('Workspace has reached the 50,000 tag membership limit.');
   return {
     ...workspace,
-    tags: [...tags, { id: crypto.randomUUID(), name, color: tag.color, nodeIds }],
+    tags: [
+      ...tags,
+      {
+        id: crypto.randomUUID(),
+        name,
+        color: tag.color,
+        nodeIds,
+        ...(tag.description?.trim() ? { description: tag.description.trim() } : {}),
+      },
+    ],
   };
 }

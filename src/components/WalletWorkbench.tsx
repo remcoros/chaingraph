@@ -57,6 +57,10 @@ import { WalletHelp } from './WalletHelp';
 import { WalletReference } from './WalletReference';
 import { CopyButton } from './CopyButton';
 import { buildTagIndex } from '../domain/tags';
+import {
+  buildWalletSelectionIndex,
+  buildWalletSelectionAddresses,
+} from '../domain/walletSelectionIndex';
 import './wallet-workbench.css';
 
 export interface WalletWorkbenchProps {
@@ -177,6 +181,15 @@ export const WalletWorkbench = memo(
 
 function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: boolean }) {
   const { workspace, wallet, active, busy, canQuery, onChange } = props;
+  // Keep loaded-data indexes above the keyed detail panel so row navigation reuses them.
+  const selectionIndex = useMemo(
+    () => buildWalletSelectionIndex(workspace),
+    [workspace.transactions, workspace.network],
+  );
+  const walletAddresses = useMemo(
+    () => buildWalletSelectionAddresses(wallet, workspace.network),
+    [wallet.addresses, workspace.network],
+  );
   const walletScan = useWalletScan({
     workspace,
     wallet,
@@ -422,13 +435,16 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     ? undefined
     : resolveWalletRow(filteredRows, selectedKey, previousRow.current);
   const selectedRow = useMemo(
-    () => (currentRow ? walletRowWithContext(workspace, currentRow) : undefined),
-    [workspace.transactions, workspace.network, currentRow],
+    () => (currentRow ? walletRowWithContext(workspace, currentRow, selectionIndex) : undefined),
+    [selectionIndex, currentRow],
   );
   const selectionKeys = useMemo(() => new Set(selection.ids), [selection.ids]);
   const rowKeys = useMemo(() => new Set(rows.map((row) => row.key)), [rows]);
   const filteredKeys = useMemo(() => new Set(filteredRows.map((row) => row.key)), [filteredRows]);
-  const allSelection = walletSelectAll(selection.ids, [...filteredKeys]);
+  const allSelection = useMemo(
+    () => walletSelectAll(selection.ids, [...filteredKeys]),
+    [selection.ids, filteredKeys],
+  );
   const selectedRows = selection.ids.length ? rows.filter((row) => selectionKeys.has(row.key)) : [];
   const selectedIds = [...new Set(selectedRows.map((row) => row.nodeId))];
   const selectedKinds = new Map(selectedRows.map((row) => [row.nodeId, row.kind]));
@@ -464,8 +480,21 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     previousRow.current = currentRow;
   }, [batching, currentRow, selectedKey]);
   const tabLabel = TABS.find((item) => item.id === tab)!.label;
-  const statusCounts = (value: WalletStatusFilter) =>
-    metadataFiltered.filter((row) => matchesWalletStatus(row, value)).length;
+  const statusTotals = useMemo(
+    () =>
+      Object.fromEntries(
+        (['all', 'open', 'later', 'decided'] as const).map((value) => [
+          value,
+          metadataFiltered.filter((row) => matchesWalletStatus(row, value)).length,
+        ]),
+      ),
+    [metadataFiltered],
+  );
+  const statusCounts = (value: WalletStatusFilter) => statusTotals[value];
+  const openReviewCount = useMemo(
+    () => rowsByTab.review.filter((row) => matchesWalletStatus(row, 'open')).length,
+    [rowsByTab.review],
+  );
 
   useEffect(() => setLimit(PAGE), [tab, query, labelFilter, tagFilter, status, typeIds]);
   useEffect(() => {
@@ -511,11 +540,12 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     transactionIds:
       row.kind === 'address' && row.relationshipDirection ? row.contextTransactionIds : undefined,
   });
+  const relatedCandidates = useMemo(() => filteredRows.map(related), [filteredRows]);
   const relatedSelection =
     selectedRows.length > 0 || selectedRow ? (
       <WalletRelatedSelection
         active={active}
-        candidates={filteredRows.map(related)}
+        candidates={relatedCandidates}
         seeds={(batching ? selectedRows : selectedRow ? [selectedRow] : []).map(related)}
         onSelect={selection.setIds}
       />
@@ -577,11 +607,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             onClick={() => changeTab(id)}
           >
             <Icon size={14} /> {label}
-            {id === 'review' && (
-              <span className="wallet-count">
-                {rowsByTab.review.filter((row) => matchesWalletStatus(row, 'open')).length}
-              </span>
-            )}
+            {id === 'review' && <span className="wallet-count">{openReviewCount}</span>}
           </button>
         ))}
       </nav>
@@ -1001,6 +1027,9 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                 key={`${tab}:${selectedRow.key}`}
                 {...props}
                 row={selectedRow}
+                selectionIndex={selectionIndex}
+                walletAddresses={walletAddresses}
+                tags={rowTags.get(selectedRow.nodeId)}
                 onNotice={setNotice}
                 onDecide={decide}
                 resolveInputs={tab !== 'sources' || (counterpartyReady && !counterparties.loading)}

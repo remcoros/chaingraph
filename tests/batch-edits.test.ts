@@ -6,6 +6,7 @@ import {
   applyBatchTag,
   createBatchTag,
   labelBatchPlan,
+  MAX_BATCH_TARGETS,
   tagBatchPlan,
 } from '../src/domain/batchEdits';
 import { outputNodeId, txNodeId, type Transaction, type Workspace } from '../src/domain/types';
@@ -147,6 +148,32 @@ describe('batch tag edits', () => {
     expect(Object.keys(updated.annotations).filter((id) => id.startsWith('tx:'))).toEqual([
       txNodeId(a),
     ]);
+  });
+});
+
+describe('strict batch boundaries', () => {
+  it('rejects invalid references atomically for every mutation', () => {
+    const w = workspace();
+    const original = structuredClone(w);
+    const ids = [third, 'invalid'];
+    expect(() => applyBatchLabel(w, ids, 'Reviewed')).toThrow(/reference/);
+    expect(() => applyBatchIcon(w, ids, '★')).toThrow(/reference/);
+    expect(() => applyBatchTag(w, ids, w.tags![0].id, 'add')).toThrow(/reference/);
+    expect(() => createBatchTag(w, ids, { name: 'New', color: '#65cbbb' })).toThrow(/reference/);
+    expect(w).toEqual(original);
+  });
+
+  it('counts all supplied references toward the batch limit before deduplication', () => {
+    const w = workspace();
+    const ids = Array<string>(MAX_BATCH_TARGETS).fill(first);
+    expect(applyBatchLabel(w, ids, 'Salary')).toBe(w);
+    ids.push(first);
+    expect(() => applyBatchLabel(w, ids, 'Changed')).toThrow(/at most 50,000/);
+    expect(() => applyBatchIcon(w, ids, '★')).toThrow(/at most 50,000/);
+    expect(() => applyBatchTag(w, ids, w.tags![0].id, 'remove')).toThrow(/at most 50,000/);
+    expect(() => createBatchTag(w, ids, { name: 'New', color: '#65cbbb' })).toThrow(
+      /at most 50,000/,
+    );
   });
 });
 

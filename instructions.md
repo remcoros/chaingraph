@@ -98,19 +98,21 @@ the count and the entity type before you use it. Selections never grow because r
 changed, are cleared when you switch workspaces, and lose an entity only when it is
 actually removed from the workspace.
 
-**Label**, **Tag** and **Icon** open small editors anchored to the toolbar. The label
-editor offers **Only unlabeled**, reports how many entities it will change and how many
-existing labels it would replace, and lists differing existing labels so a mixed value is
-never overwritten by simply opening the control. The tag editor adds or removes direct
-membership with explicit counts, or creates a tag for the selection. Icons use the shared
-palette, including an explicit **Clear icon**. Notes, bookmarks and untargeted fields stay
-unchanged.
+**Label**, **Tags** and **Icon** use the same quick editors as Wallet. Existing
+labels and icons are preserved unless you tick **Replace existing labels** or
+**Replace icons**. The label editor reports its target count; leave the label
+empty with replacement enabled to clear it. Tags show their color, full name and
+direct membership count. **Add** and **Remove** affect only the selected records.
+To create a tag, type a name, choose its color and use **Create and assign** or
+Enter. Creating closes the popup; existing-tag assignment keeps it open.
+The icon palette includes an explicit **Clear icon**.
+Notes, bookmarks and untargeted fields stay unchanged.
 
 **Hide** removes the selected entities from the canvas while keeping their data, and the
 hidden chip restores them. **Isolate** restricts the graph to the selection and its connected context; the isolation and context chips make both scopes visible. **Clear** empties the
 selection. Every applied batch saves automatically and is a single Undo step, from the
 toolbar's **Undo** or the header. Escape, the close button or clicking outside dismisses
-an editor without changing anything.
+an editor without applying an unfinished draft. Already applied tag changes remain.
 
 ## Review a wallet
 
@@ -288,7 +290,8 @@ The Inspector’s **Scripts and raw transaction** section shows saved output scr
 ## Tags and wallet matches
 
 Use **Add or choose tags** in the inspector to search, create and assign a group
-without leaving the selection. Choose **This output** for an individual output or
+without leaving the selection. It uses the same tag editor as Wallet and the
+Graph selection toolbar, including color choices and name/description search. Choose **This output** for an individual output or
 **Address + outputs** to apply it to every loaded output at that address.
 The **Tags** tab beside Wallets and Entities manages groups, imports and graph filters. Address membership also applies to outputs loaded
 later. It does not assign the entire creating or spending transaction to that tag.

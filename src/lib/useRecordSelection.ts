@@ -26,7 +26,7 @@ export function useRecordSelection() {
     }
   };
   const clear = () => {
-    setIds([]);
+    setIds((current) => (current.length ? [] : current));
     anchor.current = undefined;
   };
   return {

@@ -1,0 +1,151 @@
+/* Shared quick editors render in a portal so panel scroll boundaries cannot clip them. */
+.metadata-popover {
+  position: fixed;
+  z-index: 260;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px var(--color-shadow);
+}
+.metadata-editor {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+.metadata-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.metadata-editor-heading .icon-button {
+  flex: none;
+}
+.metadata-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.metadata-editor .metadata-replace {
+  flex-direction: row;
+  align-items: center;
+}
+.metadata-replace input {
+  width: auto;
+}
+.metadata-editor-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.tag-form .metadata-colors {
+  margin: 10px 0;
+}
+.metadata-editor input:not([type='checkbox']),
+.metadata-editor textarea {
+  width: 100%;
+  min-width: 0;
+}
+.metadata-editor textarea {
+  resize: vertical;
+}
+.metadata-editor input[type='search'] {
+  margin-bottom: 8px;
+}
+.metadata-editor .button-row,
+.metadata-tag-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.metadata-tag-create {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.metadata-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.metadata-colors button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 2px solid transparent;
+  color: #101b1f;
+}
+.metadata-colors button[aria-pressed='true'] {
+  border-color: var(--color-ink);
+}
+.metadata-tag-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.metadata-tag-option {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.metadata-tag-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.metadata-tag-name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.metadata-tag-name small {
+  font-size: 10px;
+}
+.metadata-tag-actions {
+  display: flex;
+  gap: 5px;
+}
+.metadata-tag-actions button {
+  padding: 5px 7px;
+  min-height: 32px;
+  font-size: 11px;
+}
+@media (max-width: 420px) {
+  .metadata-tag-option {
+    grid-template-columns: 8px minmax(0, 1fr);
+  }
+  .metadata-tag-actions {
+    grid-column: 2;
+  }
+  .metadata-tag-actions button,
+  .metadata-colors button {
+    min-height: 36px;
+  }
+  .metadata-colors button {
+    width: 36px;
+  }
+}

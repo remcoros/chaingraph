@@ -391,11 +391,13 @@ test.skip('Trace requires an output choice, follows one explicit branch and shar
   await page.getByRole('button', { name: 'Back to Trace', exact: true }).click();
   await expect(trace.locator('.trace-current')).toContainText('Reviewed branch');
   await trace.getByRole('button', { name: 'Tags', exact: true }).click();
-  const tags = page.getByRole('dialog', { name: 'Choose tags', exact: true });
+  const tags = page.getByRole('dialog', { name: 'Tag selected records', exact: true });
   await tags.getByLabel('Find or create tag').fill('Reviewed path');
   await tags.getByLabel('Find or create tag').press('Enter');
-  await expect(tags.getByRole('checkbox', { name: /Reviewed path/ })).toBeChecked();
-  await page.keyboard.press('Escape');
+  await expect(tags).toBeHidden();
+  await expect(
+    page.getByRole('button', { name: 'Edit assignment for Reviewed path' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Back to Trace', exact: true }).click();
   await trace.getByRole('button', { name: 'Icon', exact: true }).click();
   await page
