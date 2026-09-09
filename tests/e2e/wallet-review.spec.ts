@@ -591,7 +591,7 @@ test('carries a record into Graph and Analysis and offers a way back', async ({ 
   await detail(page).getByRole('button', { name: 'Analyze' }).click();
   await expect(workbench(page, 'Analysis')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.scan-scope')).toContainText('Output');
-  await page.getByRole('button', { name: 'Scan', exact: true }).click();
+  await page.getByRole('button', { name: 'Analyse loaded', exact: true }).click();
   await expect(page.locator('.scan-run-note')).toBeVisible();
   await page.getByRole('button', { name: 'Back to Wallet' }).click();
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');

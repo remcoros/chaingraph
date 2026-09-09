@@ -1526,3 +1526,13 @@
     gap: 6px;
   }
 }
+
+.wallet-metadata-popover textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+
+.wallet-operation-hint {
+  margin: 0 0 8px;
+}

@@ -6,7 +6,11 @@ import {
   buildWalletReviewContext,
   type WalletReviewFlowEntry,
 } from '../domain/walletReviewContext';
-import { walletRowTags, type WalletRow } from '../domain/walletWorkbenchRows';
+import {
+  walletRowRelationship,
+  walletRowTags,
+  type WalletRow,
+} from '../domain/walletWorkbenchRows';
 import { fetchTransaction } from '../lib/api';
 import { useWalletFlowInputs } from '../lib/useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
@@ -171,15 +175,7 @@ export function WalletItemDetail({
     !flowInputs.error &&
     context?.inputs.some((input) => input.id === row.nodeId && input.missing);
   const tags = walletRowTags(workspace, row);
-  const role =
-    row.ownership ??
-    (context?.role === 'wallet-output'
-      ? 'wallet'
-      : context?.role === 'possible-counterparty'
-        ? 'external'
-        : row.reviews.some((item) => item.reason === 'current-utxo' || item.reason === 'source')
-          ? 'wallet'
-          : undefined);
+  const relationship = walletRowRelationship(row, wallet, workspace.network, context?.selected);
   const changed = row.reviews.find((item) => item.changed);
   const outpoints = row.outpointIds ?? [];
   const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
@@ -365,14 +361,10 @@ export function WalletItemDetail({
           )}
           <div>
             <dt>Wallet relationship</dt>
-            <dd className={`wallet-match-value ${role === 'wallet' ? 'is-wallet' : ''}`}>
-              {role === 'wallet'
-                ? 'In this wallet'
-                : role === 'external'
-                  ? 'No match in this wallet'
-                  : row.kind === 'transaction'
-                    ? 'Wallet activity'
-                    : 'Not determined'}
+            <dd
+              className={`wallet-match-value ${relationship === 'In this wallet' ? 'is-wallet' : ''}`}
+            >
+              {relationship}
               <WalletHelp title="Wallet relationship" active={active}>
                 Matched against this wallet's discovered addresses. No match does not rule out an
                 undiscovered wallet address or identify its owner.

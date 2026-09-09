@@ -92,7 +92,7 @@ export function WalletOverview({
             title="Scan this wallet's loaded transactions for supported observations and hypotheses. No network requests"
             onClick={onScan}
           >
-            <ScanSearch size={14} /> {scanLoading ? 'Scanning...' : 'Scan'}
+            <ScanSearch size={14} /> {scanLoading ? 'Analysing...' : 'Analyse loaded'}
           </button>
           <button
             aria-label="Refresh wallet"
@@ -112,6 +112,10 @@ export function WalletOverview({
           </button>
         </div>
       </header>
+      <p className="small muted wallet-operation-hint">
+        Refresh discovers wallet history. Check UTXOs updates unspent status. Analysis uses loaded
+        data.
+      </p>
       <dl className="wallet-coverage" aria-label="Wallet coverage">
         <div>
           <dt>Wallet refreshed</dt>

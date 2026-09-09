@@ -138,3 +138,18 @@ export function createBatchTag(
   };
   return { ...workspace, tags: [...tags, tag] };
 }
+
+/** Single canonical entity only. Notes never overwrite a batch. */
+export function applyEntityNote(workspace: Workspace, id: string, note: string): Workspace {
+  const [target] = canonical(workspace, [id]);
+  if (!target) return workspace;
+  const value = note.slice(0, 10000);
+  if ((workspace.annotations[target]?.note ?? '') === value) return workspace;
+  return {
+    ...workspace,
+    annotations: {
+      ...workspace.annotations,
+      [target]: { ...(workspace.annotations[target] ?? EMPTY), note: value },
+    },
+  };
+}

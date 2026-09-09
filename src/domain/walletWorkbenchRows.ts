@@ -1,6 +1,15 @@
-import { addressNodeId, outputNodeId, short, txNodeId, type Wallet, type Workspace } from './types';
+import {
+  addressNodeId,
+  outputNodeId,
+  short,
+  txNodeId,
+  type Network,
+  type Wallet,
+  type Workspace,
+} from './types';
 import { listTagsForNode } from './tags';
 import {
+  verifiedWalletAddresses,
   listWalletAddresses,
   listWalletTransactions,
   type WalletUtxoRecord,
@@ -130,7 +139,7 @@ export function buildWalletRelationshipRows(
             kind: 'address',
             address: group.address,
             description: `${group.count} distinct observed outputs in ${group.transactionIds.length} one-hop transaction contexts. Labels, tags and review decisions apply to this address only. The observed total is not an allocated payment or balance.`,
-            meta: `${group.count} outpoints · ${group.transactionIds.length} transactions`,
+            meta: `${group.count} outpoint${group.count === 1 ? '' : 's'} · ${group.transactionIds.length} transaction${group.transactionIds.length === 1 ? '' : 's'}`,
             contextTransactionIds: group.transactionIds,
             outpointIds: group.outpointIds,
             relationshipDirection: direction,
@@ -269,7 +278,34 @@ export function matchesWalletStatus(row: WalletRow, filter: WalletStatusFilter):
       (item) => item.status !== 'open' && isCompletedReview({ status: item.status }),
     );
   }
-  if (filter === 'open') return row.changed || row.status === 'open';
+  if (filter === 'open')
+    return row.reviews.some(
+      (item) => !item.legacyOutputReview && (item.changed || item.status === 'open'),
+    );
   if (filter === 'later') return !row.changed && row.status === 'later';
   return !row.changed && row.status !== 'open' && isCompletedReview({ status: row.status });
+}
+
+/** Presentation follows verified membership and explicit missing/conflicting evidence. */
+export function walletRowRelationship(
+  row: WalletRow,
+  wallet: Wallet,
+  network: Network,
+  selected?: {
+    prevoutStatus?: string;
+    ownership: 'wallet' | 'external' | 'unknown';
+    address?: string;
+  },
+): string {
+  if (row.kind === 'transaction') return 'Wallet activity';
+  if (selected?.prevoutStatus === 'conflict') return 'Conflicting evidence';
+  const address =
+    selected?.address ?? row.address ?? (row.kind === 'address' ? row.identifier : undefined);
+  if (address) {
+    return verifiedWalletAddresses(wallet, network).some((entry) => entry.address === address)
+      ? 'In this wallet'
+      : 'No match in this wallet';
+  }
+  if (selected?.ownership === 'wallet' || row.ownership === 'wallet') return 'In this wallet';
+  return 'Unknown script';
 }

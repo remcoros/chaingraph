@@ -6,6 +6,7 @@ import { deriveAddresses } from '../src/lib/wallet';
 import {
   buildWalletRecordRows,
   matchesWalletStatus,
+  walletRowRelationship,
   walletRowTags,
   walletRowWithContext,
   buildWalletRelationshipRows,
@@ -247,5 +248,61 @@ describe('shared Wallet rows', () => {
       'Public reserve',
     ]);
     expect(walletRowTags(workspace, rows.addresses[0])).toEqual([]);
+  });
+});
+
+describe('Wallet review findings regressions', () => {
+  it('does not manufacture transaction backlog or acknowledge evidence', () => {
+    const { workspace, wallet } = fixture();
+    const rows = buildWalletRecordRows(workspace, wallet, [], []).transactions;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(matchesWalletStatus(row, 'all')).toBe(true);
+      expect(matchesWalletStatus(row, 'open')).toBe(false);
+      expect(row.reviews).toEqual([]);
+    }
+    expect(Object.keys(workspace.walletReviews ?? {})).toHaveLength(0);
+    const item = buildWalletReview(workspace, wallet).items.find(
+      (item) => !item.legacyOutputReview,
+    )!;
+    const row = { ...rows[0], reviews: [item], status: 'open' as const };
+    expect(matchesWalletStatus(row, 'open')).toBe(true);
+    expect(
+      matchesWalletStatus(
+        { ...row, reviews: [{ ...item, status: 'later', changed: false }] },
+        'open',
+      ),
+    ).toBe(false);
+    expect(
+      matchesWalletStatus(
+        { ...row, reviews: [{ ...item, status: 'reviewed', changed: true }] },
+        'open',
+      ),
+    ).toBe(true);
+  });
+
+  it('distinguishes known addresses, verified membership, unknown scripts and conflicts', () => {
+    const { workspace, wallet } = fixture();
+    const row = buildWalletRecordRows(workspace, wallet, [], []).addresses[0];
+    expect(walletRowRelationship(row, wallet, workspace.network)).toBe('In this wallet');
+    expect(walletRowRelationship({ ...row, address: undefined }, wallet, workspace.network)).toBe(
+      'In this wallet',
+    );
+    expect(walletRowRelationship(row, { ...wallet, addresses: [] }, workspace.network)).toBe(
+      'No match in this wallet',
+    );
+    expect(
+      walletRowRelationship(
+        { ...row, kind: 'output', address: undefined, ownership: 'unknown' },
+        wallet,
+        workspace.network,
+      ),
+    ).toBe('Unknown script');
+    expect(
+      walletRowRelationship(row, wallet, workspace.network, {
+        ownership: 'unknown',
+        prevoutStatus: 'conflict',
+      }),
+    ).toBe('Conflicting evidence');
   });
 });

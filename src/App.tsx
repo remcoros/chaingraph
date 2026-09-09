@@ -2525,7 +2525,7 @@ export default function App() {
                 setRightTab('inspect');
               }}
               onAddWallet={() => setWalletDialog(true)}
-              onChange={(update) => change(update)}
+              onChange={(update, group) => change(update, true, group)}
               onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
               onRefresh={() => void scan(wallet ?? w.wallets[0])}
               onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}

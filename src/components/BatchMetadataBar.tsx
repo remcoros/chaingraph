@@ -4,6 +4,7 @@ import { Check, Tag, TextCursorInput, X } from 'lucide-react';
 import { IconPicker } from './IconPicker';
 import { useDialogFocus } from './Dialogs';
 import {
+  applyEntityNote,
   applyBatchIcon,
   applyBatchLabel,
   applyBatchTag,
@@ -12,6 +13,7 @@ import {
   planBatchLabel,
   planBatchTag,
 } from '../domain/batchMetadata';
+import { canonicalTagNodeId } from '../domain/tags';
 import type { Workspace } from '../domain/types';
 
 const colors = ['#65cbbb', '#e4af67', '#9c9aed', '#e888a5', '#85bce8', '#a4c977'];
@@ -25,7 +27,7 @@ export interface BatchMetadataBarProps {
   active?: boolean;
   disabled?: boolean;
   guidance?: string;
-  onChange: (update: (workspace: Workspace) => Workspace) => void;
+  onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
   onNotice: (message: string) => void;
   onClear?: () => void;
 }
@@ -45,13 +47,16 @@ export function BatchMetadataBar({
   onNotice,
   onClear,
 }: BatchMetadataBarProps) {
-  const [open, setOpen] = useState<'label' | 'tags' | undefined>();
+  const [open, setOpen] = useState<'label' | 'tags' | 'notes' | undefined>();
   const [replaceIcons, setReplaceIcons] = useState(false);
   const labelTrigger = useRef<HTMLButtonElement>(null);
+  const noteTrigger = useRef<HTMLButtonElement>(null);
   const tagTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!active) setOpen(undefined);
   }, [active]);
+  const scopeKey = `${workspace.id}:${ids.join('|')}`;
+  useEffect(() => setOpen(undefined), [scopeKey]);
   if (!active || !ids.length) return null;
   const firstIcon = workspace.annotations[ids[0]]?.icon ?? '';
   const mixedIcons = ids.some((id) => (workspace.annotations[id]?.icon ?? '') !== firstIcon);
@@ -116,6 +121,30 @@ export function BatchMetadataBar({
             </MetadataPopover>
           )}
         </div>
+        {single && ids.length === 1 && (
+          <div className="batch-popover-anchor">
+            <button
+              ref={noteTrigger}
+              aria-haspopup="dialog"
+              aria-expanded={open === 'notes'}
+              disabled={disabled}
+              onClick={() => setOpen(open === 'notes' ? undefined : 'notes')}
+            >
+              Notes
+            </button>
+            {open === 'notes' && (
+              <MetadataPopover anchor={noteTrigger.current!} onClose={() => setOpen(undefined)}>
+                <EntityNoteEditor
+                  key={scopeKey}
+                  workspace={workspace}
+                  id={ids[0]}
+                  onChange={onChange}
+                  onClose={() => setOpen(undefined)}
+                />
+              </MetadataPopover>
+            )}
+          </div>
+        )}
         <div
           className="batch-icon"
           // The icon palette is a batch editor too: opening it closes the others
@@ -436,6 +465,8 @@ function MetadataPopover({
     const observer = new ResizeObserver(position);
     observer.observe(element);
     window.addEventListener('resize', position);
+    document.addEventListener('scroll', position, true);
+    window.visualViewport?.addEventListener('scroll', position);
     window.visualViewport?.addEventListener('resize', position);
     const outside = (event: PointerEvent) => {
       if (
@@ -449,6 +480,8 @@ function MetadataPopover({
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', position);
+      document.removeEventListener('scroll', position, true);
+      window.visualViewport?.removeEventListener('scroll', position);
       window.visualViewport?.removeEventListener('resize', position);
       document.removeEventListener('pointerdown', outside);
     };
@@ -458,5 +491,50 @@ function MetadataPopover({
       {children}
     </div>,
     document.body,
+  );
+}
+
+function EntityNoteEditor({
+  workspace,
+  id,
+  onChange,
+  onClose,
+}: {
+  workspace: Workspace;
+  id: string;
+  onChange: BatchMetadataBarProps['onChange'];
+  onClose: () => void;
+}) {
+  const ref = useDialogFocus(onClose);
+  const [group] = useState(() => `note:${crypto.randomUUID()}`);
+  const canonicalId = canonicalTagNodeId(id, workspace.network);
+  return (
+    <div
+      ref={ref}
+      className="batch-popover"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Edit notes"
+    >
+      <div className="batch-popover-heading">
+        <strong>Notes</strong>
+        <button className="icon-button" aria-label="Close notes editor" onClick={onClose}>
+          <X size={15} />
+        </button>
+      </div>
+      <textarea
+        data-autofocus
+        aria-label="Entity notes"
+        rows={5}
+        maxLength={10000}
+        value={workspace.annotations[canonicalId]?.note ?? ''}
+        onChange={(event) => {
+          const note = event.target.value;
+          onChange((current) => applyEntityNote(current, canonicalId, note), group);
+        }}
+      />
+      <p className="small muted">Saves automatically, encrypted. Undo restores edits.</p>
+      <button onClick={onClose}>Done</button>
+    </div>
   );
 }

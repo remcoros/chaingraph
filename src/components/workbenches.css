@@ -74,7 +74,8 @@
   max-width: calc(100% - 16px);
   top: 49px;
   right: 8px;
-  z-index: 12;
+  /* Keep workspace Undo above the sticky Wallet detail toolbar. */
+  z-index: 30;
   background: transparent;
   border: 0;
   padding: 3px 0;

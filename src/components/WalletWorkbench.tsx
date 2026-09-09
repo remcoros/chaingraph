@@ -72,7 +72,7 @@ export interface WalletWorkbenchProps {
   onSelectWallet: (id: string) => void;
   onAddWallet: () => void;
   onEditWallet?: (id: string) => void;
-  onChange: (update: (workspace: Workspace) => Workspace) => void;
+  onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
   onRefresh: () => void;
   onShowInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
   onIsolateInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
@@ -383,7 +383,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
     .flatMap((kind) => {
       const count = [...selectedKinds.values()].filter((value) => value === kind).length;
       const noun = kind === 'output' ? (tab === 'utxos' ? 'UTXO' : 'outpoint') : kind;
-      return count ? [`${count} ${noun}${count === 1 ? '' : 's'}`] : [];
+      return count ? [`${count} ${noun}${count === 1 ? '' : kind === 'address' ? 'es' : 's'}`] : [];
     })
     .join(' · ');
   const selectedReviews = [
@@ -482,7 +482,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
           (currentScan?.scope.kind === 'wallet' &&
           currentScan.scope.label === `Wallet ${wallet.name}`
             ? `${currentScan.findings.length} findings`
-            : 'Ready to scan')
+            : 'Ready for local analysis')
         }
         scanIssues={currentScan?.reports
           .filter((report) => report.status === 'error')
@@ -593,6 +593,25 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
           </label>
         </div>
         <div className="wallet-record-summary">
+          {(query ||
+            labelFilter !== 'all' ||
+            tagFilter !== 'all' ||
+            status !== 'all' ||
+            typeIds !== undefined) && (
+            <button
+              className="text-button"
+              aria-label="Clear wallet filters"
+              onClick={() => {
+                setQuery('');
+                setLabelFilter('all');
+                setTagFilter('all');
+                setStatus('all');
+                setTypeIds(undefined);
+              }}
+            >
+              Clear filters
+            </button>
+          )}
           <span
             className="small muted"
             aria-label={`${Math.min(limit, filteredRows.length)} of ${filteredRows.length} matching results shown`}
@@ -892,7 +911,9 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
                 </h2>
                 <div className="wallet-compact-status">
                   <span>
-                    {selectedRows.length} rows · {selectedReviews.length} review decisions
+                    {selectedRows.length} {selectedRows.length === 1 ? 'row' : 'rows'} ·{' '}
+                    {selectedReviews.length} review{' '}
+                    {selectedReviews.length === 1 ? 'decision' : 'decisions'}
                   </span>
                   <button className="text-button" onClick={selection.clear}>
                     Clear selection

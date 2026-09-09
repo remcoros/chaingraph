@@ -1,6 +1,7 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
 import {
+  applyEntityNote,
   applyBatchIcon,
   applyBatchLabel,
   applyBatchTag,
@@ -108,5 +109,24 @@ describe('batch tag edits', () => {
 
   it('refuses to edit a tag that no longer exists', () => {
     expect(() => applyBatchTag(fixture(), [OUT_A], 'missing', true)).toThrow(/no longer exists/);
+  });
+});
+
+describe('single entity notes', () => {
+  it('preserves other metadata and entities, supports clearing and canonical identity', () => {
+    const workspace = fixture();
+    const result = applyEntityNote(workspace, OUT_A, 'Evidence\nSecond line');
+    expect(result.annotations[OUT_A]).toEqual({
+      ...workspace.annotations[OUT_A],
+      note: 'Evidence\nSecond line',
+    });
+    expect(workspace.annotations[OUT_A].note).toBe('A note');
+    expect(applyEntityNote(result, OUT_A, 'Evidence\nSecond line')).toBe(result);
+    expect(applyEntityNote(result, OUT_A, '').annotations[OUT_A].note).toBe('');
+    const address = applyEntityNote(result, `addr:${ADDRESS.toUpperCase()}`, 'Address note');
+    expect(address.annotations[`addr:${ADDRESS}`].note).toBe('Address note');
+    expect(address.annotations[OUT_A]).toEqual(result.annotations[OUT_A]);
+    expect(applyEntityNote(result, 'invalid', 'ignored')).toBe(result);
+    parseWorkspace(address);
   });
 });
