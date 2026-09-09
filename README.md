@@ -100,15 +100,24 @@ There is no completeness percentage; when no UTXO check has run, the workbench
 says so and offers the action.
 
 **To review** is a queue derived from your own data, in priority order: current
-UTXOs, receipts that were spent into them, activity found by a refresh,
+UTXOs, receipts that were spent into them, other direct funding inputs of
+wallet-receiving transactions, activity found by a refresh,
 counterparties, and grouping findings from your last analysis scan. Each
-item explains its reason and shows its evidence. All Show options include counts;
-a `+` marks a partial list with more records available. The compact transaction flow
+item explains its reason and shows its evidence. Review filters include counts;
+larger lists offer an explicit Show more action. The compact transaction flow
 separates verified wallet-script matches from **No wallet match** and unknown
 prevouts. Unmatched scripts may be undiscovered wallet addresses; transaction
 links do not prove who controls an output or exactly which input funded it.
-Select a flow node to inspect it, then use Back to Wallet. Mark reviewed, **Reviewed, source
-unknown** or **Review later**. Unknown is a valid, completed answer. Review later
+The side toolbar orders **Label, Tags, Icon**, review actions, **Select related**,
+then **Show** and **Isolate**. Show switches to Graph and frames the selection;
+Isolate also applies the existing resettable graph isolation. A collapsible flow
+follows, then common information and visible lists of related transactions and
+outpoints. Its cards are not navigation
+targets: use a card's magnifier to **Show on graph**, reveal and frame that transaction or outpoint,
+even with selection lock off. **Back to Wallet** returns to the same invoker.
+Choose **Mark reviewed** or **Review later**. Previously saved **Source unknown**
+decisions remain completed and appear under Reviewed; new decisions use the two
+explicit actions. Review later
 advances to the next item and sets the deferred item aside in **Show → Review later**;
 it remains pending, but is excluded from **To review**. Reopen returns it to To review.
 Labels, notes, tags and icons stay visible in the list and details. Adding metadata
@@ -117,24 +126,63 @@ refresh keeps them. Only an item whose underlying observations actually changed 
 flagged for another look, with the date of your earlier decision. A scan never
 resets the queue.
 
-**Records** lists this wallet's UTXOs, transactions and addresses with filters for
-text, labelled or unlabelled, To review, Review later, Reviewed, and tag, plus visible counts.
+One Wallet navigation row offers **To review**, **UTXOs**, **Transactions**,
+**Addresses**, **Sources** and **Destinations**. All six tabs use the same selectable
+list and detail panel, with direct single-entity label, tag and icon editing.
+Identifiers and tags stay visible. Address flow contexts with several verified
+loaded transactions require an explicit transaction choice.
+
+**Finding types** in To review is a multi-select, including zero-count categories.
+Selected types match by union (OR); counts overlap and are computed before the
+type filter, after the other filters. Missing labels, missing tags and neither
+are distinct conditions. Clear types selects none; Reset to all types restores
+the full catalog. Heuristic categories describe existing scan results, not a new
+or automatically run scan. Definitions appear on hover, keyboard focus or a touch tap.
+
+Sources and Destinations group one-hop observations by **address**. Sources are
+funding addresses of transactions paying verified wallet scripts; Destinations
+are addresses paid by transactions spending verified wallet outputs. Both lists
+exclude addresses matching the currently selected wallet. Labels,
+tags and icons edit the address, while constituent outpoints and transaction
+contexts remain visible records. Missing inputs are resolved in bounded background
+batches on opening Sources, with explicit continuation and retry. Unresolved
+outpoints and non-address scripts are not shown as counterparty addresses.
+No-match scripts are possible counterparties, not
+identified owners; names such as an exchange or shop are user annotations.
+An address review does not silently acknowledge its individual outputs or another
+direction's review. Compatible earlier output decisions remain stored.
+
+**Scan** runs the existing supported analysis on loaded wallet data, separately
+from **Refresh**, which checks new chain activity. Opening a flow lazily loads only a bounded set of relevant visible
+previous transactions, with cancellation and retry. Cached observations do not
+trigger another request or discard Undo; genuinely new evidence follows the
+existing invalidation rules. Status distinguishes queued history, address search
+limits, unfinished UTXO checks and unavailable inputs rather than labelling
+everything partial. No deep scan or backend index is involved.
+
+Filters cover text, labelled or unlabelled, To review, Review later, Reviewed,
+tag state, plus visible counts.
 Tick rows, Ctrl/⌘ click to toggle, Shift click to select a displayed range, or use
-**Select all N results**. This replaces the selection with the current filtered
-results, including rows under Show more. **Select related** offers exact address
+**Select all (N)**. This replaces the selection with the current filtered
+results, including rows under Show more. It becomes **Unselect all (N)**, which
+clears those matching rows while retaining selections outside the filter.
+**Select related** offers exact address
 and creating-transaction matches within those same results, with counts shown
 before selection. Same transaction can include both wallet outputs and possible
-counterparties; it is not an ownership grouping. The selection bar shows the number of targets and lets you
-label, tag or set an icon directly. Review queue checkboxes offer the same batch
+counterparties; it is not an ownership grouping. Batch details replace the single
+detail in the same right-side footprint; the list never grows wider. This panel
+shows unique targets and hidden-selection warnings beside label, tag and icon
+actions. Review queue checkboxes offer the same batch
 controls, plus marking the selected items reviewed or deferring them together.
 A single item's label editor starts with its current label and replaces it when applied.
 Existing labels and icons are preserved unless you tick Replace, and
 the number of records that will change is shown first. Each batch is one autosaved
 step that a single Undo reverses. Filtering never widens a selection, and switching
-wallet or record kind clears it.
+wallet or tab clears it.
 
-Review items and rows carry **Show in Graph**, **Inspect** and **Analyze**, and both
-Graph and Analysis offer **Back to Wallet**. When the selected outputs carry
+Review items and rows carry **Show** and **Isolate**; Graph offers **Back to Wallet**.
+Shortened addresses and outpoints expose the full value on hover and have a copy control.
+When the selected outputs carry
 different recorded sources, one sentence notes that combining them in an ordinary
 spend would publish that link. This is experimental local behaviour, not a release
 claim: there is no spend composer, coin selection, fee estimate, PSBT, signing,

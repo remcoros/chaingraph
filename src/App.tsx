@@ -5,6 +5,7 @@ import {
   verifyWalletUtxo,
   type WalletUtxoRecord,
 } from './domain/walletRecords';
+import { listWalletRelationships } from './domain/walletRelationships';
 import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
@@ -208,6 +209,7 @@ export default function App() {
     (unsupportedNetwork ? `Backend does not support ${w!.network}.` : (status?.error ?? ''));
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
   const analysisSessions = useRef(new Map<string, AnalysisWorkbenchSession>());
+  const [walletScanRevision, setWalletScanRevision] = useState(0);
   useEffect(() => {
     const unlocked = new Set(ws.sessions.map((session) => session.data.id));
     for (const id of analysisSessions.current.keys())
@@ -925,34 +927,65 @@ export default function App() {
   function selectWalletRecord(
     nodeId: string,
     utxo?: WalletUtxoRecord,
-    options: { tab?: NonNullable<Workspace['view']['rightTab']>; center?: boolean } = {},
+    options: {
+      tab?: NonNullable<Workspace['view']['rightTab']>;
+      center?: boolean;
+      isolate?: boolean;
+      selectionIds?: readonly string[];
+    } = {},
   ) {
     if (!w || !wallet) return;
     const ownerId = w.id;
     const walletId = wallet.id;
     const tab = options.tab ?? shownRightTab;
     const center = options.center ?? true;
-    if (nodeId.startsWith('addr:')) {
-      const address = nodeId.slice(5);
-      if (!verifiedWalletAddresses(wallet, w.network).some((item) => item.address === address))
+    const ids = [...new Set(options.selectionIds ?? [nodeId])];
+    const idSet = new Set(ids);
+    const addresses = ids.filter((id) => id.startsWith('addr:')).map((id) => id.slice(5));
+    if (addresses.length) {
+      const relationships = listWalletRelationships(w, wallet);
+      const known = new Set([
+        ...verifiedWalletAddresses(wallet, w.network).map((entry) => entry.address),
+        ...relationships.sources.flatMap((entry) => (entry.address ? [entry.address] : [])),
+        ...relationships.destinations.flatMap((entry) => (entry.address ? [entry.address] : [])),
+      ]);
+      if (addresses.some((address) => !known.has(address))) {
+        setNotice('An address is no longer in this wallet view.');
         return;
-      ws.update(
-        ownerId,
-        (current) => ({
-          ...setNodesHidden(current, [nodeId], false),
-          watchedAddresses: [...new Set([...current.watchedAddresses, address])],
-          view: {
-            ...current.view,
-            hiddenNodeIds: current.view.hiddenNodeIds?.filter((id) => id !== nodeId),
-            showAddresses: true,
-          },
-        }),
-        false,
-      );
+      }
+    }
+    const reveal = (current: Workspace): Workspace => ({
+      ...setNodesHidden(current, ids, false),
+      watchedAddresses: addresses.length
+        ? [...new Set([...current.watchedAddresses, ...addresses])]
+        : current.watchedAddresses,
+      view: {
+        ...current.view,
+        hiddenNodeIds: current.view.hiddenNodeIds?.filter((id) => !idSet.has(id)),
+        showAddresses: addresses.length > 0 || current.view.showAddresses,
+        smallAmountThreshold: center ? undefined : current.view.smallAmountThreshold,
+      },
+    });
+    const finish = () => {
       select(nodeId);
       setRightTab(tab);
-      setGraphFilters({});
+      if (options.selectionIds) {
+        selection.replace(ids.length > 1 ? ids : []);
+        selection.setMode(ids.length > 1);
+      }
+      if (options.isolate) {
+        prepareIsolation(ids);
+        updateFilters(
+          ids.length === 1
+            ? { focus: { id: nodeId, hops: 1 } }
+            : { includeIds: ids, preserveContext: true },
+        );
+      } else setGraphFilters({});
       if (center) setFocusRequest({ id: nodeId, token: Date.now() });
+    };
+    if (nodeId.startsWith('addr:')) {
+      ws.update(ownerId, reveal, false);
+      finish();
       return;
     }
     const transactionId = nodeId.split(':')[1];
@@ -977,11 +1010,8 @@ export default function App() {
       // Cached navigation promotes graph context without replacing chain evidence.
       // A new transaction still takes the normal history/findings invalidation path.
       mergeTransactions(ownerId, cachedTransaction ? [] : [transaction], [transactionId]);
-      ws.update(ownerId, (value) => setNodesHidden(value, [nodeId], false), false);
-      select(nodeId);
-      setRightTab(tab);
-      setGraphFilters({});
-      if (center) setFocusRequest({ id: nodeId, token: Date.now() });
+      ws.update(ownerId, reveal, false);
+      finish();
     });
   }
 
@@ -989,13 +1019,19 @@ export default function App() {
   function openWalletRecord(
     nodeId: string,
     utxo?: WalletUtxoRecord,
-    mode: 'graph' | 'inspect' = 'graph',
+    mode: 'graph' | 'inspect' | 'isolate' = 'graph',
+    selectionIds?: readonly string[],
   ) {
     recordHandoffInvoker('wallet');
     setReturnWorkbench('wallet');
     switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
-    setMobilePanel(mode === 'graph' ? 'graph' : 'right');
-    selectWalletRecord(nodeId, utxo, { tab: 'inspect', center: mode === 'graph' });
+    setMobilePanel(mode === 'inspect' ? 'right' : 'graph');
+    selectWalletRecord(nodeId, utxo, {
+      tab: 'inspect',
+      center: mode !== 'inspect',
+      isolate: mode === 'isolate',
+      selectionIds: selectionIds ?? [nodeId],
+    });
   }
   function analyzeFromWallet(nodeId?: string) {
     recordHandoffInvoker('wallet');
@@ -1136,8 +1172,15 @@ export default function App() {
     if (!w || !canQuery) return;
     await run(async (signal) => {
       const result = await refreshWallets(target ? [target] : w.wallets, w, signal);
+      const checkedWallets = result.snapshot.wallets.filter(
+        (entry) => !target || entry.id === target.id,
+      );
+      const pendingTransactions = checkedWallets.reduce(
+        (count, entry) => count + (entry.pendingTransactionIds?.length ?? 0),
+        0,
+      );
       setNotice(
-        `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${result.partial ? ' Partial scan: increase the address limit or refresh again to continue queued transactions.' : ` Gap limit reached on both branches (${gap} unused addresses).`}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
+        `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${pendingTransactions ? ` ${pendingTransactions} transactions waiting; Refresh again to continue.` : result.partial ? ` Address search reached its ${scanLimit}/branch limit. Increase Addresses / branch in Graph wallet controls to search further.` : ''}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
       );
       // Only the first discovery frames an empty canvas. Returning checks leave
       // the user's camera, selection, filters and annotations alone.
@@ -2435,6 +2478,19 @@ export default function App() {
             <WalletWorkbench
               active={workbench === 'wallet' && !lockingWorkspace && !tourStep}
               workspace={w}
+              analysisScan={analysisSessions.current.get(w.id)?.scan}
+              updateEvidence={ws.update}
+              onScanComplete={(scan) => {
+                analysisSessions.current.set(w.id, {
+                  scopeMode: 'context',
+                  options: scan.options,
+                  scan,
+                  selectedId: scan.findings[0]?.id,
+                  kind: 'all',
+                  limit: 40,
+                });
+                setWalletScanRevision((value) => value + 1);
+              }}
               wallet={wallet ?? w.wallets[0]}
               canQuery={canQuery}
               busy={!!operation}
@@ -2451,6 +2507,11 @@ export default function App() {
               onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
               onRefresh={() => void scan(wallet ?? w.wallets[0])}
               onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
+              onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
+              onShowSelection={(ids, isolate) => {
+                if (ids.length)
+                  openWalletRecord(ids[0], undefined, isolate ? 'isolate' : 'graph', ids);
+              }}
               onInspect={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'inspect')}
               onAnalyze={analyzeFromWallet}
             />
@@ -2464,7 +2525,7 @@ export default function App() {
             aria-label="Analysis workspace"
           >
             <AnalysisWorkbench
-              key={w.id}
+              key={`${w.id}:${walletScanRevision}`}
               cache={analysisSessions.current}
               workspace={w}
               active={workbench === 'analysis' && !lockingWorkspace}

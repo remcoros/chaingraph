@@ -29,7 +29,7 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
       if (e.key === 'Tab') {
         const items = [
           ...el!.querySelectorAll<HTMLElement>(
-            'button:not(:disabled),input:not(:disabled),select,textarea,a[href]',
+            'button:not(:disabled),input:not(:disabled),select,textarea,a[href],[tabindex]:not([tabindex="-1"])',
           ),
         ].filter((x) => x.offsetParent !== null && x.tabIndex >= 0);
         if (!items.length) return;

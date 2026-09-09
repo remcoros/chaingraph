@@ -53,6 +53,8 @@ export function BatchMetadataBar({
     if (!active) setOpen(undefined);
   }, [active]);
   if (!active || !ids.length) return null;
+  const firstIcon = workspace.annotations[ids[0]]?.icon ?? '';
+  const mixedIcons = ids.some((id) => (workspace.annotations[id]?.icon ?? '') !== firstIcon);
   return (
     <div
       className={`batch-bar ${single ? 'single-metadata-bar' : 'batch-selection-bar'}`}
@@ -100,7 +102,7 @@ export function BatchMetadataBar({
             disabled={disabled}
             onClick={() => setOpen(open === 'tags' ? undefined : 'tags')}
           >
-            <Tag size={14} /> Tag
+            <Tag size={14} /> Tags
           </button>
           {open === 'tags' && (
             <MetadataPopover anchor={tagTrigger.current!} onClose={() => setOpen(undefined)}>
@@ -124,7 +126,10 @@ export function BatchMetadataBar({
           }}
         >
           <IconPicker
-            value={single ? (workspace.annotations[ids[0]]?.icon ?? '') : ''}
+            value={firstIcon}
+            mixed={mixedIcons}
+            compact
+            disabled={disabled}
             fieldLabel="Set icon"
             onChange={(icon) => {
               const plan = planBatchIcon(workspace, ids, single || replaceIcons);

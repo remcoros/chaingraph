@@ -65,6 +65,9 @@ interface Props {
   /** Visible caption; batch controls describe their own scope. */
   caption?: string;
   ariaLabel?: string;
+  compact?: boolean;
+  mixed?: boolean;
+  disabled?: boolean;
 }
 export function IconPicker({
   value,
@@ -74,42 +77,56 @@ export function IconPicker({
   fieldLabel,
   caption,
   ariaLabel,
+  compact = false,
+  mixed = false,
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!openToken) return;
+    if (!openToken || disabled) return;
     trigger.current?.focus();
     setOpen(true);
     onOpenHandled?.();
-  }, [openToken]);
+  }, [openToken, disabled]);
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
   const id = useId();
-  const label =
-    icons.find(([symbol]) => symbol === value)?.[1] ?? (value ? 'Imported icon' : 'None');
+  const label = mixed
+    ? 'Mixed'
+    : (icons.find(([symbol]) => symbol === value)?.[1] ?? (value ? 'Imported icon' : 'None'));
   const field = fieldLabel ?? 'Icon';
+  const accessibleLabel = ariaLabel
+    ? compact
+      ? `${ariaLabel}: ${label}`
+      : ariaLabel
+    : `${fieldLabel ?? 'Node icon'}: ${label}`;
   return (
-    <div className="icon-picker">
-      <span className="icon-picker-label">{caption ?? field}</span>
+    <div className={`icon-picker${compact ? ' icon-picker-compact' : ''}`}>
+      {!compact && <span className="icon-picker-label">{caption ?? field}</span>}
       <button
         ref={trigger}
         type="button"
         className="icon-picker-trigger"
-        aria-label={ariaLabel ?? (fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`)}
-        title={ariaLabel ?? (fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`)}
+        aria-label={accessibleLabel}
+        title={accessibleLabel}
+        disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => setOpen(true)}
       >
         <span className="icon-picker-preview" aria-hidden="true">
-          {value || '∅'}
+          {mixed ? '◐' : value || '∅'}
         </span>
+        {compact && <span>{caption ?? 'Icon'}</span>}
       </button>
       {open &&
         createPortal(
           <IconPalette
             id={id}
-            value={value}
+            value={mixed ? '' : value}
             anchor={trigger.current!}
             onChange={onChange}
             onClose={() => setOpen(false)}

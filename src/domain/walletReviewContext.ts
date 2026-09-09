@@ -1,10 +1,11 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
-import { addressToScriptHash } from '../lib/wallet';
 import { canonicalEntityNodeId } from './entityReferences';
 import { verifiedWalletAddresses } from './walletRecords';
-import type { WalletReviewItem } from './walletReview';
+import {
+  canonicalTransactionId,
+  loadedWalletTransactions,
+  validOutputIndex,
+  walletOutputEvidence,
+} from './walletRelationships';
 import {
   outputNodeId,
   sats,
@@ -34,6 +35,9 @@ export interface WalletReviewContext {
   /** Raw transaction ID, suitable for looking up loaded observations. */
   transactionId?: string;
   transactionNodeId?: string;
+  /** Canonical annotation target, which can be an address or transaction. */
+  selectedNodeId?: string;
+  transactionSelected: boolean;
   transaction?: Transaction;
   status: 'loaded' | 'missing' | 'unavailable';
   /** Full arrays. A presentation limit must never change factual row counts. */
@@ -43,8 +47,16 @@ export interface WalletReviewContext {
    * This snapshot does not independently establish their present unspent status. */
   currentOutputs: WalletReviewFlowEntry[];
   selected?: WalletReviewFlowEntry;
+  selectedSide?: 'input' | 'output';
   role: 'wallet-output' | 'possible-counterparty' | 'wallet-related-transaction' | 'unknown-output';
   missingPrevouts: number;
+}
+
+export interface WalletReviewContextSubject {
+  nodeId: string;
+  txid?: string;
+  nodeIds?: readonly string[];
+  reason?: string;
 }
 
 function outpoint(id: string): { txid: string; vout: number } | undefined {
@@ -60,82 +72,56 @@ function canonicalId(id: string, workspace: Workspace): string | undefined {
   }
 }
 
-/** A local projection of one creating transaction. No history-based ownership,
+/** A local projection of an explicitly chosen or creating transaction. No history-based ownership,
  * graph widening, automatic downloads or inferred input-to-output value mapping.
  * Wallet address derivation was verified at the workspace import/scan boundary. */
 export function buildWalletReviewContext(
   workspace: Workspace,
   wallet: Wallet,
-  item: WalletReviewItem,
+  item: WalletReviewContextSubject,
+  contextTransactionId?: string,
 ): WalletReviewContext {
   const selectedId = canonicalId(item.nodeId, workspace);
   const selectedPoint = selectedId ? outpoint(selectedId) : undefined;
+  const selectedAddress = selectedId?.startsWith('addr:') ? selectedId.slice(5) : undefined;
   const transactionId =
-    selectedPoint?.txid ??
-    (selectedId?.startsWith('tx:') ? selectedId.slice(3) : undefined) ??
-    (/^[0-9a-f]{64}$/i.test(item.txid ?? '') ? item.txid!.toLowerCase() : undefined);
-  const candidate = transactionId ? workspace.transactions[transactionId] : undefined;
-  const transaction = candidate?.txid === transactionId ? candidate : undefined;
+    contextTransactionId !== undefined
+      ? canonicalTransactionId(contextTransactionId)
+      : selectedAddress
+        ? undefined
+        : (selectedPoint?.txid ??
+          (selectedId?.startsWith('tx:') ? selectedId.slice(3) : undefined) ??
+          canonicalTransactionId(item.txid));
+  const transactions = loadedWalletTransactions(workspace);
+  const transaction = transactionId ? transactions.get(transactionId) : undefined;
   const hashes = new Set(
     verifiedWalletAddresses(wallet, workspace.network).map((entry) => entry.scripthash),
   );
-  const network = workspace.network === 'mainnet' ? networks.bitcoin : networks.testnet;
-
   const entry = (txid: string, vout: number, output?: TxOutput): WalletReviewFlowEntry => {
     const id = outputNodeId(txid, vout);
-    let hash: string | undefined;
-    let address: string | undefined;
-    if (output) {
-      try {
-        if (output.scriptPubKey.hex !== undefined) {
-          const script = hexToBytes(output.scriptPubKey.hex);
-          hash = bytesToHex(sha256(script).reverse());
-          // Never display an imported address claim that disagrees with the script.
-          try {
-            address = bitcoinAddress.fromOutputScript(script, network);
-          } catch {
-            /* Non-address script. */
-          }
-        } else {
-          const reported =
-            output.scriptPubKey.address ??
-            (output.scriptPubKey.addresses?.length === 1
-              ? output.scriptPubKey.addresses[0]
-              : undefined);
-          if (reported) {
-            hash = addressToScriptHash(reported, workspace.network);
-            address = bitcoinAddress.fromOutputScript(
-              bitcoinAddress.toOutputScript(reported, network),
-              network,
-            );
-          }
-        }
-      } catch {
-        // Missing or malformed script evidence is unknown, regardless of labels/history.
-      }
-    }
+    const { scripthash: hash, address } = walletOutputEvidence(output, workspace.network);
     return {
       id,
       txid,
       vout,
       address,
       valueSats: output ? sats(output.value) : undefined,
-      ownership: hash ? (hashes.has(hash) ? 'wallet' : 'external') : 'unknown',
-      selected: id === selectedId,
+      ownership: hash && hashes.has(hash) ? 'wallet' : address ? 'external' : 'unknown',
+      selected: id === selectedId || (!!selectedAddress && address === selectedAddress),
       missing: output === undefined,
     };
   };
   const loadedOutput = (txid: string, vout: number) => {
-    const tx = workspace.transactions[txid];
-    return tx?.txid === txid ? tx.vout.find((output) => output.n === vout) : undefined;
+    return transactions.get(txid)?.vout.find((output) => output.n === vout);
   };
   const inputs =
     transaction?.vin.map((input): WalletReviewFlowEntry => {
-      if (input.txid !== undefined && input.vout !== undefined)
-        return entry(input.txid, input.vout, loadedOutput(input.txid, input.vout));
+      const parent = canonicalTransactionId(input.txid);
+      if (input.coinbase === undefined && parent && validOutputIndex(input.vout))
+        return entry(parent, input.vout, loadedOutput(parent, input.vout));
       return {
-        id: txNodeId(transaction.txid),
-        txid: transaction.txid,
+        id: txNodeId(transactionId!),
+        txid: transactionId,
         ownership: 'unknown',
         selected: false,
         missing: input.coinbase === undefined,
@@ -143,23 +129,33 @@ export function buildWalletReviewContext(
       };
     }) ?? [];
   const outputs =
-    transaction?.vout.map((output) => entry(transaction.txid, output.n, output)) ?? [];
+    transaction?.vout
+      .filter((output) => validOutputIndex(output.n))
+      .map((output) => entry(transactionId!, output.n, output)) ?? [];
   const selected = selectedPoint
-    ? (outputs.find((output) => output.id === selectedId) ??
-      entry(selectedPoint.txid, selectedPoint.vout))
+    ? (inputs.find((input) => input.id === selectedId) ??
+      outputs.find((output) => output.id === selectedId) ??
+      entry(
+        selectedPoint.txid,
+        selectedPoint.vout,
+        loadedOutput(selectedPoint.txid, selectedPoint.vout),
+      ))
     : undefined;
   const currentOutputs: WalletReviewFlowEntry[] = [];
   if (item.reason === 'source' && selectedPoint && selected?.ownership === 'wallet') {
     const seen = new Set<string>();
-    for (const reference of item.nodeIds) {
+    for (const reference of item.nodeIds ?? []) {
       const id = canonicalId(reference, workspace);
       const point = id ? outpoint(id) : undefined;
       if (!id || !point || id === selectedId || seen.has(id)) continue;
       seen.add(id);
-      const spending = workspace.transactions[point.txid];
+      const spending = transactions.get(point.txid);
       if (
         !spending?.vin.some(
-          (input) => input.txid === selectedPoint.txid && input.vout === selectedPoint.vout,
+          (input) =>
+            input.coinbase === undefined &&
+            canonicalTransactionId(input.txid) === selectedPoint.txid &&
+            input.vout === selectedPoint.vout,
         )
       )
         continue;
@@ -170,17 +166,27 @@ export function buildWalletReviewContext(
   return {
     transactionId,
     transactionNodeId: transactionId ? txNodeId(transactionId) : undefined,
+    selectedNodeId: selectedId,
+    transactionSelected:
+      selectedId === (transactionId ? txNodeId(transactionId) : undefined) && !!selectedId,
     transaction,
     status: transaction ? 'loaded' : transactionId ? 'missing' : 'unavailable',
     inputs,
     outputs,
     currentOutputs,
     selected,
+    selectedSide: inputs.some((input) => input.selected && input.id === selectedId)
+      ? 'input'
+      : outputs.some((output) => output.selected && output.id === selectedId)
+        ? 'output'
+        : undefined,
     role: !selectedPoint
       ? 'wallet-related-transaction'
       : selected?.ownership === 'wallet'
         ? 'wallet-output'
-        : selected?.ownership === 'external' && inputs.some((input) => input.ownership === 'wallet')
+        : selected?.ownership === 'external' &&
+            outputs.some((output) => output.id === selectedId) &&
+            inputs.some((input) => input.ownership === 'wallet')
           ? 'possible-counterparty'
           : 'unknown-output',
     missingPrevouts: inputs.filter((input) => input.missing && !input.coinbase).length,
@@ -191,6 +197,7 @@ export interface RelatedEntity {
   id: string;
   address?: string;
   txid?: string;
+  transactionIds?: readonly string[];
 }
 
 /** Explicit relation within a supplied candidate set. No expansion, inferred
@@ -200,14 +207,19 @@ export function matchRelatedEntities(
   seeds: readonly RelatedEntity[],
   relation: 'address' | 'transaction',
 ): string[] {
-  const key = relation === 'address' ? 'address' : 'txid';
-  const values = new Set(
-    seeds.map((seed) => seed[key]).filter((value): value is string => !!value),
-  );
+  const valuesFor = (entity: RelatedEntity): readonly string[] =>
+    relation === 'address'
+      ? entity.address
+        ? [entity.address]
+        : []
+      : entity.txid
+        ? [entity.txid]
+        : (entity.transactionIds ?? []);
+  const values = new Set(seeds.flatMap((seed) => [...valuesFor(seed)]));
   return [
     ...new Set(
       candidates
-        .filter((candidate) => !!candidate[key] && values.has(candidate[key]!))
+        .filter((candidate) => valuesFor(candidate).some((value) => values.has(value)))
         .map((candidate) => candidate.id),
     ),
   ];

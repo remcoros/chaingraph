@@ -122,18 +122,29 @@ you choose Show; renaming never changes the key or derived addresses.
 The review queue combines
 current UTXO observations, their sources and newly discovered activity. Coverage
 and continuation messages describe the checked snapshot; use **Load more** when
-pending items remain outside the displayed batch. **Records** provides addresses,
-transactions and outputs with review filters and explicit batch selection.
+pending items remain outside the displayed batch. One tab row contains **To review**,
+**UTXOs**, **Transactions**, **Addresses**, **Sources** and **Destinations**.
+Each tab shares the same list, single-item details and explicit batch details.
 
-Select an item to label it, record its source or destination, or open it in Graph,
-the Inspector or Analysis. The flow diagram highlights verified wallet matches
+Select a row to label it or record its source or destination. The side toolbar has
+Label, Tags and Icon, review actions, Select related, Show and Isolate.
+Show opens Graph and zooms to the selection. Isolate additionally narrows Graph to
+the selection and its connected context, using the existing resettable filter.
+The flow diagram highlights verified wallet matches
 and the selected output. **No wallet match** means no match to discovered addresses,
-not proof that someone else owns it. Select a flow node to inspect it, and use
-**Back to Wallet** to return to the same review item.
-Use checkboxes to select several items, then the selection bar to label, tag or
-set their icons together. Ctrl/⌘ click toggles a row; Shift click selects a range.
-**Select all N results** selects the full filtered list, including results under
-Show more. **Select related** selects exact same-address or same-transaction
+not proof that someone else owns it. Use a flow card's magnifier to reveal and frame
+that transaction or outpoint in Graph; clicking the card itself does not navigate. **Back to Wallet**
+returns to that magnifier. Actions stay at the top of the detail panel, above the
+collapsible flow. Identifiers and tags remain visible in common information.
+If an address has several verified loaded transaction matches, choose its
+transaction context explicitly.
+
+Use checkboxes to select several items, then the batch detail panel to label, tag or
+set their icons together. It replaces single-item details without widening the list.
+Ctrl/⌘ click toggles a row; Shift click selects a range.
+**Select all (N)** selects the full filtered list, including results under
+Show more. It then becomes **Unselect all (N)**. Unselecting drops only those matching
+rows, not selections hidden by another filter. **Select related** selects exact same-address or same-transaction
 results based on the current item or selection. It replaces the selection and
 never reaches outside this filtered list. A shared transaction can include both
 your outputs and other participants. Batch edits apply only to that selection. Existing labels and icons are kept unless
@@ -143,9 +154,34 @@ updates appear in the list and details without completing the review.
 **Review later** advances to the next item and moves deferred work to
 **Show → Review later**, separate from **To review**. It stays pending after locking
 and reopening the workspace. Use Return to review or Reopen to put it back in To review.
-Marking it reviewed or explicitly recording its source as unknown completes that
-review decision. Decisions belong to the selected wallet, even when another
+Marking it reviewed completes that decision. Older saved Source unknown decisions
+remain completed and appear under Reviewed; this is no longer offered as a new action.
+Decisions belong to the selected wallet, even when another
 imported wallet covers the same addresses.
+
+**Finding types** offers the full supported category list with counts, including
+zero. A row matches any selected type (OR), so overlapping counts must not be
+added together. Counts use the other active filters before this category filter.
+Missing a label, missing tags, and missing both are separate conditions.
+**Clear types** shows no categories; **Reset to all types** restores the catalog.
+Heuristic types use existing scan results and distinguish an unrun or outdated
+scan from an observed zero. Partial observations do not establish completeness.
+
+**Sources** and **Destinations** show one grouped row per canonical address in the
+selected wallet's one-hop observations, excluding the selected wallet's own addresses.
+Edit that address's label, tags or icon
+to record a recognized exchange or shop. Underlying outpoints and transaction
+contexts remain visible below the common information. Shortened values have full-value
+tooltips and copy controls. Source input lookups start in a bounded background batch;
+Load next and Retry handle remaining or failed lookups. Missing and non-address
+outputs are counted separately instead of appearing as unidentified address rows.
+A label is user context, not a proven counterparty identity.
+
+Use **Scan** for the supported analysis on loaded data; **Refresh** checks for
+new chain activity. Visible
+flow inputs load a bounded set of missing previous transactions. Closing or
+changing the flow cancels obsolete work; errors keep the selection and offer
+Retry inputs. Unknown values remain unknown until observations arrive.
 
 Refresh the wallet to check for new activity. Existing annotations and review
 decisions remain, while newly discovered activity stays visible for review.

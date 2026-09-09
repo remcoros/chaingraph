@@ -1,52 +1,62 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronRight,
-  Pencil,
-  Plus,
-  Clock3,
-  Check,
-  CircleHelp,
-  Eye,
+  ArrowLeftRight,
+  Coins,
   ListChecks,
+  LogIn,
+  LogOut,
+  MapPin,
+  Filter,
   Network,
-  RefreshCw,
-  Search,
-  Undo2,
   Wallet as WalletIcon,
 } from 'lucide-react';
+import { formatSats, short, type Wallet, type Workspace } from '../domain/types';
+import { verifyWalletUtxo, type WalletUtxoRecord } from '../domain/walletRecords';
 import {
-  addressNodeId,
-  formatSats,
-  outputNodeId,
-  short,
-  txNodeId,
-  type Wallet,
-  type Workspace,
-} from '../domain/types';
-import { walletCheckAge } from '../domain/walletActivity';
-import {
-  listWalletAddresses,
-  listWalletTransactions,
-  verifyWalletUtxo,
-  type WalletUtxoRecord,
-} from '../domain/walletRecords';
-import {
-  buildWalletReview,
   applyReviewDecisions,
-  isCompletedReview,
+  buildWalletReview,
   REASON_LABELS,
-  reviewKey,
   spendGuidance,
-  type ReviewStatus,
   type WalletReviewItem,
 } from '../domain/walletReview';
-import { listTagsForNode } from '../domain/tags';
+import {
+  buildWalletRecordRows,
+  buildWalletRelationshipRows,
+  matchesWalletStatus,
+  reviewRow,
+  walletSelectAll,
+  walletRowWithContext,
+  resolveWalletRow,
+  type WalletRow,
+  type WalletStatusFilter,
+  type WalletTab,
+} from '../domain/walletWorkbenchRows';
+import { groupWalletRelationships } from '../domain/walletRelationships';
+import {
+  walletReviewCategories,
+  matchesReviewCategories,
+  walletReviewCategoryScanState,
+} from '../domain/walletReviewCategories';
+import type { AnalysisScan } from '../domain/analysisScan';
 import { useRecordSelection } from '../lib/useRecordSelection';
 import { useWalletUtxos } from '../lib/useWalletUtxos';
+import { useWalletScan } from '../lib/useWalletScan';
+import { useWalletCounterparties } from '../lib/useWalletCounterparties';
+import { fetchTransaction } from '../lib/api';
+import { WALLET_FLOW_INPUT_WAVE_LIMIT } from '../lib/walletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
-import { buildWalletReviewContext } from '../domain/walletReviewContext';
-import { WalletReviewFlow } from './WalletReviewFlow';
+import { WalletOverview } from './WalletOverview';
+import { WalletCategoryFilter } from './WalletCategoryFilter';
+import {
+  WalletItemDetail,
+  WalletDecisionButtons,
+  type WalletDecisionAction,
+} from './WalletItemDetail';
 import { WalletRelatedSelection } from './WalletRelatedSelection';
+import { WalletHelp } from './WalletHelp';
+import { WalletReference } from './WalletReference';
+import { CopyButton } from './CopyButton';
+import { buildTagIndex } from '../domain/tags';
 import './wallet-workbench.css';
 
 export interface WalletWorkbenchProps {
@@ -56,157 +66,112 @@ export interface WalletWorkbenchProps {
   canQuery: boolean;
   busy: boolean;
   queryDisabledReason?: string;
+  analysisScan?: AnalysisScan;
+  onScanComplete?: (scan: AnalysisScan) => void;
+  updateEvidence: (id: string, update: (current: Workspace) => Workspace, undo?: boolean) => void;
   onSelectWallet: (id: string) => void;
   onAddWallet: () => void;
   onEditWallet?: (id: string) => void;
   onChange: (update: (workspace: Workspace) => Workspace) => void;
   onRefresh: () => void;
   onShowInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
+  onIsolateInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
+  onShowSelection: (ids: string[], isolate: boolean) => void;
   onInspect: (nodeId: string, utxo?: WalletUtxoRecord) => void;
   onAnalyze: (nodeId?: string) => void;
 }
 
-type RecordTab = 'utxos' | 'transactions' | 'addresses';
-interface RecordRow {
-  id: string;
-  identifier: string;
-  amountSats?: number;
-  meta: string;
-  detail?: string;
-  utxo?: WalletUtxoRecord;
-  reviewKey?: string;
-  address?: string;
-}
+const TABS = [
+  { id: 'review', label: 'To review', Icon: ListChecks },
+  { id: 'utxos', label: 'UTXOs', Icon: Coins },
+  { id: 'transactions', label: 'Transactions', Icon: ArrowLeftRight },
+  { id: 'addresses', label: 'Addresses', Icon: MapPin },
+  { id: 'sources', label: 'Sources', Icon: LogIn },
+  { id: 'destinations', label: 'Destinations', Icon: LogOut },
+] as const;
 const PAGE = 40;
+const STATUS_LABELS = {
+  open: 'To review',
+  later: 'Review later',
+  decided: 'Reviewed',
+  all: 'All items',
+} as const;
 
-function statusLabel(item: WalletReviewItem): string {
-  if (item.changed) return 'Evidence changed';
-  return item.status === 'open'
-    ? 'To review'
-    : item.status === 'reviewed'
-      ? 'Reviewed'
-      : item.status === 'unknown'
-        ? 'Source unknown'
-        : 'Review later';
-}
-
-/** One selected wallet at a time. Review decisions, labels and tags stay inside the
- * encrypted workspace; UTXO observations remain transient.
- */
-export function WalletWorkbench({
-  active,
-  workspace,
-  wallet,
-  canQuery,
-  busy,
-  queryDisabledReason,
-  onSelectWallet,
-  onAddWallet,
-  onEditWallet,
-  onChange,
-  onRefresh,
-  onShowInGraph,
-  onInspect,
-  onAnalyze,
-}: WalletWorkbenchProps) {
-  if (!wallet)
-    return (
-      <section className="wallet-workbench" aria-label="Wallet review workbench">
-        <div className="wallet-empty">
-          <WalletIcon size={30} />
-          <h1>Wallet review</h1>
-          <p>
-            Import a watch-only extended public key to review its current coins, recover context for
-            old receipts and label them in place.
-          </p>
-          <div className="button-row">
-            <button className="primary" onClick={onAddWallet} disabled={workspace.demo}>
+export const WalletWorkbench = memo(
+  function WalletWorkbench(props: WalletWorkbenchProps) {
+    if (!props.wallet)
+      return (
+        <section className="wallet-workbench" aria-label="Wallet review workbench">
+          <div className="wallet-empty">
+            <WalletIcon size={30} />
+            <h1>Wallet review</h1>
+            <p>
+              Import a watch-only extended public key to review coins and their direct transaction
+              relationships.
+            </p>
+            <button className="primary" onClick={props.onAddWallet} disabled={props.workspace.demo}>
               Add a wallet
             </button>
           </div>
-        </div>
-      </section>
+        </section>
+      );
+    return (
+      <WalletReview
+        key={`${props.workspace.id}:${props.wallet.id}`}
+        {...props}
+        wallet={props.wallet}
+      />
     );
-  return (
-    <WalletReview
-      key={`${workspace.id}:${wallet.id}`}
-      active={active}
-      workspace={workspace}
-      wallet={wallet}
-      canQuery={canQuery}
-      busy={busy}
-      queryDisabledReason={queryDisabledReason}
-      onSelectWallet={onSelectWallet}
-      onAddWallet={onAddWallet}
-      onEditWallet={onEditWallet}
-      onChange={onChange}
-      onRefresh={onRefresh}
-      onShowInGraph={onShowInGraph}
-      onInspect={onInspect}
-      onAnalyze={onAnalyze}
-    />
-  );
-}
+  },
+  (before, after) =>
+    !before.active &&
+    !after.active &&
+    before.workspace.id === after.workspace.id &&
+    before.wallet?.id === after.wallet?.id,
+);
 
-function WalletReview({
-  active,
-  workspace,
-  wallet,
-  canQuery,
-  busy,
-  queryDisabledReason,
-  onSelectWallet,
-  onAddWallet,
-  onEditWallet,
-  onChange,
-  onRefresh,
-  onShowInGraph,
-  onInspect,
-  onAnalyze,
-}: WalletWorkbenchProps & { wallet: Wallet }) {
-  const [tab, setTab] = useState<'review' | 'records'>('review');
-  const [recordTab, setRecordTab] = useState<RecordTab>('utxos');
-  const [reviewFilter, setReviewFilter] = useState<'open' | 'later' | 'decided' | 'all'>('open');
+function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet }) {
+  const { workspace, wallet, active, busy, canQuery, onChange } = props;
+  const walletScan = useWalletScan({
+    workspace,
+    wallet,
+    active,
+    onChange,
+    onComplete: props.onScanComplete,
+  });
+  const [tab, setTab] = useState<WalletTab>('review');
+  const [status, setStatus] = useState<WalletStatusFilter>('open');
   const [selectedKey, setSelectedKey] = useState<string>();
+  const selection = useRecordSelection();
   const [limit, setLimit] = useState(PAGE);
-  const [query, setQuery] = useState('');
-  const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
-  const [recordReview, setRecordReview] = useState<'all' | 'open' | 'later' | 'decided'>('all');
-  const [tagFilter, setTagFilter] = useState('all');
-  const recordSelection = useRecordSelection();
-  const { ids: selection, setIds: setSelection } = recordSelection;
-  const reviewSelection = useRecordSelection();
   const [itemPage, setItemPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [labelFilter, setLabelFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('all');
+  const [typeIds, setTypeIds] = useState<string[]>();
   const [notice, setNotice] = useState('');
+  const detailRef = useRef<HTMLElement>(null);
+  const previousRow = useRef<WalletRow | undefined>(undefined);
   const {
     utxos,
     loading: utxoLoading,
     error: utxoError,
     check,
   } = useWalletUtxos({ workspace, wallet, enabled: active && canQuery });
-
-  const invalidUtxos = useMemo(
-    () =>
-      new Set(
-        (utxos?.records ?? [])
-          .filter(
-            (record) =>
-              workspace.transactions[record.txid] &&
-              !verifyWalletUtxo(record, workspace.transactions[record.txid], workspace.network),
-          )
-          .map((record) => `${record.txid}:${record.vout}`),
-      ),
-    [utxos, workspace.transactions, workspace.network],
-  );
   const currentUtxos = useMemo(
     () =>
       (utxos?.records ?? [])
-        .filter((record) => !invalidUtxos.has(`${record.txid}:${record.vout}`))
+        .filter(
+          (record) =>
+            !workspace.transactions[record.txid] ||
+            verifyWalletUtxo(record, workspace.transactions[record.txid], workspace.network),
+        )
         .sort(
           (a, b) => b.valueSats - a.valueSats || a.txid.localeCompare(b.txid) || a.vout - b.vout,
         ),
-    [utxos, invalidUtxos],
+    [utxos, workspace.transactions, workspace.network],
   );
+  const invalidCount = (utxos?.records.length ?? 0) - currentUtxos.length;
   const review = useMemo(
     () =>
       buildWalletReview(workspace, wallet, {
@@ -217,1022 +182,642 @@ function WalletReview({
         utxoPartial: utxos?.nextCursor !== undefined || (utxos?.failed ?? 0) > 0,
         page: itemPage,
       }),
-    [workspace, wallet, utxos, currentUtxos, itemPage],
+    [
+      workspace.id,
+      workspace.network,
+      workspace.transactions,
+      workspace.annotations,
+      workspace.tags,
+      workspace.walletReviews,
+      workspace.findings,
+      wallet,
+      utxos,
+      currentUtxos,
+      itemPage,
+    ],
   );
-  const openItems = review.items.filter((item) => item.status === 'open' || item.changed);
-  const reviewedItems = review.items.filter(
-    (item) => isCompletedReview(workspace.walletReviews?.[item.key]) && !item.changed,
+  const relationships = useMemo(
+    () => groupWalletRelationships(workspace, wallet),
+    [
+      workspace.network,
+      workspace.transactions,
+      wallet.id,
+      wallet.addresses,
+      wallet.pendingTransactionIds,
+      wallet.scanComplete,
+      wallet.scannedAt,
+    ],
   );
-  const countSuffix = review.omittedItems ? '+' : '';
-  const visibleItems =
-    reviewFilter === 'open'
-      ? openItems
-      : reviewFilter === 'later'
-        ? review.items.filter((item) => item.status === 'later' && !item.changed)
-        : reviewFilter === 'decided'
-          ? // Deferred items are outstanding work, so they never read as reviewed.
-            review.items.filter(
-              (item) => isCompletedReview(workspace.walletReviews?.[item.key]) && !item.changed,
-            )
-          : review.items;
-  const selectedItem = visibleItems.find((item) => item.key === selectedKey) ?? visibleItems[0];
-  const reviewContext = useMemo(
-    () => (selectedItem ? buildWalletReviewContext(workspace, wallet, selectedItem) : undefined),
-    [workspace, wallet, selectedItem],
-  );
-  const contextTitle =
-    reviewContext?.role === 'wallet-output'
-      ? selectedItem?.reason === 'source'
-        ? 'Earlier wallet receipt'
-        : 'Your wallet output'
-      : reviewContext?.role === 'possible-counterparty'
-        ? 'Possible counterparty'
-        : reviewContext?.role === 'wallet-related-transaction'
-          ? 'Wallet-related transaction'
-          : 'Ownership not verified';
-  const annotationHint =
-    reviewContext?.role === 'possible-counterparty'
-      ? 'Label this output with the shop or recipient you recognize. This does not label the whole transaction.'
-      : selectedItem?.reason === 'source' || selectedItem?.reason === 'current-utxo'
-        ? 'Record where this wallet output came from, for example an exchange withdrawal or a payment.'
-        : 'Add context to this selected entity. Each input and output can have its own label.';
-  const selectedReviewItems = review.items.filter((item) => reviewSelection.ids.includes(item.key));
-  const selectedReviewIds = [...new Set(selectedReviewItems.map((item) => item.nodeId))];
-  const laterItems = review.items.filter((item) => item.status === 'later' && !item.changed);
-  const displayedReviewKeys = visibleItems.slice(0, limit).map((item) => item.key);
-  const entityType = (id: string) =>
-    id.startsWith('tx:') ? 'transaction' : id.startsWith('addr:') ? 'address' : 'output';
-  const metadataTags = (id: string, address?: string) =>
-    listTagsForNode(workspace, { id, kind: entityType(id), label: '', address });
-  useEffect(
-    () => setLimit(PAGE),
-    [reviewFilter, tab, recordTab, query, labelFilter, recordReview, tagFilter],
-  );
-  useEffect(() => {
-    recordSelection.clear();
-  }, [recordTab]);
-  const detailRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (!selectedKey || !window.matchMedia('(max-width: 760px)').matches) return;
-    detailRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [selectedKey]);
-
-  const transactions = useMemo(
-    () => listWalletTransactions(workspace, wallet),
-    [workspace.transactions, wallet],
-  );
-  const addresses = useMemo(
-    () => listWalletAddresses(workspace, wallet),
-    [workspace.transactions, wallet],
-  );
-  const rows: RecordRow[] = useMemo(() => {
-    if (recordTab === 'utxos')
-      return currentUtxos.map((record) => ({
-        id: outputNodeId(record.txid, record.vout),
-        identifier: `${record.txid}:${record.vout}`,
-        amountSats: record.valueSats,
-        meta: record.height > 0 ? `Block ${record.height.toLocaleString('en-US')}` : 'Unconfirmed',
-        detail: record.address,
-        address: record.address,
-        utxo: record,
-        reviewKey: reviewKey(wallet.id, 'current-utxo', `${record.txid}:${record.vout}`),
-      }));
-    if (recordTab === 'transactions')
-      return transactions.map((record) => ({
-        id: txNodeId(record.txid),
-        identifier: record.txid,
-        meta: record.mempool
-          ? 'Unconfirmed'
-          : record.height
-            ? `Block ${record.height.toLocaleString('en-US')}`
-            : 'Height unknown',
-        detail: record.transaction
-          ? `${record.transaction.vin.length} in / ${record.transaction.vout.length} out`
-          : 'Not loaded yet',
-        reviewKey: reviewKey(wallet.id, 'new-activity', record.txid),
-      }));
-    return addresses.map((record) => ({
-      id: addressNodeId(record.address),
-      identifier: record.address,
-      meta: `${record.branch === 0 ? 'Receive' : 'Change'} ${record.index}`,
-      detail: `${record.loadedOutputCount} loaded output${record.loadedOutputCount === 1 ? '' : 's'} · ${record.history?.length ?? 0} history entries`,
-      address: record.address,
-    }));
-  }, [recordTab, currentUtxos, transactions, addresses, wallet.id]);
-
-  const rowKind = (tab: RecordTab) =>
-    tab === 'transactions'
-      ? ('transaction' as const)
-      : tab === 'addresses'
-        ? ('address' as const)
-        : ('output' as const);
-  const rowTags = (row: RecordRow) =>
-    listTagsForNode(workspace, {
-      id: row.id,
-      kind: rowKind(recordTab),
-      label: '',
-      address: row.address,
-    });
-  const search = query.trim().toLowerCase();
-  const filteredRows = rows.filter((row) => {
-    const annotation = workspace.annotations[row.id];
-    if (
-      search &&
-      ![row.identifier, annotation?.label, annotation?.note, row.detail].some((value) =>
-        value?.toLowerCase().includes(search),
-      )
-    )
-      return false;
-    if (labelFilter === 'unlabeled' && annotation?.label?.trim()) return false;
-    if (labelFilter === 'labeled' && !annotation?.label?.trim()) return false;
-    if (tagFilter !== 'all' && !rowTags(row).some((tag) => tag.id === tagFilter)) return false;
-
-    if (recordReview !== 'all' && row.reviewKey) {
-      // Deferred records have their own view and are never treated as completed.
-      const completed = isCompletedReview(workspace.walletReviews?.[row.reviewKey]);
-      const deferred = workspace.walletReviews?.[row.reviewKey]?.status === 'later';
-      if (recordReview === 'open' && (completed || deferred)) return false;
-      if (recordReview === 'later' && !deferred) return false;
-      if (recordReview === 'decided' && !completed) return false;
-    } else if (recordReview !== 'all' && !row.reviewKey) return false;
-    return true;
+  const counterparties = useWalletCounterparties({
+    workspace,
+    wallet,
+    groups: relationships,
+    active: active && tab === 'sources',
+    enabled: canQuery && !busy,
+    fetch: fetchTransaction,
+    update: props.updateEvidence,
   });
-  const visibleIds = new Set(filteredRows.map((row) => row.id));
-  const hiddenSelection = selection.filter((id) => !visibleIds.has(id)).length;
-  // Filtering never widens an existing selection; it only offers a new explicit scope.
-  const selectedIds = selection.filter((id) => rows.some((row) => row.id === id));
-  const scopeLabel =
-    recordTab === 'utxos'
-      ? 'UTXOs selected'
-      : recordTab === 'transactions'
-        ? 'transactions selected'
-        : 'addresses selected';
+  const [counterpartyReady, setCounterpartyReady] = useState(false);
+  useEffect(() => setCounterpartyReady(active && tab === 'sources'), [active, tab]);
+  const rowsByTab = useMemo<Record<WalletTab, WalletRow[]>>(() => {
+    const records =
+      tab === 'utxos' || tab === 'transactions' || tab === 'addresses'
+        ? buildWalletRecordRows(workspace, wallet, currentUtxos, review.items, tab)
+        : { utxos: [], transactions: [], addresses: [] };
+    const sourceContexts = new Map(
+      [
+        ...relationships.sourceExceptions,
+        ...relationships.sources.flatMap((group) => group.outpoints),
+      ].map((entry) => [entry.id, entry.transactionIds]),
+    );
+    return {
+      review: review.items.map((item) => {
+        const row = reviewRow(item);
+        if (item.reason === 'funding-source')
+          row.contextTransactionIds = sourceContexts.get(item.nodeId) ?? row.contextTransactionIds;
+        return row;
+      }),
+      ...records,
+      ...buildWalletRelationshipRows(workspace, relationships, review.items),
+    };
+  }, [
+    workspace.network,
+    workspace.transactions,
+    workspace.annotations,
+    workspace.tags,
+    workspace.walletReviews,
+    wallet.id,
+    wallet.addresses,
+    currentUtxos,
+    review.items,
+    relationships,
+    tab,
+  ]);
+  const rows = rowsByTab[tab];
+  const rowTags = useMemo(
+    () =>
+      buildTagIndex(workspace, {
+        nodes: rows.map((row) => ({
+          id: row.nodeId,
+          kind: row.kind,
+          address: row.address,
+          label: '',
+        })),
+        links: [],
+      }),
+    [workspace.tags, rows],
+  );
+  const search = query.trim().toLowerCase();
+  const metadataFiltered = useMemo(
+    () =>
+      rows.filter((row) => {
+        const annotation = workspace.annotations[row.nodeId];
+        const tags = rowTags.get(row.nodeId) ?? [];
+        if (
+          search &&
+          ![
+            row.identifier,
+            row.address,
+            row.title,
+            annotation?.label,
+            annotation?.note,
+            ...tags.map((tag) => tag.name),
+            ...row.contextTransactionIds,
+          ].some((text) => text?.toLowerCase().includes(search))
+        )
+          return false;
+        if (labelFilter === 'unlabeled' && annotation?.label?.trim()) return false;
+        if (labelFilter === 'labeled' && !annotation?.label?.trim()) return false;
+        if (tagFilter === 'untagged' && tags.length) return false;
+        if (
+          tagFilter !== 'all' &&
+          tagFilter !== 'untagged' &&
+          !tags.some((tag) => tag.id === tagFilter)
+        )
+          return false;
+        return true;
+      }),
+    [rows, rowTags, workspace.annotations, search, labelFilter, tagFilter],
+  );
+  const statusFiltered = useMemo(
+    () => metadataFiltered.filter((row) => matchesWalletStatus(row, status)),
+    [metadataFiltered, status],
+  );
+  const currentScan = walletScan.scan ?? props.analysisScan;
+  const scanState = useMemo(
+    () => walletReviewCategoryScanState(workspace, currentScan),
+    [workspace.findings, currentScan],
+  );
+  const categories = useMemo(
+    () =>
+      tab !== 'review'
+        ? []
+        : walletReviewCategories(
+            workspace,
+            statusFiltered.flatMap((row) => row.reviews),
+          ).map((category) => {
+            const tool = scanState.tools.find((entry) => entry.id === category.algorithm);
+            const note = !category.heuristic
+              ? undefined
+              : tool?.status === 'not-scanned'
+                ? 'Not scanned in this session; zero means no listed results, not a completed scan.'
+                : tool?.status === 'saved-findings'
+                  ? 'Saved findings; original scan coverage is unavailable.'
+                  : tool?.status === 'skipped'
+                    ? 'Skipped in the last session scan.'
+                    : tool?.status === 'error'
+                      ? 'The last session scan could not complete this tool.'
+                      : `Last session scan: ${currentScan?.scope.label ?? 'scope unavailable'}. Counts here are filtered review items.`;
+            return { ...category, note };
+          }),
+    [
+      tab,
+      workspace.annotations,
+      workspace.tags,
+      workspace.findings,
+      statusFiltered,
+      scanState,
+      currentScan,
+    ],
+  );
+  const selectedTypes = useMemo(
+    () => typeIds ?? categories.map((category) => category.id),
+    [typeIds, categories],
+  );
+  const allTypes = categories.every((category) => selectedTypes.includes(category.id));
+  const filteredRows = useMemo(
+    () =>
+      tab === 'review' && !allTypes
+        ? statusFiltered.filter((row) =>
+            row.reviews.some((item) => matchesReviewCategories(item, selectedTypes, workspace)),
+          )
+        : statusFiltered,
+    [
+      tab,
+      allTypes,
+      statusFiltered,
+      selectedTypes,
+      workspace.annotations,
+      workspace.tags,
+      workspace.findings,
+    ],
+  );
+  const displayedRows = filteredRows.slice(0, limit);
+  const currentRow = resolveWalletRow(filteredRows, selectedKey, previousRow.current);
+  const selectedRow = useMemo(
+    () => (currentRow ? walletRowWithContext(workspace, currentRow) : undefined),
+    [workspace.transactions, workspace.network, currentRow],
+  );
+  const selectionKeys = useMemo(() => new Set(selection.ids), [selection.ids]);
+  const rowKeys = useMemo(() => new Set(rows.map((row) => row.key)), [rows]);
+  const filteredKeys = useMemo(() => new Set(filteredRows.map((row) => row.key)), [filteredRows]);
+  const allSelection = walletSelectAll(selection.ids, [...filteredKeys]);
+  const selectedRows = selection.ids.length ? rows.filter((row) => selectionKeys.has(row.key)) : [];
+  const selectedIds = [...new Set(selectedRows.map((row) => row.nodeId))];
+  const selectedKinds = new Map(selectedRows.map((row) => [row.nodeId, row.kind]));
+  const selectionSummary = (['address', 'transaction', 'output'] as const)
+    .flatMap((kind) => {
+      const count = [...selectedKinds.values()].filter((value) => value === kind).length;
+      const noun = kind === 'output' ? (tab === 'utxos' ? 'UTXO' : 'outpoint') : kind;
+      return count ? [`${count} ${noun}${count === 1 ? '' : 's'}`] : [];
+    })
+    .join(' · ');
+  const selectedReviews = [
+    ...new Map(selectedRows.flatMap((row) => row.reviews).map((item) => [item.key, item])).values(),
+  ];
+  const hiddenSelected = selectedRows.filter((row) => !filteredKeys.has(row.key)).length;
+  const missingSelected = selection.ids.filter((id) => !rowKeys.has(id)).length;
+  const batching = selection.ids.length > 0;
+  useEffect(() => {
+    if (batching) return;
+    const previous = previousRow.current;
+    if (
+      previous?.kind === 'output' &&
+      !previous.address &&
+      currentRow?.kind === 'address' &&
+      currentRow.outpointIds?.includes(previous.nodeId) &&
+      (!selectedKey || selectedKey === previous.key)
+    )
+      setSelectedKey(currentRow.key);
+    previousRow.current = currentRow;
+  }, [batching, currentRow, selectedKey]);
+  const tabLabel = TABS.find((item) => item.id === tab)!.label;
+  const statusCounts = (value: WalletStatusFilter) =>
+    metadataFiltered.filter((row) => matchesWalletStatus(row, value)).length;
 
-  function decide(items: readonly WalletReviewItem[], status: ReviewStatus | 'reopen') {
-    if (!items.length) return;
-    onChange((current) => applyReviewDecisions(current, wallet, items, status));
-    reviewSelection.clear();
-    if (status === 'reopen') {
-      setReviewFilter('open');
-      setSelectedKey(items[0].key);
-    } else if (selectedItem) {
-      // Advance to the next open item deterministically instead of relying on a
-      // fallback once the decided item leaves this filter.
+  useEffect(() => setLimit(PAGE), [tab, query, labelFilter, tagFilter, status, typeIds]);
+  useEffect(() => {
+    if (selectedKey && window.matchMedia('(max-width: 760px)').matches)
+      detailRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selectedKey, batching]);
+
+  function changeTab(next: WalletTab) {
+    setTab(next);
+    selection.clear();
+    setSelectedKey(undefined);
+    previousRow.current = undefined;
+    setQuery('');
+    setLabelFilter('all');
+    setTagFilter('all');
+    setStatus(next === 'review' ? 'open' : 'all');
+    setNotice('');
+  }
+
+  function decide(items: readonly WalletReviewItem[], action: WalletDecisionAction) {
+    onChange((current) => applyReviewDecisions(current, wallet, items, action));
+    selection.clear();
+    if (action === 'reopen') {
+      setStatus('open');
+      if (tab === 'review') setSelectedKey(items[0]?.key);
+    } else if (selectedRow) {
       const decided = new Set(items.map((item) => item.key));
-      const currentIndex = visibleItems.findIndex((item) => item.key === selectedItem.key);
-      const nextItems = [
-        ...visibleItems.slice(currentIndex + 1),
-        ...visibleItems.slice(0, currentIndex),
-      ];
-      setSelectedKey(nextItems.find((item) => !decided.has(item.key))?.key);
+      const index = filteredRows.findIndex((row) => row.key === selectedRow.key);
+      const following = [...filteredRows.slice(index + 1), ...filteredRows.slice(0, index)];
+      setSelectedKey(
+        following.find((row) => !row.reviews.some((item) => decided.has(item.key)))?.key,
+      );
     }
     setNotice(
-      status === 'reopen'
-        ? `Reopened ${items.length} item${items.length === 1 ? '' : 's'}.`
-        : `Marked ${items.length} item${items.length === 1 ? '' : 's'} as ${
-            status === 'reviewed'
-              ? 'reviewed'
-              : status === 'unknown'
-                ? 'reviewed, source unknown'
-                : 'review later'
-          }.`,
+      `${action === 'reopen' ? 'Reopened' : action === 'reviewed' ? 'Reviewed' : 'Set aside'} ${items.length} review item${items.length === 1 ? '' : 's'}.`,
     );
   }
 
-  const coverage = review.coverage;
-
-  const guidance = recordTab === 'utxos' ? spendGuidance(workspace, selectedIds) : undefined;
-
+  const related = (row: WalletRow) => ({
+    id: row.key,
+    address: row.address,
+    txid: row.txid,
+    transactionIds:
+      row.kind === 'address' && row.relationshipDirection ? row.contextTransactionIds : undefined,
+  });
+  const relatedSelection =
+    selectedRows.length > 0 || selectedRow ? (
+      <WalletRelatedSelection
+        active={active}
+        candidates={filteredRows.map(related)}
+        seeds={(batching ? selectedRows : selectedRow ? [selectedRow] : []).map(related)}
+        onSelect={selection.setIds}
+      />
+    ) : undefined;
   return (
     <section className="wallet-workbench" aria-label="Wallet review workbench">
-      <header className="wallet-review-header">
-        <div className="wallet-identity">
-          <span className="wallet-eyebrow">Watch-only wallet</span>
-          <div className="wallet-picker-row">
-            <label className="wallet-picker">
-              <WalletIcon size={19} style={{ color: wallet.color }} aria-hidden="true" />
-              <select
-                aria-label="Selected wallet"
-                value={wallet.id}
-                onChange={(event) => onSelectWallet(event.target.value)}
-              >
-                {workspace.wallets.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {onEditWallet && (
-              <button
-                className="icon-button"
-                aria-label="Edit wallet name"
-                title="Edit wallet name"
-                onClick={() => onEditWallet(wallet.id)}
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-            <button className="text-button" onClick={onAddWallet} disabled={workspace.demo}>
-              <Plus size={14} /> Add wallet
-            </button>
-          </div>
-        </div>
-        <div className="wallet-review-controls">
-          <button
-            disabled={!canQuery || busy}
-            title={queryDisabledReason ?? 'Check wallet history for new transactions'}
-            onClick={onRefresh}
-          >
-            <RefreshCw size={14} /> {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
-          </button>
-          <button
-            disabled={!canQuery || utxoLoading}
-            title="Check unspent outputs at the discovered wallet addresses"
-            onClick={() => void check()}
-          >
-            <RefreshCw size={13} /> {utxoLoading ? 'Checking UTXOs…' : 'Check current UTXOs'}
-          </button>
-        </div>
-      </header>
-
-      <dl className="wallet-coverage" aria-label="Wallet coverage">
-        <div>
-          <dt>Wallet refreshed</dt>
-          <dd title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}>
-            {walletCheckAge(wallet.scannedAt)}
-            {wallet.scannedAt && !coverage.scanComplete ? ' · partial discovery' : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>Addresses</dt>
-          <dd>
-            {coverage.usedAddresses} used of {coverage.discoveredAddresses} discovered
-          </dd>
-        </div>
-        <div>
-          <dt>History</dt>
-          <dd>
-            {coverage.loadedTransactions} of {coverage.knownTransactions} known transactions loaded
-            {coverage.pendingTransactions ? ` · ${coverage.pendingTransactions} queued` : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>Current UTXOs</dt>
-          <dd>
-            {coverage.utxoCount === undefined ? (
-              canQuery ? (
-                'Not checked yet'
-              ) : (
-                'Backend unavailable'
-              )
-            ) : (
-              <>
-                {coverage.utxoCount} unspent · {formatSats(coverage.utxoBalanceSats)}
-                {coverage.utxoPartial ? ' · partial check' : ''}
-              </>
-            )}
-          </dd>
-        </div>
-      </dl>
-      <div className="wallet-coverage-actions">
-        {utxos?.nextCursor !== undefined && (
-          <button disabled={!canQuery || utxoLoading} onClick={() => void check(utxos.nextCursor)}>
-            Check next addresses
-          </button>
-        )}
-        {utxos && (
-          <span className="small muted" title={utxos.checkedAt}>
-            UTXOs checked · {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
-            {new Date(utxos.checkedAt).toLocaleTimeString()}
-            {utxos.failed ? ` · ${utxos.failed} failed` : ''}
-          </span>
-        )}
-        {!canQuery && <span className="small muted">{queryDisabledReason}</span>}
-      </div>
+      <WalletOverview
+        {...props}
+        coverage={review.coverage}
+        utxos={utxos}
+        utxoLoading={utxoLoading}
+        onCheck={(cursor) => void check(cursor)}
+        onScan={() => void walletScan.run()}
+        scanLoading={walletScan.loading}
+        scanStatus={
+          walletScan.message ||
+          (currentScan?.scope.kind === 'wallet' &&
+          currentScan.scope.label === `Wallet ${wallet.name}`
+            ? `${currentScan.findings.length} findings`
+            : 'Ready to scan')
+        }
+        scanIssues={currentScan?.reports
+          .filter((report) => report.status === 'error')
+          .map((report) => `${report.toolId}: ${report.message}`)
+          .join(' ')}
+      />
       <div aria-live="polite" className="wallet-review-messages">
         {utxoError && (
           <p role="alert" className="small warning">
             {utxoError}
           </p>
         )}
-        {invalidUtxos.size > 0 && (
+        {walletScan.error && (
           <p role="alert" className="small warning">
-            {invalidUtxos.size} UTXO observations disagree with their loaded transactions and are
+            {walletScan.error}
+          </p>
+        )}
+        {invalidCount > 0 && (
+          <p role="alert" className="small warning">
+            {invalidCount} UTXO observations disagree with their loaded transactions and are
             excluded. Check again to retry.
           </p>
         )}
       </div>
-
       <nav className="wallet-review-tabs" aria-label="Wallet sections">
-        <button
-          aria-pressed={tab === 'review'}
-          className={tab === 'review' ? 'active' : ''}
-          onClick={() => setTab('review')}
-        >
-          <ListChecks size={14} /> To review
-          <span className="wallet-count">
-            {openItems.length}
-            {review.omittedPendingItems ? '+' : ''}
-          </span>
-        </button>
-        <button
-          aria-pressed={tab === 'records'}
-          className={tab === 'records' ? 'active' : ''}
-          onClick={() => setTab('records')}
-        >
-          <Search size={14} /> Records
-        </button>
+        {TABS.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            aria-pressed={tab === id}
+            className={tab === id ? 'active' : ''}
+            onClick={() => changeTab(id)}
+          >
+            <Icon size={14} /> {label}
+            {id === 'review' && (
+              <span className="wallet-count">
+                {rowsByTab.review.filter((row) => matchesWalletStatus(row, 'open')).length}
+              </span>
+            )}
+          </button>
+        ))}
       </nav>
-
       <div aria-live="polite" className="wallet-review-status-line">
         {notice && <p className="small wallet-review-notice">{notice}</p>}
       </div>
-      {tab === 'review' ? (
-        <div className="wallet-review-body">
-          <div className="wallet-review-filters">
+      <div className="wallet-review-body">
+        <div className="wallet-record-filters">
+          {tab !== 'addresses' && (
             <label>
-              Show
+              {tab === 'review' ? 'Show' : 'Review'}
               <select
-                aria-label="Review filter"
-                value={reviewFilter}
-                onChange={(event) =>
-                  setReviewFilter(event.target.value as 'open' | 'later' | 'decided' | 'all')
-                }
+                aria-label={tab === 'review' ? 'Review filter' : 'Review state filter'}
+                value={status}
+                onChange={(event) => setStatus(event.target.value as WalletStatusFilter)}
               >
-                <option value="open">
-                  To review ({openItems.length}
-                  {countSuffix})
-                </option>
-                <option value="later">
-                  Review later ({laterItems.length}
-                  {countSuffix})
-                </option>
-                <option value="decided">
-                  Reviewed ({reviewedItems.length}
-                  {countSuffix})
-                </option>
-                <option value="all">
-                  All items ({review.items.length}
-                  {countSuffix})
-                </option>
+                {(Object.keys(STATUS_LABELS) as WalletStatusFilter[]).map((value) => (
+                  <option key={value} value={value}>
+                    {STATUS_LABELS[value]} ({statusCounts(value)})
+                  </option>
+                ))}
               </select>
             </label>
-            <span className="small muted">
-              {Math.min(limit, visibleItems.length)} of {visibleItems.length} results shown
-              {review.missingSourceTransactions
-                ? ` · ${review.missingSourceTransactions} UTXO sources not loaded`
-                : ''}
-            </span>
-            {review.omittedItems > 0 && (
-              <span className="small wallet-review-bound">
-                {review.omittedItems} more record{review.omittedItems === 1 ? '' : 's'} not listed
-                yet
-                {review.omittedPendingItems
-                  ? `, including ${review.omittedPendingItems} still to review`
-                  : ''}
-                .
+          )}
+          <label>
+            Labels
+            <select
+              aria-label="Label filter"
+              value={labelFilter}
+              onChange={(event) => setLabelFilter(event.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="unlabeled">Unlabeled</option>
+              <option value="labeled">Labelled</option>
+            </select>
+          </label>
+          <label>
+            Tags
+            <select
+              aria-label="Tag filter"
+              value={tagFilter}
+              onChange={(event) => setTagFilter(event.target.value)}
+            >
+              <option value="all">Any tag state</option>
+              <option value="untagged">No tags</option>
+              {(workspace.tags ?? []).map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {tab === 'review' && (
+            <WalletCategoryFilter
+              active={active}
+              categories={categories}
+              selected={selectedTypes}
+              onChange={setTypeIds}
+            />
+          )}
+          <label className="wallet-record-search">
+            Search
+            <input
+              type="search"
+              aria-label="Filter wallet records"
+              placeholder="Labels, tags or address"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="wallet-record-summary">
+          <span
+            className="small muted"
+            aria-label={`${Math.min(limit, filteredRows.length)} of ${filteredRows.length} matching results shown`}
+          >
+            {Math.min(limit, filteredRows.length)}/{filteredRows.length} shown
+          </span>
+          <button
+            disabled={!filteredRows.length}
+            title={
+              allSelection.allSelected
+                ? 'Unselect these matching rows, keeping selections outside the filter'
+                : 'Select every matching row, including rows below Show more'
+            }
+            onClick={() => selection.setIds(allSelection.next)}
+          >
+            {allSelection.allSelected ? 'Unselect all' : 'Select all'} ({filteredRows.length})
+          </button>
+          {tab === 'review' && review.omittedItems > 0 && (
+            <button onClick={() => setItemPage((current) => current + 1)}>
+              Show more review items ({review.omittedItems})
+            </button>
+          )}
+        </div>
+        {tab === 'sources' && (
+          <div className="wallet-input-status" role="status">
+            {counterparties.loading ? (
+              <span>Loading source addresses...</span>
+            ) : (
+              <>
+                {counterparties.failedCount > 0 && (
+                  <>
+                    <span>{counterparties.failedCount} input lookups failed</span>
+                    <button
+                      disabled={!canQuery || busy}
+                      title={props.queryDisabledReason}
+                      onClick={counterparties.retry}
+                    >
+                      Retry
+                    </button>
+                  </>
+                )}
+                {counterparties.missingCount > counterparties.failedCount && (
+                  <>
+                    <span>
+                      {counterparties.missingCount - counterparties.failedCount} input transactions
+                      waiting
+                    </span>
+                    <button
+                      disabled={!canQuery || busy}
+                      onClick={counterparties.loadMore}
+                      title={
+                        props.queryDisabledReason ??
+                        'Load the next batch of direct input transactions'
+                      }
+                    >
+                      Load next{' '}
+                      {Math.min(
+                        WALLET_FLOW_INPUT_WAVE_LIMIT,
+                        counterparties.missingCount - counterparties.failedCount,
+                      )}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+            {counterparties.unavailableCount > 0 && (
+              <span title="These input references could not be matched to an output in the loaded transactions. They are not listed as addresses.">
+                {counterparties.unavailableCount} unmatched input references
               </span>
             )}
-            {review.omittedItems > 0 && (
-              <button onClick={() => setItemPage((current) => current + 1)}>
-                Load more records
-              </button>
-            )}
-            <button
-              disabled={!visibleItems.length}
-              title="Replace the selection with all results in this filter, including rows under Show more"
-              onClick={() => reviewSelection.setIds(visibleItems.map((item) => item.key))}
-            >
-              Select all {visibleItems.length} results
-            </button>
-            <WalletRelatedSelection
-              active={active && tab === 'review'}
-              candidates={visibleItems.map((item) => ({
-                id: item.key,
-                address: item.address,
-                txid: item.txid,
-              }))}
-              seeds={(selectedReviewItems.length
-                ? selectedReviewItems
-                : selectedItem
-                  ? [selectedItem]
-                  : []
-              ).map((item) => ({ id: item.key, address: item.address, txid: item.txid }))}
-              onSelect={reviewSelection.setIds}
-            />
           </div>
-
-          {selectedReviewIds.length > 0 && (
-            <div className="wallet-review-batch">
-              <BatchMetadataBar
-                active={active}
-                workspace={workspace}
-                ids={selectedReviewIds}
-                scopeLabel="entities selected"
-                disabled={busy}
-                onChange={onChange}
-                onNotice={setNotice}
-                onClear={reviewSelection.clear}
-                guidance={
-                  selectedReviewItems.some(
-                    (item) => !visibleItems.some((visible) => visible.key === item.key),
-                  )
-                    ? `${selectedReviewItems.filter((item) => !visibleItems.some((visible) => visible.key === item.key)).length} selected items are outside this filter and remain in the batch.`
-                    : undefined
-                }
-              />
-              <div className="wallet-batch-review-actions">
-                <button disabled={busy} onClick={() => decide(selectedReviewItems, 'reviewed')}>
-                  <Check size={13} /> Mark {selectedReviewItems.length} reviewed
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    decide(selectedReviewItems, reviewFilter === 'later' ? 'reopen' : 'later')
-                  }
+        )}
+        {(tab === 'sources' || tab === 'destinations') &&
+          (() => {
+            const nonAddress = (
+              tab === 'sources'
+                ? relationships.sourceExceptions
+                : relationships.destinationExceptions
+            ).filter((entry) => !entry.missing).length;
+            return nonAddress ? (
+              <p
+                className="wallet-input-status"
+                title="Scripts such as OP_RETURN do not have an address and are excluded from this list."
+              >
+                {nonAddress} non-address outputs excluded
+              </p>
+            ) : null;
+          })()}
+        <div className="wallet-review-grid">
+          <div
+            className={`wallet-review-list ${tab === 'review' ? '' : 'wallet-review-records'}`}
+            role="list"
+            aria-label={tab === 'review' ? 'Review queue' : `${tabLabel} records`}
+          >
+            {displayedRows.map((row) => {
+              const annotation = workspace.annotations[row.nodeId];
+              const checked = selectionKeys.has(row.key);
+              const current = !batching && selectedRow?.key === row.key;
+              const tags = rowTags.get(row.nodeId) ?? [];
+              return (
+                <div
+                  className={`wallet-review-item ${tab === 'review' ? '' : 'wallet-review-record'} ${checked ? 'batch-selected selected' : ''}`}
+                  role="listitem"
+                  key={row.key}
                 >
-                  <Clock3 size={13} />{' '}
-                  {reviewFilter === 'later' ? 'Return selected to review' : 'Review selected later'}
-                </button>
-                <span className="small muted">
-                  {selectedReviewItems.length} review items · {selectedReviewIds.length} unique
-                  entities
-                </span>
-              </div>
-            </div>
-          )}
-          {!visibleItems.length ? (
-            <p className="wallet-empty-note">
-              {reviewFilter === 'later'
-                ? 'No items set aside for later.'
-                : reviewFilter === 'decided'
-                  ? 'Nothing has been reviewed yet.'
-                  : review.omittedItems > 0
-                    ? 'No items in this view yet. More records are not listed; load more records to continue.'
-                    : coverage.utxoCount === undefined
-                      ? 'Check current UTXOs to build the review queue from your live coins.'
-                      : laterItems.length
-                        ? `${laterItems.length} items are set aside in Review later. No other items are waiting in this view.`
-                        : 'Nothing to review. Refresh the wallet or check UTXOs again after new activity.'}
-            </p>
-          ) : (
-            <div
-              className={`wallet-review-grid ${selectedReviewIds.length ? 'has-batch-selection' : ''}`}
-            >
-              <div className="wallet-review-list" role="list" aria-label="Review queue">
-                {visibleItems.slice(0, limit).map((item) => (
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {}}
+                    aria-label={
+                      tab === 'review'
+                        ? `Select review item ${row.title}`
+                        : `Select ${row.identifier}`
+                    }
+                    onClick={(event) =>
+                      selection.choose(
+                        row.key,
+                        displayedRows.map((entry) => entry.key),
+                        event,
+                        true,
+                      )
+                    }
+                  />
                   <div
-                    className={`wallet-review-item ${reviewSelection.ids.includes(item.key) ? 'batch-selected' : ''}`}
-                    role="listitem"
-                    key={item.key}
-                  >
-                    <input
-                      type="checkbox"
-                      aria-label={`Select review item ${item.title}`}
-                      checked={reviewSelection.ids.includes(item.key)}
-                      onChange={() => {}}
-                      onClick={(event) =>
-                        reviewSelection.choose(item.key, displayedReviewKeys, event, true)
+                    className="wallet-row-content"
+                    onClick={(event) => {
+                      if (event.target instanceof Element && event.target.closest('.copy-control'))
+                        return;
+                      if (event.ctrlKey || event.metaKey || event.shiftKey)
+                        selection.choose(
+                          row.key,
+                          displayedRows.map((entry) => entry.key),
+                          event,
+                        );
+                      else {
+                        selection.clear();
+                        selection.anchorAt(row.key);
+                        setSelectedKey(row.key);
                       }
-                    />
-                    <button
-                      className={selectedItem?.key === item.key ? 'active' : ''}
-                      aria-pressed={selectedItem?.key === item.key}
-                      onClick={(event) => {
-                        if (event.ctrlKey || event.metaKey || event.shiftKey)
-                          reviewSelection.choose(item.key, displayedReviewKeys, event);
-                        else {
-                          reviewSelection.clear();
-                          reviewSelection.anchorAt(item.key);
-                          setSelectedKey(item.key);
-                        }
-                      }}
-                    >
-                      <span className="wallet-review-reason">
-                        {REASON_LABELS[item.reason]}
-                        <span className={`wallet-review-status status-${item.status}`}>
-                          {statusLabel(item)}
+                    }}
+                  >
+                    <div className="wallet-row-heading">
+                      <button
+                        className={`wallet-row-button ${current ? 'active' : ''} ${tab === 'review' ? '' : 'wallet-review-record-body'}`}
+                        aria-pressed={current || checked}
+                      >
+                        <span className="wallet-review-reason">
+                          {tab === 'review' ? REASON_LABELS[row.reviews[0].reason] : row.meta}
+                          {(tab === 'review' || row.status !== 'open') && (
+                            <span className={`wallet-review-status status-${row.status}`}>
+                              {row.changed
+                                ? 'Evidence changed'
+                                : row.status === 'unknown'
+                                  ? 'Source unknown'
+                                  : row.status === 'reviewed'
+                                    ? 'Reviewed'
+                                    : row.status === 'later'
+                                      ? 'Review later'
+                                      : 'To review'}
+                            </span>
+                          )}
                         </span>
+                        <strong className="wallet-item-title" title={row.identifier}>
+                          {annotation?.icon && (
+                            <span className="wallet-entity-icon" aria-hidden="true">
+                              {annotation.icon}
+                            </span>
+                          )}
+                          {annotation?.label || row.title}
+                        </strong>
+                        {(annotation?.label || tab === 'review') && (
+                          <span
+                            className="mono muted wallet-review-record-id"
+                            title={row.identifier}
+                          >
+                            {short(row.identifier, 12)}
+                          </span>
+                        )}
+                      </button>
+                      <span className="wallet-row-copy">
+                        <CopyButton
+                          value={row.identifier}
+                          label={`Copy ${row.kind === 'transaction' ? 'transaction ID' : row.kind === 'output' ? 'outpoint' : 'address'}`}
+                        />
                       </span>
-                      <strong className="wallet-item-title">
-                        <span className="wallet-entity-icon" aria-hidden="true">
-                          {workspace.annotations[item.nodeId]?.icon}
-                        </span>
-                        {item.label || item.title}
-                      </strong>
-                      {metadataTags(item.nodeId, item.address).length > 0 && (
+                    </div>
+                    <div className="wallet-row-footer">
+                      {tags.length > 0 && (
                         <span className="wallet-item-tags">
-                          {metadataTags(item.nodeId, item.address).map((tag) => (
-                            <span className="wallet-review-record-tag" key={tag.id}>
+                          {tags.map((tag) => (
+                            <span
+                              className="wallet-review-record-tag"
+                              key={tag.id}
+                              title={tag.name}
+                            >
                               <span className="tag-dot" style={{ backgroundColor: tag.color }} />
                               {tag.name}
                             </span>
                           ))}
                         </span>
                       )}
-                      {workspace.annotations[item.nodeId]?.note && (
-                        <span
-                          className="wallet-item-note"
-                          title={workspace.annotations[item.nodeId].note}
-                        >
-                          {workspace.annotations[item.nodeId].note}
+                      {annotation?.note && (
+                        <span className="wallet-item-note" title={annotation.note}>
+                          {annotation.note}
                         </span>
                       )}
-                      <span className="muted">
-                        {[
-                          item.amountSats !== undefined ? formatSats(item.amountSats) : undefined,
-                          item.address
-                            ? short(item.address, 8)
-                            : item.txid && item.amountSats === undefined
-                              ? short(item.txid, 8)
-                              : undefined,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    </button>
-                  </div>
-                ))}
-                {visibleItems.length > limit && (
-                  <button onClick={() => setLimit((current) => current + PAGE)}>
-                    Show more ({visibleItems.length - limit} remaining)
-                  </button>
-                )}
-              </div>
-              {selectedItem && selectedReviewIds.length === 0 && (
-                <article
-                  ref={detailRef}
-                  className="wallet-review-detail"
-                  aria-label="Selected review item"
-                >
-                  <span className="wallet-review-reason">
-                    {REASON_LABELS[selectedItem.reason]}
-                    <span className={`wallet-review-status status-${selectedItem.status}`}>
-                      {statusLabel(selectedItem)}
-                    </span>
-                  </span>
-                  <div
-                    className={`wallet-context-badge ${reviewContext?.role === 'wallet-output' ? 'is-wallet' : ''}`}
-                  >
-                    {reviewContext?.role === 'wallet-output' ? (
-                      <WalletIcon size={12} />
-                    ) : (
-                      <CircleHelp size={12} />
-                    )}{' '}
-                    {contextTitle}
-                  </div>
-                  <h2 className="wallet-item-title">
-                    <span className="wallet-entity-icon" aria-hidden="true">
-                      {workspace.annotations[selectedItem.nodeId]?.icon}
-                    </span>
-                    {selectedItem.label || selectedItem.title}
-                  </h2>
-                  {selectedItem.label && <p className="small muted">{selectedItem.title}</p>}
-                  {workspace.annotations[selectedItem.nodeId]?.note && (
-                    <p className="wallet-detail-note">
-                      {workspace.annotations[selectedItem.nodeId].note}
-                    </p>
-                  )}
-                  <p>{selectedItem.detail}</p>
-                  {reviewContext?.role === 'wallet-related-transaction' && (
-                    <p className="wallet-context-explanation">
-                      This transaction touches your wallet. Its other inputs and outputs may belong
-                      to other participants.
-                    </p>
-                  )}
-                  <div className="wallet-detail-body">
-                    <div className="wallet-detail-context">
-                      {reviewContext && (
-                        <details className="wallet-flow-disclosure" open>
-                          <summary>Flow and wallet matches</summary>
-                          <WalletReviewFlow
-                            key={selectedItem.key}
-                            context={reviewContext}
-                            workspace={workspace}
-                            walletName={wallet.name}
-                            onInspect={onInspect}
-                          />
-                        </details>
-                      )}
-                      {selectedItem.changed && (
-                        <p className="wallet-review-notice">
-                          The observations behind this item changed after your decision on{' '}
-                          {selectedItem.decidedAt
-                            ? new Date(selectedItem.decidedAt).toLocaleString()
-                            : 'an earlier check'}
-                          . Review it again or reopen it.
-                        </p>
-                      )}
-                      <details className="wallet-evidence-disclosure">
-                        <summary>
-                          Identifiers and tags
-                          {selectedItem.tags.length > 0 ? ` · ${selectedItem.tags.join(', ')}` : ''}
-                        </summary>
-                        <dl className="wallet-review-evidence">
-                          <div>
-                            <dt>
-                              {entityType(selectedItem.nodeId) === 'output'
-                                ? 'Outpoint'
-                                : entityType(selectedItem.nodeId)}
-                            </dt>
-                            <dd
-                              className="mono"
-                              title={selectedItem.nodeId.replace(/^(out|tx|addr):/, '')}
-                            >
-                              {short(selectedItem.nodeId.replace(/^(out|tx|addr):/, ''), 14)}
-                            </dd>
-                          </div>
-                          {selectedItem.address && (
-                            <div>
-                              <dt>Address</dt>
-                              <dd className="mono" title={selectedItem.address}>
-                                {short(selectedItem.address, 16)}
-                              </dd>
-                            </div>
-                          )}
-                          {selectedItem.amountSats !== undefined && (
-                            <div>
-                              <dt>Amount</dt>
-                              <dd>{formatSats(selectedItem.amountSats)}</dd>
-                            </div>
-                          )}
-                          {selectedItem.tags.length > 0 && (
-                            <div>
-                              <dt>Tags</dt>
-                              <dd>{selectedItem.tags.join(', ')}</dd>
-                            </div>
-                          )}
-                        </dl>
-                      </details>
+                      <div className="wallet-row-values muted">
+                        {row.amountSats !== undefined && <span>{formatSats(row.amountSats)}</span>}
+                        {row.address && row.kind !== 'address' && (
+                          <WalletReference value={row.address} kind="address" length={8} />
+                        )}
+                      </div>
                     </div>
-                    <div className="wallet-detail-actions">
-                      <section
-                        className="wallet-detail-section"
-                        aria-label="Selected entity metadata"
-                      >
-                        <h3>
-                          Label{' '}
-                          {reviewContext?.role === 'possible-counterparty'
-                            ? 'this counterparty output'
-                            : reviewContext?.role === 'wallet-output'
-                              ? 'this wallet output'
-                              : 'this entity'}
-                        </h3>
-                        <p>{annotationHint}</p>
-                        <BatchMetadataBar
-                          active={active}
-                          workspace={workspace}
-                          ids={[selectedItem.nodeId]}
-                          key={selectedItem.nodeId}
-                          single
-                          scopeLabel=""
-                          disabled={busy}
-                          onChange={onChange}
-                          onNotice={setNotice}
-                        />
-                      </section>
-                      <section className="wallet-detail-section" aria-label="Review decision">
-                        <h3>Review decision</h3>
-                        <p>
-                          Mark this item reviewed when you have enough context, or set it aside for
-                          later.
-                        </p>
-                        <div className="button-row wallet-review-decisions">
-                          {(!isCompletedReview(workspace.walletReviews?.[selectedItem.key]) ||
-                            selectedItem.changed) && (
-                            <>
-                              <button
-                                className="primary"
-                                disabled={busy}
-                                onClick={() => decide([selectedItem], 'reviewed')}
-                              >
-                                Mark reviewed
-                              </button>
-                              <button
-                                disabled={busy}
-                                onClick={() => decide([selectedItem], 'unknown')}
-                              >
-                                <CircleHelp size={14} /> Reviewed, source unknown
-                              </button>
-                              <button
-                                disabled={busy}
-                                aria-pressed={selectedItem.status === 'later'}
-                                title={
-                                  selectedItem.status === 'later'
-                                    ? 'Return this item to To review'
-                                    : 'Set aside for later and select the next item'
-                                }
-                                onClick={() =>
-                                  decide(
-                                    [selectedItem],
-                                    selectedItem.status === 'later' ? 'reopen' : 'later',
-                                  )
-                                }
-                              >
-                                <Clock3 size={14} />{' '}
-                                {selectedItem.status === 'later'
-                                  ? 'Return to review'
-                                  : 'Review later'}
-                              </button>
-                            </>
-                          )}
-                          {isCompletedReview(workspace.walletReviews?.[selectedItem.key]) && (
-                            <button
-                              disabled={busy}
-                              onClick={() => decide([selectedItem], 'reopen')}
-                            >
-                              <Undo2 size={14} /> Reopen
-                            </button>
-                          )}
-                        </div>
-                      </section>
-                      <section
-                        className="wallet-detail-section wallet-explore-section"
-                        aria-label="Explore selected entity"
-                      >
-                        <h3>Explore further</h3>
-                        <div className="button-row">
-                          <button onClick={() => onShowInGraph(selectedItem.nodeId)}>
-                            <Network size={14} /> Show in Graph
-                          </button>
-                          <button onClick={() => onInspect(selectedItem.nodeId)}>
-                            <Eye size={14} /> Inspect
-                          </button>
-                          <button onClick={() => onAnalyze(selectedItem.nodeId)}>
-                            <Search size={14} /> Analyze
-                          </button>
-                        </div>
-                      </section>
-                    </div>
-                  </div>
-                  {selectedItem.reason === 'link' && (
-                    <p className="small muted">
-                      This is a heuristic hypothesis from your last analysis scan, not proof of
-                      common ownership. Collaborative transactions such as CoinJoin and PayJoin can
-                      invalidate it. Removing or excluding the finding removes this item.
-                    </p>
-                  )}
-                  {selectedItem.reason === 'counterparty' && (
-                    <p className="small muted">
-                      Label the payment output or your relationship. Labelling it does not make the
-                      other outputs of this transaction yours, and does not claim who controls this
-                      address.
-                    </p>
-                  )}
-                </article>
-              )}
-            </div>
-          )}
-          {!review.items.some((item) => item.reason === 'link') && (
-            <p className="wallet-grouping-note">
-              No grouping findings apply to this wallet yet. Grouping is unknown until you run an
-              analysis scan on loaded data.{' '}
-              <button className="text-button" onClick={() => onAnalyze()}>
-                Analyze this wallet <ChevronRight size={13} />
-              </button>
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="wallet-review-body">
-          <nav className="wallet-record-tabs" aria-label="Wallet records">
-            {(['utxos', 'transactions', 'addresses'] as const).map((item) => (
-              <button
-                key={item}
-                aria-pressed={recordTab === item}
-                className={recordTab === item ? 'active' : ''}
-                onClick={() => setRecordTab(item)}
-              >
-                {item === 'utxos'
-                  ? 'UTXOs'
-                  : item === 'transactions'
-                    ? 'Transactions'
-                    : 'Addresses'}
-              </button>
-            ))}
-          </nav>
-          <div className="wallet-record-filters">
-            <label className="wallet-record-search">
-              Search
-              <input
-                type="search"
-                aria-label="Filter wallet records"
-                placeholder="Labels, notes or IDs"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <label>
-              Labels
-              <select
-                aria-label="Label filter"
-                value={labelFilter}
-                onChange={(event) =>
-                  setLabelFilter(event.target.value as 'all' | 'unlabeled' | 'labeled')
-                }
-              >
-                <option value="all">All</option>
-                <option value="unlabeled">Unlabeled</option>
-                <option value="labeled">Labelled</option>
-              </select>
-            </label>
-            {recordTab !== 'addresses' && (
-              <label>
-                Review
-                <select
-                  aria-label="Review state filter"
-                  value={recordReview}
-                  onChange={(event) =>
-                    setRecordReview(event.target.value as 'all' | 'open' | 'later' | 'decided')
-                  }
-                >
-                  <option value="all">All</option>
-                  <option value="open">To review</option>
-                  <option value="later">Review later</option>
-                  <option value="decided">Reviewed</option>
-                </select>
-              </label>
-            )}
-            {(workspace.tags ?? []).length > 0 && (
-              <label>
-                Tag
-                <select
-                  aria-label="Tag filter"
-                  value={tagFilter}
-                  onChange={(event) => setTagFilter(event.target.value)}
-                >
-                  <option value="all">Any tag</option>
-                  {(workspace.tags ?? []).map((tag) => (
-                    <option key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
-          <p className="wallet-selection-hint">
-            Choose records below, then use Label, Tag or Icon.{' '}
-            <span className="desktop-selection-hint">
-              Ctrl/⌘ click toggles · Shift click selects a range.
-            </span>
-          </p>
-          <div className="wallet-record-summary">
-            <span className="small muted">
-              {filteredRows.length} of {rows.length} {recordTab === 'utxos' ? 'UTXOs' : recordTab}
-              {recordTab === 'utxos' && utxos === undefined ? ' · check UTXOs to load them' : ''}
-            </span>
-            <button
-              disabled={!filteredRows.length}
-              title="Replace the selection with all results in this filter, including rows under Show more"
-              onClick={() => setSelection(filteredRows.map((row) => row.id))}
-            >
-              Select all {filteredRows.length} results
-            </button>
-            <WalletRelatedSelection
-              active={active && tab === 'records'}
-              candidates={filteredRows.map((row) => ({
-                id: row.id,
-                address: row.address,
-                txid:
-                  row.id.startsWith('out:') || row.id.startsWith('tx:')
-                    ? row.id.split(':')[1]
-                    : undefined,
-              }))}
-              seeds={rows
-                .filter((row) => selectedIds.includes(row.id))
-                .map((row) => ({
-                  id: row.id,
-                  address: row.address,
-                  txid:
-                    row.id.startsWith('out:') || row.id.startsWith('tx:')
-                      ? row.id.split(':')[1]
-                      : undefined,
-                }))}
-              onSelect={setSelection}
-            />
-          </div>
-          {hiddenSelection > 0 && (
-            <p className="small muted">
-              {hiddenSelection} selected record{hiddenSelection === 1 ? '' : 's'} outside the
-              current filter stay part of the batch. Clear the selection to drop them.
-            </p>
-          )}
-          <BatchMetadataBar
-            active={active}
-            workspace={workspace}
-            ids={selectedIds}
-            scopeLabel={scopeLabel}
-            disabled={busy}
-            guidance={guidance}
-            onChange={onChange}
-            onNotice={setNotice}
-            onClear={recordSelection.clear}
-          />
-          <div className="wallet-review-records" role="list">
-            {filteredRows.slice(0, limit).map((row) => {
-              const annotation = workspace.annotations[row.id];
-              const decision = row.reviewKey ? workspace.walletReviews?.[row.reviewKey] : undefined;
-              const checked = selectedIds.includes(row.id);
-              return (
-                <div
-                  className={`wallet-review-record ${checked ? 'selected' : ''}`}
-                  role="listitem"
-                  key={row.id}
-                >
-                  <label className="wallet-review-record-check">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      aria-label={`Select ${row.identifier}`}
-                      onChange={() => {}}
-                      onClick={(event) =>
-                        recordSelection.choose(
-                          row.id,
-                          filteredRows.slice(0, limit).map((entry) => entry.id),
-                          event,
-                          true,
-                        )
-                      }
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="wallet-review-record-body"
-                    aria-label={`Select record ${row.identifier}`}
-                    aria-pressed={checked}
-                    onClick={(event) =>
-                      recordSelection.choose(
-                        row.id,
-                        filteredRows.slice(0, limit).map((entry) => entry.id),
-                        event,
-                      )
-                    }
-                  >
-                    <span className="wallet-review-record-title">
-                      <span aria-hidden="true">{annotation?.icon}</span>
-                      <strong title={row.identifier}>
-                        {annotation?.label || short(row.identifier, 12)}
-                      </strong>
-                      {decision && (
-                        <span className={`wallet-review-status status-${decision.status}`}>
-                          {decision.status === 'reviewed'
-                            ? 'Reviewed'
-                            : decision.status === 'unknown'
-                              ? 'Source unknown'
-                              : 'Review later'}
-                        </span>
-                      )}
-                    </span>
-                    {annotation?.note && (
-                      <span className="wallet-item-note" title={annotation.note}>
-                        {annotation.note}
-                      </span>
-                    )}
-                    {annotation?.label && (
-                      <span className="mono muted wallet-review-record-id" title={row.identifier}>
-                        {short(row.identifier, 14)}
-                      </span>
-                    )}
-                    <span className="wallet-review-record-meta">
-                      <span>{row.meta}</span>
-                      {row.amountSats !== undefined && <span>{formatSats(row.amountSats)}</span>}
-                      {row.detail && <span className="muted">{row.detail}</span>}
-                      {rowTags(row).map((tag) => (
-                        <span className="wallet-review-record-tag" key={tag.id}>
-                          <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-                          {tag.name}
-                        </span>
-                      ))}
-                    </span>
-                  </button>
-                  <div className="wallet-review-record-actions">
-                    <button
-                      className="text-button"
-                      aria-label={`Inspect ${row.identifier}`}
-                      onClick={() => onInspect(row.id, row.utxo)}
-                    >
-                      Inspect
-                    </button>
-                    <button
-                      className="text-button"
-                      aria-label={`Show ${row.identifier} in Graph`}
-                      onClick={() => onShowInGraph(row.id, row.utxo)}
-                    >
-                      Graph
-                    </button>
                   </div>
                 </div>
               );
             })}
             {!filteredRows.length && (
               <p className="wallet-empty-note">
-                {rows.length
-                  ? 'No records match these filters.'
-                  : recordTab === 'utxos'
-                    ? 'No current UTXOs from the addresses checked so far.'
-                    : 'Scan this wallet to discover records.'}
+                {tab === 'review' && !selectedTypes.length
+                  ? 'No finding types selected. Choose types or reset to all.'
+                  : query || labelFilter !== 'all' || tagFilter !== 'all'
+                    ? 'No records match these filters.'
+                    : tab === 'utxos' && !utxos
+                      ? 'Check current UTXOs to load this list.'
+                      : tab === 'review' && status === 'later'
+                        ? 'No items set aside for later.'
+                        : tab === 'review' && status === 'decided'
+                          ? 'Nothing has been reviewed yet.'
+                          : tab === 'sources' || tab === 'destinations'
+                            ? counterparties.loading && tab === 'sources'
+                              ? 'Loading source addresses...'
+                              : 'No counterparty addresses in the loaded transactions.'
+                            : 'No matching observations in this view. Other filters or missing loaded data may limit the list.'}
               </p>
             )}
             {filteredRows.length > limit && (
@@ -1241,8 +826,109 @@ function WalletReview({
               </button>
             )}
           </div>
+          <article
+            ref={detailRef}
+            className={`wallet-review-detail ${batching ? 'wallet-batch-detail' : ''}`}
+            aria-label={
+              batching
+                ? 'Batch selection details'
+                : tab === 'review'
+                  ? 'Selected review item'
+                  : 'Selected wallet item'
+            }
+          >
+            {batching ? (
+              <>
+                <div className="wallet-detail-toolbar" aria-label="Selected batch actions">
+                  <BatchMetadataBar
+                    active={active}
+                    workspace={workspace}
+                    ids={selectedIds}
+                    scopeLabel="selected"
+                    disabled={busy || missingSelected > 0}
+                    onChange={onChange}
+                    onNotice={setNotice}
+                  />
+                  {selectedReviews.length > 0 && (
+                    <div className="wallet-action-group" aria-label="Batch review decisions">
+                      <WalletDecisionButtons
+                        items={selectedReviews}
+                        busy={busy || missingSelected > 0}
+                        onDecide={decide}
+                      />
+                    </div>
+                  )}
+                  {relatedSelection && (
+                    <div className="wallet-action-group">{relatedSelection}</div>
+                  )}
+                  <div className="wallet-action-group" aria-label="Graph actions">
+                    <button
+                      disabled={!selectedIds.length || busy || missingSelected > 0}
+                      title="Show these selections in Graph and zoom to the first"
+                      onClick={() => props.onShowSelection(selectedIds, false)}
+                    >
+                      <Network size={14} /> Show
+                    </button>
+                    <button
+                      disabled={!selectedIds.length || busy || missingSelected > 0}
+                      title="Isolate these selections and their connected graph context"
+                      onClick={() => props.onShowSelection(selectedIds, true)}
+                    >
+                      <Filter size={14} /> Isolate
+                    </button>
+                  </div>
+                </div>
+                <h2>
+                  {selectionSummary ? `${selectionSummary} selected` : 'Selection no longer listed'}
+                </h2>
+                <div className="wallet-compact-status">
+                  <span>
+                    {selectedRows.length} rows · {selectedReviews.length} review decisions
+                  </span>
+                  <button className="text-button" onClick={selection.clear}>
+                    Clear selection
+                  </button>
+                  {tab === 'utxos' && spendGuidance(workspace, selectedIds) && (
+                    <WalletHelp title="Combining these UTXOs" active={active}>
+                      {spendGuidance(workspace, selectedIds)}
+                    </WalletHelp>
+                  )}
+                </div>
+                {hiddenSelected > 0 && (
+                  <p className="wallet-review-bound" role="note">
+                    {hiddenSelected} selected outside this filter
+                  </p>
+                )}
+                {missingSelected > 0 && (
+                  <p className="warning" role="alert">
+                    {missingSelected} selections are no longer in this view. Clear and reselect.
+                  </p>
+                )}
+              </>
+            ) : selectedRow ? (
+              <WalletItemDetail
+                key={`${tab}:${selectedRow.key}`}
+                {...props}
+                row={selectedRow}
+                onNotice={setNotice}
+                onDecide={decide}
+                resolveInputs={tab !== 'sources' || (counterpartyReady && !counterparties.loading)}
+                relatedSelection={relatedSelection}
+              />
+            ) : (
+              <p className="wallet-empty-note">
+                {tab === 'transactions'
+                  ? 'Select a transaction.'
+                  : tab === 'utxos'
+                    ? 'Select a UTXO.'
+                    : tab === 'review'
+                      ? 'Select a review item.'
+                      : 'Select an address.'}
+              </p>
+            )}
+          </article>
         </div>
-      )}
+      </div>
     </section>
   );
 }

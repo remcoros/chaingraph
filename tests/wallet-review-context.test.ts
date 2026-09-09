@@ -85,6 +85,75 @@ function item(
 }
 
 describe('wallet selected review context', () => {
+  it('shows a direct funding subject as the selected canonical input in an explicit receiving context', () => {
+    const context = buildWalletReviewContext(
+      fixture(),
+      wallet,
+      { nodeId: `OUT:${id(1).toUpperCase()}:02`, reason: 'funding-source' },
+      id(3),
+    );
+    expect(context).toMatchObject({
+      status: 'loaded',
+      transactionId: id(3),
+      transactionNodeId: `tx:${id(3)}`,
+      selectedNodeId: outputNodeId(id(1), 2),
+      selectedSide: 'input',
+      transactionSelected: false,
+    });
+    expect(context.selected).toBe(context.inputs[1]);
+    expect(context.inputs[1]).toMatchObject({
+      id: outputNodeId(id(1), 2),
+      address: other,
+      selected: true,
+      missing: false,
+    });
+    expect(context.outputs.some((entry) => entry.selected)).toBe(false);
+    expect(context.role).not.toBe('possible-counterparty');
+    const missing = buildWalletReviewContext(
+      fixture(),
+      wallet,
+      { nodeId: outputNodeId(id(9), 0) },
+      id(3),
+    );
+    expect(missing.selected).toBe(missing.inputs[2]);
+    expect(missing.selected).toMatchObject({ missing: true, selected: true });
+  });
+
+  it('requires an explicit address transaction and selects all actual matching inputs and outputs', () => {
+    const subject = { nodeId: `addr:${mine.toUpperCase()}`, txid: id(3) };
+    const unresolved = buildWalletReviewContext(fixture(), wallet, subject);
+    expect(unresolved.status).toBe('unavailable');
+    expect(unresolved.transactionId).toBeUndefined();
+    const selected = buildWalletReviewContext(fixture(), wallet, subject, id(3));
+    expect(selected.selectedNodeId).toBe(`addr:${mine}`);
+    expect(selected.selected).toBeUndefined();
+    expect(selected.inputs.filter((entry) => entry.selected).map((entry) => entry.id)).toEqual([
+      outputNodeId(id(1), 0),
+    ]);
+    expect(selected.outputs.filter((entry) => entry.selected).map((entry) => entry.id)).toEqual([
+      outputNodeId(id(3), 0),
+    ]);
+    const transaction = buildWalletReviewContext(fixture(), wallet, { nodeId: `tx:${id(3)}` });
+    expect(transaction.transactionSelected).toBe(true);
+    expect(transaction.selectedNodeId).toBe(`tx:${id(3)}`);
+    expect(buildWalletReviewContext(fixture(), wallet, subject, 'bad').status).toBe('unavailable');
+  });
+
+  it('does not treat a non-address raw script as a known external subject', () => {
+    const workspace = fixture();
+    workspace.transactions[id(3)] = {
+      ...shared,
+      vout: [{ n: 0, value: 0, scriptPubKey: { hex: '6a00', address: mine } }],
+    };
+    expect(
+      buildWalletReviewContext(workspace, wallet, { nodeId: outputNodeId(id(3), 0) }).selected,
+    ).toMatchObject({
+      ownership: 'unknown',
+      missing: false,
+      address: undefined,
+    });
+  });
+
   it('keeps shared-transaction ownership at output level and decodes authoritative scripts', () => {
     const context = buildWalletReviewContext(fixture(), wallet, item());
     expect(context.status).toBe('loaded');

@@ -3,7 +3,12 @@ import { CheckSquare, ChevronDown } from 'lucide-react';
 import { AnchoredPopover } from './AnchoredPopover';
 import { matchRelatedEntities } from '../domain/walletReviewContext';
 
-type Candidate = { id: string; address?: string; txid?: string };
+type Candidate = {
+  id: string;
+  address?: string;
+  txid?: string;
+  transactionIds?: readonly string[];
+};
 
 /** Explicit expansion within the current results, not a clustering heuristic. */
 export function WalletRelatedSelection({
@@ -44,10 +49,6 @@ export function WalletRelatedSelection({
           onClose={() => setOpen(false)}
           width={300}
         >
-          <p>
-            Replace the selection with exact matches in this filtered list, including results under
-            Show more. No other wallets or graph entities are added.
-          </p>
           <button
             disabled={!addresses.length}
             onClick={() => {
@@ -59,6 +60,7 @@ export function WalletRelatedSelection({
           </button>
           <button
             disabled={!transactions.length}
+            title="Match creating transactions for outputs or one-hop context transactions for address groups"
             onClick={() => {
               onSelect(transactions);
               setOpen(false);
@@ -66,10 +68,7 @@ export function WalletRelatedSelection({
           >
             Same transaction <strong>{transactions.length}</strong>
           </button>
-          <p>
-            Based on {seeds.length} {seeds.length === 1 ? 'selected item' : 'selected items'}.
-            Matching an address or transaction does not establish a common owner.
-          </p>
+          <p>Exact matches within the current results.</p>
         </AnchoredPopover>
       )}
     </>

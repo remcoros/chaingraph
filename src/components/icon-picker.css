@@ -20,6 +20,21 @@
   line-height: 1;
   text-align: center;
 }
+.icon-picker-compact .icon-picker-trigger {
+  width: auto;
+  height: auto;
+  min-height: 30px;
+  gap: 5px;
+  padding: 4px 7px;
+}
+.icon-picker-compact .icon-picker-preview {
+  min-width: 14px;
+  font-size: 14px;
+}
+.icon-picker-trigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
 .icon-picker-backdrop {
   position: fixed;
   inset: 0;

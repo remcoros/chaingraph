@@ -60,6 +60,8 @@ export function SelectionToolbar({
   const tagId = useId();
   const ids = selection.ids;
   const count = ids.length;
+  const firstIcon = workspace.annotations[ids[0]]?.icon ?? '';
+  const mixedIcons = ids.some((id) => (workspace.annotations[id]?.icon ?? '') !== firstIcon);
   // The batch action stays available only while its own edit is the undo head.
   // Any later undoable edit, an undo, a lock or a workspace change retires it, so
   // it can never discard an unrelated newer edit.
@@ -129,9 +131,17 @@ export function SelectionToolbar({
           >
             <Tag size={13} /> Tag
           </button>
-          <span className="selection-toolbar-icon">
+          <span
+            className="selection-toolbar-icon"
+            onPointerDownCapture={() => setEditor(undefined)}
+            onKeyDownCapture={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') setEditor(undefined);
+            }}
+          >
             <IconPicker
-              value=""
+              value={firstIcon}
+              mixed={mixedIcons}
+              compact
               caption="Icon"
               ariaLabel={`Set an icon on ${count} selected entities`}
               onChange={(icon) =>

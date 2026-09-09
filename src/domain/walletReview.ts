@@ -16,12 +16,23 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
+import {
+  canonicalTransactionId,
+  groupWalletRelationships,
+  loadedWalletTransactions,
+  validOutputIndex,
+  type WalletRelationship,
+  type WalletRelationshipContext,
+} from './walletRelationships';
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const REVIEW_REASONS = [
   'current-utxo',
   'source',
+  'source-address',
+  'funding-source',
   'new-activity',
+  'destination-address',
   'counterparty',
   'link',
 ] as const;
@@ -76,6 +87,18 @@ export interface WalletReviewItem {
   decidedAt?: string;
   /** A decision exists, but the observations behind the item changed. */
   changed: boolean;
+  /** One-hop roles are independent of the persisted review reason. */
+  relationshipKinds?: ('source' | 'destination')[];
+  ownership?: WalletRelationship['ownership'];
+  transactionIds?: string[];
+  walletOutputIds?: string[];
+  /** Constituent evidence only. Address review nodeIds contain only the address edit target. */
+  outpointIds?: string[];
+  contexts?: WalletRelationshipContext[];
+  /** A saved output-only decision retained separately from its address group. */
+  legacyOutputReview?: boolean;
+  /** Registry algorithm associated with a saved finding. */
+  algorithm?: string;
 }
 
 export interface WalletReviewCoverage {
@@ -109,27 +132,38 @@ export interface WalletReview {
 const REASON_ORDER: Record<ReviewReason, number> = {
   'current-utxo': 0,
   source: 1,
-  'new-activity': 2,
-  counterparty: 3,
-  link: 4,
+  'source-address': 2,
+  'funding-source': 3,
+  'new-activity': 4,
+  'destination-address': 5,
+  counterparty: 6,
+  link: 7,
 };
 export const REASON_LABELS: Record<ReviewReason, string> = {
   'current-utxo': 'Current UTXO',
-  source: 'Source',
-  'new-activity': 'New receipt',
+  source: 'Earlier wallet receipt',
+  'source-address': 'Source address',
+  'funding-source': 'Direct funding source',
+  'new-activity': 'New activity',
+  'destination-address': 'Destination address',
   counterparty: 'Counterparty',
   link: 'Review possible link',
 };
 const MAX_ITEMS_PER_REASON: Record<ReviewReason, number> = {
   'current-utxo': 400,
   source: 200,
+  'source-address': 200,
+  'funding-source': 200,
   'new-activity': 100,
+  'destination-address': 100,
   counterparty: 100,
   link: 20,
 };
 
 /** Only these statuses complete a review. `later` stays pending work. */
-export function isCompletedReview(decision?: ReviewDecision): boolean {
+export function isCompletedReview(
+  decision?: Pick<ReviewDecision, 'status'> | ReviewDecision,
+): boolean {
   return decision?.status === 'reviewed' || decision?.status === 'unknown';
 }
 
@@ -191,13 +225,14 @@ export function walletOwnedOutputs(workspace: Workspace, wallet: Wallet): Map<st
   );
   const owned = new Map<string, OwnedOutput>();
   if (!hashes.size) return owned;
-  for (const transaction of Object.values(workspace.transactions))
+  for (const [txid, transaction] of loadedWalletTransactions(workspace))
     for (const output of transaction.vout) {
+      if (!validOutputIndex(output.n)) continue;
       if (!hashes.has(outputScriptHash(output, workspace.network) ?? '')) continue;
-      const nodeId = outputNodeId(transaction.txid, output.n);
+      const nodeId = outputNodeId(txid, output.n);
       owned.set(nodeId, {
         nodeId,
-        txid: transaction.txid,
+        txid,
         vout: output.n,
         valueSats: Math.round(output.value * 100_000_000),
         address: outputAddress(output, workspace.network),
@@ -259,6 +294,17 @@ export function buildWalletReview(
 ): WalletReview {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
   const owned = walletOwnedOutputs(workspace, wallet);
+  const groups = groupWalletRelationships(workspace, wallet);
+  const relationships = {
+    sources: [...groups.sources.flatMap((group) => group.outpoints), ...groups.sourceExceptions],
+    destinations: [
+      ...groups.destinations.flatMap((group) => group.outpoints),
+      ...groups.destinationExceptions,
+    ],
+  };
+  const loaded = loadedWalletTransactions(workspace);
+  const directSources = new Map(relationships.sources.map((entry) => [entry.id, entry]));
+  const directDestinations = new Map(relationships.destinations.map((entry) => [entry.id, entry]));
   const history = new Set<string>();
   for (const address of addresses)
     for (const entry of address.history ?? [])
@@ -266,22 +312,61 @@ export function buildWalletReview(
   for (const output of owned.values()) history.add(output.txid);
 
   // Exact recorded spends only. A missing spend is unknown, never proof of unspent.
-  const spentOutpoints = new Set<string>();
   const walletFundedTransactions = new Set<string>();
-  for (const transaction of Object.values(workspace.transactions))
+  for (const [txid, transaction] of loaded)
     for (const input of transaction.vin) {
-      if (input.txid === undefined || input.vout === undefined) continue;
-      const id = outputNodeId(input.txid, input.vout);
-      spentOutpoints.add(id);
-      if (owned.has(id)) walletFundedTransactions.add(transaction.txid);
+      const parent = canonicalTransactionId(input.txid);
+      if (input.coinbase !== undefined || !parent || !validOutputIndex(input.vout)) continue;
+      const id = outputNodeId(parent, input.vout);
+      if (owned.has(id)) {
+        walletFundedTransactions.add(txid);
+        history.add(txid);
+      }
     }
 
-  const verifiedUtxos = (options.utxos ?? []).filter((record) => {
-    const transaction = workspace.transactions[record.txid];
-    return !transaction || verifyWalletUtxo(record, transaction, workspace.network);
-  });
+  const walletHashes = new Set(addresses.map((address) => address.scripthash));
+  const verifiedUtxos = (options.utxos ?? [])
+    .map((record) => ({
+      ...record,
+      txid: canonicalTransactionId(record.txid) ?? record.txid,
+    }))
+    .filter((record) => {
+      try {
+        if (
+          !walletHashes.has(record.scripthash) ||
+          addressToScriptHash(record.address, workspace.network) !== record.scripthash ||
+          !canonicalTransactionId(record.txid) ||
+          !validOutputIndex(record.vout) ||
+          !Number.isSafeInteger(record.valueSats) ||
+          record.valueSats < 0 ||
+          record.valueSats > 2_100_000_000_000_000
+        )
+          return false;
+        const transaction = loaded.get(record.txid);
+        return (
+          !transaction ||
+          verifyWalletUtxo(record, { ...transaction, txid: record.txid }, workspace.network)
+        );
+      } catch {
+        return false;
+      }
+    });
   const candidates = new Map<ReviewReason, ReviewSubject[]>();
   const push = (subject: ReviewSubject) => {
+    const source = directSources.get(subject.nodeId);
+    const destination = directDestinations.get(subject.nodeId);
+    const related = [source, destination].filter((entry): entry is WalletRelationship => !!entry);
+    if (related.length) {
+      subject = {
+        ...subject,
+        relationshipKinds: [
+          ...(source ? ['source' as const] : []),
+          ...(destination ? ['destination' as const] : []),
+        ],
+        transactionIds: [...new Set(related.flatMap((entry) => entry.transactionIds))].sort(),
+        walletOutputIds: [...new Set(related.flatMap((entry) => entry.walletOutputIds))].sort(),
+      };
+    }
     const list = candidates.get(subject.reason);
     if (list) list.push(subject);
     else candidates.set(subject.reason, [subject]);
@@ -306,14 +391,15 @@ export function buildWalletReview(
   let missingSourceTransactions = 0;
   const sources = new Map<string, { output: OwnedOutput; utxos: string[] }>();
   for (const record of verifiedUtxos) {
-    const creating = workspace.transactions[record.txid];
+    const creating = loaded.get(record.txid);
     if (!creating) {
       missingSourceTransactions++;
       continue;
     }
     for (const input of creating.vin) {
-      if (input.txid === undefined || input.vout === undefined) continue;
-      const predecessor = owned.get(outputNodeId(input.txid, input.vout));
+      const parent = canonicalTransactionId(input.txid);
+      if (input.coinbase !== undefined || !parent || !validOutputIndex(input.vout)) continue;
+      const predecessor = owned.get(outputNodeId(parent, input.vout));
       if (!predecessor) continue;
       const entry = sources.get(predecessor.nodeId) ?? { output: predecessor, utxos: [] };
       entry.utxos.push(`${record.txid}:${record.vout}`);
@@ -340,9 +426,90 @@ export function buildWalletReview(
     });
   }
 
+  for (const direction of ['source', 'destination'] as const) {
+    const reason = direction === 'source' ? 'source-address' : 'destination-address';
+    for (const group of direction === 'source' ? groups.sources : groups.destinations) {
+      if (group.ownership !== 'external') continue;
+      push({
+        key: reviewKey(wallet.id, reason, group.id),
+        reason,
+        title: `${direction === 'source' ? 'Source' : 'Destination'} address ${short(group.address, 10)}`,
+        detail: `${group.count} distinct observed output${group.count === 1 ? '' : 's'} ${
+          direction === 'source'
+            ? 'used as inputs of loaded transactions paying verified wallet scripts'
+            : 'created by loaded transactions spending verified wallet outputs'
+        }. Review and metadata apply to this address only. The observed value total is not a flow allocation or balance, and an address does not identify a controller.`,
+        nodeId: group.id,
+        nodeIds: [group.id],
+        address: group.address,
+        amountSats: group.amountSats,
+        relationshipKinds: [direction],
+        ownership: group.ownership,
+        transactionIds: group.transactionIds,
+        walletOutputIds: group.walletOutputIds,
+        outpointIds: group.outpointIds,
+        contexts: group.contexts,
+        evidence: fingerprint(
+          JSON.stringify([
+            reason,
+            group.id,
+            group.ownership,
+            group.outpoints.map((output) => [
+              output.id,
+              output.amountSats,
+              output.ownership,
+              output.missing,
+              output.contexts,
+            ]),
+          ]),
+        ),
+      });
+    }
+  }
+
+  // Address groups get independent decisions. Keep replaced output reviews only
+  // when a saved decision exists, without copying it onto the entire address.
+  const representedSources = new Set([
+    ...sources.keys(),
+    ...verifiedUtxos.map((record) => outputNodeId(record.txid, record.vout)),
+  ]);
+  for (const source of relationships.sources) {
+    const key = reviewKey(wallet.id, 'funding-source', source.id.slice(4));
+    const saved = workspace.walletReviews?.[key];
+    if (source.address ? !saved : representedSources.has(source.id) && !saved) continue;
+    const output = loaded.get(source.txid)?.vout.find((entry) => entry.n === source.vout);
+    push({
+      key,
+      reason: 'funding-source',
+      title: `${source.address ? 'Saved funding-output review' : 'Funding output without address'} ${short(source.txid, 6)}:${source.vout}`,
+      detail: source.address
+        ? 'Saved output-only review. This decision does not review the entire source address or its other outputs. The whole output value is not an allocation to a particular wallet output.'
+        : source.missing
+          ? 'This exact input is referenced by a loaded transaction paying the wallet, but its previous output is missing. No address or input value is established.'
+          : 'This direct input has no verified address representation. Review this output exception only; its observed value is not an allocation to a particular wallet output.',
+      legacyOutputReview: source.address ? true : undefined,
+      nodeId: source.id,
+      nodeIds: [source.id, ...source.walletOutputIds],
+      txid: source.txid,
+      address: source.address,
+      amountSats: source.amountSats,
+      evidence: fingerprint(
+        JSON.stringify([
+          'funding-source',
+          source.id,
+          source.amountSats,
+          source.missing,
+          source.ownership,
+          output ? outputScriptHash(output, workspace.network) : undefined,
+          source.contexts,
+        ]),
+      ),
+    });
+  }
+
   for (const txid of wallet.unreviewedTransactionIds ?? []) {
     const nodeId = txNodeId(txid);
-    const transaction = workspace.transactions[txid];
+    const transaction = loaded.get(txid);
     push({
       key: reviewKey(wallet.id, 'new-activity', txid),
       reason: 'new-activity',
@@ -359,12 +526,12 @@ export function buildWalletReview(
     });
   }
 
-  // Only transactions this wallet funded can identify a counterparty I paid.
-  // Outputs of a batch that merely paid me belong to other people.
+  // Only exact wallet spends establish outgoing context. A no-match output may
+  // still use an undiscovered wallet script; incoming batch peers are not included.
   const counterparties: { nodeId: string; txid: string; valueSats: number; address?: string }[] =
     [];
   for (const txid of walletFundedTransactions) {
-    const transaction = workspace.transactions[txid];
+    const transaction = loaded.get(txid);
     if (!transaction) continue;
     for (const output of transaction.vout) {
       const nodeId = outputNodeId(txid, output.n);
@@ -377,13 +544,17 @@ export function buildWalletReview(
       });
     }
   }
-  for (const entry of counterparties.sort((a, b) => b.valueSats - a.valueSats))
+  for (const entry of counterparties.sort((a, b) => b.valueSats - a.valueSats)) {
+    const key = reviewKey(wallet.id, 'counterparty', entry.nodeId.slice(4));
+    if (entry.address && !workspace.walletReviews?.[key]) continue;
     push({
-      key: reviewKey(wallet.id, 'counterparty', entry.nodeId.slice(4)),
+      key,
       reason: 'counterparty',
-      title: `Payment of ${entry.valueSats.toLocaleString('en-US')} sats`,
-      detail:
-        'This wallet funded the transaction and this output is not a verified wallet address. It may be a counterparty you paid; it is not proof of who controls it.',
+      title: `${entry.address ? 'Saved destination-output review' : 'Destination output without address'} ${short(entry.txid, 6)}:${entry.nodeId.split(':')[2]}`,
+      detail: entry.address
+        ? 'Saved output-only review. This decision does not review the entire destination address or its other outputs. No controller is identified.'
+        : 'This output was created by a transaction spending verified wallet outputs, but no address is established. It remains an explicit output exception, not an identified counterparty.',
+      legacyOutputReview: entry.address ? true : undefined,
       nodeId: entry.nodeId,
       nodeIds: [entry.nodeId],
       txid: entry.txid,
@@ -391,6 +562,7 @@ export function buildWalletReview(
       address: entry.address,
       evidence: fingerprint(`counterparty|${entry.nodeId}|${entry.valueSats}`),
     });
+  }
 
   for (const finding of workspace.findings) {
     if (finding.excluded || finding.stale) continue;
@@ -404,6 +576,7 @@ export function buildWalletReview(
       nodeId: nodeIds[0] ?? finding.nodeIds[0],
       nodeIds: finding.nodeIds,
       txid: finding.txids[0],
+      algorithm: finding.algorithm,
       evidence: fingerprint(
         `link|${finding.algorithm}|${[...finding.nodeIds].sort().join(',')}|${[...finding.txids]
           .sort()
@@ -445,7 +618,7 @@ export function buildWalletReview(
       a.key.localeCompare(b.key),
   );
 
-  const loadedTransactions = [...history].filter((id) => workspace.transactions[id]).length;
+  const loadedTransactions = [...history].filter((id) => loaded.has(id)).length;
   return {
     items,
     omittedItems,
@@ -522,6 +695,15 @@ export function applyReviewDecisions(
       acknowledged.add(item.txid);
   }
   if (!changed) return workspace;
+  if (
+    items.some(
+      (item) => item.reason === 'source-address' || item.reason === 'destination-address',
+    ) &&
+    Object.keys(reviews).length > MAX_WALLET_REVIEWS
+  )
+    throw new Error(
+      `A workspace holds at most ${MAX_WALLET_REVIEWS.toLocaleString('en-US')} review decisions. Reopen an existing review before adding an address decision.`,
+    );
   const wallets = acknowledged.size
     ? workspace.wallets.map((entry) =>
         entry.id === wallet.id

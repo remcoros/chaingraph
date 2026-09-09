@@ -1,14 +1,15 @@
 .wallet-review-flow {
-  margin: 12px 0;
+  margin: 0 0 12px;
   padding: 10px;
   background: var(--color-paper);
   border: 1px solid var(--color-rule);
   border-radius: 8px;
+  min-width: 0;
 }
 .wallet-review-flow figcaption {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-bottom: 8px;
   font-size: 11px;
@@ -32,18 +33,21 @@
 }
 .wallet-flow-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 94px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
   align-items: stretch;
   gap: 4px;
 }
 .wallet-flow-column {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 .wallet-flow-column-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 27px;
+  min-height: 27px;
+  flex-shrink: 0;
   gap: 4px;
   font-size: 10px;
   color: var(--color-muted);
@@ -51,22 +55,27 @@
 .wallet-flow-column-heading b {
   color: var(--color-ink);
 }
-.wallet-workbench .wallet-flow-column-heading button {
+.wallet-workbench .wallet-flow-column-heading button,
+.wallet-workbench .wallet-flow-more button {
   padding: 3px;
   font-size: 10px;
   min-height: 24px;
 }
 .wallet-flow-entries {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 5px;
-  max-height: 260px;
+  justify-content: safe center;
+  gap: 6px;
+  max-height: 290px;
   overflow: auto;
+  overscroll-behavior: contain;
+  padding: 3px;
 }
-.wallet-workbench .wallet-flow-node {
+.wallet-flow-node {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  flex-shrink: 0;
   gap: 3px;
   min-width: 0;
   padding: 7px;
@@ -75,6 +84,13 @@
   white-space: normal;
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
+  border-radius: 5px;
+}
+.wallet-flow-node-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
 }
 .wallet-flow-node strong {
   overflow: hidden;
@@ -82,20 +98,65 @@
   text-overflow: ellipsis;
   font-size: 11px;
 }
+.wallet-flow-annotation {
+  display: block;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wallet-flow-annotation-kind {
+  color: var(--color-muted);
+  font-size: 9px;
+}
+.wallet-flow-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+  max-height: 72px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.wallet-flow-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 4px;
+  background: var(--color-raised);
+  border: 1px solid var(--color-rule);
+  border-radius: 4px;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+.wallet-flow-tag i {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
 .wallet-flow-node .wallet-flow-role {
   color: var(--color-muted);
   font-size: 9px;
 }
-.wallet-workbench .wallet-flow-node.ownership-wallet {
+.wallet-flow-node.ownership-wallet {
   border-left: 3px solid var(--color-accent);
 }
 .wallet-flow-node.ownership-wallet .wallet-flow-role {
   color: var(--color-accent);
 }
-.wallet-workbench .wallet-flow-node.is-selected {
-  outline: 1px solid var(--color-accent);
-  outline-offset: -1px;
+.wallet-flow-node.is-selected {
+  border: 3px solid var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 22%, transparent);
   background: var(--color-raised);
+}
+.wallet-flow-editing {
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 800;
 }
 .wallet-flow-transaction {
   display: flex;
@@ -108,46 +169,65 @@
   width: 12px;
   color: var(--color-muted);
 }
-.wallet-workbench .wallet-flow-transaction button {
-  display: flex;
-  flex-direction: column;
+.wallet-flow-transaction-node {
   align-items: center;
-  gap: 6px;
-  min-width: 0;
   flex: 1;
+  gap: 6px;
   padding: 9px 3px;
-  font-size: 9px;
+  text-align: center;
   border-color: var(--color-transaction);
+}
+.wallet-flow-transaction-node.is-selected {
+  border-color: var(--color-accent);
+}
+.wallet-flow-transaction-node strong {
+  max-width: 100%;
 }
 .wallet-flow-transaction code {
   font-size: 9px;
 }
+.wallet-workbench .wallet-flow-show {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 4px;
+  justify-content: center;
+}
+.wallet-flow-show:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
 .wallet-workbench .wallet-flow-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   font-size: 10px;
   line-height: 1.45;
   color: var(--color-muted);
   margin: 8px 0 0;
 }
 .wallet-flow-descendants {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
   margin-top: 8px;
   font-size: 10px;
   color: var(--color-muted);
 }
-.wallet-workbench .wallet-flow-descendants button {
-  padding: 4px 6px;
+.wallet-flow-descendants .wallet-flow-entries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wallet-flow-more {
+  margin-top: 4px;
+  color: var(--color-muted);
   font-size: 10px;
-  color: var(--color-accent);
 }
 @media (max-width: 760px) {
   .wallet-review-flow {
     padding: 8px;
   }
   .wallet-flow-columns {
-    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
     gap: 2px;
   }
   .wallet-flow-transaction {
@@ -156,28 +236,10 @@
   .wallet-flow-arrow {
     width: 8px;
   }
-  .wallet-workbench .wallet-flow-node {
+  .wallet-flow-node {
     padding: 6px 4px;
   }
   .wallet-flow-node strong {
     font-size: 10px;
   }
-}
-.wallet-flow-column {
-  display: flex;
-  flex-direction: column;
-}
-.wallet-flow-column-heading {
-  flex-shrink: 0;
-}
-.wallet-flow-entries {
-  flex: 1;
-  justify-content: safe center;
-}
-
-.wallet-workbench .wallet-flow-node {
-  flex-shrink: 0;
-}
-.wallet-workbench .wallet-flow-node.is-selected:not(.ownership-wallet) {
-  outline-color: var(--color-warning);
 }

@@ -336,7 +336,7 @@ address selections appear immediately.
 
 `domain/walletReview.ts` derives a review queue for one wallet from loaded
 observations and an optional verified UTXO check. Reasons are ordered: current
-UTXOs, receipts spent into them, refresh activity,
+UTXOs, receipts spent into them, other direct funding inputs, refresh activity,
 counterparties, and active non-stale findings covering verified wallet outputs.
 Counterparty items come only from transactions the wallet funded through loaded
 prevouts, so the outputs of a batch that merely paid the wallet are never
@@ -380,11 +380,63 @@ and wallet matches before showing them. These edges do not allocate individual
 inputs to outputs or independently establish unspent status.
 
 `WalletReviewFlow` bounds visible rows without altering counts, keeps a selected
-output visible, and delegates Inspect to the existing Wallet handoff. Exact related
+output visible, and exposes explicit graph magnifiers rather than clickable cards.
+Compact metadata, navigation and decision actions precede a collapsible full-width
+flow. Magnifiers use the existing
+Wallet handoff with an explicit frame request independent of selection lock.
+Exact related
 selection runs only over supplied filtered candidates, including undisplayed pages.
 All-results and related selection replace the explicit selection. The wallet name
 dialog is workspace/wallet scoped, updates only `name`, and masks its read-only key
 again each time it opens.
+
+`walletRelationships` projects direct funding inputs of transactions paying
+verified wallet scripts and outputs of transactions spending verified wallet
+outputs. Canonical subjects retain all direct transaction contexts, including
+missing-prevout placeholders. Raw script evidence is authoritative. Histories
+alone never prove direction, ownership or an input-to-output value allocation.
+This is a client-owned loaded one-hop projection, not a scan or backend index.
+The Wallet-facing projection groups those observations by canonical address.
+Address groups retain their constituent outpoints and per-transaction contexts;
+missing/non-address scripts remain exceptions in the observation model, not
+counterparty address rows. `walletCounterparties` excludes the selected wallet's
+matched addresses. Metadata targets the address.
+Address-level review keys are direction- and wallet-scoped, so an old output
+decision cannot silently complete a broader address group.
+
+`walletWorkbenchRows` supplies the shared row contract for all six Wallet tabs.
+The selected row and explicit batch keys are independent. Single clicks open
+details; modifier/checkbox selection replaces only the detail footprint, never
+the list width. Filters retain hidden batch targets and report them next to the
+actions. Address context choices use verified loaded input/output matches,
+not an arbitrary history transaction.
+
+Wallet Scan reuses the local analysis scope, registry and findings merge used by
+Analysis. It is distinct from chain-history refresh. Visible flow prevouts use
+bounded, cancellable client requests and focused input-context merges. Cache-only
+navigation performs no evidence update; new transactions use the existing
+workspace evidence invalidation path. No previous levels beyond the displayed
+flow are traversed.
+
+`useWalletCounterparties` resolves a bounded batch of known source inputs on
+activation, with explicit continuation rather than an automatic ancestor cascade.
+Its fetch/update adapters remain separate from transport and the forthcoming
+shared prevout resolver. Queued history, address scan limits, failed lookups and
+non-address scripts have separate UI states rather than one permanent partial flag.
+
+The Wallet component pauses hidden updates after deactivation. Derived models
+depend on evidence/annotation references, not camera snapshots; only the active
+record tab is built. Row tag lookup reuses `buildTagIndex`. Tooltip focus targets
+remain keyboard reachable without introducing another modal focus trap.
+
+`walletReviewCategories` describes supported observation and existing heuristic
+categories with stable IDs, definitions and counts, including zero. The UI uses
+union (OR), with no selections matching no items. Counts are computed before the
+category filter but after status/search/metadata filters; categories can overlap.
+Missing labels and effective tags are independent conditions. Scan availability
+and bounded/partial observations qualify counts rather than implying a fresh,
+complete zero. Legacy encrypted `unknown` decisions remain completed even though
+the UI no longer offers them as a new action.
 
 `useWalletUtxos` holds the transient Electrum observations shared by the wallet
 record panel and the wallet workbench. They are discarded when discovered
