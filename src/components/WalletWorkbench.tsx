@@ -42,7 +42,7 @@ import { useRecordSelection } from '../lib/useRecordSelection';
 import type { WalletUtxoController } from '../lib/useWalletUtxos';
 import { useWalletScan } from '../lib/useWalletScan';
 import { useWalletCounterparties } from '../lib/useWalletCounterparties';
-import { fetchTransaction } from '../lib/api';
+import { useTransactionFetch } from '../lib/useTransactionFetch';
 import { WALLET_FLOW_INPUT_WAVE_LIMIT } from '../lib/walletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletOverview } from './WalletOverview';
@@ -267,6 +267,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
       wallet.scannedAt,
     ],
   );
+  const fetchTransaction = useTransactionFetch('background', 'inputs');
   const counterparties = useWalletCounterparties({
     workspace,
     wallet,

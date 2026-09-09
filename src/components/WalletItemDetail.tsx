@@ -8,7 +8,7 @@ import {
   type WalletReviewFlowEntry,
 } from '../domain/walletReviewContext';
 import { walletRowRelationship, type WalletRow } from '../domain/walletWorkbenchRows';
-import { fetchTransaction } from '../lib/api';
+import { useTransactionFetch } from '../lib/useTransactionFetch';
 import { useWalletFlowInputs } from '../lib/useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from './WalletReference';
@@ -115,6 +115,7 @@ export function WalletItemDetail({
   relatedSelection?: ReactNode;
   resolveInputs?: boolean;
 }) {
+  const fetchTransaction = useTransactionFetch('visible', 'inputs');
   const [chosenContext, setChosenContext] = useState('');
   const [flowOpen, setFlowOpen] = useState(true);
   const [evidenceLimits, setEvidenceLimits] = useState({

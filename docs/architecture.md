@@ -572,3 +572,52 @@ Version-1 snapshots restore exact geometry and cameras. Compact has separate
 in-memory 3D/Flat views; explicit Repack clears layout caches and fits visible
 nodes. No layout-strategy schema or picker remains. See the
 [decision and limitations](experiments/flow-renderer-v2.md).
+
+### Frontend transaction scheduler experiment
+
+`lib/transactionScheduler.ts` coordinates existing transaction fetches. Six physical
+jobs can run globally, four per network. Non-navigation work uses at most four
+global slots and three on one network, leaving capacity for explicit navigation.
+Queued navigation precedes visible input evidence, which precedes refresh and
+bounded source-input work. Equal-priority admissions alternate eligible networks;
+there is no preemption. The queue holds at most 128 jobs, with its last 16 places
+reserved for navigation; excess callers get a retryable error. Each job accepts at
+most 64 consumers. Existing caller wave limits still apply.
+
+`fetchTransaction` accepts optional `TransactionFetchHints` after `historyHeight`.
+Identity includes the unlocked session token, network, normalized transaction ID,
+exact history height and observation token. Wallet/address scans create a new
+observation token on every invocation. Refresh cannot join an earlier navigation
+or refresh observation. There is no resolved transaction cache or TTL. Callers
+reuse loaded facts before requesting; each fetched consumer receives a deep copy.
+
+Consumer abort detaches only that caller. The final departure removes queued work
+or aborts the physical request, whose slot remains occupied until transport settles.
+A queued shared job inherits its highest remaining consumer priority. Fallback and
+optional header requests execute inside that slot, avoiding nested-queue deadlocks.
+Header requests coalesce within a session or refresh with independent cancellation;
+the existing bounded immutable block-coordinate cache remains unchanged.
+
+Each `WorkspaceSessionStore` session owns a transient fetch scope. Successful lock
+closes it synchronously before removing the session, rejecting its consumers and
+clearing activity. A reopened workspace gets a different token. React callbacks
+capture their token; existing cancellation and selection/source guards govern all
+workspace mutations. The scheduler itself never adds graph branches or annotations.
+Unscoped library callers use a standalone scope; every currently mounted workspace
+transaction-fetch path supplies its session scope. Retained, unmounted Trace code
+can use the API default and must receive a session scope if restored to the UI.
+
+The bottom Activity popover counts transaction jobs, grouped by purpose and network,
+with only 30 recent outcomes. It includes transaction phases of wallet/address
+refresh, Graph navigation/explicit previous-depth/spending search, Wallet visible
+input details and bounded source-input loading. It excludes history discovery,
+UTXO/status checks, local Analysis scans, encryption and renderer work. It does not
+add speculative prefetch. Existing explicit previous-depth navigation retains its
+own traversal budget. The popover can cancel the current statusbar action through
+its existing owner, never indiscriminately abort other consumers.
+
+Notifications coalesce at 80 ms. Only the small indicator subscribes while closed;
+detailed rows subscribe when opened. Activity never enters workspace state or
+storage. Parsing and per-consumer cloning remain synchronous and no end-to-end
+latency or rendering improvement is claimed. Reservation can reduce background-only
+throughput, and sustained higher-priority traffic can defer background work.

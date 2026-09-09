@@ -1,3 +1,5 @@
+import { TransactionFetchShell } from './lib/useTransactionFetch';
+import { TransactionActivity } from './components/TransactionActivity';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
 import { resolveGraphHandoff } from './domain/graphHandoff';
 import { resolveWalletUtxoObservation } from './domain/walletUtxoObservation';
@@ -146,6 +148,7 @@ function download(name: string, content: string, type = 'application/json') {
 export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
+  const fetchScope = ws.active?.fetchScope;
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
@@ -908,13 +911,28 @@ export default function App() {
     signal?.throwIfAborted();
     if (!w) throw new Error('Open a workspace first.');
     if (w.demo) throw new Error('Live lookups are disabled for legacy synthetic workspaces.');
-    return fetchTransaction(w.network, id, signal);
+    return (
+      w.transactions[id] ??
+      fetchTransaction(w.network, id, signal, undefined, {
+        scope: fetchScope,
+        priority: 'navigation',
+      })
+    );
   };
   const flowInputs = useFlowInputs({
     workspace: w,
     selected,
     enabled: canTrace && !operation && workbench === 'graph',
-    fetch: getTransaction,
+    fetch: (id, signal) => {
+      if (!w) return Promise.reject(new Error('Open a workspace first.'));
+      return w.transactions[id]
+        ? Promise.resolve(w.transactions[id])
+        : fetchTransaction(w.network, id, signal, undefined, {
+            scope: fetchScope,
+            priority: 'visible',
+            kind: 'inputs',
+          });
+    },
     update: ws.update,
   });
   const editNode = (id: string, target: 'label' | 'tags' | 'icon' = 'label') => {
@@ -1059,7 +1077,11 @@ export default function App() {
     void run(async (signal) => {
       const cachedTransaction = ws.getSession(ownerId)?.data.transactions[transactionId];
       const transaction =
-        cachedTransaction ?? (await fetchTransaction(w.network, transactionId, signal));
+        cachedTransaction ??
+        (await fetchTransaction(w.network, transactionId, signal, undefined, {
+          scope: fetchScope,
+          priority: 'navigation',
+        }));
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation) return;
       const current = ws.getSession(ownerId)?.data;
@@ -1134,15 +1156,23 @@ export default function App() {
   async function addQuery(text: string) {
     if (!w || !canQuery) return;
     if (!text) return;
+    const generation = selectionGeneration.current;
     await run(async (signal) => {
       if (/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
         const [id, index] = text.split(':');
         setOperation('Loading transaction…');
-        const t = await fetchTransaction(w.network, id, signal);
+        const cached = w.transactions[id.toLowerCase()];
+        const t =
+          cached ??
+          (await fetchTransaction(w.network, id, signal, undefined, {
+            scope: fetchScope,
+            priority: 'navigation',
+          }));
         if (index !== undefined && !t.vout.some((o) => o.n === Number(index)))
           throw new Error('This output index does not exist in the transaction.');
         signal.throwIfAborted();
-        mergeTransactions(w.id, [t]);
+        if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
+        mergeTransactions(w.id, cached ? [] : [t], [t.txid]);
         const requestedId =
           index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index));
         ws.update(w.id, (current) => setNodesHidden(current, [requestedId], false));
@@ -1171,10 +1201,16 @@ export default function App() {
         }
       } else {
         setOperation('Discovering address history…');
-        const result = await loadAddress(text, w.network, w.transactions, signal, (p) =>
-          setOperation(p.message),
+        const result = await loadAddress(
+          text,
+          w.network,
+          w.transactions,
+          signal,
+          (p) => setOperation(p.message),
+          { scope: fetchScope },
         );
         signal.throwIfAborted();
+        if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
         ws.update(
           w.id,
           (c) => ({
@@ -1223,6 +1259,7 @@ export default function App() {
         gap,
         maxIndex: scanLimit,
         signal,
+        fetchHints: { scope: fetchScope },
         onProgress: (p) => setOperation(p.message),
       });
       signal.throwIfAborted();
@@ -1290,6 +1327,7 @@ export default function App() {
       recoveryGraph.nodes.find((n) => n.id === nodeId) ??
       buildGraph(snapshot).nodes.find((n) => n.id === nodeId);
     if (!node?.txid || node.kind === 'address') return;
+    const generation = selectionGeneration.current;
     if (
       !canTrace &&
       !(direction === 'funding' && node.kind === 'output' && snapshot.transactions[node.txid])
@@ -1305,10 +1343,11 @@ export default function App() {
       const traceSourceId = loaded ? txNodeId(node.txid!) : node.id;
       const transaction = loaded ?? (await getTransaction(node.txid!, signal));
       signal.throwIfAborted();
+      if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
       if (!traceSourceExists(ws.getSession(w.id)!.data, traceSourceId)) return;
       if (direction === 'funding') {
         if (node.kind === 'output') {
-          mergeTransactions(w.id, [transaction]);
+          mergeTransactions(w.id, loaded ? [] : [transaction], [transaction.txid]);
           const id = txNodeId(transaction.txid);
           ws.update(
             w.id,
@@ -1366,6 +1405,7 @@ export default function App() {
           outputIndex,
           signal,
           spendingOffsets.current.get(searchKey) ?? 0,
+          { scope: fetchScope, priority: 'navigation', kind: 'spending' },
         );
         signal.throwIfAborted();
         const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
@@ -1418,7 +1458,14 @@ export default function App() {
         let partial = checked.partial;
         let snapshot = checked.snapshot;
         for (const address of current.watchedAddresses) {
-          const result = await loadAddress(address, current.network, snapshot.transactions, signal);
+          const result = await loadAddress(
+            address,
+            current.network,
+            snapshot.transactions,
+            signal,
+            undefined,
+            { scope: fetchScope },
+          );
           signal.throwIfAborted();
           mergeTransactions(current.id, result.transactions, result.observedTransactionIds);
           added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
@@ -1820,7 +1867,7 @@ export default function App() {
       </>
     ) : null;
   return (
-    <div className="app-shell">
+    <TransactionFetchShell scope={fetchScope}>
       <a
         className="skip-link"
         href={workbench === 'graph' || !w ? '#main-workspace' : `#${workbench}-workspace`}
@@ -2736,6 +2783,14 @@ export default function App() {
                 </>
               )}
             </span>
+            {fetchScope && (
+              <TransactionActivity
+                key={w.id}
+                scope={fetchScope}
+                operation={operation ? 'Current action' : undefined}
+                onCancel={() => operationRef.current?.abort()}
+              />
+            )}
             <span className="save-status">
               <LockKeyhole size={12} />
               {ws.storageError
@@ -3055,6 +3110,6 @@ export default function App() {
           }
         />
       )}
-    </div>
+    </TransactionFetchShell>
   );
 }

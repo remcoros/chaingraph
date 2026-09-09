@@ -1,0 +1,47 @@
+.statusbar .transaction-activity-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.transaction-activity p {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: 0 0 10px;
+}
+.transaction-activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.transaction-activity-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 8px 0;
+  font-size: 11px;
+}
+.transaction-activity-list li span {
+  grid-column: 1 / -1;
+}
+.transaction-activity button {
+  font-size: 11px;
+}
+.transaction-activity-cancel {
+  margin-top: 12px;
+}
+.transaction-activity-cancel p {
+  margin-top: 6px;
+}
+@media (max-width: 650px) {
+  .statusbar {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .statusbar .transaction-activity-trigger {
+    min-height: 28px;
+  }
+}

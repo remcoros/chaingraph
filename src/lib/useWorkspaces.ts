@@ -1,3 +1,4 @@
+import { TransactionFetchScope, transactionScheduler } from './transactionScheduler';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Workspace } from '../domain/types';
 import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
@@ -25,6 +26,7 @@ export interface SavedWorkspace {
   envelopeRef?: string;
 }
 export interface Session {
+  fetchScope: TransactionFetchScope;
   data: Workspace;
   password: string;
   revision: number;
@@ -262,6 +264,7 @@ export class WorkspaceSessionStore {
         ...this.state.sessions,
         {
           data,
+          fetchScope: new TransactionFetchScope(data.network),
           password,
           revision: 0,
           savedRevision: alreadySaved ? 0 : -1,
@@ -534,6 +537,7 @@ export class WorkspaceSessionStore {
         if (current && current.revision !== current.savedRevision)
           throw new Error('Workspace changed while locking; keep it open and save again.');
         this.editGroups.delete(id);
+        if (current) transactionScheduler.dispose(current.fetchScope);
         this.patch({
           sessions: this.state.sessions.filter((s) => s.data.id !== id),
           activeId: this.state.activeId === id ? undefined : this.state.activeId,

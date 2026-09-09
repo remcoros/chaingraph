@@ -391,9 +391,9 @@ describe('browser-side wallet scanner', () => {
       controller.abort();
       throw new DOMException('Aborted', 'AbortError');
     });
-    await expect(fetchTransaction('mainnet', txid(10), controller.signal)).rejects.toThrow(
-      'Aborted',
-    );
+    await expect(fetchTransaction('mainnet', txid(10), controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
     expect(methods).toEqual(['getrawtransaction']);
   });
 

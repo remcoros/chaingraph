@@ -77,11 +77,14 @@ describe('encrypted save scheduling around graph interaction', () => {
 
   it('explicit lock releases a paused save queue and stores the latest synchronous state', async () => {
     const { store, id, raw } = fixture();
+    const oldScope = store.getSession(id)!.fetchScope;
     store.pauseAutosave(id, true);
     void store.persist(id, true);
     store.update(id, (w) => ({ ...w, view: { ...w.view, glow: false } }), false);
     await store.lock(id);
     expect(store.getSession(id)).toBeUndefined();
+    expect(oldScope.closed).toBe(true);
+    expect(oldScope.getSnapshot()).toEqual([]);
     expect(await decryptWorkspace(JSON.parse(raw()!)[0].envelope, password)).toMatchObject({
       view: { glow: false },
     });

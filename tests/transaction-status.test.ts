@@ -189,13 +189,14 @@ describe('transaction status provenance and bounded header reuse', () => {
     expect(result.blockHeight).toBeUndefined();
     expect(result.confirmations).toBe(-1);
   });
-  it('propagates cancellation during metadata lookup without mixing separately cancellable requests', async () => {
+  it('detaches a consumer during shared metadata lookup without cancelling the survivor', async () => {
     const blockhash = hash(2006);
     const cancelled = new AbortController();
     const survivor = new AbortController();
     mockRpc(async (request, signal) => {
       if (request.method === 'getrawtransaction') return tx(1011, { blockhash, confirmations: 2 });
-      if (signal === cancelled.signal) cancelled.abort();
+      cancelled.abort();
+      expect(signal?.aborted).toBe(false);
       return { hash: blockhash, height: 102, confirmations: 2 };
     });
     const results = await Promise.allSettled([

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { transactionScheduler, type TransactionFetchHints } from './transactionScheduler';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
@@ -92,11 +93,14 @@ export async function backendStatus(
 // browser memory, never cached active-chain status or backend workspace state.
 const blockHeights = new Map<string, number>();
 type HeaderObservation = { height: number; active: boolean };
-const headerRequests = new WeakMap<
-  AbortSignal,
-  Map<string, Promise<HeaderObservation | undefined>>
->();
-const uncancelledHeaderRequests = new Map<string, Promise<HeaderObservation | undefined>>();
+type HeaderRequest = {
+  controller: AbortController;
+  promise: Promise<HeaderObservation | undefined>;
+  consumers: number;
+};
+// Leaf metadata requests do not acquire another scheduler slot. Keep same-block
+// reuse within a session/refresh even though transactions have independent signals.
+const headerRequests = new WeakMap<object, Map<string, HeaderRequest>>();
 const headerSchema = z.object({
   hash: z.string().regex(/^[0-9a-f]{64}$/),
   height: z.number().int().min(0).max(0x7fffffff),
@@ -105,47 +109,83 @@ const headerSchema = z.object({
 async function fetchBlockHeight(
   network: Network,
   hash: string,
-  signal?: AbortSignal,
+  signal: AbortSignal,
+  owner: object,
 ): Promise<HeaderObservation | undefined> {
-  signal?.throwIfAborted();
+  signal.throwIfAborted();
   const key = `${network}:${hash}`;
   const cached = blockHeights.get(key);
-  // The caller requires fresh positive confirmations from verbose RPC. Only
-  // the immutable height is cached; active status comes from that fresh lookup.
+  // Only immutable coordinates survive completion. Fresh verbose transaction
+  // confirmations are required before using them, as before this experiment.
   if (cached !== undefined) return { height: cached, active: true };
-  let requests = signal ? headerRequests.get(signal) : uncancelledHeaderRequests;
+  let requests = headerRequests.get(owner);
   if (!requests) {
     requests = new Map();
-    headerRequests.set(signal!, requests);
+    headerRequests.set(owner, requests);
   }
-  const pending = requests.get(key);
-  if (pending) return pending;
-  const request = (async () => {
-    try {
-      const data = await rpc(network, 'core', 'getblockheader', [hash, true], signal);
-      const parsed = headerSchema.safeParse(data);
-      if (!parsed.success || parsed.data.hash !== hash) return undefined;
-      blockHeights.set(key, parsed.data.height);
-      if (blockHeights.size > 512) blockHeights.delete(blockHeights.keys().next().value!);
-      return { height: parsed.data.height, active: parsed.data.confirmations > 0 };
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      // Optional metadata must not discard a successfully loaded transaction.
-      return undefined;
-    } finally {
-      requests.delete(key);
-    }
-  })();
-  requests.set(key, request);
-  return request;
+  let pending = requests.get(key);
+  if (!pending) {
+    const controller = new AbortController();
+    const request: HeaderRequest = {
+      controller,
+      consumers: 0,
+      promise: Promise.resolve().then(async () => {
+        try {
+          controller.signal.throwIfAborted();
+          const data = await rpc(
+            network,
+            'core',
+            'getblockheader',
+            [hash, true],
+            controller.signal,
+          );
+          const parsed = headerSchema.safeParse(data);
+          if (!parsed.success || parsed.data.hash !== hash) return undefined;
+          blockHeights.set(key, parsed.data.height);
+          if (blockHeights.size > 512) blockHeights.delete(blockHeights.keys().next().value!);
+          return { height: parsed.data.height, active: parsed.data.confirmations > 0 };
+        } catch (error) {
+          if (controller.signal.aborted) throw error;
+          return undefined; // Optional metadata must not discard a loaded transaction.
+        } finally {
+          if (requests.get(key) === request) requests.delete(key);
+        }
+      }),
+    };
+    pending = request;
+    requests.set(key, request);
+  }
+  const request = pending;
+  request.consumers++;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (value?: HeaderObservation, error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener('abort', cancel);
+      if (--request.consumers === 0) {
+        if (requests.get(key) === request) requests.delete(key);
+        request.controller.abort();
+      }
+      if (signal.aborted) reject(signal.reason);
+      else if (error) reject(error);
+      else resolve(value);
+    };
+    const cancel = () => finish();
+    signal.addEventListener('abort', cancel, { once: true });
+    void request.promise.then(
+      (value) => finish(value),
+      (error: unknown) => finish(undefined, error),
+    );
+  });
 }
-const transactionRequests = new WeakMap<AbortSignal, Map<string, Promise<Transaction>>>();
 
 async function fetchTransactionRequest(
   network: Network,
   txid: string,
-  signal?: AbortSignal,
-  historyHeight?: number,
+  signal: AbortSignal,
+  historyHeight: number | undefined,
+  headerOwner: object,
 ): Promise<Transaction> {
   if (!/^[0-9a-f]{64}$/i.test(txid)) throw new Error('Enter a 64-character transaction ID.');
   let data: unknown;
@@ -197,7 +237,7 @@ async function fetchTransactionRequest(
   )
     return { ...tx, confirmations: 0, mempool: true };
   if (tx.blockhash && (tx.confirmations ?? 0) > 0 && (fromCore || historyHeight === undefined)) {
-    const header = await fetchBlockHeight(network, tx.blockhash, signal);
+    const header = await fetchBlockHeight(network, tx.blockhash, signal, headerOwner);
     signal?.throwIfAborted();
     if (header)
       return header.active ? { ...tx, blockHeight: header.height } : { ...tx, confirmations: -1 };
@@ -224,22 +264,23 @@ export function fetchTransaction(
   txid: string,
   signal?: AbortSignal,
   historyHeight?: number,
+  hints: TransactionFetchHints = {},
 ): Promise<Transaction> {
-  if (!signal) return fetchTransactionRequest(network, txid, signal, historyHeight);
-  signal.throwIfAborted();
-  let requests = transactionRequests.get(signal);
-  if (!requests) {
-    requests = new Map();
-    transactionRequests.set(signal, requests);
-  }
-  const key = `${network}:${txid.toLowerCase()}:${historyHeight ?? ''}`;
-  const pending = requests.get(key);
-  if (pending) return pending;
-  const request = fetchTransactionRequest(network, txid, signal, historyHeight).finally(() =>
-    requests!.delete(key),
+  const key = JSON.stringify([txid.toLowerCase(), historyHeight ?? null]);
+  return transactionScheduler.request(
+    network,
+    key,
+    (physicalSignal) =>
+      fetchTransactionRequest(
+        network,
+        txid,
+        physicalSignal,
+        historyHeight,
+        hints.observation ?? hints.scope ?? transactionScheduler.standalone,
+      ),
+    signal,
+    hints,
   );
-  requests.set(key, request);
-  return request;
 }
 export async function fetchHistory(
   network: Network,
@@ -306,6 +347,7 @@ export async function scanWallet(
     maxIndex: number;
     signal?: AbortSignal;
     onProgress?: (p: ScanProgress) => void;
+    fetchHints?: TransactionFetchHints;
   },
 ): Promise<{
   wallet: Wallet;
@@ -323,6 +365,12 @@ export async function scanWallet(
     throw new Error(
       'Use a gap between 1 and 100 and an address limit between 1 and 1,000 per branch.',
     );
+  const fetchHints: TransactionFetchHints = {
+    ...options.fetchHints,
+    priority: 'background',
+    kind: 'refresh',
+    observation: {},
+  };
   const addresses: Wallet['addresses'] = [];
   const historyIds = new Set<string>();
   const heights = new Map<string, number>();
@@ -402,7 +450,7 @@ export async function scanWallet(
   const toLoad = pending.slice(0, MAX_SCAN_TRANSACTIONS);
   let loaded = 0;
   const transactions = await mapLimit(toLoad, 4, async (id) => {
-    const tx = await fetchTransaction(network, id, options.signal, heights.get(id));
+    const tx = await fetchTransaction(network, id, options.signal, heights.get(id), fetchHints);
     options.onProgress?.({
       done: checked,
       message: `${wallet.name}: loading transactions ${++loaded}/${toLoad.length}`,
@@ -448,7 +496,14 @@ export async function loadAddress(
   existing: Record<string, Transaction>,
   signal?: AbortSignal,
   onProgress?: (p: ScanProgress) => void,
+  hints: TransactionFetchHints = {},
 ): Promise<{ transactions: Transaction[]; truncated: boolean; observedTransactionIds: string[] }> {
+  const fetchHints: TransactionFetchHints = {
+    ...hints,
+    priority: 'background',
+    kind: 'refresh',
+    observation: {},
+  };
   const history = await fetchHistory(network, addressToScriptHash(address, network), signal);
   const allIds = [...new Set(history.map((h) => h.tx_hash))];
   const heights = new Map(history.map((h) => [h.tx_hash, h.height]));
@@ -469,7 +524,7 @@ export async function loadAddress(
       done: loaded,
       message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
     });
-    return fetchTransaction(network, id, signal, heights.get(id));
+    return fetchTransaction(network, id, signal, heights.get(id), fetchHints);
   });
   const requested = new Set(ids);
   for (const id of allIds) {
@@ -488,11 +543,12 @@ export async function loadFunding(
   tx: Transaction,
   existing: Record<string, Transaction>,
   signal?: AbortSignal,
+  hints: TransactionFetchHints = {},
 ): Promise<Transaction[]> {
   const ids = [...new Set(tx.vin.flatMap((i) => (i.txid && !existing[i.txid] ? [i.txid] : [])))];
   if (ids.length > 500)
     throw new Error('Funding expansion is limited to 500 transactions at a time.');
-  return mapLimit(ids, 4, (id) => fetchTransaction(network, id, signal));
+  return mapLimit(ids, 4, (id) => fetchTransaction(network, id, signal, undefined, hints));
 }
 export async function loadSpending(
   tx: Transaction,
@@ -500,6 +556,7 @@ export async function loadSpending(
   vout: number | undefined,
   signal?: AbortSignal,
   offset = 0,
+  hints: TransactionFetchHints = {},
 ): Promise<{ transactions: Transaction[]; truncated: boolean; nextOffset?: number }> {
   if (!Number.isSafeInteger(offset) || offset < 0)
     throw new Error('Spending search offset must be a nonnegative safe integer.');
@@ -527,7 +584,7 @@ export async function loadSpending(
   const candidates = await mapLimit(ids.slice(offset, offset + 500), 4, (id) =>
     w.transactions[id]
       ? Promise.resolve(withHistoryHeight(w.transactions[id], heights.get(id)!))
-      : fetchTransaction(w.network, id, signal, heights.get(id)),
+      : fetchTransaction(w.network, id, signal, heights.get(id), hints),
   );
   return {
     transactions: candidates.filter((t) =>
