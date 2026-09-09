@@ -377,3 +377,24 @@ test('stays usable on a phone viewport', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(editor).toBeHidden();
 });
+
+// The Wallet handoff reuses the accepted Analysis focus contract from 1efa564.
+test('keyboard handoff reaches Graph and returns focus to the exact Wallet invoker', async ({
+  page,
+}) => {
+  await seed(page);
+  await waitForUtxoCheck(page);
+  await reviewList(page).getByRole('listitem').first().click();
+  const invoker = detail(page).getByRole('button', { name: 'Show in Graph' });
+  await invoker.focus();
+  await page.keyboard.press('Enter');
+  await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.graph-stage')).toBeVisible();
+  // Focus moved into the Graph workspace rather than falling back to the body.
+  expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY');
+  const back = page.getByRole('button', { name: 'Back to Wallet' });
+  await back.focus();
+  await page.keyboard.press('Enter');
+  await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
+  await expect(invoker).toBeFocused();
+});

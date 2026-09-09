@@ -1,7 +1,8 @@
 # Wallet review proposal
 
 2026-09-09. Local experiment on `experiment/wallet-review`, stacked on
-`experiment/simple-workbenches` at `56eecb3`. It adds a third compact workbench
+`experiment/simple-workbenches` at `1efa564`, which is a direct child of the
+original `56eecb3` base. It adds a third compact workbench
 for one selected wallet at a time. It does not change the renderer, the backend,
 dependencies, the encryption format or the graph/analysis contracts.
 
@@ -81,11 +82,13 @@ existing read-only backend.
   cross-wallet key isolation, schema round-tripping with older workspaces,
   batch target scope and preservation, single-result batches, canonical and
   invalid references, and the guidance sentence.
-- Five new browser journeys pass in `wallet-review.spec.ts`: the derived queue
+- Six new browser journeys pass in `wallet-review.spec.ts`: the derived queue
   with lock, reload and unlock; batch label, tag and icon with three Undo steps;
   Graph and Analysis handoff with return; a refresh that keeps decisions, flags
   new activity and stays inside one wallet; and a phone viewport check that the
-  batch editor is inside the visible viewport and closes on Escape.
+  batch editor is inside the visible viewport and closes on Escape. The sixth
+  checks that a keyboard handoff moves focus into Graph and that `Back to Wallet`
+  returns focus to the exact control that started it.
 - Fresh desktop (1440x1000) and phone (390x844) screenshots were inspected in
   ignored `artifacts/wallet-review/`. The review fixed a colliding `.wallet-row`
   class that broke record row layout, an icon control that stacked its label and
@@ -114,11 +117,23 @@ change annotations, tags or findings, and they never establish ownership.
 This is a local proposal, not a release claim. No push, merge or publication was
 performed.
 
-## Upstream dependency
+## Upstream incorporation
 
 Shared finding RUX-001, keyboard focus lost on Analysis and Graph evidence
-navigation and return, belongs to the base branch and is fixed upstream at
-`1efa564` on `experiment/simple-workbenches`. It is deliberately not reimplemented
-here. The Wallet handoffs use the same selection and return contract as the
-existing Analysis handoff, so that fix is expected to extend to them when root
-authorises importing the upstream commit.
+navigation and return, belongs to the base branch and was fixed upstream at
+`1efa564`. It is not reimplemented here. With root authorisation this branch was
+rebased onto that exact commit. The conflict resolution kept the accepted focus
+contract unchanged and only generalised it: the single Analysis invoker reference
+became a per-origin map, `switchWorkbench` keeps its `handoffFocus` argument, and
+the Wallet section gained a focus target so its handoffs and `Back to Wallet` use
+the same behaviour. The upstream focus regressions in `analysis-state.spec.ts` and
+`simple-workbenches.spec.ts` pass unchanged on the rebased snapshot.
+
+## Reported, not fixed here
+
+Two `workbench.spec.ts` checks fail identically on the unmodified `56eecb3` base
+and on this branch: `compact header keeps workspace tabs and lookup controls
+reachable with keyboard-accessible help and samples` (measured header-to-lookup
+gap 45 against an expected maximum of 20) and `inspector keeps trace actions and
+label editing reachable on a 150-output selection`. They are pre-existing base
+issues outside this slice and were left alone.
