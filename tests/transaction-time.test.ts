@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest';
+import {
+  formatGmtTimestamp,
+  transactionBlockTime,
+  walletRecordBlockObservation,
+} from '../src/domain/transactionTime';
+import { transactionStatus } from '../src/domain/transactionStatus';
+import type { Transaction } from '../src/domain/types';
+
+const tx: Transaction = {
+  txid: 'a'.repeat(64),
+  vin: [],
+  vout: [],
+  blockHeight: 800000,
+  blocktime: 1690168629,
+};
+
+describe('saved block times in GMT', () => {
+  it('formats the same historical time across browser timezones with exact seconds', () => {
+    const previous = process.env.TZ;
+    try {
+      for (const timezone of ['Pacific/Honolulu', 'Europe/Amsterdam', 'Asia/Tokyo']) {
+        process.env.TZ = timezone;
+        expect(transactionBlockTime(tx)).toEqual({
+          compact: '24 Jul 2023 · 03:17 GMT',
+          exact: '2023-07-24 03:17:09 GMT',
+          iso: '2023-07-24T03:17:09.000Z',
+        });
+      }
+    } finally {
+      if (previous === undefined) delete process.env.TZ;
+      else process.env.TZ = previous;
+    }
+  });
+
+  it('uses blocktime, never current time or the generic time field', () => {
+    expect(transactionBlockTime({ ...tx, time: 1 })).toEqual(transactionBlockTime(tx));
+    expect(transactionBlockTime({ ...tx, blocktime: undefined, time: 1690168629 })).toBeUndefined();
+    expect(
+      transactionBlockTime({ ...tx, blockHeight: undefined, confirmations: 20 }),
+    ).toBeDefined();
+    expect(transactionStatus({ ...tx, blockHeight: undefined, confirmations: 20 }).label).toBe(
+      'Confirmed',
+    );
+  });
+
+  it('does not give mempool, missing, or conflicted observations a block date', () => {
+    const unknown = { ...tx, blockHeight: undefined, confirmations: 0, time: 1690168629 };
+    expect(transactionStatus(unknown).label).toBe('Status unknown');
+    expect(transactionBlockTime(unknown)).toBeUndefined();
+    expect(transactionStatus({ ...unknown, mempool: true }).label).toBe('Unconfirmed');
+    expect(transactionBlockTime({ ...unknown, mempool: true })).toBeUndefined();
+    expect(transactionBlockTime({ ...tx, confirmations: -1 })).toBeUndefined();
+    expect(transactionBlockTime(undefined)).toBeUndefined();
+  });
+
+  it('handles missing/invalid times and the epoch without inventing dates', () => {
+    for (const value of [undefined, NaN, Infinity, -1, 1e20])
+      expect(formatGmtTimestamp(value)).toBeUndefined();
+    expect(formatGmtTimestamp(0)?.exact).toBe('1970-01-01 00:00:00 GMT');
+  });
+
+  it('keeps Wallet history/UTXO height observations separate from loaded block times', () => {
+    const observed = (height?: number, mempool = false) =>
+      walletRecordBlockObservation(tx.txid, tx, height, mempool);
+    expect(transactionBlockTime(observed(800000))).toEqual(transactionBlockTime(tx));
+    expect(transactionBlockTime(observed(800001))).toBeUndefined();
+    for (const height of [0, -1]) {
+      expect(transactionStatus(observed(height, true)).label).toBe('Unconfirmed');
+      expect(transactionBlockTime(observed(height, true))).toBeUndefined();
+    }
+    const missing = walletRecordBlockObservation(tx.txid, undefined, undefined, false);
+    expect(transactionStatus(missing).kind).toBe('unknown');
+    const heightOnly = walletRecordBlockObservation(tx.txid, undefined, 800000, false);
+    expect(transactionStatus(heightOnly).label).toBe('Block 800,000');
+    expect(transactionBlockTime(heightOnly)).toBeUndefined();
+    const conflicted = walletRecordBlockObservation(
+      tx.txid,
+      { ...tx, confirmations: -1 },
+      800000,
+      false,
+    );
+    expect(transactionStatus(conflicted).kind).toBe('conflicted');
+    expect(transactionBlockTime(conflicted)).toBeUndefined();
+  });
+});

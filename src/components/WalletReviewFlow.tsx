@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight, Search } from 'lucide-react';
+import { ArrowRight, Box, Pencil, Search, Wallet, CircleHelp, TriangleAlert } from 'lucide-react';
 import type { Annotation, GraphNode, Workspace } from '../domain/types';
 import { formatSats } from '../domain/types';
 import { listTagsForNode } from '../domain/tags';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../domain/walletReviewContext';
+import { isWalletFlowEditTarget, walletFlowVisibility } from '../domain/walletFlowVisibility';
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { WalletHelp } from './WalletHelp';
 import { WalletReference } from './WalletReference';
 import './wallet-review-flow.css';
@@ -59,7 +61,7 @@ export function WalletReviewFlow({
     <figure className="wallet-review-flow" aria-label="Wallet transaction flow">
       <figcaption>
         <span className="wallet-flow-legend">
-          <i /> {walletName}
+          <Wallet size={12} aria-hidden="true" /> Your wallet · {walletName}
         </span>
       </figcaption>
       <div className="wallet-flow-columns">
@@ -81,9 +83,13 @@ export function WalletReviewFlow({
               .filter(Boolean)
               .join(' · ')}
           >
-            <span className={editingTransaction ? 'wallet-flow-editing' : 'wallet-flow-role'}>
-              {editingTransaction ? 'Editing transaction' : 'Transaction'}
-            </span>
+            <Box className="wallet-flow-transaction-icon" size={25} aria-hidden="true" />
+            <span className="wallet-flow-role">Transaction</span>
+            {editingTransaction && (
+              <span className="wallet-flow-editing">
+                <Pencil size={10} aria-hidden="true" /> Editing transaction
+              </span>
+            )}
             {(transactionAnnotation?.label || transactionAnnotation?.icon) && (
               <strong title={transactionAnnotation.label}>
                 {transactionAnnotation.icon && <span>{transactionAnnotation.icon} </span>}
@@ -95,6 +101,7 @@ export function WalletReviewFlow({
               workspace={workspace}
               node={{ id: context.transactionNodeId!, kind: 'transaction', label: '' }}
             />
+            <TransactionBlockTime transaction={context.transaction} />
             <ShowOnGraph
               id={context.transactionNodeId!}
               kind="transaction"
@@ -107,6 +114,7 @@ export function WalletReviewFlow({
           key={`${context.transactionNodeId}:outputs`}
           title="Outputs"
           kind="output"
+          displayedTransactionId={context.transactionId}
           entries={context.outputs}
           workspace={workspace}
           editingId={editingId}
@@ -182,6 +190,7 @@ function FlowColumn({
   title,
   kind,
   entries,
+  displayedTransactionId,
   workspace,
   editingId,
   onShowInGraph,
@@ -190,6 +199,7 @@ function FlowColumn({
   title: string;
   kind: 'input' | 'output';
   entries: WalletReviewFlowEntry[];
+  displayedTransactionId?: string;
   workspace: Workspace;
   editingId?: string;
   onShowInGraph: (id: string) => void;
@@ -198,13 +208,12 @@ function FlowColumn({
   const [limit, setLimit] = useState(2);
   const list = useRef<HTMLDivElement>(null);
   const editingAddress = editingId?.startsWith('addr:') ? editingId.slice(5) : undefined;
-  const isEditing = (entry: WalletReviewFlowEntry) =>
-    !entry.coinbase &&
-    entry.id.startsWith('out:') &&
-    (entry.id === editingId || (!!editingAddress && entry.address === editingAddress));
-  const chosen = entries.find(isEditing);
-  const visible = entries.slice(0, limit);
-  if (chosen && !visible.includes(chosen)) visible[visible.length - 1] = chosen;
+  const isEditing = (entry: WalletReviewFlowEntry) => isWalletFlowEditTarget(entry, editingId);
+  const { visible, total, hidden, owned, hiddenOwned, hiddenContext } = walletFlowVisibility(
+    entries,
+    editingId,
+    limit,
+  );
   const visibleKey = JSON.stringify(visible);
   const reportVisible = useRef(onVisibleEntriesChange);
   reportVisible.current = onVisibleEntriesChange;
@@ -222,26 +231,42 @@ function FlowColumn({
     const inner = selected.getBoundingClientRect();
     if (inner.top < outer.top) container.scrollTop -= outer.top - inner.top;
     else if (inner.bottom > outer.bottom) container.scrollTop += inner.bottom - outer.bottom;
-  }, [editingId, limit]);
+  }, [editingId, limit, visibleKey]);
   return (
-    <div className="wallet-flow-column">
+    <div className={`wallet-flow-column${limit === 2 ? ' is-collapsed' : ''}`}>
       <div className="wallet-flow-column-heading">
         <span>
-          {title} <b>{entries.length}</b>
+          {title} <b>{total}</b>
         </span>
-        {entries.length > 2 && (
+        {(hidden > 0 || limit > 2) && (
           <button
             className="text-button"
             aria-label={`${limit > 2 ? 'Collapse' : 'Expand'} ${title.toLowerCase()}`}
             aria-expanded={limit > 2}
             onClick={() => setLimit(limit > 2 ? 2 : PAGE_SIZE)}
           >
-            {limit > 2 ? 'Collapse' : `Show ${Math.min(PAGE_SIZE, entries.length)}`}
+            {limit > 2 ? 'Collapse' : `Show ${Math.min(PAGE_SIZE, total)}`}
           </button>
         )}
       </div>
+      {(owned > 0 || hidden > 0) && (
+        <div className="wallet-flow-counts">
+          {owned > 0 && (
+            <span>
+              <Wallet size={10} aria-hidden="true" /> {owned} wallet {kind}
+              {owned === 1 ? '' : 's'}
+            </span>
+          )}
+          {hidden > 0 && (
+            <span>
+              {hidden} hidden{hiddenOwned > 0 ? ` · ${hiddenOwned} wallet` : ''}
+              {hiddenContext > 0 ? ` · ${hiddenContext} selected context` : ''}
+            </span>
+          )}
+        </div>
+      )}
       <div className="wallet-flow-entries" ref={list}>
-        {visible.map((entry) => {
+        {visible.map((entry, index) => {
           const annotation = workspace.annotations[entry.id];
           const addressId = entry.address ? `addr:${entry.address}` : undefined;
           const addressAnnotation = addressId ? workspace.annotations[addressId] : undefined;
@@ -257,7 +282,9 @@ function FlowColumn({
               ? 'Your wallet'
               : entry.ownership === 'external'
                 ? 'No wallet match'
-                : 'Unknown';
+                : entry.prevoutStatus === 'conflict'
+                  ? 'Conflicting evidence'
+                  : 'Unknown';
           const selected = isEditing(entry);
           const value =
             entry.valueSats === undefined ? 'Value not loaded' : formatSats(entry.valueSats);
@@ -268,7 +295,7 @@ function FlowColumn({
           return (
             <div
               className={`wallet-flow-node ownership-${entry.ownership}${selected ? ' is-selected' : ''}`}
-              key={entry.id}
+              key={entry.id.startsWith('out:') ? entry.id : `${entry.id}:${index}`}
               title={[
                 role,
                 entry.id,
@@ -281,7 +308,16 @@ function FlowColumn({
                 .join(' · ')}
             >
               <div className="wallet-flow-node-heading">
-                <span className="wallet-flow-role">{role}</span>
+                <span className="wallet-flow-role">
+                  {entry.ownership === 'wallet' ? (
+                    <Wallet size={11} aria-hidden="true" />
+                  ) : entry.prevoutStatus === 'conflict' ? (
+                    <TriangleAlert size={11} aria-hidden="true" />
+                  ) : entry.ownership === 'unknown' && !entry.coinbase ? (
+                    <CircleHelp size={11} aria-hidden="true" />
+                  ) : null}
+                  {role}
+                </span>
                 <ShowOnGraph
                   id={entry.id}
                   kind={kind}
@@ -297,7 +333,8 @@ function FlowColumn({
               </div>
               {selected && (
                 <span className="wallet-flow-editing">
-                  Editing {editingAddress ? 'address' : kind}
+                  <Pencil size={10} aria-hidden="true" /> Editing{' '}
+                  {editingAddress ? 'address' : kind}
                 </span>
               )}
               {(primaryAnnotation?.label || primaryAnnotation?.icon) && (
@@ -329,10 +366,10 @@ function FlowColumn({
               ) : (
                 <AnnotationLine name="Address" annotation={addressAnnotation} />
               )}
-              {!entry.coinbase && (
+              {!entry.coinbase && creatingId !== displayedTransactionId && (
                 <AnnotationLine name="Creating transaction" annotation={creatingAnnotation} />
               )}
-              {!entry.coinbase && creatingId && (
+              {!entry.coinbase && creatingId && creatingId !== displayedTransactionId && (
                 <FlowTags
                   workspace={workspace}
                   node={{ id: `tx:${creatingId}`, kind: 'transaction', label: '' }}
@@ -354,18 +391,18 @@ function FlowColumn({
         })}
         {entries.length === 0 && <span className="small muted">No {title.toLowerCase()}</span>}
       </div>
-      {limit > 2 && visible.length < entries.length && (
+      {limit > 2 && hidden > 0 && (
         <div className="wallet-flow-more">
           {limit < MAX_VISIBLE ? (
             <button
               className="text-button"
               onClick={() => setLimit(Math.min(MAX_VISIBLE, limit + PAGE_SIZE))}
             >
-              Show {Math.min(PAGE_SIZE, entries.length - visible.length)} more
+              Show {Math.min(PAGE_SIZE, hidden)} more
             </button>
           ) : (
             <span>
-              Showing {visible.length} of {entries.length}. Open the transaction for more.
+              Showing {visible.length} of {total}. Open the transaction for more.
             </span>
           )}
         </div>

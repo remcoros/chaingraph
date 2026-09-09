@@ -12,6 +12,7 @@ import { useWalletFlowInputs } from '../lib/useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from './WalletReference';
 import { CopyButton } from './CopyButton';
+import { TransactionBlockTime } from './TransactionBlockTime';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import { WalletHelp } from './WalletHelp';
 import type { WalletWorkbenchProps } from './WalletWorkbench';
@@ -369,6 +370,14 @@ export function WalletItemDetail({
               <dt>Address</dt>
               <dd className="wallet-copy-value">
                 <WalletReference value={row.address} kind="address" length={14} />
+              </dd>
+            </div>
+          )}
+          {row.kind !== 'address' && row.txid && (
+            <div>
+              <dt>{row.kind === 'output' ? 'Creating transaction block' : 'Transaction block'}</dt>
+              <dd>
+                <TransactionBlockTime transaction={workspace.transactions[row.txid]} />
               </dd>
             </div>
           )}

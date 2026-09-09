@@ -1,3 +1,5 @@
+import { TransactionBlockTime } from './TransactionBlockTime';
+import { formatGmtTimestamp, walletRecordBlockObservation } from '../domain/transactionTime';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
@@ -80,7 +82,6 @@ export function WalletRecordsPanel({
           transaction: record.transaction,
           height: record.height,
           mempool: record.mempool,
-          time: record.time,
           utxo: undefined as WalletUtxoRecord | undefined,
         }))
       : [...(utxos?.records ?? [])]
@@ -94,7 +95,6 @@ export function WalletRecordsPanel({
             transaction: workspace.transactions[record.txid],
             height: record.height,
             mempool: record.height <= 0,
-            time: undefined as number | undefined,
             utxo: record,
           }));
   const filtered = rows.filter((row) => {
@@ -149,7 +149,7 @@ export function WalletRecordsPanel({
           {utxos && (
             <p className="small muted" title={utxos.checkedAt}>
               Checked {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
-              {new Date(utxos.checkedAt).toLocaleTimeString()}
+              {formatGmtTimestamp(Date.parse(utxos.checkedAt) / 1000)?.compact}
               {utxos.failed > 0 && ` · ${utxos.failed} failed; refresh to retry`}
             </p>
           )}
@@ -205,13 +205,14 @@ export function WalletRecordsPanel({
               </span>
               {annotation?.label && <span className="mono muted">{short(identifier, 12)}</span>}
               <span className="wallet-record-meta">
-                <span>
-                  {row.mempool
-                    ? 'Unconfirmed'
-                    : row.height
-                      ? `Block ${row.height.toLocaleString('en-US')}`
-                      : 'Height unknown'}
-                </span>
+                <TransactionBlockTime
+                  transaction={walletRecordBlockObservation(
+                    row.txid,
+                    row.transaction,
+                    row.height,
+                    row.mempool,
+                  )}
+                />
                 <span>
                   {row.utxo
                     ? formatSats(row.utxo.valueSats)
@@ -224,9 +225,6 @@ export function WalletRecordsPanel({
                 <span className="mono muted" title={row.utxo.address}>
                   {short(row.utxo.address, 12)}
                 </span>
-              )}
-              {row.time && (
-                <span className="muted">{new Date(row.time * 1000).toLocaleString()}</span>
               )}
             </button>
           );

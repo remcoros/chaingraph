@@ -1,0 +1,11 @@
+.transaction-block-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.transaction-block-time time {
+  overflow-wrap: anywhere;
+}
