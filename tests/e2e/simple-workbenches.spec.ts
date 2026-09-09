@@ -224,7 +224,7 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
     .locator('.scan-result-list button')
     .filter({ hasText: /6 equal/ })
     .click();
-  const evidence = analysis.getByRole('list', { name: 'Affected entities' });
+  const evidence = analysis.getByRole('list', { name: 'Related transactions and outputs' });
   await expect(evidence.getByRole('button', { name: /^Show output/ })).toHaveCount(6);
   await expect(evidence).toContainText('2,000,000,000');
   await screenshot(page, 'six-outputs-evidence-desktop');
@@ -255,7 +255,7 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   await expect.poll(async () => (await saved(page)).view.selectionId).toMatch(/^addr:/);
   await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
   await analysis
-    .getByRole('list', { name: 'Supporting transactions' })
+    .getByRole('list', { name: 'Related transactions and outputs' })
     .getByRole('button', { name: `Show transaction ${TX_SPENDING} on graph`, exact: true })
     .click();
   await expect.poll(async () => (await saved(page)).view.selectionId).toBe(`tx:${TX_SPENDING}`);

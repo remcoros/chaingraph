@@ -181,7 +181,7 @@ test('attached-data recovery preserves camera, annotations and Undo across cache
     .getByRole('button', { name: 'Load missing data and rerun', exact: true })
     .click();
   await expect(page.locator('.scan-notice').first()).toContainText('2 input details resolved');
-  await expect(page.locator('.scan-detail h2')).toContainText('Fee:');
+  await expect(page.locator('.scan-detail h2')).toContainText('Network fee:');
   expect(calls.map((call) => [call.method, ...call.params])).toEqual([
     ['getrawtransaction', TX_SPENDING, 2],
   ]);
@@ -228,7 +228,7 @@ test('partial success, cancellation and retry stay scoped and never add parent b
   state.mode = 'complete';
   await recover.click();
   await expect(page.locator('.scan-notice').first()).toContainText('Findings current');
-  await expect(page.locator('.scan-detail h2')).toContainText('Fee:');
+  await expect(page.locator('.scan-detail h2')).toContainText('Network fee:');
   const exported = await exportData(page);
   expect(Object.keys(exported.transactions)).toEqual([TX_SPENDING]);
   expect(exported.transactions[TX_SPENDING].vin.every((input) => !!input.prevout)).toBe(true);
@@ -255,7 +255,7 @@ test.describe('phone touch walkthrough', () => {
       .getByRole('article', { name: 'Selected finding' })
       .getByRole('button', { name: 'Load missing data and rerun', exact: true })
       .tap();
-    await expect(page.locator('.scan-detail h2')).toContainText('Fee:');
+    await expect(page.locator('.scan-detail h2')).toContainText('Network fee:');
     await page.screenshot({ path: `${shots}/after-phone-resolved.png` });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -327,7 +327,7 @@ test('Scan automatically resolves missing inputs and keeps the compact toolbar a
   const before = await exportData(page);
   await scan(page);
   await expect(page.locator('.scan-result-list')).not.toContainText('Fee unknown');
-  await page.locator('.scan-result-list > button').filter({ hasText: 'Fee:' }).click();
+  await page.locator('.scan-result-list > button').filter({ hasText: 'Network fee:' }).click();
   expect(calls.map((call) => [call.method, ...call.params])).toEqual([
     ['getrawtransaction', TX_SPENDING, 2],
   ]);
@@ -392,7 +392,7 @@ test.describe('automatic phone scan', () => {
   }) => {
     const { calls } = await prepare(page, false, false, true);
     await scan(page);
-    await page.locator('.scan-result-list > button').filter({ hasText: 'Fee:' }).tap();
+    await page.locator('.scan-result-list > button').filter({ hasText: 'Network fee:' }).tap();
     await page.getByRole('button', { name: /Finding types/ }).tap();
     await page
       .getByRole('dialog', { name: 'Analysis finding types' })

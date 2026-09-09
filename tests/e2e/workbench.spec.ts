@@ -305,7 +305,7 @@ test('renders a saved 150-input fixture and scans, excludes, restores and refres
   );
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   await expect(results.filter({ hasText: 'Needs rerun' })).toHaveCount(0);
-  await analysis.getByRole('button', { name: 'Clear all', exact: true }).click();
+  await analysis.getByRole('button', { name: 'Clear findings', exact: true }).click();
   await expect(results).toHaveCount(0);
 });
 
@@ -322,9 +322,9 @@ test('CIOH and address-reuse findings operate on loaded wallet history', async (
   await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   const results = analysis.locator('.scan-result-list > button');
-  await expect(results.filter({ hasText: 'Tentative input group' })).toHaveCount(1);
-  await expect(results.filter({ hasText: 'Address repeated on' })).toHaveCount(1);
-  await results.filter({ hasText: 'Tentative input group' }).click();
+  await expect(results.filter({ hasText: 'hypothesis' })).toHaveCount(1);
+  await expect(results.filter({ hasText: 'The same address appears' })).toHaveCount(1);
+  await results.filter({ hasText: 'hypothesis' }).click();
   await expect(analysis.locator('.scan-detail')).toContainText('PayJoin');
 });
 

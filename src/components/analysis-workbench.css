@@ -359,3 +359,33 @@
   margin-top: 12px;
   align-items: center;
 }
+
+.scan-guidance {
+  --guidance-color: #72ab42;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--guidance-color) 45%, var(--color-rule));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--guidance-color) 9%, var(--color-paper));
+  line-height: 1.6;
+}
+.scan-guidance.privacy {
+  --guidance-color: #c59035;
+}
+.scan-guidance.next-step {
+  --guidance-color: var(--color-muted);
+}
+.scan-guidance > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--guidance-color);
+}
+.scan-guidance strong {
+  font-size: 12px;
+}
+.scan-guidance p {
+  margin: 2px 0 0;
+}

@@ -45,9 +45,9 @@ it('compares available script bytes without unnecessary recovery requests or cha
   const report = tool.analyze(w);
   expect(report.findings).toHaveLength(1);
   expect(report.findings[0].kind).toBe('observation');
-  expect(report.findings[0].description).toContain('Known input types: P2WPKH');
-  expect(report.findings[0].description).toContain('Known output types: Taproot');
-  expect(report.findings[0].description).toContain('do not identify change');
+  expect(report.findings[0].details).toContain('Known input types: P2WPKH');
+  expect(report.findings[0].details).toContain('Known output types: Taproot');
+  expect(report.findings[0].details).toContain('do not identify change');
   expect(report.stats.find((stat) => stat.label === 'Unavailable input types')?.value).toBe(0);
   const fetch = vi.fn();
   await recoverAnalysisData(w, [txid], fetch, new AbortController().signal);

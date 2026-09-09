@@ -83,6 +83,15 @@ export const equalOutputTool = defineTool({
             `${outputs.length} spendable outputs share ${formatAmount(amount)}. Batching and collaborative transactions can both produce repeated amounts; this does not identify a CoinJoin. Compare the highlighted outputs with the remaining outputs and input history.`,
             outputs.map((output) => outputNodeId(tx.txid, output.n)),
             [tx.txid],
+            [tx.txid],
+            undefined,
+            {
+              summary: `${outputs.length} outputs have exactly the same amount. This can happen with repeated payments or collaborative transactions; equal amounts alone do not identify a CoinJoin.`,
+              guidance: {
+                kind: 'tip',
+                text: 'Matching amounts do not show which input funded which output. Compare the rest of the transaction before drawing conclusions about payments.',
+              },
+            },
           ),
         );
       }
@@ -209,7 +218,7 @@ export const ciohTool = defineTool({
     }
     const findings = [...groups.values()]
       .sort((a, b) => [...a.nodes].sort()[0].localeCompare([...b.nodes].sort()[0]))
-      .map((group, index) => {
+      .map((group) => {
         const nodeIds = [...group.nodes].sort(),
           txids = [...group.txids].sort();
         const unavailable = nodeIds.filter((id) => unavailableNodes.has(id)).length;
@@ -218,10 +227,24 @@ export const ciohTool = defineTool({
           'cioh',
           nodeIds.join('|'),
           'hypothesis',
-          `Tentative input group ${index + 1}: ${nodeIds.length} outputs`,
+          txids.length === 1
+            ? `${nodeIds.length} amounts spent together`
+            : `Possible connection across ${txids.length} transactions`,
           `${nodeIds.length} outputs are linked by co-spending across ${txids.length} transaction${txids.length === 1 ? '' : 's'}, including connections through shared addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were excluded.` : 'Equal-output exclusion was disabled.'} PayJoin and other collaborative transactions can still invalidate the assumption of shared ownership. ${unavailable ? `${unavailable} output${unavailable === 1 ? '' : 's'} in this group ${unavailable === 1 ? 'lacks' : 'lack'} usable previous-output details. ` : ''}Compare the supporting transactions and your labels before treating this as one wallet.`,
           nodeIds,
           txids,
+          txids,
+          undefined,
+          {
+            summary:
+              txids.length === 1
+                ? `${nodeIds.length} previously received amounts were spent together. Observers may assume they belong to one wallet, but CoinJoin and PayJoin can break that assumption.`
+                : `${txids.length} transactions connect these amounts through co-spending and shared addresses or scripts. This suggests a possible wallet connection, not proof of shared ownership.`,
+            guidance: {
+              kind: 'privacy',
+              text: 'If you want to keep different sources of bitcoin separate, combining them in one ordinary transaction creates a public connection. Labels and your wallet’s coin control can help you keep track.',
+            },
+          },
         );
       });
     return {
@@ -297,12 +320,30 @@ export const reuseTool = defineTool({
           'address-reuse',
           address,
           'observation',
-          `Address repeated on ${group.nodes.length} outputs`,
+          group.txids.size > 1
+            ? `The same address appears in ${group.txids.size} transactions`
+            : `The same address appears ${group.nodes.length} times in one transaction`,
           `${address} appears on ${group.nodes.length} outputs across ${group.txids.size} transaction${group.txids.size === 1 ? '' : 's'} in the scoped loaded history. ${group.txids.size === 1 ? 'These repeats occur within one transaction.' : 'The same address recurs in separate transactions.'} Outputs may already be spent; the occurrence count is not a balance. Inspect the linked outputs and label their context.`,
           group.nodes,
           [...group.txids],
           [...group.txids],
           group.txids.size > 1 ? 'repeated-address' : undefined,
+          {
+            summary:
+              group.txids.size > 1
+                ? 'Anyone viewing these transactions can see that they use the same address, making the activity easier to connect.'
+                : 'Several outputs use the same address within this transaction. This is not evidence of repeated receiving activity across separate transactions.',
+            guidance:
+              group.txids.size > 1
+                ? {
+                    kind: 'tip',
+                    text: 'When receiving bitcoin, use a fresh receiving address from your wallet for each payment. This reduces obvious links between payments.',
+                  }
+                : {
+                    kind: 'tip',
+                    text: 'Check the transaction’s purpose and your labels before treating these outputs as separate payments.',
+                  },
+          },
         ),
       );
     return {

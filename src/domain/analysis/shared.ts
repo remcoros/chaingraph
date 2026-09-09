@@ -160,6 +160,7 @@ export function finding(
   txids: string[],
   scopeTxids = txids,
   reviewRule?: AnalysisFinding['reviewRule'],
+  explanation?: { summary: string; guidance?: AnalysisFinding['guidance'] },
 ): AnalysisFinding {
   return {
     id: `${tool}:${stableKey(key)}`,
@@ -167,7 +168,8 @@ export function finding(
     ...(reviewRule ? { reviewRule } : {}),
     kind,
     title,
-    description,
+    description: explanation?.summary ?? description,
+    ...(explanation ? { details: description, guidance: explanation.guidance } : {}),
     nodeIds: [...new Set(nodeIds)],
     txids: [...new Set(txids)],
     scopeTxids: [...new Set(scopeTxids)],

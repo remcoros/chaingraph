@@ -110,6 +110,22 @@ export const walletTool = defineTool({
           ],
           [tx.txid],
           !overlap && inputWallets.size > 1 ? 'distinct-wallet-inputs' : undefined,
+          {
+            summary: overlap
+              ? 'Some of the same addresses or scripts are included in more than one imported wallet. These records may describe the same coins.'
+              : inputWallets.size > 1
+                ? 'This transaction spends coins matching different imported wallets. It connects those wallet records on the public blockchain, without identifying their owners.'
+                : 'Addresses or scripts from different imported wallets appear in this transaction. That alone does not tell us who paid whom.',
+            guidance: overlap
+              ? {
+                  kind: 'tip',
+                  text: 'Check whether you imported the same wallet, or part of it, more than once. Do not treat overlapping records as separate balances or people.',
+                }
+              : {
+                  kind: 'tip',
+                  text: 'Compare the wallet names and your labels to understand the connection. If the wallets represent separate sources, keep that context when reviewing future transfers.',
+                },
+          },
         ),
       );
     }

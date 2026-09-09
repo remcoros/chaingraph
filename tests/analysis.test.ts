@@ -67,7 +67,7 @@ describe('scoped analysis and honest evidence', () => {
       [3, 4, 5].map((n) => outputNodeId(tx.txid, n)),
     ]);
     expect(results.every((result) => result.kind === 'observation')).toBe(true);
-    expect(results[0].description).toContain('does not identify a CoinJoin');
+    expect(results[0].details).toContain('does not identify a CoinJoin');
     expect(
       tool('equal-outputs').run(workspace(tx), undefined, { minEqualOutputs: 4 }),
     ).toHaveLength(0);
@@ -81,7 +81,7 @@ describe('scoped analysis and honest evidence', () => {
     const enabled = tool('cioh').analyze(workspace(tx), undefined, { skipEqualOutputs: false });
     expect(enabled.findings).toHaveLength(1);
     expect(enabled.findings[0].kind).toBe('hypothesis');
-    expect(enabled.findings[0].description).toContain('PayJoin');
+    expect(enabled.findings[0].details).toContain('PayJoin');
     expect(stat(enabled, 'Missing previous-output details')).toBe(2);
   });
   it('joins known identical locking scripts across decoded and raw input representations', () => {
@@ -116,10 +116,10 @@ describe('scoped analysis and honest evidence', () => {
     const incomplete = transaction(11, [3, 4]);
     const report = tool('cioh').analyze(workspace(complete, incomplete));
     expect(report.findings).toHaveLength(2);
-    expect(report.findings.find((f) => f.txids.includes(complete.txid))?.description).not.toContain(
+    expect(report.findings.find((f) => f.txids.includes(complete.txid))?.details).not.toContain(
       'lack usable',
     );
-    expect(report.findings.find((f) => f.txids.includes(incomplete.txid))?.description).toContain(
+    expect(report.findings.find((f) => f.txids.includes(incomplete.txid))?.details).toContain(
       '2 outputs in this group lack usable previous-output details',
     );
     expect(stat(report, 'Missing previous-output details')).toBe(2);
@@ -148,7 +148,7 @@ describe('scoped analysis and honest evidence', () => {
     spend.vin[0].prevout = output(0, 1, addrA, 'pubkeyhash');
     const resolved = tool('script-types').run(w)[0];
     expect(resolved).toMatchObject({ id: partial.id, kind: 'observation' });
-    expect(resolved.description).not.toContain('unavailable');
+    expect(resolved.details).not.toContain('unavailable');
     spend.vin[0].prevout = output(0, 1);
     expect(tool('script-types').run(w)).toEqual([]);
   });
@@ -168,8 +168,8 @@ describe('scoped analysis and honest evidence', () => {
     const report = tool('value-flow').analyze(workspace(a, b, spend), [spend.txid]);
     expect(report.findings).toHaveLength(1);
     expect(report.emptyReason).toBeUndefined();
-    expect(report.findings[0].title).toBe('Fee: 1 sat');
-    expect(report.findings[0].description).toContain('0.01 sat/vB');
+    expect(report.findings[0].title).toBe('Network fee: 1 sat');
+    expect(report.findings[0].details).toContain('0.01 sat/vB');
     expect(report.findings[0].scopeTxids).toEqual([spend.txid]);
     expect(report.findings[0].txids).toEqual([spend.txid, a.txid, b.txid]);
   });
@@ -188,8 +188,8 @@ describe('scoped analysis and honest evidence', () => {
       },
     ];
     const report = tool('value-flow').analyze(workspace(spend), [spend.txid]);
-    expect(report.findings[0]).toMatchObject({ title: 'Fee: 1 sat', kind: 'observation' });
-    expect(report.findings[0].description).toContain('Known inputs total');
+    expect(report.findings[0]).toMatchObject({ title: 'Network fee: 1 sat', kind: 'observation' });
+    expect(report.findings[0].details).toContain('Known inputs total');
   });
   it('never calculates a fee from partial input history, even when known inputs exceed outputs', () => {
     const parent = transaction(1, [], [output(0, 1)]),
@@ -198,7 +198,7 @@ describe('scoped analysis and honest evidence', () => {
     expect(report.findings[0].kind).toBe('incomplete');
     expect(report.findings[0].title).toContain('Fee unknown');
     expect(report.findings[0].nodeIds).toEqual([outputNodeId(id(2), 0)]);
-    expect(report.findings[0].description).toContain('1/2 input values available');
+    expect(report.findings[0].details).toContain('1/2 input values available');
     expect(stat(report, 'Reconciled transactions')).toBe(0);
   });
   it('flags inconsistent totals, skips coinbase, and does not substitute byte size for vsize', () => {
@@ -216,8 +216,8 @@ describe('scoped analysis and honest evidence', () => {
     const result = tool('value-flow').run(workspace(parent, spend), [spend.txid], {
       feeMode: 'attention',
     })[0];
-    expect(result.title).toBe('Fee: 100,000 sats');
-    expect(result.description).toContain('Fee rate is unknown');
+    expect(result.title).toBe('Network fee: 100,000 sats');
+    expect(result.details).toContain('Fee rate is unknown');
   });
   it('filters fee reviews by a configurable threshold with inclusive equality', () => {
     const parent = transaction(1, [], [output(0, 0.01)]),
@@ -254,10 +254,7 @@ describe('scoped analysis and honest evidence', () => {
       tool('transaction-shapes')
         .run(w)
         .map((result) => result.title),
-    ).toEqual([
-      'Fan-out: 1 input, 5 spendable outputs',
-      'Consolidation-shaped: 5 inputs, 1 spendable output',
-    ]);
+    ).toEqual(['5 outputs created in one transaction', '5 amounts spent together']);
     expect(tool('transaction-shapes').run(w, undefined, { minInputs: 6, minOutputs: 6 })).toEqual(
       [],
     );
@@ -270,10 +267,10 @@ describe('scoped analysis and honest evidence', () => {
     expect(report.findings[0].title).toBe(
       'Known input and output script types differ (partial data)',
     );
-    expect(report.findings[0].description).toContain(
+    expect(report.findings[0].details).toContain(
       '1 input and 0 output types are unavailable or unrecognized',
     );
-    expect(report.findings[0].description).toContain('do not identify change');
+    expect(report.findings[0].details).toContain('do not identify change');
     expect(
       tool('script-types').run(workspace(a, spend), [spend.txid], { scriptMode: 'outputs' }),
     ).toEqual([]);
@@ -298,7 +295,7 @@ describe('scoped analysis and honest evidence', () => {
     w.wallets = [wallet(1, addrA, hash), wallet(2, addrA, hash)];
     const result = tool('wallet-intersections').run(w)[0];
     expect(result.title).toContain('overlapping coverage');
-    expect(result.description).toContain('not necessarily distinct participants');
+    expect(result.details).toContain('not necessarily distinct participants');
     expect(result.nodeIds).toEqual([outputNodeId(tx.txid, 0)]);
   });
   it('matches attached wallet inputs and avoids distinct-wallet priority for overlapping imports', () => {

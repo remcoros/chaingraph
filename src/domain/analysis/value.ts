@@ -80,6 +80,18 @@ export const valueFlowTool = defineTool({
             absent.length ? absent.map((input) => input.nodeId) : [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
+            undefined,
+            {
+              summary: absent.some((input) => input.resolution.status === 'conflict')
+                ? 'The stored input records disagree, so a reliable fee cannot be calculated.'
+                : 'Some input amounts are missing from this workspace. This does not mean anything is wrong with the transaction.',
+              guidance: {
+                kind: 'next-step',
+                text: absent.some((input) => input.resolution.status === 'conflict')
+                  ? 'Review the conflicting records before relying on a fee calculation. Loading more data will not replace conflicting evidence.'
+                  : 'Load the missing amounts and run the check again. If your node cannot provide them, the fee will remain unknown.',
+              },
+            },
           ),
         );
         continue;
@@ -106,6 +118,15 @@ export const valueFlowTool = defineTool({
             [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
+            undefined,
+            {
+              summary:
+                'Some amounts are invalid or missing, so this workspace cannot calculate a reliable fee.',
+              guidance: {
+                kind: 'next-step',
+                text: 'Review and refresh the affected transaction. This describes a problem with the available records, not proof of an invalid Bitcoin transaction.',
+              },
+            },
           ),
         );
         continue;
@@ -126,6 +147,15 @@ export const valueFlowTool = defineTool({
             [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
+            undefined,
+            {
+              summary:
+                'The stored records show more bitcoin leaving than entering the transaction. These amounts cannot support a valid fee calculation.',
+              guidance: {
+                kind: 'next-step',
+                text: 'Review the input amounts and refresh the affected records before relying on the totals.',
+              },
+            },
           ),
         );
         continue;
@@ -145,12 +175,31 @@ export const valueFlowTool = defineTool({
           'value-flow',
           tx.txid,
           'observation',
-          `${exceeds ? 'Fee threshold reached' : 'Fee'}: ${formatAmount(fee)}`,
+          `${exceeds ? 'Fee threshold reached' : 'Network fee'}: ${formatAmount(fee)}`,
           `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. The difference is the fee. ${rate === undefined ? 'Fee rate is unknown because virtual size is unavailable.' : `Fee rate: ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB (${tx.vsize} vB).`}${exceeds ? ` This meets your ${threshold} sat/vB review threshold; it does not establish overpayment at the time.` : ''}`,
           [txNodeId(tx.txid)],
           evidence,
           [tx.txid],
           exceeds ? 'fee-threshold' : undefined,
+          {
+            summary: [
+              fee > outputTotal
+                ? `The fee is larger than the ${formatAmount(outputTotal)} left after the fee. This can make small transfers relatively expensive.`
+                : `This transaction allocates ${formatAmount(fee)} to the network fee.`,
+              exceeds
+                ? `Its fee rate meets your ${threshold} sat/vB review threshold. Whether it was expensive depends on network demand when it was sent.`
+                : rate === undefined
+                  ? 'The fee rate cannot be calculated because transaction size is unavailable.'
+                  : `The fee rate is ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB, below your review threshold.`,
+            ].join(' '),
+            guidance: {
+              kind: 'tip',
+              text:
+                fee > outputTotal
+                  ? 'Fees depend on transaction size and the chosen fee rate. Before sending a small amount, check how much of your total cost will be fees.'
+                  : 'Compare your wallet’s fee options before sending. If the transfer can wait, a slower option may cost less.',
+            },
+          },
         ),
       );
     }
@@ -251,7 +300,9 @@ export const structureTool = defineTool({
           'transaction-shapes',
           tx.txid,
           'observation',
-          `${consolidation ? 'Consolidation-shaped' : 'Fan-out'}: ${inputCount} input${inputCount === 1 ? '' : 's'}, ${outputs.length} spendable output${outputs.length === 1 ? '' : 's'}`,
+          consolidation
+            ? `${inputCount} amounts spent together`
+            : `${outputs.length} outputs created in one transaction`,
           `${consolidation ? `At least ${minInputs} inputs and at most ${maxOutputs} spendable outputs, with more inputs than outputs.` : `At least ${minOutputs} spendable outputs and ${ratio} outputs per input.`} ${tx.vout.length - outputs.length} data outputs were omitted from the shape count. Batching, collaborative payments and other workflows can share this structure; the shape does not establish purpose or ownership. Inspect the input and output paths.`,
           [
             txNodeId(tx.txid),
@@ -261,6 +312,22 @@ export const structureTool = defineTool({
             ...outputs.map((output) => outputNodeId(tx.txid, output.n)),
           ],
           [tx.txid],
+          [tx.txid],
+          undefined,
+          {
+            summary: consolidation
+              ? `This transaction combines ${inputCount} previously received amounts into ${outputs.length} new output${outputs.length === 1 ? '' : 's'}. This shape is often used to gather smaller amounts together, but it does not prove they belong to one wallet.`
+              : `This transaction creates ${outputs.length} spendable outputs. It may combine several payments in one transaction; the output count does not tell us how many people were paid.`,
+            guidance: consolidation
+              ? {
+                  kind: 'privacy',
+                  text: 'Combining coins in one ordinary transaction creates a public connection between them. Use labels and your wallet’s coin control if you want to keep different sources separate.',
+                }
+              : {
+                  kind: 'tip',
+                  text: 'An output may be a payment or change returned to a wallet. Compare your wallet records and labels before treating each output as a separate recipient.',
+                },
+          },
         ),
       );
     }
@@ -383,6 +450,21 @@ export const scriptTool = defineTool({
               .map((input) => input.txid),
           ],
           [tx.txid],
+          undefined,
+          {
+            summary: partial
+              ? 'Some script types are missing, unrecognized or conflicting, so this comparison is incomplete. A script defines how an output can be spent.'
+              : 'This transaction uses different script types: the rules for spending its outputs. That can reflect different address formats and normal wallet behavior.',
+            guidance: partial
+              ? {
+                  kind: 'next-step',
+                  text: 'Load missing input data when available. If the script bytes are already present, this check may not recognize their type; another lookup will not help.',
+                }
+              : {
+                  kind: 'tip',
+                  text: 'A different address format does not identify a recipient or prove which output is change. Use your wallet records and labels to understand the transaction.',
+                },
+          },
         ),
       );
     }

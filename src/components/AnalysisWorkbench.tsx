@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Focus, Network, X, ChevronsUp, ChevronUp, Minus } from 'lucide-react';
+import {
+  Activity,
+  Focus,
+  Network,
+  X,
+  ChevronsUp,
+  ChevronUp,
+  Minus,
+  Lightbulb,
+  TriangleAlert,
+  Info,
+} from 'lucide-react';
 import { analysisTools } from '../domain/analysis';
 import {
   analysisScanScope,
@@ -49,6 +60,22 @@ function PriorityIcon({ priority }: { priority: ReviewPriority }) {
       aria-label={`${priority} review priority`}
       className={`scan-priority-icon ${priority}`}
     />
+  );
+}
+
+function FindingGuidance({ guidance }: { guidance: NonNullable<AnalysisFinding['guidance']> }) {
+  const Icon =
+    guidance.kind === 'tip' ? Lightbulb : guidance.kind === 'privacy' ? TriangleAlert : Info;
+  const label =
+    guidance.kind === 'tip' ? 'Tip' : guidance.kind === 'privacy' ? 'Privacy note' : 'Next step';
+  return (
+    <aside className={`scan-guidance ${guidance.kind}`} aria-label={label}>
+      <Icon size={18} aria-hidden="true" />
+      <div>
+        <strong>{label}</strong>
+        <p>{guidance.text}</p>
+      </div>
+    </aside>
   );
 }
 
@@ -307,7 +334,6 @@ export function AnalysisWorkbench({
   const detail = findings.find((finding) => finding.id === selectedId) ?? findings[0];
   const tool =
     detail && analysisTools.find((candidate) => detail.algorithm.startsWith(`${candidate.id}-`));
-  const report = tool && scan?.reports.find((item) => item.toolId === tool.id)?.report;
   async function run() {
     if (!active || pending.current) return;
     const controller = new AbortController();
@@ -784,6 +810,7 @@ export function AnalysisWorkbench({
               </span>
               <h2>{detail.title}</h2>
               <p>{detail.description}</p>
+              {detail.guidance && <FindingGuidance guidance={detail.guidance} />}
               {detailGaps.length > 0 && (
                 <div className="scan-recovery-detail">
                   <button
@@ -830,13 +857,11 @@ export function AnalysisWorkbench({
                   {detail.excluded ? 'Restore finding' : 'Exclude finding'}
                 </button>
               </div>
-              <h3>Evidence</h3>
-              <p className="muted">Select an item to inspect it on the graph.</p>
-              {detail.nodeIds.length > 0 && (
+              {(detail.nodeIds.length > 0 || detail.txids.length > 0) && (
                 <>
-                  <h4>Affected entities</h4>
-                  <ul className="scan-evidence" aria-label="Affected entities">
-                    {[...new Set(detail.nodeIds)].map((id) => (
+                  <h3>Related transactions and outputs</h3>
+                  <ul className="scan-evidence" aria-label="Related transactions and outputs">
+                    {[...new Set([...detail.nodeIds, ...detail.txids.map(txNodeId)])].map((id) => (
                       <EvidenceReference
                         key={id}
                         id={id}
@@ -848,33 +873,10 @@ export function AnalysisWorkbench({
                   </ul>
                 </>
               )}
-              {detail.txids.length > 0 && (
-                <>
-                  <h4>Supporting transactions</h4>
-                  <ul className="scan-evidence" aria-label="Supporting transactions">
-                    {[...new Set(detail.txids)].map((txid) => (
-                      <EvidenceReference
-                        key={txid}
-                        id={txNodeId(txid)}
-                        workspace={workspace}
-                        onGraph={onGraph}
-                        prevouts={prevouts}
-                      />
-                    ))}
-                  </ul>
-                </>
-              )}
-              {report && (
+              {detail.details && (
                 <details>
-                  <summary>Method coverage</summary>
-                  <dl>
-                    {report.stats.map((stat) => (
-                      <div key={stat.label}>
-                        <dt>{stat.label}</dt>
-                        <dd>{stat.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <summary>Details</summary>
+                  <p>{detail.details}</p>
                 </details>
               )}
               <details>

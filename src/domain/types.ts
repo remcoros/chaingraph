@@ -84,6 +84,8 @@ export interface AnalysisFinding {
   algorithm: string;
   title: string;
   description: string;
+  details?: string;
+  guidance?: { kind: 'tip' | 'privacy' | 'next-step'; text: string };
   nodeIds: string[];
   txids: string[];
   createdAt: string;

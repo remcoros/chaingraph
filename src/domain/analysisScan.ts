@@ -196,6 +196,9 @@ export function mergeScanFindings(
         old.reviewRule === finding.reviewRule &&
         old.title === finding.title &&
         old.description === finding.description &&
+        old.details === finding.details &&
+        old.guidance?.kind === finding.guidance?.kind &&
+        old.guidance?.text === finding.guidance?.text &&
         sameIds(old.nodeIds, finding.nodeIds) &&
         sameIds(old.txids, finding.txids)
         ? { ...finding, excluded: old.excluded }

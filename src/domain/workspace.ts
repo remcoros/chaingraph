@@ -234,6 +234,13 @@ const workspaceSchema = z.object({
         algorithm: z.string().max(100),
         title: z.string().max(200),
         description: text,
+        details: text.optional(),
+        guidance: z
+          .object({
+            kind: z.enum(['tip', 'privacy', 'next-step']),
+            text,
+          })
+          .optional(),
         nodeIds: z.array(z.string().max(200)).max(30000),
         txids: z.array(txid).max(10000),
         createdAt: timestamp,
