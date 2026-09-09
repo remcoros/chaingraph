@@ -31,7 +31,7 @@ export function useDialogFocus(onClose: () => void, fallbackFocusSelector?: stri
           ...el!.querySelectorAll<HTMLElement>(
             'button:not(:disabled),input:not(:disabled),select,textarea,a[href]',
           ),
-        ].filter((x) => x.offsetParent !== null);
+        ].filter((x) => x.offsetParent !== null && x.tabIndex >= 0);
         if (!items.length) return;
         const first = items[0],
           last = items[items.length - 1];
@@ -161,6 +161,7 @@ function PasswordField({
           className="icon-button"
           aria-label={`${visible ? 'Hide' : 'Show'} ${label === 'Confirm password' ? 'confirmation' : 'password'}`}
           aria-pressed={visible}
+          tabIndex={-1}
           title={`${visible ? 'Hide' : 'Show'} ${label === 'Confirm password' ? 'confirmation' : 'password'}`}
           disabled={disabled}
           onClick={() => setVisible((current) => !current)}
