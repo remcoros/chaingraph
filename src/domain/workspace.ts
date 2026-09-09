@@ -6,6 +6,7 @@ import { assertHiddenNodeBudget, hiddenNodeIdsSchema, parseHiddenNodeIds } from 
 import type { Workspace, Transaction, GraphData, GraphNode, Network } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
 import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
+import { assertWalletReviewBudget, walletReviewsSchema } from './walletReview';
 import {
   addressToScriptHash,
   inspectExtendedPublicKey,
@@ -202,6 +203,7 @@ const workspaceSchema = z.object({
     }),
   ),
   tags: workspaceTagsSchema.optional(),
+  walletReviews: walletReviewsSchema.optional(),
   findings: z
     .array(
       z.object({
@@ -257,7 +259,7 @@ const workspaceSchema = z.object({
       })
       .optional(),
     leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
-    workbench: z.enum(['graph', 'analysis', 'trace']).optional(),
+    workbench: z.enum(['graph', 'analysis', 'trace', 'wallet']).optional(),
     rightTab: z.enum(['inspect', 'analysis', 'addresses', 'transactions', 'utxos']).optional(),
     focusGraph: z.boolean().optional(),
     prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
@@ -297,6 +299,7 @@ export function assertWorkspaceBudget(data: unknown) {
     transactions?: unknown;
     wallets?: unknown;
     tags?: unknown;
+    walletReviews?: unknown;
     inputContext?: unknown;
     contextTransactionIds?: unknown;
   };
@@ -327,6 +330,7 @@ export function assertWorkspaceBudget(data: unknown) {
     }
   }
   assertTagBudget(raw.tags);
+  assertWalletReviewBudget((data as { walletReviews?: unknown }).walletReviews);
   const view = (data as { view?: unknown }).view;
   if (view && typeof view === 'object')
     assertHiddenNodeBudget((view as { hiddenNodeIds?: unknown }).hiddenNodeIds);

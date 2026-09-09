@@ -84,7 +84,45 @@ Choose an example on the welcome screen or under **Help and samples → Example 
 
 See [template sources and verification](docs/research/workspace-templates.md). Examples are real chain observations, not attributed wallets or proof of ownership. The former synthetic laboratory is no longer offered; existing saved synthetic workspaces remain readable with live lookups disabled.
 
-This branch enables two compact workbenches: **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Current selection** or **Loaded workspace** scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate selection**, beside **Lock to selection**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
+This branch enables three compact workbenches: **Wallet**, **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Current selection** or **Loaded workspace** scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate selection**, beside **Lock to selection**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
+
+### Review a wallet (experimental)
+
+**Wallet** works on one imported wallet at a time and reuses the existing import,
+scan and record code. A switcher moves between wallets. The coverage strip states
+the last check, partial discovery, used and discovered addresses, loaded versus
+known transactions, and the current UTXO count and balance from a verified check.
+There is no completeness percentage; when no UTXO check has run, the workbench
+says so and offers the action.
+
+**To review** is a queue derived from your own data, in priority order: current
+UTXOs, unlabelled receipts that were spent into them, activity found by a refresh,
+unknown counterparties, and grouping findings from your last analysis scan. Each
+item explains its reason and shows its evidence. Mark reviewed, **Reviewed, source
+unknown** or **Review later**; unknown is a valid, completed answer, and Reopen
+undoes a decision. Decisions are stored inside the encrypted workspace, so a
+refresh keeps them. Only an item whose underlying observations actually changed is
+flagged for another look, with the date of your earlier decision. A scan never
+resets the queue.
+
+**Records** lists this wallet's UTXOs, transactions and addresses with filters for
+text, labelled or unlabelled, reviewed or unreviewed, and tag, plus visible counts.
+Tick rows or use **Select N matching**, then label, tag or set an icon directly from
+the batch bar. Existing labels and icons are preserved unless you tick Replace, and
+the number of records that will change is shown first. Each batch is one autosaved
+step that a single Undo reverses. Filtering never widens a selection, and switching
+wallet or record kind clears it.
+
+Review items and rows carry **Show in Graph**, **Inspect** and **Analyze**, and both
+Graph and Analysis offer **Back to Wallet**. When the selected outputs carry
+different recorded sources, one sentence notes that combining them in an ordinary
+spend would publish that link. This is experimental local behaviour, not a release
+claim: there is no spend composer, coin selection, fee estimate, PSBT, signing,
+broadcast, exchange integration or privacy score. Grouping items are heuristic
+hypotheses with evidence, never proof of common ownership, and a personal label on
+a payment never claims who controls an address. See
+[proposal and limits](docs/experiments/wallet-review.md) and
+[sources](docs/research/2026-09-09-wallet-review.md).
 
 ## Renderer experiment
 

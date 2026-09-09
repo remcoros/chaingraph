@@ -67,6 +67,8 @@ import { setNodesHidden, showAllNodes } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
 import { AnalysisWorkbench, type AnalysisWorkbenchSession } from './components/AnalysisWorkbench';
+import { WalletWorkbench } from './components/WalletWorkbench';
+import { pruneWalletReviews } from './domain/walletReview';
 import './components/workbenches.css';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
@@ -97,6 +99,12 @@ import { MAX_ENCRYPTED_FILE_BYTES } from './lib/crypto';
 import { exportLabels, importLabels } from './lib/labels';
 import { useWorkspaces, type SavedWorkspace } from './lib/useWorkspaces';
 
+type WorkbenchMode = 'wallet' | 'graph' | 'analysis';
+const WORKBENCH_LABELS: Record<WorkbenchMode, string> = {
+  wallet: 'Wallet',
+  graph: 'Graph',
+  analysis: 'Analysis',
+};
 const ADDRESS_DISPLAY_NOTICE = 'This address is no longer hidden. Address nodes are switched off.';
 
 function download(name: string, content: string, type = 'application/json') {
@@ -188,38 +196,53 @@ export default function App() {
       if (!unlocked.has(id)) analysisSessions.current.delete(id);
   }, [ws.sessions]);
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
-  const [workbench, setWorkbench] = useState<'graph' | 'analysis'>('graph');
-  const [returnWorkbench, setReturnWorkbench] = useState<'analysis'>();
+  const [workbench, setWorkbench] = useState<WorkbenchMode>('graph');
+  const [returnWorkbench, setReturnWorkbench] = useState<WorkbenchMode>();
   const graphWorkspaceRef = useRef<HTMLElement>(null);
   const analysisWorkspaceRef = useRef<HTMLElement>(null);
-  const analysisInvoker = useRef<{ workspaceId: string; element: HTMLElement } | undefined>(
-    undefined,
-  );
+  const walletWorkspaceRef = useRef<HTMLElement>(null);
+  // The control that started a handoff, per originating workbench.
+  const workbenchInvokers = useRef<
+    Partial<Record<'analysis' | 'wallet', { workspaceId: string; element: HTMLElement }>>
+  >({});
   const pendingWorkbenchFocus = useRef<
-    { workspaceId: string; mode: 'graph' | 'analysis' } | undefined
+    { workspaceId: string; mode: WorkbenchMode; destination?: 'inspector' } | undefined
   >(undefined);
+  const rightPanelRef = useRef<HTMLElement>(null);
+  const workbenchSection = (mode: WorkbenchMode) =>
+    mode === 'graph'
+      ? graphWorkspaceRef.current
+      : mode === 'analysis'
+        ? analysisWorkspaceRef.current
+        : walletWorkspaceRef.current;
   // Transfer focus only for explicit cross-workbench actions, never during graph gestures.
   useLayoutEffect(() => {
     const pending = pendingWorkbenchFocus.current;
     pendingWorkbenchFocus.current = undefined;
     if (!pending || pending.workspaceId !== w?.id || pending.mode !== workbench) return;
     if (workbench === 'graph') {
-      const destination = graphWorkspaceRef.current?.querySelector<HTMLElement>(
-        '.graph-canvas:not([aria-hidden="true"]) canvas',
-      );
-      (destination ?? graphWorkspaceRef.current)?.focus({ preventScroll: true });
+      // A handoff that reveals the Inspector must land there; the canvas can be
+      // hidden behind the mobile panel switch and would drop focus to the body.
+      const destination =
+        pending.destination === 'inspector'
+          ? (rightPanelRef.current ?? graphWorkspaceRef.current)
+          : (graphWorkspaceRef.current?.querySelector<HTMLElement>(
+              '.graph-canvas:not([aria-hidden="true"]) canvas',
+            ) ?? graphWorkspaceRef.current);
+      destination?.focus({ preventScroll: true });
     } else {
-      const invoker = analysisInvoker.current;
+      const section = workbenchSection(workbench);
+      const invoker = workbenchInvokers.current[workbench];
       const element = invoker?.element;
       if (
         invoker?.workspaceId === w?.id &&
         element?.isConnected &&
-        analysisWorkspaceRef.current?.contains(element) &&
+        section?.contains(element) &&
         !element.matches(':disabled') &&
         element.getClientRects().length
       )
         element.focus();
-      else analysisWorkspaceRef.current?.focus();
+      else section?.focus();
     }
   }, [w?.id, workbench]);
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
@@ -573,16 +596,23 @@ export default function App() {
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
-    setSelectedWallet(w?.view.selectedWallet);
+    setSelectedWallet(
+      w?.view.selectedWallet && w.wallets.some((item) => item.id === w.view.selectedWallet)
+        ? w.view.selectedWallet
+        : w?.wallets[0]?.id,
+    );
     setLeftTab(w?.view.leftTab ?? 'wallets');
     setRightTab(w?.view.rightTab === 'analysis' ? 'inspect' : (w?.view.rightTab ?? 'inspect'));
     setWorkbench(
-      w?.view.workbench === 'analysis' || (!w?.view.workbench && w?.view.rightTab === 'analysis')
-        ? 'analysis'
-        : 'graph',
+      w?.view.workbench === 'wallet' && w.wallets.length
+        ? 'wallet'
+        : w?.view.workbench === 'analysis' ||
+            (!w?.view.workbench && w?.view.rightTab === 'analysis')
+          ? 'analysis'
+          : 'graph',
     );
     setReturnWorkbench(undefined);
-    analysisInvoker.current = undefined;
+    workbenchInvokers.current = {};
     pendingWorkbenchFocus.current = undefined;
     setLockingWorkspace(false);
     setMobilePanel(w?.view.mobilePanel ?? 'graph');
@@ -846,11 +876,16 @@ export default function App() {
     );
     return accepted;
   };
-  function selectWalletRecord(nodeId: string, utxo?: WalletUtxoRecord) {
+  function selectWalletRecord(
+    nodeId: string,
+    utxo?: WalletUtxoRecord,
+    options: { tab?: NonNullable<Workspace['view']['rightTab']>; center?: boolean } = {},
+  ) {
     if (!w || !wallet) return;
     const ownerId = w.id;
     const walletId = wallet.id;
-    const tab = shownRightTab;
+    const tab = options.tab ?? shownRightTab;
+    const center = options.center ?? true;
     if (nodeId.startsWith('addr:')) {
       const address = nodeId.slice(5);
       if (!verifiedWalletAddresses(wallet, w.network).some((item) => item.address === address))
@@ -871,7 +906,7 @@ export default function App() {
       select(nodeId);
       setRightTab(tab);
       setGraphFilters({});
-      setFocusRequest({ id: nodeId, token: Date.now() });
+      if (center) setFocusRequest({ id: nodeId, token: Date.now() });
       return;
     }
     const transactionId = nodeId.split(':')[1];
@@ -897,8 +932,35 @@ export default function App() {
       select(nodeId);
       setRightTab(tab);
       setGraphFilters({});
-      setFocusRequest({ id: nodeId, token: Date.now() });
+      if (center) setFocusRequest({ id: nodeId, token: Date.now() });
     });
+  }
+
+  /** Wallet review keeps its context: Graph and Analysis both offer a way back. */
+  function openWalletRecord(
+    nodeId: string,
+    utxo?: WalletUtxoRecord,
+    mode: 'graph' | 'inspect' = 'graph',
+  ) {
+    recordHandoffInvoker('wallet');
+    setReturnWorkbench('wallet');
+    switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
+    setMobilePanel(mode === 'graph' ? 'graph' : 'right');
+    selectWalletRecord(nodeId, utxo, { tab: 'inspect', center: mode === 'graph' });
+  }
+  function analyzeFromWallet(nodeId?: string) {
+    recordHandoffInvoker('wallet');
+    setReturnWorkbench('wallet');
+    const node = nodeId ? recoveryGraph.nodes.find((item) => item.id === nodeId) : undefined;
+    if (node) select(node.id);
+    else {
+      setSelectedId(undefined);
+      if (nodeId)
+        setNotice(
+          'This record is not loaded yet, so the scan uses the selected wallet. Open it in Graph to scan it directly.',
+        );
+    }
+    switchWorkbench('analysis', true);
   }
   async function search(e: FormEvent) {
     e.preventDefault();
@@ -1288,9 +1350,9 @@ export default function App() {
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
-  function switchWorkbench(next: 'graph' | 'analysis', handoffFocus = false) {
+  function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {
     pendingWorkbenchFocus.current =
-      handoffFocus && w ? { workspaceId: w.id, mode: next } : undefined;
+      handoffFocus && w ? { workspaceId: w.id, mode: next, destination } : undefined;
     flushActiveGraph();
     setWorkbench(next);
   }
@@ -1316,12 +1378,18 @@ export default function App() {
       false,
     );
   }
-  function showFindingOnGraph(ids: string[], isolate = false) {
+  /** Remember the control that started a handoff so the return restores focus. */
+  function recordHandoffInvoker(origin: 'analysis' | 'wallet') {
     const invoker = document.activeElement;
-    analysisInvoker.current =
-      w && invoker instanceof HTMLElement && analysisWorkspaceRef.current?.contains(invoker)
+    const section =
+      origin === 'analysis' ? analysisWorkspaceRef.current : walletWorkspaceRef.current;
+    workbenchInvokers.current[origin] =
+      w && invoker instanceof HTMLElement && section?.contains(invoker)
         ? { workspaceId: w.id, element: invoker }
         : undefined;
+  }
+  function showFindingOnGraph(ids: string[], isolate = false) {
+    recordHandoffInvoker('analysis');
     setReturnWorkbench('analysis');
     switchWorkbench('graph', true);
     const id = ids.find((candidate) => !hiddenIds.has(candidate)) ?? ids[0];
@@ -1583,24 +1651,30 @@ export default function App() {
       ) : (
         <>
           <nav className="workbench-nav" aria-label="Workbench">
-            {(['graph', 'analysis'] as const).map((mode) => (
+            {(['wallet', 'graph', 'analysis'] as const).map((mode) => (
               <button
                 key={mode}
                 aria-pressed={workbench === mode}
                 className={workbench === mode ? 'active' : ''}
                 onClick={() => switchWorkbench(mode)}
               >
-                {mode === 'graph' ? <GitBranch size={15} /> : <Search size={15} />}
-                {mode === 'graph' ? 'Graph' : 'Analysis'}
+                {mode === 'wallet' ? (
+                  <WalletIcon size={15} />
+                ) : mode === 'graph' ? (
+                  <GitBranch size={15} />
+                ) : (
+                  <Search size={15} />
+                )}
+                {WORKBENCH_LABELS[mode]}
               </button>
             ))}
-            {workbench === 'graph' && returnWorkbench && (
+            {returnWorkbench && returnWorkbench !== workbench && (
               <button
                 className="workbench-return"
                 onClick={() => switchWorkbench(returnWorkbench, true)}
               >
                 <ArrowLeft size={14} />
-                Back to Analysis
+                Back to {WORKBENCH_LABELS[returnWorkbench]}
               </button>
             )}
           </nav>
@@ -2058,7 +2132,12 @@ export default function App() {
                 </div>
               </div>
             </section>
-            <aside className="right-panel" data-tour="analysis-panel">
+            <aside
+              className="right-panel"
+              ref={rightPanelRef}
+              tabIndex={-1}
+              data-tour="analysis-panel"
+            >
               <div className={`panel-tabs ${wallet ? 'has-wallet-tabs' : ''}`}>
                 <button
                   className={shownRightTab === 'inspect' ? 'active' : ''}
@@ -2128,10 +2207,12 @@ export default function App() {
                       setMobilePanel('graph');
                     }}
                     onRemove={() => {
-                      change((c) => ({
-                        ...c,
-                        wallets: c.wallets.filter((x) => x.id !== wallet.id),
-                      }));
+                      change((c) =>
+                        pruneWalletReviews({
+                          ...c,
+                          wallets: c.wallets.filter((x) => x.id !== wallet.id),
+                        }),
+                      );
                       setSelectedWallet(undefined);
                     }}
                   />
@@ -2217,6 +2298,36 @@ export default function App() {
               </div>
             </aside>
           </main>
+          <section
+            className="workbench-page"
+            hidden={workbench !== 'wallet' || !!tourStep}
+            ref={walletWorkspaceRef}
+            id="wallet-workspace"
+            tabIndex={-1}
+            aria-label="Wallet workspace"
+          >
+            <WalletWorkbench
+              active={workbench === 'wallet' && !lockingWorkspace && !tourStep}
+              workspace={w}
+              wallet={wallet ?? w.wallets[0]}
+              canQuery={canQuery}
+              busy={!!operation}
+              queryDisabledReason={queryDisabledReason}
+              onSelectWallet={(id) => {
+                selectionGeneration.current++;
+                operationRef.current?.abort();
+                setSelectedWallet(id);
+                setSelectedId(undefined);
+                setRightTab('inspect');
+              }}
+              onAddWallet={() => setWalletDialog(true)}
+              onChange={(update) => change(update)}
+              onRefresh={() => void scan(wallet ?? w.wallets[0])}
+              onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
+              onInspect={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'inspect')}
+              onAnalyze={analyzeFromWallet}
+            />
+          </section>
           <section
             className="workbench-page"
             hidden={workbench !== 'analysis' || !!tourStep}

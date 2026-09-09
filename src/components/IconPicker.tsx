@@ -58,10 +58,12 @@ const icons = [
 interface Props {
   value: string;
   openToken?: number;
+  /** Overrides the field name when the picker edits more than one record. */
+  fieldLabel?: string;
   onOpenHandled?: () => void;
   onChange: (value: string) => void;
 }
-export function IconPicker({ value, onChange, openToken, onOpenHandled }: Props) {
+export function IconPicker({ value, onChange, openToken, onOpenHandled, fieldLabel }: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -73,15 +75,16 @@ export function IconPicker({ value, onChange, openToken, onOpenHandled }: Props)
   const id = useId();
   const label =
     icons.find(([symbol]) => symbol === value)?.[1] ?? (value ? 'Imported icon' : 'None');
+  const field = fieldLabel ?? 'Icon';
   return (
     <div className="icon-picker">
-      <span className="icon-picker-label">Icon</span>
+      <span className="icon-picker-label">{field}</span>
       <button
         ref={trigger}
         type="button"
         className="icon-picker-trigger"
-        aria-label={`Node icon: ${label}`}
-        title={`Node icon: ${label}`}
+        aria-label={fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`}
+        title={fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
