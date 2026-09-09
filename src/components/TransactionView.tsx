@@ -17,6 +17,7 @@ import {
 } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
 import { indexLoadedSpends, selectedFlowLeg } from '../domain/transactionFlow';
+import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
 import { decodeOpReturn } from '../domain/opReturn';
 import { outputAddress } from '../domain/workspace';
 import { CopyButton } from './CopyButton';
@@ -83,6 +84,7 @@ function TransactionRows({
   next: ReactNode;
 }) {
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
+  const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const flow = useRef<HTMLDivElement>(null);
   const selectedRow = useRef<HTMLDivElement>(null);
   const [localInputs, setLocalInputs] = useState(false);
@@ -180,13 +182,19 @@ function TransactionRows({
     inputLoading,
     inputError,
   ]);
-  const inputRows: Row[] = tx.vin.map((input, index) => ({
-    id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
-    index,
-    output: input.txid ? workspace.transactions[input.txid]?.vout[input.vout!] : undefined,
-    previousTxid: input.txid,
-    coinbase: input.coinbase !== undefined,
-  }));
+  const inputRows: Row[] = tx.vin.map((input, index) => {
+    const resolution = resolvePreviousOutput(workspace, input, previousOutputs);
+    return {
+      id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
+      index,
+      output:
+        resolution.status === 'loaded' || resolution.status === 'attached'
+          ? resolution.output
+          : undefined,
+      previousTxid: input.txid,
+      coinbase: input.coinbase !== undefined,
+    };
+  });
   const outputRows: Row[] = tx.vout.map((output) => ({
     id: outputNodeId(tx.txid, output.n),
     index: output.n,
@@ -564,11 +572,11 @@ export function TransactionView(props: Props) {
               disabled={!!disabledReason || inputLoading}
               title={
                 disabledReason ||
-                `Fetch ${props.missingInputCount} missing input transactions. Up to 500 per action; other branches are not followed.`
+                `Fetch up to ${props.missingInputCount} parent transactions for missing input details. Up to 500 per action; other branches are not followed.`
               }
               onClick={props.onLoadAllInputs}
             >
-              Load all input details ({props.missingInputCount})
+              Load missing input details ({props.missingInputCount})
             </button>
           )}
         </div>

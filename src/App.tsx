@@ -93,6 +93,7 @@ import {
   promoteInputContext,
   outputAddress,
 } from './domain/workspace';
+import { mergeTransactionObservations } from './domain/prevouts';
 import { filterSmallAmounts, omitAmountOrphans } from './domain/smallAmounts';
 import {
   outputNodeId,
@@ -914,7 +915,14 @@ export default function App() {
               transactions: {
                 ...current.transactions,
                 ...Object.fromEntries(
-                  transactions.map((transaction) => [transaction.txid, transaction]),
+                  transactions.map((transaction) => [
+                    transaction.txid,
+                    mergeTransactionObservations(
+                      current.transactions[transaction.txid],
+                      transaction,
+                      current.network,
+                    ),
+                  ]),
                 ),
               },
             };
@@ -1116,7 +1124,12 @@ export default function App() {
             watchedAddresses: [...new Set([...c.watchedAddresses, text])],
             transactions: {
               ...c.transactions,
-              ...Object.fromEntries(result.transactions.map((t) => [t.txid, t])),
+              ...Object.fromEntries(
+                result.transactions.map((t) => [
+                  t.txid,
+                  mergeTransactionObservations(c.transactions[t.txid], t, c.network),
+                ]),
+              ),
             },
           }),
           false,
@@ -1356,7 +1369,16 @@ export default function App() {
             ...clearContextProvenance(snapshot, result.observedTransactionIds),
             transactions: {
               ...snapshot.transactions,
-              ...Object.fromEntries(result.transactions.map((tx) => [tx.txid, tx])),
+              ...Object.fromEntries(
+                result.transactions.map((tx) => [
+                  tx.txid,
+                  mergeTransactionObservations(
+                    snapshot.transactions[tx.txid],
+                    tx,
+                    snapshot.network,
+                  ),
+                ]),
+              ),
             },
           };
           partial ||= result.truncated;

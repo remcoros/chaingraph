@@ -1,5 +1,6 @@
 import type { Transaction, Wallet, Workspace } from './types';
 import { clearContextProvenance } from './workspace';
+import { mergeTransactionObservations } from './prevouts';
 
 /** Immutable wallet evidence used by analyses, excluding refresh/UI bookkeeping. */
 export function walletEvidenceChanged(previous: Wallet[], next: Wallet[]): boolean {
@@ -29,12 +30,13 @@ export function applyWalletScan(
   let mergedTransactions = current.transactions;
   for (const transaction of transactions) {
     const previous = current.transactions[transaction.txid];
+    const merged = mergeTransactionObservations(previous, transaction, current.network);
     // Parsed transaction records are plain JSON. Include every field so future
     // script/raw metadata changes cannot accidentally keep an old finding valid.
-    if (previous && JSON.stringify(previous) === JSON.stringify(transaction)) continue;
+    if (previous && JSON.stringify(previous) === JSON.stringify(merged)) continue;
     if (mergedTransactions === current.transactions)
       mergedTransactions = { ...current.transactions };
-    mergedTransactions[transaction.txid] = transaction;
+    mergedTransactions[transaction.txid] = merged;
   }
   // Quiet checks may reuse confirmed transactions without returning downloads.
   // Promote only records observed in this wallet's histories, never unrelated parents.

@@ -4,6 +4,7 @@ import { fetchHistory, fetchTransaction } from '../lib/api';
 import { addressToScriptHash } from '../lib/wallet';
 import { fetchCurrentUtxo, type UtxoObservation } from '../lib/utxoStatus';
 import { outputAddress } from './workspace';
+import { indexPreviousOutputs, resolvePreviousOutput } from './prevouts';
 import { outputNodeId, sats, type GraphNode, type Transaction, type Workspace } from './types';
 
 export const TRACE_CANDIDATE_LIMIT = 12;
@@ -88,9 +89,15 @@ export async function searchTraceSpenders(
   signal: AbortSignal,
 ): Promise<TraceSearchResult> {
   signal.throwIfAborted();
-  const tx = workspace.transactions[point.txid];
-  const output = tx?.vout.find((item) => item.n === point.vout);
-  if (!output) throw new Error('Load the creating transaction before searching for a spender.');
+  const resolution = resolvePreviousOutput(workspace, point, indexPreviousOutputs(workspace));
+  const output =
+    resolution.status === 'loaded' || resolution.status === 'attached'
+      ? resolution.output
+      : undefined;
+  if (!output)
+    throw new Error(
+      'Previous-output details are unavailable. Load the creating transaction first.',
+    );
   const result: TraceSearchResult = {
     transactions: [],
     inspected: 0,

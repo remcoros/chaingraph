@@ -328,10 +328,9 @@ export default function GraphView(props: GraphViewProps) {
 
   const hoveredNode = hover ? props.nodes.find((node) => node.id === hover.id) : undefined;
   const transaction = hoveredNode?.txid ? props.transactions?.[hoveredNode.txid] : undefined;
-  const missingFunding =
+  const missingCreatingTransaction =
     hoveredNode?.kind === 'output' &&
-    (hoveredNode.value === undefined ||
-      Boolean(props.transactions && hoveredNode.txid && !transaction));
+    Boolean(props.transactions && hoveredNode.txid && !transaction);
   const loadedSpendingCount =
     hoveredNode?.kind === 'output'
       ? Object.values(props.transactions ?? {}).reduce(
@@ -569,12 +568,15 @@ export default function GraphView(props: GraphViewProps) {
                 </div>
               )}
             </dl>
-            {missingFunding && (
+            {missingCreatingTransaction && (
               <p className="graph-card-explanation graph-card-missing">
-                Funding transaction is not loaded. Value and address may be unknown.
+                Creating transaction is not loaded.
+                {hoveredNode.value === undefined
+                  ? ' Value and script details are unavailable.'
+                  : ' Output details are attached to loaded spending evidence.'}
               </p>
             )}
-            {hoveredNode.kind === 'output' && !missingFunding && (
+            {hoveredNode.kind === 'output' && (
               <p className="graph-card-explanation">
                 {loadedSpendingCount
                   ? `${loadedSpendingCount} spending transaction${loadedSpendingCount === 1 ? '' : 's'} loaded.`

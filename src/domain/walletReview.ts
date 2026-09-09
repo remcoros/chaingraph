@@ -12,8 +12,7 @@ import {
   type Wallet,
   type Workspace,
 } from './types';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import {
@@ -24,6 +23,7 @@ import {
   type WalletRelationship,
   type WalletRelationshipContext,
 } from './walletRelationships';
+import { indexPreviousOutputs, outputScriptHash } from './prevouts';
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const REVIEW_REASONS = [
@@ -197,17 +197,6 @@ function outputAddress(output: TxOutput, network: Workspace['network']): string 
   }
 }
 
-function outputScriptHash(output: TxOutput, network: Workspace['network']): string | undefined {
-  try {
-    if (output.scriptPubKey.hex !== undefined)
-      return bytesToHex(sha256(hexToBytes(output.scriptPubKey.hex)).reverse());
-    const address = outputAddress(output, network);
-    return address ? addressToScriptHash(address, network) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 interface OwnedOutput {
   nodeId: string;
   txid: string;
@@ -225,19 +214,20 @@ export function walletOwnedOutputs(workspace: Workspace, wallet: Wallet): Map<st
   );
   const owned = new Map<string, OwnedOutput>();
   if (!hashes.size) return owned;
-  for (const [txid, transaction] of loadedWalletTransactions(workspace))
-    for (const output of transaction.vout) {
-      if (!validOutputIndex(output.n)) continue;
-      if (!hashes.has(outputScriptHash(output, workspace.network) ?? '')) continue;
-      const nodeId = outputNodeId(txid, output.n);
-      owned.set(nodeId, {
-        nodeId,
-        txid,
-        vout: output.n,
-        valueSats: Math.round(output.value * 100_000_000),
-        address: outputAddress(output, workspace.network),
-      });
-    }
+  for (const [nodeId, resolution] of indexPreviousOutputs(workspace)) {
+    if (resolution.status !== 'loaded' && resolution.status !== 'attached') continue;
+    if (!hashes.has(outputScriptHash(resolution.output, workspace.network) ?? '')) continue;
+    const match = /^out:([0-9a-f]{64}):(\d+)$/.exec(nodeId);
+    const vout = match ? Number(match[2]) : undefined;
+    if (!match || !validOutputIndex(vout)) continue;
+    owned.set(nodeId, {
+      nodeId,
+      txid: match[1],
+      vout,
+      valueSats: Math.round(resolution.output.value * 100_000_000),
+      address: outputAddress(resolution.output, workspace.network),
+    });
+  }
   return owned;
 }
 

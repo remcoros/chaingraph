@@ -7,6 +7,7 @@ import type { Workspace, Transaction, GraphData, GraphNode, Network } from './ty
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
 import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
 import { assertWalletReviewBudget, walletReviewsSchema } from './walletReview';
+import { indexPreviousOutputs } from './prevouts';
 import {
   addressToScriptHash,
   inspectExtendedPublicKey,
@@ -21,43 +22,57 @@ const uint32 = z.number().int().min(0).max(0xffffffff);
 const derivationIndex = z.number().int().min(0).max(0x7fffffff);
 const height = z.number().int().min(-1).max(0x7fffffff);
 const timestamp = z.iso.datetime({ offset: true });
+const valueSchema = z
+  .number()
+  .min(0)
+  .max(MAX_MONEY)
+  .refine(
+    // Check decimal precision before multiplying: large valid BTC values can
+    // acquire a fractional binary rounding residue when scaled to satoshis.
+    (value) =>
+      Math.abs(value - Number(value.toFixed(8))) <= Number.EPSILON * Math.max(1, Math.abs(value)),
+    'Output values must have whole-satoshi precision.',
+  );
+const scriptPubKeySchema = z.object({
+  hex: z
+    .string()
+    .max(20000)
+    .regex(/^(?:[0-9a-fA-F]{2})*$/)
+    .optional(),
+  address: z.string().min(1).max(150).optional(),
+  addresses: z.array(z.string().min(1).max(150)).max(20).optional(),
+  type: text.optional(),
+});
+const outputDetailsSchema = z.object({
+  value: valueSchema,
+  scriptPubKey: scriptPubKeySchema,
+});
 const inputSchema = z
   .object({
     txid: txid.optional(),
     vout: uint32.optional(),
     coinbase: text.min(1).optional(),
     sequence: uint32.optional(),
+    prevout: outputDetailsSchema
+      .extend({
+        scriptPubKey: scriptPubKeySchema.extend({
+          hex: z
+            .string()
+            .max(20000)
+            .regex(/^(?:[0-9a-fA-F]{2})*$/),
+        }),
+      })
+      .optional(),
   })
   .refine(
     (input) =>
       input.coinbase !== undefined
-        ? input.txid === undefined && input.vout === undefined
+        ? input.txid === undefined && input.vout === undefined && input.prevout === undefined
         : input.txid !== undefined && input.vout !== undefined,
     'An input must contain either coinbase data or a complete transaction outpoint.',
   );
-const outputSchema = z.object({
+const outputSchema = outputDetailsSchema.extend({
   n: uint32,
-  value: z
-    .number()
-    .min(0)
-    .max(MAX_MONEY)
-    .refine(
-      // Check decimal precision before multiplying: large valid BTC values can
-      // acquire a fractional binary rounding residue when scaled to satoshis.
-      (value) =>
-        Math.abs(value - Number(value.toFixed(8))) <= Number.EPSILON * Math.max(1, Math.abs(value)),
-      'Output values must have whole-satoshi precision.',
-    ),
-  scriptPubKey: z.object({
-    hex: z
-      .string()
-      .max(20000)
-      .regex(/^(?:[0-9a-fA-F]{2})*$/)
-      .optional(),
-    address: z.string().min(1).max(150).optional(),
-    addresses: z.array(z.string().min(1).max(150)).max(20).optional(),
-    type: text.optional(),
-  }),
 });
 const transactionSchema = z
   .object({
@@ -106,6 +121,7 @@ const transactionSchema = z
       });
     }
     const inputs = new Set<string>();
+    let inputTotal = 0;
     for (const [index, input] of transaction.vin.entries()) {
       if (input.txid === undefined) continue;
       const key = `${input.txid}:${input.vout}`;
@@ -116,7 +132,14 @@ const transactionSchema = z
           message: 'Duplicate input outpoint.',
         });
       inputs.add(key);
+      if (input.prevout) inputTotal += sats(input.prevout.value);
     }
+    if (inputTotal > MAX_MONEY_SATS)
+      context.addIssue({
+        code: 'custom',
+        path: ['vin'],
+        message: 'Transaction previous-output total exceeds the Bitcoin money limit.',
+      });
     let total = 0;
     for (const [index, output] of transaction.vout.entries()) {
       if (output.n !== index)
@@ -379,7 +402,13 @@ export function assertWorkspaceBudget(data: unknown) {
 
 /** Validate decoded metadata without treating network-neutral transaction bytes as chain proof. */
 export function validateTransactionAddresses(transaction: Transaction, network: Network): void {
-  for (const output of transaction.vout) {
+  const outputs = [
+    ...transaction.vout,
+    ...transaction.vin.flatMap((input) =>
+      input.prevout && input.vout !== undefined ? [{ n: input.vout, ...input.prevout }] : [],
+    ),
+  ];
+  for (const output of outputs) {
     const { address, addresses, hex } = output.scriptPubKey;
     const reported = [...new Set([...(address ? [address] : []), ...(addresses ?? [])])];
     if (!reported.length) continue;
@@ -436,6 +465,12 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
   }
   for (const transaction of Object.values(parsed.transactions))
     validateTransactionAddresses(transaction, parsed.network);
+  if (
+    [...indexPreviousOutputs(parsed).values()].some(
+      (resolution) => resolution.status === 'conflict',
+    )
+  )
+    throw new Error('Workspace contains conflicting previous-output observations.');
   const walletIds = new Set<string>();
   for (const wallet of parsed.wallets) {
     if (walletIds.has(wallet.id))
@@ -548,6 +583,7 @@ export function clearContextProvenance(
 export function buildGraph(workspace: Workspace): GraphData {
   const nodes = new Map<string, GraphNode>();
   const links = new Map<string, GraphData['links'][number]>();
+  const previousOutputs = indexPreviousOutputs(workspace);
   const contextOutputs = new Map(
     Object.entries(workspace.inputContext ?? {}).map(([id, indexes]) => [id, new Set(indexes)]),
   );
@@ -612,14 +648,22 @@ export function buildGraph(workspace: Workspace): GraphData {
     for (const input of tx.vin) {
       if (!input.txid || input.vout === undefined) continue;
       const id = outputNodeId(input.txid, input.vout);
-      if (!nodes.has(id))
+      if (!nodes.has(id)) {
+        const resolution = previousOutputs.get(id);
+        const output =
+          resolution?.status === 'loaded' || resolution?.status === 'attached'
+            ? resolution.output
+            : undefined;
         add({
           id,
           kind: 'output',
           txid: input.txid,
           vout: input.vout,
           label: `${short(input.txid, 5)}:${input.vout}`,
+          value: output ? sats(output.value) : undefined,
+          address: output ? outputAddress(output) : undefined,
         });
+      }
       link(id, txNodeId(tx.txid), 'spends');
     }
   }

@@ -17,7 +17,7 @@ export const valueFlowTool = defineTool({
   group: 'Value and structure',
   kind: 'observation',
   description:
-    'Reconcile input and output amounts using loaded previous outputs. Reveal missing evidence and review fees against your own threshold.',
+    'Reconcile input and output amounts using known previous-output details. Reveal missing evidence and review fees against your own threshold.',
   source: {
     title: 'BIP141: transaction virtual size',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki',
@@ -59,8 +59,10 @@ export const valueFlowTool = defineTool({
         coinbase++;
         continue;
       }
-      const inputs = referencedInputs(context.workspace, tx);
-      const absent = inputs.filter((input) => !input.output);
+      const inputs = referencedInputs(context.workspace, tx, context.prevouts);
+      const absent = inputs.filter(
+        (input) => input.resolution.status === 'missing' || input.resolution.status === 'conflict',
+      );
       const evidence = [tx.txid, ...inputs.map((input) => input.txid)];
       if (absent.length || inputs.length !== tx.vin.length || !inputs.length) {
         missing++;
@@ -71,7 +73,7 @@ export const valueFlowTool = defineTool({
             tx.txid,
             'incomplete',
             'Fee unknown: previous output data is missing',
-            `${inputs.length - absent.length} of ${tx.vin.length} input values are available. A fee cannot be calculated without every previous output. Load previous transactions, then rerun this check. No missing input is treated as zero.`,
+            `${inputs.length - absent.length} of ${tx.vin.length} input values are available. A fee cannot be calculated without every previous output. Load missing parent transactions, then rerun this check. No missing input is treated as zero.`,
             absent.length ? absent.map((input) => input.nodeId) : [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
@@ -79,7 +81,11 @@ export const valueFlowTool = defineTool({
         );
         continue;
       }
-      const inputAmounts = inputs.map((input) => satoshiValue(input.output!.value));
+      const inputAmounts = inputs.map((input) =>
+        input.resolution.status === 'loaded' || input.resolution.status === 'attached'
+          ? satoshiValue(input.resolution.output.value)
+          : undefined,
+      );
       const outputAmounts = tx.vout.map((output) => satoshiValue(output.value));
       if (
         !outputAmounts.length ||
@@ -113,7 +119,7 @@ export const valueFlowTool = defineTool({
             tx.txid,
             'incomplete',
             'Inconsistent values: outputs exceed inputs',
-            `Loaded inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. Refresh the transaction and parents. These records do not support a valid fee calculation.`,
+            `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. Refresh the transaction and parents. These records do not support a valid fee calculation.`,
             [txNodeId(tx.txid)],
             evidence,
             [tx.txid],
@@ -137,7 +143,7 @@ export const valueFlowTool = defineTool({
           tx.txid,
           'observation',
           `${exceeds ? 'Fee threshold reached' : 'Fee'}: ${formatAmount(fee)}`,
-          `Loaded inputs total ${formatAmount(inputTotal)}; all outputs total ${formatAmount(outputTotal)}; their difference is ${formatAmount(fee)}. ${rate === undefined ? 'Fee rate is unknown because a usable virtual size is unavailable.' : `Fee rate: ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB (${tx.vsize} vB). Review threshold: ${threshold} sat/vB.`} This reconciles totals, without assigning individual inputs to specific outputs.`,
+          `Known inputs total ${formatAmount(inputTotal)}; all outputs total ${formatAmount(outputTotal)}; their difference is ${formatAmount(fee)}. ${rate === undefined ? 'Fee rate is unknown because a usable virtual size is unavailable.' : `Fee rate: ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB (${tx.vsize} vB). Review threshold: ${threshold} sat/vB.`} This reconciles totals, without assigning individual inputs to specific outputs.`,
           [txNodeId(tx.txid)],
           evidence,
           [tx.txid],
@@ -245,7 +251,9 @@ export const structureTool = defineTool({
           `${consolidation ? `At least ${minInputs} inputs and at most ${maxOutputs} spendable outputs, with more inputs than outputs.` : `At least ${minOutputs} spendable outputs and ${ratio} outputs per input.`} ${tx.vout.length - outputs.length} data outputs were omitted from the shape count. Batching, collaborative payments and other workflows can share this structure; the shape does not establish purpose or ownership. Inspect the input and output paths.`,
           [
             txNodeId(tx.txid),
-            ...referencedInputs(context.workspace, tx).map((input) => input.nodeId),
+            ...referencedInputs(context.workspace, tx, context.prevouts).map(
+              (input) => input.nodeId,
+            ),
             ...outputs.map((output) => outputNodeId(tx.txid, output.n)),
           ],
           [tx.txid],
@@ -311,16 +319,26 @@ export const scriptTool = defineTool({
       unknownOutputs = 0;
     for (const tx of context.transactions) {
       const inputs =
-        mode === 'outputs' || isCoinbase(tx) ? [] : referencedInputs(context.workspace, tx);
+        mode === 'outputs' || isCoinbase(tx)
+          ? []
+          : referencedInputs(context.workspace, tx, context.prevouts);
       const outputs = spendableOutputs(tx);
       const inputTypes = new Set(
-        inputs.map((input) => knownType(input.output?.scriptPubKey.type)).filter(Boolean),
+        inputs
+          .map((input) =>
+            input.resolution.status === 'loaded' || input.resolution.status === 'attached'
+              ? knownType(input.resolution.output.scriptPubKey.type)
+              : undefined,
+          )
+          .filter(Boolean),
       );
       const outputTypes = new Set(
         outputs.map((output) => knownType(output.scriptPubKey.type)).filter(Boolean),
       );
       const missingInputs = inputs.filter(
-        (input) => !knownType(input.output?.scriptPubKey.type),
+        (input) =>
+          (input.resolution.status !== 'loaded' && input.resolution.status !== 'attached') ||
+          !knownType(input.resolution.output.scriptPubKey.type),
       ).length;
       const missingOutputs = outputs.filter(
         (output) => !knownType(output.scriptPubKey.type),
@@ -346,13 +364,26 @@ export const scriptTool = defineTool({
           `${mode === 'outputs' ? 'Input scripts were not compared.' : `Known input types: ${[...inputTypes].join(', ') || 'none'}.`} Known output types: ${[...outputTypes].join(', ') || 'none'}. ${missingInputs} input and ${missingOutputs} output types are unavailable. Script differences alone identify neither change outputs, wallet software nor owners. Load missing parents and compare other evidence.`,
           [
             ...inputs
-              .filter((input) => knownType(input.output?.scriptPubKey.type))
+              .filter(
+                (input) =>
+                  (input.resolution.status === 'loaded' ||
+                    input.resolution.status === 'attached') &&
+                  knownType(input.resolution.output.scriptPubKey.type),
+              )
               .map((input) => input.nodeId),
             ...outputs
               .filter((output) => knownType(output.scriptPubKey.type))
               .map((output) => outputNodeId(tx.txid, output.n)),
           ],
-          [tx.txid, ...inputs.filter((input) => input.output).map((input) => input.txid)],
+          [
+            tx.txid,
+            ...inputs
+              .filter(
+                (input) =>
+                  input.resolution.status === 'loaded' || input.resolution.status === 'attached',
+              )
+              .map((input) => input.txid),
+          ],
           [tx.txid],
         ),
       );

@@ -270,6 +270,33 @@ describe('direct wallet relationships', () => {
     });
   });
 
+  it('uses attached prevouts without fabricating their creating transactions', () => {
+    const attachedReceipt: Transaction = {
+      ...receipt,
+      vin: [
+        {
+          txid: id(10),
+          vout: 0,
+          prevout: { value: 4, scriptPubKey: { hex: script(other) } },
+        },
+      ],
+    };
+    const workspace = fixture([attachedReceipt]);
+    const results = listWalletRelationships(workspace, wallet);
+    expect(results.sources).toContainEqual(
+      expect.objectContaining({
+        id: outputNodeId(id(10), 0),
+        address: other,
+        amountSats: 400_000_000,
+        ownership: 'external',
+        missing: false,
+      }),
+    );
+    expect(results.coverage.missingPrevouts).toBe(0);
+    expect(workspace.transactions[id(10)]).toBeUndefined();
+    expect(listLoadedAddressTransactionIds(workspace, other)).toEqual([id(2)]);
+  });
+
   it('uses raw scripts over claims, with malformed, non-address and foreign-address evidence unknown', () => {
     const malformed: Transaction = {
       txid: id(10),

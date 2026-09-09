@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Network, Pencil, Tag, Smile, X } from 'lucide-re
 import { fetchTransaction } from '../lib/api';
 import { traceSourceExists } from '../lib/tracing';
 import { outputAddress } from '../domain/workspace';
+import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
 import {
   formatSats,
   outputNodeId,
@@ -60,7 +61,12 @@ export function TraceWorkbench({
     [workspace.transactions, pointId],
   );
   const creator = point && workspace.transactions[point.txid];
-  const output = creator && creator.vout.find((item) => item.n === point.vout);
+  const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
+  const resolution = point && resolvePreviousOutput(workspace, point, prevouts);
+  const output =
+    resolution && (resolution.status === 'loaded' || resolution.status === 'attached')
+      ? resolution.output
+      : undefined;
   const spenders = useMemo(
     () => (point ? loadedSpenders(workspace, point) : []),
     [workspace.transactions, pointId],

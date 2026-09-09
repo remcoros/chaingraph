@@ -98,6 +98,21 @@ describe('visible Wallet input planning', () => {
     expect(plan.missingOutputCount).toBe(1);
   });
 
+  it('does not fetch a parent when attached evidence supplies the visible output details', () => {
+    const workspace = fixture();
+    workspace.transactions[child].vin[0].prevout = {
+      value: 1,
+      scriptPubKey: { hex: '51' },
+    };
+    const plan = walletFlowInputPlan(workspace, walletId, child, [
+      { ...input(), missing: false, prevoutStatus: 'attached' },
+    ]);
+    expect(plan.transactionIds).toEqual([]);
+    expect(plan.pendingCount).toBe(0);
+    expect(plan.missingOutputCount).toBe(0);
+    expect(workspace.transactions[parent]).toBeUndefined();
+  });
+
   it('invalidates a removed wallet, removed source or changed input list', () => {
     const workspace = fixture();
     const before = walletFlowSourceKey(workspace, walletId, child);

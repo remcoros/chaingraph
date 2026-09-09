@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
 import { canonicalAddress, canonicalEntityNodeId } from './entityReferences';
 import type { GraphData, GraphNode, Network, Workspace, WorkspaceTag } from './types';
 import { outputNodeId } from './types';
+import { indexPreviousOutputs, outputScriptHash } from './prevouts';
 
 export const MAX_WORKSPACE_TAGS = 200;
 export const MAX_TAG_MEMBERS = 50_000;
@@ -174,26 +173,13 @@ export function buildWalletMatches(
     for (const id of wallets) associated.add(id);
     transactionWallets.set(txid, associated);
   };
-  for (const transaction of Object.values(workspace.transactions)) {
-    for (const output of transaction.vout) {
-      let hash: string | undefined;
-      const script = output.scriptPubKey;
-      try {
-        if (script.hex !== undefined) {
-          hash = bytesToHex(sha256(hexToBytes(script.hex)).reverse());
-        } else {
-          const address =
-            script.address ?? (script.addresses?.length === 1 ? script.addresses[0] : undefined);
-          if (address) hash = addressToScriptHash(address, workspace.network);
-        }
-      } catch {
-        continue;
-      }
-      const wallets = hash ? walletsByScript.get(hash) : undefined;
-      if (!wallets) continue;
-      outputWallets.set(outputNodeId(transaction.txid, output.n), wallets);
-      associate(transaction.txid, wallets);
-    }
+  for (const [nodeId, resolution] of indexPreviousOutputs(workspace)) {
+    if (resolution.status !== 'loaded' && resolution.status !== 'attached') continue;
+    const hash = outputScriptHash(resolution.output, workspace.network);
+    const wallets = hash ? walletsByScript.get(hash) : undefined;
+    if (!wallets) continue;
+    outputWallets.set(nodeId, wallets);
+    associate(nodeId.slice(4, 68), wallets);
   }
   for (const transaction of Object.values(workspace.transactions)) {
     for (const input of transaction.vin) {

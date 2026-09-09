@@ -63,11 +63,20 @@ export const walletTool = defineTool({
     }
     const findings = [];
     let overlapping = 0,
-      missingParents = 0;
+      missingPrevouts = 0;
     for (const tx of context.transactions) {
-      const refs = isCoinbase(tx) ? [] : referencedInputs(context.workspace, tx);
-      missingParents += refs.filter((input) => !input.output).length;
-      const inputs = refs.map((input) => ({ nodeId: input.nodeId, ids: matches(input.output) }));
+      const refs = isCoinbase(tx) ? [] : referencedInputs(context.workspace, tx, context.prevouts);
+      missingPrevouts += refs.filter(
+        (input) => input.resolution.status === 'missing' || input.resolution.status === 'conflict',
+      ).length;
+      const inputs = refs.map((input) => ({
+        nodeId: input.nodeId,
+        ids: matches(
+          input.resolution.status === 'loaded' || input.resolution.status === 'attached'
+            ? input.resolution.output
+            : undefined,
+        ),
+      }));
       const outputs = spendableOutputs(tx).map((output) => ({
         nodeId: outputNodeId(tx.txid, output.n),
         ids: matches(output),
@@ -90,7 +99,15 @@ export const walletTool = defineTool({
             : `${wallets.size} imported wallets touch this transaction`,
           `Matching wallet records: ${[...wallets].map((id) => names.get(id)).join(', ')}. Inputs match ${inputWallets.size} imported wallets; outputs match ${outputWallets.size}. ${overlap ? 'At least one output belongs to the derived coverage of multiple imports; these are not necessarily distinct participants. ' : ''}Matches use only already derived addresses or locking scripts. This does not identify real owners or assign particular inputs to particular outputs. Check wallet scan coverage and load missing previous transactions.`,
           candidates.filter((record) => record.ids.size).map((record) => record.nodeId),
-          [tx.txid, ...refs.filter((input) => input.output).map((input) => input.txid)],
+          [
+            tx.txid,
+            ...refs
+              .filter(
+                (input) =>
+                  input.resolution.status === 'loaded' || input.resolution.status === 'attached',
+              )
+              .map((input) => input.txid),
+          ],
           [tx.txid],
         ),
       );
@@ -107,7 +124,7 @@ export const walletTool = defineTool({
         { label: 'Known addresses', value: addresses.size },
         { label: 'Matching transactions', value: findings.length },
         { label: 'Overlapping coverage', value: overlapping },
-        { label: 'Missing parent references', value: missingParents },
+        { label: 'Missing previous-output details', value: missingPrevouts },
       ],
     };
   },

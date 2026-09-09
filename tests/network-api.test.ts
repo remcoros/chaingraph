@@ -86,6 +86,7 @@ describe('explicit Bitcoin network transport', () => {
     const blocked = new Promise<void>((resolve) => {
       release = resolve;
     });
+
     const calls: { network: Network; target: string }[] = [];
     vi.stubGlobal(
       'fetch',
@@ -108,6 +109,61 @@ describe('explicit Bitcoin network transport', () => {
       { network: 'mainnet', target: 'core' },
       { network: 'testnet4', target: 'core' },
       { network: 'mainnet', target: 'electrum' },
+    ]);
+  });
+
+  it('requests verbosity 2 and retries verbosity 1 only for unavailable Core prevout data', async () => {
+    const calls: unknown[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const request = JSON.parse(init.body as string);
+        calls.push(request);
+        if (request.target === 'core' && request.params[1] === 2)
+          return response(
+            {
+              error: 'Bitcoin RPC previous-output data is unavailable',
+              code: 'core_prevout_unavailable',
+            },
+            false,
+          );
+        return response({ result: transaction(id(1)) });
+      }),
+    );
+    expect(await fetchTransaction('mainnet', id(1))).toEqual(transaction(id(1)));
+    expect(calls).toEqual([
+      { target: 'core', params: [id(1), 2], network: 'mainnet', method: 'getrawtransaction' },
+      { target: 'core', params: [id(1), 1], network: 'mainnet', method: 'getrawtransaction' },
+    ]);
+  });
+
+  it('does not retry verbosity 1 for unrelated Core failures and deduplicates one signal scope', async () => {
+    const calls: unknown[] = [];
+    const controller = new AbortController();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const request = JSON.parse(init.body as string);
+        calls.push(request);
+        await Promise.resolve();
+        return request.target === 'core'
+          ? response({ error: 'Bitcoin RPC rejected the request' }, false)
+          : response({ result: transaction(id(1)) });
+      }),
+    );
+    const [first, second] = await Promise.all([
+      fetchTransaction('mainnet', id(1), controller.signal),
+      fetchTransaction('mainnet', id(1), controller.signal),
+    ]);
+    expect(first).toEqual(second);
+    expect(calls).toEqual([
+      { target: 'core', params: [id(1), 2], network: 'mainnet', method: 'getrawtransaction' },
+      {
+        target: 'electrum',
+        params: [id(1), true],
+        network: 'mainnet',
+        method: 'blockchain.transaction.get',
+      },
     ]);
   });
 

@@ -3,6 +3,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { addressToScriptHash } from '../lib/wallet';
 import { canonicalEntityNodeId } from './entityReferences';
+import { indexPreviousOutputs, resolvePreviousOutput } from './prevouts';
 import { verifiedWalletAddresses } from './walletRecords';
 import {
   outputNodeId,
@@ -152,6 +153,7 @@ export function loadedWalletTransactions(workspace: Workspace): Map<string, Tran
  * requires actual loaded wallet-script matches and exact outpoint references. */
 export function listWalletRelationships(workspace: Workspace, wallet: Wallet): WalletRelationships {
   const transactions = loadedWalletTransactions(workspace);
+  const prevouts = indexPreviousOutputs(workspace);
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
   const hashes = new Set(addresses.map((entry) => entry.scripthash));
   const outputs = new Map<string, WalletRelationship>();
@@ -216,6 +218,16 @@ export function listWalletRelationships(workspace: Workspace, wallet: Wallet): W
       const parent = canonicalTransactionId(input.txid);
       if (input.coinbase !== undefined || !parent || !validOutputIndex(input.vout)) continue;
       const id = outputNodeId(parent, input.vout);
+      const resolution = resolvePreviousOutput(
+        workspace,
+        { txid: parent, vout: input.vout },
+        prevouts,
+      );
+      if (resolution.status === 'loaded' || resolution.status === 'attached') {
+        const entry = outputs.get(id) ?? subject(parent, input.vout, resolution.output);
+        outputs.set(id, entry);
+        if (entry.ownership === 'wallet') owned.add(id);
+      }
       if (owned.has(id)) ids.add(id);
     }
     if (ids.size) {
@@ -287,7 +299,12 @@ export function listWalletRelationships(workspace: Workspace, wallet: Wallet): W
       if (!parent || !validOutputIndex(input.vout)) unidentifiedInputs++;
       else {
         const id = outputNodeId(parent, input.vout);
-        if (!outputs.has(id)) missing.add(id);
+        const resolution = resolvePreviousOutput(
+          workspace,
+          { txid: parent, vout: input.vout },
+          prevouts,
+        );
+        if (resolution.status === 'missing' || resolution.status === 'conflict') missing.add(id);
       }
     }
   }
@@ -398,7 +415,7 @@ export function listLoadedAddressTransactionIds(workspace: Workspace, address: s
     return [];
   }
   const transactions = loadedWalletTransactions(workspace);
-  const outputs = new Set<string>();
+  const prevouts = indexPreviousOutputs(workspace);
   const contexts = new Set<string>();
   for (const [txid, transaction] of transactions) {
     for (const output of transaction.vout) {
@@ -406,7 +423,6 @@ export function listLoadedAddressTransactionIds(workspace: Workspace, address: s
         validOutputIndex(output.n) &&
         walletOutputEvidence(output, workspace.network).scripthash === scripthash
       ) {
-        outputs.add(outputNodeId(txid, output.n));
         contexts.add(txid);
       }
     }
@@ -415,11 +431,15 @@ export function listLoadedAddressTransactionIds(workspace: Workspace, address: s
     if (
       transaction.vin.some((input) => {
         const parent = canonicalTransactionId(input.txid);
+        if (input.coinbase !== undefined || !parent || !validOutputIndex(input.vout)) return false;
+        const resolution = resolvePreviousOutput(
+          workspace,
+          { txid: parent, vout: input.vout },
+          prevouts,
+        );
         return (
-          input.coinbase === undefined &&
-          parent &&
-          validOutputIndex(input.vout) &&
-          outputs.has(outputNodeId(parent, input.vout))
+          (resolution.status === 'loaded' || resolution.status === 'attached') &&
+          walletOutputEvidence(resolution.output, workspace.network).scripthash === scripthash
         );
       })
     )

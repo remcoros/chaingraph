@@ -81,7 +81,7 @@ describe('scoped analysis and honest evidence', () => {
     expect(enabled.findings).toHaveLength(1);
     expect(enabled.findings[0].kind).toBe('hypothesis');
     expect(enabled.findings[0].description).toContain('PayJoin');
-    expect(stat(enabled, 'Missing parent references')).toBe(2);
+    expect(stat(enabled, 'Missing previous-output details')).toBe(2);
   });
   it('joins known identical locking scripts across decoded and raw input representations', () => {
     const a = transaction(1, [], [output(0, 0.02, addrA)]);
@@ -119,6 +119,24 @@ describe('scoped analysis and honest evidence', () => {
     expect(report.findings[0].description).toContain('0.01 sat/vB');
     expect(report.findings[0].scopeTxids).toEqual([spend.txid]);
     expect(report.findings[0].txids).toEqual([spend.txid, a.txid, b.txid]);
+  });
+  it('reconciles fees from attached prevouts without loading parent transactions', () => {
+    const spend = transaction(10, [1, 2], [output(0, 0.3)]);
+    spend.vin = [
+      {
+        txid: id(1),
+        vout: 0,
+        prevout: { value: 0.10000001, scriptPubKey: { hex: '51', type: 'pubkeyhash' } },
+      },
+      {
+        txid: id(2),
+        vout: 0,
+        prevout: { value: 0.2, scriptPubKey: { hex: '52', type: 'witness_v0_keyhash' } },
+      },
+    ];
+    const report = tool('value-flow').analyze(workspace(spend), [spend.txid]);
+    expect(report.findings[0]).toMatchObject({ title: 'Fee: 1 sat', kind: 'observation' });
+    expect(report.findings[0].description).toContain('Known inputs total');
   });
   it('never calculates a fee from partial input history, even when known inputs exceed outputs', () => {
     const parent = transaction(1, [], [output(0, 1)]),

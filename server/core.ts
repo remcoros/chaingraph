@@ -71,7 +71,21 @@ export class CoreClient {
         const value = JSON.parse(text);
         if (!value || value.id !== id || typeof value !== 'object')
           throw new SafeError('Invalid Bitcoin RPC response');
-        if (value.error) throw new SafeError('Bitcoin RPC rejected the request');
+        if (value.error) {
+          const rpcCode =
+            typeof value.error === 'object' &&
+            value.error !== null &&
+            typeof value.error.code === 'number'
+              ? value.error.code
+              : undefined;
+          if (method === 'getrawtransaction' && params[1] === 2 && rpcCode === -32603)
+            throw new SafeError(
+              'Bitcoin RPC previous-output data is unavailable',
+              502,
+              'core_prevout_unavailable',
+            );
+          throw new SafeError('Bitcoin RPC rejected the request');
+        }
         if (!Object.hasOwn(value, 'result')) throw new SafeError('Invalid Bitcoin RPC response');
         return value.result;
       } catch (error) {

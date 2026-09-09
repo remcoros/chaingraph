@@ -135,16 +135,20 @@ export const ciohTool = defineTool({
       evidence = new Map<string, Set<string>>();
     const scriptsByAddress = new Map<string, string>();
     for (const tx of context.transactions)
-      for (const input of referencedInputs(context.workspace, tx)) {
-        const address = input.output && outputAddress(input.output),
-          script = input.output?.scriptPubKey.hex;
+      for (const input of referencedInputs(context.workspace, tx, context.prevouts)) {
+        const output =
+          input.resolution.status === 'loaded' || input.resolution.status === 'attached'
+            ? input.resolution.output
+            : undefined;
+        const address = output && outputAddress(output),
+          script = output?.scriptPubKey.hex;
         if (address && script !== undefined) scriptsByAddress.set(address, script.toLowerCase());
       }
     let eligible = 0,
       skippedEqual = 0,
       skippedSmall = 0,
       alreadyOneScript = 0,
-      missingParents = 0;
+      missingPrevouts = 0;
     function root(key: string): string {
       let current = key;
       while (union.has(current) && union.get(current) !== current) current = union.get(current)!;
@@ -165,16 +169,20 @@ export const ciohTool = defineTool({
         skippedEqual++;
         continue;
       }
-      const inputs = referencedInputs(context.workspace, tx);
+      const inputs = referencedInputs(context.workspace, tx, context.prevouts);
       if (inputs.length < 2) {
         skippedSmall++;
         continue;
       }
       const members = inputs.map((input) => {
-        if (!input.output) missingParents++;
-        const address = input.output && outputAddress(input.output);
+        const output =
+          input.resolution.status === 'loaded' || input.resolution.status === 'attached'
+            ? input.resolution.output
+            : undefined;
+        if (!output) missingPrevouts++;
+        const address = output && outputAddress(output);
         const script =
-          input.output?.scriptPubKey.hex?.toLowerCase() ??
+          output?.scriptPubKey.hex?.toLowerCase() ??
           (address ? scriptsByAddress.get(address) : undefined);
         return {
           ...input,
@@ -218,7 +226,7 @@ export const ciohTool = defineTool({
           nodeIds.join('|'),
           'hypothesis',
           `Tentative input group ${index + 1}: ${nodeIds.length} outputs`,
-          `${nodeIds.length} referenced outputs were co-spent across ${txids.length} transactions in this scope, with transitive grouping through known addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were skipped (${skippedEqual} skipped in this run).` : 'Equal-output exclusion was disabled for this run.'} PayJoin and other collaboration can invalidate this grouping. ${missingParents ? `${missingParents} input references in this run have missing parent data; those links use outpoints and cannot establish address-level continuity. ` : ''}Load the supporting transactions and compare your own labels. This does not establish a person's identity.`,
+          `${nodeIds.length} referenced outputs were co-spent across ${txids.length} transactions in this scope, with transitive grouping through known addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were skipped (${skippedEqual} skipped in this run).` : 'Equal-output exclusion was disabled for this run.'} PayJoin and other collaboration can invalidate this grouping. ${missingPrevouts ? `${missingPrevouts} input references in this run have missing previous-output details; those links use outpoints and cannot establish address-level continuity. ` : ''}Load the supporting transactions and compare your own labels. This does not establish a person's identity.`,
           nodeIds,
           txids,
         );
@@ -235,7 +243,7 @@ export const ciohTool = defineTool({
         { label: 'Equal-output candidates skipped', value: skippedEqual },
         { label: 'Coinbase / insufficient inputs', value: skippedSmall },
         { label: 'Already one script', value: alreadyOneScript },
-        { label: 'Missing parent references', value: missingParents },
+        { label: 'Missing previous-output details', value: missingPrevouts },
       ],
     };
   },

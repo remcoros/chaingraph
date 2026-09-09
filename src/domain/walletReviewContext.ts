@@ -1,4 +1,9 @@
 import { canonicalEntityNodeId } from './entityReferences';
+import {
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  type PreviousOutputResolution,
+} from './prevouts';
 import { verifiedWalletAddresses } from './walletRecords';
 import {
   canonicalTransactionId,
@@ -28,6 +33,7 @@ export interface WalletReviewFlowEntry {
   ownership: 'wallet' | 'external' | 'unknown';
   selected: boolean;
   missing: boolean;
+  prevoutStatus?: PreviousOutputResolution['status'];
   coinbase?: boolean;
 }
 
@@ -97,7 +103,14 @@ export function buildWalletReviewContext(
   const hashes = new Set(
     verifiedWalletAddresses(wallet, workspace.network).map((entry) => entry.scripthash),
   );
-  const entry = (txid: string, vout: number, output?: TxOutput): WalletReviewFlowEntry => {
+  const prevouts = indexPreviousOutputs(workspace);
+
+  const entry = (
+    txid: string,
+    vout: number,
+    output?: TxOutput,
+    prevoutStatus?: PreviousOutputResolution['status'],
+  ): WalletReviewFlowEntry => {
     const id = outputNodeId(txid, vout);
     const { scripthash: hash, address } = walletOutputEvidence(output, workspace.network);
     return {
@@ -109,16 +122,26 @@ export function buildWalletReviewContext(
       ownership: hash && hashes.has(hash) ? 'wallet' : address ? 'external' : 'unknown',
       selected: id === selectedId || (!!selectedAddress && address === selectedAddress),
       missing: output === undefined,
+      prevoutStatus,
     };
   };
-  const loadedOutput = (txid: string, vout: number) => {
-    return transactions.get(txid)?.vout.find((output) => output.n === vout);
+  const knownOutput = (txid: string, vout: number) => {
+    const resolution = resolvePreviousOutput(workspace, { txid, vout }, prevouts);
+    return {
+      output:
+        resolution.status === 'loaded' || resolution.status === 'attached'
+          ? resolution.output
+          : undefined,
+      status: resolution.status,
+    };
   };
   const inputs =
     transaction?.vin.map((input): WalletReviewFlowEntry => {
       const parent = canonicalTransactionId(input.txid);
-      if (input.coinbase === undefined && parent && validOutputIndex(input.vout))
-        return entry(parent, input.vout, loadedOutput(parent, input.vout));
+      if (input.coinbase === undefined && parent && validOutputIndex(input.vout)) {
+        const resolved = knownOutput(parent, input.vout);
+        return entry(parent, input.vout, resolved.output, resolved.status);
+      }
       return {
         id: txNodeId(transactionId!),
         txid: transactionId,
@@ -135,11 +158,10 @@ export function buildWalletReviewContext(
   const selected = selectedPoint
     ? (inputs.find((input) => input.id === selectedId) ??
       outputs.find((output) => output.id === selectedId) ??
-      entry(
-        selectedPoint.txid,
-        selectedPoint.vout,
-        loadedOutput(selectedPoint.txid, selectedPoint.vout),
-      ))
+      (() => {
+        const resolved = knownOutput(selectedPoint.txid, selectedPoint.vout);
+        return entry(selectedPoint.txid, selectedPoint.vout, resolved.output, resolved.status);
+      })())
     : undefined;
   const currentOutputs: WalletReviewFlowEntry[] = [];
   if (item.reason === 'source' && selectedPoint && selected?.ownership === 'wallet') {
@@ -159,7 +181,8 @@ export function buildWalletReviewContext(
         )
       )
         continue;
-      const target = entry(point.txid, point.vout, loadedOutput(point.txid, point.vout));
+      const resolved = knownOutput(point.txid, point.vout);
+      const target = entry(point.txid, point.vout, resolved.output, resolved.status);
       if (target.ownership === 'wallet') currentOutputs.push(target);
     }
   }

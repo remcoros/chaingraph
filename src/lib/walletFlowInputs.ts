@@ -1,5 +1,6 @@
 import type { Network, Transaction, Workspace } from '../domain/types';
 import type { WalletReviewFlowEntry } from '../domain/walletReviewContext';
+import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
 import { parseTransaction, validateTransactionAddresses } from '../domain/workspace';
 import { mapLimit } from './api';
 import { mergeFlowInputs } from './useFlowInputs';
@@ -68,11 +69,12 @@ export function walletFlowInputPlan(
   }
   const missing = new Set<string>();
   let missingOutputCount = 0;
+  const prevouts = indexPreviousOutputs(workspace);
   for (const ref of refs) {
-    const parent = workspace.transactions[ref.txid];
-    if (!parent) missing.add(ref.txid);
-    else if (parent.txid !== ref.txid || !parent.vout.some((output) => output.n === ref.vout))
-      missingOutputCount++;
+    const resolution = resolvePreviousOutput(workspace, ref, prevouts);
+    if (resolution.status === 'loaded' || resolution.status === 'attached') continue;
+    if (!workspace.transactions[ref.txid]) missing.add(ref.txid);
+    else missingOutputCount++;
   }
   return {
     refs,

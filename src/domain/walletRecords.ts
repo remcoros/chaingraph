@@ -1,8 +1,7 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
 import type { Network, Transaction, TxOutput, Wallet, WalletAddress, Workspace } from './types';
 import { outputNodeId, sats } from './types';
+import { indexPreviousOutputs, outputScriptHash } from './prevouts';
 
 export interface WalletTransactionRecord {
   txid: string;
@@ -37,19 +36,6 @@ export function verifiedWalletAddresses(wallet: Wallet, network: Network): Walle
     }
   }
   return [...unique.values()];
-}
-
-function outputScriptHash(output: TxOutput, network: Network): string | undefined {
-  try {
-    if (output.scriptPubKey.hex !== undefined)
-      return bytesToHex(sha256(hexToBytes(output.scriptPubKey.hex)).reverse());
-    const address =
-      output.scriptPubKey.address ??
-      (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined);
-    return address ? addressToScriptHash(address, network) : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /** Count received outputs in the local transaction snapshot, including spent
@@ -100,12 +86,11 @@ export function listWalletTransactions(
   }
   const ids = new Set(histories.keys());
   const ownedOutputs = new Set<string>();
-  for (const tx of Object.values(workspace.transactions)) {
-    for (const output of tx.vout) {
-      if (hashes.has(outputScriptHash(output, workspace.network) ?? '')) {
-        ownedOutputs.add(outputNodeId(tx.txid, output.n));
-        ids.add(tx.txid);
-      }
+  for (const [nodeId, resolution] of indexPreviousOutputs(workspace)) {
+    if (resolution.status !== 'loaded' && resolution.status !== 'attached') continue;
+    if (hashes.has(outputScriptHash(resolution.output, workspace.network) ?? '')) {
+      ownedOutputs.add(nodeId);
+      ids.add(nodeId.slice(4, 68));
     }
   }
   for (const tx of Object.values(workspace.transactions)) {

@@ -15,6 +15,14 @@ export interface HistoryEntry {
   tx_hash: string;
   height: number;
 }
+class RpcError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 export async function rpc<T>(
   network: Network,
   target: 'core' | 'electrum',
@@ -33,7 +41,10 @@ export async function rpc<T>(
   signal?.throwIfAborted();
   if (!payload || typeof payload !== 'object') throw new Error('Invalid upstream response.');
   if (!response.ok || payload.error)
-    throw new Error(typeof payload.error === 'string' ? payload.error : 'Upstream request failed.');
+    throw new RpcError(
+      typeof payload.error === 'string' ? payload.error : 'Upstream request failed.',
+      typeof payload.code === 'string' ? payload.code : undefined,
+    );
   return payload.result as T;
 }
 const networkSchema = z.enum(['mainnet', 'testnet4']);
@@ -128,7 +139,9 @@ async function fetchBlockHeight(
   requests.set(key, request);
   return request;
 }
-export async function fetchTransaction(
+const transactionRequests = new WeakMap<AbortSignal, Map<string, Promise<Transaction>>>();
+
+async function fetchTransactionRequest(
   network: Network,
   txid: string,
   signal?: AbortSignal,
@@ -138,17 +151,33 @@ export async function fetchTransaction(
   let data: unknown;
   let fromCore = true;
   try {
-    data = await rpc(network, 'core', 'getrawtransaction', [txid.toLowerCase(), 1], signal);
+    data = await rpc(network, 'core', 'getrawtransaction', [txid.toLowerCase(), 2], signal);
   } catch (e) {
     if (signal?.aborted) throw e;
-    fromCore = false;
-    data = await rpc(
-      network,
-      'electrum',
-      'blockchain.transaction.get',
-      [txid.toLowerCase(), true],
-      signal,
-    );
+    if (e instanceof RpcError && e.code === 'core_prevout_unavailable') {
+      try {
+        data = await rpc(network, 'core', 'getrawtransaction', [txid.toLowerCase(), 1], signal);
+      } catch (fallbackError) {
+        if (signal?.aborted) throw fallbackError;
+        fromCore = false;
+        data = await rpc(
+          network,
+          'electrum',
+          'blockchain.transaction.get',
+          [txid.toLowerCase(), true],
+          signal,
+        );
+      }
+    } else {
+      fromCore = false;
+      data = await rpc(
+        network,
+        'electrum',
+        'blockchain.transaction.get',
+        [txid.toLowerCase(), true],
+        signal,
+      );
+    }
   }
   const tx = parseTransaction(data);
   if (tx.txid !== txid.toLowerCase()) throw new Error('Upstream returned a different transaction.');
@@ -188,6 +217,29 @@ export async function fetchTransaction(
     );
   }
   return tx;
+}
+
+export function fetchTransaction(
+  network: Network,
+  txid: string,
+  signal?: AbortSignal,
+  historyHeight?: number,
+): Promise<Transaction> {
+  if (!signal) return fetchTransactionRequest(network, txid, signal, historyHeight);
+  signal.throwIfAborted();
+  let requests = transactionRequests.get(signal);
+  if (!requests) {
+    requests = new Map();
+    transactionRequests.set(signal, requests);
+  }
+  const key = `${network}:${txid.toLowerCase()}:${historyHeight ?? ''}`;
+  const pending = requests.get(key);
+  if (pending) return pending;
+  const request = fetchTransactionRequest(network, txid, signal, historyHeight).finally(() =>
+    requests!.delete(key),
+  );
+  requests.set(key, request);
+  return request;
 }
 export async function fetchHistory(
   network: Network,

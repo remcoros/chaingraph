@@ -2,14 +2,7 @@ import type { GraphSnapshot } from './graphSnapshot';
 import type { GraphFilters } from './graphFilters';
 export type Network = 'mainnet' | 'testnet4';
 export type ScriptType = 'p2pkh' | 'p2sh-p2wpkh' | 'p2wpkh' | 'p2tr';
-export interface TxInput {
-  txid?: string;
-  vout?: number;
-  coinbase?: string;
-  sequence?: number;
-}
-export interface TxOutput {
-  n: number;
+export interface TxOutputDetails {
   value: number;
   scriptPubKey: {
     hex?: string;
@@ -17,6 +10,17 @@ export interface TxOutput {
     addresses?: string[];
     type?: string;
   };
+}
+export interface TxInput {
+  txid?: string;
+  vout?: number;
+  coinbase?: string;
+  sequence?: number;
+  /** Historical output content observed with this spend, not current UTXO status. */
+  prevout?: TxOutputDetails;
+}
+export interface TxOutput extends TxOutputDetails {
+  n: number;
 }
 export interface Transaction {
   txid: string;

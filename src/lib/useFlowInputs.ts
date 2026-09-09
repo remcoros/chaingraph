@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
+import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
+import { mergeTransactionObservations } from '../domain/prevouts';
 import { mapLimit } from './api';
 
 /** Default navigation resolves only the selected outpoint. Bulk input details are explicit. */
@@ -9,11 +11,16 @@ export function flowInputPlan(workspace: Workspace, selected?: GraphNode, allInp
   const current =
     related.find(({ tx }) => tx.txid === workspace.view.transactionFlow?.transactionId) ??
     related[0];
+  const prevouts = indexPreviousOutputs(workspace);
   const missing = new Set(
     allInputs
-      ? (current?.tx.vin.flatMap((input) =>
-          input.txid && !workspace.transactions[input.txid] ? [input.txid] : [],
-        ) ?? [])
+      ? (current?.tx.vin.flatMap((input) => {
+          if (!input.txid || workspace.transactions[input.txid]) return [];
+          const resolution = resolvePreviousOutput(workspace, input, prevouts);
+          return resolution.status === 'missing' || resolution.status === 'conflict'
+            ? [input.txid]
+            : [];
+        }) ?? [])
       : [],
   );
   if (selected?.kind === 'output' && selected.txid && !workspace.transactions[selected.txid])
@@ -61,7 +68,12 @@ export function mergeFlowInputs(
     contextTransactionIds: provenance.size ? [...provenance] : undefined,
     transactions: {
       ...workspace.transactions,
-      ...Object.fromEntries(loaded.map((tx) => [tx.txid, tx])),
+      ...Object.fromEntries(
+        loaded.map((tx) => [
+          tx.txid,
+          mergeTransactionObservations(workspace.transactions[tx.txid], tx, workspace.network),
+        ]),
+      ),
     },
   };
 }

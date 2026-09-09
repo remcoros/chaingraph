@@ -130,8 +130,8 @@ export function WalletReviewFlow({
       <div className="wallet-flow-footnote">
         <span>
           {context.missingPrevouts > 0
-            ? `${context.missingPrevouts} input details missing`
-            : 'Loaded transaction links'}
+            ? `${context.missingPrevouts} previous-output details unavailable`
+            : 'Previous-output details available'}
         </span>
         <WalletHelp title="Wallet flow evidence" active={active}>
           <p>

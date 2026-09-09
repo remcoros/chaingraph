@@ -1,4 +1,5 @@
 import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
+import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
 import {
   canonicalTransactionId,
   validOutputIndex,
@@ -131,15 +132,21 @@ export function walletCounterpartyInputPlan(
   );
   const missing = new Set<string>();
   const unavailable = new Set<string>();
+  const prevouts = indexPreviousOutputs(workspace);
   for (const ref of evidence.contexts.flatMap((context) => context.refs)) {
+    const resolution = resolvePreviousOutput(workspace, ref, prevouts);
+    if (resolution.status === 'loaded' || resolution.status === 'attached') continue;
     if (!workspace.transactions[ref.txid]) missing.add(ref.txid);
-    else if (!loaded(workspace, ref.txid)?.vout.some((output) => output.n === ref.vout))
-      unavailable.add(ref.id);
+    else unavailable.add(ref.id);
   }
   const nonAddress = new Set<string>();
   for (const entry of [...groups.sourceExceptions, ...groups.destinationExceptions]) {
     if (entry.missing) continue;
-    const output = loaded(workspace, entry.txid)?.vout.find((item) => item.n === entry.vout);
+    const resolution = resolvePreviousOutput(workspace, entry, prevouts);
+    const output =
+      resolution.status === 'loaded' || resolution.status === 'attached'
+        ? resolution.output
+        : undefined;
     const script = walletOutputEvidence(output, workspace.network);
     if (script.scripthash && !script.address) nonAddress.add(entry.id);
     else if (!script.address) unavailable.add(entry.id);

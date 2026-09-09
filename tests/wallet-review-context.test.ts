@@ -255,6 +255,7 @@ describe('wallet selected review context', () => {
       currentOutputs: [],
       role: 'unknown-output',
     });
+
     expect(context.selected).toMatchObject({
       id: outputNodeId(id(8), 0),
       ownership: 'unknown',
@@ -273,6 +274,44 @@ describe('wallet selected review context', () => {
       ownership: 'unknown',
     });
     expect(coinbase.missingPrevouts).toBe(0);
+  });
+
+  it('uses attached input evidence without treating the parent transaction as loaded', () => {
+    const workspace = fixture();
+    delete workspace.transactions[parent.txid];
+    workspace.transactions[shared.txid] = {
+      ...shared,
+      vin: [
+        {
+          txid: parent.txid,
+          vout: 0,
+          prevout: { value: 1, scriptPubKey: { hex: script(mine) } },
+        },
+        ...shared.vin.slice(1),
+      ],
+    };
+    const context = buildWalletReviewContext(
+      workspace,
+      wallet,
+      item(outputNodeId(parent.txid, 0), { txid: parent.txid }),
+    );
+    expect(context.status).toBe('missing');
+    expect(context.selected).toMatchObject({
+      valueSats: 100_000_000,
+      ownership: 'wallet',
+      missing: false,
+      prevoutStatus: 'attached',
+    });
+    const spendingContext = buildWalletReviewContext(
+      workspace,
+      wallet,
+      item(`tx:${shared.txid}`, { reason: 'new-activity' }),
+    );
+    expect(spendingContext.inputs[0]).toMatchObject({
+      ownership: 'wallet',
+      missing: false,
+      prevoutStatus: 'attached',
+    });
   });
 
   it('preserves all rows and canonical metadata references for compact presentation', () => {

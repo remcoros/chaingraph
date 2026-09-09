@@ -405,6 +405,27 @@ describe('read-only proxy', () => {
     expect((await f.rpc('getblock', [hash], 'core')).status).toBe(413);
     expect((await f.rpc('gettxout', [hash, 0], 'core')).status).toBe(504);
   });
+  it('exposes only the machine-readable verbosity-2 fallback code', async () => {
+    const f = await fixture({
+      core: (rpc, res) => {
+        if (rpc.method !== 'getrawtransaction') return false;
+        res.end(
+          JSON.stringify({
+            id: rpc.id,
+            error: { code: -32603, message: 'private block path and storage details' },
+          }),
+        );
+        return true;
+      },
+    });
+    expect(await (await f.rpc('getrawtransaction', [hash, 2], 'core')).json()).toEqual({
+      error: 'Bitcoin RPC previous-output data is unavailable',
+      code: 'core_prevout_unavailable',
+    });
+    expect(await (await f.rpc('getrawtransaction', [hash, 1], 'core')).json()).toEqual({
+      error: 'Bitcoin RPC rejected the request',
+    });
+  });
   it('reports rejected Core authentication without forwarding its HTTP body', async () => {
     const f = await fixture({
       core: (rpc, res) => {

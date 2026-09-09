@@ -21,6 +21,11 @@ import {
 } from '../domain/types';
 import { walletEvidenceChanged } from '../domain/walletActivity';
 import { outputAddress } from '../domain/workspace';
+import {
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  type PreviousOutputIndex,
+} from '../domain/prevouts';
 import './analysis-workbench.css';
 
 export interface AnalysisWorkbenchSession {
@@ -46,17 +51,23 @@ function EvidenceReference({
   id,
   workspace,
   onGraph,
+  prevouts,
 }: {
   id: string;
   workspace: Workspace;
   onGraph: AnalysisWorkbenchProps['onGraph'];
+  prevouts: PreviousOutputIndex;
 }) {
   const [prefix, txid, index] = id.split(':');
   const kind = prefix === 'out' ? 'Output' : prefix === 'tx' ? 'Transaction' : 'Address';
   const reference = id.slice(id.indexOf(':') + 1);
-  const output =
+  const resolution =
     prefix === 'out'
-      ? workspace.transactions[txid]?.vout.find((item) => item.n === Number(index))
+      ? resolvePreviousOutput(workspace, { txid, vout: Number(index) }, prevouts)
+      : undefined;
+  const output =
+    resolution?.status === 'loaded' || resolution?.status === 'attached'
+      ? resolution.output
       : undefined;
   const address = output && outputAddress(output);
   const label = workspace.annotations[id]?.label;
@@ -114,6 +125,7 @@ export function AnalysisWorkbench({
   const [limit, setLimit] = useState(saved?.limit ?? 40);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const pending = useRef<AbortController | undefined>(undefined);
   const latest = useRef(workspace);
   latest.current = workspace;
@@ -512,7 +524,13 @@ export function AnalysisWorkbench({
                   <h4>Affected entities</h4>
                   <ul className="scan-evidence" aria-label="Affected entities">
                     {[...new Set(detail.nodeIds)].map((id) => (
-                      <EvidenceReference key={id} id={id} workspace={workspace} onGraph={onGraph} />
+                      <EvidenceReference
+                        key={id}
+                        id={id}
+                        workspace={workspace}
+                        onGraph={onGraph}
+                        prevouts={prevouts}
+                      />
                     ))}
                   </ul>
                 </>
@@ -527,6 +545,7 @@ export function AnalysisWorkbench({
                         id={txNodeId(txid)}
                         workspace={workspace}
                         onGraph={onGraph}
+                        prevouts={prevouts}
                       />
                     ))}
                   </ul>
@@ -547,10 +566,11 @@ export function AnalysisWorkbench({
               )}
               <h3>Interpretation and limits</h3>
               <p>
-                These checks use the loaded snapshot. Missing parents, undiscovered addresses and
-                unloaded spenders limit coverage. A hypothesis does not prove common ownership.
-                Collaborative transactions, including CoinJoin and PayJoin, can invalidate ownership
-                assumptions. Bitcoin does not record which input funded a particular output.
+                These checks use the loaded snapshot. Missing previous-output details, undiscovered
+                addresses and unloaded spenders limit coverage. A hypothesis does not prove common
+                ownership. Collaborative transactions, including CoinJoin and PayJoin, can
+                invalidate ownership assumptions. Bitcoin does not record which input funded a
+                particular output.
               </p>
               {tool && (
                 <a href={tool.source.url} target="_blank" rel="noreferrer">

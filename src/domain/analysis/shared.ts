@@ -7,6 +7,7 @@ import {
   type TxOutput,
   type Workspace,
 } from '../types';
+import { indexPreviousOutputs, resolvePreviousOutput, type PreviousOutputIndex } from '../prevouts';
 
 export type AnalysisScope = 'graph' | 'selection';
 export type AnalysisKind = 'observation' | 'hypothesis' | 'incomplete';
@@ -44,6 +45,7 @@ export interface AnalysisTool {
 export interface AnalysisContext {
   workspace: Workspace;
   transactions: Transaction[];
+  prevouts: PreviousOutputIndex;
   createdAt: string;
   options: AnalysisOptions;
 }
@@ -61,6 +63,7 @@ export function defineTool(definition: ToolDefinition): AnalysisTool {
     const report = execute({
       workspace,
       transactions,
+      prevouts: indexPreviousOutputs(workspace),
       options,
       createdAt: new Date().toISOString(),
     });
@@ -169,13 +172,17 @@ export function finding(
     createdAt: context.createdAt,
   };
 }
-export function referencedInputs(workspace: Workspace, tx: Transaction) {
+export function referencedInputs(
+  workspace: Workspace,
+  tx: Transaction,
+  prevouts: PreviousOutputIndex = indexPreviousOutputs(workspace),
+) {
   return tx.vin
     .filter((input) => input.txid !== undefined && input.vout !== undefined)
     .map((input) => ({
       txid: input.txid!,
       vout: input.vout!,
       nodeId: outputNodeId(input.txid!, input.vout!),
-      output: workspace.transactions[input.txid!]?.vout.find((output) => output.n === input.vout),
+      resolution: resolvePreviousOutput(workspace, input, prevouts),
     }));
 }
