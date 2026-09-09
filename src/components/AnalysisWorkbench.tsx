@@ -680,7 +680,6 @@ export function AnalysisWorkbench({
         </div>
       )}
       <div className="scan-results-heading">
-        <h2>Findings</h2>
         <WalletCategoryFilter
           active={active}
           title="Analysis finding types"
@@ -711,30 +710,20 @@ export function AnalysisWorkbench({
               <span className="wallet-count">{filtered.priorities[priority]}</span>
             </button>
           ))}
-          <WalletHelp title="Review priority rules" active={active}>
-            Review order, not confidence, ownership certainty or a danger rating. High: reconciled
-            fee rate at or above your threshold. Medium: hypotheses, address repeats across
-            transactions, or distinct wallet-record inputs without overlapping imports. Low: other
-            observations and missing data. Counts match type and evidence filters, ignoring priority
-            selection. Older findings use evidence kind until rerun.
-          </WalletHelp>
         </div>
-        <label>
-          Evidence
-          <select
-            aria-label="Finding evidence"
-            value={kind}
-            onChange={(event) => {
-              setKind(event.target.value);
-              setLimit(40);
-            }}
-          >
-            <option value="all">All evidence</option>
-            <option value="observation">Observations</option>
-            <option value="hypothesis">Hypotheses</option>
-            <option value="incomplete">Incomplete data</option>
-          </select>
-        </label>
+        <select
+          aria-label="Finding evidence"
+          value={kind}
+          onChange={(event) => {
+            setKind(event.target.value);
+            setLimit(40);
+          }}
+        >
+          <option value="all">All evidence</option>
+          <option value="observation">Observations</option>
+          <option value="hypothesis">Hypotheses</option>
+          <option value="incomplete">Incomplete data</option>
+        </select>
         {(scan || workspace.findings.length > 0) && (
           <span className="muted">
             {findings.length} result{findings.length === 1 ? '' : 's'}
