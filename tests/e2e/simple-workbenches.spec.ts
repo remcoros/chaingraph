@@ -267,6 +267,77 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   expect(calls).toEqual([]);
 });
 
+for (const phone of [false, true]) {
+  test(`keyboard workbench handoff reaches Graph and returns to the exact Analysis invoker (${phone ? 'phone' : 'desktop'})`, async ({
+    page,
+  }) => {
+    const { calls } = await seed(page);
+    if (phone) await page.setViewportSize({ width: 390, height: 844 });
+    await workbench(page, 'Analysis').click();
+    const analysis = page.locator('.analysis-workbench');
+    await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+    const canvas = page.locator('.graph-canvas canvas');
+    const invokers = [
+      analysis.getByRole('button', { name: 'Show on graph', exact: true }),
+      analysis.getByRole('button', { name: 'Isolate', exact: true }),
+      analysis.getByRole('button', { name: /^Show output/ }).first(),
+      analysis.getByRole('button', { name: /^Show address/ }).first(),
+      analysis.getByRole('button', { name: /^Show transaction/ }).first(),
+    ];
+    for (const invoker of invokers) {
+      await invoker.focus();
+      await page.keyboard.press('Enter');
+      await expect(canvas).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            Boolean(document.activeElement?.closest('[aria-label="Graph navigation"]')),
+          ),
+        )
+        .toBe(true);
+      await page.getByRole('button', { name: 'Back to Analysis', exact: true }).focus();
+      await page.keyboard.press('Enter');
+      await expect(invoker).toBeFocused();
+      await expect(analysis.getByLabel('Scan scope')).toHaveValue('context');
+    }
+    await screenshot(page, `keyboard-analysis-return-${phone ? 'phone' : 'desktop'}`);
+    expect(calls).toEqual([]);
+  });
+}
+
+test('keyboard workbench return falls back when the originating finding is replaced or cleared', async ({
+  page,
+}) => {
+  await seed(page);
+  const analysis = page.locator('.analysis-workbench');
+  await workbench(page, 'Analysis').click();
+  await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
+  for (const remove of [false, true]) {
+    const invoker = analysis.getByRole('button', { name: 'Show on graph', exact: true });
+    const original = await invoker.elementHandle();
+    await invoker.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.graph-canvas canvas')).toBeFocused();
+    await workbench(page, 'Analysis').focus();
+    await page.keyboard.press('Enter');
+    await expect(workbench(page, 'Analysis')).toBeFocused();
+    if (remove) await analysis.getByRole('button', { name: 'Clear all', exact: true }).click();
+    else await analysis.locator('.scan-result-list button').nth(1).click();
+    expect(await original!.evaluate((element) => element.isConnected)).toBe(false);
+    await workbench(page, 'Graph').focus();
+    await page.keyboard.press('Enter');
+    await expect(workbench(page, 'Graph')).toBeFocused();
+    await page.getByRole('button', { name: 'Back to Analysis', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('region', { name: 'Analysis workspace', exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(analysis.getByRole('button', { name: 'Scan', exact: true })).toBeFocused();
+  }
+});
+
 // Retain the original journeys while the Trace workbench is intentionally disabled.
 test.skip('Trace requires an output choice, follows one explicit branch and shares encrypted annotations', async ({
   page,

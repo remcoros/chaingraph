@@ -465,7 +465,7 @@ export function AnalysisWorkbench({
             )}
           </div>
           {detail && (
-            <article className="scan-detail" aria-label="Selected finding">
+            <article key={detail.id} className="scan-detail" aria-label="Selected finding">
               <span className="scan-result-kind">
                 {detail.kind ?? 'hypothesis'}
                 {detail.excluded ? ' · Excluded finding' : ''}

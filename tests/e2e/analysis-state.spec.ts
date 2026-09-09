@@ -116,3 +116,45 @@ test('an invalid optional setting reports that tool error while the rest of the 
   await expect(analysis.locator('.scan-result-list button').first()).toBeVisible();
   expect(calls).toHaveLength(0);
 });
+
+test('keyboard workbench return does not retain invokers across workspace switches or locking', async ({
+  page,
+}) => {
+  await prepare(page);
+  await unlock(page, 'Analysis A');
+  await page
+    .locator('.analysis-workbench')
+    .getByRole('button', { name: 'Scan', exact: true })
+    .click();
+  const invoker = page.getByRole('button', { name: 'Show on graph', exact: true });
+  const original = await invoker.elementHandle();
+  await invoker.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.graph-canvas canvas')).toBeFocused();
+  await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
+  await unlock(page, 'Analysis B');
+  await nav(page).getByRole('button', { name: 'Graph', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Back to Analysis', exact: true })).toHaveCount(0);
+  expect(await original!.evaluate((element) => element.isConnected)).toBe(false);
+  await page.locator('.workspace-tab[title="Analysis A"]').click();
+  await expect(page.getByRole('button', { name: 'Back to Analysis', exact: true })).toHaveCount(0);
+  await nav(page).getByRole('button', { name: 'Analysis', exact: true }).click();
+  await page.getByRole('button', { name: 'Show on graph', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.graph-canvas canvas')).toBeFocused();
+  await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
+  await expect(page.locator('.workspace-tab[title="Analysis A"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
+  // This workspace was locked in Graph, so use the unlock dialog directly.
+  await page.locator('.saved-row').filter({ hasText: 'Analysis A' }).click();
+  const modal = page.getByRole('dialog', { name: 'Unlock workspace', exact: true });
+  await modal.getByLabel('Password').fill(password);
+  await modal.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+  await expect(modal).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Back to Analysis', exact: true })).toHaveCount(0);
+  await nav(page).getByRole('button', { name: 'Analysis', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(nav(page).getByRole('button', { name: 'Analysis', exact: true })).toBeFocused();
+});

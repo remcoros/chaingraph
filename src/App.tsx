@@ -148,6 +148,38 @@ export default function App() {
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
   const [workbench, setWorkbench] = useState<'graph' | 'analysis'>('graph');
   const [returnWorkbench, setReturnWorkbench] = useState<'analysis'>();
+  const graphWorkspaceRef = useRef<HTMLElement>(null);
+  const analysisWorkspaceRef = useRef<HTMLElement>(null);
+  const analysisInvoker = useRef<{ workspaceId: string; element: HTMLElement } | undefined>(
+    undefined,
+  );
+  const pendingWorkbenchFocus = useRef<
+    { workspaceId: string; mode: 'graph' | 'analysis' } | undefined
+  >(undefined);
+  // Transfer focus only for explicit cross-workbench actions, never during graph gestures.
+  useLayoutEffect(() => {
+    const pending = pendingWorkbenchFocus.current;
+    pendingWorkbenchFocus.current = undefined;
+    if (!pending || pending.workspaceId !== w?.id || pending.mode !== workbench) return;
+    if (workbench === 'graph') {
+      const destination = graphWorkspaceRef.current?.querySelector<HTMLElement>(
+        '.graph-canvas:not([aria-hidden="true"]) canvas',
+      );
+      (destination ?? graphWorkspaceRef.current)?.focus({ preventScroll: true });
+    } else {
+      const invoker = analysisInvoker.current;
+      const element = invoker?.element;
+      if (
+        invoker?.workspaceId === w?.id &&
+        element?.isConnected &&
+        analysisWorkspaceRef.current?.contains(element) &&
+        !element.matches(':disabled') &&
+        element.getClientRects().length
+      )
+        element.focus();
+      else analysisWorkspaceRef.current?.focus();
+    }
+  }, [w?.id, workbench]);
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
@@ -490,6 +522,8 @@ export default function App() {
         : 'graph',
     );
     setReturnWorkbench(undefined);
+    analysisInvoker.current = undefined;
+    pendingWorkbenchFocus.current = undefined;
     setLockingWorkspace(false);
     setMobilePanel(w?.view.mobilePanel ?? 'graph');
     setPrefetchDepth(w?.view.prefetchDepth ?? 0);
@@ -1172,7 +1206,9 @@ export default function App() {
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
-  function switchWorkbench(next: 'graph' | 'analysis') {
+  function switchWorkbench(next: 'graph' | 'analysis', handoffFocus = false) {
+    pendingWorkbenchFocus.current =
+      handoffFocus && w ? { workspaceId: w.id, mode: next } : undefined;
     flushActiveGraph();
     setWorkbench(next);
   }
@@ -1199,8 +1235,13 @@ export default function App() {
     );
   }
   function showFindingOnGraph(ids: string[], isolate = false) {
+    const invoker = document.activeElement;
+    analysisInvoker.current =
+      w && invoker instanceof HTMLElement && analysisWorkspaceRef.current?.contains(invoker)
+        ? { workspaceId: w.id, element: invoker }
+        : undefined;
     setReturnWorkbench('analysis');
-    switchWorkbench('graph');
+    switchWorkbench('graph', true);
     const id = ids.find((candidate) => !hiddenIds.has(candidate)) ?? ids[0];
     if (isolate) {
       prepareIsolation(ids);
@@ -1471,7 +1512,10 @@ export default function App() {
               </button>
             ))}
             {workbench === 'graph' && returnWorkbench && (
-              <button className="workbench-return" onClick={() => switchWorkbench(returnWorkbench)}>
+              <button
+                className="workbench-return"
+                onClick={() => switchWorkbench(returnWorkbench, true)}
+              >
                 <ArrowLeft size={14} />
                 Back to Analysis
               </button>
@@ -1643,6 +1687,7 @@ export default function App() {
           </div>
           <main
             hidden={workbench !== 'graph' && !tourStep}
+            ref={graphWorkspaceRef}
             id="main-workspace"
             tabIndex={-1}
             className={`workbench show-${shownMobilePanel} ${shownFocusGraph ? 'focus-graph' : ''}`}
@@ -2067,6 +2112,7 @@ export default function App() {
           <section
             className="workbench-page"
             hidden={workbench !== 'analysis' || !!tourStep}
+            ref={analysisWorkspaceRef}
             id="analysis-workspace"
             tabIndex={-1}
             aria-label="Analysis workspace"
