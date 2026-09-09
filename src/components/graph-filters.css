@@ -1,0 +1,145 @@
+.filter-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filter-fields > label,
+.filter-field-pair > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--color-muted);
+}
+.filter-fields select,
+.filter-fields input[type='text'] {
+  font-size: 11px;
+  padding: 6px 8px;
+  min-height: 32px;
+  width: 100%;
+}
+.filter-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.filter-fields .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink);
+  font-size: 11px;
+}
+.filter-fields p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.filter-field-error {
+  color: var(--color-warn, #e4af67);
+}
+.filter-amount-field .small-amount-control select {
+  width: 100%;
+}
+.filter-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-rule);
+}
+.filter-popover-actions button {
+  gap: 5px;
+  font-size: 11px;
+  min-height: 32px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 3px 2px 7px;
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.filter-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 210px;
+}
+.filter-chip > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  min-width: 20px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.filter-chip > button:hover {
+  background: var(--color-wash, var(--color-raised));
+  color: var(--color-ink);
+}
+.filter-chip-scope {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-rule));
+  color: var(--color-accent);
+}
+.filter-chip-hidden {
+  border-style: dashed;
+  color: var(--color-muted);
+}
+.filter-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+.graph-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.graph-filter-trigger.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+}
+.graph-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: 9px;
+}
+@media (max-width: 999px) {
+  .filter-chip > button {
+    min-height: 28px;
+    min-width: 28px;
+  }
+  .filter-chip {
+    font-size: 11px;
+  }
+}

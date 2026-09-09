@@ -28,7 +28,7 @@ async function openWorkspace(page: Page, icon = '') {
   await page.goto('/');
   await page.locator('.saved-row').click();
   const dialog = page.getByRole('dialog', { name: 'Unlock workspace' });
-  await dialog.getByLabel('Password').fill(password);
+  await dialog.getByLabel('Password', { exact: true }).fill(password);
   await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('transaction');

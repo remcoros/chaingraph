@@ -18,6 +18,7 @@ import {
 } from '../domain/types';
 import { walletCheckAge } from '../domain/walletActivity';
 import type { GraphFilters } from '../domain/graphFilters';
+import type { EntitySelection } from '../lib/useEntitySelection';
 import EntityBrowser from './EntityBrowser';
 interface Props {
   w: Workspace;
@@ -44,9 +45,12 @@ interface Props {
   entityKind: string;
   setEntityKind: (kind: string) => void;
   entityNodes: GraphNode[];
+  /** Entities offered for batch edits; connected context is excluded. */
+  entityBatchNodes?: GraphNode[];
   bookmarks: [string, Annotation][];
   graphFilters?: GraphFilters;
   onGraphFiltersChange?: (filters: GraphFilters) => void;
+  onResetGraphFilters?: () => void;
   entityTotalCount?: number;
   contextCount?: number;
   hiddenNodeIds?: readonly string[];
@@ -58,6 +62,7 @@ interface Props {
   transactions?: Record<string, Transaction>;
   removableNodeIds?: readonly string[];
   onRemoveNode?: (id: string) => void;
+  selection?: EntitySelection;
 }
 export function WorkspacePanel({
   w,
@@ -84,9 +89,11 @@ export function WorkspacePanel({
   entityKind,
   setEntityKind,
   entityNodes,
+  entityBatchNodes,
   bookmarks,
   graphFilters,
   onGraphFiltersChange,
+  onResetGraphFilters,
   entityTotalCount,
   contextCount,
   hiddenNodeIds,
@@ -98,6 +105,7 @@ export function WorkspacePanel({
   transactions,
   removableNodeIds,
   onRemoveNode,
+  selection,
 }: Props) {
   return (
     <aside className="left-panel" data-tour="wallet-panel">
@@ -240,10 +248,13 @@ export function WorkspacePanel({
         <EntityBrowser
           key={w.id}
           nodes={entityNodes}
+          batchNodes={entityBatchNodes}
           annotations={w.annotations}
           filters={
             graphFilters ?? { query: entityFilter, kind: entityKind as GraphFilters['kind'] }
           }
+          onResetFilters={onResetGraphFilters}
+          extraFiltersActive={!!w.view.smallAmountThreshold}
           onFiltersChange={
             onGraphFiltersChange ??
             ((filters) => {
@@ -264,6 +275,9 @@ export function WorkspacePanel({
           transactions={transactions ?? w.transactions}
           removableNodeIds={removableNodeIds}
           onRemoveNode={onRemoveNode}
+          wallets={w.wallets}
+          tags={w.tags}
+          selection={selection}
         />
       ) : (
         <div className="entity-list">

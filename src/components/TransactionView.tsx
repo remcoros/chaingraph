@@ -23,6 +23,8 @@ import { CopyButton } from './CopyButton';
 import { OpReturnData } from './OpReturnData';
 import './transaction-view.css';
 import type { VisibilityProps } from './VisibilityActions';
+import { SelectionCheckbox } from './SelectionToolbar';
+import type { EntitySelection } from '../lib/useEntitySelection';
 
 interface Props extends VisibilityProps {
   workspace: Workspace;
@@ -40,6 +42,7 @@ interface Props extends VisibilityProps {
   renderMetadata?: (nodeId: string) => ReactNode;
   state?: TransactionFlowState;
   onStateChange?: (state: TransactionFlowState) => void;
+  selection?: EntitySelection;
 }
 interface Row {
   id?: string;
@@ -65,6 +68,7 @@ function TransactionRows({
   renderMetadata,
   state,
   onStateChange,
+  selection,
   spends,
   onNavigate,
   identity,
@@ -284,10 +288,18 @@ function TransactionRows({
                 return (
                   <div
                     key={row.index}
-                    className={`transaction-row ${matches(row) ? 'is-selected' : ''}`}
+                    className={`transaction-row ${matches(row) ? 'is-selected' : ''} ${row.id && selection?.has(row.id) ? 'is-batch-selected' : ''}`}
                     data-selected={matches(row)}
                     ref={matches(row) ? selectedRow : undefined}
                   >
+                    {selection?.mode && row.id && (
+                      <SelectionCheckbox
+                        id={row.id}
+                        label={`${inputs ? 'input' : 'output'} ${row.index}`}
+                        checked={selection.has(row.id)}
+                        onToggle={selection.toggle}
+                      />
+                    )}
                     <div className="transaction-row-content">
                       <button
                         type="button"
@@ -298,7 +310,12 @@ function TransactionRows({
                         title={
                           row.id ? `${address ? `${address}\n` : ''}${row.id.slice(4)}` : 'Coinbase'
                         }
-                        onClick={() => row.id && onSelect(row.id)}
+                        onClick={(event) => {
+                          if (!row.id) return;
+                          if (selection && (event.ctrlKey || event.metaKey))
+                            selection.toggle(row.id);
+                          else onSelect(row.id);
+                        }}
                       >
                         <span className="transaction-row-index">#{row.index}</span>
                         <span className="transaction-row-main">

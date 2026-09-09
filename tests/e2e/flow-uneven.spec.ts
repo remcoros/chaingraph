@@ -52,7 +52,7 @@ test('both flow collapse controls remain reachable through uneven expanded lanes
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   const flow = page.locator('.transaction-view');
   await flow.getByRole('button', { name: 'Show all 40 inputs', exact: true }).click();

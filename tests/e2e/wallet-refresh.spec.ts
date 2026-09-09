@@ -314,9 +314,10 @@ test('shows wallet script matches without making requests or acknowledging new a
   await createAndLoad(page);
   const requests = fixture.calls.length;
   await page.getByRole('button', { name: 'Show wallet matches', exact: true }).click();
-  await expect(page.getByLabel('Graph visibility', { exact: true })).toContainText(
-    'Public BIP84 wallet',
-  );
+  await expect(page.locator('.filter-chip')).toContainText([
+    'Wallet: Public BIP84 wallet',
+    'Connected context shown',
+  ]);
   expect(fixture.calls).toHaveLength(requests);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('output');
@@ -328,6 +329,6 @@ test('shows wallet script matches without making requests or acknowledging new a
     'Wallet: Public BIP84 wallet',
   );
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
-  await expect(page.getByLabel('Graph visibility', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.filter-chip')).toHaveCount(0);
   expect(fixture.calls).toHaveLength(requests);
 });

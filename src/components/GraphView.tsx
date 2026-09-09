@@ -1,6 +1,7 @@
 import { transactionStatus } from '../domain/transactionStatus';
 import {
   ArrowLeftFromLine,
+  CheckSquare,
   Crosshair,
   Pencil,
   X,
@@ -47,6 +48,10 @@ export interface GraphViewProps extends VisibilityProps {
   links: GraphLink[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  /** Shared multiple-selection state; the renderer stays free of selection logic. */
+  selectionMode?: boolean;
+  batchSelectedIds?: readonly string[];
+  onToggleSelection?: (id: string) => void;
   dimensions: 2 | 3;
   sizeBy: 'uniform' | 'value' | 'degree';
   glow: boolean;
@@ -191,13 +196,17 @@ export default function GraphView(props: GraphViewProps) {
           if (hit?.type === 'node') requestCard(hit.id);
           else scheduleCardClose();
         },
-        select: ({ hit }) => {
+        select: ({ hit, point }) => {
           if (!hit) {
             dismissCard();
             return;
           }
           const node = resolveGraphHit(hit, current.current.nodes, current.current.links);
-          if (node) current.current.onSelect(node.id);
+          if (!node) return;
+          const toggle = Boolean(point.modifiers?.ctrl || point.modifiers?.meta);
+          if ((toggle || current.current.selectionMode) && current.current.onToggleSelection)
+            current.current.onToggleSelection(node.id);
+          else current.current.onSelect(node.id);
         },
         dismiss: () => dismissCard(),
         error: () => setError(true),
@@ -426,6 +435,21 @@ export default function GraphView(props: GraphViewProps) {
                 >
                   <Crosshair size={15} />
                 </button>
+                {props.onToggleSelection && (
+                  <button
+                    type="button"
+                    aria-label={
+                      props.batchSelectedIds?.includes(hoveredNode.id)
+                        ? 'Remove from batch selection'
+                        : 'Add to batch selection'
+                    }
+                    aria-pressed={props.batchSelectedIds?.includes(hoveredNode.id) ?? false}
+                    title="Add or remove this item in the batch selection"
+                    onClick={() => props.onToggleSelection?.(hoveredNode.id)}
+                  >
+                    <CheckSquare size={15} />
+                  </button>
+                )}
                 {props.onTrace && hoveredNode.kind !== 'address' && (
                   <button
                     type="button"

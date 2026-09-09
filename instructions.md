@@ -77,15 +77,65 @@ Select an item to add a label, note, icon, or bookmark in its inspector. The ico
 
 ## Filter and navigate
 
-The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
+The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, tag state or one tag, wallet membership, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. The graph navigation has the same **Filters** popover. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
+
+Active filters appear as removable chips under the graph navigation. Remove one chip to drop one restriction, or choose **Reset filters** to clear all of them, including the canvas amount threshold. The transaction flow keeps its independent amount setting. Manual hiding is deliberately separate: a dashed chip counts manually hidden entities and restores them, and resetting filters never unhides anything. The batch toolbar and finding **Isolate** actions show an **Isolated N entities** chip. Removing it clears that isolation while retaining other filters. The navigation toggle **Isolate selection** instead shows a **1 hop from selection** or **2 hops from selection** chip. Wallet membership comes from derived addresses and is not proof of ownership. An output with no loaded spend is unknown, never proven unspent.
 
 Navigation floats at the top of the graph canvas once transactions are loaded. On narrow screens, navigation uses compact icons with accessible names and tooltips.
 
-**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Isolate selection**, next to **Lock to selection**, toggles the same path filter. It starts at one connection and follows your selection; choose two connections in **Paths** for a wider view. Turning isolation off or choosing **Reset filters** clears graph filters while preserving deliberate manual hiding. **Center selection** reveals selections omitted by filters and moves the camera. Manually hidden entities remain hidden until explicitly restored. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Hide panels**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
+**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Select matching** excludes connected context, while a context entity you tick or Ctrl/Cmd click yourself stays a batch target. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Isolate selection**, next to **Lock to selection**, toggles the same path filter. It starts at one connection and follows your selection; choose two connections in **Paths** for a wider view. Turning isolation off or choosing **Reset filters** clears graph filters while preserving deliberate manual hiding. **Center selection** reveals selections omitted by filters and moves the camera. Manually hidden entities remain hidden until explicitly restored. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Hide panels**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
+
+## Select several entities and edit them together
+
+**Select** in the graph navigation or in **Entities** turns on selection mode. Checkboxes
+appear on entity rows and transaction flow rows, and Ctrl or Cmd click toggles an entity
+on the canvas, in the list or in the flow. A plain click keeps inspecting and navigating
+as before. The floating selection toolbar reports how many entities are selected and how
+many of them are not currently on the canvas.
+
+**Select N matching …** takes exactly the entities matching your current filters, stating
+the count and the entity type before you use it. Selections never grow because results
+changed, are cleared when you switch workspaces, and lose an entity only when it is
+actually removed from the workspace.
+
+**Label**, **Tag** and **Icon** open small editors anchored to the toolbar. The label
+editor offers **Only unlabeled**, reports how many entities it will change and how many
+existing labels it would replace, and lists differing existing labels so a mixed value is
+never overwritten by simply opening the control. The tag editor adds or removes direct
+membership with explicit counts, or creates a tag for the selection. Icons use the shared
+palette, including an explicit **Clear icon**. Notes, bookmarks and untargeted fields stay
+unchanged.
+
+**Hide** removes the selected entities from the canvas while keeping their data, and the
+hidden chip restores them. **Isolate** restricts the graph to the selection and its connected context; the isolation and context chips make both scopes visible. **Clear** empties the
+selection. Every applied batch saves automatically and is a single Undo step, from the
+toolbar's **Undo** or the header. Escape, the close button or clicking outside dismisses
+an editor without changing anything.
+
+## Review a wallet
+
+Open **Wallet** and choose an imported watch-only wallet. The review queue combines
+current UTXO observations, their sources and newly discovered activity. Coverage
+and continuation messages describe the checked snapshot; use **Load more** when
+pending items remain outside the displayed batch. **Records** provides addresses,
+transactions and outputs with review filters and explicit batch selection.
+
+Select an item to label it, record its source or destination, or open it in Graph,
+the Inspector or Analysis. Use **Back to Wallet** to return to the same review item.
+Batch labels, tags and icons apply only to the selected records. **Review later**
+keeps an item pending, including after locking and reopening the workspace.
+Marking it reviewed or explicitly recording its source as unknown completes that
+review decision. Decisions belong to the selected wallet, even when another
+imported wallet covers the same addresses.
+
+Refresh the wallet to check for new activity. Existing annotations and review
+decisions remain, while newly discovered activity stays visible for review.
+Labels and wallet matches help organize your observations; neither is proof of
+ownership or a guarantee that spending coins together preserves privacy.
 
 ## Run analysis
 
-The compact **Graph** and **Analysis** navigation belongs to the unlocked workspace, below the workspace tabs. Graph keeps its camera, layout, Inspector and wallet tabs when you move between workbenches. The Trace workbench is disabled for now; saved workspaces last used in Trace open Graph.
+The compact **Wallet**, **Graph** and **Analysis** navigation belongs to the unlocked workspace, below the workspace tabs. Open Wallet to import a watch-only wallet or review an existing one. Graph keeps its camera, layout, Inspector and wallet tabs when you move between workbenches. The Trace workbench is disabled for now; saved workspaces last used in Trace open Graph.
 
 Open **Analysis** and press **Scan** to run every applicable existing tool. **Current selection** follows the selected transaction, output, address or wallet. Without a selection, it covers the loaded workspace, including data outside graph filters. Choose **Loaded workspace** to scan all loaded transactions explicitly. Outputs include their creating transaction and loaded exact spenders. Read the scope before scanning. Optional settings expose the registry defaults. No analysis request downloads chain data.
 
@@ -101,7 +151,7 @@ Results use the main screen, with a readable evidence and limits view. **Affecte
 | Script-type comparisons       | Observed input/output script patterns and optionally change-like hypotheses, with their limitations.                                                             |
 | Imported-wallet intersections | Transactions touching multiple imported wallet records, distinguishing overlapping imports from independent coverage.                                            |
 
-**Show on graph** selects and reveals a finding without isolating it. **Isolate** explicitly limits the view. Graph shows active filters with **Reset filters**, including saved isolation and path filters. Manual hiding is reported separately and remains in place until you choose **Show hidden**. Use **Back to Analysis** to return to the finding.
+**Show on graph** selects and reveals a finding without isolating it. **Isolate** explicitly limits the view. Graph shows removable filter chips with **Reset filters**, including saved isolation and path filters. Removing the **Isolated N entities** chip clears that isolation; other filters and manual hiding still apply. Manual hiding is reported separately and remains in place until you choose **Show** on the manual-hiding chip or another explicit restore action. Use **Back to Analysis** to return to the finding.
 
 Exclude a finding to remove its overlay, or restore it later. New wallet or transaction evidence marks old findings stale. Annotations remain independent from analysis.
 
@@ -207,7 +257,7 @@ calculation.
 **Show new activity** reveals newly loaded transactions and marks that notification
 as reviewed. The notification persists through later quiet checks and encrypted
 reopen. **Show wallet matches** reveals all loaded script matches and their connected
-transactions without acknowledging new activity. **All paths** clears these filters.
+transactions without acknowledging new activity. **Reset filters** clears these filters.
 The optional **Check activity every 30s** monitor runs only while unlocked and must
 be enabled again after reopen. Turning it off cancels its in-flight check.
 

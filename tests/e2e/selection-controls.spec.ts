@@ -51,12 +51,14 @@ test('selection lock and display options persist, and mobile panels ignore deskt
         const snapshot = w.view.graphSnapshot;
         const node = snapshot?.nodes.find((n) => n.id === `tx:${TX_FUNDING}`);
         if (!node || !snapshot) return false;
+        // Floating filter chips reserve space above the canvas, so a centered
+        // selection sits slightly below the camera target.
         return (
           Math.hypot(
             node.x - snapshot.camera.target.x,
             node.y - snapshot.camera.target.y,
             node.z - snapshot.camera.target.z,
-          ) < 2 &&
+          ) < 4 &&
           w.view.lockToSelection === true &&
           w.view.showLabels === false &&
           w.view.showTags === false &&

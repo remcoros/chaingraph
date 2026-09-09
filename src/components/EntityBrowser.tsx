@@ -6,19 +6,24 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  SlidersHorizontal,
+  CheckSquare,
   Trash2,
   X,
 } from 'lucide-react';
 import {
+  describeMatchScope,
   sortEntities,
   valueFilterError,
+  hasActiveFilters,
   type EntitySort,
   type GraphFilters,
 } from '../domain/graphFilters';
 import { formatSats, type Annotation, type GraphNode, type Transaction } from '../domain/types';
 import './entity-browser.css';
 import type { VisibilityProps } from './VisibilityActions';
+import { GraphFilterButton } from './GraphFilterControls';
+import { SelectionCheckbox } from './SelectionToolbar';
+import type { EntitySelection } from '../lib/useEntitySelection';
 
 interface Props extends VisibilityProps {
   transactions?: Record<string, Transaction>;
@@ -29,53 +34,30 @@ interface Props extends VisibilityProps {
   hiddenCount?: number;
   onShowAllHidden?: () => void;
   nodes: GraphNode[];
+  /** Rows eligible for batch actions; connected context is never included. */
+  batchNodes?: GraphNode[];
   annotations: Record<string, Annotation>;
   filters: GraphFilters;
   onFiltersChange: (filters: GraphFilters) => void;
+  onResetFilters?: () => void;
+  extraFiltersActive?: boolean;
   selectedId?: string;
   onSelect: (id: string) => void;
   totalCount?: number;
   contextCount?: number;
-}
-
-function SatoshiBound({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value?: number;
-  onChange: (value?: number) => void;
-}) {
-  const [text, setText] = useState(value?.toString() ?? '');
-  useEffect(() => {
-    if (value === undefined || Number.isFinite(value)) setText(value?.toString() ?? '');
-  }, [value]);
-  return (
-    <input
-      aria-label={label}
-      type="text"
-      inputMode="numeric"
-      placeholder="No limit"
-      value={text}
-      aria-invalid={
-        value !== undefined &&
-        (!Number.isSafeInteger(value) || value < 0 || value > 2_100_000_000_000_000)
-      }
-      onChange={(event) => {
-        const raw = event.target.value;
-        setText(raw);
-        onChange(raw === '' ? undefined : /^\d+$/.test(raw) ? Number(raw) : Number.NaN);
-      }}
-    />
-  );
+  wallets?: readonly { id: string; name: string }[];
+  tags?: readonly { id: string; name: string }[];
+  selection?: EntitySelection;
 }
 
 export default function EntityBrowser({
   nodes,
+  batchNodes,
   annotations,
   filters,
   onFiltersChange,
+  onResetFilters,
+  extraFiltersActive = false,
   selectedId,
   onSelect,
   totalCount = nodes.length,
@@ -89,6 +71,9 @@ export default function EntityBrowser({
   onVisibilityChange,
   hiddenCount = 0,
   onShowAllHidden,
+  wallets = [],
+  tags = [],
+  selection,
 }: Props) {
   const removable = useMemo(() => new Set(removableNodeIds), [removableNodeIds]);
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
@@ -113,21 +98,10 @@ export default function EntityBrowser({
     if (index >= 0) setPage(Math.floor(index / pageSize));
     // Follow explicit selection changes without undoing the user's next-page action.
   }, [selectedId]);
-  const activeFilters = Boolean(
-    filters.query ||
-    (filters.kind && filters.kind !== 'all') ||
-    (filters.label && filters.label !== 'all') ||
-    filters.bookmarkedOnly ||
-    filters.minSats !== undefined ||
-    filters.maxSats !== undefined ||
-    (filters.spend && filters.spend !== 'all') ||
-    (filters.funding && filters.funding !== 'all') ||
-    filters.focus ||
-    filters.includeIds ||
-    filters.tagId ||
-    filters.walletId ||
-    filters.preserveContext,
-  );
+  const activeFilters = hasActiveFilters(filters) || extraFiltersActive;
+  const selectable = batchNodes ?? nodes;
+  const scope = describeMatchScope(selectable);
+  const excludedContext = nodes.length - selectable.length;
   return (
     <div className="entity-browser">
       <div className="entity-filters">
@@ -191,93 +165,59 @@ export default function EntityBrowser({
             )}
           </div>
         )}
-        <details className="entity-advanced">
-          <summary>
-            <SlidersHorizontal size={13} /> More filters
-          </summary>
-          <div className="entity-advanced-fields">
-            <label>
-              Labels
-              <select
-                aria-label="Entity label state"
-                value={filters.label ?? 'all'}
-                onChange={(event) => patch({ label: event.target.value as GraphFilters['label'] })}
-              >
-                <option value="all">Any label state</option>
-                <option value="labeled">Has a user label</option>
-                <option value="unlabeled">No user label</option>
-              </select>
-            </label>
-            <label className="entity-bookmark-filter">
-              <input
-                type="checkbox"
-                checked={filters.bookmarkedOnly ?? false}
-                onChange={(event) => patch({ bookmarkedOnly: event.target.checked })}
-              />{' '}
-              Bookmarked only
-            </label>
-            <div className="entity-filter-pair">
-              <label>
-                Min sats
-                <SatoshiBound
-                  label="Minimum entity value in sats"
-                  value={filters.minSats}
-                  onChange={(minSats) => patch({ minSats })}
-                />
-              </label>
-              <label>
-                Max sats
-                <SatoshiBound
-                  label="Maximum entity value in sats"
-                  value={filters.maxSats}
-                  onChange={(maxSats) => patch({ maxSats })}
-                />
-              </label>
-            </div>
-            <label>
-              Loaded spend evidence
-              <select
-                aria-label="Output spend evidence"
-                value={filters.spend ?? 'all'}
-                onChange={(event) => patch({ spend: event.target.value as GraphFilters['spend'] })}
-              >
-                <option value="all">Any entity</option>
-                <option value="observed">Outputs with a loaded spend</option>
-                <option value="unknown">Outputs without a loaded spend</option>
-              </select>
-            </label>
-            <label>
-              Funding data
-              <select
-                aria-label="Output funding data"
-                value={filters.funding ?? 'all'}
-                onChange={(event) =>
-                  patch({ funding: event.target.value as GraphFilters['funding'] })
+        <div className="entity-filter-actions">
+          <GraphFilterButton
+            triggerLabel="More filters"
+            className="entity-more-filters"
+            filters={filters}
+            onChange={onFiltersChange}
+            onReset={onResetFilters}
+            extraFiltersActive={extraFiltersActive}
+            wallets={wallets}
+            tags={tags}
+          />
+          {selection && (
+            <button
+              type="button"
+              className={`selection-mode-toggle ${selection.mode ? 'active' : ''}`}
+              aria-pressed={selection.mode}
+              title="Show checkboxes for choosing several entities. Single click still inspects an entity."
+              onClick={() => selection.setMode(!selection.mode)}
+            >
+              <CheckSquare size={13} /> Select
+            </button>
+          )}
+        </div>
+        {selection?.mode && (
+          <div className="entity-selection-bar">
+            <span role="status">{selection.count.toLocaleString()} selected</span>
+            {selectable.length > 0 && (
+              <button
+                type="button"
+                aria-label={`Select ${scope} in the entity list`}
+                title={
+                  excludedContext > 0
+                    ? `Replace the selection with these matches. ${excludedContext.toLocaleString()} connected context entities are excluded.`
+                    : 'Replace the selection with the entities listed here.'
                 }
+                onClick={() => selection.replace(selectable.map((node) => node.id))}
               >
-                <option value="all">Any entity</option>
-                <option value="missing">Outputs missing funding data</option>
-                <option value="loaded">Outputs with funding data</option>
-              </select>
-            </label>
-            <p>
-              Spend and funding filters select outputs only. No loaded spend means unknown, not
-              unspent. Value limits exclude unknown amounts.
-            </p>
-            <label className="entity-bookmark-filter">
-              <input
-                type="checkbox"
-                checked={filters.preserveContext ?? false}
-                onChange={(event) => patch({ preserveContext: event.target.checked })}
-              />
-              Show connected context on canvas
-            </label>
-            <p>
-              Context adds directly connected neighbors outside the matches, within the current
-              focus. Filters reset when switching workspaces.
-            </p>
+                Select {scope}
+              </button>
+            )}
+            {excludedContext > 0 && (
+              <span>
+                {excludedContext.toLocaleString()} context{' '}
+                {excludedContext === 1 ? 'entity' : 'entities'} excluded
+              </span>
+            )}
+            {selection.count > 0 && (
+              <button type="button" onClick={selection.clear}>
+                Clear selection
+              </button>
+            )}
           </div>
-        </details>
+        )}
         {error && (
           <p className="entity-filter-error" role="alert">
             {error}
@@ -291,7 +231,7 @@ export default function EntityBrowser({
           {activeFilters && (
             <button
               type="button"
-              onClick={() => onFiltersChange({})}
+              onClick={() => (onResetFilters ? onResetFilters() : onFiltersChange({}))}
               aria-label="Clear entity and graph filters"
             >
               <X size={12} /> Clear
@@ -325,12 +265,23 @@ export default function EntityBrowser({
         {sorted.slice(first, first + pageSize).map((node) => (
           <div
             key={node.id}
-            className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''}`}
+            className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${selection?.has(node.id) ? 'is-batch-selected' : ''}`}
           >
+            {selection?.mode && (
+              <SelectionCheckbox
+                id={node.id}
+                label={node.label}
+                checked={selection.has(node.id)}
+                onToggle={selection.toggle}
+              />
+            )}
             <button
               className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
               aria-pressed={selectedId === node.id}
-              onClick={() => onSelect(node.id)}
+              onClick={(event) => {
+                if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
+                else onSelect(node.id);
+              }}
               title={node.id}
             >
               <span className={`entity-dot ${node.kind}`} />

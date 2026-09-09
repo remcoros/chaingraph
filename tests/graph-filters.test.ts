@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { filterGraph, sortEntities, valueFilterError } from '../src/domain/graphFilters';
+import {
+  activeFilterChips,
+  clearFilterKey,
+  describeMatchScope,
+  filterGraph,
+  hasActiveFilters,
+  intersectIds,
+  sortEntities,
+  valueFilterError,
+} from '../src/domain/graphFilters';
 import type { Annotation, GraphData } from '../src/domain/types';
 
 const graph: GraphData = {
@@ -166,5 +175,95 @@ describe('entity ordering', () => {
     expect(sorted[0].label).toBe('Transaction 0');
     expect(sorted[500].label).toBe('Transaction 500');
     expect(new Set(sorted.map((node) => node.id)).size).toBe(501);
+  });
+});
+
+describe('membership exclusions and active filter chips', () => {
+  it('excludes explicit identifiers alongside inclusions', () => {
+    expect(ids(filterGraph(graph, { excludeIds: ['out:a:0', 'tx:isolated'] }))).toEqual([
+      'tx:a',
+      'tx:b',
+      'out:b:0',
+      'addr:c',
+      'out:missing:0',
+    ]);
+    expect(
+      ids(
+        filterGraph(graph, {
+          includeIds: ['tx:a', 'out:a:0'],
+          excludeIds: ['out:a:0'],
+        }),
+      ),
+    ).toEqual(['tx:a']);
+  });
+
+  it('intersects membership identifier sets and ignores absent restrictions', () => {
+    expect(intersectIds([undefined, undefined])).toBeUndefined();
+    expect(intersectIds([['a', 'b', 'a'], undefined])).toEqual(['a', 'b']);
+    expect(
+      intersectIds([
+        ['a', 'b'],
+        ['b', 'c'],
+      ]),
+    ).toEqual(['b']);
+    expect(intersectIds([['a'], ['b']])).toEqual([]);
+  });
+
+  it('lists every active filter as a removable chip without touching other dimensions', () => {
+    const filters = {
+      query: 'salary',
+      kind: 'output' as const,
+      label: 'unlabeled' as const,
+      tagState: 'untagged' as const,
+      walletMatch: 'matched' as const,
+      minSats: 1000,
+      spend: 'unknown' as const,
+      bookmarkedOnly: true,
+      includeIds: ['out:a:0', 'out:b:0'],
+      preserveContext: true,
+    };
+    const chips = activeFilterChips(filters);
+    expect(chips.map((chip) => chip.key)).toEqual([
+      'query',
+      'kind',
+      'label',
+      'tagState',
+      'walletMatch',
+      'bookmarkedOnly',
+      'value',
+      'spend',
+      'includeIds',
+      'preserveContext',
+    ]);
+    expect(chips.find((chip) => chip.key === 'includeIds')).toEqual({
+      key: 'includeIds',
+      kind: 'scope',
+      label: 'Isolated 2 entities',
+    });
+    expect(chips.find((chip) => chip.key === 'value')!.label).toBe('Min 1,000 sats');
+    const withoutValue = clearFilterKey(filters, 'value');
+    expect(withoutValue.minSats).toBeUndefined();
+    expect(withoutValue.query).toBe('salary');
+    expect(hasActiveFilters(clearFilterKey({ kind: 'output' }, 'kind'))).toBe(false);
+    expect(hasActiveFilters({ kind: 'all', label: 'all', query: '  ' })).toBe(false);
+  });
+
+  it('names wallet and tag chips from the workspace, falling back to a removed record', () => {
+    expect(
+      activeFilterChips({ walletId: 'w1', tagId: 't1' }, { walletName: 'Savings' }).map(
+        (chip) => chip.label,
+      ),
+    ).toEqual(['Tag: Removed tag', 'Wallet: Savings']);
+  });
+
+  it('describes an exact batch scope for one entity kind and for mixed results', () => {
+    expect(describeMatchScope(filterGraph(graph, { kind: 'output' }).matchedNodes)).toBe(
+      '3 matching outputs',
+    );
+    expect(describeMatchScope(filterGraph(graph, { query: 'destination' }).matchedNodes)).toBe(
+      '1 matching address',
+    );
+    expect(describeMatchScope(graph.nodes)).toBe('7 matching entities');
+    expect(describeMatchScope([])).toBe('0 matching entities');
   });
 });

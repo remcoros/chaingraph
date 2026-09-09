@@ -62,8 +62,19 @@ interface Props {
   fieldLabel?: string;
   onOpenHandled?: () => void;
   onChange: (value: string) => void;
+  /** Visible caption; batch controls describe their own scope. */
+  caption?: string;
+  ariaLabel?: string;
 }
-export function IconPicker({ value, onChange, openToken, onOpenHandled, fieldLabel }: Props) {
+export function IconPicker({
+  value,
+  onChange,
+  openToken,
+  onOpenHandled,
+  fieldLabel,
+  caption,
+  ariaLabel,
+}: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -78,13 +89,13 @@ export function IconPicker({ value, onChange, openToken, onOpenHandled, fieldLab
   const field = fieldLabel ?? 'Icon';
   return (
     <div className="icon-picker">
-      <span className="icon-picker-label">{field}</span>
+      <span className="icon-picker-label">{caption ?? field}</span>
       <button
         ref={trigger}
         type="button"
         className="icon-picker-trigger"
-        aria-label={fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`}
-        title={fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`}
+        aria-label={ariaLabel ?? (fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`)}
+        title={ariaLabel ?? (fieldLabel ? `${fieldLabel}: ${label}` : `Node icon: ${label}`)}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}

@@ -33,7 +33,7 @@ async function openFixture(page: Page) {
   );
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Check current UTXO status', exact: true }),

@@ -37,7 +37,7 @@ test('mobile annotated transaction keeps quick tools inside the flow viewport', 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   const flow = page.locator('.transaction-view');
   await expect(flow).toBeVisible();

@@ -4,7 +4,7 @@ A self-hosted Bitcoin analysis workbench for personal wallets and on-chain inves
 
 Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, browser-side receive/change scanning, labels, notes, a searchable icon palette, bookmarks, and BIP329 label exchange. Workspace tags group counterparties independently from labels and notes, while separate wallet-match highlights identify derived addresses and their loaded outputs. Seven analysis tools cover equal outputs, common-input ownership, address reuse, value flow and fees, consolidation and fan-out, script types, and imported-wallet intersections. Each tool exposes its scope, parameters, assumptions and coverage.
 
-Filter the graph by entity type, labels, notes, bookmarks, value and loaded funding/spending evidence. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. Nine example workspaces offer real transactions across six mainnet and three testnet4 cases with starter labels, tags, icons and bookmarks. Only examples for networks configured on your backend are shown.
+Filter the graph by entity type, labels, tags, wallet membership, notes, bookmarks, value and loaded funding/spending evidence. The floating **Filters** popover collects those controls, and removable chips show every active filter beside a **Reset filters** action. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. Select several entities and apply a label, tag or icon to exactly that set. Nine example workspaces offer real transactions across six mainnet and three testnet4 cases with starter labels, tags, icons and bookmarks. Only examples for networks configured on your backend are shown.
 
 ![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)
 
@@ -192,6 +192,37 @@ Tags can be searched, created and assigned from **Add or choose tags** in the in
 workbench. Graph controls independently show or hide labels, tags and icons. On
 desktop, **Hide panels** sits beside the 3D/Flat toggle and temporarily hides the
 side panels; it is hidden on mobile, where panels already have separate views.
+
+### Filters, multiple selection and batch metadata
+
+The floating **Filters** popover holds the shared filter set: entity type, labels,
+tags, wallet membership, satoshi bounds, loaded spend and funding evidence,
+bookmarks and connected context. **More filters** in **Entities** opens the same
+controls. Active filters appear as removable chips under the graph navigation,
+with **Reset filters** clearing all of them. Manual hiding is separate: its own
+chip counts manually hidden entities and restores them, and **Reset filters**
+never unhides anything. Isolation appears as its own **Isolated N entities** chip.
+Wallet membership comes from derived addresses; it is not proof of ownership, and
+a missing loaded spend still means unknown rather than unspent. The canvas amount
+threshold and the transaction flow threshold stay independent.
+
+**Select** in the graph navigation or in **Entities** turns on selection mode,
+which adds checkboxes to entity rows and transaction flow rows. Ctrl or Cmd click
+toggles an entity on the canvas, in the list and in the flow; a plain click still
+inspects and navigates. The floating selection toolbar reports the count, how many
+selected entities are not on the canvas, and offers **Select N matching …** for the
+current filter scope. Select matching excludes connected context, while a context
+entity you select explicitly stays a batch target, and results changing never
+grows a selection. Selections are cleared when you
+switch workspaces and pruned only when an entity is actually removed.
+
+Label, Tag and Icon open small anchored editors instead of the single-entity
+Inspector. The label editor offers **Only unlabeled** and states how many entities
+it affects and how many existing labels it would replace; mixed existing values are
+listed and are never overwritten merely by opening the control. The tag editor adds
+or removes direct membership with explicit counts, or creates a tag for the
+selection. Icons reuse the shared icon palette. Each applied batch saves
+automatically and is one Undo step, available from the toolbar or the header.
 
 Choose **Entities → Match graph** to keep the list aligned with the filtered
 canvas. The existing visibility modes remain available to recover hidden and

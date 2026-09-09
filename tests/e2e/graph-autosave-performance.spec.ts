@@ -157,7 +157,7 @@ async function openFixture(page: Page, workspace: Workspace) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(page.locator('.graph-canvas canvas')).toBeVisible({ timeout: 45000 });
   // Let force-layout cooling and the initial save finish before measuring input.

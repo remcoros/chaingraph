@@ -1,0 +1,216 @@
+.selection-toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: min(760px, calc(100vw - 24px));
+  padding: 6px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+  box-shadow: 0 6px 24px #0005;
+  font-size: 11px;
+}
+.selection-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.selection-toolbar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 4px;
+  border-right: 1px solid var(--color-rule);
+  color: var(--color-ink);
+}
+.selection-toolbar-count small {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.selection-toolbar-select-matching {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-rule));
+}
+.selection-toolbar-undo {
+  color: var(--color-accent);
+}
+.selection-toolbar .icon-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.selection-toolbar .icon-picker-label {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.selection-toolbar .icon-picker-trigger {
+  min-height: 30px;
+}
+.batch-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-rule);
+}
+.batch-editor-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  min-height: 32px;
+}
+.batch-editor-error {
+  color: var(--color-danger, #e888a5);
+}
+.batch-tag-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  min-height: 32px;
+}
+.batch-tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 230px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.batch-tag-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+  border-top: 1px solid var(--color-rule);
+}
+.batch-tag-row:first-child {
+  border-top: 0;
+}
+.batch-tag-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 30px;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.batch-tag-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.batch-tag-name > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.batch-tag-name small {
+  color: var(--color-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.selection-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0 2px;
+}
+.selection-checkbox input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-accent);
+}
+.selection-mode-toggle.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+}
+.entity-list-entry.is-batch-selected .entity-row,
+.transaction-row.is-batch-selected {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.entity-list-entry:has(> .selection-checkbox) {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.entity-list-entry:has(> .selection-checkbox) > .entity-row {
+  flex: 1;
+  min-width: 0;
+}
+.entity-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.entity-filter-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 10px;
+}
+.entity-filter-actions .graph-nav-caption {
+  display: inline;
+}
+.entity-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--color-muted);
+}
+.entity-selection-bar button {
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+@media (max-width: 999px) {
+  .selection-toolbar {
+    bottom: 34px;
+    gap: 4px;
+    padding: 5px;
+    max-width: calc(100vw - 16px);
+  }
+  .selection-toolbar button,
+  .batch-tag-row button {
+    min-height: 38px;
+  }
+  /* Keep touch targets while fitting the actions into fewer rows. */
+  .selection-toolbar button {
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+  .selection-toolbar .icon-picker-label {
+    display: none;
+  }
+  .selection-toolbar-select-matching {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+  .selection-checkbox input {
+    width: 18px;
+    height: 18px;
+  }
+  .selection-checkbox {
+    padding: 0 4px;
+  }
+}

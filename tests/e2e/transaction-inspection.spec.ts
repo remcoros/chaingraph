@@ -78,7 +78,10 @@ test('transaction rows retain spending context while automatically loading prevo
   await expect(page.locator('.saved-row')).toBeVisible();
   await page.reload();
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill('transaction-inspection-test');
+  await page
+    .getByRole('dialog')
+    .getByLabel('Password', { exact: true })
+    .fill('transaction-inspection-test');
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(view).toBeVisible();
   await expect(view).not.toHaveAttribute('open');
@@ -132,7 +135,10 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   await expect(page.locator('.saved-row')).toBeVisible();
   await page.reload();
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill('transaction-inspection-test');
+  await page
+    .getByRole('dialog')
+    .getByLabel('Password', { exact: true })
+    .fill('transaction-inspection-test');
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
   await expect(view.getByRole('button', { name: 'Collapse outputs', exact: true })).toBeAttached();
@@ -248,7 +254,7 @@ test('keeps selected rows visible through tag wrapping and resize, and shows tra
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('output');

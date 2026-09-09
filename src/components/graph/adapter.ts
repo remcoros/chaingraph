@@ -37,6 +37,8 @@ export interface GraphPointer {
   x: number;
   y: number;
   pointerType: string;
+  /** Modifier keys held during the reported event; consumers decide their meaning. */
+  modifiers?: { ctrl: boolean; meta: boolean; shift: boolean };
 }
 export interface GraphPointerEvent {
   hit?: GraphHit;

@@ -29,6 +29,7 @@ import {
   ChevronRight,
   ArrowLeft,
   ArrowRight,
+  CheckSquare,
   Crosshair,
   Focus,
   Filter,
@@ -62,7 +63,17 @@ import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { HelpMenu } from './components/HelpMenu';
 import { AboutDialog } from './components/AboutDialog';
-import { filterGraph, valueFilterError, type GraphFilters } from './domain/graphFilters';
+import {
+  describeMatchScope,
+  filterGraph,
+  hasActiveFilters,
+  intersectIds,
+  valueFilterError,
+  type GraphFilters,
+} from './domain/graphFilters';
+import { useEntitySelection } from './lib/useEntitySelection';
+import { SelectionToolbar } from './components/SelectionToolbar';
+import { FilterChips, GraphFilterButton } from './components/GraphFilterControls';
 import { setNodesHidden, showAllNodes } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
@@ -85,6 +96,7 @@ import {
   outputNodeId,
   addressNodeId,
   txNodeId,
+  type GraphData,
   type Transaction,
   type Wallet,
   type Workspace,
@@ -172,6 +184,7 @@ export default function App() {
   const selectionGeneration = useRef(0);
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
+  const selection = useEntitySelection(w?.id);
   const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
     ids: [],
     index: -1,
@@ -402,18 +415,46 @@ export default function App() {
     }
     return presentation;
   }, [w?.annotations, w?.wallets, w?.view.highlightMode, graph, walletMatches, tagIndex]);
-  const effectiveFilters = useMemo(() => {
+  // Batch selection is shared UI state projected onto the neutral display contract.
+  const batchPresentation = useMemo(() => {
+    if (!selection.ids.length) return nodePresentation;
+    const merged = new Map(nodePresentation);
+    for (const id of selection.ids) {
+      const base = merged.get(id);
+      merged.set(id, { ...base, highlight: true, scale: (base?.scale ?? 1) * 1.35 });
+    }
+    return merged;
+  }, [nodePresentation, selection.ids]);
+  const membershipFilters = (
+    source: GraphData,
+    sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
+    sourceTags: ReadonlyMap<string, unknown>,
+  ): GraphFilters => {
+    const includes: (string[] | undefined)[] = [graphFilters.includeIds];
+    const excludes: string[] = [];
     if (graphFilters.walletId)
-      return {
-        ...graphFilters,
-        includeIds: [...walletMatches]
+      includes.push(
+        [...sourceMatches]
           .filter(([, match]) => match.walletIds.includes(graphFilters.walletId!))
           .map(([id]) => id),
-      };
-    if (!graphFilters.tagId) return graphFilters;
-    const tag = w?.tags?.find((tag) => tag.id === graphFilters.tagId);
-    return { ...graphFilters, includeIds: tag ? tagNodeIds(tag, graph) : [] };
-  }, [graphFilters, w?.tags, graph, walletMatches]);
+      );
+    if (graphFilters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
+    else if (graphFilters.walletMatch === 'unmatched') excludes.push(...sourceMatches.keys());
+    if (graphFilters.tagId) {
+      const tag = w?.tags?.find((entry) => entry.id === graphFilters.tagId);
+      includes.push(tag ? tagNodeIds(tag, source) : []);
+    }
+    if (graphFilters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
+    else if (graphFilters.tagState === 'untagged') excludes.push(...sourceTags.keys());
+    const includeIds = intersectIds(includes);
+    return includeIds || excludes.length
+      ? { ...graphFilters, includeIds, excludeIds: excludes.length ? excludes : undefined }
+      : graphFilters;
+  };
+  const effectiveFilters = useMemo(
+    () => membershipFilters(graph, walletMatches, tagIndex),
+    [graphFilters, w?.tags, graph, walletMatches, tagIndex],
+  );
   const automaticContextIds = useMemo(
     () => [
       ...new Set([...(w?.contextTransactionIds ?? []), ...Object.keys(w?.inputContext ?? {})]),
@@ -473,18 +514,10 @@ export default function App() {
   const entityGraph = useMemo(() => {
     if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
     const source = entityVisibility === 'visible' ? graph : recoveryGraph;
-    let filters = effectiveFilters;
-    if (source !== graph && graphFilters.walletId && w) {
-      filters = {
-        ...effectiveFilters,
-        includeIds: [...buildWalletMatches(w, source)]
-          .filter(([, match]) => match.walletIds.includes(graphFilters.walletId!))
-          .map(([id]) => id),
-      };
-    } else if (source !== graph && graphFilters.tagId) {
-      const tag = w?.tags?.find((tag) => tag.id === graphFilters.tagId);
-      filters = { ...effectiveFilters, includeIds: tag ? tagNodeIds(tag, source) : [] };
-    }
+    const filters =
+      source === graph || !w
+        ? effectiveFilters
+        : membershipFilters(source, buildWalletMatches(w, source), buildTagIndex(w, source));
     return filterGraph(
       source,
       { ...filters, showAddresses: entityVisibility === 'visible' ? w?.view.showAddresses : true },
@@ -495,8 +528,7 @@ export default function App() {
     graph,
     recoveryGraph,
     effectiveFilters,
-    graphFilters.walletId,
-    graphFilters.tagId,
+    graphFilters,
     w?.wallets,
     w?.tags,
     w?.annotations,
@@ -518,6 +550,10 @@ export default function App() {
         current.ids.slice(0, current.index + 1).filter((id) => available.has(id)).length - 1;
       return { ids, index };
     });
+    // Only entities that no longer exist leave the batch selection. Filtering or
+    // hiding an entity keeps it selected, with its scope reported in the toolbar.
+    const removed = selection.ids.filter((id) => !available.has(id));
+    if (removed.length) selection.remove(removed);
     if (selectedId && !available.has(selectedId)) setSelectedId(undefined);
   }, [graphIds, selectedId]);
   const renderEntityMetadata = (id: string) => {
@@ -1282,6 +1318,46 @@ export default function App() {
     };
   }, [live, canQuery, w?.id, gap, scanLimit]);
   const entityNodes = entityGraph.matchedNodes;
+  // Match graph lists connected context so links stay explainable. Context is
+  // excluded from Select matching; explicit selections remain batch targets.
+  const entityBatchNodes = useMemo(() => {
+    if (entityVisibility !== 'graph') return entityNodes;
+    const context = new Set(visibleGraph.contextNodeIds);
+    return entityNodes.filter((node) => !context.has(node.id));
+  }, [entityNodes, entityVisibility, visibleGraph]);
+  const canvasIds = useMemo(
+    () => new Set(visibleGraph.nodes.map((node) => node.id)),
+    [visibleGraph],
+  );
+  const selectionOnCanvas = selection.ids.filter((id) => canvasIds.has(id)).length;
+  const matchingScope = useMemo(
+    () => ({
+      label: describeMatchScope(visibleGraph.matchedNodes),
+      ids: visibleGraph.matchedNodes.map((node) => node.id),
+    }),
+    [visibleGraph],
+  );
+  const undoToken = ws.getSession(w?.id ?? '')?.undoRevision ?? 0;
+  const applyBatch = (summary: string, update: (data: Workspace) => Workspace) => {
+    if (!w) return undefined;
+    const before = ws.getSession(w.id)?.undoRevision;
+    try {
+      // A single workspace update keeps one Undo step for the whole batch.
+      change(update);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'The batch edit could not be applied.');
+      return undefined;
+    }
+    const after = ws.getSession(w.id)?.undoRevision;
+    setError('');
+    if (after === undefined || after === before) {
+      // Nothing changed, so no undo step exists and none is offered.
+      setNotice('That batch left every selected entity unchanged.');
+      return undefined;
+    }
+    setNotice(`${summary}. Undo restores the previous values.`);
+    return after;
+  };
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   useEffect(() => {
     if (
@@ -1497,50 +1573,76 @@ export default function App() {
           <option value={2}>2 hops</option>
         </select>
       </label>
+      <GraphFilterButton
+        filters={graphFilters}
+        onChange={updateFilters}
+        onReset={resetGraphFilters}
+        extraFiltersActive={!!w.view.smallAmountThreshold}
+        wallets={w.wallets}
+        tags={w.tags}
+      />
+      <button
+        className={`selection-mode-toggle ${selection.mode ? 'active' : ''}`}
+        aria-label="Selection mode"
+        aria-pressed={selection.mode}
+        title="Choose several entities for batch labels, tags and icons. Ctrl or Cmd click also toggles an entity."
+        onClick={() => selection.setMode(!selection.mode)}
+      >
+        <CheckSquare size={14} />
+        <span className="graph-nav-caption">Select</span>
+      </button>
     </div>
   ) : null;
-  const activeGraphFilters = [
-    graphFilters.includeIds !== undefined && 'Isolated result',
-    graphFilters.focus && `${graphFilters.focus.hops}-hop paths`,
-    graphFilters.walletId &&
-      `Wallet: ${w?.wallets.find((item) => item.id === graphFilters.walletId)?.name ?? 'Removed'}`,
-    graphFilters.tagId &&
-      `Tag: ${w?.tags?.find((item) => item.id === graphFilters.tagId)?.name ?? 'Removed'}`,
-    graphFilters.query?.trim() && 'Text match',
-    graphFilters.kind && graphFilters.kind !== 'all' && `Type: ${graphFilters.kind}`,
-    graphFilters.label && graphFilters.label !== 'all' && graphFilters.label,
-    graphFilters.bookmarkedOnly && 'Bookmarks',
-    (graphFilters.minSats !== undefined || graphFilters.maxSats !== undefined) && 'Value range',
-    graphFilters.spend && graphFilters.spend !== 'all' && 'Spending evidence',
-    graphFilters.funding && graphFilters.funding !== 'all' && 'Funding evidence',
-    w?.view.smallAmountThreshold && `Above ${w.view.smallAmountThreshold.toLocaleString()} sats`,
-    graphFilters.showAddresses === false && 'Address filter',
-  ].filter(Boolean);
+  const selectionOffCanvas = Boolean(
+    selected && !visibleGraph.nodes.some((node) => node.id === selected.id),
+  );
   const graphNavigationStatus =
     w &&
-    (activeGraphFilters.length > 0 ||
+    (hasActiveFilters(graphFilters) ||
+      w.view.smallAmountThreshold ||
       hiddenCount > 0 ||
-      (selected && !visibleGraph.nodes.some((node) => node.id === selected.id))) ? (
-      <div className="view-summary graph-filter-status" aria-label="Graph visibility">
-        {activeGraphFilters.length > 0 && (
-          <>
-            <span>Filters: {activeGraphFilters.join(' · ')}</span>
-            <button onClick={resetGraphFilters}>Reset filters</button>
-          </>
-        )}
-        {hiddenCount > 0 && (
-          <span>
-            {hiddenCount} manually hidden <button onClick={showAllHidden}>Show hidden</button>
+      selectionOffCanvas) ? (
+      <>
+        <FilterChips
+          filters={graphFilters}
+          onChange={updateFilters}
+          names={{
+            walletName: w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name,
+            tagName: w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name,
+          }}
+          hiddenCount={hiddenCount}
+          onShowAllHidden={showAllHidden}
+          onReset={resetGraphFilters}
+          extraFiltersActive={!!w.view.smallAmountThreshold}
+        >
+          {!!w.view.smallAmountThreshold && (
+            <span className="filter-chip">
+              <span>Above {w.view.smallAmountThreshold.toLocaleString()} sats</span>
+              <button
+                aria-label="Remove graph amount filter"
+                onClick={() =>
+                  change(
+                    (current) => ({
+                      ...current,
+                      view: { ...current.view, smallAmountThreshold: undefined },
+                    }),
+                    false,
+                  )
+                }
+              >
+                <X size={11} />
+              </button>
+            </span>
+          )}
+        </FilterChips>
+        {selectionOffCanvas && (
+          <span className="view-summary">
+            {hiddenIds.has(selected!.id)
+              ? 'selection hidden from graph'
+              : 'selection hidden by filters'}
           </span>
         )}
-        {selected && !visibleGraph.nodes.some((node) => node.id === selected.id) && (
-          <span>
-            {hiddenIds.has(selected.id)
-              ? 'Selection is manually hidden.'
-              : 'Selection is outside the current view.'}
-          </span>
-        )}
-      </div>
+      </>
     ) : null;
   return (
     <div className="app-shell">
@@ -1820,7 +1922,10 @@ export default function App() {
                         operationRef.current?.abort();
                         flushActiveGraph();
                         setLockingWorkspace(true);
-                        void ws.lock(w.id).catch((e) => setError(e.message)).finally(() => setLockingWorkspace(false));
+                        void ws
+                          .lock(w.id)
+                          .catch((e) => setError(e.message))
+                          .finally(() => setLockingWorkspace(false));
                       }}
                     >
                       <LockKeyhole size={15} />
@@ -1879,6 +1984,7 @@ export default function App() {
               transactions={w.transactions}
               removableNodeIds={removableNodeIds}
               onRemoveNode={requestEntityRemoval}
+              selection={selection}
               tagsPanel={
                 <TagsPanel
                   key={w.id}
@@ -1931,6 +2037,7 @@ export default function App() {
               }
               graphFilters={graphFilters}
               onGraphFiltersChange={updateFilters}
+              onResetGraphFilters={resetGraphFilters}
               entityTotalCount={
                 entityVisibility === 'hidden'
                   ? hiddenCount
@@ -1951,6 +2058,7 @@ export default function App() {
               hiddenCount={hiddenCount}
               onShowAllHidden={showAllHidden}
               entityNodes={entityNodes}
+              entityBatchNodes={entityBatchNodes}
               bookmarks={bookmarks}
             />
             <section className="graph-stage" data-tour="graph-stage" aria-label="Graph workspace">
@@ -1983,6 +2091,7 @@ export default function App() {
                     }
                     workspace={w}
                     selected={selected}
+                    selection={selection}
                     hiddenNodeIds={w.view.hiddenNodeIds}
                     onSetHidden={setEntityHidden}
                     {...flowInputs}
@@ -2062,13 +2171,16 @@ export default function App() {
                             }
                           />
                         }
-                        nodePresentation={nodePresentation}
+                        nodePresentation={batchPresentation}
                         renderMetadata={renderEntityMetadata}
                         nodes={visibleGraph.nodes}
                         links={visibleGraph.links}
                         focusRequest={focusRequest}
                         selectedId={selectedId}
                         onSelect={select}
+                        selectionMode={selection.mode}
+                        batchSelectedIds={selection.ids}
+                        onToggleSelection={selection.toggle}
                         hiddenNodeIds={w.view.hiddenNodeIds}
                         onSetHidden={setEntityHidden}
                         dimensions={w.view.dimensions}
@@ -2121,7 +2233,7 @@ export default function App() {
                       <p>Hidden entities remain saved and can be inspected in the entity list.</p>
                       <div className="button-row">
                         {!!Object.keys(graphFilters).length && (
-                          <button onClick={() => updateFilters({})}>Clear filters</button>
+                          <button onClick={resetGraphFilters}>Clear filters</button>
                         )}
                         {!!hiddenCount && (
                           <button onClick={showAllHidden}>Show all hidden entities</button>
@@ -2347,6 +2459,26 @@ export default function App() {
               onGraph={showFindingOnGraph}
             />
           </section>
+          <SelectionToolbar
+            active={workbench === 'graph' && !tourStep}
+            workspace={w}
+            selection={selection}
+            visibleSelectedCount={selectionOnCanvas}
+            hiddenSelectedCount={selection.count - selectionOnCanvas}
+            matching={matchingScope}
+            onApply={applyBatch}
+            undoToken={undoToken}
+            onSetHidden={setEntityHidden}
+            onIsolate={(ids) => {
+              prepareIsolation(ids);
+              updateFilters({ includeIds: ids, preserveContext: true });
+              setMobilePanel('graph');
+              setNotice(
+                `Isolated ${ids.length.toLocaleString()} selected entities. The isolation chip restores the full canvas.`,
+              );
+            }}
+            onUndo={() => ws.undo(w.id)}
+          />
           <footer className="statusbar">
             <span>
               {operation ? (

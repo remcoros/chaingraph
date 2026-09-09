@@ -62,7 +62,7 @@ test('entity row actions hide and remove their own target without changing the s
   await mockBitcoin(page, false);
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   const spending = page
     .locator('.entity-list-entry')

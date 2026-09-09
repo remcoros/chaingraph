@@ -42,7 +42,7 @@ test('saved block heights and explicit mempool observations are distinct from un
   await mockBitcoin(page, false);
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   for (const [id, status] of [
     [TX_FUNDING, 'Block 800,123'],

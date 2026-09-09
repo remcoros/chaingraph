@@ -570,3 +570,39 @@ test.skip('Trace timeout leaves its anchor and saved transactions intact', async
   release();
   expect(Object.keys((await saved(page)).transactions)).toEqual([TX_FUNDING]);
 });
+
+for (const surface of ['chips', 'popover', 'entities'] as const) {
+  test(`combined ${surface} reset clears canvas amounts while preserving flow amounts and manual hiding`, async ({
+    page,
+  }) => {
+    await seed(page, (workspace) => {
+      workspace.view.hiddenNodeIds = [siblingOutput];
+      workspace.view.smallAmountThreshold = 1000;
+      workspace.view.flowAmountThreshold = 10000;
+      workspace.view.filters = { kind: 'output' };
+    });
+    const filters = page.getByLabel('Active graph filters');
+    await expect(filters).toContainText('Above 1,000 sats');
+    if (surface === 'popover') {
+      await page
+        .locator('.graph-navigation')
+        .getByRole('button', { name: /^Filters/ })
+        .click();
+      await page
+        .getByRole('dialog', { name: 'Graph filters', exact: true })
+        .getByRole('button', { name: 'Reset filters', exact: true })
+        .click();
+    } else if (surface === 'entities') {
+      await page
+        .getByRole('button', { name: 'Clear entity and graph filters', exact: true })
+        .click();
+    } else {
+      await filters.getByRole('button', { name: 'Reset filters', exact: true }).click();
+    }
+    await expect.poll(async () => (await saved(page)).view.smallAmountThreshold).toBeUndefined();
+    await expect.poll(async () => (await saved(page)).view.filters?.kind).toBeUndefined();
+    const restored = await saved(page);
+    expect(restored.view.flowAmountThreshold).toBe(10000);
+    expect(restored.view.hiddenNodeIds).toEqual([siblingOutput]);
+  });
+}

@@ -69,6 +69,9 @@
 /* The workspace actions share the navigation row away from Graph. */
 .workbench-toolbar:not(.mode-graph) {
   position: absolute;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 16px);
   top: 49px;
   right: 8px;
   z-index: 12;

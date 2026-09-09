@@ -47,7 +47,7 @@ async function openFixture(page: Page) {
   await mockBitcoin(page, false);
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(page.getByLabel('Hide small amounts in flow')).toBeVisible();
 }
@@ -90,7 +90,7 @@ test('independent amount filters retain selections and unknown inputs, collapse 
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(flowFilter).toHaveValue('546');
   await expect(graphFilter).toHaveValue('1000');
@@ -148,7 +148,7 @@ test('Entities can match the canvas while filtered observations remain recoverab
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(visibility).toHaveValue('graph');
   await expect(smallRow).toHaveCount(0);

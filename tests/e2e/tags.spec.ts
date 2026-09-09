@@ -45,7 +45,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   const calls = await mockBitcoin(page, false);
   await page.goto('/');
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Tags', exact: true }).click();
   await page.getByText('Group existing labels', { exact: true }).click();
@@ -121,7 +121,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   expect(calls).toHaveLength(0);
   await page.reload();
   await page.locator('.saved-row').click();
-  await page.getByRole('dialog').getByLabel('Password').fill(password);
+  await page.getByRole('dialog').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Tags', exact: true }).click();
   await expect(

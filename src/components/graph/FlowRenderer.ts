@@ -265,7 +265,12 @@ export class FlowRenderer implements GraphAdapter {
   }
   private pointer(e: PointerEvent) {
     const r = this.container.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top, pointerType: e.pointerType };
+    return {
+      x: e.clientX - r.left,
+      y: e.clientY - r.top,
+      pointerType: e.pointerType,
+      modifiers: { ctrl: Boolean(e.ctrlKey), meta: Boolean(e.metaKey), shift: Boolean(e.shiftKey) },
+    };
   }
   private setActive(active: boolean) {
     if (this.active !== active) {

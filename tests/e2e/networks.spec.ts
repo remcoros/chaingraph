@@ -184,7 +184,7 @@ test('an imported unsupported workspace remains editable offline and reopens wit
   await page.reload();
   await page.locator('.saved-row').click();
   const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
-  await unlock.getByLabel('Password').fill(password);
+  await unlock.getByLabel('Password', { exact: true }).fill(password);
   await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Backend does not support testnet4.');
   await expect(page.getByLabel('Node notes')).toHaveValue('Edited offline and retained');

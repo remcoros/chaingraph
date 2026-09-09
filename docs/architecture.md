@@ -19,10 +19,12 @@ flowchart LR
 | `src/domain/types.ts`                                    | Workspace, transaction, wallet, annotation, finding, and graph contracts                                          |
 | `src/domain/workspace.ts`                                | Input schema validation and derivation of graph nodes/links from loaded transactions                              |
 | `src/domain/analysis.ts`, `src/domain/analysis/`         | Local analysis registry, parameter contracts, scoped evidence and run reports                                     |
-| `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods and explicit connected context                                |
+| `src/domain/graphFilters.ts`                             | Shared list/canvas filtering, bounded neighborhoods, explicit connected context and active-filter descriptions    |
 | `src/domain/workspaceTemplates.ts`                       | Supported-network catalog and lazy real-chain template snapshots                                                  |
 | `src/domain/walletReview.ts`                             | Wallet review queue derivation, encrypted review decisions and evidence invalidation                              |
-| `src/domain/batchMetadata.ts`                            | Identifier-based label, tag and icon batch edits returning one workspace per batch                                |
+| `src/domain/batchMetadata.ts`                            | Wallet record label, tag and icon batch edits returning one workspace per batch                                   |
+| `src/domain/batchEdits.ts`                               | Pure graph label/icon/tag batch plans and appliers over explicit entity identifiers                               |
+| `src/lib/useEntitySelection.ts`                          | Shared graph multiple-selection UI state: mode, explicit identifiers, pruning and workspace isolation             |
 | `src/lib/wallet.ts`                                      | Account-key validation, receive/change derivation, script construction, and Electrum script hashes                |
 | `src/lib/api.ts`                                         | Typed HTTP calls, transaction loading, bounded history scans, funding/spending expansion                          |
 | `src/lib/crypto.ts`                                      | Versioned authenticated-encryption envelope and strict envelope decoding                                          |
@@ -69,6 +71,35 @@ The fundamental flow is `transaction → output → spending transaction`. Outpu
 
 The graph is derived from workspace transactions and annotations. Only active, non-stale analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
 
+## Shared filtering, selection and batch actions
+
+Filtering, multiple selection and batch metadata form one small layer over explicit
+entity identifiers. `GraphFilters` keeps every user-visible dimension, including
+entity type, label state, tag state or one tag, wallet membership or one wallet,
+satoshi bounds, loaded spend and funding evidence, bookmarks, focus hops, isolation
+and connected context. `GraphFilterButton` provides the floating Filters popover;
+its `FilterFields` are shared with the entity list. `activeFilterChips` and `clearFilterKey` describe and remove
+one dimension at a time, so the workbench renders removable chips and a filters-only
+reset. Membership dimensions resolve to `includeIds` intersections and `excludeIds`
+unions in the workbench, using the existing wallet-match and tag indexes; the domain
+filter never derives membership itself. Manual hiding stays in `view.hiddenNodeIds`
+and is unaffected by any filter reset. Wallet membership is derived-address evidence,
+not an ownership claim, and an output without a loaded spend remains unknown.
+
+`useEntitySelection` holds selection mode and an ordered set of identifiers as shared
+UI state. It is cleared when the active workspace changes, is pruned only for entities
+that no longer exist, and never grows because results changed. Renderers stay free of
+selection semantics: adapters report modifier keys on their pointer events, and
+`GraphView` decides whether a click inspects or toggles. Batch highlighting is
+projected through the existing neutral `NodePresentation` overrides.
+
+`src/domain/batchEdits.ts` contains the pure batch operations. Each returns the same
+workspace object when nothing changes, canonicalizes supplied identifiers, writes only
+the targeted field, and respects the existing tag and membership budgets. The workbench
+applies one batch through a single workspace update, so an applied batch is exactly one
+Undo step and one autosave. `describeMatchScope` produces the exact wording used before
+selecting a filtered scope, for example "28 matching outputs".
+
 `GraphView` owns semantic hit lookup, selection routing, keyboard details, node-only React hover cards with compact header actions, trace/edit callbacks, pointer-to-card placement and resize observation. Optional `toolbar`, `navigation` and `legend` React slots keep shared chrome inside GraphView. The display toolbar occupies layout space above the actual viewport, so picking and tooltip coordinates exclude its height. Navigation floats inside the viewport as a separate React overlay: only its controls accept pointer events, and entering them dismisses stale hover cards. The renderer canvas retains its full viewport and coordinate origin. The workbench supplies GraphControls through the toolbar slot; renderer implementations contain no toolbar or legend content. Transaction DOM views and inspector components remain independent consumers of domain data and selection callbacks.
 
 `graph/presentation.ts` projects the visible domain graph into a `GraphFrame`: nodes contain stable IDs, resolved shapes/colors/radii/highlights, optional display text and transient coordinate hints; links contain stable IDs and string endpoints with resolved colors, widths and arrows. Neither workspace records nor domain action callbacks enter the engine. `GraphView.nodePresentation` accepts an optional `ReadonlyMap<string, NodePresentation>` with `color`, `highlight` and `scale` overrides. Callers interpret tags, wallet matches or findings. Selection color takes precedence, and the existing glow toggle gates halos. The renderer-neutral text projection independently includes labels, tags and icons according to saved display toggles; it does not mutate annotations. Missing overrides retain kind/cluster/value/degree defaults. The contract does not imply ownership from presentation.
@@ -101,7 +132,7 @@ The workbench mode is an optional encrypted view field. Old `rightTab: analysis`
 
 The dormant `domain/traceWorkbench.ts` and Trace component remain for a later iteration; they are not mounted or reachable through the current workbench navigation. Their original bounded lookup design and limitations remain documented in [Trace semantics and limits](research/simple-trace.md). Existing graph transaction traversal is independent of this disabled workbench.
 
-Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. **Isolate selection** reuses the existing Paths focus filter, defaults to one hop and follows shared selection changes. Paths can expand it to two hops. Turning the toggle off clears graph filters, leaving manual hiding intact. Finding isolation continues to use explicit include IDs, with the same visible reset.
+Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. **Isolate selection** reuses the existing Paths focus filter, defaults to one hop and follows shared selection changes. Paths can expand it to two hops. Turning the toggle off clears graph filters, leaving manual hiding intact. Finding isolation and the graph batch toolbar use explicit include IDs with connected context, with separate chips for isolation and context. Removing a chip clears its own filter dimension; other filters and manual hiding remain in effect.
 
 ## Verification boundaries
 

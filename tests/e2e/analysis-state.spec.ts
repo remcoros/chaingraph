@@ -36,7 +36,7 @@ async function prepare(page: Page, empty = false) {
 async function unlock(page: Page, name: string) {
   await page.locator('.saved-row').filter({ hasText: name }).click();
   const modal = page.getByRole('dialog', { name: 'Unlock workspace', exact: true });
-  await modal.getByLabel('Password').fill(password);
+  await modal.getByLabel('Password', { exact: true }).fill(password);
   await modal.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(page.locator('.analysis-workbench')).toBeVisible();
 }
@@ -150,7 +150,7 @@ test('keyboard workbench return does not retain invokers across workspace switch
   // This workspace was locked in Graph, so use the unlock dialog directly.
   await page.locator('.saved-row').filter({ hasText: 'Analysis A' }).click();
   const modal = page.getByRole('dialog', { name: 'Unlock workspace', exact: true });
-  await modal.getByLabel('Password').fill(password);
+  await modal.getByLabel('Password', { exact: true }).fill(password);
   await modal.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(modal).toBeHidden();
   await expect(page.getByRole('button', { name: 'Back to Analysis', exact: true })).toHaveCount(0);

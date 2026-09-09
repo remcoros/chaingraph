@@ -676,14 +676,24 @@ describe('force adapter contract', () => {
     callbacks.onNodeHover({ id: 'a', x: 99 });
     expect(events.hover).toHaveBeenLastCalledWith({
       hit: { type: 'node', id: 'a' },
-      point: { x: 50, y: 50, pointerType: 'mouse' },
+      point: {
+        x: 50,
+        y: 50,
+        pointerType: 'mouse',
+        modifiers: { ctrl: false, meta: false, shift: false },
+      },
     });
     pointer('pointerdown');
     pointer('pointerup');
     callbacks.onLinkClick({ id: 'edge', source: {} }, { button: 0 });
     expect(events.select).toHaveBeenLastCalledWith({
       hit: { type: 'link', id: 'edge' },
-      point: { x: 50, y: 50, pointerType: 'mouse' },
+      point: {
+        x: 50,
+        y: 50,
+        pointerType: 'mouse',
+        modifiers: { ctrl: false, meta: false, shift: false },
+      },
     });
     vi.mocked(events.hover).mockClear();
     vi.mocked(events.select).mockClear();
@@ -713,7 +723,12 @@ describe('force adapter contract', () => {
     callbacks.onNodeClick({ id: 'b' }, { button: 0 });
     expect(events.select).toHaveBeenLastCalledWith({
       hit: { type: 'node', id: 'b' },
-      point: { x: 50, y: 50, pointerType: 'touch' },
+      point: {
+        x: 50,
+        y: 50,
+        pointerType: 'touch',
+        modifiers: { ctrl: false, meta: false, shift: false },
+      },
     });
     adapter.dispose();
   });
@@ -801,7 +816,12 @@ describe('force adapter contract', () => {
     callbacks.onLinkHover({ id: 'edge' });
     expect(events.hover).toHaveBeenLastCalledWith({
       hit: undefined,
-      point: { x: 50, y: 50, pointerType: 'mouse' },
+      point: {
+        x: 50,
+        y: 50,
+        pointerType: 'mouse',
+        modifiers: { ctrl: false, meta: false, shift: false },
+      },
     });
     pointer('pointerdown');
     pointer('pointerup');
