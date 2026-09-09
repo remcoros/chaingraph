@@ -5,6 +5,7 @@ import {
   applyReviewDecisions,
   buildWalletReview,
   isCompletedReview,
+  openReviewItems,
   pruneWalletReviews,
   reviewKey,
   spendGuidance,
@@ -171,6 +172,71 @@ describe('wallet review queue', () => {
 });
 
 describe('review decisions', () => {
+  it.each(['open', 'later', 'reviewed', 'unknown'] as const)(
+    'keeps source and counterparty items %s when labels and tags change',
+    (status) => {
+      const workspace = fixture();
+      const candidates = build(workspace).items.filter(
+        (item) => item.reason === 'source' || item.reason === 'counterparty',
+      );
+      expect(candidates).toHaveLength(2);
+      const decided =
+        status === 'open' ? workspace : applyReviewDecisions(workspace, wallet, candidates, status);
+      const labelled: Workspace = {
+        ...decided,
+        annotations: Object.fromEntries(
+          candidates.map((item) => [
+            item.nodeId,
+            { label: `Recorded ${item.reason}`, note: '', icon: '', bookmarked: false },
+          ]),
+        ),
+      };
+      // Labels alone previously removed both kinds of candidate.
+      const afterLabels = build(labelled).items;
+      for (const item of candidates) {
+        expect(afterLabels.find((entry) => entry.key === item.key)).toMatchObject({
+          evidence: item.evidence,
+          status,
+          changed: false,
+          decidedAt: decided.walletReviews?.[item.key]?.at,
+          label: `Recorded ${item.reason}`,
+          tags: [],
+        });
+      }
+      // Removing the labels and adding a tag must update the display metadata
+      // without losing the item, changing its evidence or resolving pending work.
+      const tagged: Workspace = {
+        ...labelled,
+        annotations: {},
+        tags: [
+          {
+            id: '30000000-0000-4000-8000-000000000001',
+            name: 'Recorded context',
+            color: '#27c4a7',
+            nodeIds: candidates.map((item) => item.nodeId),
+          },
+        ],
+      };
+      const afterTags = build(tagged).items;
+      for (const item of candidates) {
+        const rebuilt = afterTags.find((entry) => entry.key === item.key);
+        expect(rebuilt).toMatchObject({
+          evidence: item.evidence,
+          status,
+          changed: false,
+          decidedAt: decided.walletReviews?.[item.key]?.at,
+          label: '',
+          tags: ['Recorded context'],
+        });
+        expect(openReviewItems(afterTags).some((entry) => entry.key === item.key)).toBe(
+          status === 'open' || status === 'later',
+        );
+        expect(rebuilt?.title).not.toMatch(/unlabeled|unknown/i);
+      }
+      expect(tagged.walletReviews).toBe(decided.walletReviews);
+    },
+  );
+
   it('records one undoable update and keeps decisions across a rebuild', () => {
     const workspace = fixture();
     const review = build(workspace);

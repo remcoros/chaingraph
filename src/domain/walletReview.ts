@@ -114,9 +114,9 @@ const REASON_ORDER: Record<ReviewReason, number> = {
 };
 export const REASON_LABELS: Record<ReviewReason, string> = {
   'current-utxo': 'Current UTXO',
-  source: 'Missing source label',
+  source: 'Source',
   'new-activity': 'New receipt',
-  counterparty: 'Unknown counterparty',
+  counterparty: 'Counterparty',
   link: 'Review possible link',
 };
 const MAX_ITEMS_PER_REASON: Record<ReviewReason, number> = {
@@ -308,11 +308,11 @@ export function buildWalletReview(
   for (const { output, utxos } of [...sources.values()].sort(
     (a, b) => b.output.valueSats - a.output.valueSats,
   )) {
-    if (annotationOf(workspace, output.nodeId)?.label) continue;
+    // Metadata decorates the evidence; only an explicit decision completes review.
     push({
       key: reviewKey(wallet.id, 'source', `${output.txid}:${output.vout}`),
       reason: 'source',
-      title: `Unlabeled receipt of ${output.valueSats.toLocaleString('en-US')} sats`,
+      title: `Receipt of ${output.valueSats.toLocaleString('en-US')} sats`,
       detail: `This wallet output was spent into ${utxos.length} current UTXO${
         utxos.length === 1 ? '' : 's'
       }. Recording where it came from explains today's balance.`,
@@ -354,8 +354,6 @@ export function buildWalletReview(
     for (const output of transaction.vout) {
       const nodeId = outputNodeId(txid, output.n);
       if (owned.has(nodeId)) continue;
-      if (annotationOf(workspace, nodeId)?.label) continue;
-      if (tagNamesFor(workspace, nodeId, outputAddress(output)).length) continue;
       counterparties.push({
         nodeId,
         txid,
@@ -368,7 +366,7 @@ export function buildWalletReview(
     push({
       key: reviewKey(wallet.id, 'counterparty', entry.nodeId.slice(4)),
       reason: 'counterparty',
-      title: `Payment of ${entry.valueSats.toLocaleString('en-US')} sats to an unknown address`,
+      title: `Payment of ${entry.valueSats.toLocaleString('en-US')} sats`,
       detail:
         'This wallet funded the transaction and this output is not a verified wallet address. It may be a counterparty you paid; it is not proof of who controls it.',
       nodeId: entry.nodeId,

@@ -336,7 +336,7 @@ address selections appear immediately.
 
 `domain/walletReview.ts` derives a review queue for one wallet from loaded
 observations and an optional verified UTXO check. Reasons are ordered: current
-UTXOs, unlabelled receipts spent into them, refresh activity, unknown
+UTXOs, receipts spent into them, refresh activity,
 counterparties, and active non-stale findings covering verified wallet outputs.
 Counterparty items come only from transactions the wallet funded through loaded
 prevouts, so the outputs of a batch that merely paid the wallet are never
@@ -349,8 +349,11 @@ Optional encrypted `walletReviews` maps `walletId|reason|subject` to a status of
 evidence. Old workspaces without the field load unchanged, and the record is
 bounded at 20,000 decisions. A refresh keeps decisions; only a changed evidence
 fingerprint marks an item as needing review again, with its earlier decision date.
-Deciding a refresh-activity item also removes that transaction from the wallet's
-existing unreviewed queue in the same workspace transform. Removing a wallet
+Completing a refresh-activity item also removes that transaction from the wallet's
+existing unreviewed queue in the same workspace transform. Deferral does not
+acknowledge it. The UI separates deferred items into Review later; changed evidence
+returns an item to To review. Annotation changes do not remove candidates or change
+their evidence fingerprint. Removing a wallet
 prunes its decisions.
 
 `domain/batchMetadata.ts` plans and applies label, tag and icon edits over an
@@ -360,7 +363,12 @@ when nothing changes. Labels and icons are preserved unless replacement is
 requested, and plans expose the affected and preserved counts before applying.
 Tag membership reuses the existing tag budgets, canonical references and name
 uniqueness. Filtering in the workbench never widens a selection; it only offers a
-new explicit scope, and selected records outside the current filter are reported.
+new explicit scope, and selected records outside the current filter are reported
+beside the batch controls. `useRecordSelection` handles explicit toggles and ranges
+limited to the displayed ordering. Single-item editors opt into replacement and
+start with the current annotation; batch editors keep existing metadata by default.
+Wallet metadata popovers render through a viewport-bounded portal, outside the
+workbench scroll clipping boundary.
 
 `useWalletUtxos` holds the transient Electrum observations shared by the wallet
 record panel and the wallet workbench. They are discarded when discovered

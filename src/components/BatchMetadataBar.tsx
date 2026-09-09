@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Tag, TextCursorInput, X } from 'lucide-react';
 import { IconPicker } from './IconPicker';
 import { useDialogFocus } from './Dialogs';
@@ -20,6 +21,8 @@ export interface BatchMetadataBarProps {
   /** Explicitly selected records. Filters never widen this set. */
   ids: string[];
   scopeLabel: string;
+  single?: boolean;
+  active?: boolean;
   disabled?: boolean;
   guidance?: string;
   onChange: (update: (workspace: Workspace) => Workspace) => void;
@@ -34,6 +37,8 @@ export function BatchMetadataBar({
   workspace,
   ids,
   scopeLabel,
+  single = false,
+  active = true,
   disabled,
   guidance,
   onChange,
@@ -42,15 +47,31 @@ export function BatchMetadataBar({
 }: BatchMetadataBarProps) {
   const [open, setOpen] = useState<'label' | 'tags' | undefined>();
   const [replaceIcons, setReplaceIcons] = useState(false);
-  if (!ids.length) return null;
+  const labelTrigger = useRef<HTMLButtonElement>(null);
+  const tagTrigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!active) setOpen(undefined);
+  }, [active]);
+  if (!active || !ids.length) return null;
   return (
-    <div className="batch-bar" role="group" aria-label="Batch metadata editing">
+    <div
+      className={`batch-bar ${single ? 'single-metadata-bar' : 'batch-selection-bar'}`}
+      role="group"
+      aria-label={single ? 'Edit entity metadata' : 'Batch metadata editing'}
+    >
       <span className="batch-scope">
-        <strong>{ids.length}</strong> {scopeLabel}
+        {single ? (
+          scopeLabel
+        ) : (
+          <>
+            <strong>{ids.length}</strong> {scopeLabel}
+          </>
+        )}
       </span>
       <div className="batch-actions">
         <div className="batch-popover-anchor">
           <button
+            ref={labelTrigger}
             aria-haspopup="dialog"
             aria-expanded={open === 'label'}
             disabled={disabled}
@@ -59,17 +80,21 @@ export function BatchMetadataBar({
             <TextCursorInput size={14} /> Label
           </button>
           {open === 'label' && (
-            <BatchLabelEditor
-              workspace={workspace}
-              ids={ids}
-              onClose={() => setOpen(undefined)}
-              onChange={onChange}
-              onNotice={onNotice}
-            />
+            <MetadataPopover anchor={labelTrigger.current!} onClose={() => setOpen(undefined)}>
+              <BatchLabelEditor
+                workspace={workspace}
+                ids={ids}
+                single={single}
+                onClose={() => setOpen(undefined)}
+                onChange={onChange}
+                onNotice={onNotice}
+              />
+            </MetadataPopover>
           )}
         </div>
         <div className="batch-popover-anchor">
           <button
+            ref={tagTrigger}
             aria-haspopup="dialog"
             aria-expanded={open === 'tags'}
             disabled={disabled}
@@ -78,13 +103,15 @@ export function BatchMetadataBar({
             <Tag size={14} /> Tag
           </button>
           {open === 'tags' && (
-            <BatchTagEditor
-              workspace={workspace}
-              ids={ids}
-              onClose={() => setOpen(undefined)}
-              onChange={onChange}
-              onNotice={onNotice}
-            />
+            <MetadataPopover anchor={tagTrigger.current!} onClose={() => setOpen(undefined)}>
+              <BatchTagEditor
+                workspace={workspace}
+                ids={ids}
+                onClose={() => setOpen(undefined)}
+                onChange={onChange}
+                onNotice={onNotice}
+              />
+            </MetadataPopover>
           )}
         </div>
         <div
@@ -97,17 +124,17 @@ export function BatchMetadataBar({
           }}
         >
           <IconPicker
-            value=""
+            value={single ? (workspace.annotations[ids[0]]?.icon ?? '') : ''}
             fieldLabel="Set icon"
             onChange={(icon) => {
-              const plan = planBatchIcon(workspace, ids, replaceIcons);
+              const plan = planBatchIcon(workspace, ids, single || replaceIcons);
               if (!plan.targets.length) {
                 onNotice(
                   'Every selected record already has an icon. Enable Replace to change them.',
                 );
                 return;
               }
-              onChange((current) => applyBatchIcon(current, ids, icon, replaceIcons));
+              onChange((current) => applyBatchIcon(current, ids, icon, single || replaceIcons));
               onNotice(
                 `${icon ? 'Icon set on' : 'Icon cleared on'} ${plan.targets.length} record${
                   plan.targets.length === 1 ? '' : 's'
@@ -116,14 +143,16 @@ export function BatchMetadataBar({
             }}
           />
         </div>
-        <label className="batch-replace">
-          <input
-            type="checkbox"
-            checked={replaceIcons}
-            onChange={(event) => setReplaceIcons(event.target.checked)}
-          />
-          Replace icons
-        </label>
+        {!single && (
+          <label className="batch-replace">
+            <input
+              type="checkbox"
+              checked={replaceIcons}
+              onChange={(event) => setReplaceIcons(event.target.checked)}
+            />
+            Replace icons
+          </label>
+        )}
         {onClear && (
           <button className="text-button" onClick={onClear}>
             Clear selection
@@ -142,15 +171,16 @@ export function BatchMetadataBar({
 function BatchLabelEditor({
   workspace,
   ids,
+  single = false,
   onClose,
   onChange,
   onNotice,
-}: Pick<BatchMetadataBarProps, 'workspace' | 'ids' | 'onChange' | 'onNotice'> & {
+}: Pick<BatchMetadataBarProps, 'workspace' | 'ids' | 'onChange' | 'onNotice' | 'single'> & {
   onClose: () => void;
 }) {
   const ref = useDialogFocus(onClose);
-  const [value, setValue] = useState('');
-  const [replace, setReplace] = useState(false);
+  const [value, setValue] = useState(single ? (workspace.annotations[ids[0]]?.label ?? '') : '');
+  const [replace, setReplace] = useState(single);
   const plan = planBatchLabel(workspace, ids, replace);
   return (
     <div
@@ -161,7 +191,7 @@ function BatchLabelEditor({
       aria-label="Label selected records"
     >
       <div className="batch-popover-heading">
-        <strong>Label {ids.length} records</strong>
+        <strong>{single ? 'Edit label' : `Label ${ids.length} records`}</strong>
         <button className="icon-button" aria-label="Close label editor" onClick={onClose}>
           <X size={15} />
         </button>
@@ -193,16 +223,20 @@ function BatchLabelEditor({
             onChange={(event) => setValue(event.target.value)}
           />
         </label>
-        <label className="batch-replace">
-          <input
-            type="checkbox"
-            checked={replace}
-            onChange={(event) => setReplace(event.target.checked)}
-          />
-          Replace existing labels
-        </label>
+        {!single && (
+          <label className="batch-replace">
+            <input
+              type="checkbox"
+              checked={replace}
+              onChange={(event) => setReplace(event.target.checked)}
+            />
+            Replace existing labels
+          </label>
+        )}
         <p className="small muted">
-          {plan.targets.length} of {ids.length} records change.
+          {single
+            ? 'Saves automatically after applying.'
+            : `${plan.targets.length} of ${ids.length} records change.`}
           {plan.preserved ? ` ${plan.preserved} already labelled and kept as they are.` : ''}
         </p>
         <div className="button-row">
@@ -259,7 +293,9 @@ function BatchTagEditor({
       aria-label="Tag selected records"
     >
       <div className="batch-popover-heading">
-        <strong>Tag {ids.length} records</strong>
+        <strong>
+          Tag {ids.length} {ids.length === 1 ? 'record' : 'records'}
+        </strong>
         <button className="icon-button" aria-label="Close tag editor" onClick={onClose}>
           <X size={15} />
         </button>
@@ -358,5 +394,64 @@ function BatchTagEditor({
         </p>
       )}
     </div>
+  );
+}
+
+/** Portal keeps editors out of the scrolling workbench's clipping boundary. */
+function MetadataPopover({
+  anchor,
+  onClose,
+  children,
+}: {
+  anchor: HTMLElement;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = ref.current!;
+    const position = () => {
+      const viewport = window.visualViewport;
+      const left = viewport?.offsetLeft ?? 0;
+      const top = viewport?.offsetTop ?? 0;
+      const width = viewport?.width ?? window.innerWidth;
+      const height = viewport?.height ?? window.innerHeight;
+      element.style.width = `${Math.min(320, width - 24)}px`;
+      element.style.maxHeight = `${height - 24}px`;
+      const trigger = anchor.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      element.style.left = `${Math.max(left + 12, Math.min(trigger.left, left + width - box.width - 12))}px`;
+      const preferredTop =
+        trigger.bottom + 6 + box.height > top + height - 12
+          ? trigger.top - box.height - 6
+          : trigger.bottom + 6;
+      element.style.top = `${Math.max(top + 12, Math.min(preferredTop, top + height - box.height - 12))}px`;
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(element);
+    window.addEventListener('resize', position);
+    window.visualViewport?.addEventListener('resize', position);
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !element.contains(event.target) &&
+        !anchor.contains(event.target)
+      )
+        onClose();
+    };
+    document.addEventListener('pointerdown', outside);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', position);
+      window.visualViewport?.removeEventListener('resize', position);
+      document.removeEventListener('pointerdown', outside);
+    };
+  }, [anchor, onClose]);
+  return createPortal(
+    <div className="wallet-metadata-popover" ref={ref}>
+      {children}
+    </div>,
+    document.body,
   );
 }

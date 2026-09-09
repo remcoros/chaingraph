@@ -96,19 +96,26 @@ There is no completeness percentage; when no UTXO check has run, the workbench
 says so and offers the action.
 
 **To review** is a queue derived from your own data, in priority order: current
-UTXOs, unlabelled receipts that were spent into them, activity found by a refresh,
-unknown counterparties, and grouping findings from your last analysis scan. Each
+UTXOs, receipts that were spent into them, activity found by a refresh,
+counterparties, and grouping findings from your last analysis scan. Each
 item explains its reason and shows its evidence. Mark reviewed, **Reviewed, source
-unknown** or **Review later**; unknown is a valid, completed answer, and Reopen
-undoes a decision. Decisions are stored inside the encrypted workspace, so a
+unknown** or **Review later**. Unknown is a valid, completed answer. Review later
+advances to the next item and sets the deferred item aside in **Show → Review later**;
+it remains pending, but is excluded from **To review**. Reopen returns it to To review.
+Labels, notes, tags and icons stay visible in the list and details. Adding metadata
+does not complete a review or remove an item. Decisions are stored inside the encrypted workspace, so a
 refresh keeps them. Only an item whose underlying observations actually changed is
 flagged for another look, with the date of your earlier decision. A scan never
 resets the queue.
 
 **Records** lists this wallet's UTXOs, transactions and addresses with filters for
-text, labelled or unlabelled, reviewed or unreviewed, and tag, plus visible counts.
-Tick rows or use **Select N matching**, then label, tag or set an icon directly from
-the batch bar. Existing labels and icons are preserved unless you tick Replace, and
+text, labelled or unlabelled, To review, Review later, Reviewed, and tag, plus visible counts.
+Tick rows, Ctrl/⌘ click to toggle, Shift click to select a displayed range, or use
+**Select N matching**. The selection bar shows the number of targets and lets you
+label, tag or set an icon directly. Review queue checkboxes offer the same batch
+controls, plus marking the selected items reviewed or deferring them together.
+A single item's label editor starts with its current label and replaces it when applied.
+Existing labels and icons are preserved unless you tick Replace, and
 the number of records that will change is shown first. Each batch is one autosaved
 step that a single Undo reverses. Filtering never widens a selection, and switching
 wallet or record kind clears it.

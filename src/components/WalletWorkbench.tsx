@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronRight,
+  Clock3,
+  Check,
   CircleHelp,
   Eye,
   ListChecks,
@@ -37,6 +39,7 @@ import {
   type WalletReviewItem,
 } from '../domain/walletReview';
 import { listTagsForNode } from '../domain/tags';
+import { useRecordSelection } from '../lib/useRecordSelection';
 import { useWalletUtxos } from '../lib/useWalletUtxos';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import './wallet-workbench.css';
@@ -153,14 +156,16 @@ function WalletReview({
 }: WalletWorkbenchProps & { wallet: Wallet }) {
   const [tab, setTab] = useState<'review' | 'records'>('review');
   const [recordTab, setRecordTab] = useState<RecordTab>('utxos');
-  const [reviewFilter, setReviewFilter] = useState<'open' | 'decided' | 'all'>('open');
+  const [reviewFilter, setReviewFilter] = useState<'open' | 'later' | 'decided' | 'all'>('open');
   const [selectedKey, setSelectedKey] = useState<string>();
   const [limit, setLimit] = useState(PAGE);
   const [query, setQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
-  const [recordReview, setRecordReview] = useState<'all' | 'open' | 'decided'>('all');
+  const [recordReview, setRecordReview] = useState<'all' | 'open' | 'later' | 'decided'>('all');
   const [tagFilter, setTagFilter] = useState('all');
-  const [selection, setSelection] = useState<string[]>([]);
+  const recordSelection = useRecordSelection();
+  const { ids: selection, setIds: setSelection } = recordSelection;
+  const reviewSelection = useRecordSelection();
   const [itemPage, setItemPage] = useState(1);
   const [notice, setNotice] = useState('');
   const {
@@ -204,25 +209,33 @@ function WalletReview({
       }),
     [workspace, wallet, utxos, currentUtxos, itemPage],
   );
-  const openItems = review.items.filter(
-    (item) => item.status === 'open' || item.status === 'later' || item.changed,
-  );
+  const openItems = review.items.filter((item) => item.status === 'open' || item.changed);
   const visibleItems =
     reviewFilter === 'open'
       ? openItems
-      : reviewFilter === 'decided'
-        ? // Deferred items are outstanding work, so they never read as reviewed.
-          review.items.filter(
-            (item) => isCompletedReview(workspace.walletReviews?.[item.key]) && !item.changed,
-          )
-        : review.items;
+      : reviewFilter === 'later'
+        ? review.items.filter((item) => item.status === 'later' && !item.changed)
+        : reviewFilter === 'decided'
+          ? // Deferred items are outstanding work, so they never read as reviewed.
+            review.items.filter(
+              (item) => isCompletedReview(workspace.walletReviews?.[item.key]) && !item.changed,
+            )
+          : review.items;
   const selectedItem = visibleItems.find((item) => item.key === selectedKey) ?? visibleItems[0];
+  const selectedReviewItems = review.items.filter((item) => reviewSelection.ids.includes(item.key));
+  const selectedReviewIds = [...new Set(selectedReviewItems.map((item) => item.nodeId))];
+  const laterItems = review.items.filter((item) => item.status === 'later' && !item.changed);
+  const displayedReviewKeys = visibleItems.slice(0, limit).map((item) => item.key);
+  const entityType = (id: string) =>
+    id.startsWith('tx:') ? 'transaction' : id.startsWith('addr:') ? 'address' : 'output';
+  const metadataTags = (id: string, address?: string) =>
+    listTagsForNode(workspace, { id, kind: entityType(id), label: '', address });
   useEffect(
     () => setLimit(PAGE),
     [reviewFilter, tab, recordTab, query, labelFilter, recordReview, tagFilter],
   );
   useEffect(() => {
-    setSelection([]);
+    recordSelection.clear();
   }, [recordTab]);
   const detailRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -301,9 +314,11 @@ function WalletReview({
     if (tagFilter !== 'all' && !rowTags(row).some((tag) => tag.id === tagFilter)) return false;
 
     if (recordReview !== 'all' && row.reviewKey) {
-      // A deferred record is still outstanding work, so it stays under Unreviewed.
+      // Deferred records have their own view and are never treated as completed.
       const completed = isCompletedReview(workspace.walletReviews?.[row.reviewKey]);
-      if (recordReview === 'open' && completed) return false;
+      const deferred = workspace.walletReviews?.[row.reviewKey]?.status === 'later';
+      if (recordReview === 'open' && (completed || deferred)) return false;
+      if (recordReview === 'later' && !deferred) return false;
       if (recordReview === 'decided' && !completed) return false;
     } else if (recordReview !== 'all' && !row.reviewKey) return false;
     return true;
@@ -322,11 +337,20 @@ function WalletReview({
   function decide(items: readonly WalletReviewItem[], status: ReviewStatus | 'reopen') {
     if (!items.length) return;
     onChange((current) => applyReviewDecisions(current, wallet, items, status));
-    if (status !== 'reopen' && reviewFilter === 'open') {
+    reviewSelection.clear();
+    if (status === 'reopen') {
+      setReviewFilter('open');
+      setSelectedKey(items[0].key);
+    } else if (selectedItem) {
       // Advance to the next open item deterministically instead of relying on a
       // fallback once the decided item leaves this filter.
       const decided = new Set(items.map((item) => item.key));
-      setSelectedKey(visibleItems.find((item) => !decided.has(item.key))?.key);
+      const currentIndex = visibleItems.findIndex((item) => item.key === selectedItem.key);
+      const nextItems = [
+        ...visibleItems.slice(currentIndex + 1),
+        ...visibleItems.slice(0, currentIndex),
+      ];
+      setSelectedKey(nextItems.find((item) => !decided.has(item.key))?.key);
     }
     setNotice(
       status === 'reopen'
@@ -350,15 +374,10 @@ function WalletReview({
   return (
     <section className="wallet-workbench" aria-label="Wallet review workbench">
       <header className="wallet-review-header">
-        <div>
-          <h1>Wallet review</h1>
-          <p className="muted">
-            Current coins first, then the receipts and counterparties behind them.
-          </p>
-        </div>
-        <div className="wallet-review-controls">
-          <label>
-            Wallet
+        <div className="wallet-identity">
+          <span className="wallet-eyebrow">Watch-only wallet</span>
+          <label className="wallet-picker">
+            <WalletIcon size={19} style={{ color: wallet.color }} aria-hidden="true" />
             <select
               aria-label="Selected wallet"
               value={wallet.id}
@@ -371,21 +390,28 @@ function WalletReview({
               ))}
             </select>
           </label>
+        </div>
+        <div className="wallet-review-controls">
           <button
-            className="primary"
             disabled={!canQuery || busy}
-            title={queryDisabledReason}
+            title={queryDisabledReason ?? 'Check wallet history for new transactions'}
             onClick={onRefresh}
           >
-            <RefreshCw size={14} />
-            {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
+            <RefreshCw size={14} /> {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
+          </button>
+          <button
+            disabled={!canQuery || utxoLoading}
+            title="Check unspent outputs at the discovered wallet addresses"
+            onClick={() => void check()}
+          >
+            <RefreshCw size={13} /> {utxoLoading ? 'Checking UTXOs…' : 'Check current UTXOs'}
           </button>
         </div>
       </header>
 
       <dl className="wallet-coverage" aria-label="Wallet coverage">
         <div>
-          <dt>Last check</dt>
+          <dt>Wallet refreshed</dt>
           <dd title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}>
             {walletCheckAge(wallet.scannedAt)}
             {wallet.scannedAt && !coverage.scanComplete ? ' · partial discovery' : ''}
@@ -423,10 +449,6 @@ function WalletReview({
         </div>
       </dl>
       <div className="wallet-coverage-actions">
-        <button disabled={!canQuery || utxoLoading} onClick={() => void check()}>
-          <RefreshCw size={13} />
-          {utxoLoading ? 'Checking UTXOs…' : 'Check current UTXOs'}
-        </button>
         {utxos?.nextCursor !== undefined && (
           <button disabled={!canQuery || utxoLoading} onClick={() => void check(utxos.nextCursor)}>
             Check next addresses
@@ -434,7 +456,7 @@ function WalletReview({
         )}
         {utxos && (
           <span className="small muted" title={utxos.checkedAt}>
-            Checked {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
+            UTXOs checked · {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
             {new Date(utxos.checkedAt).toLocaleTimeString()}
             {utxos.failed ? ` · ${utxos.failed} failed` : ''}
           </span>
@@ -488,10 +510,11 @@ function WalletReview({
                 aria-label="Review filter"
                 value={reviewFilter}
                 onChange={(event) =>
-                  setReviewFilter(event.target.value as 'open' | 'decided' | 'all')
+                  setReviewFilter(event.target.value as 'open' | 'later' | 'decided' | 'all')
                 }
               >
                 <option value="open">To review</option>
+                <option value="later">Review later ({laterItems.length})</option>
                 <option value="decided">Reviewed</option>
                 <option value="all">All items</option>
               </select>
@@ -517,42 +540,104 @@ function WalletReview({
                 Load more records
               </button>
             )}
-            {openItems.length > 0 && reviewFilter === 'open' && (
-              <button
-                onClick={() => decide(openItems.slice(0, limit), 'later')}
-                disabled={busy}
-                title="Keep these items in the queue and revisit them later"
-              >
-                Review these later
-              </button>
-            )}
+            <button
+              disabled={!visibleItems.length}
+              onClick={() => reviewSelection.setIds(visibleItems.map((item) => item.key))}
+            >
+              Select {visibleItems.length} matching
+            </button>
           </div>
           {firstUse && (
             <p className="wallet-first-use">
-              This queue is derived from your loaded wallet data: current UTXOs first, then the
-              receipts that funded them, new activity and unknown counterparties. Start at the top
-              row, add a label or tag, then mark it reviewed. Unknown is a valid answer.
+              Start with a UTXO: add its source, then mark it reviewed. Use checkboxes to edit
+              several items together.
             </p>
+          )}
+          {selectedReviewIds.length > 0 && (
+            <div className="wallet-review-batch">
+              <BatchMetadataBar
+                active={active}
+                workspace={workspace}
+                ids={selectedReviewIds}
+                scopeLabel="entities selected"
+                disabled={busy}
+                onChange={onChange}
+                onNotice={setNotice}
+                onClear={reviewSelection.clear}
+                guidance={
+                  selectedReviewItems.some(
+                    (item) => !visibleItems.some((visible) => visible.key === item.key),
+                  )
+                    ? `${selectedReviewItems.filter((item) => !visibleItems.some((visible) => visible.key === item.key)).length} selected items are outside this filter and remain in the batch.`
+                    : undefined
+                }
+              />
+              <div className="wallet-batch-review-actions">
+                <button disabled={busy} onClick={() => decide(selectedReviewItems, 'reviewed')}>
+                  <Check size={13} /> Mark {selectedReviewItems.length} reviewed
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    decide(selectedReviewItems, reviewFilter === 'later' ? 'reopen' : 'later')
+                  }
+                >
+                  <Clock3 size={13} />{' '}
+                  {reviewFilter === 'later' ? 'Return selected to review' : 'Review selected later'}
+                </button>
+                <span className="small muted">
+                  {selectedReviewItems.length} review items · {selectedReviewIds.length} unique
+                  entities
+                </span>
+              </div>
+            </div>
           )}
           {!visibleItems.length ? (
             <p className="wallet-empty-note">
-              {reviewFilter === 'decided'
-                ? 'Nothing has been reviewed yet.'
-                : review.omittedItems > 0
-                  ? 'No items in this view yet. More records are not listed; load more records to continue.'
-                  : coverage.utxoCount === undefined
-                    ? 'Check current UTXOs to build the review queue from your live coins.'
-                    : 'Nothing to review. Refresh the wallet or check UTXOs again after new activity.'}
+              {reviewFilter === 'later'
+                ? 'No items set aside for later.'
+                : reviewFilter === 'decided'
+                  ? 'Nothing has been reviewed yet.'
+                  : review.omittedItems > 0
+                    ? 'No items in this view yet. More records are not listed; load more records to continue.'
+                    : coverage.utxoCount === undefined
+                      ? 'Check current UTXOs to build the review queue from your live coins.'
+                      : laterItems.length
+                        ? `${laterItems.length} items are set aside in Review later. No other items are waiting in this view.`
+                        : 'Nothing to review. Refresh the wallet or check UTXOs again after new activity.'}
             </p>
           ) : (
-            <div className="wallet-review-grid">
+            <div
+              className={`wallet-review-grid ${selectedReviewIds.length ? 'has-batch-selection' : ''}`}
+            >
               <div className="wallet-review-list" role="list" aria-label="Review queue">
                 {visibleItems.slice(0, limit).map((item) => (
-                  <div className="wallet-review-item" role="listitem" key={item.key}>
+                  <div
+                    className={`wallet-review-item ${reviewSelection.ids.includes(item.key) ? 'batch-selected' : ''}`}
+                    role="listitem"
+                    key={item.key}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`Select review item ${item.title}`}
+                      checked={reviewSelection.ids.includes(item.key)}
+                      onChange={() => {}}
+                      onClick={(event) =>
+                        reviewSelection.choose(item.key, displayedReviewKeys, event, true)
+                      }
+                    />
                     <button
                       className={selectedItem?.key === item.key ? 'active' : ''}
                       aria-pressed={selectedItem?.key === item.key}
-                      onClick={() => setSelectedKey(item.key)}
+                      onClick={(event) => {
+                        if (event.ctrlKey || event.metaKey || event.shiftKey)
+                          reviewSelection.choose(item.key, displayedReviewKeys, event);
+                        else {
+                          reviewSelection.clear();
+                          reviewSelection.anchorAt(item.key);
+                          setSelectedKey(item.key);
+                        }
+                      }}
                     >
                       <span className="wallet-review-reason">
                         {REASON_LABELS[item.reason]}
@@ -560,7 +645,30 @@ function WalletReview({
                           {statusLabel(item)}
                         </span>
                       </span>
-                      <strong>{item.label || item.title}</strong>
+                      <strong className="wallet-item-title">
+                        <span className="wallet-entity-icon" aria-hidden="true">
+                          {workspace.annotations[item.nodeId]?.icon}
+                        </span>
+                        {item.label || item.title}
+                      </strong>
+                      {metadataTags(item.nodeId, item.address).length > 0 && (
+                        <span className="wallet-item-tags">
+                          {metadataTags(item.nodeId, item.address).map((tag) => (
+                            <span className="wallet-review-record-tag" key={tag.id}>
+                              <span className="tag-dot" style={{ backgroundColor: tag.color }} />
+                              {tag.name}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                      {workspace.annotations[item.nodeId]?.note && (
+                        <span
+                          className="wallet-item-note"
+                          title={workspace.annotations[item.nodeId].note}
+                        >
+                          {workspace.annotations[item.nodeId].note}
+                        </span>
+                      )}
                       <span className="muted">
                         {[
                           item.amountSats !== undefined ? formatSats(item.amountSats) : undefined,
@@ -582,7 +690,7 @@ function WalletReview({
                   </button>
                 )}
               </div>
-              {selectedItem && (
+              {selectedItem && selectedReviewIds.length === 0 && (
                 <article
                   ref={detailRef}
                   className="wallet-review-detail"
@@ -594,7 +702,18 @@ function WalletReview({
                       {statusLabel(selectedItem)}
                     </span>
                   </span>
-                  <h2>{selectedItem.title}</h2>
+                  <h2 className="wallet-item-title">
+                    <span className="wallet-entity-icon" aria-hidden="true">
+                      {workspace.annotations[selectedItem.nodeId]?.icon}
+                    </span>
+                    {selectedItem.label || selectedItem.title}
+                  </h2>
+                  {selectedItem.label && <p className="small muted">{selectedItem.title}</p>}
+                  {workspace.annotations[selectedItem.nodeId]?.note && (
+                    <p className="wallet-detail-note">
+                      {workspace.annotations[selectedItem.nodeId].note}
+                    </p>
+                  )}
                   <p>{selectedItem.detail}</p>
                   {selectedItem.changed && (
                     <p className="wallet-review-notice">
@@ -607,7 +726,11 @@ function WalletReview({
                   )}
                   <dl className="wallet-review-evidence">
                     <div>
-                      <dt>Entity</dt>
+                      <dt>
+                        {entityType(selectedItem.nodeId) === 'output'
+                          ? 'Outpoint'
+                          : entityType(selectedItem.nodeId)}
+                      </dt>
                       <dd
                         className="mono"
                         title={selectedItem.nodeId.replace(/^(out|tx|addr):/, '')}
@@ -637,28 +760,51 @@ function WalletReview({
                     )}
                   </dl>
                   <BatchMetadataBar
+                    active={active}
                     workspace={workspace}
                     ids={[selectedItem.nodeId]}
-                    scopeLabel="record in this item"
+                    key={selectedItem.nodeId}
+                    single
+                    scopeLabel={`Edit ${entityType(selectedItem.nodeId)}`}
                     disabled={busy}
                     onChange={onChange}
                     onNotice={setNotice}
                   />
                   <div className="button-row wallet-review-decisions">
-                    <button
-                      className="primary"
-                      disabled={busy}
-                      onClick={() => decide([selectedItem], 'reviewed')}
-                    >
-                      Mark reviewed
-                    </button>
-                    <button disabled={busy} onClick={() => decide([selectedItem], 'unknown')}>
-                      <CircleHelp size={14} /> Reviewed, source unknown
-                    </button>
-                    <button disabled={busy} onClick={() => decide([selectedItem], 'later')}>
-                      Review later
-                    </button>
-                    {selectedItem.status !== 'open' && (
+                    {(!isCompletedReview(workspace.walletReviews?.[selectedItem.key]) ||
+                      selectedItem.changed) && (
+                      <>
+                        <button
+                          className="primary"
+                          disabled={busy}
+                          onClick={() => decide([selectedItem], 'reviewed')}
+                        >
+                          Mark reviewed
+                        </button>
+                        <button disabled={busy} onClick={() => decide([selectedItem], 'unknown')}>
+                          <CircleHelp size={14} /> Reviewed, source unknown
+                        </button>
+                        <button
+                          disabled={busy}
+                          aria-pressed={selectedItem.status === 'later'}
+                          title={
+                            selectedItem.status === 'later'
+                              ? 'Return this item to To review'
+                              : 'Set aside for later and select the next item'
+                          }
+                          onClick={() =>
+                            decide(
+                              [selectedItem],
+                              selectedItem.status === 'later' ? 'reopen' : 'later',
+                            )
+                          }
+                        >
+                          <Clock3 size={14} />{' '}
+                          {selectedItem.status === 'later' ? 'Return to review' : 'Review later'}
+                        </button>
+                      </>
+                    )}
+                    {isCompletedReview(workspace.walletReviews?.[selectedItem.key]) && (
                       <button disabled={busy} onClick={() => decide([selectedItem], 'reopen')}>
                         <Undo2 size={14} /> Reopen
                       </button>
@@ -722,13 +868,16 @@ function WalletReview({
             ))}
           </nav>
           <div className="wallet-record-filters">
-            <input
-              type="search"
-              aria-label="Filter wallet records"
-              placeholder="Filter labels, notes or IDs"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <label className="wallet-record-search">
+              Search
+              <input
+                type="search"
+                aria-label="Filter wallet records"
+                placeholder="Labels, notes or IDs"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
             <label>
               Labels
               <select
@@ -750,11 +899,12 @@ function WalletReview({
                   aria-label="Review state filter"
                   value={recordReview}
                   onChange={(event) =>
-                    setRecordReview(event.target.value as 'all' | 'open' | 'decided')
+                    setRecordReview(event.target.value as 'all' | 'open' | 'later' | 'decided')
                   }
                 >
                   <option value="all">All</option>
-                  <option value="open">Unreviewed</option>
+                  <option value="open">To review</option>
+                  <option value="later">Review later</option>
                   <option value="decided">Reviewed</option>
                 </select>
               </label>
@@ -777,6 +927,12 @@ function WalletReview({
               </label>
             )}
           </div>
+          <p className="wallet-selection-hint">
+            Choose records below, then use Label, Tag or Icon.{' '}
+            <span className="desktop-selection-hint">
+              Ctrl/⌘ click toggles · Shift click selects a range.
+            </span>
+          </p>
           <div className="wallet-record-summary">
             <span className="small muted">
               {filteredRows.length} of {rows.length} {recordTab === 'utxos' ? 'UTXOs' : recordTab}
@@ -790,11 +946,15 @@ function WalletReview({
             >
               Select {filteredRows.length} matching
             </button>
-            {selectedIds.length > 0 && (
-              <button onClick={() => setSelection([])}>Clear selection</button>
-            )}
           </div>
+          {hiddenSelection > 0 && (
+            <p className="small muted">
+              {hiddenSelection} selected record{hiddenSelection === 1 ? '' : 's'} outside the
+              current filter stay part of the batch. Clear the selection to drop them.
+            </p>
+          )}
           <BatchMetadataBar
+            active={active}
             workspace={workspace}
             ids={selectedIds}
             scopeLabel={scopeLabel}
@@ -802,7 +962,7 @@ function WalletReview({
             guidance={guidance}
             onChange={onChange}
             onNotice={setNotice}
-            onClear={() => setSelection([])}
+            onClear={recordSelection.clear}
           />
           <div className="wallet-review-records" role="list">
             {filteredRows.slice(0, limit).map((row) => {
@@ -820,19 +980,35 @@ function WalletReview({
                       type="checkbox"
                       checked={checked}
                       aria-label={`Select ${row.identifier}`}
-                      onChange={(event) =>
-                        setSelection((current) =>
-                          event.target.checked
-                            ? [...new Set([...current, row.id])]
-                            : current.filter((id) => id !== row.id),
+                      onChange={() => {}}
+                      onClick={(event) =>
+                        recordSelection.choose(
+                          row.id,
+                          filteredRows.slice(0, limit).map((entry) => entry.id),
+                          event,
+                          true,
                         )
                       }
                     />
                   </label>
-                  <div className="wallet-review-record-body">
+                  <button
+                    type="button"
+                    className="wallet-review-record-body"
+                    aria-label={`Select record ${row.identifier}`}
+                    aria-pressed={checked}
+                    onClick={(event) =>
+                      recordSelection.choose(
+                        row.id,
+                        filteredRows.slice(0, limit).map((entry) => entry.id),
+                        event,
+                      )
+                    }
+                  >
                     <span className="wallet-review-record-title">
                       <span aria-hidden="true">{annotation?.icon}</span>
-                      <strong>{annotation?.label || short(row.identifier, 12)}</strong>
+                      <strong title={row.identifier}>
+                        {annotation?.label || short(row.identifier, 12)}
+                      </strong>
                       {decision && (
                         <span className={`wallet-review-status status-${decision.status}`}>
                           {decision.status === 'reviewed'
@@ -843,9 +1019,16 @@ function WalletReview({
                         </span>
                       )}
                     </span>
-                    <span className="mono muted wallet-review-record-id">
-                      {short(row.identifier, 14)}
-                    </span>
+                    {annotation?.note && (
+                      <span className="wallet-item-note" title={annotation.note}>
+                        {annotation.note}
+                      </span>
+                    )}
+                    {annotation?.label && (
+                      <span className="mono muted wallet-review-record-id" title={row.identifier}>
+                        {short(row.identifier, 14)}
+                      </span>
+                    )}
                     <span className="wallet-review-record-meta">
                       <span>{row.meta}</span>
                       {row.amountSats !== undefined && <span>{formatSats(row.amountSats)}</span>}
@@ -857,7 +1040,7 @@ function WalletReview({
                         </span>
                       ))}
                     </span>
-                  </div>
+                  </button>
                   <div className="wallet-review-record-actions">
                     <button
                       className="text-button"
@@ -892,12 +1075,6 @@ function WalletReview({
               </button>
             )}
           </div>
-          {hiddenSelection > 0 && (
-            <p className="small muted">
-              {hiddenSelection} selected record{hiddenSelection === 1 ? '' : 's'} outside the
-              current filter stay part of the batch. Clear the selection to drop them.
-            </p>
-          )}
         </div>
       )}
     </section>

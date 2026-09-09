@@ -122,8 +122,15 @@ transactions and outputs with review filters and explicit batch selection.
 
 Select an item to label it, record its source or destination, or open it in Graph,
 the Inspector or Analysis. Use **Back to Wallet** to return to the same review item.
-Batch labels, tags and icons apply only to the selected records. **Review later**
-keeps an item pending, including after locking and reopening the workspace.
+Use checkboxes to select several items, then the selection bar to label, tag or
+set their icons together. Ctrl/⌘ click toggles a row; Shift click selects a range.
+Batch edits apply only to that selection. Existing labels and icons are kept unless
+you choose Replace. Single-item editing starts from the current value. Metadata
+updates appear in the list and details without completing the review.
+
+**Review later** advances to the next item and moves deferred work to
+**Show → Review later**, separate from **To review**. It stays pending after locking
+and reopening the workspace. Use Return to review or Reopen to put it back in To review.
 Marking it reviewed or explicitly recording its source as unknown completes that
 review decision. Decisions belong to the selected wallet, even when another
 imported wallet covers the same addresses.

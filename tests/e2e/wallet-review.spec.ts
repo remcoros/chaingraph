@@ -217,8 +217,8 @@ test('derives a resumable review queue from current coins and their sources', as
   const rows = reviewList(page).getByRole('listitem');
   await expect(rows.first()).toContainText('Current UTXO');
   await expect(rows.first()).toContainText('60,000,000 sats');
-  await expect(reviewList(page)).toContainText('Missing source label');
-  await expect(reviewList(page)).toContainText('Unknown counterparty');
+  await expect(reviewList(page)).toContainText('Source');
+  await expect(reviewList(page)).toContainText('Counterparty');
   // A labelled UTXO is still reviewable but never jumps ahead of unlabelled coins.
   await expect(rows.nth(1)).toContainText('Exchange A withdrawal');
   await screenshot(page, 'review-queue-desktop');
@@ -337,7 +337,7 @@ test('a refresh keeps decisions, flags new activity and stays inside one wallet'
   const rows = reviewList(page).getByRole('listitem');
   await rows.first().click();
   await detail(page).getByRole('button', { name: 'Mark reviewed' }).click();
-  await expect(detail(page)).toContainText('Reviewed');
+  await expect(page.locator('.wallet-review-status-line')).toContainText('reviewed');
 
   const chain = await mockChain(page);
   chain.newActivity = true;
@@ -413,7 +413,9 @@ test('Review later keeps refreshed activity discoverable across views and a relo
   await expect(detail(page)).toContainText('New activity since your last review');
   await detail(page).getByRole('button', { name: 'Review later' }).click();
 
-  // Still pending in the queue, and still present under All items.
+  // Deferred work moves out of To review into its own view, without completion.
+  await expect(reviewList(page)).not.toContainText('New receipt');
+  await page.getByLabel('Review filter').selectOption('later');
   await expect(reviewList(page)).toContainText('New receipt');
   await page.getByLabel('Review filter').selectOption('all');
   await expect(reviewList(page)).toContainText('Review later');
@@ -422,12 +424,14 @@ test('Review later keeps refreshed activity discoverable across views and a relo
   await expect(reviewList(page)).toHaveCount(0);
   await expect(page.locator('.wallet-empty-note')).toContainText('Nothing has been reviewed yet');
   await page.getByLabel('Review filter').selectOption('open');
-  await expect(reviewList(page)).toContainText('New receipt');
+  await expect(reviewList(page)).not.toContainText('New receipt');
 
-  // Records agrees: a deferred record is unreviewed, not reviewed.
+  // Records agrees: deferred work has its own filter and is not completed.
   await page.getByRole('button', { name: /Records/ }).click();
   await page.getByRole('button', { name: 'Transactions', exact: true }).click();
   await page.getByLabel('Review state filter').selectOption('open');
+  await expect(page.locator('.wallet-review-records')).not.toContainText(TX_NEW.slice(0, 12));
+  await page.getByLabel('Review state filter').selectOption('later');
   await expect(page.locator('.wallet-review-records')).toContainText(TX_NEW.slice(0, 12));
   await page.getByLabel('Review state filter').selectOption('decided');
   await expect(page.locator('.wallet-review-records')).not.toContainText(TX_NEW.slice(0, 12));
@@ -446,6 +450,7 @@ test('Review later keeps refreshed activity discoverable across views and a relo
 
   await page.reload();
   await unlock(page, 'Old public wallet');
+  await page.getByLabel('Review filter').selectOption('later');
   await expect(reviewList(page)).toContainText('New receipt', { timeout: 20000 });
   await expect(reviewList(page)).toContainText('Review later');
 });
@@ -586,5 +591,179 @@ for (const phone of [false, true]) {
     expect(stored.findings.every((finding) => finding.stale)).toBe(true);
     expect(stored.annotations[`out:${TX_MID}:0`].note).toBe('Keep this note while navigating');
     expect(stored.transactions[TX_NEW]).toBeDefined();
+  });
+}
+
+for (const viewport of [
+  { name: 'desktop', width: 1440, height: 900 },
+  { name: 'phone', width: 390, height: 844 },
+]) {
+  test(`wallet polish keeps metadata visible and editors reachable (${viewport.name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await seed(page);
+    await waitForUtxoCheck(page);
+    await screenshot(page, `polish-${viewport.name}-initial`);
+    await reviewList(page).getByRole('listitem').nth(1).getByRole('button').click();
+    const initialCount = await reviewList(page).getByRole('listitem').count();
+    const bar = detail(page).getByRole('group', { name: 'Edit entity metadata' });
+    await bar.getByRole('button', { name: 'Label', exact: true }).click();
+    let editor = page.getByRole('dialog', { name: 'Label selected records' });
+    await expect(editor.getByLabel('Batch label')).toHaveValue('Exchange A withdrawal');
+    await editor.getByLabel('Batch label').fill('Cold storage');
+    const apply = editor.getByRole('button', { name: 'Apply label' });
+    const box = await apply.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThan(viewport.height);
+    expect(
+      await apply.evaluate((el) => {
+        const b = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2));
+      }),
+    ).toBe(true);
+    await screenshot(page, `polish-${viewport.name}-label-editor`);
+    await apply.click();
+    await expect(detail(page).getByRole('heading')).toHaveText('Cold storage');
+    await expect(reviewList(page)).toContainText('Cold storage');
+    await expect(reviewList(page).getByRole('listitem')).toHaveCount(initialCount);
+    await bar.getByRole('button', { name: 'Label', exact: true }).click();
+    editor = page.getByRole('dialog', { name: 'Label selected records' });
+    await expect(editor.getByLabel('Batch label')).toHaveValue('Cold storage');
+    await page.keyboard.press('Escape');
+    await bar.getByRole('button', { name: 'Tag', exact: true }).click();
+    const tag = page.getByRole('dialog', { name: 'Tag selected records' });
+    await tag.getByLabel('Find or create tag').fill('Long-term savings');
+    await tag.getByRole('button', { name: 'Create and assign' }).click();
+    await expect(detail(page)).toContainText('Long-term savings');
+    await expect(reviewList(page)).toContainText('Long-term savings');
+    for (const name of ['Savings', 'Cold storage']) {
+      await bar.getByRole('button', { name: /^Set icon/ }).click();
+      await page
+        .getByRole('dialog', { name: 'Choose node icon' })
+        .getByRole('button', { name, exact: true })
+        .click();
+    }
+    await expect(detail(page).getByRole('heading')).toContainText('❄️');
+    await expect(reviewList(page)).toContainText('❄️');
+    if (viewport.name === 'desktop') {
+      const actions = await detail(page)
+        .getByRole('button', { name: 'Analyze', exact: true })
+        .boundingBox();
+      const panel = await page.locator('.wallet-workbench').boundingBox();
+      expect(actions!.y + actions!.height).toBeLessThanOrEqual(panel!.y + panel!.height);
+    }
+    await screenshot(page, `polish-${viewport.name}-metadata`);
+    if (viewport.name === 'phone')
+      await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Undo workspace change' }).first()).toBeEnabled();
+  });
+}
+
+test('wallet records support range selection, additive toggles and an explicit hidden batch scope', async ({
+  page,
+}) => {
+  await seed(page);
+  await waitForUtxoCheck(page);
+  await page.getByRole('button', { name: /Records/ }).click();
+  await page.getByRole('button', { name: 'Transactions', exact: true }).click();
+  const rows = page.locator('.wallet-review-records').getByRole('listitem');
+  const bodies = rows.getByRole('button', { name: /^Select record/ });
+  const checks = rows.getByRole('checkbox');
+  await expect(rows).toHaveCount(3);
+  await bodies.first().click();
+  await bodies.nth(2).click({ modifiers: ['Shift'] });
+  await expect(checks).toHaveCount(3);
+  for (let i = 0; i < 3; i++) await expect(checks.nth(i)).toBeChecked();
+  await bodies.nth(1).click({ modifiers: ['Control'] });
+  await expect(checks.nth(1)).not.toBeChecked();
+  const bar = page.getByRole('group', { name: 'Batch metadata editing' });
+  await expect(bar).toContainText('2 transactions selected');
+  await page.getByLabel('Filter wallet records').fill(TX_OLD);
+  await expect(page.locator('.wallet-review-records').getByRole('listitem')).toHaveCount(1);
+  await expect(page.getByText(/1 selected record outside/)).toBeVisible();
+  await expect(bar).toContainText('2 transactions selected');
+  await bar.getByRole('button', { name: 'Label', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Label selected records' });
+  await editor.getByLabel('Batch label').fill('Selected transfers');
+  await editor.getByRole('button', { name: 'Apply label' }).click();
+  await page.getByLabel('Filter wallet records').fill('');
+  await expect(rows.filter({ hasText: 'Selected transfers' })).toHaveCount(2);
+  await expect(rows.nth(1)).not.toContainText('Selected transfers');
+  await bar.getByRole('button', { name: 'Clear selection' }).click();
+  // Checkbox ranges include the intermediate rows and remain keyboard accessible.
+  await checks.first().click();
+  await checks.nth(2).click({ modifiers: ['Shift'] });
+  for (let i = 0; i < 3; i++) await expect(checks.nth(i)).toBeChecked();
+  await checks.nth(1).focus();
+  await page.keyboard.press('Space');
+  await expect(checks.nth(1)).not.toBeChecked();
+  await screenshot(page, 'polish-records-range-selection');
+  await page.getByRole('button', { name: 'Addresses', exact: true }).click();
+  await expect(bar).toBeHidden();
+});
+
+test('queue selection batches metadata, defers to untouched work and reopens into To review', async ({
+  page,
+}) => {
+  await seed(page);
+  await waitForUtxoCheck(page);
+  const rows = reviewList(page).getByRole('listitem');
+  // Shift range starts at the ordinary selected review row, not only at a checkbox.
+  await rows.first().getByRole('button').click();
+  await rows
+    .nth(1)
+    .getByRole('button')
+    .click({ modifiers: ['Shift'] });
+  const bar = page.getByRole('group', { name: 'Batch metadata editing' });
+  await expect(bar).toContainText('2 entities selected');
+  await expect(detail(page)).toBeHidden();
+  await bar.getByRole('button', { name: 'Label', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Label selected records' });
+  await editor.getByLabel('Batch label').fill('Wallet savings');
+  await editor.getByLabel('Replace existing labels').check();
+  await editor.getByRole('button', { name: 'Apply label' }).click();
+  await expect(rows.filter({ hasText: 'Wallet savings' })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Review selected later', exact: true }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(detail(page)).toContainText('Source');
+  await expect(reviewList(page)).not.toContainText('Wallet savings');
+  await page.getByLabel('Review filter').selectOption('later');
+  await expect(rows).toHaveCount(2);
+  await expect(
+    detail(page).getByRole('button', { name: 'Return to review', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await detail(page).getByRole('button', { name: 'Return to review', exact: true }).click();
+  await expect(page.getByLabel('Review filter')).toHaveValue('open');
+  await expect(detail(page)).toContainText('Wallet savings');
+  await detail(page).getByRole('button', { name: 'Mark reviewed', exact: true }).click();
+  await page.getByLabel('Review filter').selectOption('decided');
+  await expect(
+    detail(page).getByRole('button', { name: 'Mark reviewed', exact: true }),
+  ).toHaveCount(0);
+  await detail(page).getByRole('button', { name: 'Reopen', exact: true }).click();
+  await expect(page.getByLabel('Review filter')).toHaveValue('open');
+  await expect(detail(page)).toContainText('Wallet savings');
+});
+
+for (const kind of ['Label', 'Tag'] as const) {
+  test(`wallet ${kind} editor closes when keyboard navigation leaves the workbench`, async ({
+    page,
+  }) => {
+    await seed(page);
+    await waitForUtxoCheck(page);
+    await detail(page).getByRole('button', { name: kind, exact: true }).click();
+    await expect(page.locator('.wallet-metadata-popover')).toBeVisible();
+    // A focus-driven activation has no outside pointerdown to dismiss the editor.
+    await workbench(page, 'Analysis').focus();
+    await page.keyboard.press('Enter');
+    await expect(workbench(page, 'Analysis')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.wallet-metadata-popover')).toHaveCount(0);
+    await page.keyboard.press('Tab');
+    expect(
+      await page.evaluate(() => !!document.activeElement?.closest('.wallet-metadata-popover')),
+    ).toBe(false);
+    await workbench(page, 'Wallet').click();
+    await expect(page.locator('.wallet-metadata-popover')).toHaveCount(0);
   });
 }
