@@ -151,6 +151,38 @@ describe('wallet selected review context', () => {
       ownership: 'unknown',
       missing: false,
       address: undefined,
+      scriptPubKey: { hex: '6a00', address: mine },
+    });
+  });
+
+  it.each(['6a', '6a03414243', '6a03ff0041', '6a0341', '51'])(
+    'retains loaded script %s for presentation without changing ownership',
+    (hex) => {
+      const workspace = fixture();
+      const output = { n: 0, value: 0, scriptPubKey: { hex } };
+      workspace.transactions[id(3)] = { ...shared, vout: [output] };
+      const context = buildWalletReviewContext(workspace, wallet, item());
+      expect(context.outputs[0].scriptPubKey).toBe(output.scriptPubKey);
+      expect(context.outputs[0]).toMatchObject({ ownership: 'unknown', missing: false });
+      expect(context.inputs[0].scriptPubKey).toBe(parent.vout[0].scriptPubKey);
+    },
+  );
+
+  it('updates script presentation with late prevout evidence and withholds conflicting scripts', () => {
+    const workspace = fixture();
+    delete workspace.transactions[parent.txid];
+    workspace.transactions[shared.txid] = { ...shared, vin: [{ txid: parent.txid, vout: 0 }] };
+    const input = () => buildWalletReviewContext(workspace, wallet, item()).inputs[0];
+    expect(input()).toMatchObject({ missing: true, scriptPubKey: undefined });
+    const scriptPubKey = { hex: '51' };
+    workspace.transactions[shared.txid].vin[0].prevout = { value: 1, scriptPubKey };
+    expect(input()).toMatchObject({ missing: false, prevoutStatus: 'attached', scriptPubKey });
+    expect(input().scriptPubKey).toBe(scriptPubKey);
+    workspace.transactions[parent.txid] = parent;
+    expect(input()).toMatchObject({
+      missing: true,
+      prevoutStatus: 'conflict',
+      scriptPubKey: undefined,
     });
   });
 

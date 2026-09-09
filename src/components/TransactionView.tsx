@@ -19,7 +19,7 @@ import {
 import { relatedTransactions } from '../domain/transactionInspection';
 import { indexLoadedSpends, selectedFlowLeg } from '../domain/transactionFlow';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
-import { decodeOpReturn } from '../domain/opReturn';
+import { isOpReturn } from '../domain/opReturn';
 import { outputAddress } from '../domain/workspace';
 import { CopyButton } from './CopyButton';
 import { OpReturnData } from './OpReturnData';
@@ -267,7 +267,7 @@ function TransactionRows({
             <div className="transaction-rows">
               {shown.map((row) => {
                 const address = row.output && outputAddress(row.output);
-                const opReturn = decodeOpReturn(row.output?.scriptPubKey.hex);
+                const opReturn = isOpReturn(row.output?.scriptPubKey.hex);
                 const label = row.id && workspace.annotations[row.id]?.label;
                 const destinations = row.id ? (spends.get(row.id) ?? []) : [];
                 const loaded = inputs
@@ -455,7 +455,7 @@ export function TransactionView(props: Props) {
     selectedResolution?.status === 'loaded' || selectedResolution?.status === 'attached'
       ? selectedResolution.output
       : undefined;
-  const selectedUnspendable = !!decodeOpReturn(selectedOutput?.scriptPubKey.hex);
+  const selectedUnspendable = isOpReturn(selectedOutput?.scriptPubKey.hex);
   const loadedSpenders = selected.kind === 'output' ? (spends.get(selected.id) ?? []) : [];
   const preview = (direction: 'previous' | 'next') => {
     const active =

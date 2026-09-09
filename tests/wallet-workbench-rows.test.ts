@@ -305,4 +305,36 @@ describe('Wallet review findings regressions', () => {
       }),
     ).toBe('Conflicting evidence');
   });
+
+  it('identifies loaded script outputs in details without treating them as wallet members', () => {
+    const { workspace, wallet } = fixture();
+    const addressRow = buildWalletRecordRows(workspace, wallet, [], []).addresses[0];
+    const row = {
+      ...addressRow,
+      kind: 'output' as const,
+      address: undefined,
+      ownership: 'unknown' as const,
+    };
+    for (const hex of ['6a', '6a0341', '6A03ff0041']) {
+      expect(
+        walletRowRelationship(row, wallet, workspace.network, {
+          ownership: 'unknown',
+          scriptPubKey: { hex },
+        }),
+      ).toBe('OP_RETURN · Unspendable output');
+    }
+    expect(
+      walletRowRelationship(row, wallet, workspace.network, {
+        ownership: 'unknown',
+        scriptPubKey: { hex: '51' },
+      }),
+    ).toBe('Script output');
+    expect(
+      walletRowRelationship(row, wallet, workspace.network, {
+        ownership: 'unknown',
+        prevoutStatus: 'conflict',
+        scriptPubKey: { hex: '6a' },
+      }),
+    ).toBe('Conflicting evidence');
+  });
 });

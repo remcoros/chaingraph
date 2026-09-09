@@ -78,7 +78,7 @@ test('shows bounded OP_RETURN text in the flow, with complete hover, selectable 
     1,
   );
   await expect(outpoint).toHaveAttribute('title', `${txid}:12`);
-  await expect(outpoint).toHaveText(/…[0-9a-f]+:12$/);
+  await expect(outpoint).toHaveText(/\.\.\.[0-9a-f]+:12$/);
   expect((await outpoint.innerText()).length).toBeLessThan(`${txid}:12`.length);
   await inspector.getByRole('button', { name: 'Copy outpoint', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`${txid}:12`);

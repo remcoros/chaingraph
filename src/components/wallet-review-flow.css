@@ -234,9 +234,13 @@
   padding: 4px;
   justify-content: center;
 }
-.wallet-review-flow button:focus-visible {
+.wallet-review-flow button:focus-visible,
+.wallet-review-flow summary:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+.wallet-flow-node .op-return-data {
+  font-size: inherit;
 }
 .wallet-workbench .wallet-flow-footnote {
   display: flex;

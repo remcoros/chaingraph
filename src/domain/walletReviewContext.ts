@@ -29,6 +29,8 @@ export interface WalletReviewFlowEntry {
   vout?: number;
   address?: string;
   valueSats?: number;
+  /** Loaded or resolved script evidence, retained by reference for visible-row presentation. */
+  scriptPubKey?: TxOutput['scriptPubKey'];
   /** External means no match to this wallet's verified discovered scripts.
    * It does not identify a controller or exclude an undiscovered wallet address. */
   ownership: 'wallet' | 'external' | 'unknown';
@@ -122,6 +124,7 @@ export function buildWalletReviewContext(
       vout,
       address,
       valueSats: output ? sats(output.value) : undefined,
+      scriptPubKey: output?.scriptPubKey,
       ownership: hash && hashes.has(hash) ? 'wallet' : address ? 'external' : 'unknown',
       selected: id === selectedId || (!!selectedAddress && address === selectedAddress),
       missing: output === undefined,

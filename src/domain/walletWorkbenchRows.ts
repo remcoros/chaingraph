@@ -4,10 +4,12 @@ import {
   short,
   txNodeId,
   type Network,
+  type TxOutput,
   type Wallet,
   type Workspace,
 } from './types';
 import { listTagsForNode } from './tags';
+import { isOpReturn } from './opReturn';
 import { addressToScriptHash } from '../lib/wallet';
 import type { WalletSelectionAddresses, WalletSelectionIndex } from './walletSelectionIndex';
 import {
@@ -308,11 +310,13 @@ export function walletRowRelationship(
     prevoutStatus?: string;
     ownership: 'wallet' | 'external' | 'unknown';
     address?: string;
+    scriptPubKey?: TxOutput['scriptPubKey'];
   },
   walletAddresses?: WalletSelectionAddresses,
 ): string {
   if (row.kind === 'transaction') return 'Wallet activity';
   if (selected?.prevoutStatus === 'conflict') return 'Conflicting evidence';
+  if (isOpReturn(selected?.scriptPubKey?.hex)) return 'OP_RETURN · Unspendable output';
   const address =
     selected?.address ?? row.address ?? (row.kind === 'address' ? row.identifier : undefined);
   if (address) {
@@ -325,5 +329,6 @@ export function walletRowRelationship(
       : 'No match in this wallet';
   }
   if (selected?.ownership === 'wallet' || row.ownership === 'wallet') return 'In this wallet';
+  if (selected?.scriptPubKey) return 'Script output';
   return 'Unknown script';
 }

@@ -1,11 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight, Box, Pencil, Search, Wallet, CircleHelp, TriangleAlert } from 'lucide-react';
+import {
+  ArrowRight,
+  Box,
+  Pencil,
+  Search,
+  Wallet,
+  CircleHelp,
+  TriangleAlert,
+  FileCode,
+} from 'lucide-react';
 import type { Annotation, GraphNode, Workspace } from '../domain/types';
 import { formatSats } from '../domain/types';
 import { listTagsForNode } from '../domain/tags';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../domain/walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from '../domain/walletFlowVisibility';
 import { TransactionBlockTime } from './TransactionBlockTime';
+import { isOpReturn } from '../domain/opReturn';
+import { OpReturnData } from './OpReturnData';
 import { WalletHelp } from './WalletHelp';
 import { WalletReference } from './WalletReference';
 import './wallet-review-flow.css';
@@ -216,7 +227,11 @@ function FlowColumn({
     editingId,
     limit,
   );
-  const visibleKey = JSON.stringify(visible);
+  // Payload bytes cannot change which prevouts need loading or which row needs framing.
+  // Keep potentially large scripts out of effect signatures and decode only visible cards.
+  const visibleKey = JSON.stringify(visible, (key, value) =>
+    key === 'scriptPubKey' ? undefined : value,
+  );
   const reportVisible = useRef(onVisibleEntriesChange);
   reportVisible.current = onVisibleEntriesChange;
   const latestVisible = useRef(visible);
@@ -278,15 +293,21 @@ function FlowColumn({
           const creatingAnnotation = creatingId
             ? workspace.annotations[`tx:${creatingId}`]
             : undefined;
+          const opReturn = isOpReturn(entry.scriptPubKey?.hex);
+          const scriptOutput = !entry.address && !entry.missing && !!entry.scriptPubKey;
           const role = entry.coinbase
             ? 'Coinbase'
-            : entry.ownership === 'wallet'
-              ? 'Your wallet'
-              : entry.ownership === 'external'
-                ? 'No wallet match'
-                : entry.prevoutStatus === 'conflict'
-                  ? 'Conflicting evidence'
-                  : 'Unknown';
+            : opReturn
+              ? 'Unspendable'
+              : entry.ownership === 'wallet'
+                ? 'Your wallet'
+                : entry.ownership === 'external'
+                  ? 'No wallet match'
+                  : entry.prevoutStatus === 'conflict'
+                    ? 'Conflicting evidence'
+                    : scriptOutput
+                      ? 'Script output'
+                      : 'Unknown';
           const selected = isEditing(entry);
           const value =
             entry.valueSats === undefined ? 'Value not loaded' : formatSats(entry.valueSats);
@@ -311,10 +332,14 @@ function FlowColumn({
             >
               <div className="wallet-flow-node-heading">
                 <span className="wallet-flow-role">
-                  {entry.ownership === 'wallet' ? (
+                  {opReturn ? (
+                    <FileCode size={11} aria-hidden="true" />
+                  ) : entry.ownership === 'wallet' ? (
                     <Wallet size={11} aria-hidden="true" />
                   ) : entry.prevoutStatus === 'conflict' ? (
                     <TriangleAlert size={11} aria-hidden="true" />
+                  ) : scriptOutput ? (
+                    <FileCode size={11} aria-hidden="true" />
                   ) : entry.ownership === 'unknown' && !entry.coinbase ? (
                     <CircleHelp size={11} aria-hidden="true" />
                   ) : null}
@@ -345,6 +370,7 @@ function FlowColumn({
                   {primaryAnnotation.label}
                 </strong>
               )}
+              {opReturn && <OpReturnData hex={entry.scriptPubKey?.hex} />}
               {entry.coinbase ? (
                 <strong>Newly mined coins</strong>
               ) : (
