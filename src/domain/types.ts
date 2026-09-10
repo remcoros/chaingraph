@@ -103,7 +103,7 @@ export interface TransactionFlowState {
 }
 export interface Workspace {
   /** Decrypted data schema version, independent of the encrypted envelope format. */
-  version: 2;
+  version: 3;
   id: string;
   name: string;
   description?: string;
@@ -122,6 +122,8 @@ export interface Workspace {
     string,
     { status: 'reviewed' | 'unknown' | 'later'; at: string; evidence: string }
   >;
+  /** Compact scan records and retained path evidence, encrypted with this workspace. */
+  connectionScans?: import('./connectionScanRecords').ConnectionScanRecords;
   findings: AnalysisFinding[];
   watchedAddresses: string[];
   demo: boolean;
@@ -148,7 +150,7 @@ export interface Workspace {
     filters?: GraphFilters;
     leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
     workbench?: 'graph' | 'analysis' | 'trace' | 'wallet';
-    rightTab?: 'inspect' | 'analysis' | 'addresses' | 'transactions' | 'utxos';
+    rightTab?: 'scan' | 'inspect' | 'analysis' | 'addresses' | 'transactions' | 'utxos';
     focusGraph?: boolean;
     prefetchDepth?: 0 | 1 | 2;
     selectedWallet?: string;

@@ -244,7 +244,7 @@ describe('explicit canvas membership', () => {
       const legacy = version === undefined ? unversioned : { ...unversioned, version };
       const before = structuredClone(legacy);
       const parsed = parseWorkspace(legacy);
-      expect(parsed.version).toBe(2);
+      expect(parsed.version).toBe(3);
       expect(ids(parsed)).toEqual(buildGraph(w).nodes.map((node) => node.id));
       expect(parsed.view.graphNodeIds).not.toContain(outputNodeId(a, 1));
       expect(legacy).toEqual(before);

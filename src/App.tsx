@@ -1,4 +1,6 @@
 import { TransactionFetchShell } from './lib/useTransactionFetch';
+import { ConnectionScanPanel } from './components/ConnectionScanPanel';
+import { addScanPath } from './domain/connectionScanRecords';
 import { spendingNotice } from './lib/spendingNotice';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
 import { resolveGraphHandoff } from './domain/graphHandoff';
@@ -732,7 +734,7 @@ export default function App() {
               index: Math.min(99, current.index + 1),
             },
       );
-      setRightTab('inspect');
+      setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
     [ws.update, ws.getSession],
   );
@@ -2539,15 +2541,17 @@ export default function App() {
               onClick={() => setMobilePanel('right')}
             >
               <List size={15} />
-              {shownRightTab === 'analysis'
-                ? 'Inspector'
-                : shownRightTab === 'addresses'
-                  ? 'Addresses'
-                  : shownRightTab === 'transactions'
-                    ? 'Transactions'
-                    : shownRightTab === 'utxos'
-                      ? 'UTXOs'
-                      : 'Inspector'}
+              {shownRightTab === 'scan'
+                ? 'Scan'
+                : shownRightTab === 'analysis'
+                  ? 'Inspector'
+                  : shownRightTab === 'addresses'
+                    ? 'Addresses'
+                    : shownRightTab === 'transactions'
+                      ? 'Transactions'
+                      : shownRightTab === 'utxos'
+                        ? 'UTXOs'
+                        : 'Inspector'}
             </button>
           </div>
           <main
@@ -2856,6 +2860,13 @@ export default function App() {
                 >
                   Inspector
                 </button>
+                <button
+                  className={shownRightTab === 'scan' ? 'active' : ''}
+                  aria-pressed={shownRightTab === 'scan'}
+                  onClick={() => setRightTab('scan')}
+                >
+                  Scan
+                </button>
                 {wallet && (
                   <>
                     <button
@@ -2883,6 +2894,57 @@ export default function App() {
                 )}
               </div>
               <div className="inspector-scroll" ref={inspectorScroll}>
+                {fetchScope && (
+                  <ConnectionScanPanel
+                    key={w.id}
+                    workspace={w}
+                    selectionId={selectedId}
+                    visibleNodeIds={visibleGraph.nodes.map((node) => node.id)}
+                    addedNodeIds={[...connectionMembers]}
+                    loadedSpenders={flowIndex.spenders}
+                    active={
+                      shownRightTab === 'scan' && shownWorkbench === 'graph' && !lockingWorkspace
+                    }
+                    canQuery={canQuery}
+                    scope={fetchScope}
+                    isCurrent={() =>
+                      wRef.current?.id === w.id &&
+                      ws.getSession(w.id)?.fetchScope === fetchScope &&
+                      !fetchScope.closed
+                    }
+                    onChange={(update, undo) => {
+                      if (
+                        wRef.current?.id === w.id &&
+                        ws.getSession(w.id)?.fetchScope === fetchScope &&
+                        !fetchScope.closed
+                      )
+                        ws.update(w.id, update, undo);
+                    }}
+                    onSelect={(id) => {
+                      select(id, { preserveCamera: true });
+                      setRightTab('scan');
+                    }}
+                    onAdd={(result, prefixLength, evidence) => {
+                      change((current) =>
+                        addScanPath(
+                          evidence
+                            ? {
+                                ...current,
+                                connectionScans: {
+                                  runs: current.connectionScans?.runs ?? [],
+                                  evidence: { ...current.connectionScans?.evidence, ...evidence },
+                                },
+                              }
+                            : current,
+                          result,
+                          prefixLength,
+                        ),
+                      );
+                      setGraphFilters({});
+                      setFocusRequest(undefined);
+                    }}
+                  />
+                )}
                 {wallet && (
                   <WalletRecordsPanel
                     walletUtxos={walletUtxos}
@@ -2902,7 +2964,8 @@ export default function App() {
                     onSelect={selectWalletRecord}
                   />
                 )}
-                {shownRightTab === 'addresses' ||
+                {shownRightTab === 'scan' ||
+                shownRightTab === 'addresses' ||
                 shownRightTab === 'transactions' ||
                 shownRightTab === 'utxos' ? null : wallet &&
                   !selected &&

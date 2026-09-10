@@ -20,6 +20,7 @@ export function indexGraphFlow(graph: { nodes: GraphNode[]; links: GraphLink[] }
     }
   >();
   const related = new Map<string, string[]>();
+  const spenders = new Map<string, string[]>();
   for (const node of graph.nodes)
     if (node.kind === 'transaction')
       contexts.set(node.id, { transactionId: node.id, nodes: new Map(), links: new Map() });
@@ -34,11 +35,17 @@ export function indexGraphFlow(graph: { nodes: GraphNode[]; links: GraphLink[] }
     context.nodes.set(outputId, role);
     context.links.set(link.id, role);
     const candidates = related.get(outputId) ?? [];
-    if (input) candidates.push(transactionId);
-    else candidates.unshift(transactionId);
+    if (input) {
+      candidates.push(transactionId);
+      const ids = spenders.get(outputId) ?? [];
+      ids.push(transactionId.slice(3));
+      spenders.set(outputId, ids);
+    } else candidates.unshift(transactionId);
     related.set(outputId, candidates);
   }
   return {
+    /** Reuse observed relationships for bounded scans without rescanning workspace payloads. */
+    spenders: spenders as ReadonlyMap<string, readonly string[]>,
     resolve(selectedId?: string, preferredTxid?: string): GraphFlowContext | undefined {
       if (!selectedId) return undefined;
       const selected = nodes.get(selectedId);

@@ -72,7 +72,7 @@ describe('workspace format at persistence and import boundaries', () => {
     const original = structuredClone(legacy);
     const saved = await validateAndEncryptWorkspace(legacy as unknown as Workspace, password);
     expect(await decryptWorkspace(saved, password)).toMatchObject({
-      version: 2,
+      version: 3,
       view: { graphNodeIds: buildGraph(current).nodes.map((node) => node.id) },
       retainedField: 'public fixture metadata',
     });

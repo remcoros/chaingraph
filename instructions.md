@@ -52,6 +52,47 @@ Older saved synthetic laboratory workspaces remain readable. Live lookups stay d
 
 The graph represents transaction creation and consumption of outputs. An output can already be spent; the presence of an output node does not mean it is an available UTXO. Unknown funding outputs may appear before their parent transaction has been loaded. Address nodes are an optional additional view of script destinations, not proof of a common owner.
 
+## Connection scans
+
+Select a transaction or output and open **Scan** in Graph's right inspector.
+Choose upstream, downstream or both, then **Visible graph** or **All added nodes**
+(including hidden and filtered nodes) as targets. Inputs use their previous
+outpoint identity. Addresses and the entire workspace are outside this scan scope.
+
+**Scan** searches for directed connections and shared ancestors or descendants.
+The source and targets are frozen for that run. Selecting another graph node does
+not change or restart it; use **Scan current selection** to start from that node.
+Defaults are 3 transaction hops, 200 examined transactions, 15 seconds and a
+50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
+transactions, 60 seconds and a 200-branch boundary. Cached transactions and
+spending-history candidates share the same allowance with target-side searches.
+Scopes above 1,000 targets require a smaller visible graph or filter scope.
+
+Connection rows use a green check; stopping points use an amber warning and name
+the limit or unknown evidence. Red identifies failed evidence reads. Expand a row
+to inspect directed path steps. **Add path (+N new)** or **Add path to here (+N new)**
+adds exactly those nodes in one Undo action, without sibling outputs. Longer paths
+offer **Add through** for an explicit prefix and show its final node and full count.
+Adding reveals that path and resets graph filters, preserving annotations and the
+camera. From a branch boundary, add the path, select its endpoint and start a new
+scan. Missing saved path evidence is reported before adding; reload it or rerun.
+
+Previous scans are grouped by source. Select a record to review it, **Rerun** to
+create a new record with its original targets and settings, or remove it.
+Dismissal applies to that run. **Clear records** leaves added graph nodes and
+annotations intact. Storage holds at most 20 runs, 50 results per run and 200
+additional path transactions, with a combined 2 MiB scan-record limit. Remove
+records and retry saving if that limit is reached. Scan details stay inside the
+encrypted workspace; explored transactions and frontiers are not saved.
+
+Cancel, closing the Scan tab, changing workbenches, switching workspaces or locking
+stops active work. Interrupted records restore as interrupted; reopening never
+restarts a scan. Offline scans use loaded observations. A scan retains one
+deterministic target witness at each meeting point and does not enumerate every
+possible path or guarantee a globally shortest path. No connection within limits
+does not prove absence. Shared transactions imply neither common ownership nor
+an allocation of particular inputs to outputs. Missing spenders remain unknown.
+
 ## Add personal wallets
 
 Add one or more wallets to the workspace using an **account-level extended public key**. Chaingraph accepts depth-3 account keys and derives receive branch `0` and change branch `1` in your browser.

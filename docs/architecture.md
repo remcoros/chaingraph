@@ -220,6 +220,62 @@ The force adapter clones incoming render data because the engine mutates positio
 
 The entity list remains the alternative interaction path for keyboard access and WebGL failure. Individual node dragging remains disabled due to the verified upstream pointer-event incompatibility. Camera and node coordinates use a bounded, renderer-neutral snapshot inside the encrypted workspace. Selection, filters, pane choices and transaction-flow expansion are restored alongside display settings. The optional Lock to selection preference routes every shared selection change to the adapter’s focus API and reveals selections hidden by filters. Desktop Focus graph sits with the 3D/Flat controls and is hidden at mobile widths. Adapters may implement optional snapshot restoration and events without acquiring business logic. The custom Three.js and Studio proposals now use the shared feature foundation and remain separate local branches for comparison. Their renderer receives the same neutral display contract; the main default is FlowRenderer, described below. See the [running preview comparison](experiments/comparison.md). See [rendering research and validation](research/graph.md) and the [boundary report](experiments/graph-boundary.md).
 
+## Bounded graph connection scans
+
+The right inspector's Scan tab owns an explicit frozen source, target snapshot
+and settings. `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
+deterministic FIFO fronts alternate source/target work and requested directions.
+Each walk preserves its direction. Shared-ancestor/descendant results join
+same-direction walks at a meeting point and retain per-edge directions; no
+alternating-direction flood fill, ownership claim or value allocation is used.
+Target fronts keep the first deterministic witness for each reached node rather
+than enumerating every target/path. Fully displayed connection paths are omitted.
+
+All fronts share one unique-transaction budget, a deadline, total path-hop and
+result bounds. Defaults are 3 hops, 200 transactions, 15 seconds and a 50-branch
+boundary; hard limits are 8 hops, 1,000 transactions, 60 seconds, 200 branches,
+1,000 targets and 50 results. Depth stops before further spender lookups.
+Fan-out, depth, time, transaction and result limits, unknown evidence, failures
+and cancellation remain distinct. Stopping paths can be reviewed and accepted
+without admitting siblings. Partial results are not exhaustive or globally
+shortest-path guarantees.
+
+`lib/connectionScanFetch.ts` reuses loaded transactions and attached prevouts in
+a transient per-run pool. It reuses the graph's existing spender relationships
+and a bounded index of saved path evidence. Standalone callers without that index
+charge and yield while preparing loaded relationships within the scan budget.
+The worker requests neighbors over a small bridge; the adapter mirrors and
+returns budget charges for every cached or fetched candidate. Existing scheduler
+background priority, session scope, optional Core spender-index lookup and
+bounded Electrum histories are reused. `fetchIndexedSpenders` has an optional
+pre-inspection gate so its candidate work consumes the same scan allowance.
+An empty spender reply remains unknown. The first verified fallback spender is
+sufficient; candidate failures leave an explicit failure boundary. There are
+no new backend endpoints, jobs, indexes or caches.
+
+`lib/connectionScanRunner.ts` aborts leaf requests on cancellation/deadline and
+rejects replies after session changes. User cancellation can retain a partial
+result; closing a workspace discards late replies. The UI stores a running marker
+before dispatch. Workspace schema v3 migrates v2 membership without reseeding it;
+worker validation restores running markers as interrupted, never as jobs.
+The existing encrypted envelope format remains unchanged.
+
+`domain/connectionScanRecords.ts` bounds encrypted records to 20 runs, 50 results
+per run, 200 extra path transactions and 2 MiB for all scan data. Run fields are
+strictly validated. Path direction, observed edges, network addresses and prevout
+consistency are validated at the existing encryption-worker boundary. Shared
+evidence is retained only for saved result paths and reused from normal workspace
+observations where present. Frontier queues, visited maps and transport state
+cannot enter the record schema. UI-time edits check compact limits; full workspace
+validation remains off the UI thread. Missing evidence is explicit at Add path.
+There is no automatic scan resumption or retention eviction.
+
+Accepting a complete path or explicit prefix merges only supporting transactions
+and calls existing graph membership APIs once, producing one Undo step. It reveals
+those nodes, resets graph filters, and preserves annotations and camera geometry.
+Clearing scan records does not remove accepted nodes or annotations. Scan details
+never enter the public saved-workspace index.
+
 ## Analysis extension point
 
 `analysisTools` in `src/domain/analysis.ts` is the extension point. Shared contracts and tool definitions live in `src/domain/analysis/`. A tool declares metadata, an evidence category, source reference and typed parameter descriptors. `analyze(workspace, optionalTransactionIds, options)` returns findings, scope IDs, summary, coverage statistics and a no-match explanation. `run` remains a convenience wrapper returning findings only. Pure tools make no network requests.

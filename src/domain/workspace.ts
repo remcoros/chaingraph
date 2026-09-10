@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  assertConnectionScanBudget,
+  connectionScansSchema,
+  validateConnectionScanRecords,
+} from './connectionScanRecords';
 import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { graphSnapshotSchema } from './graphSnapshot';
@@ -220,6 +225,7 @@ const workspaceSchema = z.object({
   demo: z.boolean(),
   wallets: z.array(walletSchema).max(100),
   transactions: z.record(txid, transactionSchema),
+  connectionScans: z.lazy(() => connectionScansSchema(transactionSchema)).optional(),
   inputContext: z.record(txid, z.array(uint32).min(1).max(10000)).optional(),
   contextTransactionIds: z.array(txid).max(10000).optional(),
   annotations: z.record(
@@ -307,7 +313,9 @@ const workspaceSchema = z.object({
       .optional(),
     leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
     workbench: z.enum(['graph', 'analysis', 'trace', 'wallet']).optional(),
-    rightTab: z.enum(['inspect', 'analysis', 'addresses', 'transactions', 'utxos']).optional(),
+    rightTab: z
+      .enum(['scan', 'inspect', 'analysis', 'addresses', 'transactions', 'utxos'])
+      .optional(),
     focusGraph: z.boolean().optional(),
     prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
     selectedWallet: z.string().max(200).optional(),
@@ -340,7 +348,7 @@ export class WorkspaceValidationError extends Error {
 }
 
 // Count cheap structural records before parsing/allocating every imported node.
-export function assertWorkspaceBudget(data: unknown) {
+export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) {
   if (!data || typeof data !== 'object') return;
   const raw = data as {
     transactions?: unknown;
@@ -376,6 +384,10 @@ export function assertWorkspaceBudget(data: unknown) {
         );
     }
   }
+  assertConnectionScanBudget(
+    (data as { connectionScans?: unknown }).connectionScans,
+    validateScanBytes,
+  );
   assertTagBudget(raw.tags);
   assertWalletReviewBudget((data as { walletReviews?: unknown }).walletReviews);
   const view = (data as { view?: unknown }).view;
@@ -469,11 +481,11 @@ export function parseTransaction(data: unknown): Transaction {
 }
 export function parseWorkspace(data: unknown, verifyDerivation = true): Workspace {
   const migrated = migrateWorkspace(data);
-  assertWorkspaceBudget(migrated);
+  assertWorkspaceBudget(migrated, true);
   const parsed = workspaceSchema.parse(migrated);
   if (
     parsed.view.graphNodeIds === undefined &&
-    (data as { version?: unknown }).version === CURRENT_WORKSPACE_VERSION
+    [2, CURRENT_WORKSPACE_VERSION].includes((data as { version?: number }).version ?? 0)
   )
     throw new Error('Workspace is missing explicit graph entity membership.');
   if (parsed.view.graphNodeIds !== undefined)
@@ -505,6 +517,14 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
     )
   )
     throw new Error('Workspace contains conflicting previous-output observations.');
+  if (parsed.connectionScans) {
+    for (const transaction of Object.values(parsed.connectionScans.evidence))
+      validateTransactionAddresses(transaction, parsed.network);
+    validateConnectionScanRecords(parsed.connectionScans, parsed);
+    parsed.connectionScans.runs = parsed.connectionScans.runs.map((run) =>
+      run.status === 'running' ? { ...run, status: 'interrupted' as const } : run,
+    );
+  }
   const walletIds = new Set<string>();
   for (const wallet of parsed.wallets) {
     if (walletIds.has(wallet.id))
