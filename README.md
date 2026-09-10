@@ -269,7 +269,7 @@ Tags can be searched, created and assigned from **Add or choose tags** in the in
 
 Graph hover cards wrap long annotations and metadata within the graph viewport.
 Identifiers use the shared seven-character ends, with the complete outpoint index;
-hover the title or identifier for its full value. Close stays above the wrapping action row.
+hover the title or identifier for its full value. Actions and close stay right aligned on the top row.
 
 **Lock to selection** keeps the graph centered as you select items anywhere in the
 workbench. Graph controls independently show or hide labels, tags and icons. On

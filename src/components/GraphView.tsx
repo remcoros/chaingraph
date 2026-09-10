@@ -428,7 +428,10 @@ export default function GraphView(props: GraphViewProps) {
             }}
           >
             <div className="graph-card-heading">
-              <span className={`graph-card-kind graph-card-kind-${hoveredNode.kind}`}>
+              <span
+                className={`graph-card-kind graph-card-kind-${hoveredNode.kind}`}
+                title={hoveredNode.kind}
+              >
                 {hoveredNode.kind}
               </span>
               <div className="graph-card-actions" role="group" aria-label="Graph item actions">
