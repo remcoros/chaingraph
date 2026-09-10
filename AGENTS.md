@@ -75,9 +75,13 @@ packaging workflows do not apply here.
   Prefer loaded or attached prevout evidence before fetching parents; distinguish
   missing evidence from zero values, unspent outputs or ownership conclusions.
 - Do not use em dashes in authored copy.
+- For UI design and implementation, use `.agents/skills/product-ui-design/SKILL.md` to 
+  establish task hierarchy, information density, copy, interaction and visual structure 
+  before coding.
+- For substantial UI work, when visual validation is in the requested scope,
+  also use `.agents/skills/chaingraph-ui-review/SKILL.md`, inspect fresh-context 
+  screenshots, and run browser suites (when asked) serially within a checkout.
 
-For substantial UI work, when visual validation is in the requested scope, use the local review checklist in
-`.agents/skills/chaingraph-ui-review/SKILL.md`, inspect fresh-context screenshots,
-and run browser suites serially within a checkout. See `CONTRIBUTING.md` for separate
+See `CONTRIBUTING.md` for separate
 worktree dependencies and preview/test ports. Release commands and validation are
 documented in `docs/deployment.md`; do not assume a publication destination.
