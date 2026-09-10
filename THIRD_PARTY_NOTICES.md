@@ -350,7 +350,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## @tweenjs/tween.js 25.0.0
+## @tweenjs/tween.js 23.1.3
 
 Declared license: MIT
 
@@ -593,7 +593,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## bip174 3.0.0
+## bip174 3.0.1
 
 Declared license: MIT
 
@@ -602,6 +602,35 @@ Declared license: MIT
 MIT License
 
 Copyright (c) 2019 Jonathan Underwood and BitcoinJS team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## bip174/node_modules/uint8array-tools 0.0.10
+
+Declared license: MIT
+
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2021 Jonathan Underwood
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2310,7 +2339,7 @@ licenses; we recommend you read them, as their terms may differ from the
 terms above.
 ```
 
-## lucide-react 1.42.0
+## lucide-react 1.44.0
 
 Declared license: ISC
 
@@ -3090,7 +3119,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## react 19.2.8
+## react 19.3.0
 
 Declared license: MIT
 
@@ -3119,7 +3148,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## react-dom 19.2.8
+## react-dom 19.3.0
 
 Declared license: MIT
 
@@ -3208,7 +3237,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## scheduler 0.27.0
+## scheduler 0.28.0
 
 Declared license: MIT
 
@@ -3468,7 +3497,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## three 0.185.1
+## three 0.186.0
 
 Declared license: MIT
 
@@ -3795,7 +3824,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## valibot 1.4.2
+## valibot 1.5.0
 
 Declared license: MIT
 
@@ -3812,7 +3841,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## varuint-bitcoin 2.0.0
+## varuint-bitcoin 2.0.1
 
 Declared license: MIT
 
@@ -3844,7 +3873,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## varuint-bitcoin/node_modules/uint8array-tools 0.0.8
+## varuint-bitcoin/node_modules/uint8array-tools 0.0.10
 
 Declared license: MIT
 
@@ -3926,7 +3955,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## zod 4.5.4
+## zod 4.6.1
 
 Declared license: MIT
 
