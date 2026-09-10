@@ -2514,7 +2514,7 @@ export default function App() {
               updateEvidence={ws.update}
               onScanComplete={(scan) => {
                 analysisSessions.current.set(w.id, {
-                  scopeMode: 'context',
+                  scopeMode: analysisSessions.current.get(w.id)?.scopeMode,
                   options: scan.options,
                   scan,
                   selectedId: scan.findings[0]?.id,

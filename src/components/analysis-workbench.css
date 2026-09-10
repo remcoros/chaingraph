@@ -59,49 +59,73 @@
   width: auto;
   padding: 5px 30px 5px 8px;
 }
-.scan-settings,
+.analysis-settings,
 .scan-coverage {
   padding: 6px 0;
   border-bottom: 1px solid var(--color-rule);
   font-size: 12px;
 }
-.scan-settings summary,
+.analysis-settings summary,
 .scan-coverage summary,
 .scan-detail summary {
   cursor: pointer;
 }
 .scan-settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 18px;
-  padding: 16px 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: 16px 24px;
+  padding: 12px 0;
 }
-.scan-settings fieldset {
+.analysis-settings fieldset {
   border: 0;
-  padding: 0;
+  border-top: 1px solid var(--color-rule);
+  padding: 8px 0 0;
   margin: 0;
   min-width: 0;
 }
-.scan-settings legend {
+.analysis-settings legend {
   font-weight: 700;
-  margin-bottom: 8px;
+  padding: 0 6px 0 0;
 }
-.scan-settings label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-.scan-settings .scan-checkbox {
-  flex-direction: row;
+.analysis-settings label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
 }
-.scan-checkbox input {
-  width: auto;
+.analysis-settings label > small {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  line-height: 1.5;
 }
-.scan-settings input,
-.scan-settings select {
+.analysis-settings .scan-select {
+  grid-template-columns: minmax(0, 1fr);
+}
+.analysis-settings .scan-checkbox {
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+}
+.analysis-settings .scan-checkbox > small {
+  grid-column: 2;
+}
+.analysis-settings input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  margin: 2px 0 0;
+}
+.analysis-settings input[type='number'] {
+  width: 76px;
+  padding: 5px 6px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.analysis-settings select {
+  width: 100%;
   padding: 5px 30px 5px 8px;
 }
 .scan-run-note,
@@ -355,9 +379,13 @@
   }
 }
 
-.scan-settings .scan-auto-load {
-  margin-top: 12px;
-  align-items: center;
+.analysis-settings .scan-auto-load {
+  grid-template-columns: 15px minmax(0, auto) auto;
+  justify-content: start;
+  margin: 12px 0 0;
+}
+.analysis-settings > button {
+  margin-bottom: 6px;
 }
 
 .scan-guidance {

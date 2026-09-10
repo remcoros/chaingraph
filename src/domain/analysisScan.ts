@@ -30,6 +30,38 @@ export interface AnalysisScan {
   evidenceTransactions?: Workspace['transactions'];
 }
 
+export type AnalysisScopeMode = 'context' | 'workspace';
+
+/** An absent choice follows the wallet default without becoming an explicit choice.
+ * Existing session values remain explicit; graph entities retain context priority.
+ */
+export function analysisScopeChoice(
+  workspace: Workspace,
+  choice: string | undefined,
+  selected?: GraphNode,
+  wallet?: Wallet,
+) {
+  const mode: AnalysisScopeMode =
+    choice === 'context' || choice === 'workspace' ? choice : wallet ? 'context' : 'workspace';
+  const selection = analysisScanScope(workspace, selected, wallet);
+  const hasSelection = selection.kind !== 'workspace';
+  const selectionLabel = hasSelection
+    ? `Selection (${selection.kind[0].toUpperCase() + selection.kind.slice(1)})`
+    : 'Selection (None)';
+  const scope =
+    mode === 'workspace'
+      ? analysisScanScope(workspace)
+      : hasSelection
+        ? selection
+        : {
+            ...selection,
+            label: 'No current selection',
+            explanation: 'Select a wallet or graph entity, or choose Loaded workspace.',
+            txids: [],
+          };
+  return { mode, selectionLabel, hasSelection, scope };
+}
+
 /** Graph filters and manual visibility never limit analysis observations. */
 export function analysisScanScope(
   workspace: Workspace,
