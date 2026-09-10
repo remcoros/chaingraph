@@ -391,7 +391,9 @@ Specifically attempt to remove 30 to 50 percent of explanatory UI copy from the 
 
 Passing type checks and tests does not prove UI quality.
 
-When visual validation is in scope:
+Browser and screenshot validation require explicit user request or an agreed QA scope. Otherwise, run appropriate non-browser checks and state that visual validation was not performed. This applies to targeted browser checks as well as full suites. UI work or skill selection alone does not authorize these checks; do not pause to request them merely to satisfy a checklist.
+
+When browser and screenshot validation is authorized, apply the following within the agreed scope:
 
 1. Render the changed surface with realistic data.
 2. Inspect it at the target desktop viewport and at least one constrained width.
@@ -400,7 +402,7 @@ When visual validation is in scope:
 5. Inspect a common state and at least one exceptional state such as loading, empty, or error.
 6. Run the reduction pass after seeing the rendered result.
 
-A screenshot review is part of design work, not cosmetic QA.
+When authorized, screenshot review helps assess design quality. It is not a completion requirement outside that scope.
 
 ## 21. Approval checklist
 
@@ -422,7 +424,7 @@ Do not approve a substantial UI change until the relevant answers are yes:
 - Is the interaction keyboard accessible with visible focus?
 - Do icon-only controls have accessible names?
 - Does color reinforce rather than carry meaning alone?
-- Has a rendered screenshot been inspected when visual validation is in scope?
+- Have the explicitly requested or agreed browser/screenshot checks been completed, or has omitted visual validation been stated when those checks are outside scope?
 - Has the deletion pass been performed?
 
 ## 22. Relationship to review skills

@@ -5,12 +5,16 @@ description: Review Chaingraph interaction changes for accessible, accurate Bitc
 
 # Chaingraph UI review
 
-Use for substantive graph, panel, navigation or workspace interactions. Verify behavior in a fresh browser context. Match existing styling for incremental edits; when the user asks for a redesign or isolated experiment, compare alternative hierarchies and interactions instead of treating the current layout as a constraint.
+Use for substantive graph, panel, navigation or workspace interactions. Match existing styling for incremental edits; when the user asks for a redesign or isolated experiment, compare alternative hierarchies and interactions instead of treating the current layout as a constraint.
+
+Browser and screenshot validation require explicit user request or an agreed QA scope. Otherwise, run appropriate non-browser checks and state that visual validation was not performed. This applies to targeted browser checks as well as full suites. UI work or skill selection alone does not authorize these checks; do not pause to request them merely to satisfy a checklist.
+
+Review the criteria below through source inspection and appropriate non-browser checks by default. Perform browser exercises and screenshot inspection only when authorized, in a fresh browser context and within the agreed scope.
 
 - Check keyboard access, visible focus, control labels, modal focus return, reduced motion, and narrow screens.
 - Exercise filters, empty results, missing funding, stale findings and disconnected state. Show the difference between loaded observations and hypotheses.
 - Keep explicit controls to restore the whole graph and navigate back from a selection. Do not silently truncate results or call an output unspent from absent graph evidence.
-- Inspect screenshots and test realistic long identifiers, labels and large transaction structures.
+- Check realistic long identifiers, labels and large transaction structures; inspect screenshots only when authorized.
 - Trace a path, select an output, edit its label/note, and return to the graph. Check the number of clicks and scrolls, whether editing is immediately reachable, and whether camera movement helps orientation.
 - Keep icon-only controls visually compact with accessible names. Custom selects and popovers need keyboard navigation, focus return and usable empty/disabled states.
 - Compare shared selection, hover, trace and annotation actions across renderer adapters. Transaction input/output views and script inspection must work independently from the canvas.
@@ -20,7 +24,7 @@ Use for substantive graph, panel, navigation or workspace interactions. Verify b
 - Exercise continuous graph gestures with pending edits. Saves must wait for idle input, and immediate lock/export/switch must capture the latest view. Distinguish actual browser event timing from slow automation round trips.
 - Restore hidden entities with other filters or address display disabled. Explain why an entity stays off the canvas and provide an explicit recovery action. Row removal must preserve unrelated selection and identify targets even when labels collide.
 - Keep private workspace content out of URLs, logs and plaintext storage. Public workspace names are the intentional exception.
-- Run browser suites serially within a checkout. Parallel worktrees need separate dependencies, preview/test ports and artifact directories; use the port overrides described in CONTRIBUTING.md.
+- Run authorized browser checks serially within a checkout. Parallel worktrees need separate dependencies, preview/test ports and artifact directories; use the port overrides described in CONTRIBUTING.md.
 - Record actionable findings and fixes in the release review, along with what was actually tested.
 
 Inspired by [Vercel Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) and [Vercel's review skill](https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines), consulted 2026-09-08. This project-specific checklist is original MIT project text.

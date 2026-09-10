@@ -52,7 +52,11 @@ Browser storage is tied to each origin. Two preview ports have separate workspac
 
 ## Review a change
 
-Describe the user-visible problem, what changes, and the checks actually performed. Test complicated arithmetic, cryptography, protocol handling and storage failures with meaningful regressions. For UI changes, exercise the real workflow with mouse and keyboard, inspect desktop/mobile screenshots, and check that notes and primary actions remain easy to reach. Count clicks and scrolling, not just green assertions.
+Describe the user-visible problem, what changes, and the checks actually performed. Test complicated arithmetic, cryptography, protocol handling and storage failures with meaningful regressions.
+
+Browser and screenshot validation require explicit user request or an agreed QA scope. Otherwise, run appropriate non-browser checks and state that visual validation was not performed. This applies to targeted browser checks as well as full suites. UI work or skill selection alone does not authorize these checks; do not pause to request them merely to satisfy a checklist.
+
+When browser and screenshot validation is authorized for UI changes, exercise the real workflow with mouse and keyboard, inspect desktop/mobile screenshots within the agreed scope, and check that notes and primary actions remain easy to reach. Count clicks and scrolling, not just green assertions.
 
 Independent reviews can start with skills, memory and repository instructions disabled when explicitly requested. Give those sessions the product, privacy and file-ownership constraints in their task. Keep alternative designs in separate branches; compare working previews before adopting a wholesale redesign. Review all generated diffs before integration.
 

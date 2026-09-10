@@ -59,17 +59,18 @@ packaging workflows do not apply here.
 - `npm run build` checks types and builds; `npm test` runs domain/backend tests;
   `npm run test:e2e` runs browser journeys. Match checks to the change and current
   user instructions. Documentation-only edits do not need an application test suite.
-- Agents normally run focused checks, not full end-to-end/browser suites. Run a full
-  browser suite only when explicitly requested or included in an agreed release/QA
-  pass. A targeted browser regression or small visual check is appropriate when it
-  verifies the change; avoid repeating broad checks during iteration. This default
-  does not prohibit `npm test`, and later user instructions can expand validation.
+- Browser and screenshot validation require explicit user request or an agreed QA
+  scope. Otherwise, run appropriate non-browser checks and state that visual
+  validation was not performed. This applies to targeted browser checks as well as
+  full suites. UI work or skill selection alone does not authorize these checks;
+  do not pause to request them merely to satisfy a checklist.
 - Test complex domain/security logic and end-to-end user workflows; avoid tests that
   merely repeat implementation. Exercise real services read-only when available.
 - State exactly what was validated. A build or mocked RPC test is not live validation.
 - Keep README and user instructions in sync with changes. Preserve unrelated files.
-- Do not assume that passing checks makes a UI usable. Inspect screenshots and trace
-  real editing/navigation tasks. Explicit redesign requests may change the layout
+- Do not assume that passing non-browser checks establishes visual usability.
+  When browser and screenshot validation is authorized, inspect screenshots and
+  trace real editing/navigation tasks. Explicit redesign requests may change the layout
   and renderer; preserve data contracts and compare isolated working proposals.
 - Keep renderer mechanics separate from selection, metadata and workspace logic.
   Prefer loaded or attached prevout evidence before fetching parents; distinguish
@@ -78,9 +79,10 @@ packaging workflows do not apply here.
 - For UI design and implementation, use `.agents/skills/product-ui-design/SKILL.md` to 
   establish task hierarchy, information density, copy, interaction and visual structure 
   before coding.
-- For substantial UI work, when visual validation is in the requested scope,
-  also use `.agents/skills/chaingraph-ui-review/SKILL.md`, inspect fresh-context 
-  screenshots, and run browser suites (when asked) serially within a checkout.
+- For substantial UI work, when browser and screenshot validation is explicitly
+  requested or included in an agreed QA scope, also use
+  `.agents/skills/chaingraph-ui-review/SKILL.md`. Run authorized browser checks
+  serially within a checkout and stay within the agreed validation scope.
 
 See `CONTRIBUTING.md` for separate
 worktree dependencies and preview/test ports. Release commands and validation are
