@@ -227,6 +227,10 @@ corridors, with rounded groups for shared connections in 3D, including after Rep
 outputs downstream. Existing positions stay
 anchored until **Repack**. Workspace schema v2 saves this explicit membership and
 migrates older workspaces while preserving their existing graph.
+Small input/output groups adapt their spacing to the number and size of their
+nodes, with balanced pairs and compact rings; larger groups keep dense rounded
+packing. Each side adapts independently, and onward transaction connections retain
+clearance. Use **Repack** to apply this spacing to previously positioned nodes.
 
 This checkout experiments with contextual input/output flow. Selecting a transaction
 adds blue brackets to its inputs and green rings to its outputs, with matching

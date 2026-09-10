@@ -663,10 +663,18 @@ retain node-fill precedence, and the selection accent remains independent.
 An optional stable `RenderLink.directed` hint carries observed source-to-target
 relationships into `graph/groupedFlowLayout.ts`. It separates terminal outpoints
 from shared bridge outpoints using visible directed relationships. Terminal inputs
-and outputs occupy bounded local groups attached to their transaction. Packing uses
-actual node radii and spaced X/Y footprints, then lifts new nodes onto a rounded
-front/back shell with depth proportional to the occupied group radius. Flat mode
-keeps the two-dimensional footprint. Address associations do not change
+and outputs occupy bounded local groups attached to their transaction. Fresh sides
+with up to eight terminal outpoints use a count-aware balanced footprint: a centered
+singleton, a symmetric pair, or an evenly spaced ring with balanced depth in 3D.
+Pairwise glyph radii determine clearance, independently for each side. Onward
+connections reserve a central corridor between the side's upper and lower groups.
+The complete proposal must clear existing geometry before any member is placed.
+Larger sides, obstructed proposals and partially positioned sides retain the existing
+collision-aware packing. That packing uses actual node radii and spaced X/Y
+footprints, then lifts new nodes onto a rounded front/back shell with depth
+proportional to the occupied group radius. Flat mode keeps the two-dimensional
+footprint. Cached positions remain exact; Repack applies the new spacing to an
+existing layout. Address associations do not change
 an outpoint's directed role. Shared outpoints remain single canonical nodes.
 
 The transaction skeleton determines branch placement before terminal groups are

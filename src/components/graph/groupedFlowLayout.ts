@@ -17,7 +17,59 @@ const radius = (node: LayoutNode) => Math.max(2.4, node.radius ?? 5);
 type Side = -1 | 1;
 type Leaf = { node: LayoutNode; hub: string; side: Side };
 type Bridge = { node: LayoutNode; source: string; target: string };
-type Pack = { leaves: Leaf[]; radius: number; outer: number };
+type Pack = {
+  leaves: Leaf[];
+  radius: number;
+  outer: number;
+  small?: { points: Position[]; extent: number };
+};
+
+/** Small groups need a complete balanced footprint, not a partial grid ring.
+ * Keep projected glyphs apart as well as their meshes so depth cannot hide a
+ * sibling in the normal flow view. Each side uses its own count and radii. */
+function smallFootprint(leaves: Leaf[], flat: boolean, corridor: boolean) {
+  if (!leaves.length || leaves.length > 8) return;
+  const units = leaves.map((_, index): Position => {
+    if (leaves.length === 1) return { x: 0, y: 0, z: 0 };
+    if (leaves.length === 2) return { x: 0, y: index ? 0.5 : -0.5, z: 0 };
+    const angle = (2 * Math.PI * index) / leaves.length + Math.PI / (2 * leaves.length);
+    return {
+      x: Math.cos(angle),
+      y: Math.sin(angle),
+      // Balanced depth gives small groups volume without a dominant central pole.
+      z: flat ? 0 : Math.cos(2 * angle) * 0.45,
+    };
+  });
+  let scale = 0;
+  for (let i = 0; i < leaves.length; i++)
+    for (let j = i + 1; j < leaves.length; j++) {
+      const gap = Math.max(3, Math.min(radius(leaves[i].node), radius(leaves[j].node)) * 0.65);
+      scale = Math.max(
+        scale,
+        (radius(leaves[i].node) + radius(leaves[j].node) + gap) /
+          Math.hypot(units[i].x - units[j].x, units[i].y - units[j].y),
+      );
+    }
+  const points = units.map((point) => scaled(point, scale));
+  if (corridor) {
+    const clearance = Math.max(...leaves.map((leaf) => radius(leaf.node))) + 7;
+    if (points.length === 1) points[0].y = clearance;
+    else {
+      // Split a small group evenly above/below its onward connection. An odd
+      // count gets extra room before recentering so neither lobe blocks the path.
+      const shift = clearance * (points.length % 2 ? points.length / (points.length - 1) : 1);
+      for (const point of points) point.y += (point.y < 0 ? -1 : 1) * shift;
+      const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+      for (const point of points) point.y -= meanY;
+    }
+  }
+  const extent = Math.max(
+    ...points.map(
+      (point, index) => Math.hypot(point.x, point.y, point.z) + radius(leaves[index].node),
+    ),
+  );
+  return { points, extent };
+}
 
 /** A compact circular glyph footprint shared by rounded bridges and branch fans. */
 function roundedFootprint(count: number, pitch: number) {
@@ -155,14 +207,19 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
   for (const node of nodes)
     if (positions.has(node.id)) occupancy.add(positions.get(node.id)!, radius(node));
   const packs = new Map<string, Map<Side, Pack>>();
+  const corridors = new Set(
+    bridges.flatMap((bridge) => [`${bridge.source}:1`, `${bridge.target}:-1`]),
+  );
   for (const hub of hubs.values()) {
     const sides = new Map<Side, Pack>();
     for (const side of [-1, 1] as const) {
       const members = leaves.filter((leaf) => leaf.hub === hub.id && leaf.side === side);
+      const small = smallFootprint(members, flat, corridors.has(`${hub.id}:${side}`));
       const amount = members.reduce((sum, leaf) => sum + (radius(leaf.node) + 1.2) ** 2, 0);
-      const extent = members.length ? Math.max(6, Math.sqrt(amount * 1.65)) : 0;
+      const extent = small?.extent ?? (members.length ? Math.max(6, Math.sqrt(amount * 1.65)) : 0);
       sides.set(side, {
         leaves: members,
+        small,
         radius: extent,
         outer: extent ? radius(hub) + 8 + extent * 2 : radius(hub) + 8,
       });
@@ -627,6 +684,33 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
         .filter((leaf) => !positions.has(leaf.node.id))
         .sort((a, b) => radius(b.node) - radius(a.node) || compare(a.node.id, b.node.id));
       if (!pending.length) continue;
+      if (pack.small && pending.length === pack.leaves.length) {
+        const corridor = neighbors.get(hubId)!.some((neighbor) => neighbor.side === side);
+        // Validate the entire group before committing any member. If an anchored
+        // branch obstructs it, the existing collision-aware packer places that side.
+        const proposed = pack.leaves.map((leaf, index) => {
+          const local = pack.small!.points[index];
+          return {
+            leaf,
+            local,
+            point: worldPoint(frame, hub, {
+              x: side * (hubRadius + 8 + pack.radius + local.x),
+              y: local.y,
+              z: local.z,
+            }),
+          };
+        });
+        if (
+          proposed.every(
+            ({ leaf, local, point }) =>
+              (!corridor || Math.abs(local.y) >= radius(leaf.node) + 7) &&
+              occupancy.free(point, radius(leaf.node)),
+          )
+        ) {
+          for (const { leaf, point } of proposed) put(leaf.node.id, point);
+          continue;
+        }
+      }
       const pitch = Math.min(...pack.leaves.map((leaf) => radius(leaf.node))) * 2 + 1.8;
       // Space the footprint first; 3D leaves are then lifted onto a rounded shell.
       const projection = new Occupancy(cellSize, true);

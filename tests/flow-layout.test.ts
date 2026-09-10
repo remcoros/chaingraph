@@ -18,6 +18,21 @@ const fixture = (count = 1): LayoutRequest => ({
     { source: 'output-0', target: 'address' },
   ],
 });
+const terminalTransaction = (inputs: number, outputs: number, dimensions: 2 | 3): LayoutRequest => {
+  const graph = fixture(Math.max(inputs, outputs));
+  graph.dimensions = dimensions;
+  graph.nodes = graph.nodes.filter(
+    (node) =>
+      node.id === 'transaction' ||
+      (node.id.startsWith('input-') && Number(node.id.slice(6)) < inputs) ||
+      (node.id.startsWith('output-') && Number(node.id.slice(7)) < outputs),
+  );
+  const ids = new Set(graph.nodes.map((node) => node.id));
+  graph.links = graph.links
+    .filter((link) => ids.has(link.source) && ids.has(link.target))
+    .map((link) => ({ ...link, directed: true }));
+  return graph;
+};
 // Normalized covariance determinant is positive only for genuinely spatial
 // groups, including when a planar disc is tilted away from the world axes.
 function spatialVolume(points: Position[]) {
@@ -612,6 +627,136 @@ describe('grouped flow and generic compact layout', () => {
       expect(Math.max(...points.map((point) => point.z))).toBeGreaterThan(3);
       expect(Math.min(...points.map((point) => point.z))).toBeLessThan(-3);
     }
+  });
+
+  describe.each([2, 3] as const)('small transaction spacing in %dD', (dimensions) => {
+    it.each([
+      [1, 2],
+      [2, 2],
+      [3, 3],
+      [5, 5],
+      [8, 8],
+      [1, 5],
+      [5, 20],
+    ])('balances %d inputs and %d outputs independently', (inputs, outputs) => {
+      const request = terminalTransaction(inputs, outputs, dimensions);
+      const result = compactLayout(request).positions;
+      const center = new Map(result).get('transaction')!;
+      expect(result).toHaveLength(request.nodes.length);
+      for (const [prefix, count, direction] of [
+        ['input-', inputs, -1],
+        ['output-', outputs, 1],
+      ] as const) {
+        const points = result.filter(([id]) => id.startsWith(prefix)).map(([, point]) => point);
+        expect(points).toHaveLength(count);
+        expect(points.every((point) => (point.x - center.x) * direction > 10)).toBe(true);
+        for (let i = 0; i < points.length; i++)
+          for (let j = i + 1; j < points.length; j++)
+            expect(
+              Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y),
+            ).toBeGreaterThan(11.4);
+        if (count <= 8) {
+          for (const axis of ['y', 'z'] as const)
+            expect(points.reduce((sum, point) => sum + point[axis], 0) / count).toBeCloseTo(
+              center[axis],
+              8,
+            );
+          if (count > 1) {
+            const nearest = points.map((point, index) =>
+              Math.min(
+                ...points
+                  .filter((_, other) => other !== index)
+                  .map((other) => Math.hypot(point.x - other.x, point.y - other.y)),
+              ),
+            );
+            expect(Math.max(...nearest) / Math.min(...nearest)).toBeLessThan(1.2);
+          }
+          if (dimensions === 3 && count >= 5) expect(spatialVolume(points)).toBeGreaterThan(0.1);
+        }
+      }
+      if (dimensions === 2) expect(result.every(([, point]) => point.z === 0)).toBe(true);
+      expect(
+        compactLayout({
+          ...request,
+          nodes: [...request.nodes].reverse(),
+          links: [...request.links].reverse(),
+        }).positions,
+      ).toEqual(result);
+      expect(compactLayout({ ...request, previous: result }).positions).toEqual(result);
+    });
+
+    it('keeps differently sized glyphs readable without pulling a small side off center', () => {
+      const request = terminalTransaction(5, 8, dimensions);
+      request.nodes = request.nodes.map((node, index) => ({
+        ...node,
+        radius: [3, 5, 11][index % 3],
+      }));
+      const result = new Map(compactLayout(request).positions);
+      const center = result.get('transaction')!;
+      for (const prefix of ['input-', 'output-']) {
+        const members = request.nodes.filter((node) => node.id.startsWith(prefix));
+        for (const axis of ['y', 'z'] as const)
+          expect(
+            members.reduce((sum, node) => sum + result.get(node.id)![axis], 0) / members.length,
+          ).toBeCloseTo(center[axis], 8);
+        for (let i = 0; i < members.length; i++)
+          for (let j = i + 1; j < members.length; j++) {
+            const a = result.get(members[i].id)!,
+              b = result.get(members[j].id)!;
+            expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(
+              members[i].radius! + members[j].radius! + 1.4,
+            );
+          }
+      }
+    });
+
+    it('balances the terminal outputs around an open onward path in a five-output transaction', () => {
+      const request = terminalTransaction(5, 5, dimensions);
+      request.nodes.push({ id: 'spender', shape: 'box' });
+      request.links.push({ source: 'output-0', target: 'spender', directed: true });
+      const positions = compactLayout(request).positions;
+      const result = new Map(positions);
+      const source = result.get('transaction')!,
+        target = result.get('spender')!,
+        bridge = result.get('output-0')!;
+      expect(bridge.x).toBeGreaterThan(source.x);
+      expect(bridge.x).toBeLessThan(target.x);
+      const terminal = [1, 2, 3, 4].map((index) => result.get(`output-${index}`)!);
+      for (const point of terminal) expect(Math.abs(point.y - source.y)).toBeGreaterThanOrEqual(12);
+      for (const axis of ['y', 'z'] as const)
+        expect(terminal.reduce((sum, point) => sum + point[axis], 0) / terminal.length).toBeCloseTo(
+          source[axis],
+          8,
+        );
+      expect(compactLayout({ ...request, previous: positions }).positions).toEqual(positions);
+    });
+
+    it('adds a small side without moving its cached transaction or an already displayed output', () => {
+      const initial = terminalTransaction(0, 1, dimensions);
+      const previous = compactLayout(initial).positions;
+      const request = { ...terminalTransaction(5, 5, dimensions), previous };
+      const positions = compactLayout(request).positions;
+      const result = new Map(positions);
+      expect(result.size).toBe(request.nodes.length);
+      for (const [id, point] of previous) expect(result.get(id)).toEqual(point);
+      expect(positions.every(([, point]) => Object.values(point).every(Number.isFinite))).toBe(
+        true,
+      );
+      for (const [id, point] of positions)
+        for (const [otherId, other] of positions)
+          if (id < otherId)
+            expect(
+              Math.hypot(point.x - other.x, point.y - other.y, point.z - other.z),
+            ).toBeGreaterThan(11.4);
+      expect(
+        compactLayout({
+          ...request,
+          previous: [...previous].reverse(),
+          nodes: [...request.nodes].reverse(),
+          links: [...request.links].reverse(),
+        }).positions,
+      ).toEqual(positions);
+    });
   });
 
   it('traces three creating transactions and adds their sides without moving existing observations', () => {
