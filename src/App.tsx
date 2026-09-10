@@ -707,7 +707,11 @@ export default function App() {
   const selected = selectedId ? recoveryNodesById.get(selectedId) : undefined;
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
-  }, [w?.id, selectedId, selectedWallet, rightTab]);
+  }, [w?.id, rightTab]);
+  useLayoutEffect(() => {
+    // Scan results stay in place while their paths change the graph selection.
+    if (rightTab !== 'scan' && inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
+  }, [selectedId, selectedWallet, rightTab]);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
   const editingWallet =
     w?.id === walletNameDialog?.workspaceId
