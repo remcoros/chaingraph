@@ -348,8 +348,8 @@ test('finding types expose zero counts, match by OR and keep counts independent 
   await expect(menu.getByRole('checkbox')).toHaveCount(19);
   await expect(menu.getByRole('checkbox', { checked: true })).toHaveCount(19);
   await menu.getByRole('img', { name: 'Finding type counts', exact: true }).focus();
-  await expect(page.getByRole('tooltip')).toContainText('Match any selected type');
-  await expect(page.getByRole('tooltip')).toContainText('Counts overlap');
+  await expect(page.getByRole('tooltip')).toContainText('match any selected type');
+  await expect(page.getByRole('tooltip')).toContainText('counts may overlap');
   await expect(count('All current UTXOs')).toHaveText('2');
   await expect(count('Source address')).toHaveText('0');
   await expect(count('Earlier wallet receipt')).toHaveText('1');
@@ -365,7 +365,14 @@ test('finding types expose zero counts, match by OR and keep counts independent 
     await expect(help).toHaveAttribute('aria-describedby', /.+/);
     await expect(
       page.locator(`[id="${await help.getAttribute('aria-describedby')}"]`),
-    ).toContainText('Not scanned in this session');
+    ).toContainText('No scan results are available for this type yet.');
+    if (tool.id === 'transaction-shapes') {
+      await expect(page.getByRole('tooltip')).toHaveCount(1);
+      await page.screenshot({ path: 'artifacts/wallet-finding-type-help.png' });
+      await page.setViewportSize({ width: 900, height: 900 });
+      await page.screenshot({ path: 'artifacts/wallet-finding-type-help-narrow.png' });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
   }
   await menu.getByRole('button', { name: 'Clear types', exact: true }).click();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(0);

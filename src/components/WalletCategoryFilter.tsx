@@ -17,7 +17,7 @@ export function WalletCategoryFilter({
   selected,
   onChange,
   title = 'Wallet finding types',
-  countHelp = 'Match any selected type. Counts overlap and describe rows matching the other filters.',
+  countHelp = 'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyse loaded to look for new findings.',
 }: {
   active: boolean;
   title?: string;
@@ -90,7 +90,8 @@ export function WalletCategoryFilter({
                     <span className="wallet-count">{category.count}</span>
                   </label>
                   <WalletHelp title={category.label} active={active && open}>
-                    {category.description} {category.note}
+                    <p>{category.description}</p>
+                    {category.note && <p className="muted">{category.note}</p>}
                   </WalletHelp>
                 </div>
               </div>

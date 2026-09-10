@@ -380,14 +380,14 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             const note = !category.heuristic
               ? undefined
               : tool?.status === 'not-scanned'
-                ? 'Not scanned in this session; zero means no listed results, not a completed scan.'
+                ? 'No scan results are available for this type yet.'
                 : tool?.status === 'saved-findings'
-                  ? 'Saved findings; original scan coverage is unavailable.'
+                  ? 'These findings were saved earlier; the details of that scan are unavailable.'
                   : tool?.status === 'skipped'
-                    ? 'Skipped in the last session scan.'
+                    ? 'The last scan skipped this check.'
                     : tool?.status === 'error'
-                      ? 'The last session scan could not complete this tool.'
-                      : `Last session scan: ${currentScan?.scope.label ?? 'scope unavailable'}. Counts here are filtered review items.`;
+                      ? 'The last scan could not finish this check. Choose Analyse loaded to try again.'
+                      : `Last scan: ${currentScan?.scope.label ?? 'selection unavailable'}.`;
             return { ...category, note };
           }),
     [

@@ -18,7 +18,7 @@ export const valueFlowTool = defineTool({
   group: 'Value and structure',
   kind: 'observation',
   description:
-    'Reconcile input and output amounts using known previous-output details. Reveal missing evidence and review fees against your own threshold.',
+    'Compare the bitcoin going into a transaction with the amount coming out. The difference is the transaction fee. This check shows the fee when enough information is available, flags fee rates at or above your chosen threshold, and points out missing or conflicting input details.',
   source: {
     title: 'BIP141: transaction virtual size',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki',
@@ -228,7 +228,7 @@ export const structureTool = defineTool({
   group: 'Value and structure',
   kind: 'observation',
   description:
-    'Find many-input, few-output shapes or transactions distributing value to many outputs. Tune the thresholds for your investigation.',
+    'Find transactions that gather many previously received amounts into a few new outputs, or split bitcoin across many outputs. These patterns can help you spot coin consolidation or payments made in batches, though the transaction alone cannot tell you its purpose or how many people were involved.',
   source: {
     title: 'Bitcoin transaction structure',
     url: 'https://developer.bitcoin.org/devguide/transactions.html',
@@ -351,7 +351,7 @@ export const scriptTool = defineTool({
   group: 'Value and structure',
   kind: 'observation',
   description:
-    'Compare reported types or standard types decoded from loaded script hex. Highlight mixed types and differences without guessing which output is change.',
+    'Compare the types of spending rules used by a transaction’s inputs and outputs, such as legacy, SegWit and Taproot. This helps you spot changes in how coins are held. A different type can be a clue to investigate, but it does not establish which output is change.',
   source: {
     title: 'BIP78: limitations of script-type heuristics',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0078.mediawiki',

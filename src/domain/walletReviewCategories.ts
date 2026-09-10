@@ -22,22 +22,22 @@ export interface WalletReviewCategory {
 
 const reasonDescriptions: Record<ReviewReason, string> = {
   'current-utxo':
-    'All outputs reported unspent at the last verified UTXO check, regardless of metadata.',
+    'Coins in this wallet that were unspent at the last UTXO check. This includes coins you have already labelled or tagged, so you can review everything the check found.',
   'wallet-address':
-    'Used receiving and change addresses in this wallet. Label their purpose without having to label unused derived addresses.',
+    'Receiving and change addresses in this wallet that have been used. Add labels to remember what you used them for; unused addresses are left out of the review list.',
   source:
-    'Earlier wallet receipts directly spent in transactions creating the checked current UTXOs, not sender or exchange identities.',
+    'Earlier coins received by this wallet and later spent in transactions that created your current UTXOs. These receipts let you look back one step in your wallet’s history.',
   'source-address':
-    'Direct input addresses with no match to the selected wallet, in loaded transactions paying it. No separate controller is proven.',
+    'Addresses used to fund transactions that paid this wallet. They do not match its known addresses, but may still belong to you. Add a label if you recognize the sender or source.',
   'funding-source':
-    'Direct funding outputs without address evidence, plus saved output-only decisions retained separately from address reviews.',
+    'Your saved reviews of individual outputs that funded this wallet. These earlier decisions remain available to revisit; new source reviews are grouped by address.',
   'new-activity':
-    'Activity retained for review after a wallet refresh, including unloaded history entries.',
+    'Transaction activity found during a wallet refresh and kept here for you to review. Some transactions may still need to be loaded before you can see their details.',
   'destination-address':
-    'Output addresses with no match to the selected wallet, in transactions spending its verified outputs. No controller is identified.',
+    'Addresses paid by transactions that spent coins from this wallet. They do not match its known addresses, but may still belong to you. Add a label if you recognize the recipient or purpose.',
   counterparty:
-    'Destination outputs without address evidence, plus saved output-only decisions retained separately from address reviews.',
-  link: 'Active, non-stale saved analysis findings affecting this wallet. Observations and hypotheses retain their original evidence.',
+    'Your saved reviews of individual outputs created when this wallet spent coins. These earlier decisions remain available to revisit; new destination reviews are grouped by address.',
+  link: 'Analysis findings involving this wallet that are still current. Open a finding to see the pattern it detected and the transactions behind it, then decide whether it helps explain your wallet’s activity.',
 };
 
 const metadataCategories = [
@@ -45,31 +45,31 @@ const metadataCategories = [
     id: 'unidentified-sources',
     label: 'Unidentified direct sources',
     description:
-      'Source address review subjects with neither a nonblank address label nor effective address tags. Output reviews and missing-address exceptions do not add to this count.',
+      'Source addresses with no label or tags to help you recognize them. Use this list to record where incoming payments came from. Labels on individual coins do not label the address itself.',
   },
   {
     id: 'unidentified-destinations',
     label: 'Unidentified direct destinations',
     description:
-      'Destination address review subjects with neither a nonblank address label nor effective address tags. Output reviews do not add to this count; no-match does not prove external ownership.',
+      'Destination addresses with no label or tags to help you recognize them. Use this list to record who you paid or why you moved the coins. An address here may still belong to you.',
   },
   {
     id: 'utxo-missing-label',
     label: 'UTXOs missing labels',
     description:
-      'Current UTXO review subjects with no nonblank label on the output itself. Tags, notes and icons do not count as labels.',
+      'Current unspent coins that have no label of their own. Add a short name to remember where a coin came from or what you are keeping it for. Coins with tags or notes can still appear here.',
   },
   {
     id: 'utxo-missing-tags',
     label: 'UTXOs missing tags',
     description:
-      'Current UTXO review subjects with no effective output or verified-address tags. Labels do not count as tags.',
+      'Current unspent coins with no tags, either on the coin itself or inherited from its address. Tags help you group coins by source, purpose or another meaning you choose.',
   },
   {
     id: 'utxo-unidentified',
     label: 'UTXOs missing labels and tags',
     description:
-      'Current UTXO review subjects with neither a nonblank output label nor effective tags.',
+      'Current unspent coins with neither a label of their own nor any tags, including tags inherited from their address. Use this list to start organizing your coins.',
   },
 ] as const;
 
@@ -143,7 +143,7 @@ export function walletReviewCategories(
             id: 'saved-output-reviews',
             label: 'Previous output decisions',
             description:
-              'Earlier saved output reviews are retained here. New source and destination reviews target addresses.',
+              'Decisions you saved when reviews were made for individual outputs. You can revisit those decisions here. New source and destination reviews bring related activity together under each address.',
           },
         ]
       : []),
@@ -151,7 +151,7 @@ export function walletReviewCategories(
     ...analysisTools.map((tool) => ({
       id: `heuristic:${tool.id}`,
       label: tool.name,
-      description: `${tool.description} Saved ${tool.kind === 'hypothesis' ? 'hypotheses, not ownership proof' : 'observations, not ownership claims'} only; choosing this type does not run a scan.`,
+      description: tool.description,
       heuristic: true,
       algorithm: tool.id,
       kind: tool.kind,

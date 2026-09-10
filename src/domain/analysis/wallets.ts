@@ -17,7 +17,7 @@ export const walletTool = defineTool({
   group: 'Imported wallets',
   kind: 'observation',
   description:
-    'Find transactions touching derived addresses from multiple imported wallets. Distinguish shared import coverage from different wallet records co-spending.',
+    'Find transactions whose inputs or outputs match more than one wallet you have imported. This can reveal connections between your wallet records, including coins spent together. It also flags overlapping imports, where the same coins appear in more than one wallet record.',
   source: {
     title: 'BIP32: hierarchical deterministic wallet derivation',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki',

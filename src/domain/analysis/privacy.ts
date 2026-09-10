@@ -37,7 +37,7 @@ export const equalOutputTool = defineTool({
   group: 'Privacy patterns',
   kind: 'observation',
   description:
-    'Find exact repeated positive amounts and highlight each matching group separately. Useful for studying ambiguity and repeated payments.',
+    'Find outputs in the same transaction that contain exactly the same amount of bitcoin. Each matching group is highlighted so you can compare it. Equal amounts can occur in ordinary payments or transactions made jointly by several people; they do not identify which input funded which output.',
   source: {
     title: 'Boltzmann transaction linkability research',
     url: 'https://github.com/Samourai-Wallet/boltzmann',
@@ -115,7 +115,7 @@ export const ciohTool = defineTool({
   group: 'Privacy patterns',
   kind: 'hypothesis',
   description:
-    'Group outputs spent together. Shared addresses or scripts can connect groups across transactions, but shared ownership remains a hypothesis.',
+    'Find coins spent together in a transaction, then connect those groups where the same address or spending script appears again. This can suggest coins controlled by one wallet, but transactions made jointly by several people can create the same links.',
   source: {
     title: 'BIP78: why PayJoin breaks common-input ownership',
     url: 'https://github.com/bitcoin/bips/blob/master/bip-0078.mediawiki',
@@ -271,7 +271,7 @@ export const reuseTool = defineTool({
   group: 'Privacy patterns',
   kind: 'observation',
   description:
-    'Locate addresses repeated on outputs within the chosen scope. Separate repeats in one transaction from reuse across transactions.',
+    'Find addresses that appear on more than one output, either within a single transaction or across several transactions. Reusing a receiving address makes separate payments easier to connect. The results show where the address appears so you can review those connections.',
   source: {
     title: 'A Fistful of Bitcoins: address clustering research',
     url: 'https://cseweb.ucsd.edu/~smeiklejohn/files/imc13.pdf',
