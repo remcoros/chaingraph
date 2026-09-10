@@ -1,6 +1,7 @@
 import { canonicalAddress, canonicalEntityNodeId } from './entityReferences';
+import { graphRemovalClosure } from './graphBranch';
 import { outputNodeId, short, txNodeId, type Workspace } from './types';
-import { outputAddress } from './workspace';
+import { buildGraph, outputAddress } from './workspace';
 import { buildWalletMatches } from './tags';
 
 export interface EntityRemovalPlan {
@@ -163,6 +164,52 @@ export function planEntityRemoval(
   };
 }
 
+/** Forget vanished entities and newly orphaned I/O without dropping shared
+ * outpoints, their loaded evidence, or unrelated future references. */
+function pruneRemovedGraphMembership(before: Workspace, after: Workspace): Workspace {
+  const admitted = before.view.graphNodeIds;
+  if (!admitted?.length) return after;
+  const fullGraph = (workspace: Workspace) =>
+    buildGraph({
+      ...workspace,
+      inputContext: undefined,
+      view: { ...workspace.view, showAddresses: true },
+    });
+  const remainingGraph = fullGraph(after);
+  const remaining = new Set(remainingGraph.nodes.map((node) => node.id));
+  const previousGraph = fullGraph(before);
+  const removedTransactions = Object.keys(before.transactions)
+    .filter((id) => !after.transactions[id])
+    .map(txNodeId);
+  const removedTransactionNodes = new Set(removedTransactions);
+  // Old transaction edges identify its I/O, while only surviving edges can
+  // protect those outputs. Deleting a creator can remove an address association
+  // even when a spending input keeps the outpoint itself in the evidence graph.
+  const removalGraph = {
+    nodes: [
+      ...new Map(
+        [...previousGraph.nodes, ...remainingGraph.nodes].map((node) => [node.id, node]),
+      ).values(),
+    ],
+    links: [
+      ...remainingGraph.links,
+      ...previousGraph.links.filter(
+        (link) =>
+          removedTransactionNodes.has(link.source) || removedTransactionNodes.has(link.target),
+      ),
+    ],
+  };
+  const noLongerAdmitted = new Set(
+    graphRemovalClosure(removalGraph, new Set(admitted), removedTransactions),
+  );
+  for (const node of previousGraph.nodes)
+    if (!remaining.has(node.id)) noLongerAdmitted.add(node.id);
+  const graphNodeIds = admitted.filter((id) => !noLongerAdmitted.has(id));
+  return graphNodeIds.length === admitted.length
+    ? after
+    : { ...after, view: { ...after.view, graphNodeIds } };
+}
+
 /** Re-plan at application time; callers confirm against the active workspace immediately before calling. */
 export function removeWorkspaceEntity(workspace: Workspace, reference: string): Workspace {
   const plan = planEntityRemoval(workspace, reference);
@@ -176,14 +223,14 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
     nodeIds: tag.nodeIds.filter((id) => !affected.has(id)),
   }));
   if (plan.kind === 'watched-address')
-    return {
+    return pruneRemovedGraphMembership(workspace, {
       ...workspace,
       watchedAddresses: workspace.watchedAddresses.filter(
         (address) => canonicalAddress(address) !== plan.nodeId.slice(5),
       ),
       annotations,
       tags,
-    };
+    });
   const removed = new Set(plan.removedTransactionIds);
   const transactions = { ...workspace.transactions };
   for (const id of removed) delete transactions[id];
@@ -219,7 +266,7 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
       }),
   );
   const filters = workspace.view.filters;
-  return {
+  return pruneRemovedGraphMembership(workspace, {
     ...workspace,
     inputContext: Object.keys(inputContext).length ? inputContext : undefined,
     contextTransactionIds: workspace.contextTransactionIds?.filter((id) => !removed.has(id)),
@@ -257,5 +304,5 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
           ? { ...workspace.view.transactionFlow, transactionId: undefined }
           : workspace.view.transactionFlow,
     },
-  };
+  });
 }

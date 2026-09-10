@@ -1,5 +1,6 @@
 import { SmallAmountControl } from './SmallAmountControl';
 import { Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { Workspace } from '../domain/types';
 export function GraphControls({
   view,
@@ -7,8 +8,10 @@ export function GraphControls({
   focusGraph,
   onToggleFocus,
   smallAmountHiddenCount,
+  motionToggle,
 }: {
   view: Workspace['view'];
+  motionToggle?: ReactNode;
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
   smallAmountHiddenCount?: number;
   focusGraph?: boolean;
@@ -48,7 +51,7 @@ export function GraphControls({
         <span>Size by</span>
         <select
           aria-label="Size nodes by"
-          title="Value emphasizes larger amounts using a bounded square-root scale. Sizes remain stable when filtering; perspective also affects apparent size."
+          title="Value uses a gentle logarithmic scale. Sizes stay stable when filtering; perspective also affects apparent size."
           value={view.sizeBy}
           onChange={(e) =>
             onChange((current) => ({
@@ -87,7 +90,8 @@ export function GraphControls({
           <option value="none">Types + findings</option>
         </select>
       </span>
-      <div className="graph-annotation-toggles" role="group" aria-label="Graph annotations">
+      <div className="graph-annotation-toggles" role="group" aria-label="Graph display">
+        {motionToggle}
         {(
           [
             ['showLabels', 'Show labels', Type],
@@ -119,8 +123,8 @@ export function GraphControls({
       <button
         className={`icon-button ${view.showAddresses ? 'active' : ''}`}
         aria-pressed={view.showAddresses}
-        title="Show address nodes"
-        aria-label="Show address nodes"
+        title="Show address nodes added to this graph"
+        aria-label="Show added address nodes"
         onClick={() =>
           onChange((current) => ({ ...current, showAddresses: !current.showAddresses }))
         }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveAddresses } from '../src/lib/wallet';
 import type { Wallet } from '../src/domain/types';
 import { planEntityRemoval, removeWorkspaceEntity } from '../src/domain/entityRemoval';
+import { addGraphNodes, projectGraphMembership } from '../src/domain/graphMembership';
 import {
   buildGraph,
   newWorkspace,
@@ -33,6 +34,83 @@ function fixture() {
   return w;
 }
 describe('workspace entity removal', () => {
+  it('does not retain an orphan input through an address edge lost with its creating transaction', () => {
+    const w = fixture();
+    const output = `out:${parent}:0`;
+    const destination = `addr:${address}`;
+    w.transactions[parent].vout[0].scriptPubKey = { address };
+    w.watchedAddresses = [address];
+    w.view.graphNodeIds = [`tx:${parent}`, output, destination];
+    const next = removeWorkspaceEntity(w, `tx:${parent}`);
+    expect(next.transactions[child]).toBe(w.transactions[child]);
+    expect(buildGraph(next).nodes.some((node) => node.id === output)).toBe(true);
+    expect(next.watchedAddresses).toEqual([address]);
+    expect(next.view.graphNodeIds).toEqual([destination]);
+    expect(parseWorkspace(next)).toEqual(next);
+  });
+
+  it.each([false, true])(
+    'cleans up a removed transaction’s input only when its loaded parent is off the canvas (parent admitted: %s)',
+    (parentAdmitted) => {
+      const w = fixture();
+      const inputId = `out:${parent}:0`;
+      w.view.graphNodeIds = [
+        ...(parentAdmitted ? [`tx:${parent}`] : []),
+        `tx:${child}`,
+        inputId,
+        `out:${child}:0`,
+      ];
+      w.annotations[inputId] = note;
+      w.tags = [
+        { id: crypto.randomUUID(), name: 'Keep evidence', color: '#339988', nodeIds: [inputId] },
+      ];
+      const next = removeWorkspaceEntity(w, `tx:${child}`);
+      expect(next.view.graphNodeIds).toEqual(parentAdmitted ? [`tx:${parent}`, inputId] : []);
+      expect(next.transactions[parent]).toBe(w.transactions[parent]);
+      expect(next.transactions[child]).toBeUndefined();
+      expect(next.annotations[inputId]).toBe(note);
+      expect(next.tags).toEqual(w.tags);
+      expect(next.transactions[parent].vout).toHaveLength(1);
+      expect(parseWorkspace(next)).toEqual(next);
+      expect(w.view.graphNodeIds).toContain(inputId);
+    },
+  );
+
+  it('does not resurrect removed siblings when a transaction is reloaded, while retaining shared outpoints', () => {
+    const w = fixture();
+    w.transactions[parent].vout.push({ n: 1, value: 0.5, scriptPubKey: { hex: '51' } });
+    w.view.graphNodeIds = buildGraph(w).nodes.map((node) => node.id);
+    const removed = removeWorkspaceEntity(w, `tx:${parent}`);
+    expect(removed.view.graphNodeIds).toContain(`out:${parent}:0`);
+    expect(removed.view.graphNodeIds).not.toContain(`tx:${parent}`);
+    expect(removed.view.graphNodeIds).not.toContain(`out:${parent}:1`);
+    const reloaded = addGraphNodes(
+      { ...removed, transactions: { ...removed.transactions, [parent]: w.transactions[parent] } },
+      [`tx:${parent}`],
+    );
+    const ids = projectGraphMembership(buildGraph(reloaded), reloaded.view.graphNodeIds).nodes.map(
+      (node) => node.id,
+    );
+    expect(ids).toContain(`tx:${parent}`);
+    expect(ids).toContain(`out:${parent}:0`);
+    expect(ids).not.toContain(`out:${parent}:1`);
+    expect(reloaded.transactions[parent].vout).toHaveLength(2);
+  });
+
+  it('prunes only vanished address membership, preserving loaded associations even with addresses switched off', () => {
+    for (const hasLoadedAssociation of [false, true]) {
+      const w = fixture();
+      w.watchedAddresses = [address];
+      if (hasLoadedAssociation) w.transactions[parent].vout[0].scriptPubKey = { address };
+      w.view.graphNodeIds = [`addr:${address}`, `tx:${'f'.repeat(64)}`];
+      expect(w.view.showAddresses).toBe(false);
+      const removed = removeWorkspaceEntity(w, `addr:${address}`);
+      expect(removed.view.graphNodeIds?.includes(`addr:${address}`)).toBe(hasLoadedAssociation);
+      expect(removed.view.graphNodeIds).toContain(`tx:${'f'.repeat(64)}`);
+      expect(removed.transactions).toBe(w.transactions);
+    }
+  });
+
   it('removes unannotated transactions immediately but never edits individual outputs or inputs', () => {
     const w = fixture();
     expect(planEntityRemoval(w, `tx:${parent}`)?.requiresConfirmation).toBe(false);

@@ -7,6 +7,7 @@ import { useDialogFocus } from './Dialogs';
 import './visibility.css';
 
 export interface VisibilityProps {
+  graphNodeIds?: readonly string[];
   hiddenNodeIds?: readonly string[];
   onSetHidden?: (ids: string[], hidden: boolean) => void;
 }
@@ -14,6 +15,7 @@ export interface VisibilityProps {
 export function VisibilityActions({
   nodeId,
   transaction,
+  graphNodeIds,
   hiddenNodeIds = [],
   onSetHidden,
   onOpenChange,
@@ -25,7 +27,14 @@ export function VisibilityActions({
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const id = useId();
+  const notOnGraph = graphNodeIds !== undefined && !graphNodeIds.includes(nodeId);
   const hidden = hiddenNodeIds.includes(nodeId);
+  const offGraph = notOnGraph || hidden;
+  const toggleLabel = notOnGraph
+    ? 'Add entity to graph'
+    : hidden
+      ? 'Show entity in graph'
+      : 'Hide entity from graph';
   const setMenu = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
@@ -40,11 +49,11 @@ export function VisibilityActions({
       <button
         type="button"
         className="icon-button entity-visibility-toggle"
-        aria-label={hidden ? 'Show entity in graph' : 'Hide entity from graph'}
-        title={hidden ? 'Show entity in graph' : 'Hide entity from graph'}
-        onClick={() => onSetHidden([nodeId], !hidden)}
+        aria-label={toggleLabel}
+        title={toggleLabel}
+        onClick={() => onSetHidden([nodeId], !offGraph)}
       >
-        {hidden ? <Eye size={15} /> : <EyeOff size={15} />}
+        {offGraph ? <Eye size={15} /> : <EyeOff size={15} />}
       </button>
       {transaction && (
         <button
@@ -69,6 +78,7 @@ export function VisibilityActions({
             id={id}
             anchor={anchor.current}
             transaction={transaction}
+            graphNodeIds={graphNodeIds}
             hiddenNodeIds={hiddenNodeIds}
             onSetHidden={onSetHidden}
             onClose={() => setMenu(false)}
@@ -83,6 +93,7 @@ function GroupVisibility({
   id,
   anchor,
   transaction,
+  graphNodeIds,
   hiddenNodeIds = [],
   onSetHidden,
   onClose,
@@ -104,6 +115,7 @@ function GroupVisibility({
   const left = Math.max(12, Math.min(rect.left, viewport.width - width - 12));
   const top = Math.max(12, Math.min(rect.bottom + 6, viewport.height - 258));
   const hidden = new Set(hiddenNodeIds);
+  const admitted = graphNodeIds === undefined ? undefined : new Set(graphNodeIds);
   return (
     <div
       className="visibility-backdrop"
@@ -140,14 +152,21 @@ function GroupVisibility({
         </div>
         {(['inputs', 'outputs'] as const).map((side) => {
           const ids = transactionNodeIds(transaction, side);
-          const hiddenIds = ids.filter((id) => hidden.has(id));
-          const visibleIds = ids.filter((id) => !hidden.has(id));
+          const missingIds = ids.filter((id) => admitted !== undefined && !admitted.has(id));
+          const hiddenIds = ids.filter((id) => (!admitted || admitted.has(id)) && hidden.has(id));
+          const offGraphIds = ids.filter(
+            (id) => (admitted !== undefined && !admitted.has(id)) || hidden.has(id),
+          );
+          const visibleIds = ids.filter((id) => (!admitted || admitted.has(id)) && !hidden.has(id));
           return (
             <div className="visibility-group" key={side}>
               <span>
                 {side === 'inputs' ? 'Inputs' : 'Outputs'}{' '}
-                <small>
-                  {hiddenIds.length} hidden / {ids.length}
+                <small
+                  title={`${visibleIds.length} shown, ${hiddenIds.length} hidden, ${missingIds.length} not on graph`}
+                  aria-label={`${visibleIds.length} shown, ${hiddenIds.length} hidden, ${missingIds.length} not on graph, ${ids.length} total`}
+                >
+                  {visibleIds.length} shown / {ids.length}
                 </small>
               </span>
               <button
@@ -160,19 +179,16 @@ function GroupVisibility({
               </button>
               <button
                 type="button"
-                disabled={!hiddenIds.length}
-                aria-label={`Show ${hiddenIds.length} ${side} in graph`}
-                onClick={() => onSetHidden?.(hiddenIds, false)}
+                disabled={!offGraphIds.length}
+                aria-label={`Add or show ${offGraphIds.length} ${side} in graph`}
+                onClick={() => onSetHidden?.(offGraphIds, false)}
               >
-                <Eye size={13} /> Show {hiddenIds.length}
+                <Eye size={13} /> Show {offGraphIds.length}
               </button>
             </div>
           );
         })}
-        <p>
-          Changes manual visibility only. Filters and loaded transaction context can further limit
-          the graph. Inputs refer to previous outputs wherever that outpoint appears.
-        </p>
+        <p>Inputs refer to previous outputs wherever that outpoint appears.</p>
       </div>
     </div>
   );

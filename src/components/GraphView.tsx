@@ -10,6 +10,8 @@ import {
   Minus,
   RotateCw,
   LoaderCircle,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -20,6 +22,7 @@ import {
   type Transaction,
 } from '../domain/types';
 import './graph.css';
+import type { GraphFlowContext } from './graph/flowContext';
 import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
 import {
   graphSnapshotSchema,
@@ -43,14 +46,17 @@ export interface GraphViewProps extends VisibilityProps {
   onActivity?: (active: boolean) => void;
   onRegisterSnapshotFlush?: (flush: (() => void) | undefined) => void;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
-  toolbar?: ReactNode;
+  toolbar?: ReactNode | ((controls: { motionToggle?: ReactNode }) => ReactNode);
   /** Shared controls floating over the viewport, outside the renderer event surface. */
   navigation?: ReactNode;
   /** Filter/visibility context below every floating control group. */
   navigationStatus?: ReactNode;
+  /** Contextual actions float along the right edge without remounting the renderer. */
+  contextToolbar?: ReactNode;
   renderMetadata?: (nodeId: string) => ReactNode;
   legend?: ReactNode;
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
+  flowContext?: GraphFlowContext;
   nodes: GraphNode[];
   links: GraphLink[];
   selectedId?: string;
@@ -84,6 +90,7 @@ export default function GraphView(props: GraphViewProps) {
   current.current = props;
   const cardRef = useRef<HTMLElement>(null);
   const navigationRef = useRef<HTMLDivElement>(null);
+  const contextToolbarRef = useRef<HTMLDivElement>(null);
   const resizeGraph = useRef<(() => void) | undefined>(undefined);
   const pointer = useRef({ x: 0, y: 0, touch: false });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -98,7 +105,12 @@ export default function GraphView(props: GraphViewProps) {
     busy: false,
     nodeCount: 0,
   });
-  const [rendererActions, setRendererActions] = useState({ zoom: false, repack: false });
+  const [rendererActions, setRendererActions] = useState({
+    zoom: false,
+    repack: false,
+    motion: false,
+  });
+  const [motionEnabled, setMotionEnabled] = useState(true);
   const savedSnapshot = useRef(props.snapshot);
   const lastFitToken = useRef(props.fitToken);
   const immutableNodeSource = useRef<GraphSnapshot['nodes'] | undefined>(undefined);
@@ -271,7 +283,11 @@ export default function GraphView(props: GraphViewProps) {
       });
       if (savedSnapshot.current) adapter.restoreSnapshot?.(savedSnapshot.current);
       graphRef.current = adapter;
-      setRendererActions({ zoom: !!adapter.zoom, repack: !!adapter.repack });
+      setRendererActions({
+        zoom: !!adapter.zoom,
+        repack: !!adapter.repack,
+        motion: !!adapter.setMotion,
+      });
       current.current.onRegisterSnapshotFlush?.(
         adapter.flushSnapshot ? () => adapter?.flushSnapshot?.() : undefined,
       );
@@ -287,7 +303,10 @@ export default function GraphView(props: GraphViewProps) {
         const topInset = navigation?.height
           ? Math.max(0, navigation.bottom - element.getBoundingClientRect().top + 8)
           : 0;
-        adapter?.resize(width, height, topInset);
+        const context = contextToolbarRef.current?.getBoundingClientRect();
+        const rightInset = context?.width ? context.width + 24 : 0;
+        element.parentElement?.style.setProperty('--graph-context-right-inset', `${rightInset}px`);
+        adapter?.resize(width, height, topInset, rightInset);
       };
       resizeGraph.current = resize;
       resize();
@@ -310,15 +329,21 @@ export default function GraphView(props: GraphViewProps) {
     };
   }, [adapterFactory]);
 
+  useEffect(() => {
+    graphRef.current?.setMotion?.(motionEnabled);
+  }, [adapterFactory, motionEnabled]);
+
   const hasNavigation = Boolean(props.navigation);
+  const hasContextToolbar = Boolean(props.contextToolbar);
   useEffect(() => {
     const navigation = navigationRef.current;
     resizeGraph.current?.();
     if (!navigation) return;
     const observer = new ResizeObserver(() => resizeGraph.current?.());
     observer.observe(navigation);
+    if (contextToolbarRef.current) observer.observe(contextToolbarRef.current);
     return () => observer.disconnect();
-  }, [hasNavigation, adapterFactory]);
+  }, [hasNavigation, hasContextToolbar, adapterFactory]);
 
   useEffect(() => {
     if (containerRef.current)
@@ -329,12 +354,14 @@ export default function GraphView(props: GraphViewProps) {
     props.links,
     props.dimensions,
     props.selectedId,
+    props.batchSelectedIds,
     props.sizeBy,
     props.glow,
     props.showLabels,
     props.showTags,
     props.showIcons,
     props.nodePresentation,
+    props.flowContext,
   ]);
 
   useEffect(() => {
@@ -354,6 +381,7 @@ export default function GraphView(props: GraphViewProps) {
       : hoveredNode.txid || hoveredNode.address || hoveredNode.id
     : '';
   const hoveredPresentation = hoveredNode && props.nodePresentation?.get(hoveredNode.id);
+  const hoveredRole = hoveredNode && props.flowContext?.nodes.get(hoveredNode.id);
   // Explicit annotation metadata distinguishes human labels, even hex-shaped ones,
   // from generated identifiers. Keep the legacy display-label fallback for callers
   // without that metadata, shortening only an exact raw/canonical reference.
@@ -417,7 +445,30 @@ export default function GraphView(props: GraphViewProps) {
 
   return (
     <div className="graph-view" data-testid="graph-view" onPointerLeave={scheduleCardClose}>
-      {props.toolbar && <div className="graph-shared-toolbar">{props.toolbar}</div>}
+      {props.toolbar && (
+        <div className="graph-shared-toolbar">
+          {typeof props.toolbar === 'function'
+            ? props.toolbar({
+                motionToggle: rendererActions.motion ? (
+                  <button
+                    type="button"
+                    className={`icon-button ${motionEnabled ? 'active' : ''}`}
+                    aria-label="Motion"
+                    aria-pressed={motionEnabled}
+                    title={motionEnabled ? 'Pause motion' : 'Resume motion'}
+                    onClick={() => setMotionEnabled((enabled) => !enabled)}
+                  >
+                    {motionEnabled ? (
+                      <Pause size={16} aria-hidden="true" />
+                    ) : (
+                      <Play size={16} aria-hidden="true" />
+                    )}
+                  </button>
+                ) : undefined,
+              })
+            : props.toolbar}
+        </div>
+      )}
       <div className="graph-viewport">
         <div ref={containerRef} className="graph-canvas" aria-hidden={error} />
         {!error && hover && hoveredNode && (
@@ -450,9 +501,15 @@ export default function GraphView(props: GraphViewProps) {
             <div className="graph-card-heading">
               <span
                 className={`graph-card-kind graph-card-kind-${hoveredNode.kind}`}
-                title={hoveredNode.kind}
+                title={
+                  hoveredRole
+                    ? `${hoveredRole === 'input' ? 'Input to' : 'Output from'} ${props.flowContext?.transactionId.slice(3)}`
+                    : hoveredNode.kind
+                }
               >
-                {hoveredNode.kind}
+                {hoveredRole
+                  ? `${hoveredRole === 'input' ? 'Input to' : 'Output from'} transaction`
+                  : hoveredNode.kind}
               </span>
               <div className="graph-card-actions" role="group" aria-label="Graph item actions">
                 <VisibilityActions
@@ -463,6 +520,7 @@ export default function GraphView(props: GraphViewProps) {
                       : undefined
                   }
                   hiddenNodeIds={props.hiddenNodeIds}
+                  graphNodeIds={props.graphNodeIds}
                   onSetHidden={props.onSetHidden}
                   onOpenChange={(open) => {
                     visibilityOpen.current = open;
@@ -723,6 +781,16 @@ export default function GraphView(props: GraphViewProps) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {props.contextToolbar && (
+          <div
+            ref={contextToolbarRef}
+            className="graph-context-overlay"
+            onPointerEnter={() => dismissCard()}
+            onFocusCapture={() => dismissCard()}
+          >
+            {props.contextToolbar}
           </div>
         )}
         {props.legend}

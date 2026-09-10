@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { graphSnapshotSchema } from './graphSnapshot';
+import {
+  assertGraphNodeBudget,
+  graphNodeIdsSchema,
+  parseGraphNodeIds,
+} from './graphMembershipValidation';
 import { assertHiddenNodeBudget, hiddenNodeIdsSchema, parseHiddenNodeIds } from './visibility';
 import type { Workspace, Transaction, GraphData, GraphNode, Network } from './types';
 import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
@@ -261,6 +266,7 @@ const workspaceSchema = z.object({
     sizeBy: z.enum(['uniform', 'value', 'degree']),
     glow: z.boolean(),
     showAddresses: z.boolean(),
+    graphNodeIds: graphNodeIdsSchema.optional(),
     hiddenNodeIds: hiddenNodeIdsSchema.optional(),
     entityVisibility: z.enum(['visible', 'hidden', 'all', 'graph']).optional(),
     smallAmountThreshold: z.number().int().min(0).max(MAX_MONEY_SATS).optional(),
@@ -373,8 +379,10 @@ export function assertWorkspaceBudget(data: unknown) {
   assertTagBudget(raw.tags);
   assertWalletReviewBudget((data as { walletReviews?: unknown }).walletReviews);
   const view = (data as { view?: unknown }).view;
-  if (view && typeof view === 'object')
+  if (view && typeof view === 'object') {
     assertHiddenNodeBudget((view as { hiddenNodeIds?: unknown }).hiddenNodeIds);
+    assertGraphNodeBudget((view as { graphNodeIds?: unknown }).graphNodeIds);
+  }
   if (
     raw.transactions &&
     typeof raw.transactions === 'object' &&
@@ -463,6 +471,13 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
   const migrated = migrateWorkspace(data);
   assertWorkspaceBudget(migrated);
   const parsed = workspaceSchema.parse(migrated);
+  if (
+    parsed.view.graphNodeIds === undefined &&
+    (data as { version?: unknown }).version === CURRENT_WORKSPACE_VERSION
+  )
+    throw new Error('Workspace is missing explicit graph entity membership.');
+  if (parsed.view.graphNodeIds !== undefined)
+    parsed.view.graphNodeIds = parseGraphNodeIds(parsed.view.graphNodeIds, parsed.network);
   if (parsed.view.hiddenNodeIds !== undefined)
     parsed.view.hiddenNodeIds = parseHiddenNodeIds(parsed.view.hiddenNodeIds, parsed.network);
   if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
@@ -528,6 +543,11 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
       verifyWalletAddresses(wallet.key, parsed.network, wallet.scriptType, wallet.addresses);
   }
   for (const address of parsed.watchedAddresses) addressToScriptHash(address, parsed.network);
+  if (parsed.view.graphNodeIds === undefined)
+    parsed.view.graphNodeIds = parseGraphNodeIds(
+      buildGraph(parsed).nodes.map((node) => node.id),
+      parsed.network,
+    );
   return parsed;
 }
 export function newWorkspace(name: string, network: Workspace['network']): Workspace {
@@ -543,7 +563,7 @@ export function newWorkspace(name: string, network: Workspace['network']): Works
     findings: [],
     watchedAddresses: [],
     demo: false,
-    view: { dimensions: 3, sizeBy: 'uniform', glow: true, showAddresses: false },
+    view: { dimensions: 3, sizeBy: 'uniform', glow: true, showAddresses: false, graphNodeIds: [] },
   };
 }
 export function outputAddress(output: Transaction['vout'][number]) {

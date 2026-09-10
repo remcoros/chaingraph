@@ -216,14 +216,49 @@ a payment never claims who controls an address. See
 
 ## Renderer experiment
 
-This isolated branch uses a purpose-built Three.js adapter with a compact, static
-force layout. Only additions are simulated when extending an investigation; saved
-nodes remain anchored. The floating toolbar brings Fit, zoom and an explicit
+The graph now contains only explicitly added nodes. Clicking a transaction adds
+that transaction; clicking an input or output adds that outpoint. Complete transaction
+records remain available in the flow panel without automatically displaying siblings.
+The icons-only right toolbar adds, hides or removes inputs, outputs, selections and
+transaction branches. Removing from the graph keeps evidence and annotations; branch
+actions retain shared outpoints. Inputs and outputs form compact, rounded 3D groups
+around each transaction. Shared outpoints connect transaction branches through open
+corridors, with rounded groups for shared connections in 3D, including after Repack. Only visible nodes determine spacing. New inputs go upstream and new
+outputs downstream. Existing positions stay
+anchored until **Repack**. Workspace schema v2 saves this explicit membership and
+migrates older workspaces while preserving their existing graph.
+
+This checkout experiments with contextual input/output flow. Selecting a transaction
+adds blue brackets to its inputs and green rings to its outputs, with matching
+connection colors and a contextual legend. Selecting an outpoint retains the
+related transaction chosen in the flow panel. Fresh layouts and explicit **Repack**
+favor incoming and outgoing groups on opposite sides; selection changes only
+appearance. Saved positions and cameras remain intact, so use Repack to try the
+spacing on an existing workspace. Tag, wallet and finding colors retain precedence
+on node fills. Small role outlines fade at distant zoom levels. Newly opened branches continue the direction from a connected transaction through
+the chosen outpoint. New input/output groups follow that local direction. Placement
+uses nearby free space while preserving existing nodes. Shared nodes already inside
+a group remain there until Repack. Explicit Repack still organizes the visible
+transaction paths along a common axis.
+
+The panel bar includes an icon-only **Motion** toggle before Show labels, enabled by default for the
+mounted graph. It controls directional dots and camera inertia. Hovering a node or
+connection and selecting nodes activates the related creation/spending connections;
+adaptive dot density limits visual clutter. Dots indicate transaction
+direction. Expanded transaction paths animate across the visible upstream/downstream
+trace; terminal branches fill a target of 50 per direction with a stable spatial spread.
+Larger scopes use fewer dots per connection so expanded paths remain animated.
+Motion off preserves manual navigation and static node placement.
+
+This isolated branch uses a purpose-built Three.js adapter with grouped transaction
+layout and a compact force fallback for other associations. Only newly added nodes
+are positioned when extending an investigation; saved nodes remain anchored. The floating toolbar brings Fit, zoom and an explicit
 Repack action beside selection history, selection lock and the existing path
 filter. Repack rearranges visible nodes, including older saved layouts. There is
 no layout picker. Filters and hidden-selection status sit below the controls.
 The rest of the workbench remains shared.
-See the [scope, review and limitations](docs/experiments/flow-renderer-v2.md).
+See the [renderer architecture](docs/architecture.md#default-flow-renderer) and
+[adapter background](docs/experiments/flow-renderer-v2.md).
 
 ## Development
 
@@ -350,6 +385,13 @@ entities without losing their annotations. **Hidden** lists them for quick resto
 addresses also offer removal. Removing annotated or tagged data asks for confirmation,
 and Undo restores a removal. Stopping an address watch retains shared transaction data.
 Individual inputs and outputs can be hidden, while complete transaction records stay intact.
+Hiding or removing a transaction also hides or removes its inputs/outputs from the graph
+when they lose their last connection. Shared connections survive, and **Show all hidden**
+restores a hidden group.
+Adding a creating or spending transaction from the right toolbar keeps the camera in
+place, including with Lock enabled. **Center** moves to the selected transaction explicitly.
+New branches extend beyond their source input/output sphere with clearance proportional
+to its radius, giving large CoinJoins more space without moving existing nodes.
 
 **All amounts** in the graph toolbar and transaction flow controls each view
 independently. Both preferences are saved; the flow control hides when its panel
@@ -358,9 +400,9 @@ selected output and unknown values remain visible. Isolated transaction/address
 nodes and prefetched branches cut off by the amount filter are omitted from the
 canvas; their data stays in the workspace. The flow reports omitted rows
 and offers **Show** to restore them. The entity list stays available for selecting
-filtered outputs. **Size by Value** uses a bounded square-root curve so small
-outputs remain selectable while large transfers stand out. Sizes stay stable
-when filtering or adding data.
+filtered outputs. **Size by Value** uses a fixed logarithmic radius: 150,000,000
+sats has about 2.6 times the diameter of 20,000 sats. Sizes stay stable when
+filtering or adding data; perspective still affects their apparent size.
 
 The Inspector's top-bar refresh icon checks an output's current UTXO status. It queries Core
 with mempool spends included and shows a dismissible notification that hides after eight seconds.

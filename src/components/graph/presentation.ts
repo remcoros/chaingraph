@@ -1,5 +1,6 @@
 import type { GraphLink, GraphNode } from '../../domain/types';
 import type { GraphFrame, GraphHit } from './adapter';
+import type { GraphFlowContext } from './flowContext';
 
 /** Callers interpret tags, wallets or findings and supply only visual overrides. */
 export interface NodePresentation {
@@ -18,6 +19,8 @@ export interface GraphPalette {
   accent: string;
   muted: string;
   background: string;
+  input?: string;
+  flowOutput?: string;
 }
 export function readGraphPalette(element: HTMLElement): GraphPalette {
   const style = getComputedStyle(element);
@@ -26,6 +29,8 @@ export function readGraphPalette(element: HTMLElement): GraphPalette {
   return {
     transaction: color('--color-tx', '#e3a54f'),
     output: color('--color-output', '#84c2ae'),
+    input: color('--color-flow-input', '#83baff'),
+    flowOutput: color('--color-flow-output', '#82cfaa'),
     address: color('--color-address', '#919fd1'),
     accent: color('--color-accent', '#eab66b'),
     muted: color('--color-muted', '#74818b'),
@@ -52,12 +57,11 @@ const DEFAULT_NODE_RADIUS = 3.2;
 function valueRadius(satoshis: number | undefined): number {
   if (satoshis === undefined || !Number.isFinite(satoshis) || satoshis < 0)
     return DEFAULT_NODE_RADIUS;
-  // A square-root response makes area differences easier to see. The fixed
-  // 10,000 BTC reference smoothly limits growth instead of making large outputs
-  // hit the same hard cap. Keep dust pickable and all radii between 2.4 and 20.
-  // This absolute scale does not change when nodes are added or filtered out.
-  const fraction = satoshis / (satoshis + 1_000_000_000_000);
-  return 2.4 + 17.6 * Math.sqrt(fraction);
+  // Absolute logarithmic radius exposes ordinary payment differences while
+  // keeping the full Bitcoin range usable: 20k sats ~2.0, 150m sats ~5.4,
+  // and 21m BTC ~11.8. Neither sphere area nor volume represents a value ratio.
+  // Zero stays pickable; filtering and additions never change this scale.
+  return 1.6 + 0.9 * Math.log10(1 + satoshis / 10_000);
 }
 export function presentGraph(
   input: {
@@ -65,17 +69,29 @@ export function presentGraph(
     links: readonly GraphLink[];
     dimensions: 2 | 3;
     selectedId?: string;
+    batchSelectedIds?: readonly string[];
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
     showLabels?: boolean;
     showTags?: boolean;
     showIcons?: boolean;
     nodePresentation?: ReadonlyMap<string, NodePresentation>;
+    flowContext?: GraphFlowContext;
   },
   palette: GraphPalette,
 ): GraphFrame {
   const ids = new Set(input.nodes.map((node) => node.id));
+  const activeIds = new Set(input.batchSelectedIds);
+  if (input.selectedId) activeIds.add(input.selectedId);
   const links = input.links.filter((link) => ids.has(link.source) && ids.has(link.target));
+  const created = new Set(
+    links.filter((link) => link.kind === 'creates').map((link) => link.target),
+  );
+  const bridges = new Set(
+    links
+      .filter((link) => link.kind === 'spends' && created.has(link.source))
+      .map((link) => link.source),
+  );
   const degrees = new Map<string, number>();
   for (const link of links)
     for (const id of [link.source, link.target]) degrees.set(id, (degrees.get(id) || 0) + 1);
@@ -86,6 +102,9 @@ export function presentGraph(
     nodes: input.nodes.map((node) => {
       const override = input.nodePresentation?.get(node.id);
       const selected = node.id === input.selectedId;
+      const role = input.flowContext?.nodes.get(node.id);
+      const roleColor =
+        role === 'input' ? (palette.input ?? '#83baff') : (palette.flowOutput ?? palette.output);
       const radius =
         input.sizeBy === 'value'
           ? valueRadius(node.value)
@@ -115,11 +134,19 @@ export function presentGraph(
             .filter(Boolean)
             .join('\n') || undefined,
         shape: shapes[node.kind],
+        marker: role
+          ? {
+              shape: role === 'input' ? ('brackets' as const) : ('ring' as const),
+              color: roleColor,
+            }
+          : undefined,
         color: selected
           ? palette.accent
-          : (override?.color ?? (node.cluster ? clusterColor(node.cluster) : palette[node.kind])),
+          : (override?.color ??
+            (node.cluster ? clusterColor(node.cluster) : role ? roleColor : palette[node.kind])),
         radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
         selected,
+        flowActive: activeIds.has(node.id),
         highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
         x: node.x,
         y: node.y,
@@ -130,14 +157,29 @@ export function presentGraph(
       };
     }),
     links: links.map((link) => {
+      const bridge =
+        (link.kind === 'creates' && bridges.has(link.target)) ||
+        (link.kind === 'spends' && bridges.has(link.source));
       const selected = link.source === input.selectedId || link.target === input.selectedId;
+      const role = input.flowContext?.links.get(link.id);
+      const emphasized = selected || Boolean(role);
       return {
         id: link.id,
         source: link.source,
         target: link.target,
-        color: selected ? palette.accent : palette.muted,
-        width: selected ? 0.65 : 0,
-        arrowLength: link.kind === 'address' ? 0 : selected ? 4.5 : 3.6,
+        color:
+          role === 'input'
+            ? (palette.input ?? '#83baff')
+            : role === 'output'
+              ? (palette.flowOutput ?? palette.output)
+              : selected
+                ? palette.accent
+                : palette.muted,
+        width: bridge ? 1 : emphasized ? 0.65 : 0,
+        arrowLength: link.kind === 'address' ? 0 : bridge ? 5.5 : emphasized ? 4.5 : 3.6,
+        directed: link.kind !== 'address',
+        flowSide:
+          link.kind === 'spends' ? 'incoming' : link.kind === 'creates' ? 'outgoing' : undefined,
       };
     }),
   };

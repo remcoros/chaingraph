@@ -88,6 +88,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   spendCount,
   spendId,
   hidden,
+  notOnGraph,
   batchMode,
   batchSelected,
   canShowHidden,
@@ -106,6 +107,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   spendCount: number;
   spendId?: string;
   hidden: boolean;
+  notOnGraph: boolean;
   batchMode: boolean;
   batchSelected: boolean;
   canShowHidden: boolean;
@@ -114,6 +116,8 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   inputLoading?: boolean;
   actions: RefObject<FlowRowActions>;
 }) {
+  const offGraph = hidden || notOnGraph;
+  const visibilityLabel = `${notOnGraph ? 'Add' : 'Show'} ${inputs ? 'input' : 'output'} ${row.index} in graph`;
   const address = row.output && outputAddress(row.output);
   const opReturn = isOpReturn(row.output?.scriptPubKey.hex);
   const navigate = () => {
@@ -195,9 +199,9 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
                 Selected · outside filter
               </span>
             )}
-            {row.id && hidden && (
+            {row.id && offGraph && (
               <span className="entity-hidden-badge">
-                <EyeOff size={10} /> Hidden
+                <EyeOff size={10} /> {notOnGraph ? 'Not on graph' : 'Hidden'}
               </span>
             )}
             {row.id && renderMetadata?.(row.id)}
@@ -207,11 +211,12 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
       </div>
       {row.id && (
         <div className="transaction-row-tools">
-          {hidden && canShowHidden && (
+          {offGraph && canShowHidden && (
             <button
               type="button"
               className="icon-button"
-              aria-label={`Show ${inputs ? 'input' : 'output'} ${row.index} in graph`}
+              aria-label={visibilityLabel}
+              title={visibilityLabel}
               onClick={() => actions.current.onSetHidden?.([row.id!], false)}
             >
               <Eye size={12} />
@@ -254,6 +259,7 @@ function TransactionRows({
   inputLoading,
   inputError,
   onSmallAmountThresholdChange,
+  graphNodeIds,
   hiddenNodeIds = [],
   onSetHidden,
   renderMetadata,
@@ -274,6 +280,10 @@ function TransactionRows({
   next: ReactNode;
 }) {
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
+  const admitted = useMemo(
+    () => (graphNodeIds === undefined ? undefined : new Set(graphNodeIds)),
+    [graphNodeIds],
+  );
   const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const flow = useRef<HTMLDivElement>(null);
   const actions = useRef<FlowRowActions>({
@@ -517,6 +527,7 @@ function TransactionRows({
                   spendCount={spends.get(row.id ?? '')?.length ?? 0}
                   spendId={spends.get(row.id ?? '')?.[0]?.txid}
                   hidden={!!row.id && hidden.has(row.id)}
+                  notOnGraph={!!row.id && admitted !== undefined && !admitted.has(row.id)}
                   batchMode={selection?.mode ?? false}
                   batchSelected={!!row.id && !!selection?.has(row.id)}
                   canShowHidden={!!onSetHidden}
@@ -563,8 +574,13 @@ export function TransactionView(props: Props) {
     onStateChange?.({ ...state, transactionId, expandedInputs: false, expandedOutputs: false });
   };
   if (!selected || (selected.kind === 'address' && !related.length)) return null;
+  const currentNotOnGraph =
+    !!current &&
+    props.graphNodeIds !== undefined &&
+    !props.graphNodeIds.includes(txNodeId(current.tx.txid));
   const navigate = (txid: string, outputId: string) => {
     choose(txid);
+    props.onSetHidden?.([txNodeId(txid)], false);
     onSelect(outputId);
   };
   const leg = current
@@ -796,19 +812,24 @@ export function TransactionView(props: Props) {
                     </button>
                     <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
                   </div>
-                  {props.hiddenNodeIds?.includes(txNodeId(current.tx.txid)) && (
+                  {(currentNotOnGraph ||
+                    props.hiddenNodeIds?.includes(txNodeId(current.tx.txid))) && (
                     <div className="transaction-hidden-state">
                       <span className="entity-hidden-badge">
-                        <EyeOff size={10} /> Hidden
+                        <EyeOff size={10} /> {currentNotOnGraph ? 'Not on graph' : 'Hidden'}
                       </span>
                       {props.onSetHidden && (
                         <button
                           type="button"
                           className="text-button"
-                          aria-label="Show displayed transaction in graph"
+                          aria-label={
+                            currentNotOnGraph
+                              ? 'Add displayed transaction to graph'
+                              : 'Show displayed transaction in graph'
+                          }
                           onClick={() => props.onSetHidden?.([txNodeId(current.tx.txid)], false)}
                         >
-                          Show
+                          {currentNotOnGraph ? 'Add to graph' : 'Show'}
                         </button>
                       )}
                     </div>
@@ -818,7 +839,7 @@ export function TransactionView(props: Props) {
                       className="transaction-choice"
                       aria-label="Displayed transaction"
                       value={current.tx.txid}
-                      onChange={(e) => choose(e.target.value)}
+                      onChange={(e) => navigate(e.target.value, selected.id)}
                     >
                       {related.map(({ tx, role }) => (
                         <option key={tx.txid} value={tx.txid}>

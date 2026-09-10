@@ -103,7 +103,7 @@ export interface TransactionFlowState {
 }
 export interface Workspace {
   /** Decrypted data schema version, independent of the encrypted envelope format. */
-  version: 1;
+  version: 2;
   id: string;
   name: string;
   description?: string;
@@ -130,6 +130,8 @@ export interface Workspace {
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
     showAddresses: boolean;
+    /** Explicit canvas membership, separate from complete loaded Bitcoin observations. */
+    graphNodeIds?: string[];
     /** Manual canvas visibility, independent of filters and cached Bitcoin observations. */
     hiddenNodeIds?: string[];
     entityVisibility?: 'visible' | 'hidden' | 'all' | 'graph';

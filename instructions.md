@@ -71,13 +71,51 @@ Scans use a gap of unused addresses, a maximum index, and a bounded number of tr
 
 Drag the background to orbit in 3D, pan with the camera controls, and scroll or pinch to zoom. Use the fit control to bring loaded activity back into view. Individual nodes cannot currently be dragged. Switch to 2D for a flat layout with rotation disabled; both views use WebGL. On smaller screens or without WebGL, use the entity list to select and inspect items.
 
-Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize different properties. Value sizing uses a bounded square-root curve, with a selectable minimum size and a smooth upper limit. Degree describes the number of graph connections, not transaction importance or ownership confidence. Cluster colors and glow are visual aids. The **Show labels**, **Show tags**, and **Show icons** buttons independently control graph captions without deleting annotations.
+Choose uniform sizing, value-based sizing, or degree-based sizing to emphasize different properties. Value sizing uses a fixed logarithmic radius, with a selectable minimum size and a clear contrast across common satoshi amounts. Degree describes the number of graph connections, not transaction importance or ownership confidence. Cluster colors and glow are visual aids. The **Show labels**, **Show tags**, and **Show icons** buttons independently control graph captions without deleting annotations.
 
 Transactions are cubes, outputs are spheres, and optional addresses are diamonds. Hover a node for identifiers, values, available details, and compact actions at the top of its card. Connection lines do not open cards, reducing interruptions in dense graphs. **Load previous level** expands that path; **Edit label / notes** opens and focuses the inspector. The inspector and entity list provide the same tracing workflow without hover.
 
 Select an item to add a label, note, icon, or bookmark in its inspector. The icon button opens a multi-row symbol palette with keyboard arrow navigation and a clear option. Labels record your observations; they do not change blockchain data. Use bookmarks to return to relevant items and undo to reverse recent workspace edits. Undo history is limited to the current session and is reset when new chain data is loaded, so undo cannot erase a later scan. Removing a transaction includes its annotations and asks for confirmation when user data is attached. Descendant inputs may still show output placeholders.
 
 ## Filter and navigate
+
+Clicking a transaction, input or output adds only that chosen node to the graph.
+Its complete transaction record stays available in the flow panel. The icons-only
+right toolbar offers input/output Add, Hide and Remove actions, selection history,
+centering and branch cleanup. Hover a control for its action name. **Remove
+from graph** keeps evidence and annotations. Hiding or removing a transaction also
+cleans up its inputs/outputs that have no remaining graph connections. Shared nodes
+stay connected; batch actions evaluate all selected transactions together. **Hide**
+is temporary and can be reversed with **Show all hidden**.
+The right toolbar's creating/spending transaction actions preserve the camera, including
+with Lock enabled. Use **Center** when you want to move to the newly added transaction.
+New transactions extend beyond the clicked input/output group's outer boundary, with
+clearance that grows with the group's radius. This gives large CoinJoins more room for
+subsequent inputs/outputs while keeping small branches compact. Existing nodes stay in place.
+
+In this experiment, the graph legend identifies the transaction used for input/output
+context. Blue brackets mark its inputs; green rings mark its outputs. Following an
+outpoint keeps the transaction chosen in the flow panel. Selecting another transaction
+changes these accents without rearranging nodes. Inputs and outputs occupy compact,
+rounded 3D groups on opposite sides of each transaction. Shared outpoints connect
+transaction branches through those groups. New branches extend from the connected transaction through the chosen outpoint,
+and newly added inputs and outputs follow that branch direction. Existing positions
+stay fixed; opening a creator may leave its connecting outpoint inside an existing
+group.
+Spacing depends on visible nodes, so undisplayed siblings do not stretch the graph.
+Use **Repack** to organize the visible branches together; it deliberately rearranges
+the visible graph while retaining rounded 3D groups for terminal and shared outpoints. Orbiting changes the
+screen direction, so use the markers and arrows to follow flow from any angle.
+
+Use the play/pause **Motion** icon before Show labels in the panel bar to control flowing dots and
+camera inertia. Motion starts on for each mounted graph. Selecting or hovering
+nodes, or hovering connections, shows transaction direction on nearby connections.
+Selecting or hovering a transaction animates its visible expanded paths upstream and
+downstream, including further transactions already on the graph. All expanded paths
+stay animated; terminal branches fill a target of 50 branches per direction, sampled
+across each sphere. Larger animated traces use fewer dots per connection. Hovering an
+input/output or connection follows the same visible trace from that outpoint.
+Manual pan, orbit and zoom remain available with Motion off.
 
 Use **Wallets** in the graph toolbar to choose several associated wallets. An entity
 must match at least one chosen wallet and the other active filters. **Clear** removes
@@ -371,13 +409,14 @@ Bitcoin relay policy. Unknown values and the selected output stay visible. A
 **filtered · Show** control restores omitted flow rows. You can also choose a
 filtered output from Entities without resetting the threshold.
 
-**Size by → Value** makes large outputs more prominent using a bounded square-root
-curve. The sizes are visual emphasis, not a proportional volume scale; perspective
-and minimum/maximum sizes affect apparent ratios. New lookups focus the requested transaction, output or address automatically.
+**Size by → Value** uses the fixed radius `1.6 + 0.9 × log10(1 + sats / 10,000)`.
+A 150,000,000-sat output is about 2.6 times the diameter of a 20,000-sat output at
+the same depth. The scale stays stable when nodes are added or filtered; it is
+logarithmic visual emphasis, not proportional area or volume. New lookups focus the requested transaction, output or address automatically.
 Lock additionally follows selections made throughout the workbench.
 
-**Load previous** can reveal a cached parent's full inputs and outputs without
-another download. The notice now says when that happens. Removing the original
+**Load previous** adds the requested parents and connecting outpoints. Other
+inputs and outputs stay off the canvas until you choose them or use Add inputs/outputs. Removing the original
 transaction cleans up unused input context too. Shared, independently added,
 annotated or wallet-related transactions remain; Undo restores the removed branch.
 Older saved data without recorded ancestry provenance is retained conservatively.

@@ -9,9 +9,14 @@ export async function validateAndEncryptWorkspace(
   password: string,
   encrypt = encryptWorkspace,
 ) {
-  const migrated = migrateWorkspace(workspace);
-  parseWorkspace(migrated, false);
-  return encrypt(migrated, password);
+  // Validate the original version so legacy graph membership is seeded only
+  // after its observations pass validation. Preserve unrelated persisted fields.
+  const validated = parseWorkspace(workspace, false);
+  const migrated = migrateWorkspace(workspace) as Workspace;
+  return encrypt(
+    { ...migrated, view: { ...migrated.view, graphNodeIds: validated.view.graphNodeIds } },
+    password,
+  );
 }
 
 /** Blob text/JSON, authentication, expansion, migration and wallet verification run in the worker. */

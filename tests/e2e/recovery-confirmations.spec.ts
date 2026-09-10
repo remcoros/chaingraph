@@ -63,9 +63,9 @@ test('hidden address recovery survives disabling canvas address nodes', async ({
   await address
     .getByRole('button', { name: 'Hide Duplicate label from graph', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Show address nodes', exact: true }).click();
+  await page.getByRole('button', { name: 'Show added address nodes', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Show address nodes', exact: true }),
+    page.getByRole('button', { name: 'Show added address nodes', exact: true }),
   ).toHaveAttribute('aria-pressed', 'false');
   await page.getByLabel('Filter graph entities', { exact: true }).fill('no match');
   await page.getByRole('button', { name: 'Browse 1 hidden entities', exact: true }).click();
@@ -79,14 +79,14 @@ test('hidden address recovery survives disabling canvas address nodes', async ({
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Center selection', exact: true })).toBeDisabled();
   await expect(
-    page.getByRole('button', { name: 'Show address nodes', exact: true }),
+    page.getByRole('button', { name: 'Show added address nodes', exact: true }),
   ).toHaveAttribute('aria-pressed', 'false');
   await page
     .locator('.right-panel')
     .getByRole('button', { name: 'Show and center', exact: true })
     .click();
   await expect(
-    page.getByRole('button', { name: 'Show address nodes', exact: true }),
+    page.getByRole('button', { name: 'Show added address nodes', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(
     page.locator('.right-panel').getByText('Hidden from graph', { exact: true }),
@@ -130,16 +130,16 @@ test('restoring a hidden address explains disabled address display and offers an
   await address
     .getByRole('button', { name: 'Hide Duplicate label from graph', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Show address nodes', exact: true }).click();
+  await page.getByRole('button', { name: 'Show added address nodes', exact: true }).click();
   await page.getByLabel('Entity visibility', { exact: true }).selectOption('hidden');
   await address.getByRole('button', { name: 'Show Duplicate label in graph', exact: true }).click();
   await expect(page.locator('.toast')).toContainText('Address nodes are switched off');
   await expect(
-    page.getByRole('button', { name: 'Show address nodes', exact: true }),
+    page.getByRole('button', { name: 'Show added address nodes', exact: true }),
   ).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Enable address display', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Show address nodes', exact: true }),
+    page.getByRole('button', { name: 'Show added address nodes', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await page.getByLabel('Entity visibility', { exact: true }).selectOption('all');
   await expect(address).toBeVisible();

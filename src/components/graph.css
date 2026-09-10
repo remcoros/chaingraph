@@ -16,6 +16,17 @@
   outline-offset: -3px;
   touch-action: none;
 }
+.graph-context-overlay {
+  position: absolute;
+  z-index: 5;
+  right: 12px;
+  top: 8px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  pointer-events: auto;
+}
 .graph-hover-card {
   box-sizing: border-box;
   position: absolute;
@@ -187,7 +198,7 @@
   position: absolute;
   top: 8px;
   left: 8px;
-  right: 8px;
+  right: max(8px, var(--graph-context-right-inset, 8px));
   z-index: 7;
   pointer-events: none;
   display: flex;
@@ -234,6 +245,29 @@
 }
 .graph-card-kind-output::before {
   background: var(--color-output);
+  border-radius: 50%;
+}
+.graph-viewport .graph-legend {
+  right: max(17px, var(--graph-context-right-inset, 17px));
+  flex-wrap: wrap;
+  row-gap: 5px;
+}
+.graph-flow-context {
+  color: var(--color-ink);
+}
+.graph-flow-key {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+}
+.graph-flow-key.input {
+  border: 2px solid var(--color-flow-input, #83baff);
+  border-radius: 2px;
+  mask: linear-gradient(to right, #000 0 28%, transparent 28% 72%, #000 72% 100%);
+}
+.graph-flow-key.output {
+  border: 1.5px solid var(--color-flow-output, #82cfaa);
   border-radius: 50%;
 }
 .graph-card-kind-address::before {

@@ -58,6 +58,27 @@ function expectVisible(
 }
 
 describe('camera framing for real geometry', () => {
+  it('reserves the right action rail without shifting node positions or orbit direction', () => {
+    const nodes = [node('left', -120, 0, 0, 20), node('right', 120, 10, 30, 35)];
+    const before = structuredClone(nodes);
+    const opts = { ...options, width: 700, rightInset: 120 };
+    const pose = frameCamera(nodes, opts)!;
+    const camera = new PerspectiveCamera(opts.fov, opts.width / opts.height, 0.1, 1e8);
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    camera.updateMatrixWorld();
+    for (const n of nodes)
+      for (const dx of [-n.radius, n.radius])
+        for (const dz of [-n.radius, n.radius]) {
+          const p = new Vector3(n.x! + dx, n.y!, n.z! + dz).project(camera);
+          const screenX = ((p.x + 1) * opts.width) / 2;
+          expect(screenX).toBeGreaterThanOrEqual(opts.padding - 1e-7);
+          expect(screenX).toBeLessThanOrEqual(opts.width - opts.rightInset + 1e-7);
+        }
+    expect(nodes).toEqual(before);
+    expect(pose.position.x).toBe(pose.target.x);
+    expect(pose.position.y).toBe(pose.target.y);
+  });
   it('centers translated geometry and keeps the same useful framing distance', () => {
     const original = [node('a', -100, 0, 0), node('b', 100, 20, 0)];
     const shifted = original.map((item) => ({

@@ -321,6 +321,7 @@ export function NodeInspector({
   onCenter,
   onShowAndCenter,
   canRemove,
+  graphNodeIds,
   hiddenNodeIds = [],
   onSetHidden,
   onRefresh,
@@ -356,6 +357,7 @@ export function NodeInspector({
     [spendingByNode, selected.id, w.transactions],
   );
   const selectedHidden = hiddenNodeIds.includes(selected.id);
+  const selectedNotOnGraph = graphNodeIds !== undefined && !graphNodeIds.includes(selected.id);
   const unavailable = busy
     ? 'Wait for the current operation to finish.'
     : queryDisabledReason ||
@@ -472,6 +474,7 @@ export function NodeInspector({
             <VisibilityActions
               nodeId={selected.id}
               transaction={selected.kind === 'transaction' ? tx : undefined}
+              graphNodeIds={graphNodeIds}
               hiddenNodeIds={hiddenNodeIds}
               onSetHidden={onSetHidden}
             />
@@ -482,21 +485,21 @@ export function NodeInspector({
                 title="Center this node in graph"
                 aria-label="Center this node in graph"
                 onClick={onCenter}
-                disabled={selectedHidden}
+                disabled={selectedHidden || selectedNotOnGraph}
               >
                 <Crosshair size={15} />
               </button>
             )}
           </div>
         </div>
-        {selectedHidden && (
+        {(selectedHidden || selectedNotOnGraph) && (
           <div className="selection-hidden-state">
             <span className="entity-hidden-badge">
-              <EyeOff size={12} /> Hidden from graph
+              <EyeOff size={12} /> {selectedNotOnGraph ? 'Not on graph' : 'Hidden from graph'}
             </span>
             {onShowAndCenter && (
               <button type="button" className="text-button" onClick={onShowAndCenter}>
-                Show and center
+                {selectedNotOnGraph ? 'Add and center' : 'Show and center'}
               </button>
             )}
           </div>

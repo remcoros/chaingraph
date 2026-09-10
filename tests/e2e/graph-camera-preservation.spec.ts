@@ -93,14 +93,12 @@ test('empty, partial and failed spending searches retain the manually positioned
       ).toBeVisible();
     else {
       await expect(
-        page
-          .getByRole('status')
-          .filter({
-            hasText:
-              outcome === 'partial'
-                ? 'Spending search incomplete'
-                : "Not in your node's current UTXO set",
-          }),
+        page.getByRole('status').filter({
+          hasText:
+            outcome === 'partial'
+              ? 'Spending search incomplete'
+              : "Not in your node's current UTXO set",
+        }),
       ).toBeVisible();
     }
     await expect(page.locator('.statusbar')).toContainText('1 transaction');

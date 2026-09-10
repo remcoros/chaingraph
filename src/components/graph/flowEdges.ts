@@ -86,9 +86,12 @@ export function makeFlowEdges() {
       style.push(
         nodeBoundsRadius(nodes.get(l.source)!),
         nodeBoundsRadius(nodes.get(l.target)!),
-        l.width > 0
-          ? 1 / (1 + Math.max(degrees.get(l.source) ?? 0, degrees.get(l.target) ?? 0) / 24)
-          : 0,
+        // A transaction bridge stays legible even beside a high-degree fan.
+        l.width >= 1
+          ? 1
+          : l.width > 0
+            ? 1 / (1 + Math.max(degrees.get(l.source) ?? 0, degrees.get(l.target) ?? 0) / 24)
+            : 0,
         l.arrowLength,
       );
     }

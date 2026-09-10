@@ -15,6 +15,15 @@ import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
 import { GraphLegend } from './components/GraphLegend';
+import { indexGraphFlow } from './components/graph/flowContext';
+import { GraphContextToolbar } from './components/GraphContextToolbar';
+import {
+  addGraphNodes,
+  ensureGraphMembership,
+  hideGraphNodes,
+  projectGraphMembership,
+  removeGraphNodes,
+} from './domain/graphMembership';
 import { GraphControls } from './components/GraphControls';
 import { EntityBadges } from './components/EntityBadges';
 import { CopyButton } from './components/CopyButton';
@@ -90,7 +99,7 @@ import {
   GraphFilterButton,
 } from './components/GraphFilterControls';
 import { GraphWalletFilter } from './components/GraphWalletFilter';
-import { setNodesHidden, showAllNodes } from './domain/visibility';
+import { setNodesHidden, showAllNodes, transactionNodeIds } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
 import { AnalysisWorkbench, type AnalysisWorkbenchSession } from './components/AnalysisWorkbench';
@@ -214,6 +223,9 @@ export default function App() {
   });
   const [focusGraph, setFocusGraph] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ id: string; token: number }>();
+  // Toolbar expansion can change selection without engaging Lock to selection.
+  // A normal selection, explicit Center, or Lock toggle resumes camera following.
+  const cameraPreservedSelection = useRef<string | undefined>(undefined);
   const [aboutOpen, setAboutOpen] = useState<false | 'guide' | 'about' | 'connection'>(false);
   const [connectionCheck, setConnectionCheck] = useState(0);
   const { networks, statuses, discoveryError } = useBackendNetworks(connectionCheck);
@@ -421,16 +433,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', keydown);
   }, [ws.persist, flushActiveGraph]);
   const graph = useMemo(
-    () => (w ? buildGraph(w) : { nodes: [], links: [] }),
+    () => (w ? buildGraph({ ...w, inputContext: undefined }) : { nodes: [], links: [] }),
     [
       w?.id,
       w?.transactions,
-      w?.inputContext,
       w?.annotations,
       w?.findings,
       w?.watchedAddresses,
       w?.view.showAddresses,
     ],
+  );
+  const flowIndex = useMemo(() => indexGraphFlow(graph), [graph]);
+  const graphFlowContext = useMemo(
+    () => flowIndex.resolve(selectedId, w?.view.transactionFlow?.transactionId),
+    [flowIndex, selectedId, w?.view.transactionFlow?.transactionId],
   );
   const walletMatches = useMemo(
     () => (w ? buildWalletMatches(w, graph) : new Map()),
@@ -502,16 +518,24 @@ export default function App() {
     ],
     [w?.contextTransactionIds, w?.inputContext],
   );
+  const admittedGraph = useMemo(
+    () => projectGraphMembership(graph, w?.view.graphNodeIds),
+    [graph, w?.view.graphNodeIds],
+  );
+  const admittedIds = useMemo(
+    () => new Set(admittedGraph.nodes.map((node) => node.id)),
+    [admittedGraph],
+  );
   const amountSelectionId = w?.view.smallAmountThreshold ? selectedId : undefined;
   const amountGraph = useMemo(
     () =>
       filterSmallAmounts(
-        graph,
+        admittedGraph,
         w?.view.smallAmountThreshold,
         amountSelectionId,
         automaticContextIds,
       ),
-    [graph, w?.view.smallAmountThreshold, amountSelectionId, automaticContextIds],
+    [admittedGraph, w?.view.smallAmountThreshold, amountSelectionId, automaticContextIds],
   );
   const amountFilterIndex = useMemo(() => buildGraphFilterIndex(amountGraph), [amountGraph]);
   const canvasFilterResult = useMemo(
@@ -553,7 +577,11 @@ export default function App() {
   const recoveryGraph = useMemo(() => {
     if (!w || w.view.showAddresses || !w.view.hiddenNodeIds?.some((id) => id.startsWith('addr:')))
       return graph;
-    const expanded = buildGraph({ ...w, view: { ...w.view, showAddresses: true } });
+    const expanded = buildGraph({
+      ...w,
+      inputContext: undefined,
+      view: { ...w.view, showAddresses: true },
+    });
     const nodes = expanded.nodes.filter(
       (node) => node.kind !== 'address' || hiddenIds.has(node.id),
     );
@@ -564,19 +592,21 @@ export default function App() {
     };
   }, [graph, hiddenIds, w?.view.showAddresses]);
   const hiddenCount = useMemo(
-    () => recoveryGraph.nodes.filter((node) => hiddenIds.has(node.id)).length,
-    [recoveryGraph, hiddenIds],
+    () =>
+      recoveryGraph.nodes.filter((node) => admittedIds.has(node.id) && hiddenIds.has(node.id))
+        .length,
+    [recoveryGraph, hiddenIds, admittedIds],
   );
   const visibleEntityCount = useMemo(
-    () => graph.nodes.filter((node) => !hiddenIds.has(node.id)).length,
-    [graph, hiddenIds],
+    () => admittedGraph.nodes.filter((node) => !hiddenIds.has(node.id)).length,
+    [admittedGraph, hiddenIds],
   );
   const entityVisibility = w?.view.entityVisibility ?? 'visible';
   const recoveryFilterIndex = useMemo(() => buildGraphFilterIndex(recoveryGraph), [recoveryGraph]);
   const entityGraph = useMemo(() => {
     if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
     if (entityVisibility === 'visible' && !w?.view.smallAmountThreshold) return canvasFilterResult;
-    const source = entityVisibility === 'visible' ? graph : recoveryGraph;
+    const source = entityVisibility === 'visible' ? admittedGraph : recoveryGraph;
     const filters =
       source === graph || !w
         ? effectiveFilters
@@ -590,6 +620,7 @@ export default function App() {
     );
   }, [
     graph,
+    admittedGraph,
     recoveryGraph,
     effectiveFilters,
     appliedGraphFilters,
@@ -651,40 +682,13 @@ export default function App() {
       : undefined;
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
-    (id: string) => {
+    (id: string, options?: { preserveCamera?: boolean }) => {
       selectionGeneration.current++;
+      cameraPreservedSelection.current = options?.preserveCamera ? id : undefined;
+      if (options?.preserveCamera) setFocusRequest(undefined);
       const active = ws.getSession(wRef.current?.id ?? '')?.data;
-      const target = /^(tx|out):([0-9a-f]{64})(?::([0-9]+))?$/.exec(id);
-      const scope = target && active?.inputContext?.[target[2]];
-      const promote: string[] = [];
-      // An already visible input output stays compact. Opening its transaction or
-      // a hidden sibling explicitly reveals the complete parent before selecting.
-      if (active && target && scope && (target[1] === 'tx' || !scope.includes(Number(target[3]))))
-        promote.push(target[2]);
-      // Flow can display a compact parent's inputs before the canvas contains
-      // their placeholders. Expose that spending transaction before selecting
-      // its input, so failed creator loading cannot invalidate the selection.
-      const displayedId = active?.view.transactionFlow?.transactionId;
-      if (
-        active &&
-        displayedId &&
-        active.inputContext?.[displayedId] &&
-        target?.[1] === 'out' &&
-        active.transactions[displayedId]?.vin.some(
-          (input) => input.txid === target[2] && input.vout === Number(target[3]),
-        )
-      )
-        promote.push(displayedId);
-      if (active && promote.length)
-        ws.update(active.id, (current) => promoteInputContext(current, promote), false);
-      if (active && id.startsWith('addr:')) {
-        const address = id.slice(5);
-        const creators = Object.keys(active.inputContext ?? {}).filter((txid) =>
-          active.transactions[txid]?.vout.some((output) => outputAddress(output) === address),
-        );
-        if (creators.length)
-          ws.update(active.id, (current) => promoteInputContext(current, creators), false);
-      }
+      // A click admits exactly one entity, never its transaction's other branches.
+      if (active) ws.update(active.id, (current) => addGraphNodes(current, [id]), false);
       setSelectedId(id);
       setGraphFilters((filters) =>
         filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
@@ -703,6 +707,7 @@ export default function App() {
   );
   useEffect(() => {
     operationRef.current?.abort();
+    cameraPreservedSelection.current = undefined;
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
@@ -806,13 +811,35 @@ export default function App() {
   ]);
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
-      change((current) => setNodesHidden(current, ids, hidden));
-      if (hidden && selectedId && ids.includes(selectedId)) setFocusRequest(undefined);
+      if (hidden) selectionGeneration.current++;
+      change((current) => (hidden ? hideGraphNodes(current, ids) : addGraphNodes(current, ids)));
+      if (hidden) setFocusRequest(undefined);
       if (!hidden && !w?.view.showAddresses && ids.some((id) => id.startsWith('addr:')))
         setNotice(ADDRESS_DISPLAY_NOTICE);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Entity visibility could not be updated.');
     }
+  };
+  const revealGraphNodes = (ids: string[]) => {
+    if (!ids.length) return;
+    change((current) => {
+      const revealed = addGraphNodes(current, ids);
+      return {
+        ...revealed,
+        view: {
+          ...revealed.view,
+          smallAmountThreshold: undefined,
+          showAddresses: revealed.view.showAddresses || ids.some((id) => id.startsWith('addr:')),
+        },
+      };
+    });
+    // Explicit Add makes its result visible without moving the camera or existing nodes.
+    setGraphFilters({});
+  };
+  const removeFromGraph = (ids: string[]) => {
+    selectionGeneration.current++;
+    setFocusRequest(undefined);
+    change((current) => removeGraphNodes(current, ids));
   };
   const showAllHidden = () => change(showAllNodes);
   const removalPlan = useMemo(
@@ -1028,9 +1055,10 @@ export default function App() {
       (current) => {
         if (requiredSourceId && !traceSourceExists(current, requiredSourceId)) return current;
         accepted = true;
+        const initialized = ensureGraphMembership(current);
         const promoted = contextIds
-          ? promoteInputContext(current, promotionIds)
-          : clearContextProvenance(current, promotionIds);
+          ? promoteInputContext(initialized, promotionIds)
+          : clearContextProvenance(initialized, promotionIds);
         const merged = !transactions.length
           ? promoted
           : {
@@ -1085,18 +1113,21 @@ export default function App() {
         return;
       }
     }
-    const reveal = (current: Workspace): Workspace => ({
-      ...setNodesHidden(current, ids, false),
-      watchedAddresses: addresses.length
-        ? [...new Set([...current.watchedAddresses, ...addresses])]
-        : current.watchedAddresses,
-      view: {
-        ...current.view,
-        hiddenNodeIds: current.view.hiddenNodeIds?.filter((id) => !idSet.has(id)),
-        showAddresses: addresses.length > 0 || current.view.showAddresses,
-        smallAmountThreshold: center ? undefined : current.view.smallAmountThreshold,
-      },
-    });
+    const reveal = (current: Workspace): Workspace => {
+      const admitted = addGraphNodes(current, ids);
+      return {
+        ...admitted,
+        watchedAddresses: addresses.length
+          ? [...new Set([...current.watchedAddresses, ...addresses])]
+          : current.watchedAddresses,
+        view: {
+          ...admitted.view,
+          hiddenNodeIds: current.view.hiddenNodeIds?.filter((id) => !idSet.has(id)),
+          showAddresses: addresses.length > 0 || current.view.showAddresses,
+          smallAmountThreshold: center ? undefined : current.view.smallAmountThreshold,
+        },
+      };
+    };
     const finish = () => {
       select(nodeId);
       setRightTab(tab);
@@ -1367,10 +1398,12 @@ export default function App() {
   }
   function showWalletActivity(target: Wallet) {
     const ids = new Set(target.unreviewedTransactionIds ?? []);
+    const activityNodes = graph.nodes
+      .filter((node) => node.kind === 'transaction' && node.txid && ids.has(node.txid))
+      .map((node) => node.id);
+    revealGraphNodes(activityNodes);
     updateFilters({
-      includeIds: graph.nodes
-        .filter((node) => node.txid && ids.has(node.txid))
-        .map((node) => node.id),
+      includeIds: activityNodes,
       preserveContext: true,
     });
     setLeftTab('entities');
@@ -1387,7 +1420,11 @@ export default function App() {
       false,
     );
   }
-  async function expand(direction: 'funding' | 'spending', nodeId = selectedId) {
+  async function expand(
+    direction: 'funding' | 'spending',
+    nodeId = selectedId,
+    options?: { preserveCamera?: boolean },
+  ) {
     if (!w) return;
     const snapshot = ws.getSession(w.id)?.data;
     if (!snapshot) return;
@@ -1403,6 +1440,10 @@ export default function App() {
       !(direction === 'funding' && node.kind === 'output' && snapshot.transactions[node.txid])
     )
       return;
+    if (options?.preserveCamera) {
+      cameraPreservedSelection.current = selectedId;
+      setFocusRequest(undefined);
+    }
     await run(async (signal) => {
       setOperation(
         direction === 'funding'
@@ -1435,9 +1476,9 @@ export default function App() {
             }),
             false,
           );
-          select(id);
+          select(id, options);
           setGraphFilters({});
-          setFocusRequest({ id, token: Date.now() });
+          if (!options?.preserveCamera) setFocusRequest({ id, token: Date.now() });
           setNotice(
             'Creating transaction opened. Load its input details explicitly to trace further.',
           );
@@ -1455,6 +1496,7 @@ export default function App() {
             onProgress: setOperation,
           });
           signal.throwIfAborted();
+          if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
           if (
             mergeTransactions(
               w.id,
@@ -1463,8 +1505,20 @@ export default function App() {
               result.transactions.map((tx) => tx.txid),
               traceSourceId,
             )
-          )
+          ) {
+            const parents = new Set(result.resolvedTransactionIds);
+            ws.update(w.id, (current) =>
+              addGraphNodes(current, [
+                ...result.resolvedTransactionIds.map(txNodeId),
+                ...transaction.vin.flatMap((input) =>
+                  input.txid && input.vout !== undefined && parents.has(input.txid)
+                    ? [outputNodeId(input.txid, input.vout)]
+                    : [],
+                ),
+              ]),
+            );
             setNotice(ancestryNotice(result, before));
+          }
         }
       } else {
         const outputIndex = node.kind === 'output' ? node.vout : undefined;
@@ -1479,6 +1533,7 @@ export default function App() {
           spendingOffsets.current.get(searchKey)?.unavailableTxids,
         );
         signal.throwIfAborted();
+        if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
         if (
           !mergeTransactions(
             w.id,
@@ -1489,6 +1544,32 @@ export default function App() {
           )
         )
           return;
+        const spendingNodeIds = result.transactions.map((item) => txNodeId(item.txid));
+        const connectingOutputs = result.transactions.flatMap((item) =>
+          item.vin.flatMap((input) =>
+            input.txid === transaction.txid &&
+            input.vout !== undefined &&
+            (outputIndex === undefined || input.vout === outputIndex)
+              ? [outputNodeId(input.txid, input.vout)]
+              : [],
+          ),
+        );
+        ws.update(w.id, (current) => {
+          const admitted = addGraphNodes(current, [...spendingNodeIds, ...connectingOutputs]);
+          return node.kind === 'output' && result.transactions.length === 1
+            ? {
+                ...admitted,
+                view: {
+                  ...admitted.view,
+                  transactionFlow: {
+                    ...admitted.view.transactionFlow,
+                    transactionId: result.transactions[0].txid,
+                    open: true,
+                  },
+                },
+              }
+            : admitted;
+        });
         if ('nextOffset' in result && result.nextOffset !== undefined)
           spendingOffsets.current.set(searchKey, {
             offset: result.nextOffset,
@@ -1632,6 +1713,7 @@ export default function App() {
       viewOwner !== w.id ||
       !w.view.lockToSelection ||
       !selectedId ||
+      cameraPreservedSelection.current === selectedId ||
       hiddenIds.has(selectedId)
     )
       return;
@@ -1652,7 +1734,7 @@ export default function App() {
       setNotice('This entity is hidden from the graph. Show it in the inspector to center it.');
       return;
     }
-    if (showHidden) change((current) => setNodesHidden(current, [id], false));
+    if (showHidden || !admittedIds.has(id)) change((current) => addGraphNodes(current, [id]));
     const rendered =
       filters || showHidden
         ? filterGraph(
@@ -1674,6 +1756,7 @@ export default function App() {
       setNotice('View filters cleared to reveal this selection.');
     }
     setMobilePanel('graph');
+    cameraPreservedSelection.current = undefined;
     setFocusRequest({ id, token: Date.now() });
   }
   function navigateSelection(delta: number) {
@@ -1685,6 +1768,7 @@ export default function App() {
       : {};
     setGraphFilters(filters);
     setNavigation({ ...navigation, index });
+    cameraPreservedSelection.current = undefined;
     setSelectedId(id);
     setRightTab('inspect');
     centerNode(id, filters);
@@ -1708,18 +1792,18 @@ export default function App() {
         }),
       ),
     ];
-    change(
-      (current) => ({
-        ...promoteInputContext(current, transactionIds),
+    change((current) => {
+      const admitted = addGraphNodes(promoteInputContext(current, transactionIds), ids);
+      return {
+        ...admitted,
         view: {
-          ...current.view,
+          ...admitted.view,
           smallAmountThreshold: preserveFilters ? current.view.smallAmountThreshold : undefined,
           showAddresses:
             ids.some((nodeId) => nodeId.startsWith('addr:')) || current.view.showAddresses,
         },
-      }),
-      false,
-    );
+      };
+    }, false);
   }
   /** Remember the control that started a handoff so the return restores focus. */
   function recordHandoffInvoker(origin: 'analysis' | 'wallet') {
@@ -1740,7 +1824,7 @@ export default function App() {
     change((latest) => {
       const resolved = resolveGraphHandoff(latest, ids, supportingTxids);
       if (!resolved) return latest;
-      const revealed = setNodesHidden(resolved.workspace, [resolved.selectedId], false);
+      const revealed = addGraphNodes(resolved.workspace, [...resolved.ids, resolved.selectedId]);
       return {
         ...revealed,
         view: {
@@ -1777,6 +1861,108 @@ export default function App() {
       false,
     );
   }
+  const contextTransaction =
+    graphFlowContext && w?.transactions[graphFlowContext.transactionId.slice(3)];
+  const contextSideIds = contextTransaction
+    ? {
+        inputs: transactionNodeIds(contextTransaction, 'inputs'),
+        outputs: transactionNodeIds(contextTransaction, 'outputs'),
+      }
+    : undefined;
+  const visibleIds = new Set(visibleGraph.nodes.map((node) => node.id));
+  const contextSides =
+    contextSideIds &&
+    (Object.fromEntries(
+      (['inputs', 'outputs'] as const).map((side) => [
+        side,
+        {
+          total: contextSideIds[side].length,
+          shown: contextSideIds[side].filter((id) => visibleIds.has(id)).length,
+          hidden: contextSideIds[side].filter((id) => admittedIds.has(id) && hiddenIds.has(id))
+            .length,
+          added: contextSideIds[side].filter((id) => admittedIds.has(id)).length,
+        },
+      ]),
+    ) as
+      | {
+          inputs: { total: number; shown: number; hidden: number; added: number };
+          outputs: { total: number; shown: number; hidden: number; added: number };
+        }
+      | undefined);
+  const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
+  const selectedSpenders =
+    selected?.kind === 'output'
+      ? graph.links
+          .filter((link) => link.kind === 'spends' && link.source === selected.id)
+          .map((link) => link.target)
+      : [];
+  const openSpendingFromToolbar = () => {
+    if (!selectedId) return;
+    if (selectedSpenders.length === 1) select(selectedSpenders[0], { preserveCamera: true });
+    else if (selectedSpenders.length > 1) {
+      change(
+        (current) => ({
+          ...current,
+          view: {
+            ...current.view,
+            transactionFlow: { ...current.view.transactionFlow, open: true },
+          },
+        }),
+        false,
+      );
+      setNotice('Choose a spending transaction in the transaction flow panel.');
+    } else void expand('spending', selectedId, { preserveCamera: true });
+  };
+  const graphContextToolbar = w ? (
+    <GraphContextToolbar
+      contextTitle={
+        graphFlowContext ? `Transaction ${graphFlowContext.transactionId.slice(3)}` : undefined
+      }
+      selectedKind={selected?.kind}
+      selectedCount={toolbarSelection.length}
+      canBack={navigation.index > 0}
+      canForward={navigation.index < navigation.ids.length - 1}
+      canCenter={!!selected}
+      onBack={() => navigateSelection(-1)}
+      onForward={() => navigateSelection(1)}
+      onCenter={() => centerNode(selectedId, {}, true)}
+      sides={contextSides}
+      onAddSide={(side) => revealGraphNodes(contextSideIds?.[side] ?? [])}
+      onHideSide={(side) =>
+        setEntityHidden(
+          (contextSideIds?.[side] ?? []).filter((id) => visibleIds.has(id)),
+          true,
+        )
+      }
+      onRemoveSide={(side) => removeFromGraph(contextSideIds?.[side] ?? [])}
+      canOpenCreatingTx={!!tx || canTrace}
+      canOpenSpendingTx={selectedSpenders.length > 0 || canTrace}
+      onOpenCreatingTx={() => void expand('funding', selectedId, { preserveCamera: true })}
+      onOpenSpendingTx={openSpendingFromToolbar}
+      canShowSelection={toolbarSelection.some((id) => !visibleIds.has(id))}
+      canHideSelection={toolbarSelection.some((id) => visibleIds.has(id))}
+      canRemoveSelection={toolbarSelection.some((id) => admittedIds.has(id))}
+      onShowSelection={() => revealGraphNodes(toolbarSelection)}
+      onHideSelection={() =>
+        setEntityHidden(
+          toolbarSelection.filter((id) => visibleIds.has(id)),
+          true,
+        )
+      }
+      onRemoveSelection={() => removeFromGraph(toolbarSelection)}
+      canHideBranch={!!graphFlowContext && visibleIds.has(graphFlowContext.transactionId)}
+      canRemoveBranch={!!graphFlowContext && admittedIds.has(graphFlowContext.transactionId)}
+      onHideBranch={() =>
+        setEntityHidden(graphFlowContext ? [graphFlowContext.transactionId] : [], true)
+      }
+      onRemoveBranch={() =>
+        removeFromGraph(graphFlowContext ? [graphFlowContext.transactionId] : [])
+      }
+      hiddenCount={hiddenCount}
+      onRestoreHidden={showAllHidden}
+      busy={!!operation}
+    />
+  ) : null;
   const graphNavigation = w ? (
     <div className="graph-navigation">
       <button
@@ -1809,15 +1995,16 @@ export default function App() {
         title="Keep the graph centered on selections from any panel"
         aria-pressed={w.view.lockToSelection ?? false}
         className={`graph-lock-selection ${w.view.lockToSelection ? 'active' : ''}`}
-        onClick={() =>
+        onClick={() => {
+          cameraPreservedSelection.current = undefined;
           change(
             (current) => ({
               ...current,
               view: { ...current.view, lockToSelection: !current.view.lockToSelection },
             }),
             false,
-          )
-        }
+          );
+        }}
       >
         <Focus size={14} />
         <span className="graph-nav-caption">Lock</span>
@@ -1945,7 +2132,9 @@ export default function App() {
           <span className="view-summary">
             {hiddenIds.has(selected!.id)
               ? 'selection hidden from graph'
-              : 'selection hidden by filters'}
+              : !admittedIds.has(selected!.id)
+                ? 'selection not on graph'
+                : 'selection hidden by filters'}
           </span>
         )}
       </>
@@ -2393,7 +2582,10 @@ export default function App() {
                       !tourStep &&
                       ws.update(
                         w.id,
-                        (current) => ({ ...current, view: { ...current.view, transactionFlow } }),
+                        (current) => ({
+                          ...current,
+                          view: { ...current.view, transactionFlow },
+                        }),
                         false,
                       )
                     }
@@ -2411,6 +2603,7 @@ export default function App() {
                     selected={selected}
                     selection={selection}
                     hiddenNodeIds={w.view.hiddenNodeIds}
+                    graphNodeIds={w.view.graphNodeIds}
                     onSetHidden={setEntityHidden}
                     {...flowInputs}
                     onSelect={select}
@@ -2468,16 +2661,19 @@ export default function App() {
                           )
                         }
                         navigation={graphNavigation}
+                        contextToolbar={graphContextToolbar}
                         navigationStatus={graphNavigationStatus}
                         legend={
                           <GraphLegend
+                            flowContext={graphFlowContext}
                             dimensions={w.view.dimensions}
                             showAddresses={w.view.showAddresses}
                             demo={w.demo}
                           />
                         }
-                        toolbar={
+                        toolbar={({ motionToggle }) => (
                           <GraphControls
+                            motionToggle={motionToggle}
                             smallAmountHiddenCount={amountGraph.hiddenCount}
                             view={w.view}
                             focusGraph={shownFocusGraph}
@@ -2489,8 +2685,9 @@ export default function App() {
                               )
                             }
                           />
-                        }
+                        )}
                         nodePresentation={batchPresentation}
+                        flowContext={graphFlowContext}
                         renderMetadata={renderEntityMetadata}
                         nodes={visibleGraph.nodes}
                         links={visibleGraph.links}
@@ -2501,6 +2698,7 @@ export default function App() {
                         batchSelectedIds={selection.ids}
                         onToggleSelection={selection.toggle}
                         hiddenNodeIds={w.view.hiddenNodeIds}
+                        graphNodeIds={w.view.graphNodeIds}
                         onSetHidden={setEntityHidden}
                         dimensions={w.view.dimensions}
                         sizeBy={w.view.sizeBy}
@@ -2545,11 +2743,13 @@ export default function App() {
                   {!!graph.nodes.length && !visibleGraph.nodes.length && (
                     <div className="filtered-graph-empty">
                       <h3>
-                        {hiddenCount === graph.nodes.length
-                          ? 'All entities are hidden'
-                          : 'No visible nodes match these filters'}
+                        {!admittedGraph.nodes.length
+                          ? 'Choose a node to add to the graph'
+                          : hiddenCount === admittedGraph.nodes.length
+                            ? 'All entities are hidden'
+                            : 'No visible nodes match these filters'}
                       </h3>
-                      <p>Hidden entities remain saved and can be inspected in the entity list.</p>
+                      <p>Use the transaction flow, entity list or right toolbar to show nodes.</p>
                       <div className="button-row">
                         {!!Object.keys(graphFilters).length && (
                           <button onClick={resetGraphFilters}>Clear filters</button>
@@ -2692,6 +2892,7 @@ export default function App() {
                     onCenter={() => centerNode()}
                     onShowAndCenter={() => centerNode(selected.id, undefined, true)}
                     hiddenNodeIds={w.view.hiddenNodeIds}
+                    graphNodeIds={w.view.graphNodeIds}
                     onSetHidden={setEntityHidden}
                     annotationKey={`${w.id}:${selected.id}`}
                     onExpand={(direction) => void expand(direction)}
@@ -2866,9 +3067,12 @@ export default function App() {
               ) : (
                 <>
                   <span className="status-dot" />
-                  {graph.nodes.length.toLocaleString()} nodes
+                  <span data-testid="graph-node-count">
+                    {visibleGraph.nodes.length.toLocaleString()}{' '}
+                    {visibleGraph.nodes.length === 1 ? 'node' : 'nodes'}
+                  </span>
                   <span className="status-separator">/</span>
-                  {graph.links.length.toLocaleString()} connections
+                  {visibleGraph.links.length.toLocaleString()} connections
                   <span className="status-separator">/</span>
                   {Object.keys(w.transactions).length.toLocaleString()}{' '}
                   {Object.keys(w.transactions).length === 1 ? 'transaction' : 'transactions'}
