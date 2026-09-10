@@ -234,7 +234,18 @@ starts a new run from that selection without clearing earlier results. Each card
 provides clickable source and target rows; the latest status and checked count
 stay with the scan controls above the results divider. Known nodes in expanded
 paths are also selectable. Each run owns its frozen source, target snapshot and
-settings. `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
+settings. Custom targets use a transient App-owned picker with its own IDs and
+draft, independent from graph selection and batch metadata selection. Graph and
+shared selection actions toggle picks while the source remains fixed. Done commits
+the draft, Escape discards it, and leaving Scan or changing workspace ends picking.
+The floating bar follows the existing selection toolbar placement. The picker
+does not add graph members or fetch evidence. `domain/connectionScanTargets.ts`
+expands explicitly picked transactions to their immediate input prevouts and
+outputs from loaded workspace/path evidence, without recursion. It deduplicates,
+excludes the source and rejects missing evidence or more than 1,000 expanded targets.
+Only the custom scope and frozen expanded target IDs enter the existing encrypted
+run record; picks and picker state reset on workspace changes.
+`domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
 deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
 same-direction walks at a meeting point and retain per-edge directions; no
@@ -243,8 +254,10 @@ Both fronts retain transient directed edges when other branches join a reached
 node. Meeting reconstruction follows target edges back to distinct frozen targets.
 When the first source witness overlaps that target leg or contains no new node,
 a bounded source reconstruction looks for an admissible alternative, excluding
-the other leg's nodes. It tracks at most two states per node, distinguishing an
-already displayed prefix from one containing new nodes. A late joining branch
+the other leg's nodes. Source and target reconstruction each track at most two
+states per node, distinguishing an already displayed path from one containing new
+nodes. This also preserves new paths through visible non-target context in custom
+scopes. A late joining branch
 on either side refreshes previously reached intersections immediately; found paths
 stream before later cancellation or timeout.
 Reconstruction shares the deadline, combined hop cap and result limit, periodically

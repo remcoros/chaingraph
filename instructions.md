@@ -55,9 +55,20 @@ The graph represents transaction creation and consumption of outputs. An output 
 ## Connection scans
 
 Select a transaction or output and open **Scan** in Graph's right inspector.
-Choose upstream, downstream or both, then **Visible graph** or **All added nodes**
-(including hidden and filtered nodes) as targets. Inputs use their previous
+Choose **Both**, **Sources** or **Destinations**, then **Visible graph**, **All added nodes**
+(including hidden and filtered nodes), or **Custom targets**. Inputs use their previous
 outpoint identity. Addresses and the entire workspace are outside this scan scope.
+
+For custom targets, choose **Pick target(s)**. Click transactions or outputs in the
+graph to add or remove them; the source stays fixed while picking. The floating
+bar lists removable short IDs. **Done** applies the picks; **Esc** or its close
+button cancels the edit. Normal selection and batch metadata selection are separate.
+Each picked transaction includes its immediate inputs and outputs as scan targets,
+even if those outpoints are hidden or not added to the graph. Picked outputs stay
+individual targets. The displayed target count includes this expansion, deduplicates
+overlap and excludes the source. Expansion does not follow further transactions.
+Picks last for the current workspace session; the completed run retains its frozen
+target IDs with the encrypted results.
 
 **Scan selection** searches from the selected node for directed connections and
 shared ancestors or descendants. Selecting another node prepares the next scan;
@@ -68,7 +79,9 @@ Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
 transactions, 60 seconds and a 200-branch boundary. Cached transactions and
 spending-history candidates share the same allowance with target-side searches.
-Scopes above 1,000 targets require a smaller visible graph or filter scope.
+Scopes above 1,000 targets require custom picks or a smaller visible graph or filter
+scope. Custom picks including their inputs/outputs must also fit that limit;
+oversized or unavailable target sets are rejected without silently dropping nodes.
 
 Results stream into compact cards. The default **Findings** filter shows
 connections first, then branch choices and evidence problems. **Endpoints** is a
@@ -127,8 +140,7 @@ within the sidebar width.
 
 Cancel, closing the Scan tab, changing workbenches, switching workspaces or locking
 stops active work. Interrupted records restore as interrupted; reopening never
-restarts a scan. Offline scans use loaded observations. A scan retains one
-deterministic target witness at each meeting point and does not enumerate every
+restarts a scan. Offline scans use loaded observations. A scan does not enumerate every
 possible path or guarantee a globally shortest path. No connection within limits
 does not prove absence. Shared transactions imply neither common ownership nor
 an allocation of particular inputs to outputs. Missing spenders remain unknown.

@@ -36,7 +36,7 @@ const reason = z.enum([
 const settingsSchema = z
   .object({
     direction: z.enum(['upstream', 'downstream', 'both']),
-    targetScope: z.enum(['visible', 'added']),
+    targetScope: z.enum(['visible', 'added', 'custom']),
     maxHops: z.number().int().min(1).max(SCAN_LIMITS.maxHops),
     maxTransactions: z.number().int().min(1).max(SCAN_LIMITS.maxTransactions),
     maxMilliseconds: z.number().int().min(1).max(SCAN_LIMITS.maxMilliseconds),

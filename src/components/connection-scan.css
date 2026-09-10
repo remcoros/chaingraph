@@ -49,6 +49,28 @@
 .connection-scan-advanced {
   grid-column: 1 / -1;
 }
+.connection-scan-custom-targets {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.connection-scan-custom-targets > button {
+  justify-self: start;
+}
+.connection-scan-picked-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.connection-scan-picked-list button {
+  min-height: 28px;
+  padding: 3px 0;
+  font-family: var(--font-mono);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .connection-scan summary {
   cursor: pointer;
   min-height: 28px;

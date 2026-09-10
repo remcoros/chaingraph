@@ -42,6 +42,7 @@ import {
 } from '../domain/connectionScanGroups';
 import { retryConnectionScanResult, applyScanRecheck } from '../lib/connectionScanRetry';
 import { transactionStatus } from '../domain/transactionStatus';
+import { prepareCustomScanTargets } from '../domain/connectionScanTargets';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
@@ -65,6 +66,11 @@ const nameFor = (workspace: Workspace, id: string) => workspace.annotations[id]?
 type Props = {
   workspace: Workspace;
   selectionId?: string;
+  customTargetIds: readonly string[];
+  pickingTargets: boolean;
+  onPickTargets: (invoker: HTMLButtonElement) => void;
+  onCancelPicking: () => void;
+  onRemoveTarget: (id: string) => void;
   visibleNodeIds: string[];
   addedNodeIds: string[];
   loadedSpenders: ReadonlyMap<string, readonly string[]>;
@@ -108,6 +114,30 @@ export function ConnectionScanPanel(props: Props) {
   );
   const run = scanRuns.at(-1);
   const source = selectionId;
+  const customTargetPlan = useMemo(() => {
+    if (settings.targetScope !== 'custom' || !eligible(source)) return { ids: [], error: '' };
+    try {
+      return {
+        ids: prepareCustomScanTargets({
+          pickedNodeIds: props.customTargetIds,
+          transactions: { ...workspace.connectionScans?.evidence, ...workspace.transactions },
+          source,
+        }),
+        error: '',
+      };
+    } catch (cause) {
+      return {
+        ids: [],
+        error: cause instanceof Error ? cause.message : 'Targets could not be prepared.',
+      };
+    }
+  }, [
+    props.customTargetIds,
+    source,
+    settings.targetScope,
+    workspace.transactions,
+    workspace.connectionScans?.evidence,
+  ]);
   const savedSpenders = useMemo(
     () => indexLoadedSpends(workspace.connectionScans?.evidence ?? {}),
     [workspace.connectionScans?.evidence],
@@ -186,7 +216,14 @@ export function ConnectionScanPanel(props: Props) {
   }
 
   async function start(startSource: string | undefined) {
-    if (!eligible(startSource) || busy || controller.current || retryController.current) return;
+    if (
+      !eligible(startSource) ||
+      busy ||
+      props.pickingTargets ||
+      controller.current ||
+      retryController.current
+    )
+      return;
     setError('');
     const frozenSettings = { ...settings };
     for (const [key, label, maximum] of [
@@ -204,20 +241,39 @@ export function ConnectionScanPanel(props: Props) {
         return;
       }
     }
-    const targetIds = [
-      ...new Set(
-        (frozenSettings.targetScope === 'visible'
-          ? props.visibleNodeIds
-          : props.addedNodeIds
-        ).filter((id) => eligible(id) && id !== startSource),
-      ),
-    ];
+    let targetIds: string[];
+    try {
+      targetIds =
+        frozenSettings.targetScope === 'custom'
+          ? prepareCustomScanTargets({
+              pickedNodeIds: props.customTargetIds,
+              transactions: { ...workspace.connectionScans?.evidence, ...workspace.transactions },
+              source: startSource,
+            })
+          : [
+              ...new Set(
+                (frozenSettings.targetScope === 'visible'
+                  ? props.visibleNodeIds
+                  : props.addedNodeIds
+                ).filter((id) => eligible(id) && id !== startSource),
+              ),
+            ];
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Targets could not be prepared.');
+      return;
+    }
     if (targetIds.length > SCAN_LIMITS.maxTargets) {
-      setError(`Choose a smaller graph scope: at most ${SCAN_LIMITS.maxTargets} targets per scan.`);
+      setError(
+        `Pick custom targets or choose a smaller graph scope: at most ${SCAN_LIMITS.maxTargets} targets per scan.`,
+      );
       return;
     }
     if (!targetIds.length) {
-      setError('Add another transaction or output to the target scope first.');
+      setError(
+        frozenSettings.targetScope === 'custom'
+          ? 'Pick another transaction or output as a target.'
+          : 'Add another transaction or output to the target scope first.',
+      );
       return;
     }
     if (!traceSourceExists(workspace, startSource)) {
@@ -405,7 +461,7 @@ export function ConnectionScanPanel(props: Props) {
             void start(source);
           }}
         >
-          <fieldset disabled={busy} className="connection-scan-fields">
+          <fieldset disabled={busy || !!retrying} className="connection-scan-fields">
             <label>
               Direction
               <select
@@ -426,17 +482,62 @@ export function ConnectionScanPanel(props: Props) {
               Targets
               <select
                 value={settings.targetScope}
-                onChange={(event) =>
+                onChange={(event) => {
+                  props.onCancelPicking();
+                  setError('');
                   setSettings({
                     ...settings,
                     targetScope: event.target.value as ScanSettings['targetScope'],
-                  })
-                }
+                  });
+                }}
               >
                 <option value="visible">Visible graph</option>
                 <option value="added">All added nodes</option>
+                <option value="custom">Custom targets</option>
               </select>
             </label>
+            {settings.targetScope === 'custom' && (
+              <div className="connection-scan-custom-targets">
+                <button
+                  type="button"
+                  disabled={!eligible(source) || props.pickingTargets}
+                  onClick={(event) => props.onPickTargets(event.currentTarget)}
+                >
+                  <Crosshair size={14} /> Pick target(s)
+                </button>
+                {props.customTargetIds.length > 0 && (
+                  <>
+                    <span className="small muted">
+                      {props.customTargetIds.length} picked
+                      {!customTargetPlan.error && ` · ${customTargetPlan.ids.length} targets`}
+                    </span>
+                    <div className="connection-scan-picked-list" aria-label="Custom scan targets">
+                      {props.customTargetIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className="text-button"
+                          disabled={props.pickingTargets}
+                          title={`Remove ${id}`}
+                          aria-label={`Remove target ${id}`}
+                          onClick={() => props.onRemoveTarget(id)}
+                        >
+                          {short(id)} <X size={12} />
+                        </button>
+                      ))}
+                    </div>
+                    <span className="small muted">
+                      Includes picked transactions’ inputs and outputs.
+                    </span>
+                  </>
+                )}
+                {customTargetPlan.error && (
+                  <p className="connection-scan-error" role="alert">
+                    {customTargetPlan.error}
+                  </p>
+                )}
+              </div>
+            )}
             <label>
               Max transaction hops
               <input
@@ -506,7 +607,16 @@ export function ConnectionScanPanel(props: Props) {
                 Cancel
               </button>
             ) : (
-              <button className="primary" disabled={!eligible(source)} type="submit">
+              <button
+                className="primary"
+                disabled={
+                  !eligible(source) ||
+                  props.pickingTargets ||
+                  (settings.targetScope === 'custom' &&
+                    (!customTargetPlan.ids.length || !!customTargetPlan.error))
+                }
+                type="submit"
+              >
                 <ScanLine size={15} />
                 Scan selection
               </button>
@@ -540,7 +650,9 @@ export function ConnectionScanPanel(props: Props) {
                 <dt>Targets</dt>
                 <dd>
                   {run.targetIds.length}{' '}
-                  {run.settings.targetScope === 'visible' ? 'visible' : 'added'} graph nodes
+                  {run.settings.targetScope === 'custom'
+                    ? 'custom targets'
+                    : `${run.settings.targetScope === 'visible' ? 'visible' : 'added'} graph nodes`}
                 </dd>
                 <dt>Direction</dt>
                 <dd>

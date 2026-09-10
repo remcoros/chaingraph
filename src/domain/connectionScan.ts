@@ -35,7 +35,7 @@ export const SCAN_STATUS_ONLY_REASONS: readonly ScanStopReason[] = [
 ];
 export interface ScanSettings {
   direction: ScanDirection | 'both';
-  targetScope: 'visible' | 'added';
+  targetScope: 'visible' | 'added' | 'custom';
   maxHops: number;
   maxTransactions: number;
   maxMilliseconds: number;
@@ -106,7 +106,7 @@ export function validateScanSettings(settings: ScanSettings): ScanSettings {
   if (
     !settings ||
     !['upstream', 'downstream', 'both'].includes(settings.direction) ||
-    !['visible', 'added'].includes(settings.targetScope)
+    !['visible', 'added', 'custom'].includes(settings.targetScope)
   )
     throw new Error('Invalid scan settings.');
   for (const key of ['maxHops', 'maxTransactions', 'maxMilliseconds', 'fanOut'] as const) {
@@ -386,8 +386,10 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         });
     }
     if (!target.predecessors.has(meetingNode)) return;
-    const visited = new Set([meetingNode]);
-    const queue = [{ path: [meetingNode], hops: 0 }];
+    // Custom targets can sit beyond displayed non-target context. Preserve a
+    // novel target leg even when a shorter displayed leg reaches the same node.
+    const queue = [{ path: [meetingNode], hops: 0, novel: !displayed.has(meetingNode) }];
+    const visited = new Set([`${meetingNode}:${queue[0]!.novel}`]);
     for (let cursor = 0; cursor < queue.length; cursor++) {
       await reconstructionCheckpoint();
       if (reasons.has('results')) return;
@@ -399,7 +401,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
           sourceVisit,
           new Set(visit.path.slice(1)),
           settings.maxHops - visit.hops,
-          visit.path.every((id) => displayed.has(id)),
+          !visit.novel,
         );
         if (!prefix) continue;
         addResult({
@@ -418,11 +420,14 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
       }
       for (const next of target.predecessors.get(node) ?? []) {
         budget.checkpoint();
-        if (next === options.source || visited.has(next)) continue;
+        if (next === options.source || visit.path.includes(next)) continue;
         const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
         if (hops > settings.maxHops) continue;
-        visited.add(next);
-        queue.push({ path: [...visit.path, next], hops });
+        const novel = visit.novel || !displayed.has(next);
+        const key = `${next}:${novel}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        queue.push({ path: [...visit.path, next], hops, novel });
       }
     }
   };

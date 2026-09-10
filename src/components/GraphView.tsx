@@ -62,6 +62,7 @@ export interface GraphViewProps extends VisibilityProps {
   onSelect: (id: string) => void;
   /** Shared multiple-selection state; the renderer stays free of selection logic. */
   selectionMode?: boolean;
+  selectionPurpose?: 'batch' | 'scan-target';
   batchSelectedIds?: readonly string[];
   onToggleSelection?: (id: string) => void;
   dimensions: 2 | 3;
@@ -661,21 +662,23 @@ export default function GraphView(props: GraphViewProps) {
                     if (open) keepCardOpen();
                   }}
                 />
-                {props.onToggleSelection && (
-                  <button
-                    type="button"
-                    aria-label={
-                      props.batchSelectedIds?.includes(hoveredNode.id)
-                        ? 'Remove from batch selection'
-                        : 'Add to batch selection'
-                    }
-                    aria-pressed={props.batchSelectedIds?.includes(hoveredNode.id) ?? false}
-                    title="Add or remove this item in the batch selection"
-                    onClick={() => props.onToggleSelection?.(hoveredNode.id)}
-                  >
-                    <CheckSquare size={15} />
-                  </button>
-                )}
+                {props.onToggleSelection &&
+                  (props.selectionPurpose !== 'scan-target' ||
+                    /^(tx|out):/.test(hoveredNode.id)) && (
+                    <button
+                      type="button"
+                      aria-label={`${props.batchSelectedIds?.includes(hoveredNode.id) ? 'Remove from' : 'Add to'} ${props.selectionPurpose === 'scan-target' ? 'scan targets' : 'batch selection'}`}
+                      aria-pressed={props.batchSelectedIds?.includes(hoveredNode.id) ?? false}
+                      title={
+                        props.selectionPurpose === 'scan-target'
+                          ? 'Add or remove this scan target'
+                          : 'Add or remove this item in the batch selection'
+                      }
+                      onClick={() => props.onToggleSelection?.(hoveredNode.id)}
+                    >
+                      <CheckSquare size={15} />
+                    </button>
+                  )}
               </div>
             </div>
           </section>

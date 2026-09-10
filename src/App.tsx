@@ -1,5 +1,8 @@
 import { TransactionFetchShell } from './lib/useTransactionFetch';
 import { ConnectionScanPanel } from './components/ConnectionScanPanel';
+import { ScanTargetToolbar } from './components/ScanTargetToolbar';
+import { prepareCustomScanTargets } from './domain/connectionScanTargets';
+import { isScanNodeId } from './domain/connectionScan';
 import { addScanPath } from './domain/connectionScanRecords';
 import { spendingNotice } from './lib/spendingNotice';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
@@ -222,6 +225,26 @@ export default function App() {
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
   const selection = useEntitySelection(w?.id);
+  const [scanTargets, setScanTargets] = useState<string[]>([]);
+  const [scanTargetDraft, setScanTargetDraft] = useState<{
+    workspaceId: string;
+    source: string;
+    ids: string[];
+  }>();
+  const scanTargetInvoker = useRef<HTMLElement | null>(null);
+  const toggleScanTarget = useCallback((id: string) => {
+    if (!isScanNodeId(id)) return;
+    setScanTargetDraft((draft) =>
+      !draft || id === draft.source
+        ? draft
+        : {
+            ...draft,
+            ids: draft.ids.includes(id)
+              ? draft.ids.filter((target) => target !== id)
+              : [...draft.ids, id],
+          },
+    );
+  }, []);
   const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
     ids: [],
     index: -1,
@@ -358,6 +381,37 @@ export default function App() {
       : rightTab);
   const shownMobilePanel = tourStep?.view?.panel ?? mobilePanel;
   const shownFocusGraph = tourStep ? false : focusGraph;
+  const pickingScanTargets =
+    !!scanTargetDraft &&
+    scanTargetDraft.workspaceId === w?.id &&
+    shownWorkbench === 'graph' &&
+    shownRightTab === 'scan' &&
+    !lockingWorkspace &&
+    !tourStep;
+  useEffect(() => {
+    if (!pickingScanTargets) setScanTargetDraft(undefined);
+  }, [pickingScanTargets]);
+  const finishScanTargetPicking = (apply: boolean) => {
+    if (apply && scanTargetDraft) setScanTargets(scanTargetDraft.ids);
+    if (scanTargetDraft) setSelectedId(scanTargetDraft.source);
+    setScanTargetDraft(undefined);
+    setMobilePanel('right');
+    requestAnimationFrame(() => scanTargetInvoker.current?.focus({ preventScroll: true }));
+  };
+  const scanTargetPreview = useMemo(() => {
+    if (!w || !scanTargetDraft || scanTargetDraft.workspaceId !== w.id) return {};
+    try {
+      return {
+        targetCount: prepareCustomScanTargets({
+          pickedNodeIds: scanTargetDraft.ids,
+          transactions: { ...w.connectionScans?.evidence, ...w.transactions },
+          source: scanTargetDraft.source,
+        }).length,
+      };
+    } catch (cause) {
+      return { error: cause instanceof Error ? cause.message : 'Targets could not be prepared.' };
+    }
+  }, [scanTargetDraft, w?.id, w?.transactions, w?.connectionScans?.evidence]);
   const [live, setLive] = useState(false);
   const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const [scanLimit, setScanLimit] = useState(200);
@@ -486,15 +540,16 @@ export default function App() {
     return presentation;
   }, [w?.annotations, w?.wallets, w?.view.highlightMode, graph, walletMatches, tagIndex]);
   // Batch selection is shared UI state projected onto the neutral display contract.
+  const highlightedSelection = pickingScanTargets ? scanTargetDraft!.ids : selection.ids;
   const batchPresentation = useMemo(() => {
-    if (!selection.ids.length) return nodePresentation;
+    if (!highlightedSelection.length) return nodePresentation;
     const merged = new Map(nodePresentation);
-    for (const id of selection.ids) {
+    for (const id of highlightedSelection) {
       const base = merged.get(id);
       merged.set(id, { ...base, highlight: true, scale: (base?.scale ?? 1) * 1.35 });
     }
     return merged;
-  }, [nodePresentation, selection.ids]);
+  }, [nodePresentation, highlightedSelection]);
   const membershipFilters = (
     source: GraphData,
     sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
@@ -720,6 +775,10 @@ export default function App() {
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
     (id: string, options?: { preserveCamera?: boolean }) => {
+      if (pickingScanTargets) {
+        toggleScanTarget(id);
+        return;
+      }
       selectionGeneration.current++;
       cameraPreservedSelection.current = options?.preserveCamera ? id : undefined;
       if (options?.preserveCamera) setFocusRequest(undefined);
@@ -740,7 +799,7 @@ export default function App() {
       );
       setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
-    [ws.update, ws.getSession],
+    [ws.update, ws.getSession, pickingScanTargets, toggleScanTarget],
   );
   useEffect(() => {
     operationRef.current?.abort();
@@ -748,6 +807,8 @@ export default function App() {
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
+    setScanTargets([]);
+    setScanTargetDraft(undefined);
     setSelectedWallet(
       w?.view.selectedWallet && w.wallets.some((item) => item.id === w.view.selectedWallet)
         ? w.view.selectedWallet
@@ -2156,6 +2217,7 @@ export default function App() {
         aria-label="Selection mode"
         aria-pressed={selection.mode}
         title="Choose several entities for batch labels, tags and icons. Ctrl or Cmd click also toggles an entity."
+        disabled={pickingScanTargets}
         onClick={() => selection.setMode(!selection.mode)}
       >
         <CheckSquare size={14} />
@@ -2570,7 +2632,7 @@ export default function App() {
               transactions={w.transactions}
               removableNodeIds={removableNodeIds}
               onRemoveNode={requestEntityRemoval}
-              selection={selection}
+              selection={pickingScanTargets ? undefined : selection}
               tagsPanel={
                 <TagsPanel
                   key={w.id}
@@ -2580,7 +2642,7 @@ export default function App() {
                   onChange={changeTags}
                   onSelect={(id) => {
                     select(id);
-                    setMobilePanel('right');
+                    if (!pickingScanTargets) setMobilePanel('right');
                   }}
                   onShow={(tag) => {
                     updateFilters({ tagId: tag.id, preserveContext: true });
@@ -2602,7 +2664,7 @@ export default function App() {
               }}
               onSelectNode={(id) => {
                 select(id);
-                setMobilePanel('right');
+                if (!pickingScanTargets) setMobilePanel('right');
               }}
               onAddWallet={() => setWalletDialog(true)}
               onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
@@ -2689,7 +2751,7 @@ export default function App() {
                     }
                     workspace={w}
                     selected={selected}
-                    selection={selection}
+                    selection={pickingScanTargets ? undefined : selection}
                     hiddenNodeIds={w.view.hiddenNodeIds}
                     graphNodeIds={w.view.graphNodeIds}
                     onSetHidden={setEntityHidden}
@@ -2782,9 +2844,10 @@ export default function App() {
                         focusRequest={focusRequest}
                         selectedId={selectedId}
                         onSelect={select}
-                        selectionMode={selection.mode}
-                        batchSelectedIds={selection.ids}
-                        onToggleSelection={selection.toggle}
+                        selectionMode={pickingScanTargets || selection.mode}
+                        selectionPurpose={pickingScanTargets ? 'scan-target' : 'batch'}
+                        batchSelectedIds={highlightedSelection}
+                        onToggleSelection={pickingScanTargets ? toggleScanTarget : selection.toggle}
                         hiddenNodeIds={w.view.hiddenNodeIds}
                         graphNodeIds={w.view.graphNodeIds}
                         onSetHidden={setEntityHidden}
@@ -2902,7 +2965,23 @@ export default function App() {
                   <ConnectionScanPanel
                     key={w.id}
                     workspace={w}
-                    selectionId={selectedId}
+                    selectionId={pickingScanTargets ? scanTargetDraft!.source : selectedId}
+                    customTargetIds={scanTargets}
+                    pickingTargets={pickingScanTargets}
+                    onPickTargets={(invoker) => {
+                      if (!selectedId || !isScanNodeId(selectedId)) return;
+                      scanTargetInvoker.current = invoker;
+                      setScanTargetDraft({
+                        workspaceId: w.id,
+                        source: selectedId,
+                        ids: scanTargets.filter((id) => id !== selectedId),
+                      });
+                      setMobilePanel('graph');
+                    }}
+                    onCancelPicking={() => setScanTargetDraft(undefined)}
+                    onRemoveTarget={(id) =>
+                      setScanTargets((ids) => ids.filter((target) => target !== id))
+                    }
                     visibleNodeIds={visibleGraph.nodes.map((node) => node.id)}
                     addedNodeIds={[...connectionMembers]}
                     loadedSpenders={flowIndex.spenders}
@@ -3182,7 +3261,7 @@ export default function App() {
             />
           </section>
           <SelectionToolbar
-            active={workbench === 'graph' && !tourStep}
+            active={workbench === 'graph' && !tourStep && !pickingScanTargets}
             workspace={w}
             selection={selection}
             visibleSelectedCount={selectionOnCanvas}
@@ -3202,6 +3281,15 @@ export default function App() {
             }}
             onUndo={() => ws.undo(w.id)}
           />
+          {pickingScanTargets && scanTargetDraft && (
+            <ScanTargetToolbar
+              ids={scanTargetDraft.ids}
+              onRemove={toggleScanTarget}
+              onDone={() => finishScanTargetPicking(true)}
+              onCancel={() => finishScanTargetPicking(false)}
+              {...scanTargetPreview}
+            />
+          )}
           <footer className="statusbar">
             <span>
               {operation ? (

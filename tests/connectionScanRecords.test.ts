@@ -55,6 +55,18 @@ function fixture() {
 }
 
 describe('compact connection scan records', () => {
+  it('encrypts custom scope and expanded targets using the existing compact run record', async () => {
+    const { workspace, run, evidence } = fixture();
+    run.settings.targetScope = 'custom';
+    run.targetIds = [tn(3), out(2), out(3), out(3, 1)];
+    const next = replaceScanRun(workspace, run, evidence);
+    const encrypted = await validateAndEncryptWorkspace(next, 'public fixture password');
+    expect(JSON.stringify(encrypted)).not.toContain(run.source);
+    const restored = await decryptAndValidateWorkspace(encrypted, 'public fixture password');
+    expect(restored.connectionScans?.runs[0]).toEqual(run);
+    expect(Object.keys(restored.connectionScans!)).toEqual(['runs', 'evidence']);
+  });
+
   it('encrypts a compact round trip and restores running records without altering a save input', async () => {
     const { workspace, run, evidence } = fixture();
     run.status = 'running';

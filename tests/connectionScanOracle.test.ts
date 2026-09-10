@@ -98,6 +98,7 @@ async function scanConnections(
   direction: ScanSettings['direction'],
   maxHops: number,
   displayed = [source, ...targets],
+  targetScope: ScanSettings['targetScope'] = 'visible',
 ) {
   const run = await runConnectionScan({
     id: 'oracle',
@@ -106,6 +107,7 @@ async function scanConnections(
     displayedNodeIds: displayed,
     settings: {
       ...DEFAULT_SCAN_SETTINGS,
+      targetScope,
       direction,
       maxHops,
       maxTransactions: 1000,
@@ -162,6 +164,90 @@ async function scanConnections(
 }
 
 describe('connection search independent DAG oracle', () => {
+  it.each([
+    {
+      direction: 'upstream' as const,
+      mask: 47,
+      source: tx(4),
+      target: out(3, 0),
+      hidden: tx(2),
+      relationship: 'shared-ancestor',
+    },
+    {
+      direction: 'downstream' as const,
+      mask: 61,
+      source: tx(1),
+      target: out(1, 0),
+      hidden: tx(3),
+      relationship: 'shared-descendant',
+    },
+  ])(
+    'keeps a novel $relationship target leg beyond shorter displayed context',
+    async ({ direction, mask, source, target, hidden, relationship }) => {
+      const edges = transactionDag(mask);
+      const displayed = [...new Set(edges.flat())].filter((node) => node !== hidden);
+      const expected = [`${target}|${relationship}`];
+      expect(referenceConnections(edges, source, [target], displayed, direction, 4)).toEqual(
+        expected,
+      );
+      expect(
+        await scanConnections(edges, source, [target], direction, 4, displayed, 'custom'),
+      ).toEqual(expected);
+    },
+  );
+
+  it.each(['upstream', 'downstream', 'both'] as const)(
+    'matches custom targets among displayed non-target context for %s searches',
+    async (direction) => {
+      for (let mask = 0; mask < 64; mask++) {
+        const edges = transactionDag(mask);
+        const nodes = [...new Set([tx(1), tx(2), tx(3), tx(4), ...edges.flat()])];
+        for (const source of nodes) {
+          for (const target of nodes) {
+            if (source === target) continue;
+            const targets = [
+              ...new Set([
+                target,
+                ...(target.startsWith('tx:')
+                  ? edges.flatMap(([from, to]) =>
+                      from === target ? [to] : to === target ? [from] : [],
+                    )
+                  : []),
+              ]),
+            ].filter((node) => node !== source);
+            for (const hidden of nodes) {
+              if (hidden === source || hidden === target) continue;
+              // Custom scope decouples target membership from displayed context.
+              // A useful path can differ from a visible route by just one node.
+              const displayed = nodes.filter((node) => node !== hidden);
+              const expected = referenceConnections(
+                edges,
+                source,
+                targets,
+                displayed,
+                direction,
+                4,
+              );
+              const actual = await scanConnections(
+                edges,
+                source,
+                targets,
+                direction,
+                4,
+                displayed,
+                'custom',
+              );
+              expect(
+                actual,
+                `custom DAG mask ${mask}, source ${source}, target ${target}, hidden ${hidden}`,
+              ).toEqual(expected);
+            }
+          }
+        }
+      }
+    },
+  );
+
   it.each(['upstream', 'downstream', 'both'] as const)(
     'matches selected transactions with their whole immediate input/output neighborhood for %s searches',
     async (direction) => {
