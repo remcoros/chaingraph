@@ -198,7 +198,7 @@
   max-width: 100%;
 }
 
-/* Node details stay near the pointer, with all actions in the first row. */
+/* Reserve the first row for kind/close; actions wrap within the card below it. */
 .graph-hover-card {
   width: 304px;
   padding: 10px 12px 12px;
@@ -206,17 +206,26 @@
   box-shadow: 0 8px 30px #0007;
 }
 .graph-card-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px;
   margin-bottom: 7px;
+}
+.graph-card-heading .graph-card-close {
+  grid-column: 2;
+  grid-row: 1;
 }
 .graph-card-kind {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   margin-right: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .graph-card-kind::before {
   content: '';
+  flex: none;
   width: 8px;
   height: 8px;
   background: var(--color-tx);
@@ -231,9 +240,12 @@
   transform: rotate(45deg);
 }
 .graph-card-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
   margin: 0;
   gap: 2px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .graph-card-actions button,
 .graph-card-heading .graph-card-close {
@@ -255,6 +267,8 @@
   background: var(--color-wash);
 }
 .graph-card-label {
+  min-width: 0;
+  white-space: normal;
   font-size: 13px;
   line-height: 1.4;
   margin-bottom: 5px;
@@ -264,17 +278,22 @@
   margin: 8px 0 0;
 }
 .graph-card-facts div {
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
   align-items: baseline;
   gap: 10px;
 }
 .graph-card-facts dd {
   text-align: right;
 }
-.graph-card-identifier {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.graph-card-facts dt,
+.graph-card-facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.graph-hover-card .entity-badges,
+.graph-hover-card .entity-badges > span {
+  min-width: 0;
+  max-width: 100%;
 }
 .graph-card-explanation {
   margin-top: 8px;

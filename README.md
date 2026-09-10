@@ -267,6 +267,10 @@ OP_RETURN outputs show decoded text when possible, with a short preview and expa
 selectable, copyable full data. Binary data stays hex; script decoding never executes it.
 Tags can be searched, created and assigned from **Add or choose tags** in the inspector.
 
+Graph hover cards wrap long annotations and metadata within the graph viewport.
+Identifiers use the shared seven-character ends, with the complete outpoint index;
+hover the title or identifier for its full value. Close stays above the wrapping action row.
+
 **Lock to selection** keeps the graph centered as you select items anywhere in the
 workbench. Graph controls independently show or hide labels, tags and icons. On
 desktop, **Hide panels** sits beside the 3D/Flat toggle and temporarily hides the

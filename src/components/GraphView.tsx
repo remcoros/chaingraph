@@ -139,7 +139,7 @@ export default function GraphView(props: GraphViewProps) {
     const element = containerRef.current;
     if (!element) return;
     const { width, height } = element.getBoundingClientRect();
-    const widthOfCard = Math.min(304, Math.max(200, width - 24));
+    const widthOfCard = Math.min(304, Math.max(0, width - 24));
     const x = keyboard ? (width - widthOfCard) / 2 : pointer.current.x + 12;
     const y = keyboard ? 40 : pointer.current.y + 12;
     setHover((previous) =>
@@ -333,6 +333,23 @@ export default function GraphView(props: GraphViewProps) {
   }, [adapterFactory, props.focusRequest, props.dimensions]);
 
   const hoveredNode = hover ? props.nodes.find((node) => node.id === hover.id) : undefined;
+  const hoveredIdentifier = hoveredNode
+    ? hoveredNode.kind === 'output' && hoveredNode.txid
+      ? `${hoveredNode.txid}:${hoveredNode.vout}`
+      : hoveredNode.txid || hoveredNode.address || hoveredNode.id
+    : '';
+  const hoveredPresentation = hoveredNode && props.nodePresentation?.get(hoveredNode.id);
+  // Explicit annotation metadata distinguishes human labels, even hex-shaped ones,
+  // from generated identifiers. Keep the legacy display-label fallback for callers
+  // without that metadata, shortening only an exact raw/canonical reference.
+  const hoveredLabel =
+    hoveredPresentation?.label !== undefined
+      ? [hoveredPresentation.icon, hoveredPresentation.label || short(hoveredIdentifier)]
+          .filter(Boolean)
+          .join(' ')
+      : hoveredNode?.label === hoveredIdentifier || hoveredNode?.label === hoveredNode?.id
+        ? short(hoveredIdentifier)
+        : hoveredNode?.label;
   const transaction = hoveredNode?.txid ? props.transactions?.[hoveredNode.txid] : undefined;
   const missingCreatingTransaction =
     hoveredNode?.kind === 'output' &&
@@ -505,13 +522,13 @@ export default function GraphView(props: GraphViewProps) {
               type="button"
               className="graph-card-label"
               aria-label="Select this graph item"
-              title="Select this item in the transaction view and Inspector"
+              title={`${hoveredLabel}\n${hoveredIdentifier}\nSelect this item in the transaction view and Inspector`}
               onClick={() => {
                 props.onSelect(hoveredNode.id);
                 dismissCard();
               }}
             >
-              {hoveredNode.label}
+              {hoveredLabel}
             </button>
             {props.renderMetadata?.(hoveredNode.id)}
             <dl className="graph-card-facts">
@@ -523,19 +540,8 @@ export default function GraphView(props: GraphViewProps) {
                       ? 'Outpoint'
                       : 'Address'}
                 </dt>
-                <dd
-                  className="graph-card-identifier"
-                  title={
-                    hoveredNode.kind === 'output' && hoveredNode.txid
-                      ? `${hoveredNode.txid}:${hoveredNode.vout}`
-                      : hoveredNode.txid || hoveredNode.address || hoveredNode.id
-                  }
-                >
-                  {short(
-                    hoveredNode.kind === 'output' && hoveredNode.txid
-                      ? `${hoveredNode.txid}:${hoveredNode.vout}`
-                      : hoveredNode.txid || hoveredNode.address || hoveredNode.id,
-                  )}
+                <dd className="graph-card-identifier" title={hoveredIdentifier}>
+                  {short(hoveredIdentifier)}
                 </dd>
               </div>
               {hoveredNode.value !== undefined && (
