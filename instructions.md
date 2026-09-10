@@ -77,13 +77,13 @@ Adding reveals that path and resets graph filters, preserving annotations and th
 camera. From a branch boundary, add the path, select its endpoint and start a new
 scan. Missing saved path evidence is reported before adding; reload it or rerun.
 
-Previous scans are grouped by source. Select a record to review it, **Rerun** to
-create a new record with its original targets and settings, or remove it.
-Dismissal applies to that run. **Clear records** leaves added graph nodes and
-annotations intact. Storage holds at most 20 runs, 50 results per run and 200
-additional path transactions, with a combined 2 MiB scan-record limit. Remove
-records and retry saving if that limit is reached. Scan details stay inside the
-encrypted workspace; explored transactions and frontiers are not saved.
+Only the latest scan's results are retained. Starting another scan replaces them;
+there is no scan history to manage. **Clear all results** clears the set, cancels
+an active scan, and leaves added graph nodes and annotations intact. The latest
+results stay encrypted with the workspace, bounded to 50 results, 200 additional
+path transactions and 2 MiB. If path evidence cannot be retained, it remains
+available to add during the current session. Explored transactions and frontiers
+are not saved. Results, path steps and actions stack within the sidebar width.
 
 Cancel, closing the Scan tab, changing workbenches, switching workspaces or locking
 stops active work. Interrupted records restore as interrupted; reopening never

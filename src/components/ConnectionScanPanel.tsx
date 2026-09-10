@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, GitBranch, Square, TriangleAlert, X } from 'lucide-react';
+import { Check, GitBranch, Square, TriangleAlert } from 'lucide-react';
 import { short, type Transaction, type Workspace } from '../domain/types';
 import {
   DEFAULT_SCAN_SETTINGS,
@@ -9,13 +9,7 @@ import {
   type ScanSettings,
   type ScanStopReason,
 } from '../domain/connectionScan';
-import {
-  appendScanRun,
-  clearScanRuns,
-  dismissScanResult,
-  prepareScanPath,
-  removeScanRun,
-} from '../domain/connectionScanRecords';
+import { replaceScanRun, clearScanRuns, prepareScanPath } from '../domain/connectionScanRecords';
 import { runConnectionScanInWorker } from '../lib/connectionScanRunner';
 import type { TransactionFetchScope } from '../lib/transactionScheduler';
 import { traceSourceExists } from '../lib/tracing';
@@ -53,13 +47,11 @@ type Props = {
 /** A run owns its source and targets. Selection only supplies an explicit new run. */
 export function ConnectionScanPanel(props: Props) {
   const { workspace, selectionId, active, scope, canQuery, onChange, onSelect } = props;
-  const [settings, setSettings] = useState<ScanSettings>({ ...DEFAULT_SCAN_SETTINGS });
-  const [selectedRunId, setSelectedRunId] = useState<string>();
+  const [settings, setSettings] = useState<ScanSettings>(() => ({
+    ...(workspace.connectionScans?.runs.at(-1)?.settings ?? DEFAULT_SCAN_SETTINGS),
+  }));
   const [liveRun, setLiveRun] = useState<ScanRun>();
-  const [pendingSave, setPendingSave] = useState<{
-    run: ScanRun;
-    evidence: Record<string, Transaction>;
-  }>();
+  const [transientEvidence, setTransientEvidence] = useState<Record<string, Transaction>>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'connection' | 'boundary'>('all');
@@ -68,22 +60,12 @@ export function ConnectionScanPanel(props: Props) {
   const current = useRef(props);
   current.current = props;
   const runs = workspace.connectionScans?.runs ?? [];
-  const selectedRun = runs.find((run) => run.id === selectedRunId);
-  const run = liveRun?.id === selectedRunId ? liveRun : selectedRun;
+  const run = liveRun ?? runs.at(-1);
   const source = run?.source ?? selectionId;
   const savedSpenders = useMemo(
     () => indexLoadedSpends(workspace.connectionScans?.evidence ?? {}),
     [workspace.connectionScans?.evidence],
   );
-  const groups = useMemo(() => {
-    const grouped = new Map<string, ScanRun[]>();
-    for (const item of [...runs].reverse()) {
-      const group = grouped.get(item.source) ?? [];
-      group.push(item);
-      grouped.set(item.source, group);
-    }
-    return [...grouped];
-  }, [workspace.connectionScans?.runs]);
 
   useEffect(() => {
     mounted.current = true;
@@ -96,30 +78,41 @@ export function ConnectionScanPanel(props: Props) {
     if (!active) controller.current?.abort();
   }, [active]);
 
-  function saveResult(
-    result: { run: ScanRun; evidence: Record<string, Transaction> },
-    requireExisting = false,
-  ) {
+  function clearResults() {
+    controller.current?.abort();
+    controller.current = undefined;
+    setBusy(false);
+    setLiveRun(undefined);
+    setTransientEvidence(undefined);
+    setError('');
+    setFilter('all');
+    onChange(clearScanRuns, false);
+  }
+
+  function retainResult(result: { run: ScanRun; evidence: Record<string, Transaction> }) {
+    setLiveRun(result.run);
     try {
-      onChange((w) => {
-        if (requireExisting && !w.connectionScans?.runs.some((row) => row.id === result.run.id))
-          throw new Error('The scan record was removed. Retry saving to keep these results.');
-        return appendScanRun(w, result.run, result.evidence);
-      }, false);
-      setSelectedRunId(result.run.id);
-      setLiveRun(result.run);
-      setPendingSave(undefined);
+      onChange((w) => replaceScanRun(w, result.run, result.evidence), false);
+      setTransientEvidence(undefined);
       setError('');
-    } catch (cause) {
-      setPendingSave(result);
-      setError(cause instanceof Error ? cause.message : 'Scan record could not be saved.');
+    } catch {
+      // Results remain usable in this session even if their evidence exceeds storage bounds.
+      setTransientEvidence(result.evidence);
+      try {
+        onChange((w) => replaceScanRun(w, result.run), false);
+      } catch {
+        // The inline error also covers unavailable workspace storage or validation.
+      }
+      setError(
+        'Some path evidence could not be retained. Add the path now or scan again after reopening.',
+      );
     }
   }
 
-  async function start(startSource: string | undefined, previous?: ScanRun) {
-    if (!eligible(startSource) || busy || controller.current || pendingSave) return;
+  async function start(startSource: string | undefined) {
+    if (!eligible(startSource) || busy || controller.current) return;
     setError('');
-    const frozenSettings = { ...(previous?.settings ?? settings) };
+    const frozenSettings = { ...settings };
     for (const [key, label, maximum] of [
       ['maxHops', 'Max transaction hops', SCAN_LIMITS.maxHops],
       ['maxTransactions', 'Transactions examined', SCAN_LIMITS.maxTransactions],
@@ -137,11 +130,10 @@ export function ConnectionScanPanel(props: Props) {
     }
     const targetIds = [
       ...new Set(
-        previous?.targetIds ??
-          (frozenSettings.targetScope === 'visible'
-            ? props.visibleNodeIds
-            : props.addedNodeIds
-          ).filter((id) => eligible(id) && id !== startSource),
+        (frozenSettings.targetScope === 'visible'
+          ? props.visibleNodeIds
+          : props.addedNodeIds
+        ).filter((id) => eligible(id) && id !== startSource),
       ),
     ];
     if (targetIds.length > SCAN_LIMITS.maxTargets) {
@@ -168,7 +160,7 @@ export function ConnectionScanPanel(props: Props) {
       results: [],
     };
     try {
-      onChange((w) => appendScanRun(w, initial), false);
+      onChange((w) => replaceScanRun(w, initial), false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Scan could not start.');
       return;
@@ -177,7 +169,7 @@ export function ConnectionScanPanel(props: Props) {
     controller.current = abort;
     setBusy(true);
     setSettings(frozenSettings);
-    setSelectedRunId(initial.id);
+    setTransientEvidence(undefined);
     setLiveRun(initial);
     setFilter('all');
     try {
@@ -208,7 +200,7 @@ export function ConnectionScanPanel(props: Props) {
       });
       if (!mounted.current || controller.current !== abort || !current.current.isCurrent()) return;
       setLiveRun(result.run);
-      saveResult(result, true);
+      retainResult(result);
     } catch {
       if (!mounted.current || controller.current !== abort || !current.current.isCurrent()) return;
       const failed: ScanRun = {
@@ -217,7 +209,7 @@ export function ConnectionScanPanel(props: Props) {
         stopReasons: [abort.signal.aborted ? 'cancelled' : 'failure'],
       };
       setLiveRun(failed);
-      saveResult({ run: failed, evidence: {} }, true);
+      retainResult({ run: failed, evidence: {} });
       if (!abort.signal.aborted)
         setError('Scan could not finish. Retry when evidence is available.');
     } finally {
@@ -233,7 +225,7 @@ export function ConnectionScanPanel(props: Props) {
   return (
     <div className="connection-scan" hidden={!active}>
       <section className="panel-section">
-        <div className="scan-source">
+        <div className="connection-scan-source">
           <span className="muted">From</span>
           <strong title={source}>
             {source && eligible(source)
@@ -256,7 +248,7 @@ export function ConnectionScanPanel(props: Props) {
             void start(source);
           }}
         >
-          <fieldset disabled={busy} className="scan-fields">
+          <fieldset disabled={busy} className="connection-scan-fields">
             <label>
               Direction
               <select
@@ -301,7 +293,7 @@ export function ConnectionScanPanel(props: Props) {
                 }
               />
             </label>
-            <details className="scan-advanced">
+            <details className="connection-scan-advanced">
               <summary>Advanced limits</summary>
               <label>
                 Transactions examined
@@ -344,28 +336,20 @@ export function ConnectionScanPanel(props: Props) {
               </label>
             </details>
           </fieldset>
-          <div className="scan-actions">
+          <div className="connection-scan-actions">
             {busy ? (
               <button type="button" onClick={() => controller.current?.abort()}>
                 <Square size={13} />
                 Cancel
               </button>
             ) : (
-              <button
-                className="primary"
-                disabled={!eligible(source) || !!pendingSave}
-                type="submit"
-              >
+              <button className="primary" disabled={!eligible(source)} type="submit">
                 <GitBranch size={15} />
                 Scan
               </button>
             )}
             {eligible(selectionId) && selectionId !== source && (
-              <button
-                type="button"
-                disabled={busy || !!pendingSave}
-                onClick={() => void start(selectionId)}
-              >
+              <button type="button" disabled={busy} onClick={() => void start(selectionId)}>
                 Scan current selection
               </button>
             )}
@@ -373,27 +357,14 @@ export function ConnectionScanPanel(props: Props) {
         </form>
         {!canQuery && <p className="small muted">Offline: loaded evidence only.</p>}
         {error && (
-          <p className="scan-error" role="alert">
+          <p className="connection-scan-error" role="alert">
             {error}
           </p>
         )}
-        {pendingSave && (
-          <div className="scan-actions">
-            <button onClick={() => saveResult(pendingSave)}>Retry saving record</button>
-            <button
-              onClick={() => {
-                setPendingSave(undefined);
-                setError('');
-              }}
-            >
-              Discard unsaved record
-            </button>
-          </div>
-        )}
       </section>
       {run && (
-        <section className="panel-section scan-results" aria-label="Scan results">
-          <div className="scan-status" role="status" aria-live="polite">
+        <section className="panel-section connection-scan-results" aria-label="Scan results">
+          <div className="connection-scan-status" role="status" aria-live="polite">
             <strong>
               {busy
                 ? 'Scanning'
@@ -421,7 +392,10 @@ export function ConnectionScanPanel(props: Props) {
           {!busy && !run.results.some((item) => item.kind === 'connection') && (
             <p className="small muted">No connection found within these limits.</p>
           )}
-          <label className="scan-result-filter">
+          <button className="text-button connection-scan-clear" onClick={clearResults}>
+            Clear all results
+          </button>
+          <label className="connection-scan-result-filter">
             Results
             <select
               value={filter}
@@ -440,14 +414,14 @@ export function ConnectionScanPanel(props: Props) {
             <ScanResultRow
               key={`${run.id}:${result.id}`}
               workspace={
-                pendingSave
+                transientEvidence
                   ? {
                       ...workspace,
                       connectionScans: {
                         runs,
                         evidence: {
                           ...workspace.connectionScans?.evidence,
-                          ...pendingSave.evidence,
+                          ...transientEvidence,
                         },
                       },
                     }
@@ -456,102 +430,12 @@ export function ConnectionScanPanel(props: Props) {
               result={result}
               visibleNodeIds={props.visibleNodeIds}
               onSelect={onSelect}
-              onAdd={(row, length) => props.onAdd(row, length, pendingSave?.evidence)}
-              onDismiss={() => {
-                onChange((w) => dismissScanResult(w, run.id, result.id), false);
-                setLiveRun((value) =>
-                  value?.id === run.id
-                    ? {
-                        ...value,
-                        results: value.results.map((row) =>
-                          row.id === result.id ? { ...row, dismissed: true } : row,
-                        ),
-                      }
-                    : value,
-                );
-                setPendingSave((value) =>
-                  value?.run.id === run.id
-                    ? {
-                        ...value,
-                        run: {
-                          ...value.run,
-                          results: value.run.results.map((row) =>
-                            row.id === result.id ? { ...row, dismissed: true } : row,
-                          ),
-                        },
-                      }
-                    : value,
-                );
-              }}
+              onAdd={(row, length) => props.onAdd(row, length, transientEvidence)}
             />
           ))}
           {!shownResults.length && results.length > 0 && (
             <p className="small muted">No results match this filter.</p>
           )}
-        </section>
-      )}
-      {!!runs.length && (
-        <section className="panel-section scan-history">
-          <div className="scan-status">
-            <h3>Previous scans</h3>
-            <button
-              className="text-button"
-              disabled={busy}
-              onClick={() => {
-                onChange(clearScanRuns, false);
-                setSelectedRunId(undefined);
-                if (!pendingSave) setLiveRun(undefined);
-              }}
-            >
-              Clear records
-            </button>
-          </div>
-          {groups.map(([groupSource, items]) => (
-            <details key={groupSource} open={source === groupSource}>
-              <summary title={groupSource}>
-                {nameFor(workspace, groupSource)} <span className="muted">({items.length})</span>
-              </summary>
-              {items.map((item) => (
-                <div className="scan-history-row" key={item.id}>
-                  <button
-                    className="text-button"
-                    aria-pressed={item.id === selectedRunId}
-                    disabled={busy}
-                    onClick={() => {
-                      setSelectedRunId(item.id);
-                      setLiveRun(undefined);
-                      setSettings({ ...item.settings });
-                    }}
-                  >
-                    {new Date(item.startedAt).toLocaleString()} ·{' '}
-                    {item.results.filter((row) => !row.dismissed).length} results
-                  </button>
-                  <button
-                    className="text-button"
-                    disabled={busy || !!pendingSave}
-                    onClick={() => void start(item.source, item)}
-                  >
-                    Rerun
-                  </button>
-                  <button
-                    className="scan-icon-button"
-                    aria-label={`Remove scan from ${new Date(item.startedAt).toLocaleString()}`}
-                    disabled={busy}
-                    onClick={() => {
-                      onChange((w) => removeScanRun(w, item.id), false);
-                      if (item.id === selectedRunId) {
-                        setSelectedRunId(undefined);
-                        setLiveRun(undefined);
-                      }
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </details>
-          ))}
-          <p className="small muted">Clearing records keeps added paths and annotations.</p>
         </section>
       )}
     </div>
@@ -564,14 +448,12 @@ function ScanResultRow({
   visibleNodeIds,
   onSelect,
   onAdd,
-  onDismiss,
 }: {
   workspace: Workspace;
   result: ScanResult;
   visibleNodeIds: string[];
   onSelect: (id: string) => void;
   onAdd: (result: ScanResult, prefixLength: number) => void;
-  onDismiss: () => void;
 }) {
   const [prefixLength, setPrefixLength] = useState(result.path.length);
   const [error, setError] = useState('');
@@ -600,29 +482,26 @@ function ScanResultRow({
   const obscured = plan.nodeIds.some((id) => !visible.has(id) && !plan.newNodeIds.includes(id));
   return (
     <details
-      className={`scan-result ${connection ? 'is-connection' : result.reason === 'failure' ? 'is-failure' : 'is-boundary'}`}
+      className={`connection-scan-result ${connection ? 'is-connection' : result.reason === 'failure' ? 'is-failure' : 'is-boundary'}`}
     >
       <summary>
         {connection ? <Check size={15} /> : <TriangleAlert size={15} />}
         <span>
           <strong>{title}</strong>
           <span title={result.endpoint}>{nameFor(workspace, result.endpoint)}</span>
+          <small>{result.hops} transaction hops</small>
         </span>
-        <small>{result.hops} hops</small>
       </summary>
-      <div className="scan-result-detail">
+      <div className="connection-scan-result-detail">
         {connection && fullPlan.newNodeIds.includes(result.endpoint) && (
           <p className="small muted">Endpoint removed from graph. Add path restores it.</p>
         )}
-        <div className="scan-actions">
+        <div className="connection-scan-actions">
           <button
             disabled={!traceSourceExists(workspace, result.endpoint)}
             onClick={() => onSelect(result.endpoint)}
           >
             Select endpoint
-          </button>
-          <button className="text-button" onClick={onDismiss}>
-            Dismiss
           </button>
         </div>
         {(result.path.length > 5 || fullPlan.missingTxids.length > 0) && result.path.length > 1 && (
@@ -640,11 +519,11 @@ function ScanResultRow({
             </select>
           </label>
         )}
-        <ol className="scan-path">
+        <ol className="connection-scan-path">
           {result.path.slice(0, prefixLength).map((id, index) => (
             <li key={`${id}:${index}`} title={id}>
               <span aria-label={index ? result.directions[index - 1] : 'Source'}>
-                {index ? (result.directions[index - 1] === 'upstream' ? '←' : '→') : '●'}
+                {index ? (result.directions[index - 1] === 'upstream' ? '↑' : '↓') : '●'}
               </span>
               <span>{nameFor(workspace, id)}</span>
               {plan.newNodeIds.includes(id) && <small>New</small>}
@@ -658,7 +537,9 @@ function ScanResultRow({
           </p>
         )}
         {plan.missingTxids.length > 0 ? (
-          <p className="small scan-error">Path evidence must be reloaded before adding.</p>
+          <p className="small connection-scan-error">
+            Path evidence must be reloaded before adding.
+          </p>
         ) : (
           <button
             onClick={() => {
@@ -677,7 +558,7 @@ function ScanResultRow({
           <p className="small muted">Adding reveals hidden nodes and resets graph filters.</p>
         )}
         {error && (
-          <p className="scan-error" role="alert">
+          <p className="connection-scan-error" role="alert">
             {error}
           </p>
         )}

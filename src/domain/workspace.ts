@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   assertConnectionScanBudget,
   connectionScansSchema,
+  latestConnectionScanRecords,
   validateConnectionScanRecords,
 } from './connectionScanRecords';
 import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
@@ -479,7 +480,11 @@ export function validateTransactionAddresses(transaction: Transaction, network: 
 export function parseTransaction(data: unknown): Transaction {
   return transactionSchema.parse(data);
 }
-export function parseWorkspace(data: unknown, verifyDerivation = true): Workspace {
+export function parseWorkspace(
+  data: unknown,
+  verifyDerivation = true,
+  restoreRunningScans = true,
+): Workspace {
   const migrated = migrateWorkspace(data);
   assertWorkspaceBudget(migrated, true);
   const parsed = workspaceSchema.parse(migrated);
@@ -521,9 +526,11 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
     for (const transaction of Object.values(parsed.connectionScans.evidence))
       validateTransactionAddresses(transaction, parsed.network);
     validateConnectionScanRecords(parsed.connectionScans, parsed);
-    parsed.connectionScans.runs = parsed.connectionScans.runs.map((run) =>
-      run.status === 'running' ? { ...run, status: 'interrupted' as const } : run,
-    );
+    parsed.connectionScans = latestConnectionScanRecords(parsed);
+    if (restoreRunningScans && parsed.connectionScans)
+      parsed.connectionScans.runs = parsed.connectionScans.runs.map((run) =>
+        run.status === 'running' ? { ...run, status: 'interrupted' as const } : run,
+      );
   }
   const walletIds = new Set<string>();
   for (const wallet of parsed.wallets) {

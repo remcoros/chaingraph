@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
 import {
   addScanPath,
-  appendScanRun,
+  replaceScanRun,
   assertConnectionScanBudget,
   clearScanRuns,
   dismissScanResult,
   prepareScanPath,
-  removeScanRun,
 } from '../src/domain/connectionScanRecords';
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import { projectGraphMembership } from '../src/domain/graphMembership';
-import type { Transaction } from '../src/domain/types';
+import type { Transaction, Workspace } from '../src/domain/types';
 import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import { decryptWorkspace } from '../src/lib/crypto';
 import {
   validateAndEncryptWorkspace,
   decryptAndValidateWorkspace,
@@ -58,7 +58,7 @@ describe('compact connection scan records', () => {
   it('encrypts a compact round trip and restores running records without altering a save input', async () => {
     const { workspace, run, evidence } = fixture();
     run.status = 'running';
-    const next = appendScanRun(workspace, run, evidence);
+    const next = replaceScanRun(workspace, run, evidence);
     next.view.rightTab = 'scan';
     const encrypted = await validateAndEncryptWorkspace(next, 'public fixture password');
     expect(JSON.stringify(encrypted)).not.toContain(run.source);
@@ -70,13 +70,84 @@ describe('compact connection scan records', () => {
     expect(restored.transactions).toEqual(workspace.transactions);
   });
 
-  it('shares only supporting evidence across runs, and drops unrelated exploration', () => {
+  it('replaces the latest results and prunes all evidence from the previous scan', () => {
     const { workspace, run, evidence } = fixture();
-    const saved = appendScanRun(workspace, run, { ...evidence, [id(8)]: transaction(8) });
-    const twice = appendScanRun(saved, { ...run, id: 'second' }, evidence);
-    expect(Object.keys(twice.connectionScans!.evidence)).toEqual([id(2), id(3)]);
-    expect(removeScanRun(twice, run.id).connectionScans!.evidence).toEqual(evidence);
-    expect(removeScanRun(saved, run.id).connectionScans).toBeUndefined();
+    const saved = replaceScanRun(workspace, run, { ...evidence, [id(8)]: transaction(8) });
+    const latest: ScanRun = {
+      ...run,
+      id: 'latest',
+      source: tn(8),
+      targetIds: [],
+      results: [
+        {
+          id: 'latest:1',
+          kind: 'boundary',
+          endpoint: tn(8),
+          path: [tn(8)],
+          directions: [],
+          hops: 0,
+          reason: 'depth',
+        },
+      ],
+    };
+    const replaced = replaceScanRun(saved, latest, { [id(8)]: transaction(8) });
+    expect(replaced.connectionScans!.runs).toEqual([latest]);
+    expect(Object.keys(replaced.connectionScans!.evidence)).toEqual([id(8)]);
+    expect(saved.connectionScans!.runs).toEqual([run]);
+    expect(replaced.transactions).toBe(workspace.transactions);
+    const started = replaceScanRun(replaced, {
+      ...run,
+      id: 'next',
+      status: 'running',
+      results: [],
+    });
+    expect(started.connectionScans!.runs).toHaveLength(1);
+    expect(started.connectionScans!.evidence).toEqual({});
+  });
+
+  it('validates all legacy runs before keeping the final result and encrypts that normalization', async () => {
+    const { workspace, run, evidence } = fixture();
+    const latest: ScanRun = {
+      ...run,
+      id: 'latest',
+      status: 'running',
+      source: tn(8),
+      targetIds: [],
+      results: [
+        {
+          id: 'latest:1',
+          kind: 'boundary',
+          endpoint: tn(8),
+          path: [tn(8)],
+          directions: [],
+          hops: 0,
+          reason: 'depth',
+        },
+      ],
+    };
+    const legacy = {
+      ...workspace,
+      connectionScans: { runs: [run, latest], evidence: { ...evidence, [id(8)]: transaction(8) } },
+    };
+    const parsed = parseWorkspace(legacy);
+    expect(parsed.connectionScans!.runs).toEqual([{ ...latest, status: 'interrupted' }]);
+    expect(Object.keys(parsed.connectionScans!.evidence)).toEqual([id(8)]);
+    const encrypted = await validateAndEncryptWorkspace(legacy, 'public fixture password');
+    const serialized = (await decryptWorkspace(encrypted, 'public fixture password')) as Workspace;
+    expect(serialized.connectionScans!.runs).toEqual([latest]);
+    expect(Object.keys(serialized.connectionScans!.evidence)).toEqual([id(8)]);
+    const restored = await decryptAndValidateWorkspace(encrypted, 'public fixture password');
+    expect(restored).toEqual(parsed);
+    expect(legacy.connectionScans.runs).toHaveLength(2);
+    expect(legacy.connectionScans.runs[1].status).toBe('running');
+    const malformed = {
+      ...legacy,
+      connectionScans: {
+        ...legacy.connectionScans,
+        runs: [{ ...run, results: [{ ...run.results[0], hops: 0 }] }, latest],
+      },
+    };
+    expect(() => parseWorkspace(malformed)).toThrow('invalid source, endpoint or path');
   });
 
   it('adds an exact path or explicit prefix, reveals nodes, and preserves camera and annotations', () => {
@@ -85,7 +156,7 @@ describe('compact connection scan records', () => {
     workspace.view.hiddenNodeIds = [tn(3)];
     workspace.view.filters = { kind: 'address' };
     workspace.view.smallAmountThreshold = 500;
-    const saved = appendScanRun(workspace, run, evidence);
+    const saved = replaceScanRun(workspace, run, evidence);
     expect(prepareScanPath(saved, result).newNodeIds).toEqual([out(1), tn(2), out(2)]);
     const prefix = addScanPath(saved, result, 3);
     expect(prefix.view.graphNodeIds).toEqual([tn(1), tn(3), out(1), tn(2)]);
@@ -110,20 +181,22 @@ describe('compact connection scan records', () => {
   it('promotes scoped evidence so accepted edges are actually rendered without adding siblings', () => {
     const { workspace, result, run, evidence } = fixture();
     workspace.inputContext = { [id(1)]: [1] };
-    const added = addScanPath(appendScanRun(workspace, run, evidence), result);
+    const added = addScanPath(replaceScanRun(workspace, run, evidence), result);
     const graph = projectGraphMembership(buildGraph(added), added.view.graphNodeIds);
     expect(graph.nodes.map((node) => node.id).sort()).toEqual([...result.path].sort());
     expect(graph.links).toHaveLength(4);
     expect(() => parseWorkspace(added)).not.toThrow();
   });
 
-  it('keeps dismissal local to its run and clearing independent from graph actions', () => {
+  it('dismisses current results and clearing leaves graph actions intact', () => {
     const { workspace, run, result, evidence } = fixture();
-    const saved = appendScanRun(appendScanRun(workspace, run, evidence), { ...run, id: 'second' });
+    const saved = replaceScanRun(workspace, run, evidence);
     const dismissed = dismissScanResult(saved, run.id, result.id);
     expect(dismissed.connectionScans!.runs[0].results[0].dismissed).toBe(true);
-    expect(dismissed.connectionScans!.runs[1].results[0].dismissed).toBeUndefined();
+    expect(saved.connectionScans!.runs[0].results[0].dismissed).toBeUndefined();
+    expect(dismissScanResult(saved, 'past-run', result.id)).toBe(saved);
     expect(clearScanRuns(dismissed).view.graphNodeIds).toEqual(workspace.view.graphNodeIds);
+    expect(clearScanRuns(dismissed).connectionScans).toBeUndefined();
   });
 
   it('adds a boundary path in one undo action and preserves later presentation changes', () => {
@@ -138,7 +211,7 @@ describe('compact connection scan records', () => {
       directions: result.directions.slice(0, 2),
       hops: 1,
     };
-    const saved = appendScanRun(workspace, { ...run, results: [boundary] }, evidence);
+    const saved = replaceScanRun(workspace, { ...run, results: [boundary] }, evidence);
     const store = new WorkspaceSessionStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
@@ -159,9 +232,41 @@ describe('compact connection scan records', () => {
     expect(() => parseWorkspace(restored)).not.toThrow();
   });
 
+  it('does not resurrect earlier results when undoing an annotation after replacement or clear', () => {
+    const { workspace, run, evidence } = fixture();
+    const saved = replaceScanRun(workspace, run, evidence);
+    const store = new WorkspaceSessionStore({
+      storage: { getItem: () => null, setItem: () => {} },
+    });
+    store.open(saved, 'public fixture password');
+    const edit = (label: string) =>
+      store.update(saved.id, (current) => ({
+        ...current,
+        annotations: {
+          ...current.annotations,
+          [run.source]: { label, note: '', icon: '', bookmarked: false },
+        },
+      }));
+    edit('First annotation');
+    store.update(
+      saved.id,
+      (current) => replaceScanRun(current, { ...run, id: 'latest' }, evidence),
+      false,
+    );
+    store.undo(saved.id);
+    expect(store.getSession(saved.id)!.data.connectionScans?.runs.map((item) => item.id)).toEqual([
+      'latest',
+    ]);
+    edit('Second annotation');
+    store.update(saved.id, clearScanRuns, false);
+    store.undo(saved.id);
+    expect(store.getSession(saved.id)!.data.connectionScans).toBeUndefined();
+    expect(store.getSession(saved.id)!.data.view.graphNodeIds).toEqual(saved.view.graphNodeIds);
+  });
+
   it('retains honest missing-evidence results but blocks adding an unverified path', () => {
     const { workspace, run, result } = fixture();
-    const saved = appendScanRun(workspace, run);
+    const saved = replaceScanRun(workspace, run);
     expect(() => parseWorkspace(saved)).not.toThrow();
     expect(prepareScanPath(saved, result).missingTxids).toEqual([id(2), id(3)]);
     expect(() => addScanPath(saved, result)).toThrow('evidence is missing');
@@ -171,7 +276,7 @@ describe('compact connection scan records', () => {
     'rejects transient/unknown scan fields: %j',
     (extra) => {
       const { workspace, run, evidence } = fixture();
-      const saved = appendScanRun(workspace, run, evidence);
+      const saved = replaceScanRun(workspace, run, evidence);
       expect(() =>
         parseWorkspace({ ...saved, connectionScans: { ...saved.connectionScans, ...extra } }),
       ).toThrow();
@@ -195,16 +300,16 @@ describe('compact connection scan records', () => {
       { path: [tn(1), out(1), tn(1)] },
     ])
       expect(() =>
-        appendScanRun(
+        replaceScanRun(
           workspace,
           { ...run, results: [{ ...result, ...patch } as ScanResult] },
           evidence,
         ),
       ).toThrow();
     expect(() =>
-      appendScanRun(workspace, run, { ...evidence, [id(3)]: transaction(3, 7) }),
+      replaceScanRun(workspace, run, { ...evidence, [id(3)]: transaction(3, 7) }),
     ).toThrow('not supported');
-    expect(() => appendScanRun(workspace, { ...run, examined: 201 }, evidence)).toThrow(
+    expect(() => replaceScanRun(workspace, { ...run, examined: 201 }, evidence)).toThrow(
       'transaction count',
     );
   });
@@ -228,7 +333,7 @@ describe('compact connection scan records', () => {
     };
     expect(() =>
       parseWorkspace(
-        appendScanRun(workspace, { ...run, source: tn(2), results: [result] }, evidence),
+        replaceScanRun(workspace, { ...run, source: tn(2), results: [result] }, evidence),
       ),
     ).not.toThrow();
     const spend = {
@@ -247,7 +352,7 @@ describe('compact connection scan records', () => {
     };
     expect(() =>
       parseWorkspace(
-        appendScanRun(
+        replaceScanRun(
           workspace,
           { ...run, source: tn(2), results: [descendant] },
           { ...evidence, [id(4)]: spend },
@@ -258,9 +363,12 @@ describe('compact connection scan records', () => {
 
   it('rejects count and byte overflows with actionable errors', () => {
     const { workspace, run } = fixture();
-    let saved = workspace;
-    for (let n = 0; n < 20; n++) saved = appendScanRun(saved, { ...run, id: `run${n}` });
-    expect(() => appendScanRun(saved, { ...run, id: 'overflow' })).toThrow('20 runs');
+    expect(() =>
+      assertConnectionScanBudget({
+        runs: Array.from({ length: 21 }, (_, n) => ({ ...run, id: `run${n}` })),
+        evidence: {},
+      }),
+    ).toThrow('20-run import limit');
     expect(() =>
       assertConnectionScanBudget({
         runs: [],
@@ -271,7 +379,7 @@ describe('compact connection scan records', () => {
       assertConnectionScanBudget({ runs: [], evidence: { data: 'x'.repeat(2 * 1024 * 1024) } }),
     ).toThrow('2 MiB');
     expect(() =>
-      appendScanRun(workspace, {
+      replaceScanRun(workspace, {
         ...run,
         results: Array.from({ length: 51 }, (_, n) => ({ ...run.results[0], id: String(n) })),
       }),

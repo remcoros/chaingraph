@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { indexGraphFlow } from '../src/components/graph/flowContext';
 import { DEFAULT_SCAN_SETTINGS, runConnectionScan } from '../src/domain/connectionScan';
-import { addScanPath, appendScanRun, clearScanRuns } from '../src/domain/connectionScanRecords';
+import { addScanPath, replaceScanRun, clearScanRuns } from '../src/domain/connectionScanRecords';
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import type { Transaction } from '../src/domain/types';
 import { createConnectionScanFetch } from '../src/lib/connectionScanFetch';
@@ -62,7 +62,7 @@ describe('connection scan module integration', () => {
       const result = run.results.find((result) => result.relationship === relationship);
       expect(result).toBeDefined();
       expect(run.examined).toBeLessThanOrEqual(run.settings.maxTransactions);
-      const saved = parseWorkspace(appendScanRun(workspace, run, adapter.evidence));
+      const saved = parseWorkspace(replaceScanRun(workspace, run, adapter.evidence));
       expect(saved.transactions).toEqual(workspace.transactions);
       expect(saved.connectionScans?.evidence[id(9)]).toBeUndefined();
       const added = parseWorkspace(addScanPath(saved, result!));

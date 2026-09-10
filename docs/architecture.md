@@ -260,20 +260,27 @@ before dispatch. Workspace schema v3 migrates v2 membership without reseeding it
 worker validation restores running markers as interrupted, never as jobs.
 The existing encrypted envelope format remains unchanged.
 
-`domain/connectionScanRecords.ts` bounds encrypted records to 20 runs, 50 results
-per run, 200 extra path transactions and 2 MiB for all scan data. Run fields are
+`domain/connectionScanRecords.ts` retains only the latest run, bounded to 50
+results, 200 extra path transactions and 2 MiB. A new scan replaces the previous
+results and releases their evidence. Legacy arrays of up to 20 runs validate
+before normalization to the final run; encrypted saves write that normalized
+state. There is no history picker, manual save/restore or rerun archive. Run fields are
 strictly validated. Path direction, observed edges, network addresses and prevout
 consistency are validated at the existing encryption-worker boundary. Shared
 evidence is retained only for saved result paths and reused from normal workspace
 observations where present. Frontier queues, visited maps and transport state
 cannot enter the record schema. UI-time edits check compact limits; full workspace
 validation remains off the UI thread. Missing evidence is explicit at Add path.
-There is no automatic scan resumption or retention eviction.
+There is no automatic scan resumption. Clear all results cancels active work and
+clears the retained result set. Replacement and clearing carry through undo
+snapshots so an unrelated edit undo cannot restore an older scan.
 
 Accepting a complete path or explicit prefix merges only supporting transactions
 and calls existing graph membership APIs once, producing one Undo step. It reveals
 those nodes, resets graph filters, and preserves annotations and camera geometry.
-Clearing scan records does not remove accepted nodes or annotations. Scan details
+Sidebar controls and results use their own CSS namespace and a vertical layout,
+independent of the Analysis workbench's two-column results. Clearing the latest
+results does not remove accepted nodes or annotations. Scan details
 never enter the public saved-workspace index.
 
 ## Analysis extension point

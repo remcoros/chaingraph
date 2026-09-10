@@ -10,6 +10,7 @@ import { clearContextProvenance } from './workspace';
 export const MAX_SCAN_EVIDENCE_TRANSACTIONS = 200;
 export const MAX_SCAN_RECORD_BYTES = 2 * 1024 * 1024;
 export interface ConnectionScanRecords {
+  /** One latest run. Arrays remain readable for compatibility with earlier workspaces. */
   runs: ScanRun[];
   evidence: Record<string, Transaction>;
 }
@@ -83,7 +84,7 @@ export function assertConnectionScanBudget(data: unknown, checkBytes = true): vo
   if (!data || typeof data !== 'object') return;
   const raw = data as { runs?: unknown; evidence?: unknown };
   if (Array.isArray(raw.runs) && raw.runs.length > SCAN_LIMITS.maxRuns)
-    throw new Error('Scan storage holds at most 20 runs. Remove a previous scan and retry.');
+    throw new Error('Legacy scan records exceed the 20-run import limit.');
   if (Array.isArray(raw.runs)) {
     for (const run of raw.runs) {
       if (!run || typeof run !== 'object') continue;
@@ -98,14 +99,12 @@ export function assertConnectionScanBudget(data: unknown, checkBytes = true): vo
     typeof raw.evidence === 'object' &&
     Object.keys(raw.evidence).length > MAX_SCAN_EVIDENCE_TRANSACTIONS
   )
-    throw new Error(
-      'Scan storage holds at most 200 path transactions. Remove a previous scan and retry.',
-    );
+    throw new Error('Scan results exceed 200 path transactions. Reduce the scan limits and retry.');
   if (
     checkBytes &&
     new TextEncoder().encode(JSON.stringify(data)).byteLength > MAX_SCAN_RECORD_BYTES
   )
-    throw new Error('Scan records exceed 2 MiB. Remove a previous scan and retry.');
+    throw new Error('Scan results exceed 2 MiB. Reduce the scan limits and retry.');
 }
 
 function transactionId(id: string) {
@@ -226,6 +225,7 @@ function compactRecords(
   runs: ScanRun[],
   supplied: Record<string, Transaction> = {},
 ): ConnectionScanRecords {
+  runs = runs.slice(-1);
   const available = { ...workspace.connectionScans?.evidence, ...supplied };
   const needed = new Set(
     runs.flatMap((run) => run.results.flatMap((result) => [...requiredEvidence(result)])),
@@ -240,26 +240,24 @@ function compactRecords(
   return records;
 }
 
-export function appendScanRun(
+/** Every new scan replaces the latest results; only its supporting evidence survives. */
+export function replaceScanRun(
   workspace: Workspace,
   run: ScanRun,
   evidence: Record<string, Transaction> = {},
 ): Workspace {
   scanRunSchema.parse(run);
-  const previous = workspace.connectionScans?.runs ?? [];
-  const exists = previous.some((item) => item.id === run.id);
-  const runs = exists
-    ? previous.map((item) => (item.id === run.id ? run : item))
-    : [...previous, run];
-  const records = compactRecords(workspace, runs, evidence);
+  const records = compactRecords(workspace, [run], evidence);
   validateConnectionScanRecords(records, workspace, false);
   return { ...workspace, connectionScans: records };
 }
-export function removeScanRun(workspace: Workspace, id: string): Workspace {
-  const runs = workspace.connectionScans?.runs.filter((run) => run.id !== id);
-  return runs
-    ? { ...workspace, connectionScans: runs.length ? compactRecords(workspace, runs) : undefined }
-    : workspace;
+
+/** Call after validating all imported records, including those being discarded. */
+export function latestConnectionScanRecords(
+  workspace: Workspace,
+): ConnectionScanRecords | undefined {
+  const latest = workspace.connectionScans?.runs.at(-1);
+  return latest ? compactRecords(workspace, [latest]) : undefined;
 }
 export function clearScanRuns(workspace: Workspace): Workspace {
   return workspace.connectionScans ? { ...workspace, connectionScans: undefined } : workspace;
@@ -269,23 +267,15 @@ export function dismissScanResult(
   runId: string,
   resultId: string,
 ): Workspace {
-  if (!workspace.connectionScans) return workspace;
-  return {
-    ...workspace,
-    connectionScans: {
-      ...workspace.connectionScans,
-      runs: workspace.connectionScans.runs.map((run) =>
-        run.id === runId
-          ? {
-              ...run,
-              results: run.results.map((result) =>
-                result.id === resultId ? { ...result, dismissed: true } : result,
-              ),
-            }
-          : run,
-      ),
-    },
+  const latest = workspace.connectionScans?.runs.at(-1);
+  if (!latest || latest.id !== runId) return workspace;
+  const run = {
+    ...latest,
+    results: latest.results.map((result) =>
+      result.id === resultId ? { ...result, dismissed: true } : result,
+    ),
   };
+  return { ...workspace, connectionScans: compactRecords(workspace, [run]) };
 }
 
 const membershipCache = new WeakMap<string[], Set<string>>();

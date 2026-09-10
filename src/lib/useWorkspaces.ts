@@ -381,6 +381,12 @@ export class WorkspaceSessionStore {
                         current.data,
                         data,
                       ),
+                      // Latest scan results are not an undoable archive. Preserve
+                      // pre-path evidence on camera writes, but carry explicit
+                      // result replacement/clearing through older edit snapshots.
+                      ...(data.connectionScans !== current.data.connectionScans
+                        ? { connectionScans: data.connectionScans }
+                        : {}),
                       view: {
                         ...data.view,
                         hiddenNodeIds: snapshot.view.hiddenNodeIds,

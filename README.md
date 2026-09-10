@@ -11,8 +11,9 @@ direct connections and shared ancestors or descendants among visible or added
 graph nodes. Searches default to 3 transaction hops, 200 examined transactions,
 15 seconds and a 50-branch stopping point. Review exact paths, add a path or an
 explicit prefix in one undoable action, and continue from a stopping point.
-Compact scan records and path evidence stay encrypted; the explored search space
-is discarded. Results are bounded observations, not exhaustive paths or ownership
+Only the latest results and path evidence stay encrypted; a new scan replaces
+them and **Clear all results** clears them without removing added paths. The
+explored search space is discarded. Results are bounded observations, not exhaustive paths or ownership
 claims. See [connection scan instructions](instructions.md#connection-scans).
 
 ![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)

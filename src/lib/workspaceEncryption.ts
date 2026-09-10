@@ -10,11 +10,17 @@ export async function validateAndEncryptWorkspace(
   encrypt = encryptWorkspace,
 ) {
   // Validate the original version so legacy graph membership is seeded only
-  // after its observations pass validation. Preserve unrelated persisted fields.
-  const validated = parseWorkspace(workspace, false);
+  // after its observations pass validation. Normalize scan results without marking
+  // the live run interrupted; that transition belongs to import/unlock only.
+  // Preserve unrelated persisted fields.
+  const validated = parseWorkspace(workspace, false, false);
   const migrated = migrateWorkspace(workspace) as Workspace;
   return encrypt(
-    { ...migrated, view: { ...migrated.view, graphNodeIds: validated.view.graphNodeIds } },
+    {
+      ...migrated,
+      connectionScans: validated.connectionScans,
+      view: { ...migrated.view, graphNodeIds: validated.view.graphNodeIds },
+    },
     password,
   );
 }
