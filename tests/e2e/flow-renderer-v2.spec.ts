@@ -498,6 +498,33 @@ test('hidden empty mount defers fit and known coordinates render without a worke
   expect(errors).toEqual([]);
 });
 
+test('disposing before initial layout does not replace automatic framing with an empty camera snapshot', async ({
+  page,
+}) => {
+  await controlLayoutWorkers(page);
+  await open(page);
+  const result = await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.update({
+      ...f.frame,
+      nodes: f.frame.nodes.map(({ x, y, z, ...node }: RenderNode) => node),
+    });
+    f.reset();
+    f.snapshots.length = 0;
+    const pending = Boolean(f.graph.pending);
+    f.graph.dispose();
+    const published = f.snapshots.length;
+    f.reset();
+    (window as any).layoutWorkers.at(-1).reply();
+    f.graph.flushSnapshot();
+    return { pending, published, snapshot: f.snapshots.at(-1) };
+  });
+  expect(result.pending).toBe(true);
+  expect(result.published).toBe(0);
+  expect(result.snapshot.nodes).toHaveLength(4);
+  expect(result.snapshot.camera.position).not.toEqual({ x: 260, y: 140, z: 1000 });
+});
+
 test('an immediate checkpoint preserves the visible graph without completing a pending layout, and disposal rejects its reply', async ({
   page,
 }) => {

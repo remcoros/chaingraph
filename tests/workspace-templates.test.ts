@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WORKSPACE_TEMPLATES, createTemplateWorkspace } from '../src/domain/workspaceTemplates';
 import { buildGraph, parseWorkspace } from '../src/domain/workspace';
 import { outputNodeId, sats, txNodeId } from '../src/domain/types';
+import { projectGraphMembership } from '../src/domain/graphMembership';
+import { transactionNodeIds } from '../src/domain/visibility';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -77,6 +79,53 @@ describe('real annotated workspace templates', () => {
       ).toThrow();
     },
   );
+
+  it.each(WORKSPACE_TEMPLATES)(
+    'starts $id with connected I/O and its annotated teaching points on the canvas',
+    async (template) => {
+      const workspace = await createTemplateWorkspace(template.id);
+      const graph = projectGraphMembership(buildGraph(workspace), workspace.view.graphNodeIds);
+      const nodes = new Set(graph.nodes.map((node) => node.id));
+      expect(nodes.size).toBe(workspace.view.graphNodeIds!.length);
+      expect(nodes.has(workspace.view.selectionId!)).toBe(true);
+      for (const id of Object.keys(workspace.annotations)) expect(nodes.has(id), id).toBe(true);
+      const linked = new Set(graph.links.flatMap((link) => [link.source, link.target]));
+      for (const id of nodes) expect(linked.has(id), `Disconnected opening node: ${id}`).toBe(true);
+      for (const node of graph.nodes.filter((node) => node.kind === 'transaction')) {
+        const transaction = workspace.transactions[node.txid!];
+        if (workspace.inputContext?.[transaction.txid]) continue;
+        for (const side of ['inputs', 'outputs'] as const) {
+          const candidates = transactionNodeIds(transaction, side);
+          const shown = candidates.filter((id) => nodes.has(id));
+          expect(shown.length).toBe(Math.min(candidates.length, 20));
+        }
+      }
+      // Selection and save/load preserve this initial canvas without expanding it.
+      const saved = parseWorkspace({
+        ...workspace,
+        view: { ...workspace.view, selectionId: graph.nodes.at(-1)!.id },
+      });
+      expect(saved.view.graphNodeIds).toEqual(workspace.view.graphNodeIds);
+      expect(workspace.view.prefetchDepth).toBe(0);
+    },
+  );
+
+  it('keeps large opening graphs bounded while showing script variety and repeated amounts', async () => {
+    for (const id of ['mainnet-batch-outputs', 'testnet4-fan-out', 'mainnet-wabisabi']) {
+      const workspace = await createTemplateWorkspace(id);
+      const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
+      const visible = new Set(workspace.view.graphNodeIds);
+      const outputs = root.vout.filter((output) => visible.has(outputNodeId(root.txid, output.n)));
+      expect(visible.size).toBeLessThanOrEqual(41);
+      expect(outputs.length).toBeLessThan(root.vout.length);
+      expect(new Set(outputs.map((output) => output.scriptPubKey.type))).toEqual(
+        new Set(root.vout.map((output) => output.scriptPubKey.type)),
+      );
+      if (id === 'mainnet-wabisabi')
+        for (const tag of workspace.tags!)
+          expect(tag.nodeIds.filter((node) => visible.has(node)).length).toBeGreaterThanOrEqual(2);
+    }
+  });
 
   it.each(WORKSPACE_TEMPLATES)(
     'creates isolated copies of $id with fresh workspace and tag identities',

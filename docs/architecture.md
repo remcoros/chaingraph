@@ -627,7 +627,15 @@ The address display toggle filters admitted address nodes; it does not expand
 address associations automatically. Addresses enter the graph through explicit selection
 or lookup, like other entities.
 Selection admits only the clicked node; explicit tracing admits requested transactions
-and connecting outpoints. New examples begin with their root and chosen selection.
+and connecting outpoints. New examples seed a curated canvas with their root transactions,
+selection, annotations and connecting outpoints. Small root transactions show all I/O;
+dense roots show up to 20 inputs and 20 outputs, prioritizing annotated outpoints,
+bridges, script variety and pairs from tagged groups. Annotated context-parent siblings
+include their creator so they remain connected. This is creation-time membership only;
+omitted observations remain loaded, and later selection does not expand transaction I/O.
+Disposal before initial framing does not publish an untouched default-camera snapshot,
+so development remounts retain automatic initial Fit. Explicit checkpoints still capture
+the current view, including while layout is pending.
 The icons-only right toolbar exposes exact input/output group and batch actions;
 branch removal keeps outpoints connected to another admitted transaction. Removing
 from the graph preserves evidence, annotations and cached geometry. Membership undo

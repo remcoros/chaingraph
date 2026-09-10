@@ -49,6 +49,7 @@ function denseWorkspace(count: number): Workspace {
   ];
   workspace.view.dimensions = 2;
   workspace.view.selectionId = ids[0];
+  workspace.view.graphNodeIds = ids;
   workspace.view.filters = { includeIds: ids };
   workspace.view.transactionFlow = { open: false, transactionId: txid(0) };
   workspace.view.showLabels = false;

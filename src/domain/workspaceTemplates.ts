@@ -1,6 +1,7 @@
 import type { Annotation, Network, Transaction, Wallet, Workspace, WorkspaceTag } from './types';
 import { outputNodeId, sats, txNodeId } from './types';
 import { newWorkspace, parseWorkspace } from './workspace';
+import { transactionNodeIds } from './visibility';
 
 export interface WorkspaceTemplate {
   readonly id: string;
@@ -185,6 +186,54 @@ async function loadSnapshot(id: string): Promise<Snapshot> {
     default:
       throw new Error('Unknown workspace template.');
   }
+}
+
+/** A starting canvas, independent of loaded evidence and later manual expansion. */
+function initialTemplateGraph(workspace: Workspace, roots: string[], selected: string): string[] {
+  const nodes = new Set([...roots.map(txNodeId), selected]);
+  const rootIds = new Set(roots);
+  const bridges = new Set(
+    roots.flatMap((id) =>
+      workspace.transactions[id].vin.flatMap((input) =>
+        input.txid && input.vout !== undefined && rootIds.has(input.txid)
+          ? [outputNodeId(input.txid, input.vout)]
+          : [],
+      ),
+    ),
+  );
+  const limit = 20;
+  for (const id of roots) {
+    const transaction = workspace.transactions[id];
+    for (const side of ['inputs', 'outputs'] as const) {
+      const candidates = transactionNodeIds(transaction, side);
+      const available = new Set(candidates);
+      // Keep the example's selected/annotated outpoints and exact spending paths.
+      const priority = [selected, ...bridges, ...Object.keys(workspace.annotations)].filter(
+        (node) => available.has(node),
+      );
+      if (side === 'outputs') {
+        const scripts = new Set<string | undefined>();
+        for (const output of transaction.vout) {
+          if (scripts.has(output.scriptPubKey.type)) continue;
+          scripts.add(output.scriptPubKey.type);
+          priority.push(outputNodeId(id, output.n));
+        }
+        // Two members make repeated-amount groups visible in the CoinJoin example.
+        for (const tag of workspace.tags ?? [])
+          priority.push(...tag.nodeIds.filter((node) => available.has(node)).slice(0, 2));
+      }
+      for (const node of [...new Set([...priority, ...candidates])].slice(0, limit))
+        nodes.add(node);
+    }
+  }
+  // The wallet example also annotates a context parent's additional sibling. Show
+  // its creator to connect that sibling to the already visible funding outpoint.
+  for (const node of Object.keys(workspace.annotations)) {
+    if (nodes.has(node) || !node.startsWith('out:')) continue;
+    nodes.add(node);
+    nodes.add(txNodeId(node.split(':')[1]));
+  }
+  return [...nodes];
 }
 
 /** Creates ordinary editable workspace data. Call in a worker, like vault validation. */
@@ -642,7 +691,7 @@ export async function createTemplateWorkspace(
     showTags: true,
     showIcons: true,
     selectionId: selected,
-    graphNodeIds: [...new Set([txNodeId(snapshot.roots[0]), selected])],
+    graphNodeIds: initialTemplateGraph(workspace, snapshot.roots, selected),
     leftTab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks',
     rightTab: 'inspect',
     prefetchDepth: 0,

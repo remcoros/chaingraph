@@ -996,7 +996,10 @@ export class FlowRenderer implements GraphAdapter {
   }
   dispose() {
     if (this.dead) return;
-    this.flushSnapshot();
+    // StrictMode can dispose before the first layout. Do not save an untouched
+    // default camera that would suppress initial framing on the next mount.
+    // Gestures/restoration clear firstFit; explicit checkpoints remain unconditional.
+    if (!this.firstFit) this.flushSnapshot();
     this.dead = true;
     this.syncMotion();
     this.cancelQuiet();

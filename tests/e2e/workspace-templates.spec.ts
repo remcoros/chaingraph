@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { WORKSPACE_TEMPLATES } from '../../src/domain/workspaceTemplates';
 import { decryptWorkspace } from '../../src/lib/crypto';
 import type { Workspace } from '../../src/domain/types';
-import { parseWorkspace } from '../../src/domain/workspace';
+import { buildGraph, parseWorkspace } from '../../src/domain/workspace';
+import { projectGraphMembership } from '../../src/domain/graphMembership';
 import { mockBitcoin } from '../fixtures/bitcoin';
 
 const PASSWORD = 'public-template-test-password';
@@ -76,7 +77,7 @@ for (const template of WORKSPACE_TEMPLATES) {
     await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator('.transaction-flow')).toBeVisible();
-    const [copy] = await savedWorkspaces(page);
+    let [copy] = await savedWorkspaces(page);
     expect(copy.name).toBe(template.name);
     expect(copy.network).toBe(template.network);
     expect(copy.demo).toBe(false);
@@ -85,6 +86,28 @@ for (const template of WORKSPACE_TEMPLATES) {
       Object.values(copy.annotations).some((a) => a.label && a.note && a.icon && a.bookmarked),
     ).toBe(true);
     expect(Object.keys(copy.transactions).length).toBeGreaterThan(1);
+    const canvas = projectGraphMembership(buildGraph(copy), copy.view.graphNodeIds);
+    const rootId = `tx:${copy.view.transactionFlow!.transactionId}`;
+    expect(canvas.links.some((link) => link.kind === 'spends' && link.target === rootId)).toBe(
+      true,
+    );
+    expect(canvas.links.some((link) => link.kind === 'creates' && link.source === rootId)).toBe(
+      true,
+    );
+    // The initial encrypted creation can finish before the renderer's first
+    // quiet-period checkpoint. Wait for that geometry to reach persistence.
+    await expect
+      .poll(async () => {
+        [copy] = await savedWorkspaces(page);
+        return copy.view.graphSnapshot?.nodes.length;
+      })
+      .toBe(canvas.nodes.length);
+    expect(copy.view.graphSnapshot!.camera.position).not.toEqual({ x: 260, y: 140, z: 1000 });
+    await page.screenshot({ path: `artifacts/example-${template.id}-opening.png` });
+    if (template.id === 'mainnet-op-return') {
+      await page.setViewportSize({ width: 900, height: 900 });
+      await page.screenshot({ path: 'artifacts/example-message-opening-narrow.png' });
+    }
     const storage = await page.evaluate((key) => localStorage.getItem(key), STORAGE);
     expect(storage).not.toContain(template.description);
     expect(storage).not.toContain(PASSWORD);
