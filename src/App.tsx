@@ -1998,10 +1998,8 @@ export default function App() {
       selectedCount={toolbarSelection.length}
       canBack={navigation.index > 0}
       canForward={navigation.index < navigation.ids.length - 1}
-      canCenter={!!selected}
       onBack={() => navigateSelection(-1)}
       onForward={() => navigateSelection(1)}
-      onCenter={() => centerNode(selectedId, {}, true)}
       sides={contextSides}
       onAddSide={(side) => revealGraphNodes(contextSideIds?.[side] ?? [])}
       onHideSide={(side) =>
@@ -2043,8 +2041,10 @@ export default function App() {
       hiddenCount={hiddenCount}
       onRestoreHidden={showAllHidden}
       unconnectedCount={unconnectedForHide.size}
+      removableOutputCount={unconnectedForRemoval.size}
       showAllOutputCount={showAllOutputCount}
       onHideUnconnected={() => void updateAllGraphOutputs('hide')}
+      onRemoveUnconnected={() => removeFromGraph([...unconnectedForRemoval])}
       onShowAllOutputs={() => void updateAllGraphOutputs('show')}
       busy={!!operation}
     />

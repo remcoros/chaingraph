@@ -45,8 +45,8 @@ import { transactionStatus } from '../domain/transactionStatus';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
-  'upstream-connection': 'Upstream connection',
-  'downstream-connection': 'Downstream connection',
+  'upstream-connection': 'Source connection',
+  'downstream-connection': 'Destination connection',
   'shared-ancestor': 'Shared ancestor',
   'shared-descendant': 'Shared descendant',
   'many-inputs': 'Many inputs',
@@ -417,9 +417,9 @@ export function ConnectionScanPanel(props: Props) {
                   })
                 }
               >
-                <option value="downstream">Downstream</option>
-                <option value="upstream">Upstream</option>
                 <option value="both">Both</option>
+                <option value="upstream">Sources</option>
+                <option value="downstream">Destinations</option>
               </select>
             </label>
             <label>
@@ -545,10 +545,10 @@ export function ConnectionScanPanel(props: Props) {
                 <dt>Direction</dt>
                 <dd>
                   {run.settings.direction === 'both'
-                    ? 'Upstream and downstream'
+                    ? 'Sources and destinations'
                     : run.settings.direction === 'upstream'
-                      ? 'Upstream'
-                      : 'Downstream'}
+                      ? 'Sources'
+                      : 'Destinations'}
                 </dd>
                 <dt>Max hops</dt>
                 <dd>{run.settings.maxHops}</dd>

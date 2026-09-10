@@ -1,11 +1,9 @@
 import {
-  ArrowDownToLine,
   ArrowLeft,
   ArrowLeftToLine,
   ArrowRight,
   ArrowRightFromLine,
-  ArrowUpFromLine,
-  Crosshair,
+  ArrowRightToLine,
   Eye,
   EyeOff,
   Network,
@@ -32,10 +30,8 @@ export interface GraphContextToolbarProps {
   selectedCount: number;
   canBack: boolean;
   canForward: boolean;
-  canCenter: boolean;
   onBack: () => void;
   onForward: () => void;
-  onCenter: () => void;
   sides?: Record<GraphContextSide, GraphContextSideCounts>;
   onAddSide: (side: GraphContextSide) => void;
   onHideSide: (side: GraphContextSide) => void;
@@ -57,8 +53,10 @@ export interface GraphContextToolbarProps {
   hiddenCount?: number;
   onRestoreHidden?: () => void;
   unconnectedCount: number;
+  removableOutputCount: number;
   showAllOutputCount: number;
   onHideUnconnected: () => void;
+  onRemoveUnconnected: () => void;
   onShowAllOutputs: () => void;
   busy?: boolean;
 }
@@ -69,7 +67,7 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
   const selected = `${countLabel(props.selectedCount)} selected ${props.selectedCount === 1 ? 'node' : 'nodes'}`;
   return (
     <div className="graph-context-toolbar" role="group" aria-label="Graph exploration">
-      <div className="graph-context-navigation" role="group" aria-label="Selection navigation">
+      <div className="graph-context-navigation" role="group" aria-label="Graph navigation">
         <button
           type="button"
           aria-label="Previous graph selection"
@@ -90,12 +88,12 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
         </button>
         <button
           type="button"
-          aria-label="Center selection"
-          title="Center the selected node"
-          disabled={!props.canCenter}
-          onClick={props.onCenter}
+          aria-label="Show all inputs and outputs"
+          title="Show all loaded inputs/outputs for transactions on the graph"
+          disabled={props.busy || props.showAllOutputCount === 0}
+          onClick={props.onShowAllOutputs}
         >
-          <Crosshair size={16} aria-hidden="true" />
+          <Eye size={17} aria-hidden="true" />
         </button>
       </div>
 
@@ -135,7 +133,7 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
         >
           {(['inputs', 'outputs'] as const).map((side) => {
             const counts = props.sides![side];
-            const Direction = side === 'inputs' ? ArrowDownToLine : ArrowUpFromLine;
+            const Direction = side === 'inputs' ? ArrowRightToLine : ArrowRightFromLine;
             const addCount = Math.max(0, counts.total - counts.shown);
             return (
               <div
@@ -276,12 +274,12 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
         </button>
         <button
           type="button"
-          disabled={props.busy || props.showAllOutputCount === 0}
-          onClick={props.onShowAllOutputs}
-          aria-label="Show all inputs and outputs"
-          title="Show all loaded inputs/outputs for transactions on the graph"
+          disabled={props.busy || props.removableOutputCount === 0}
+          onClick={props.onRemoveUnconnected}
+          aria-label={`Remove ${countLabel(props.removableOutputCount)} inputs/outputs with zero or one connection from graph; keep evidence and notes`}
+          title={`Remove ${countLabel(props.removableOutputCount)} inputs/outputs with zero or one connection`}
         >
-          <Eye size={17} aria-hidden="true" />
+          <X size={17} aria-hidden="true" />
         </button>
       </div>
     </div>

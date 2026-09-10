@@ -209,7 +209,7 @@
   max-width: 100%;
 }
 
-/* Keep actions and close right aligned on the top row; the kind yields space. */
+/* Keep the heading clear; primary actions follow the card details. */
 .graph-hover-card {
   width: 304px;
   padding: 10px 12px 12px;
@@ -218,20 +218,21 @@
 }
 .graph-card-heading {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px;
   margin-bottom: 7px;
 }
 .graph-card-heading .graph-card-close {
-  grid-column: 3;
+  grid-column: 2;
   grid-row: 1;
 }
 .graph-card-kind {
   display: block;
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .graph-card-kind::before {
   content: '';
@@ -275,13 +276,13 @@
   transform: rotate(45deg);
 }
 .graph-card-actions {
-  grid-column: 2;
-  grid-row: 1;
   min-width: 0;
-  margin: 0;
-  gap: 2px;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-rule);
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 .graph-card-actions button,
 .graph-card-heading .graph-card-close {
@@ -298,8 +299,22 @@
   color: var(--color-muted);
 }
 .graph-card-actions button {
-  flex: 0 1 28px;
-  min-width: 15px;
+  gap: 4px;
+  width: auto;
+  padding: 4px 6px;
+  color: var(--color-ink);
+}
+.graph-card-secondary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-left: auto;
+}
+.graph-card-secondary-actions button {
+  width: 28px;
+  padding: 4px;
+  color: var(--color-muted);
 }
 .graph-card-actions button:hover,
 .graph-card-heading .graph-card-close:hover {

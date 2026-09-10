@@ -2,7 +2,6 @@ import { TransactionBlockTime } from './TransactionBlockTime';
 import {
   ArrowLeftFromLine,
   CheckSquare,
-  Crosshair,
   Pencil,
   X,
   Expand,
@@ -515,85 +514,6 @@ export default function GraphView(props: GraphViewProps) {
                   ? `${hoveredRole === 'input' ? 'Input to' : 'Output from'} transaction`
                   : hoveredNode.kind}
               </span>
-              <div className="graph-card-actions" role="group" aria-label="Graph item actions">
-                <VisibilityActions
-                  nodeId={hoveredNode.id}
-                  transaction={
-                    hoveredNode.kind === 'transaction'
-                      ? props.transactions?.[hoveredNode.txid ?? '']
-                      : undefined
-                  }
-                  hiddenNodeIds={props.hiddenNodeIds}
-                  graphNodeIds={props.graphNodeIds}
-                  onSetHidden={props.onSetHidden}
-                  onOpenChange={(open) => {
-                    visibilityOpen.current = open;
-                    if (open) keepCardOpen();
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-label="Select graph item"
-                  title="Select in transaction view and Inspector"
-                  onClick={() => {
-                    props.onSelect(hoveredNode.id);
-                    dismissCard();
-                  }}
-                >
-                  <Crosshair size={15} />
-                </button>
-                {props.onToggleSelection && (
-                  <button
-                    type="button"
-                    aria-label={
-                      props.batchSelectedIds?.includes(hoveredNode.id)
-                        ? 'Remove from batch selection'
-                        : 'Add to batch selection'
-                    }
-                    aria-pressed={props.batchSelectedIds?.includes(hoveredNode.id) ?? false}
-                    title="Add or remove this item in the batch selection"
-                    onClick={() => props.onToggleSelection?.(hoveredNode.id)}
-                  >
-                    <CheckSquare size={15} />
-                  </button>
-                )}
-                {props.onTrace && hoveredNode.kind !== 'address' && (
-                  <button
-                    type="button"
-                    disabled={Boolean(traceReason)}
-                    aria-label={
-                      hoveredNode.kind === 'output'
-                        ? 'Open creating transaction'
-                        : 'Load previous level'
-                    }
-                    title={
-                      traceReason ||
-                      (hoveredNode.kind === 'output'
-                        ? 'Open only the transaction that created this output'
-                        : 'Load one previous level of funding transactions')
-                    }
-                    onClick={() => {
-                      props.onTrace?.(hoveredNode.id);
-                      dismissCard();
-                    }}
-                  >
-                    <ArrowLeftFromLine size={15} />
-                  </button>
-                )}
-                {props.onEdit && (
-                  <button
-                    type="button"
-                    aria-label="Edit label and notes"
-                    title="Edit label, tags, icon and notes"
-                    onClick={() => {
-                      props.onEdit?.(hoveredNode.id);
-                      dismissCard();
-                    }}
-                  >
-                    <Pencil size={15} />
-                  </button>
-                )}
-              </div>
               <button
                 type="button"
                 className="graph-card-close"
@@ -684,6 +604,80 @@ export default function GraphView(props: GraphViewProps) {
             {traceReason && props.onTrace && hoveredNode.kind !== 'address' && (
               <p className="graph-card-explanation">{traceReason}</p>
             )}
+            <div className="graph-card-actions" role="group" aria-label="Graph item actions">
+              {props.onTrace && hoveredNode.kind !== 'address' && (
+                <button
+                  type="button"
+                  disabled={Boolean(traceReason)}
+                  aria-label={
+                    hoveredNode.kind === 'output'
+                      ? 'Open creating transaction'
+                      : 'Load previous level'
+                  }
+                  title={
+                    traceReason ||
+                    (hoveredNode.kind === 'output'
+                      ? 'Open only the transaction that created this output'
+                      : 'Load one previous level of funding transactions')
+                  }
+                  onClick={() => {
+                    props.onTrace?.(hoveredNode.id);
+                    dismissCard();
+                  }}
+                >
+                  <ArrowLeftFromLine size={15} /> Trace
+                </button>
+              )}
+              {props.onEdit && (
+                <button
+                  type="button"
+                  aria-label="Edit label and notes"
+                  title="Edit label, tags, icon and notes"
+                  onClick={() => {
+                    props.onEdit?.(hoveredNode.id);
+                    dismissCard();
+                  }}
+                >
+                  <Pencil size={15} /> Edit
+                </button>
+              )}
+              <div
+                className="graph-card-secondary-actions"
+                role="group"
+                aria-label="Visibility and selection"
+              >
+                <VisibilityActions
+                  nodeId={hoveredNode.id}
+                  transaction={
+                    hoveredNode.kind === 'transaction'
+                      ? props.transactions?.[hoveredNode.txid ?? '']
+                      : undefined
+                  }
+                  hiddenNodeIds={props.hiddenNodeIds}
+                  graphNodeIds={props.graphNodeIds}
+                  onSetHidden={props.onSetHidden}
+                  onOpenChange={(open) => {
+                    visibilityOpen.current = open;
+                    if (open) keepCardOpen();
+                  }}
+                />
+                {props.onToggleSelection && (
+                  <button
+                    type="button"
+                    aria-label={
+                      props.batchSelectedIds?.includes(hoveredNode.id)
+                        ? 'Remove from batch selection'
+                        : 'Add to batch selection'
+                    }
+                    aria-pressed={props.batchSelectedIds?.includes(hoveredNode.id) ?? false}
+                    title="Add or remove this item in the batch selection"
+                    onClick={() => props.onToggleSelection?.(hoveredNode.id)}
+                  >
+                    <CheckSquare size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
           </section>
         )}
         {error && (
