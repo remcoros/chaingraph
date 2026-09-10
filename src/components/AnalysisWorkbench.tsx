@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { analysisTools } from '../domain/analysis';
 import {
-  analysisScanScope,
+  analysisScopeChoice,
   mergeScanFindings,
   scanAnalysis,
   scanDefaults,
@@ -81,7 +81,7 @@ function FindingGuidance({ guidance }: { guidance: NonNullable<AnalysisFinding['
 }
 
 export interface AnalysisWorkbenchSession {
-  scopeMode: string;
+  scopeMode?: string;
   options: ReturnType<typeof scanDefaults>;
   scan?: AnalysisScan;
   selectedId?: string;
@@ -176,7 +176,7 @@ export function AnalysisWorkbench({
   cache,
 }: AnalysisWorkbenchProps) {
   const saved = cache?.get(workspace.id);
-  const [scopeMode, setScopeMode] = useState(saved?.scopeMode ?? 'context');
+  const [scopeMode, setScopeMode] = useState(saved?.scopeMode);
   const [options, setOptions] = useState(saved?.options ?? scanDefaults);
   const [scan, setScan] = useState<AnalysisScan | undefined>(saved?.scan);
   const [selectedId, setSelectedId] = useState<string | undefined>(saved?.selectedId);
@@ -252,13 +252,8 @@ export function AnalysisWorkbench({
     notice,
     limit,
   ]);
-  const scope = useMemo(
-    () =>
-      analysisScanScope(
-        workspace,
-        scopeMode === 'context' ? selected : undefined,
-        scopeMode === 'context' ? wallet : undefined,
-      ),
+  const { mode, selectionLabel, hasSelection, scope } = useMemo(
+    () => analysisScopeChoice(workspace, scopeMode, selected, wallet),
     [
       workspace.id,
       workspace.network,
@@ -274,6 +269,7 @@ export function AnalysisWorkbench({
       scopeMode,
     ],
   );
+  const selectionUnavailable = mode === 'context' && !hasSelection;
   const changed =
     scan &&
     ((scan.evidenceTransactions !== undefined &&
@@ -337,7 +333,7 @@ export function AnalysisWorkbench({
   const tool =
     detail && analysisTools.find((candidate) => detail.algorithm.startsWith(`${candidate.id}-`));
   async function run() {
-    if (!active || pending.current) return;
+    if (!active || pending.current || selectionUnavailable) return;
     const controller = new AbortController();
     pending.current = controller;
     setBusy(true);
@@ -474,7 +470,11 @@ export function AnalysisWorkbench({
           <p className="muted">Patterns in loaded data, with evidence and limits.</p>
         </div>
         <div className="button-row">
-          <button className="primary" disabled={busy || !active} onClick={() => void run()}>
+          <button
+            className="primary"
+            disabled={busy || !active || selectionUnavailable}
+            onClick={() => void run()}
+          >
             <Activity size={15} />
             {recovering ? 'Loading…' : busy ? 'Scanning…' : 'Scan'}
           </button>
@@ -515,25 +515,24 @@ export function AnalysisWorkbench({
           Scan scope
           <select
             aria-label="Scan scope"
-            value={scopeMode}
+            value={mode}
             onChange={(event) => setScopeMode(event.target.value)}
           >
-            <option value="context">Current selection</option>
+            <option value="context" disabled={!hasSelection}>
+              {selectionLabel}
+            </option>
             <option value="workspace">Loaded workspace</option>
           </select>
         </label>
         <div>
           <strong>{scope.label}</strong>
-          {scopeMode === 'context' && scope.kind === 'workspace' && (
-            <p>No current selection. The scan uses the loaded workspace.</p>
-          )}
           <p>{scope.explanation}</p>
           <p className="muted">
             {scope.txids.length} loaded transaction{scope.txids.length === 1 ? '' : 's'}
           </p>
         </div>
       </div>
-      <details className="scan-settings">
+      <details className="analysis-settings">
         <summary>Optional settings</summary>
         <label className="scan-checkbox scan-auto-load">
           <input
@@ -541,7 +540,7 @@ export function AnalysisWorkbench({
             checked={autoLoad}
             onChange={(event) => setAutoLoad(event.target.checked)}
           />
-          Load missing input data before scanning
+          <span>Load missing input data before scanning</span>
           <WalletHelp title="Automatic input loading" active={active}>
             Refreshes affected transactions, then unresolved parents, reusing loaded and attached
             data first. Up to eight transaction lookups, three at a time, for five seconds. Partial
@@ -551,11 +550,34 @@ export function AnalysisWorkbench({
         <div className="scan-settings-grid">
           {analysisTools.map((item) => (
             <fieldset key={item.id}>
-              <legend>{item.name}</legend>
+              <legend>
+                <span className="scan-settings-title">
+                  {item.name}
+                  {item.id === 'wallet-intersections' && (
+                    <WalletHelp title="Imported-wallet intersection options" active={active}>
+                      <p>
+                        <strong>Any inputs or outputs:</strong> Find transactions whose inputs or
+                        outputs match at least two imported wallets.
+                      </p>
+                      <p>
+                        <strong>Inputs from multiple wallets:</strong> Match at least two imported
+                        wallets using input evidence only.
+                      </p>
+                      <p>
+                        Both use already derived addresses and scripts. Overlapping imports can
+                        match the same address; matches do not prove separate participants or common
+                        ownership.
+                      </p>
+                    </WalletHelp>
+                  )}
+                </span>
+              </legend>
               {item.parameters.map((parameter) => (
                 <label
                   key={parameter.id}
-                  className={parameter.type === 'boolean' ? 'scan-checkbox' : ''}
+                  className={
+                    parameter.type === 'boolean' ? 'scan-checkbox' : `scan-${parameter.type}`
+                  }
                 >
                   {parameter.type === 'boolean' ? (
                     <>
@@ -572,11 +594,11 @@ export function AnalysisWorkbench({
                           }))
                         }
                       />
-                      {parameter.label}
+                      <span>{parameter.label}</span>
                     </>
                   ) : (
                     <>
-                      {parameter.label}
+                      <span>{parameter.label}</span>
                       {parameter.type === 'select' ? (
                         <select
                           value={String(options[item.id][parameter.id])}
