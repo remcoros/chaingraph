@@ -43,6 +43,13 @@ flowchart LR
 
 An unlocked session holds its workspace and password in browser memory. Annotation fields update the workspace immediately, with continuous typing in one field grouped into an Undo step. Presentation writes preserve the latest view across Undo. Mutations increment a revision; autosave serializes an encrypted snapshot after a short debounce and records which revision reached storage. Saves are serialized to avoid races. Graph gestures pause automatic save dispatch and index publication until interaction settles. The adapter coalesces camera snapshots after 1.2 seconds of quiet and schedules publication during idle time, retaining immutable geometry across camera-only changes. Explicit lock/export/switch checkpoints flush the current camera synchronously. Full workspace validation, serialization, compression and encryption run in a single-job browser worker; saves return only the encrypted envelope. Unlock and file import use the same serialized worker queue for file JSON parsing, authenticated decryption, bounded decompression, schema migration and complete wallet derivation validation. Reads return validated workspace data only to browser memory. Workers terminate on completion, failure or timeout; closing a read dialog aborts queued work or terminates an active read and prevents late session opening. Error messages come from allowlisted codes, never raw platform or schema exception text. Transport still uses structured cloning, so dispatch waits for idle interaction; it is not zero-copy. Save failures retain unlocked edits. See [performance findings](research/graph-autosave-performance.md). Locking first flushes pending graph state, freezes edits, waits for a current encrypted save, then removes the unlocked session. Failed saves leave the session open. Evidence-changing chain-data refreshes clear snapshot undo history so an old undo cannot discard newly fetched transactions. Quiet checks and activity acknowledgments carry the latest scan metadata into retained snapshots, preserving unrelated user-edit undo without reviving an old activity queue. It is not a guarantee of secure erasure from JavaScript memory.
 
+Create, unlock and encrypted-import dialogs use local encryption action groups
+with explicit buttons and Enter handling, rather than native credential-form
+submission. Password fields request autocomplete off. This mitigates a possible
+delayed browser save-password prompt; Chromium can still infer submissions and
+ignore that hint. No browser reproduction or suppression guarantee is claimed.
+See [password prompt investigation](research/2026-09-10-local-password-prompts.md).
+
 Small encrypted envelopes hold private workspace contents inline in `localStorage`. When the estimated combined index exceeds 1,048,576 characters or localStorage raises a quota error, envelopes move to IndexedDB; the outer saved-entry public name, identifier, timestamp and immutable payload reference remain visible. Existing inline envelopes migrate together. IndexedDB payload writes complete before the public index is published. A separate IndexedDB readwrite transaction serializes the synchronous index revision check and publication across contexts; Web Locks additionally coordinate the complete save where available. All index mutations, including deletion and small inline saves, use the same available coordinator. A transaction abort after successful synchronous index publication does not roll back its referenced ciphertext. Saving requires either IndexedDB coordination or Web Locks, rather than an unsafe localStorage check/write fallback. Failure retains the previous index and unsaved session; cleanup removes only replaced or deleted references after publication. A crash or cleanup failure may leave an unreferenced encrypted blob, so no claim of crash-proof garbage collection is made. The existing 32 MiB plaintext and 100-saved-workspace bounds remain. See [storage protocol and validation](research/encrypted-browser-storage.md). The optional description remains inside the encrypted payload. Old saved entries without a public name are accepted and acquire one after unlock and save. Legacy encrypted-file envelopes remain readable; new files use envelope v2 and their filename uses the public name. Workspaces are portable through encrypted-file export/import. Imports and unlocks must pass envelope/domain validation and derive every supplied wallet address from its account key, script type, branch and index. Sparse paths derive only supplied indexes. Saving and exporting validate the complete workspace shape before encryption; scanner-produced addresses already pass the derivation boundary. Passwords and plaintext workspaces are not sent to the backend. Plaintext BIP329 export is an explicit separate operation and can include extended public keys.
 
 ### Envelope format and workspace schema
@@ -234,7 +241,9 @@ than enumerating every target/path. Fully displayed connection paths are omitted
 All fronts share one unique-transaction budget, a deadline, total path-hop and
 result bounds. Defaults are 3 hops, 200 transactions, 15 seconds and a 50-branch
 boundary; hard limits are 8 hops, 1,000 transactions, 60 seconds, 200 branches,
-1,000 targets and 50 results. Depth stops before further spender lookups.
+1,000 targets and 50 results. Depth stops before further spender lookups and
+records a run-level reason without producing result rows or consuming the result
+allowance.
 Fan-out, depth, time, transaction and result limits, unknown evidence, failures
 and cancellation remain distinct. Stopping paths can be reviewed and accepted
 without admitting siblings. Partial results are not exhaustive or globally
@@ -255,9 +264,13 @@ no new backend endpoints, jobs, indexes or caches.
 
 `lib/connectionScanRunner.ts` aborts leaf requests on cancellation/deadline and
 rejects replies after session changes. User cancellation can retain a partial
-result; closing a workspace discards late replies. The UI stores a running marker
-before dispatch. Workspace schema v3 migrates v2 membership without reseeding it;
-worker validation restores running markers as interrupted, never as jobs.
+result; closing a workspace discards late replies. New findings bypass progress
+throttling and stream with only their path evidence. The UI retains them during
+the run; dismissal is applied to subsequent snapshots and completion, while clear
+cancels the run and rejects late updates. Count-only progress stays transient.
+The UI stores a running marker before dispatch. Workspace schema v3 migrates v2
+membership without reseeding it; worker validation restores running markers as
+interrupted, never as jobs.
 The existing encrypted envelope format remains unchanged.
 
 `domain/connectionScanRecords.ts` retains only the latest run, bounded to 50
@@ -272,8 +285,11 @@ observations where present. Frontier queues, visited maps and transport state
 cannot enter the record schema. UI-time edits check compact limits; full workspace
 validation remains off the UI thread. Missing evidence is explicit at Add path.
 There is no automatic scan resumption. Clear all results cancels active work and
-clears the retained result set. Replacement and clearing carry through undo
-snapshots so an unrelated edit undo cannot restore an older scan.
+clears the retained result set. Replacement, dismissal and clearing carry through
+undo snapshots so an unrelated edit undo cannot restore an older scan. Each
+snapshot retains path proof absent from its own observations within the same
+record caps; undoing Add therefore keeps the latest results usable when that
+evidence fits. Missing proof remains explicit if a snapshot reaches those caps.
 
 Accepting a complete path or explicit prefix merges only supporting transactions
 and calls existing graph membership APIs once, producing one Undo step. It reveals

@@ -205,10 +205,12 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     }
     resultKeys.add(key);
     run.results.push({ ...result, hops, id: `${run.id}:${run.results.length + 1}` });
+    // Publish actionable results before another frontier can wait on evidence.
+    progress();
   };
   const boundary = (front: Front, visit: Visit, reason: ScanStopReason) => {
     reasons.add(reason);
-    if (front.side === 'source')
+    if (front.side === 'source' && reason !== 'depth')
       addResult({
         kind: 'boundary',
         endpoint: visit.path.at(-1)!,

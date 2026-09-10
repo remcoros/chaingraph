@@ -15,7 +15,7 @@ export type { ConnectionScanRequest } from './connectionScanProtocol';
 export interface ConnectionScanRunnerOptions extends Omit<ConnectionScanFetchOptions, 'signal'> {
   request: ConnectionScanRequest;
   signal?: AbortSignal;
-  onProgress?: (run: ScanRun) => void;
+  onProgress?: (run: ScanRun, evidence: Record<string, Transaction>) => void;
   /** Captured workspace/session ownership, checked before any accepted reply. */
   isCurrent?: () => boolean;
   workerFactory?: () => Worker;
@@ -51,7 +51,16 @@ export function runConnectionScanInWorker(
     let settled = false;
     let lastRequest = 0;
     let lastProgress = 0;
+    let lastResultCount = 0;
     let examinedCount = 0;
+    const pathEvidence = (run: ScanRun): Record<string, Transaction> => {
+      const ids = new Set(
+        run.results.flatMap((result) => result.path.map((id) => id.split(':')[1]!)),
+      );
+      return Object.fromEntries(
+        [...ids].flatMap((id) => (adapter.evidence[id] ? [[id, adapter.evidence[id]]] : [])),
+      );
+    };
     const send = (message: ScanWorkerInput) => {
       if (!settled) worker.postMessage(message);
     };
@@ -94,22 +103,25 @@ export function runConnectionScanInWorker(
         return;
       }
       if (message.type === 'progress') {
-        if (Date.now() - lastProgress >= 100 || message.run.status !== 'running') {
+        if (
+          message.run.results.length > lastResultCount ||
+          Date.now() - lastProgress >= 100 ||
+          message.run.status !== 'running'
+        ) {
           lastProgress = Date.now();
-          options.onProgress?.({
-            ...message.run,
-            examined: Math.max(examinedCount, message.run.examined),
-          });
+          lastResultCount = message.run.results.length;
+          options.onProgress?.(
+            {
+              ...message.run,
+              examined: Math.max(examinedCount, message.run.examined),
+            },
+            pathEvidence(message.run),
+          );
         }
         return;
       }
       if (message.type === 'complete') {
-        const ids = new Set(
-          message.run.results.flatMap((result) => result.path.map((id) => id.split(':')[1]!)),
-        );
-        const evidence = Object.fromEntries(
-          [...ids].flatMap((id) => (adapter.evidence[id] ? [[id, adapter.evidence[id]]] : [])),
-        );
+        const evidence = pathEvidence(message.run);
         cleanup();
         resolve({
           run: { ...message.run, examined: Math.max(examinedCount, message.run.examined) },

@@ -84,7 +84,7 @@
   grid-template-columns: 12px 15px minmax(0, 1fr);
   gap: 7px;
   align-items: start;
-  padding: 9px 0;
+  padding: 9px 32px 9px 0;
   list-style: none;
 }
 .connection-scan-result > summary::before {
@@ -163,8 +163,64 @@
 .connection-scan-source button {
   justify-self: start;
 }
-.connection-scan-clear {
-  margin-top: 8px;
+.connection-scan-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.connection-scan-status strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.connection-scan-status svg {
+  flex-shrink: 0;
+}
+.connection-scan-clear,
+.connection-scan-dismiss {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.connection-scan-run-details {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.connection-scan-run-details summary {
+  color: var(--color-muted);
+}
+.connection-scan-run-details summary svg {
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+.connection-scan-run-details dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 8px 0;
+}
+.connection-scan-run-details dt {
+  color: var(--color-muted);
+}
+.connection-scan-run-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.connection-scan-result-row {
+  position: relative;
+  min-width: 0;
+}
+.connection-scan-dismiss {
+  position: absolute;
+  top: 5px;
+  right: 0;
+}
+.connection-scan-result-detail > button,
+.connection-scan-result-detail .connection-scan-actions > button {
+  justify-self: start;
 }
 .connection-scan,
 .connection-scan-result {

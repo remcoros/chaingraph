@@ -258,7 +258,7 @@ const completed = (status: ScanRun['status'] = 'complete'): ScanRun => ({
       path: [`tx:${id(1)}`, `out:${id(1)}:0`, `tx:${id(2)}`],
       directions: ['downstream', 'downstream'],
       hops: 1,
-      reason: 'depth',
+      reason: 'fan-out',
     },
   ],
 });
@@ -298,6 +298,40 @@ describe('connection scan worker ownership', () => {
     const result = await s.pending;
     expect(Object.keys(result.evidence)).toEqual([id(1), id(2)]);
     expect(s.worker.terminated).toBe(true);
+  });
+  it('streams new results immediately with only their path evidence while throttling unchanged progress', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      const s = runnerSetup();
+      const running = completed('running');
+      s.worker.reply({ type: 'progress', run: { ...running, results: [] } });
+      expect(s.progress).toHaveBeenCalledTimes(1);
+      expect(s.progress.mock.calls[0][1]).toEqual({});
+      s.worker.reply({ type: 'progress', run: running });
+      expect(s.progress).toHaveBeenCalledTimes(2);
+      expect(Object.keys(s.progress.mock.calls[1][1])).toEqual([id(1), id(2)]);
+      expect(s.progress.mock.calls[1][1][id(3)]).toBeUndefined();
+      s.worker.reply({ type: 'progress', run: { ...running, examined: 3 } });
+      expect(s.progress).toHaveBeenCalledTimes(2);
+      clock.mockReturnValue(1100);
+      s.worker.reply({ type: 'progress', run: { ...running, examined: 3 } });
+      expect(s.progress).toHaveBeenCalledTimes(3);
+      expect(s.progress.mock.calls[2][1]).not.toBe(s.progress.mock.calls[1][1]);
+      s.worker.reply({ type: 'complete', run: completed() });
+      expect((await s.pending).evidence).toEqual(s.progress.mock.calls[1][1]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it('delivers final cancelled progress with retained path evidence', async () => {
+    const s = runnerSetup();
+    s.worker.reply({ type: 'progress', run: completed('running') });
+    s.controller.abort();
+    s.worker.reply({ type: 'progress', run: completed('cancelled') });
+    expect(s.progress.mock.calls.at(-1)![0].status).toBe('cancelled');
+    expect(Object.keys(s.progress.mock.calls.at(-1)![1])).toEqual([id(1), id(2)]);
+    s.worker.reply({ type: 'complete', run: completed('cancelled') });
+    await s.pending;
   });
   it('cancels transport but accepts the worker partial cancelled result', async () => {
     const s = runnerSetup();

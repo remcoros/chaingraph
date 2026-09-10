@@ -1,6 +1,10 @@
 import { TransactionFetchScope, transactionScheduler } from './transactionScheduler';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
-import type { Workspace } from '../domain/types';
+import type { Transaction, Workspace } from '../domain/types';
+import {
+  MAX_SCAN_EVIDENCE_TRANSACTIONS,
+  MAX_SCAN_RECORD_BYTES,
+} from '../domain/connectionScanRecords';
 import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
 import { carryScanMetadata, walletEvidenceChanged } from '../domain/walletActivity';
 import { carryObservationContext } from '../domain/observationContext';
@@ -17,6 +21,44 @@ import { indexedEnvelopeStorage, type EnvelopeStorage } from './envelopeStorage'
 import { operationError, operationErrorCode } from './workspaceOperationError';
 import { validateAndEncryptWorkspace } from './workspaceEncryption';
 import { decryptWorkspaceOffThread, encryptWorkspaceOffThread } from './workspaceEncryptionClient';
+
+/** Undo keeps current results, retaining only proof absent from this older snapshot. */
+function scanRecordsForUndo(snapshot: Workspace, current: Workspace): Workspace['connectionScans'] {
+  const records = current.connectionScans;
+  if (!records || snapshot.transactions === current.transactions) return records;
+  const needed = new Set(
+    records.runs.flatMap((run) =>
+      run.results.flatMap((result) =>
+        result.path
+          .filter((node) => node.startsWith('tx:') || result.path.length === 1)
+          .map((node) => node.split(':')[1]),
+      ),
+    ),
+  );
+  const evidence: Record<string, Transaction> = {};
+  const encoder = new TextEncoder();
+  let bytes = encoder.encode(JSON.stringify({ runs: records.runs, evidence: {} })).byteLength;
+  let count = 0;
+  for (const txid of needed) {
+    if (snapshot.transactions[txid]) continue;
+    const transaction =
+      records.evidence[txid] ??
+      current.transactions[txid] ??
+      snapshot.connectionScans?.evidence[txid];
+    if (!transaction) continue;
+    // A conservative comma allowance keeps every snapshot inside normal save bounds.
+    const entryBytes =
+      encoder.encode(JSON.stringify(txid) + ':' + JSON.stringify(transaction)).byteLength + 1;
+    if (count >= MAX_SCAN_EVIDENCE_TRANSACTIONS || bytes + entryBytes > MAX_SCAN_RECORD_BYTES)
+      continue;
+    evidence[txid] = transaction;
+    count++;
+    bytes += entryBytes;
+  }
+  // If a snapshot cannot retain every proof within the caps, existing path review
+  // reports missing evidence and requires another scan before adding that path.
+  return { runs: records.runs, evidence };
+}
 
 export const INLINE_INDEX_LIMIT = 1024 * 1024;
 export const STORAGE_KEY = 'chaingraph.encrypted-workspaces.v1';
@@ -385,7 +427,7 @@ export class WorkspaceSessionStore {
                       // pre-path evidence on camera writes, but carry explicit
                       // result replacement/clearing through older edit snapshots.
                       ...(data.connectionScans !== current.data.connectionScans
-                        ? { connectionScans: data.connectionScans }
+                        ? { connectionScans: scanRecordsForUndo(snapshot, data) }
                         : {}),
                       view: {
                         ...data.view,

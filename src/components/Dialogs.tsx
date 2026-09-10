@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { X, LockKeyhole, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { Network, ScriptType, Wallet, Workspace } from '../domain/types';
 import { newWorkspace } from '../domain/workspace';
@@ -117,7 +117,7 @@ export function Modal({
       >
         <div className="modal-heading">
           <h2>{title}</h2>
-          <button className="icon-button" aria-label="Close dialog" onClick={onClose}>
+          <button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
@@ -139,12 +139,68 @@ function focusDialogField(input: HTMLInputElement | null) {
     modal.scrollTop += fieldBounds.bottom - modalBounds.bottom + 16;
 }
 
+/** Local encryption actions do not submit website sign-in credentials. */
+export function PasswordControls({
+  children,
+  label,
+  action,
+  disabled,
+  onConfirm,
+}: {
+  children: ReactNode;
+  label: string;
+  action: ReactNode;
+  disabled?: boolean;
+  onConfirm: () => void | Promise<void>;
+}) {
+  return (
+    <div
+      className="stack"
+      role="group"
+      aria-label={label}
+      onKeyDown={(event) => {
+        const input = event.target as HTMLInputElement;
+        // Preserve Enter in single-line fields without a native form submission.
+        // Textareas, buttons, links and IME composition retain their own behavior.
+        if (
+          disabled ||
+          event.defaultPrevented ||
+          event.key !== 'Enter' ||
+          event.repeat ||
+          event.nativeEvent.isComposing ||
+          event.keyCode === 229 ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
+          input.tagName !== 'INPUT' ||
+          !['text', 'password'].includes(input.type) ||
+          input.disabled ||
+          input.readOnly
+        )
+          return;
+        event.preventDefault();
+        void onConfirm();
+      }}
+    >
+      {children}
+      <button
+        type="button"
+        className="primary"
+        disabled={disabled}
+        onClick={() => void onConfirm()}
+      >
+        {action}
+      </button>
+    </div>
+  );
+}
+
 function PasswordField({
   label = 'Password',
   value,
   onChange,
   disabled,
-  creating,
   autofocus,
   describedBy,
   invalid,
@@ -154,7 +210,6 @@ function PasswordField({
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-  creating?: boolean;
   autofocus?: boolean;
   describedBy?: string;
   invalid?: boolean;
@@ -170,7 +225,7 @@ function PasswordField({
           id={id}
           ref={inputRef}
           type={visible ? 'text' : 'password'}
-          autoComplete={creating ? 'new-password' : 'current-password'}
+          autoComplete="off"
           data-autofocus={autofocus || undefined}
           required
           maxLength={1024}
@@ -239,8 +294,7 @@ export function CreateDialog({
     onClose();
   };
   useEffect(() => () => pending.current?.abort(), []);
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  async function submit() {
     if (pending.current) return;
     if (!name.trim()) {
       setInvalidField('name');
@@ -308,7 +362,16 @@ export function CreateDialog({
           ? 'Start with real transactions, labels and tags. This is your own editable copy, saved like any other workspace.'
           : 'A private space for your wallets, transactions, labels, and investigations.'}
       </p>
-      <form onSubmit={submit} className="stack" noValidate>
+      <PasswordControls
+        label="Create workspace encryption"
+        onConfirm={submit}
+        disabled={busy || !net || !networks?.includes(net)}
+        action={
+          <>
+            {busy ? 'Preparing workspace…' : 'Create workspace'} <ArrowRight size={16} />
+          </>
+        }
+      >
         <label>
           Name (public)
           <input
@@ -385,7 +448,6 @@ export function CreateDialog({
             clearFieldError('password');
           }}
           disabled={busy}
-          creating
           inputRef={passwordInput}
           invalid={invalidField === 'password'}
           describedBy={`${passwordHintId}${invalidField === 'password' ? ` ${errorId}` : ''}`}
@@ -401,7 +463,6 @@ export function CreateDialog({
             clearFieldError('confirm');
           }}
           disabled={busy}
-          creating
           inputRef={confirmInput}
           invalid={invalidField === 'confirm'}
           describedBy={invalidField === 'confirm' ? errorId : undefined}
@@ -420,14 +481,7 @@ export function CreateDialog({
             Cannot discover supported networks. Check the backend connection.
           </p>
         )}
-        <button
-          className="primary"
-          type="submit"
-          disabled={busy || !net || !networks?.includes(net)}
-        >
-          {busy ? 'Preparing workspace…' : 'Create workspace'} <ArrowRight size={16} />
-        </button>
-      </form>
+      </PasswordControls>
     </Modal>
   );
 }
@@ -469,11 +523,11 @@ export function UnlockDialog({
         Saved {new Date(entry.savedAt).toLocaleString()}. Workspace names are public. Descriptions,
         wallet names and contents stay encrypted until unlocked.
       </p>
-      <form
-        className="stack"
-        noValidate
-        onSubmit={async (e) => {
-          e.preventDefault();
+      <PasswordControls
+        label="Unlock workspace encryption"
+        disabled={busy}
+        action={busy ? 'Decrypting…' : 'Unlock workspace'}
+        onConfirm={async () => {
           if (busy) return;
           if (!password) {
             setError('Enter your workspace password.');
@@ -519,10 +573,7 @@ export function UnlockDialog({
             {error}
           </p>
         )}
-        <button className="primary" disabled={busy}>
-          {busy ? 'Decrypting…' : 'Unlock workspace'}
-        </button>
-      </form>
+      </PasswordControls>
     </Modal>
   );
 }
@@ -729,11 +780,11 @@ export function ImportDialog({
   return (
     <Modal title="Open encrypted workspace" onClose={read.close}>
       <p className="muted wrap">{file.name}</p>
-      <form
-        className="stack"
-        noValidate
-        onSubmit={async (e) => {
-          e.preventDefault();
+      <PasswordControls
+        label="Open encrypted workspace"
+        disabled={busy}
+        action={busy ? 'Decrypting…' : 'Open workspace'}
+        onConfirm={async () => {
           if (busy) return;
           if (!password) {
             setError('Enter your workspace password.');
@@ -780,10 +831,7 @@ export function ImportDialog({
             {error}
           </p>
         )}
-        <button className="primary" disabled={busy}>
-          {busy ? 'Decrypting…' : 'Open workspace'}
-        </button>
-      </form>
+      </PasswordControls>
     </Modal>
   );
 }

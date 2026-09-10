@@ -61,21 +61,26 @@ outpoint identity. Addresses and the entire workspace are outside this scan scop
 
 **Scan** searches for directed connections and shared ancestors or descendants.
 The source and targets are frozen for that run. Selecting another graph node does
-not change or restart it; use **Scan current selection** to start from that node.
+not change or restart it; use **Selection** to start from that node.
 Defaults are 3 transaction hops, 200 examined transactions, 15 seconds and a
 50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
 transactions, 60 seconds and a 200-branch boundary. Cached transactions and
 spending-history candidates share the same allowance with target-side searches.
 Scopes above 1,000 targets require a smaller visible graph or filter scope.
 
-Connection rows use a green check; stopping points use an amber warning and name
-the limit or unknown evidence. Red identifies failed evidence reads. Expand a row
-to inspect directed path steps. **Add path (+N new)** or **Add path to here (+N new)**
-adds exactly those nodes in one Undo action, without sibling outputs. Longer paths
-offer **Add through** for an explicit prefix and show its final node and full count.
-Adding reveals that path and resets graph filters, preserving annotations and the
-camera. From a branch boundary, add the path, select its endpoint and start a new
-scan. Missing saved path evidence is reported before adding; reload it or rerun.
+Results appear as they are found. Connection rows use a green check; stopping
+points identify large transactions, missing chain data or failed lookups. Hop
+limits end branches without adding result rows. The completion status explains
+why the scan stopped; expand the checked count for the run's settings and scope.
+
+Expand a result to inspect its directed path. **Select** selects its endpoint;
+**Add (+N)** adds exactly the displayed path with N new nodes in one Undo action,
+without sibling outputs. Longer paths offer **Path length** to choose an explicit
+prefix. Adding reveals the path and resets graph filters, preserving annotations
+and the camera. From a stopping point, add the path, select its endpoint and use
+**Selection** to scan from there. Missing saved path evidence is reported before
+adding; reload it or rerun. Use a row's **Dismiss result** icon to remove it from
+the list, including while scanning.
 
 Only the latest scan's results are retained. Starting another scan replaces them;
 there is no scan history to manage. **Clear all results** clears the set, cancels

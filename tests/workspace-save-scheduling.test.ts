@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
+import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
 import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/domain/connectionScan';
+import {
+  addScanPath,
+  replaceScanRun,
+  clearScanRuns,
+  prepareScanPath,
+} from '../src/domain/connectionScanRecords';
+import type { Transaction } from '../src/domain/types';
 
 const password = 'public scheduling fixture password';
 function fixture(encrypt?: typeof encryptWorkspace) {
@@ -107,5 +115,125 @@ describe('encrypted save scheduling around graph interaction', () => {
       view: { glow: false },
     });
     expect(store.getSession(id)!.revision).not.toBe(store.getSession(id)!.savedRevision);
+  });
+});
+
+describe('latest scan results across graph Undo', () => {
+  const txid = (n: number) => n.toString(16).padStart(64, '0');
+  const node = (n: number) => `tx:${txid(n)}`;
+  const output = (n: number) => `out:${txid(n)}:0`;
+  const transaction = (n: number, parent?: number): Transaction => ({
+    txid: txid(n),
+    vin: parent === undefined ? [{ coinbase: '00' }] : [{ txid: txid(parent), vout: 0 }],
+    vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
+  });
+  function scanFixture() {
+    const { store, id } = fixture();
+    store.update(
+      id,
+      (w) => ({
+        ...w,
+        transactions: { [txid(1)]: transaction(1) },
+        view: { ...w.view, graphNodeIds: [node(1)] },
+      }),
+      false,
+    );
+    const run: ScanRun = {
+      id: 'public-run',
+      source: node(1),
+      targetIds: [node(2)],
+      settings: { ...DEFAULT_SCAN_SETTINGS },
+      startedAt: '2026-09-10T12:00:00.000Z',
+      status: 'complete',
+      examined: 2,
+      stopReasons: [],
+      results: [
+        {
+          id: 'public-run:1',
+          kind: 'connection',
+          relationship: 'direct',
+          endpoint: node(2),
+          path: [node(1), output(1), node(2)],
+          directions: ['downstream', 'downstream'],
+          hops: 1,
+        },
+      ],
+    };
+    const evidence = { [txid(2)]: transaction(2, 1) };
+    store.update(id, (w) => replaceScanRun(w, run, evidence), false);
+    return { store, id, run, evidence };
+  }
+
+  it('keeps a dismissed path usable after adding it and undoing the graph action', () => {
+    const { store, id, run, evidence } = scanFixture();
+    const result = run.results[0];
+    store.update(id, (w) => addScanPath(w, result));
+    expect(store.getSession(id)!.data.connectionScans!.evidence).toEqual({});
+    store.update(
+      id,
+      (w) => replaceScanRun(w, { ...run, results: [{ ...result, dismissed: true }] }, evidence),
+      false,
+    );
+    store.undo(id);
+    const restored = store.getSession(id)!.data;
+    expect(restored.transactions[txid(2)]).toBeUndefined();
+    expect(restored.connectionScans!.runs[0].results[0].dismissed).toBe(true);
+    expect(prepareScanPath(restored, result).missingTxids).toEqual([]);
+    expect(addScanPath(restored, result).view.graphNodeIds).toContain(node(2));
+    expect(() => parseWorkspace(restored)).not.toThrow();
+  });
+
+  it('keeps replacement and clear current through older user-edit Undo', () => {
+    const { store, id, run } = scanFixture();
+    store.update(id, (w) => ({ ...w, description: 'Public annotation' }));
+    const latest = { ...run, id: 'latest-run', results: [] };
+    store.update(id, (w) => replaceScanRun(w, latest), false);
+    store.undo(id);
+    expect(store.getSession(id)!.data.connectionScans!.runs).toEqual([latest]);
+    store.update(id, (w) => ({ ...w, description: 'Another public annotation' }));
+    store.update(id, clearScanRuns, false);
+    store.undo(id);
+    expect(store.getSession(id)!.data.connectionScans).toBeUndefined();
+  });
+
+  it('bounds snapshot proof and reports missing evidence when the path pool is larger', () => {
+    const { store, id, run } = scanFixture();
+    const transactions: Record<string, Transaction> = { [txid(1)]: transaction(1) };
+    const results = Array.from({ length: 50 }, (_, i) => {
+      const path = [node(1)];
+      let parent = 1;
+      for (let step = 0; step < 5; step++) {
+        const next = 10 + i * 5 + step;
+        transactions[txid(next)] = transaction(next, parent);
+        path.push(output(parent), node(next));
+        parent = next;
+      }
+      return {
+        id: `bounded:${i}`,
+        kind: 'boundary' as const,
+        reason: 'fan-out' as const,
+        endpoint: path.at(-1)!,
+        path,
+        directions: Array<'downstream'>(10).fill('downstream'),
+        hops: 5,
+      };
+    });
+    store.update(id, (w) => ({ ...w, transactions }));
+    store.update(
+      id,
+      (w) =>
+        replaceScanRun(w, {
+          ...run,
+          settings: { ...run.settings, maxHops: 8, maxTransactions: 1000 },
+          results,
+        }),
+      false,
+    );
+    store.undo(id);
+    const restored = store.getSession(id)!.data;
+    expect(Object.keys(restored.connectionScans!.evidence)).toHaveLength(200);
+    expect(prepareScanPath(restored, results[0]).missingTxids).toEqual([]);
+    expect(prepareScanPath(restored, results.at(-1)!).missingTxids.length).toBeGreaterThan(0);
+    expect(() => parseWorkspace(restored)).not.toThrow();
   });
 });

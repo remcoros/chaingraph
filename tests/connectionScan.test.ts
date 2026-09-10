@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
   SCAN_LIMITS,
@@ -148,11 +148,12 @@ describe('bounded connection traversal', () => {
     expect(run.results.every((result) => !result.path.includes(out(2)))).toBe(true);
   });
 
-  it('retains depth boundaries and enforces the combined meeting path hop limit', async () => {
+  it('records depth limits without result rows and enforces the combined meeting hop limit', async () => {
     const run = await runConnectionScan(
       options(pathEdges, { settings: { ...DEFAULT_SCAN_SETTINGS, maxHops: 1 } }),
     );
-    expect(run.results.some((result) => result.reason === 'depth')).toBe(true);
+    expect(run.stopReasons).toContain('depth');
+    expect(run.results.some((result) => result.reason === 'depth')).toBe(false);
     expect(run.results.some((result) => result.kind === 'connection')).toBe(false);
     expect(run.results.every((result) => result.hops <= 1)).toBe(true);
   });
@@ -181,9 +182,57 @@ describe('bounded connection traversal', () => {
     };
     const stopped = await runConnectionScan(limited);
     expect(expanded).not.toContain(out(2));
+    expect(stopped.stopReasons).toContain('depth');
+    expect(stopped.results.some((result) => result.reason === 'depth')).toBe(false);
+  });
+
+  it('publishes a direct result before the next frontier waits for evidence', async () => {
+    let release!: () => void;
+    let waiting = false;
+    const progress = vi.fn();
+    const input = options(pathEdges, {
+      targetIds: [tx(2), tx(9)],
+      settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream' },
+      onProgress: progress,
+    });
+    const original = input.resolveNeighbors;
+    input.resolveNeighbors = async (...args) => {
+      if (args[0] === out(2)) {
+        waiting = true;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return original(...args);
+    };
+    const pending = runConnectionScan(input);
+    await vi.waitFor(() => expect(waiting).toBe(true));
+    const published = progress.mock.calls.at(-1)![0];
+    expect(published.status).toBe('running');
     expect(
-      stopped.results.some((result) => result.reason === 'depth' && result.endpoint === out(2)),
+      published.results.some(
+        (result: { relationship?: string; endpoint: string }) =>
+          result.relationship === 'direct' && result.endpoint === tx(2),
+      ),
     ).toBe(true);
+    release();
+    await pending;
+  });
+
+  it('does not consume the result allowance with many hop-limit branches', async () => {
+    const edges: Edge[] = Array.from({ length: 60 }, (_, index) => [
+      creates(1, index),
+      spends(1, index + 2, index),
+      creates(index + 2),
+    ]).flat();
+    const run = await runConnectionScan(
+      options(edges, {
+        targetIds: [],
+        settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream', maxHops: 1, fanOut: 100 },
+      }),
+    );
+    expect(run.stopReasons).toEqual(['depth']);
+    expect(run.results).toEqual([]);
   });
 
   it('counts cached and fallback candidate examination in the same total budget', async () => {
