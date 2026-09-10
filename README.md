@@ -95,7 +95,7 @@ New examples open with a curated graph of inputs, outputs and relevant transacti
 
 See [template sources and verification](docs/research/workspace-templates.md). Examples are real chain observations, not attributed wallets or proof of ownership. The former synthetic laboratory is no longer offered; existing saved synthetic workspaces remain readable with live lookups disabled.
 
-This branch enables three compact workbenches: **Wallet**, **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Selection (Wallet/Transaction/Output/Address)** or **Loaded workspace** scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate**, beside **Lock**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
+This branch enables three compact workbenches: **Wallet**, **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Workspace** (the default), **Selection (Wallet/Transaction/Output/Address)**, or any individual wallet as scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate**, beside **Lock**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
 
 ### Review a wallet (experimental)
 
@@ -124,11 +124,21 @@ larger lists offer an explicit Show more action. The compact transaction flow
 separates verified wallet-script matches from **No wallet match** and unknown
 prevouts. Unmatched scripts may be undiscovered wallet addresses; transaction
 links do not prove who controls an output or exactly which input funded it.
-The side toolbar orders **Label, Tags, Icon**, review actions, **Select related**,
+The detail header shows review status beside the title and a shortened identifier; hover
+to see the full value or use Copy. A visible guidance callout explains the finding
+and suggests relevant actions with a subtle green glow. **Mark reviewed** remains
+the primary action. Editing labels or tags keeps the current item open, even if it
+no longer matches a metadata filter.
+The side toolbar orders **Label, Tags, Notes, Icon**, review actions, **Select related**,
 then **Show** and **Isolate**. Show switches to Graph and frames the selection;
-Isolate also applies the existing resettable graph isolation. A collapsible flow
-follows, then common information and visible lists of related transactions and
-outpoints. Its cards are not navigation
+Isolate also applies the existing resettable graph isolation. Identifier, tags and
+relationship details come before the transaction flow, which starts collapsed and
+keeps its transaction chooser in the title bar. From the tabs down, the workbench
+uses a centered, responsive width comparable to Graph’s central area. Analysis
+uses the same width below its title and divider. A compact toolbar groups scope selection,
+**Scan**, **Options** and **Clear findings**, with selection details beneath.
+**Options** opens the input-loading setting and scan thresholds in a full-width panel.
+Related transactions and outpoints follow. The flow cards are not navigation
 targets: use a card's magnifier to **Show on graph**, reveal and frame that transaction or outpoint,
 even with selection lock off. **Back to Wallet** returns to the same invoker.
 Choose **Mark reviewed** or **Review later**. Previously saved **Source unknown**

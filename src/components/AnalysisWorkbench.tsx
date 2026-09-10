@@ -1,7 +1,8 @@
 import { TransactionBlockTime } from './TransactionBlockTime';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Activity,
+  SlidersHorizontal,
   Focus,
   Network,
   X,
@@ -186,6 +187,8 @@ export function AnalysisWorkbench({
   const [priorities, setPriorities] = useState<ReviewPriority[]>(
     saved?.priorities ?? [...reviewPriorities],
   );
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsId = useId();
   const [autoLoad, setAutoLoad] = useState(saved?.autoLoad ?? true);
   const [recovering, setRecovering] = useState(false);
   const [limit, setLimit] = useState(saved?.limit ?? 40);
@@ -254,12 +257,13 @@ export function AnalysisWorkbench({
     notice,
     limit,
   ]);
-  const { mode, selectionLabel, hasSelection, scope } = useMemo(
+  const { mode, selectionLabel, hasSelection, scope, walletUnavailable } = useMemo(
     () => analysisScopeChoice(workspace, scopeMode, selected, wallet),
     [
       workspace.id,
       workspace.network,
       workspace.transactions,
+      workspace.wallets,
       selected?.id,
       selected?.kind,
       selected?.txid,
@@ -271,7 +275,7 @@ export function AnalysisWorkbench({
       scopeMode,
     ],
   );
-  const selectionUnavailable = mode === 'context' && !hasSelection;
+  const selectionUnavailable = (mode === 'context' && !hasSelection) || walletUnavailable;
   const changed =
     scan &&
     ((scan.evidenceTransactions !== undefined &&
@@ -482,478 +486,515 @@ export function AnalysisWorkbench({
   }
   return (
     <section className="analysis-workbench" aria-label="Analysis workbench">
-      <header className="scan-header">
+      <header className="analysis-header">
         <h1>Analysis</h1>
-        <div className="scan-scope">
-          <label>
-            Scope
-            <select
-              aria-label="Scan scope"
-              value={mode}
-              disabled={busy}
-              onChange={(event) => setScopeMode(event.target.value)}
-            >
-              <option value="context" disabled={!hasSelection}>
-                {selectionLabel}
-              </option>
-              <option value="workspace">Loaded workspace</option>
-            </select>
-          </label>
-          {mode === 'context' && <strong className="scan-scope-name">{scope.label}</strong>}
-          <span className="muted">
-            {scope.txids.length} loaded transaction{scope.txids.length === 1 ? '' : 's'}
-          </span>
-          <WalletHelp title="Scan scope" active={active}>
-            {scope.explanation}
-          </WalletHelp>
-        </div>
-        <div className="button-row">
-          <button
-            className="primary"
-            disabled={busy || !active || selectionUnavailable}
-            onClick={() => void run()}
-          >
-            <Activity size={15} />
-            <span aria-live="polite">
-              {recovering ? 'Scan: loading input data…' : busy ? 'Scanning…' : 'Scan'}
-            </span>
-          </button>
-          {workspace.findings.length > 0 && (
-            <button
-              className="text-button"
-              disabled={busy}
-              onClick={() => {
-                onFindings([]);
-                setScan(undefined);
-                setSelectedId(undefined);
-                setKind('all');
-              }}
-            >
-              Clear findings
-            </button>
-          )}
-          {busy && (
-            <button
-              onClick={() => {
-                pending.current?.abort();
-                pending.current = undefined;
-                setBusy(false);
-                setRecovering(false);
-                setNotice(
-                  'Operation cancelled. This attempt was not saved. Existing findings are retained.',
-                );
-              }}
-            >
-              <X size={14} />
-              Cancel
-            </button>
-          )}
-        </div>
       </header>
-      <div className="scan-secondary">
-        <div className="scan-auto-load">
-          <label>
-            <input
-              type="checkbox"
-              checked={autoLoad}
-              disabled={busy}
-              onChange={(event) => setAutoLoad(event.target.checked)}
-            />
-            Load missing input data before scanning
-          </label>
-          <WalletHelp title="Automatic input loading" active={active}>
-            Uses the backend to refresh affected transactions and unresolved parents, reusing loaded
-            and attached data first. Up to eight lookups over five seconds. Turn off to scan
-            offline.
-          </WalletHelp>
+      <div className="analysis-body">
+        <div className="scan-launch">
+          <div className="scan-header" role="group" aria-label="Scan controls">
+            <div className="scan-scope">
+              <label>
+                Scope
+                <select
+                  aria-label="Scan scope"
+                  value={mode}
+                  disabled={busy}
+                  onChange={(event) => setScopeMode(event.target.value)}
+                >
+                  <option value="workspace">Workspace</option>
+                  <option value="context" disabled={!hasSelection}>
+                    {selectionLabel}
+                  </option>
+                  {workspace.wallets.map((item) => (
+                    <option key={item.id} value={`wallet:${item.id}`}>
+                      Wallet: {item.name}
+                    </option>
+                  ))}
+                  {walletUnavailable && (
+                    <option value={mode} disabled>
+                      Wallet unavailable
+                    </option>
+                  )}
+                </select>
+              </label>
+            </div>
+            <div className="button-row">
+              <button
+                className="primary"
+                disabled={busy || !active || selectionUnavailable}
+                onClick={() => void run()}
+              >
+                <Activity size={15} />
+                <span aria-live="polite">
+                  {recovering ? 'Scan: loading input data…' : busy ? 'Scanning…' : 'Scan'}
+                </span>
+              </button>
+              {busy && (
+                <button
+                  onClick={() => {
+                    pending.current?.abort();
+                    pending.current = undefined;
+                    setBusy(false);
+                    setRecovering(false);
+                    setNotice(
+                      'Operation cancelled. This attempt was not saved. Existing findings are retained.',
+                    );
+                  }}
+                >
+                  <X size={14} />
+                  Cancel
+                </button>
+              )}
+            </div>
+            <button
+              className="scan-options-toggle"
+              aria-expanded={optionsOpen}
+              aria-controls={optionsId}
+              onClick={() => setOptionsOpen(!optionsOpen)}
+            >
+              <SlidersHorizontal size={14} /> Options
+            </button>
+            {workspace.findings.length > 0 && (
+              <button
+                className="text-button scan-clear"
+                disabled={busy}
+                onClick={() => {
+                  onFindings([]);
+                  setScan(undefined);
+                  setSelectedId(undefined);
+                  setKind('all');
+                }}
+              >
+                Clear findings
+              </button>
+            )}
+          </div>
+          <div className="scan-scope-summary">
+            {mode !== 'workspace' && <strong className="scan-scope-name">{scope.label}</strong>}
+            <span className="muted">
+              {scope.txids.length} loaded transaction{scope.txids.length === 1 ? '' : 's'}
+            </span>
+            <WalletHelp title="Scan scope" active={active}>
+              {scope.explanation}
+            </WalletHelp>
+            {!autoLoad && <span>Loaded data only</span>}
+          </div>
         </div>
-        <details className="analysis-settings">
-          <summary>Optional settings</summary>
-          <div className="scan-settings-grid">
-            {analysisTools.map((item) => (
-              <fieldset key={item.id}>
-                <legend>
-                  <span className="scan-settings-title">
-                    {item.name}
-                    {item.id === 'wallet-intersections' && (
-                      <WalletHelp title="Imported-wallet intersection options" active={active}>
-                        <p>
-                          <strong>Any inputs or outputs:</strong> Find transactions whose inputs or
-                          outputs match at least two imported wallets.
-                        </p>
-                        <p>
-                          <strong>Inputs from multiple wallets:</strong> Match at least two imported
-                          wallets using input evidence only.
-                        </p>
-                        <p>
-                          Both use already derived addresses and scripts. Overlapping imports can
-                          match the same address; matches do not prove separate participants or
-                          common ownership.
-                        </p>
-                      </WalletHelp>
-                    )}
-                  </span>
-                </legend>
-                {item.parameters.map((parameter) => (
-                  <label
-                    key={parameter.id}
-                    className={
-                      parameter.type === 'boolean' ? 'scan-checkbox' : `scan-${parameter.type}`
-                    }
-                  >
-                    {parameter.type === 'boolean' ? (
-                      <>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(options[item.id][parameter.id])}
-                          onChange={(event) =>
-                            setOptions((current) => ({
-                              ...current,
-                              [item.id]: {
-                                ...current[item.id],
-                                [parameter.id]: event.target.checked,
-                              },
-                            }))
-                          }
-                        />
-                        <span>{parameter.label}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>{parameter.label}</span>
-                        {parameter.type === 'select' ? (
-                          <select
-                            value={String(options[item.id][parameter.id])}
-                            onChange={(event) =>
-                              setOptions((current) => ({
-                                ...current,
-                                [item.id]: {
-                                  ...current[item.id],
-                                  [parameter.id]: event.target.value,
-                                },
-                              }))
-                            }
-                          >
-                            {parameter.choices?.map((choice) => (
-                              <option key={choice.value} value={choice.value}>
-                                {choice.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
+        <section
+          id={optionsId}
+          className="scan-options-panel"
+          aria-label="Scan options"
+          hidden={!optionsOpen}
+        >
+          <div className="scan-auto-load">
+            <label>
+              <input
+                type="checkbox"
+                checked={autoLoad}
+                disabled={busy}
+                onChange={(event) => setAutoLoad(event.target.checked)}
+              />
+              Load missing input data
+            </label>
+            <WalletHelp title="Automatic input loading" active={active && optionsOpen}>
+              Fetch missing transaction inputs before scanning so more checks can run. Turn this off
+              to use only data already loaded.
+            </WalletHelp>
+          </div>
+          <div className="analysis-settings">
+            <div className="scan-settings-grid">
+              {analysisTools.map((item) => (
+                <fieldset key={item.id}>
+                  <legend>
+                    <span className="scan-settings-title">
+                      {item.name}
+                      {item.id === 'wallet-intersections' && (
+                        <WalletHelp
+                          title="Imported-wallet intersection options"
+                          active={active && optionsOpen}
+                        >
+                          <p>
+                            <strong>Any inputs or outputs:</strong> Find transactions whose inputs
+                            or outputs match at least two imported wallets.
+                          </p>
+                          <p>
+                            <strong>Inputs from multiple wallets:</strong> Match at least two
+                            imported wallets using input evidence only.
+                          </p>
+                          <p>
+                            Both use already derived addresses and scripts. Overlapping imports can
+                            match the same address; matches do not prove separate participants or
+                            common ownership.
+                          </p>
+                        </WalletHelp>
+                      )}
+                    </span>
+                  </legend>
+                  {item.parameters.map((parameter) => (
+                    <label
+                      key={parameter.id}
+                      className={
+                        parameter.type === 'boolean' ? 'scan-checkbox' : `scan-${parameter.type}`
+                      }
+                    >
+                      {parameter.type === 'boolean' ? (
+                        <>
                           <input
-                            type="number"
-                            value={
-                              Number.isNaN(options[item.id][parameter.id])
-                                ? ''
-                                : Number(options[item.id][parameter.id])
-                            }
-                            min={parameter.min}
-                            max={parameter.max}
-                            step={parameter.step ?? 1}
+                            type="checkbox"
+                            checked={Boolean(options[item.id][parameter.id])}
                             onChange={(event) =>
                               setOptions((current) => ({
                                 ...current,
                                 [item.id]: {
                                   ...current[item.id],
-                                  [parameter.id]:
-                                    event.target.value === '' ? NaN : Number(event.target.value),
+                                  [parameter.id]: event.target.checked,
                                 },
                               }))
                             }
                           />
-                        )}
-                      </>
-                    )}
-                    {parameter.help && <small className="muted">{parameter.help}</small>}
-                  </label>
-                ))}
-              </fieldset>
-            ))}
-          </div>
-          <button
-            onClick={() => {
-              setOptions(scanDefaults());
-              setAutoLoad(true);
-            }}
-          >
-            Restore defaults
-          </button>
-        </details>
-        {scan && (
-          <details className="scan-coverage" key={scan.runAt} open={!scan.findings.length}>
-            <summary>
-              Scan coverage
-              {scan.reports.some((item) => item.status === 'skipped') &&
-                ` · ${scan.reports.filter((item) => item.status === 'skipped').length} skipped`}
-              {scan.reports.some((item) => item.status === 'error') &&
-                ` · ${scan.reports.filter((item) => item.status === 'error').length} error`}
-            </summary>
-            <ul>
-              {scan.reports.map((item) => (
-                <li key={item.toolId}>
-                  <strong>
-                    {analysisTools.find((candidate) => candidate.id === item.toolId)?.name}
-                  </strong>
-                  <span className={`scan-status ${item.status}`}>
-                    {item.status === 'complete'
-                      ? 'Ran'
-                      : item.status === 'skipped'
-                        ? 'Skipped'
-                        : 'Error'}
-                  </span>
-                  <p>{item.message}</p>
-                  {item.report && (
-                    <details>
-                      <summary>Coverage and skipped records</summary>
-                      <dl>
-                        {item.report.stats.map((stat) => (
-                          <div key={stat.label}>
-                            <dt>{stat.label}</dt>
-                            <dd>{stat.value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </details>
-                  )}
-                </li>
+                          <span>{parameter.label}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{parameter.label}</span>
+                          {parameter.type === 'select' ? (
+                            <select
+                              value={String(options[item.id][parameter.id])}
+                              onChange={(event) =>
+                                setOptions((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    [parameter.id]: event.target.value,
+                                  },
+                                }))
+                              }
+                            >
+                              {parameter.choices?.map((choice) => (
+                                <option key={choice.value} value={choice.value}>
+                                  {choice.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="number"
+                              value={
+                                Number.isNaN(options[item.id][parameter.id])
+                                  ? ''
+                                  : Number(options[item.id][parameter.id])
+                              }
+                              min={parameter.min}
+                              max={parameter.max}
+                              step={parameter.step ?? 1}
+                              onChange={(event) =>
+                                setOptions((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    [parameter.id]:
+                                      event.target.value === '' ? NaN : Number(event.target.value),
+                                  },
+                                }))
+                              }
+                            />
+                          )}
+                        </>
+                      )}
+                      {parameter.help && <small className="muted">{parameter.help}</small>}
+                    </label>
+                  ))}
+                </fieldset>
               ))}
-            </ul>
-          </details>
-        )}
-        {scan && (
-          <p className="scan-run-note">
-            Last scan: {scan.scope.label} · {scan.scope.txids.length} transactions ·{' '}
-            <time dateTime={scan.runAt}>{new Date(scan.runAt).toLocaleTimeString()}</time>
-          </p>
-        )}
-      </div>
-      <div aria-live="polite">
-        {notice && <p className="scan-notice">{notice}</p>}
-        {changed && (
-          <p className="scan-notice">Scope, data or settings changed. Scan again to update.</p>
-        )}
-      </div>
-      {scopeGaps.length > 0 && (
-        <div className="scan-recovery-scope">
-          <span>
-            {scopeGaps.length} input details unavailable in {scan ? 'last scan' : 'current'} scope
-          </span>
-          <button
-            disabled={busy || !active || !scopeGaps.some((gap) => gap.recoverable)}
-            onClick={() => void recover(recoveryScope.txids)}
-          >
-            Load scope data and rerun
-          </button>
-          <WalletHelp title="Missing input data" active={active}>
-            Reuses loaded and attached outputs. Refreshes affected spends, then unresolved parents
-            only. Up to 20 transaction lookups, three at once, with a 30-second timeout. Parent
-            outputs are attached without adding graph branches. Reruns all checks with the last scan
-            scope and settings. Nodes may lack pruned or unconfirmed parent data. Unavailable data
-            stays unknown; cancellation discards this attempt.
-          </WalletHelp>
-        </div>
-      )}
-      <div className="scan-results-heading">
-        <WalletCategoryFilter
-          active={active}
-          title="Analysis finding types"
-          categories={categories}
-          selected={types.filter((id) => categories.some((category) => category.id === id))}
-          onChange={(ids) => {
-            setTypes(ids);
-            setLimit(40);
-          }}
-          countHelp="Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status."
-        />
-        <div className="scan-priorities" aria-label="Review priority filters">
-          {reviewPriorities.map((priority) => (
+            </div>
             <button
-              key={priority}
-              aria-pressed={priorities.includes(priority)}
               onClick={() => {
-                setPriorities((current) =>
-                  current.includes(priority)
-                    ? current.filter((item) => item !== priority)
-                    : [...current, priority],
-                );
-                setLimit(40);
+                setOptions(scanDefaults());
+                setAutoLoad(true);
               }}
             >
-              <PriorityIcon priority={priority} />
-              {priority[0].toUpperCase() + priority.slice(1)}{' '}
-              <span className="wallet-count">{filtered.priorities[priority]}</span>
+              Restore defaults
             </button>
-          ))}
-        </div>
-        <select
-          aria-label="Finding evidence"
-          value={kind}
-          onChange={(event) => {
-            setKind(event.target.value);
-            setLimit(40);
-          }}
-        >
-          <option value="all">All evidence</option>
-          <option value="observation">Observations</option>
-          <option value="hypothesis">Hypotheses</option>
-          <option value="incomplete">Incomplete data</option>
-        </select>
-        {(scan || workspace.findings.length > 0) && (
-          <span className="muted">
-            {findings.length} result{findings.length === 1 ? '' : 's'}
-          </span>
-        )}
-        {filteredResults && (
-          <button className="text-button" onClick={resetFilters}>
-            Reset filters
-          </button>
-        )}
-      </div>
-      {!findings.length ? (
-        <p className="scan-empty">
-          {filteredResults
-            ? 'No findings match these filters. Reset filters to show available results.'
-            : scan
-              ? 'No findings in this scan. Review Scan coverage for skipped records, missing data and tools with no matches.'
-              : 'Scan the current selection or loaded workspace to inspect its patterns and limits.'}
-        </p>
-      ) : (
-        <div className="scan-results">
-          <div className="scan-result-list" aria-label="Analysis findings">
-            {findings.slice(0, limit).map((finding) => (
-              <button
-                key={finding.id}
-                className={detail?.id === finding.id ? 'active' : ''}
-                aria-pressed={detail?.id === finding.id}
-                onClick={() => setSelectedId(finding.id)}
-              >
-                <span className="scan-result-kind">
-                  <PriorityIcon priority={findingReview(finding).priority} />
-                  {finding.kind ?? 'hypothesis'}
-                  {finding.excluded ? ' · Excluded' : ''}
-                  {finding.stale ? ' · Needs rerun' : ''}
-                </span>
-                <strong>{finding.title}</strong>
-                <span className="muted">
-                  {finding.txids.length} supporting transaction
-                  {finding.txids.length === 1 ? '' : 's'}
-                </span>
-              </button>
-            ))}
-            {findings.length > limit && (
-              <button onClick={() => setLimit((current) => current + 40)}>
-                Show more findings ({findings.length - limit} remaining)
-              </button>
-            )}
           </div>
-          {detail && (
-            <article key={detail.id} className="scan-detail" aria-label="Selected finding">
-              <span className="scan-result-kind">
-                <PriorityIcon priority={findingReview(detail).priority} />
-                {findingReview(detail).priority} priority · {detail.kind ?? 'hypothesis'}
-                {detail.excluded ? ' · Excluded finding' : ''}
-                <WalletHelp title="Why this priority" active={active}>
-                  {findingReview(detail).reason}
-                </WalletHelp>
-              </span>
-              <h2>{detail.title}</h2>
-              <p>{detail.description}</p>
-              {detail.guidance && <FindingGuidance guidance={detail.guidance} />}
-              {detailGaps.length > 0 && (
-                <div className="scan-recovery-detail">
-                  <button
-                    disabled={busy || !active || !detailGaps.some((gap) => gap.recoverable)}
-                    onClick={() => void recover(detailTxids)}
-                  >
-                    {recovering ? 'Loading…' : 'Load missing data and rerun'}
-                  </button>
-                  <span className="muted">
-                    {detailGaps.some((gap) => gap.conflict)
-                      ? 'Conflicting observations need review; they will not be replaced.'
-                      : `For ${new Set(detailGaps.map((gap) => gap.txid)).size} affected transaction(s).`}
-                  </span>
-                </div>
-              )}
-              {detail.stale && (
-                <p className="scan-notice">
-                  Loaded data changed after this finding. Scan again to refresh its evidence.
-                </p>
-              )}
-              <div className="button-row">
-                <button
-                  disabled={!detail.nodeIds.length && !detail.txids.length}
-                  onClick={() => showGraph(detail.nodeIds)}
-                >
-                  <Network size={14} />
-                  Show on graph
-                </button>
-                <button
-                  disabled={!detail.nodeIds.length && !detail.txids.length}
-                  onClick={() => showGraph(detail.nodeIds, true)}
-                >
-                  <Focus size={14} />
-                  Isolate
-                </button>
-                <button
-                  onClick={() =>
-                    onFindings(
-                      workspace.findings.map((finding) =>
-                        finding.id === detail.id
-                          ? { ...finding, excluded: !finding.excluded }
-                          : finding,
-                      ),
-                    )
-                  }
-                >
-                  {detail.excluded ? 'Restore finding' : 'Exclude finding'}
-                </button>
-              </div>
-              {graphNotice && graphNotice.findingId === detail.id && (
-                <p className="scan-notice" role="status">
-                  {graphNotice.message}
-                </p>
-              )}
-              {(detail.nodeIds.length > 0 || detail.txids.length > 0) && (
-                <>
-                  <h3>Related transactions and outputs</h3>
-                  <ul className="scan-evidence" aria-label="Related transactions and outputs">
-                    {[...new Set([...detail.nodeIds, ...detail.txids.map(txNodeId)])].map((id) => (
-                      <EvidenceReference
-                        key={id}
-                        id={id}
-                        workspace={workspace}
-                        onGraph={showGraph}
-                        prevouts={prevouts}
-                      />
-                    ))}
-                  </ul>
-                </>
-              )}
-              {detail.details && (
-                <details>
-                  <summary>Details</summary>
-                  <p>{detail.details}</p>
-                </details>
-              )}
-              <details>
-                <summary>Interpretation and limits</summary>
-                <p>
-                  Checks use the available workspace data. Missing input details, unscanned wallet
-                  addresses and unloaded transactions limit coverage. Co-spending does not prove
-                  shared ownership: CoinJoin and PayJoin can invalidate that assumption. Bitcoin
-                  does not record which input funded a particular output.
-                </p>
-                {tool && (
-                  <a href={tool.source.url} target="_blank" rel="noreferrer">
-                    Method reference: {tool.source.title}
-                  </a>
-                )}
-              </details>
-            </article>
+        </section>
+        <div className="scan-secondary">
+          {scan && (
+            <details className="scan-coverage" key={scan.runAt} open={!scan.findings.length}>
+              <summary>
+                Scan coverage
+                {scan.reports.some((item) => item.status === 'skipped') &&
+                  ` · ${scan.reports.filter((item) => item.status === 'skipped').length} skipped`}
+                {scan.reports.some((item) => item.status === 'error') &&
+                  ` · ${scan.reports.filter((item) => item.status === 'error').length} error`}
+              </summary>
+              <ul>
+                {scan.reports.map((item) => (
+                  <li key={item.toolId}>
+                    <strong>
+                      {analysisTools.find((candidate) => candidate.id === item.toolId)?.name}
+                    </strong>
+                    <span className={`scan-status ${item.status}`}>
+                      {item.status === 'complete'
+                        ? 'Ran'
+                        : item.status === 'skipped'
+                          ? 'Skipped'
+                          : 'Error'}
+                    </span>
+                    <p>{item.message}</p>
+                    {item.report && (
+                      <details>
+                        <summary>Coverage and skipped records</summary>
+                        <dl>
+                          {item.report.stats.map((stat) => (
+                            <div key={stat.label}>
+                              <dt>{stat.label}</dt>
+                              <dd>{stat.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </details>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {scan && (
+            <p className="scan-run-note">
+              Last scan: {scan.scope.label} · {scan.scope.txids.length} transactions ·{' '}
+              <time dateTime={scan.runAt}>{new Date(scan.runAt).toLocaleTimeString()}</time>
+            </p>
           )}
         </div>
-      )}
+        <div aria-live="polite">
+          {notice && <p className="scan-notice">{notice}</p>}
+          {changed && (
+            <p className="scan-notice">Scope, data or settings changed. Scan again to update.</p>
+          )}
+        </div>
+        {scopeGaps.length > 0 && (
+          <div className="scan-recovery-scope">
+            <span>
+              {scopeGaps.length} input details unavailable in {scan ? 'last scan' : 'current'} scope
+            </span>
+            <button
+              disabled={busy || !active || !scopeGaps.some((gap) => gap.recoverable)}
+              onClick={() => void recover(recoveryScope.txids)}
+            >
+              Load scope data and rerun
+            </button>
+            <WalletHelp title="Missing input data" active={active}>
+              Reuses loaded and attached outputs. Refreshes affected spends, then unresolved parents
+              only. Up to 20 transaction lookups, three at once, with a 30-second timeout. Parent
+              outputs are attached without adding graph branches. Reruns all checks with the last
+              scan scope and settings. Nodes may lack pruned or unconfirmed parent data. Unavailable
+              data stays unknown; cancellation discards this attempt.
+            </WalletHelp>
+          </div>
+        )}
+        <div className="scan-results-heading">
+          <WalletCategoryFilter
+            active={active}
+            title="Analysis finding types"
+            categories={categories}
+            selected={types.filter((id) => categories.some((category) => category.id === id))}
+            onChange={(ids) => {
+              setTypes(ids);
+              setLimit(40);
+            }}
+            countHelp="Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status."
+          />
+          <div className="scan-priorities" aria-label="Review priority filters">
+            {reviewPriorities.map((priority) => (
+              <button
+                key={priority}
+                aria-pressed={priorities.includes(priority)}
+                onClick={() => {
+                  setPriorities((current) =>
+                    current.includes(priority)
+                      ? current.filter((item) => item !== priority)
+                      : [...current, priority],
+                  );
+                  setLimit(40);
+                }}
+              >
+                <PriorityIcon priority={priority} />
+                {priority[0].toUpperCase() + priority.slice(1)}{' '}
+                <span className="wallet-count">{filtered.priorities[priority]}</span>
+              </button>
+            ))}
+          </div>
+          <select
+            aria-label="Finding evidence"
+            value={kind}
+            onChange={(event) => {
+              setKind(event.target.value);
+              setLimit(40);
+            }}
+          >
+            <option value="all">All evidence</option>
+            <option value="observation">Observations</option>
+            <option value="hypothesis">Hypotheses</option>
+            <option value="incomplete">Incomplete data</option>
+          </select>
+          {(scan || workspace.findings.length > 0) && (
+            <span className="muted">
+              {findings.length} result{findings.length === 1 ? '' : 's'}
+            </span>
+          )}
+          {filteredResults && (
+            <button className="text-button" onClick={resetFilters}>
+              Reset filters
+            </button>
+          )}
+        </div>
+        {!findings.length ? (
+          <p className="scan-empty">
+            {filteredResults
+              ? 'No findings match these filters. Reset filters to show available results.'
+              : scan
+                ? 'No findings in this scan. Review Scan coverage for skipped records, missing data and tools with no matches.'
+                : 'Scan the current selection or loaded workspace to inspect its patterns and limits.'}
+          </p>
+        ) : (
+          <div className="scan-results">
+            <div className="scan-result-list" aria-label="Analysis findings">
+              {findings.slice(0, limit).map((finding) => (
+                <button
+                  key={finding.id}
+                  className={detail?.id === finding.id ? 'active' : ''}
+                  aria-pressed={detail?.id === finding.id}
+                  onClick={() => setSelectedId(finding.id)}
+                >
+                  <span className="scan-result-kind">
+                    <PriorityIcon priority={findingReview(finding).priority} />
+                    {finding.kind ?? 'hypothesis'}
+                    {finding.excluded ? ' · Excluded' : ''}
+                    {finding.stale ? ' · Needs rerun' : ''}
+                  </span>
+                  <strong>{finding.title}</strong>
+                  <span className="muted">
+                    {finding.txids.length} supporting transaction
+                    {finding.txids.length === 1 ? '' : 's'}
+                  </span>
+                </button>
+              ))}
+              {findings.length > limit && (
+                <button onClick={() => setLimit((current) => current + 40)}>
+                  Show more findings ({findings.length - limit} remaining)
+                </button>
+              )}
+            </div>
+            {detail && (
+              <article key={detail.id} className="scan-detail" aria-label="Selected finding">
+                <span className="scan-result-kind">
+                  <PriorityIcon priority={findingReview(detail).priority} />
+                  {findingReview(detail).priority} priority · {detail.kind ?? 'hypothesis'}
+                  {detail.excluded ? ' · Excluded finding' : ''}
+                  <WalletHelp title="Why this priority" active={active}>
+                    {findingReview(detail).reason}
+                  </WalletHelp>
+                </span>
+                <h2>{detail.title}</h2>
+                <p>{detail.description}</p>
+                {detail.guidance && <FindingGuidance guidance={detail.guidance} />}
+                {detailGaps.length > 0 && (
+                  <div className="scan-recovery-detail">
+                    <button
+                      disabled={busy || !active || !detailGaps.some((gap) => gap.recoverable)}
+                      onClick={() => void recover(detailTxids)}
+                    >
+                      {recovering ? 'Loading…' : 'Load missing data and rerun'}
+                    </button>
+                    <span className="muted">
+                      {detailGaps.some((gap) => gap.conflict)
+                        ? 'Conflicting observations need review; they will not be replaced.'
+                        : `For ${new Set(detailGaps.map((gap) => gap.txid)).size} affected transaction(s).`}
+                    </span>
+                  </div>
+                )}
+                {detail.stale && (
+                  <p className="scan-notice">
+                    Loaded data changed after this finding. Scan again to refresh its evidence.
+                  </p>
+                )}
+                <div className="button-row">
+                  <button
+                    disabled={!detail.nodeIds.length && !detail.txids.length}
+                    onClick={() => showGraph(detail.nodeIds)}
+                  >
+                    <Network size={14} />
+                    Show on graph
+                  </button>
+                  <button
+                    disabled={!detail.nodeIds.length && !detail.txids.length}
+                    onClick={() => showGraph(detail.nodeIds, true)}
+                  >
+                    <Focus size={14} />
+                    Isolate
+                  </button>
+                  <button
+                    onClick={() =>
+                      onFindings(
+                        workspace.findings.map((finding) =>
+                          finding.id === detail.id
+                            ? { ...finding, excluded: !finding.excluded }
+                            : finding,
+                        ),
+                      )
+                    }
+                  >
+                    {detail.excluded ? 'Restore finding' : 'Exclude finding'}
+                  </button>
+                </div>
+                {graphNotice && graphNotice.findingId === detail.id && (
+                  <p className="scan-notice" role="status">
+                    {graphNotice.message}
+                  </p>
+                )}
+                {(detail.nodeIds.length > 0 || detail.txids.length > 0) && (
+                  <>
+                    <h3>Related transactions and outputs</h3>
+                    <ul className="scan-evidence" aria-label="Related transactions and outputs">
+                      {[...new Set([...detail.nodeIds, ...detail.txids.map(txNodeId)])].map(
+                        (id) => (
+                          <EvidenceReference
+                            key={id}
+                            id={id}
+                            workspace={workspace}
+                            onGraph={showGraph}
+                            prevouts={prevouts}
+                          />
+                        ),
+                      )}
+                    </ul>
+                  </>
+                )}
+                {detail.details && (
+                  <details>
+                    <summary>Details</summary>
+                    <p>{detail.details}</p>
+                  </details>
+                )}
+                <details>
+                  <summary>Interpretation and limits</summary>
+                  <p>
+                    Checks use the available workspace data. Missing input details, unscanned wallet
+                    addresses and unloaded transactions limit coverage. Co-spending does not prove
+                    shared ownership: CoinJoin and PayJoin can invalidate that assumption. Bitcoin
+                    does not record which input funded a particular output.
+                  </p>
+                  {tool && (
+                    <a href={tool.source.url} target="_blank" rel="noreferrer">
+                      Method reference: {tool.source.title}
+                    </a>
+                  )}
+                </details>
+              </article>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

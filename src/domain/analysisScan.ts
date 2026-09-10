@@ -30,10 +30,10 @@ export interface AnalysisScan {
   evidenceTransactions?: Workspace['transactions'];
 }
 
-export type AnalysisScopeMode = 'context' | 'workspace';
+export type AnalysisScopeMode = 'context' | 'workspace' | `wallet:${string}`;
 
-/** An absent choice follows the wallet default without becoming an explicit choice.
- * Existing session values remain explicit; graph entities retain context priority.
+/** Workspace is the default. Explicit wallets ignore graph selection, and a
+ * removed wallet keeps an empty scope rather than broadening the scan.
  */
 export function analysisScopeChoice(
   workspace: Workspace,
@@ -41,25 +41,43 @@ export function analysisScopeChoice(
   selected?: GraphNode,
   wallet?: Wallet,
 ) {
+  const walletId = choice?.startsWith('wallet:') ? choice.slice('wallet:'.length) : undefined;
   const mode: AnalysisScopeMode =
-    choice === 'context' || choice === 'workspace' ? choice : wallet ? 'context' : 'workspace';
+    choice === 'context' || choice === 'workspace'
+      ? choice
+      : walletId
+        ? `wallet:${walletId}`
+        : 'workspace';
+  const scopeWallet = walletId
+    ? workspace.wallets.find((entry) => entry.id === walletId)
+    : undefined;
+  const walletUnavailable = mode.startsWith('wallet:') && !scopeWallet;
   const selection = analysisScanScope(workspace, selected, wallet);
   const hasSelection = selection.kind !== 'workspace';
   const selectionLabel = hasSelection
     ? `Selection (${selection.kind[0].toUpperCase() + selection.kind.slice(1)})`
     : 'Selection (None)';
-  const scope =
+  const scope: ScanScope =
     mode === 'workspace'
       ? analysisScanScope(workspace)
-      : hasSelection
-        ? selection
-        : {
-            ...selection,
-            label: 'No current selection',
-            explanation: 'Select a wallet or graph entity, or choose Loaded workspace.',
-            txids: [],
-          };
-  return { mode, selectionLabel, hasSelection, scope };
+      : mode.startsWith('wallet:')
+        ? scopeWallet
+          ? analysisScanScope(workspace, undefined, scopeWallet)
+          : {
+              kind: 'wallet',
+              label: 'Wallet unavailable',
+              explanation: 'This wallet is no longer in this workspace. Choose another scope.',
+              txids: [],
+            }
+        : hasSelection
+          ? selection
+          : {
+              ...selection,
+              label: 'No current selection',
+              explanation: 'Select a wallet or graph entity, or choose Workspace.',
+              txids: [],
+            };
+  return { mode, selectionLabel, hasSelection, scope, walletUnavailable };
 }
 
 /** Graph filters and manual visibility never limit analysis observations. */
@@ -132,7 +150,7 @@ export function analysisScanScope(
     };
   return {
     kind: 'workspace',
-    label: 'Loaded workspace',
+    label: 'Workspace',
     explanation:
       'All loaded transactions, including hidden and filtered graph records. Loaded parents supply input evidence.',
     txids: Object.keys(workspace.transactions).sort(),

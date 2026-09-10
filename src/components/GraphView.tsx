@@ -652,8 +652,8 @@ export default function GraphView(props: GraphViewProps) {
                 </div>
               )}
               {transaction && (
-                <div>
-                  <dt>Chain status</dt>
+                <div className="graph-card-block">
+                  <dt>Block</dt>
                   <dd>
                     <TransactionBlockTime transaction={transaction} />
                   </dd>

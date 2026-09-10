@@ -156,13 +156,14 @@ export function WalletReviewFlow({
         </span>
         <WalletHelp title="Wallet flow evidence" active={active}>
           <p>
-            Your wallet means a verified match to a discovered wallet address. No wallet match does
-            not rule out an undiscovered wallet address. Unknown means the required evidence is
-            missing.
+            “Your wallet” identifies an address discovered in your wallet. “No wallet match” means
+            it is not among your discovered addresses, though it could still belong to you.
+            “Unknown” means there is not enough information to check.
           </p>
           <p>
-            Arrows show transaction links, not exact coin allocation or proof of common ownership.
-            Use a magnifier to show that transaction or outpoint in Graph.
+            Arrows connect transactions to the outputs they create or spend. They do not show which
+            input funded each output or who owns the coins. Choose “Show on graph” (the magnifying
+            glass) to open a transaction or outpoint in Graph.
           </p>
         </WalletHelp>
       </div>

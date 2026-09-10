@@ -1,5 +1,15 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Clock3, Filter, Info, Network, Search, Undo2 } from 'lucide-react';
+import { useCallback, useId, useMemo, useState, type ReactNode } from 'react';
+import {
+  ChevronRight,
+  CircleCheck,
+  Clock3,
+  Filter,
+  Info,
+  Network,
+  Search,
+  TriangleAlert,
+  Undo2,
+} from 'lucide-react';
 import { formatSats, short, type Wallet, type Workspace, type WorkspaceTag } from '../domain/types';
 import { isCompletedReview, type WalletReviewItem } from '../domain/walletReview';
 import {
@@ -7,7 +17,11 @@ import {
   orderWalletContextTransactions,
   type WalletReviewFlowEntry,
 } from '../domain/walletReviewContext';
-import { walletRowRelationship, type WalletRow } from '../domain/walletWorkbenchRows';
+import {
+  walletRowFinding,
+  walletRowRelationship,
+  type WalletRow,
+} from '../domain/walletWorkbenchRows';
 import { useTransactionFetch } from '../lib/useTransactionFetch';
 import { useWalletFlowInputs } from '../lib/useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
@@ -21,7 +35,7 @@ import type {
   WalletSelectionIndex,
   WalletSelectionAddresses,
 } from '../domain/walletSelectionIndex';
-import { walletRelatedRecords } from '../domain/walletRelatedRecords';
+import { walletRelatedRecords, walletRelatedDescription } from '../domain/walletRelatedRecords';
 import { walletReviewGuidance, walletSubjectTitle } from '../domain/walletReviewGuidance';
 
 export type WalletDecisionAction = 'reviewed' | 'later' | 'reopen';
@@ -117,7 +131,8 @@ export function WalletItemDetail({
 }) {
   const fetchTransaction = useTransactionFetch('visible');
   const [chosenContext, setChosenContext] = useState('');
-  const [flowOpen, setFlowOpen] = useState(true);
+  const [flowOpen, setFlowOpen] = useState(false);
+  const flowId = useId();
   const [evidenceLimits, setEvidenceLimits] = useState({
     inputs: 20,
     outputs: 20,
@@ -208,7 +223,37 @@ export function WalletItemDetail({
   const outpoints = row.outpointIds ?? [];
   const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
   const subjectTitle = walletSubjectTitle(row);
-  const guidance = walletReviewGuidance(row, { label: annotation?.label, tagCount: tags.length });
+  const missingContext = !annotation?.label?.trim() && tags.length === 0;
+  const completed = !changed && (row.status === 'reviewed' || row.status === 'unknown');
+  const finding = walletRowFinding(workspace, row);
+  const addressReuse = finding?.algorithm.replace(/-v\d+$/, '') === 'address-reuse';
+  const guidedActions: ('label' | 'tags')[] = completed
+    ? []
+    : finding
+      ? tags.length === 0
+        ? ['tags']
+        : []
+      : [
+          ...(!annotation?.label?.trim() ? ['label' as const] : []),
+          ...(tags.length === 0 ? ['tags' as const] : []),
+        ];
+  const title =
+    finding?.title ||
+    annotation?.label?.trim() ||
+    (missingContext ? `${subjectTitle} without label or tags` : subjectTitle);
+  const calloutTone =
+    changed || (!completed && (missingContext || addressReuse))
+      ? 'attention'
+      : completed
+        ? 'complete'
+        : 'info';
+  const GuidanceIcon = calloutTone === 'attention' ? TriangleAlert : completed ? CircleCheck : Info;
+  const guidance = walletReviewGuidance(
+    row,
+    { label: annotation?.label, tagCount: tags.length },
+    finding,
+    !!relatedSelection,
+  );
   const statusLabel = changed
     ? 'Evidence changed'
     : row.status === 'unknown'
@@ -217,31 +262,44 @@ export function WalletItemDetail({
         ? 'Reviewed'
         : row.status === 'later'
           ? 'Review later'
-          : 'To review';
+          : 'Not reviewed';
   const related = useMemo(
     () => walletRelatedRecords(workspace, row, selectionIndex),
-    [selectionIndex, row.nodeId, row.contextTransactionIds, row.outpointIds],
+    [selectionIndex, row, finding],
   );
   return (
     <>
       <header className="wallet-subject-header wallet-detail-heading">
         <div>
           {annotation?.label && <span className="wallet-subject-kind">{subjectTitle}</span>}
-          <h2 className="wallet-item-title">
-            {annotation?.icon && (
-              <span className="wallet-entity-icon" aria-hidden="true">
-                {annotation.icon}
+          <div className="wallet-subject-title-row">
+            <h2 className="wallet-item-title">
+              {annotation?.icon && (
+                <span className="wallet-entity-icon" aria-hidden="true">
+                  {annotation.icon}
+                </span>
+              )}
+              {title}
+            </h2>
+            {row.reviews.length > 0 && (
+              <span className={`wallet-subject-status status-${changed ? 'changed' : row.status}`}>
+                {statusLabel}
               </span>
             )}
-            {annotation?.label || subjectTitle}
-          </h2>
+          </div>
+          <div className="wallet-header-reference">
+            <WalletReference
+              value={row.identifier}
+              kind={
+                row.kind === 'address'
+                  ? 'address'
+                  : row.kind === 'output'
+                    ? 'outpoint'
+                    : 'transaction ID'
+              }
+            />
+          </div>
         </div>
-        {row.reviews.length > 0 && (
-          <span className={`wallet-subject-status status-${row.status}`}>{statusLabel}</span>
-        )}
-        <WalletHelp title="Review guidance" active={active}>
-          {guidance}
-        </WalletHelp>
       </header>
       <div
         className="wallet-detail-toolbar"
@@ -253,6 +311,7 @@ export function WalletItemDetail({
           workspace={workspace}
           ids={[row.nodeId]}
           single
+          guidedActions={guidedActions}
           scopeLabel=""
           disabled={
             busy || awaitingAddress || (row.kind === 'output' && !row.address && flowInputs.loading)
@@ -268,7 +327,13 @@ export function WalletItemDetail({
             )}
           </div>
         )}
-        {relatedSelection && <div className="wallet-action-group">{relatedSelection}</div>}
+        {relatedSelection && (
+          <div
+            className={`wallet-action-group${!completed && finding ? ' wallet-guided-related' : ''}`}
+          >
+            {relatedSelection}
+          </div>
+        )}
         <div className="wallet-action-group" aria-label="Graph actions">
           <button
             disabled={busy}
@@ -287,71 +352,14 @@ export function WalletItemDetail({
           </button>
         </div>
       </div>
-      {context ? (
-        <details
-          className="wallet-flow-disclosure"
-          open={flowOpen}
-          onToggle={(event) => setFlowOpen(event.currentTarget.open)}
-        >
-          <summary>Transaction flow</summary>
-          {flowOpen && (
-            <>
-              {contextTransactionIds.length > 1 && (
-                <div className="wallet-context-chooser">
-                  <select
-                    aria-label="Transaction context"
-                    title={contextId}
-                    value={contextId ?? ''}
-                    onChange={(event) => setChosenContext(event.target.value)}
-                  >
-                    {contextTransactionIds.map((txid) => (
-                      <option value={txid} key={txid} title={txid}>
-                        {workspace.annotations[`tx:${txid}`]?.label || short(txid)}
-                      </option>
-                    ))}
-                  </select>
-                  {contextId && <CopyButton value={contextId} label="Copy transaction ID" />}
-                </div>
-              )}
-              <WalletReviewFlow
-                key={contextId}
-                context={context}
-                workspace={workspace}
-                walletName={wallet.name}
-                editedNodeId={row.nodeId}
-                onShowInGraph={onShowInGraph}
-                onVisibleInputsChange={onVisibleInputsChange}
-                active={active}
-              />
-              <div className="wallet-flow-load-state" role="status">
-                {flowInputs.loading && <span>Loading input details...</span>}
-                {flowInputs.error && (
-                  <>
-                    <span className="warning">Input details unavailable</span>
-                    <WalletHelp title="Input loading" active={active}>
-                      <p>{flowInputs.error}</p>
-                    </WalletHelp>
-                    <button
-                      disabled={!active || !canQuery || busy || flowInputs.loading}
-                      onClick={flowInputs.retry}
-                    >
-                      Retry inputs
-                    </button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </details>
-      ) : (
-        <div className="wallet-flow-empty" role="status">
-          <Info size={16} aria-hidden="true" />
-          <div>
-            <span>No related transaction found in loaded data.</span>
-            {hasUnloadedHistory && <span>Some wallet history is not loaded.</span>}
-          </div>
-        </div>
-      )}
+      <div
+        className={`wallet-review-callout tone-${calloutTone}`}
+        role="note"
+        aria-label="Review guidance"
+      >
+        <GuidanceIcon size={18} aria-hidden="true" />
+        <p>{guidance}</p>
+      </div>
       <section className="wallet-subject-card" aria-label={`${subjectTitle} details`}>
         <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
           <div className="wallet-subject-identifier">
@@ -405,7 +413,7 @@ export function WalletItemDetail({
           </div>
           {row.kind === 'address' && row.contextTransactionIds.length > 0 && (
             <div>
-              <dt>Seen in</dt>
+              <dt>Seen in loaded data</dt>
               <dd>
                 {row.contextTransactionIds.length} transaction
                 {row.contextTransactionIds.length === 1 ? '' : 's'}
@@ -445,6 +453,81 @@ export function WalletItemDetail({
           </div>
         )}
       </section>
+      {context ? (
+        <section
+          className={`wallet-flow-disclosure${flowOpen ? ' is-open' : ''}`}
+          aria-label="Transaction flow"
+        >
+          <div className="wallet-flow-titlebar">
+            <button
+              className="wallet-flow-toggle"
+              aria-expanded={flowOpen}
+              aria-controls={flowId}
+              onClick={() => setFlowOpen(!flowOpen)}
+            >
+              <ChevronRight size={14} aria-hidden="true" /> Transaction flow
+            </button>
+            {contextTransactionIds.length > 1 && (
+              <div className="wallet-context-chooser">
+                <select
+                  aria-label="Transaction context"
+                  title={contextId}
+                  value={contextId ?? ''}
+                  onChange={(event) => setChosenContext(event.target.value)}
+                >
+                  {contextTransactionIds.map((txid) => (
+                    <option value={txid} key={txid} title={txid}>
+                      {workspace.annotations[`tx:${txid}`]?.label || short(txid)}
+                    </option>
+                  ))}
+                </select>
+                {contextId && <CopyButton value={contextId} label="Copy transaction ID" />}
+              </div>
+            )}
+          </div>
+          <div id={flowId} className="wallet-flow-content" hidden={!flowOpen}>
+            {flowOpen && (
+              <>
+                <WalletReviewFlow
+                  key={contextId}
+                  context={context}
+                  workspace={workspace}
+                  walletName={wallet.name}
+                  editedNodeId={row.nodeId}
+                  onShowInGraph={onShowInGraph}
+                  onVisibleInputsChange={onVisibleInputsChange}
+                  active={active}
+                />
+                <div className="wallet-flow-load-state" role="status">
+                  {flowInputs.loading && <span>Loading input details...</span>}
+                  {flowInputs.error && (
+                    <>
+                      <span className="warning">Input details unavailable</span>
+                      <WalletHelp title="Input loading" active={active}>
+                        <p>{flowInputs.error}</p>
+                      </WalletHelp>
+                      <button
+                        disabled={!active || !canQuery || busy || flowInputs.loading}
+                        onClick={flowInputs.retry}
+                      >
+                        Retry inputs
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      ) : (
+        <div className="wallet-flow-empty" role="status">
+          <Info size={16} aria-hidden="true" />
+          <div>
+            <span>No related transaction found in loaded data.</span>
+            {hasUnloadedHistory && <span>Some wallet history is not loaded.</span>}
+          </div>
+        </div>
+      )}
       <div className="wallet-related-grid">
         {(
           [
@@ -463,29 +546,38 @@ export function WalletItemDetail({
               <h3>
                 {title} ({ids.length})
               </h3>
-              {ids.slice(0, evidenceLimits[key]).map((id) => (
-                <div key={id} className="wallet-evidence-outpoint">
-                  <div className="wallet-reference-actions">
-                    <WalletReference
-                      value={id.replace(/^(out|tx):/, '')}
-                      kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
-                    />
-                    <button
-                      className="icon-button"
-                      title="Show on graph"
-                      aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
-                      onClick={() => onShowInGraph(id)}
-                    >
-                      <Search size={13} />
-                    </button>
+              {ids.slice(0, evidenceLimits[key]).map((id) => {
+                const description = walletRelatedDescription(workspace, row, id, selectionIndex);
+                return (
+                  <div key={id} className="wallet-evidence-outpoint">
+                    <div className="wallet-reference-actions">
+                      <WalletReference
+                        value={id.replace(/^(out|tx):/, '')}
+                        kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
+                      />
+                      <button
+                        className="icon-button"
+                        title="Show on graph"
+                        aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
+                        onClick={() => onShowInGraph(id)}
+                      >
+                        <Search size={13} />
+                      </button>
+                    </div>
+                    {description && (
+                      <span className="wallet-related-description">{description}</span>
+                    )}
+                    {workspace.annotations[id]?.label && (
+                      <span
+                        className="wallet-related-label"
+                        title={workspace.annotations[id].label}
+                      >
+                        {workspace.annotations[id].label}
+                      </span>
+                    )}
                   </div>
-                  {workspace.annotations[id]?.label && (
-                    <span className="wallet-related-label" title={workspace.annotations[id].label}>
-                      {workspace.annotations[id].label}
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
               {ids.length > evidenceLimits[key] && (
                 <button
                   onClick={() =>

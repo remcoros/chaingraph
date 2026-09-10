@@ -2,8 +2,20 @@
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 16px clamp(16px, 2vw, 28px) 32px;
+  padding: 12px clamp(14px, 2vw, 28px) 28px;
   background: var(--color-paper);
+}
+.analysis-body {
+  width: min(100%, max(860px, calc(100vw - 575px)));
+  margin-inline: auto;
+}
+.analysis-header {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--color-rule);
 }
 .analysis-workbench h1 {
   margin: 0;
@@ -24,17 +36,40 @@
   padding: 6px 10px;
   font-size: 12px;
 }
+.scan-launch {
+  padding: 10px 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.scan-header .scan-clear {
+  color: var(--color-muted);
+}
+.scan-options-toggle[aria-expanded='true'] {
+  background: var(--color-raised);
+  border-color: var(--color-accent);
+}
+.scan-options-panel {
+  padding: 14px 12px;
+  margin-top: 8px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+}
+.scan-secondary:empty {
+  display: none;
+}
 .scan-header {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-rule);
+  gap: 8px 10px;
+  padding: 0 0 6px;
 }
 .scan-header > .button-row {
-  margin-left: auto;
+  margin: 0;
   flex-wrap: wrap;
+  justify-content: flex-start;
 }
 .scan-scope {
   display: flex;
@@ -42,12 +77,30 @@
   flex-wrap: wrap;
   gap: 6px 10px;
   min-width: 0;
-  flex: 1;
   font-size: 12px;
 }
+.scan-scope-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: var(--color-muted);
+  padding: 4px 0;
+}
 .scan-scope-name {
-  max-width: 240px;
+  max-width: 360px;
   overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.scan-scope-name + span {
+  padding-left: 10px;
+  border-left: 1px solid var(--color-rule);
+}
+.scan-header select,
+.scan-header button {
+  min-height: 32px;
 }
 .scan-scope label,
 .scan-results-heading label {
@@ -66,9 +119,10 @@
 .scan-secondary {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 6px 20px;
-  padding: 6px 0;
+  gap: 6px 16px;
+  padding: 6px 0 10px;
   border-bottom: 1px solid var(--color-rule);
   font-size: 12px;
 }
@@ -80,7 +134,6 @@
 .scan-coverage {
   font-size: 12px;
 }
-.analysis-settings summary,
 .scan-coverage summary,
 .scan-detail summary {
   cursor: pointer;
@@ -103,6 +156,8 @@
   margin: 0;
 }
 .scan-secondary .scan-run-note {
+  flex-basis: 100%;
+  text-align: left;
   margin: 0;
   padding: 0;
   color: var(--color-muted);
@@ -328,14 +383,10 @@
 }
 @media (max-width: 760px) {
   .analysis-workbench {
-    padding: 18px 16px 36px;
+    padding: 12px 12px 24px;
   }
   .scan-header {
     gap: 8px 12px;
-  }
-  .scan-scope {
-    flex-basis: 100%;
-    order: 1;
   }
   .scan-scope-name {
     max-width: 100%;

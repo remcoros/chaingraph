@@ -15,6 +15,7 @@ import { verifyWalletUtxo, type WalletUtxoRecord } from '../domain/walletRecords
 import {
   applyReviewDecisions,
   buildWalletReview,
+  isCompletedReview,
   REASON_LABELS,
   spendGuidance,
   type WalletReviewItem,
@@ -53,6 +54,7 @@ import {
   type WalletDecisionAction,
 } from './WalletItemDetail';
 import { WalletRelatedSelection } from './WalletRelatedSelection';
+import { matchRelatedEntities } from '../domain/walletReviewContext';
 import { WalletHelp } from './WalletHelp';
 import { WalletReference } from './WalletReference';
 import { TransactionBlockTime } from './TransactionBlockTime';
@@ -216,6 +218,19 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
   const [notice, setNotice] = useState('');
   const detailRef = useRef<HTMLElement>(null);
   const previousRow = useRef<WalletRow | undefined>(undefined);
+  const previousFilterScope = useRef<string | undefined>(undefined);
+  const filterScopeFor = (reviewStatus: WalletStatusFilter) =>
+    JSON.stringify([
+      workspace.id,
+      wallet.id,
+      tab,
+      query,
+      labelFilter,
+      tagFilter,
+      reviewStatus,
+      typeIds,
+    ]);
+  const filterScope = filterScopeFor(status);
   const { utxos, loading: utxoLoading, error: utxoError, check } = props.walletUtxos;
   const currentUtxos = useMemo(
     () =>
@@ -431,9 +446,16 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     canQuery &&
     !utxos &&
     !utxoError;
+  // Metadata edits can remove a row from the current filters. Keep its live
+  // details available until the user navigates, changes filters, or decides.
+  const retainedRow =
+    previousFilterScope.current === filterScope &&
+    (!selectedKey || selectedKey === previousRow.current?.key)
+      ? rows.find((row) => row.key === previousRow.current?.key)
+      : undefined;
   const currentRow = initialReviewLoading
     ? undefined
-    : resolveWalletRow(filteredRows, selectedKey, previousRow.current);
+    : (retainedRow ?? resolveWalletRow(filteredRows, selectedKey, previousRow.current));
   const selectedRow = useMemo(
     () => (currentRow ? walletRowWithContext(workspace, currentRow, selectionIndex) : undefined),
     [selectionIndex, currentRow],
@@ -470,15 +492,18 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     if (batching) return;
     const previous = previousRow.current;
     if (
-      previous?.kind === 'output' &&
-      !previous.address &&
-      currentRow?.kind === 'address' &&
-      currentRow.outpointIds?.includes(previous.nodeId) &&
-      (!selectedKey || selectedKey === previous.key)
+      currentRow &&
+      ((selectedKey && selectedKey !== currentRow.key) ||
+        (previous?.kind === 'output' &&
+          !previous.address &&
+          currentRow.kind === 'address' &&
+          currentRow.outpointIds?.includes(previous.nodeId) &&
+          (!selectedKey || selectedKey === previous.key)))
     )
       setSelectedKey(currentRow.key);
     previousRow.current = currentRow;
-  }, [batching, currentRow, selectedKey]);
+    previousFilterScope.current = filterScope;
+  }, [batching, currentRow, selectedKey, filterScope]);
   const tabLabel = TABS.find((item) => item.id === tab)!.label;
   const statusTotals = useMemo(
     () =>
@@ -507,6 +532,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     selection.clear();
     setSelectedKey(undefined);
     previousRow.current = undefined;
+    previousFilterScope.current = undefined;
     setQuery('');
     setLabelFilter('all');
     setTagFilter('all');
@@ -519,14 +545,23 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     selection.clear();
     if (action === 'reopen') {
       setStatus('open');
-      if (tab === 'review') setSelectedKey(items[0]?.key);
+      const reopened =
+        tab === 'review' ? rows.find((row) => row.key === items[0]?.key) : selectedRow;
+      setSelectedKey(reopened?.key);
+      previousRow.current = reopened;
+      previousFilterScope.current = filterScopeFor('open');
     } else if (selectedRow) {
       const decided = new Set(items.map((item) => item.key));
       const index = filteredRows.findIndex((row) => row.key === selectedRow.key);
-      const following = [...filteredRows.slice(index + 1), ...filteredRows.slice(0, index)];
+      const following =
+        index < 0
+          ? filteredRows
+          : [...filteredRows.slice(index + 1), ...filteredRows.slice(0, index)];
       setSelectedKey(
         following.find((row) => !row.reviews.some((item) => decided.has(item.key)))?.key,
       );
+      previousRow.current = undefined;
+      previousFilterScope.current = undefined;
     }
     setNotice(
       `${action === 'reopen' ? 'Reopened' : action === 'reviewed' ? 'Reviewed' : 'Set aside'} ${items.length} review item${items.length === 1 ? '' : 's'}.`,
@@ -541,15 +576,18 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
       row.kind === 'address' && row.relationshipDirection ? row.contextTransactionIds : undefined,
   });
   const relatedCandidates = useMemo(() => filteredRows.map(related), [filteredRows]);
-  const relatedSelection =
-    selectedRows.length > 0 || selectedRow ? (
-      <WalletRelatedSelection
-        active={active}
-        candidates={relatedCandidates}
-        seeds={(batching ? selectedRows : selectedRow ? [selectedRow] : []).map(related)}
-        onSelect={selection.setIds}
-      />
-    ) : undefined;
+  const relatedSeeds = (batching ? selectedRows : selectedRow ? [selectedRow] : []).map(related);
+  const hasRelatedMatches =
+    matchRelatedEntities(relatedCandidates, relatedSeeds, 'address').length > 0 ||
+    matchRelatedEntities(relatedCandidates, relatedSeeds, 'transaction').length > 0;
+  const relatedSelection = hasRelatedMatches ? (
+    <WalletRelatedSelection
+      active={active}
+      candidates={relatedCandidates}
+      seeds={relatedSeeds}
+      onSelect={selection.setIds}
+    />
+  ) : undefined;
   return (
     <section
       className="wallet-workbench"
@@ -975,6 +1013,15 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                     workspace={workspace}
                     ids={selectedIds}
                     scopeLabel="selected"
+                    guidedActions={
+                      selectedReviews.some(
+                        (item) =>
+                          item.reason === 'link' &&
+                          (item.changed || !isCompletedReview({ status: item.status })),
+                      )
+                        ? ['tags']
+                        : undefined
+                    }
                     disabled={busy || missingSelected > 0}
                     onChange={onChange}
                     onNotice={setNotice}

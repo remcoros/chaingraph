@@ -150,7 +150,7 @@ export const REASON_LABELS: Record<ReviewReason, string> = {
   'new-activity': 'New activity',
   'destination-address': 'Destination address',
   counterparty: 'Saved output review',
-  link: 'Review possible link',
+  link: 'Analysis finding',
 };
 const MAX_ITEMS_PER_REASON: Record<ReviewReason, number> = {
   'current-utxo': 400,
@@ -599,6 +599,8 @@ export function buildWalletReview(
       detail: finding.description,
       nodeId: nodeIds[0] ?? finding.nodeIds[0],
       nodeIds: finding.nodeIds,
+      address: owned.get(nodeIds[0])?.address,
+      transactionIds: finding.txids,
       txid: finding.txids[0],
       algorithm: finding.algorithm,
       evidence: fingerprint(

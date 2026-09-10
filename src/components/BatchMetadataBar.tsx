@@ -19,6 +19,7 @@ export interface BatchMetadataBarProps {
   active?: boolean;
   disabled?: boolean;
   guidance?: string;
+  guidedActions?: readonly ('label' | 'tags')[];
   onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
   onNotice: (message: string) => void;
   onClear?: () => void;
@@ -35,6 +36,7 @@ export function BatchMetadataBar({
   active = true,
   disabled,
   guidance,
+  guidedActions,
   onChange,
   onNotice,
   onClear,
@@ -71,6 +73,7 @@ export function BatchMetadataBar({
         <div className="batch-popover-anchor">
           <button
             ref={labelTrigger}
+            className={guidedActions?.includes('label') ? 'wallet-guided-action' : undefined}
             aria-haspopup="dialog"
             aria-expanded={open === 'label'}
             disabled={disabled}
@@ -96,6 +99,7 @@ export function BatchMetadataBar({
         <div className="batch-popover-anchor">
           <button
             ref={tagTrigger}
+            className={guidedActions?.includes('tags') ? 'wallet-guided-action' : undefined}
             aria-haspopup="dialog"
             aria-expanded={open === 'tags'}
             disabled={disabled}

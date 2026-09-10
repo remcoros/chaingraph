@@ -60,6 +60,13 @@ export interface WalletRow {
   ownership?: 'wallet' | 'external' | 'unknown';
 }
 
+export function walletRowFinding(workspace: Workspace, row: WalletRow) {
+  const review = row.reviews.find((item) => item.reason === 'link' && item.key === row.key);
+  return review
+    ? workspace.findings.find((finding) => review.key.endsWith(`|link|${finding.id}`))
+    : undefined;
+}
+
 export function walletRowTags(workspace: Workspace, row: WalletRow) {
   return listTagsForNode(workspace, {
     id: row.nodeId,
@@ -123,7 +130,11 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
     address: item.address,
     txid: item.nodeId.startsWith('addr:') ? undefined : item.nodeId.split(':')[1],
     contextTransactionIds:
-      kind === 'address' ? (item.transactionIds ?? []) : item.txid ? [item.txid] : [],
+      kind === 'address' || item.reason === 'link'
+        ? (item.transactionIds ?? (item.txid ? [item.txid] : []))
+        : item.txid
+          ? [item.txid]
+          : [],
     outpointIds: item.outpointIds,
     ownership: item.ownership,
     relationshipDirection:

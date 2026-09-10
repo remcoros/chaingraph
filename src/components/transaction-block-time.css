@@ -9,6 +9,10 @@
 .transaction-block-time time {
   overflow-wrap: anywhere;
 }
+.graph-card-facts dd > .transaction-block-time,
+.selection-facts dd > .transaction-block-time {
+  color: inherit;
+}
 .scan-evidence > li > .transaction-block-time {
   padding-inline: 10px;
 }

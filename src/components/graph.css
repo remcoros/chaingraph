@@ -374,3 +374,14 @@
     display: inline-flex;
   }
 }
+
+.graph-card-facts .graph-card-block {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.graph-card-block .transaction-block-time {
+  justify-content: flex-end;
+}
+.graph-card-block .transaction-block-time time {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}

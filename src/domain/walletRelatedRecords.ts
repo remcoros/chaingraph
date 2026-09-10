@@ -1,7 +1,7 @@
 import { outputNodeId, txNodeId, type Workspace } from './types';
 import { relatedTransactions } from './transactionInspection';
 import { walletOutputEvidence } from './walletRelationships';
-import type { WalletRow } from './walletWorkbenchRows';
+import { walletRowFinding, type WalletRow } from './walletWorkbenchRows';
 import type { WalletSelectionIndex } from './walletSelectionIndex';
 
 export interface WalletRelatedRecords {
@@ -18,6 +18,11 @@ export function walletRelatedRecords(
   const inputs = new Set<string>();
   const outputs = new Set(row.outpointIds ?? []);
   const transactions = new Set(row.contextTransactionIds);
+  const finding = walletRowFinding(workspace, row);
+  for (const id of finding?.nodeIds ?? []) {
+    if (id.startsWith('out:')) outputs.add(id);
+  }
+  for (const txid of finding?.txids ?? []) transactions.add(txid);
   if (row.kind === 'transaction' && row.txid) {
     const transaction = workspace.transactions[row.txid];
     transactions.delete(row.txid);
@@ -69,4 +74,96 @@ export function walletRelatedRecords(
     outputs: [...outputs],
     transactions: [...transactions].map(txNodeId),
   };
+}
+
+/** Prefer exact chain relationships, then saved finding membership. Missing
+ * evidence stays explicit rather than turning a shared finding into a flow. */
+export function walletRelatedDescription(
+  workspace: Workspace,
+  row: WalletRow,
+  id: string,
+  index: WalletSelectionIndex,
+): string {
+  const spends = (txid: string, outpoint: string) =>
+    index.spendingTransactionIds.get(outpoint)?.includes(txid) ?? false;
+  const addressFor = (outpoint: string) => {
+    const evidence = index.prevouts.get(outpoint);
+    return evidence?.status === 'loaded' || evidence?.status === 'attached'
+      ? walletOutputEvidence(evidence.output, workspace.network).address
+      : undefined;
+  };
+  if (id.startsWith('tx:')) {
+    const txid = id.slice(3);
+    const transaction = workspace.transactions[txid];
+    if (row.kind === 'output') {
+      if (row.txid === txid) return 'Creates this outpoint';
+      if (spends(txid, row.nodeId)) return 'Spends this outpoint';
+    }
+    if (row.kind === 'transaction' && row.txid) {
+      if (
+        workspace.transactions[row.txid]?.vin.some(
+          (input) =>
+            input.coinbase === undefined && input.vout !== undefined && input.txid === txid,
+        )
+      )
+        return 'Creates an input';
+      if (
+        transaction?.vin.some(
+          (input) =>
+            input.coinbase === undefined && input.vout !== undefined && input.txid === row.txid,
+        )
+      )
+        return 'Spends an output';
+    }
+    if (row.address && transaction) {
+      const receives = transaction.vout.some(
+        (output) => walletOutputEvidence(output, workspace.network).address === row.address,
+      );
+      const sends = transaction.vin.some(
+        (input) =>
+          input.txid !== undefined &&
+          input.vout !== undefined &&
+          input.coinbase === undefined &&
+          addressFor(outputNodeId(input.txid, input.vout)) === row.address,
+      );
+      if (receives && sends) return 'Spends from and pays this address';
+      if (receives) return 'Pays this address';
+      if (sends) return 'Spends from this address';
+    }
+  } else if (id.startsWith('out:')) {
+    const creatingTxid = id.slice(4, id.lastIndexOf(':'));
+    if (row.kind === 'transaction' && row.txid) {
+      if (spends(row.txid, id)) return 'Spent in this transaction';
+      if (creatingTxid === row.txid) return 'Created by this transaction';
+    }
+    if (row.kind === 'output') {
+      if (spends(creatingTxid, row.nodeId))
+        return 'Created by a transaction that spends this outpoint';
+      if (row.txid && spends(row.txid, id))
+        return 'Spent by the transaction that created this outpoint';
+      if (index.spendingTransactionIds.get(row.nodeId)?.some((txid) => spends(txid, id)))
+        return 'Spent in the same transaction';
+      const address = row.address ?? addressFor(row.nodeId);
+      if (address && addressFor(id) === address) return 'Received at the same address';
+      if (creatingTxid === row.txid) return 'Created in the same transaction';
+    }
+    if (row.kind === 'address' && row.address && addressFor(id) === row.address)
+      return 'Received at this address';
+  }
+  const finding = walletRowFinding(workspace, row);
+  if (
+    finding?.nodeIds.includes(id) ||
+    (id.startsWith('tx:') && finding?.txids.includes(id.slice(3)))
+  )
+    return 'Included in this finding';
+  if (id.startsWith('tx:') && !workspace.transactions[id.slice(3)])
+    return 'Relationship details unavailable until this transaction is loaded';
+  if (id.startsWith('out:')) {
+    const evidence = index.prevouts.get(id);
+    if (evidence?.status === 'conflict')
+      return 'Conflicting output details prevent checking the relationship';
+    if (!evidence || evidence.status === 'missing')
+      return 'Relationship details unavailable until this output is loaded';
+  }
+  return 'Relationship details unavailable in loaded data';
 }
