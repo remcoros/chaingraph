@@ -16,13 +16,16 @@ import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
 import { GraphLegend } from './components/GraphLegend';
 import { indexGraphFlow } from './components/graph/flowContext';
-import { GraphContextToolbar } from './components/GraphContextToolbar';
+import { GraphContextToolbar, type GraphContextSideCounts } from './components/GraphContextToolbar';
+import { graphUnconnectedOutputIds, graphTransactionOutputIds } from './domain/graphBranch';
 import {
   addGraphNodes,
   ensureGraphMembership,
   hideGraphNodes,
   projectGraphMembership,
   removeGraphNodes,
+  fullGraphMembershipEvidence,
+  showAllGraphOutputs,
 } from './domain/graphMembership';
 import { GraphControls } from './components/GraphControls';
 import { EntityBadges } from './components/EntityBadges';
@@ -222,7 +225,11 @@ export default function App() {
     index: -1,
   });
   const [focusGraph, setFocusGraph] = useState(false);
-  const [focusRequest, setFocusRequest] = useState<{ id: string; token: number }>();
+  const [focusRequest, setFocusRequest] = useState<{
+    id: string;
+    token: number;
+    preserveZoom?: boolean;
+  }>();
   // Toolbar expansion can change selection without engaging Lock to selection.
   // A normal selection, explicit Center, or Lock toggle resumes camera following.
   const cameraPreservedSelection = useRef<string | undefined>(undefined);
@@ -572,6 +579,30 @@ export default function App() {
     selectedId,
   ]);
   const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
+  const connectionGraph = useMemo(
+    () => (w && !w.view.showAddresses ? fullGraphMembershipEvidence(w) : graph),
+    [graph],
+  );
+  const connectionMembers = useMemo(
+    () => new Set(w?.view.graphNodeIds ?? connectionGraph.nodes.map((node) => node.id)),
+    [w?.view.graphNodeIds, connectionGraph],
+  );
+  const shownConnectionMembers = useMemo(
+    () => new Set([...connectionMembers].filter((id) => !hiddenIds.has(id))),
+    [connectionMembers, hiddenIds],
+  );
+  const unconnectedForHide = useMemo(
+    () => graphUnconnectedOutputIds(connectionGraph, shownConnectionMembers),
+    [connectionGraph, shownConnectionMembers],
+  );
+  const unconnectedForRemoval = useMemo(
+    () => graphUnconnectedOutputIds(connectionGraph, connectionMembers),
+    [connectionGraph, connectionMembers],
+  );
+  const allGraphOutputIds = useMemo(
+    () => graphTransactionOutputIds(connectionGraph, shownConnectionMembers),
+    [connectionGraph, shownConnectionMembers],
+  );
   // Address visibility is a canvas preference. Manually hidden addresses must
   // remain recoverable without enabling every address node in the renderer.
   const recoveryGraph = useMemo(() => {
@@ -1129,7 +1160,7 @@ export default function App() {
       };
     };
     const finish = () => {
-      select(nodeId);
+      select(nodeId, { preserveCamera: options.isolate });
       setRightTab(tab);
       if (options.selectionIds) {
         selection.replace(ids.length > 1 ? ids : []);
@@ -1143,7 +1174,7 @@ export default function App() {
             : { includeIds: ids, preserveContext: true },
         );
       } else setGraphFilters({});
-      if (center) setFocusRequest({ id: nodeId, token: Date.now() });
+      if (center && !options.isolate) setFocusRequest({ id: nodeId, token: Date.now() });
     };
     if (nodeId.startsWith('addr:')) {
       ws.update(ownerId, reveal, false);
@@ -1307,7 +1338,7 @@ export default function App() {
               txNodeId(t.txid),
             )
           )
-            setNotice(ancestryNotice(result, before));
+            setNotice(ancestryNotice(result));
         }
       } else {
         setOperation('Discovering address history…');
@@ -1342,7 +1373,7 @@ export default function App() {
         setNotice(
           result.truncated
             ? 'Partial address history: 500-transaction limit reached. Search again to load more.'
-            : `Loaded ${result.transactions.length} transactions for this address.`,
+            : '',
         );
       }
       setQuery('');
@@ -1479,15 +1510,9 @@ export default function App() {
           select(id, options);
           setGraphFilters({});
           if (!options?.preserveCamera) setFocusRequest({ id, token: Date.now() });
-          setNotice(
-            'Creating transaction opened. Load its input details explicitly to trace further.',
-          );
         } else if (!loaded) {
           signal.throwIfAborted();
           mergeTransactions(w.id, [transaction]);
-          setNotice(
-            'Creating transaction loaded. The output now has its value and script details. Trace again to load its previous inputs.',
-          );
         } else {
           const before = ws.getSession(w.id)!.data;
           const result = await loadAncestors([transaction], before.transactions, 1, {
@@ -1517,7 +1542,7 @@ export default function App() {
                 ),
               ]),
             );
-            setNotice(ancestryNotice(result, before));
+            setNotice(ancestryNotice(result));
           }
         }
       } else {
@@ -1726,7 +1751,7 @@ export default function App() {
           false,
         );
     }
-    setFocusRequest({ id: selectedId, token: Date.now() });
+    setFocusRequest({ id: selectedId, token: Date.now(), preserveZoom: true });
   }, [w?.id, viewOwner, w?.view.lockToSelection, selectedId, hiddenIds]);
   function centerNode(id = selectedId, filters?: GraphFilters, showHidden = false) {
     if (!id) return;
@@ -1753,7 +1778,6 @@ export default function App() {
       setGraphFilters({});
       if (id.startsWith('addr:'))
         change((current) => ({ ...current, view: { ...current.view, showAddresses: true } }));
-      setNotice('View filters cleared to reveal this selection.');
     }
     setMobilePanel('graph');
     cameraPreservedSelection.current = undefined;
@@ -1763,17 +1787,15 @@ export default function App() {
     const index = navigation.index + delta;
     const id = navigation.ids[index];
     if (!id) return;
-    const filters: GraphFilters = graphFilters.focus
-      ? { focus: { ...graphFilters.focus, id } }
-      : {};
-    setGraphFilters(filters);
+    selectionGeneration.current++;
     setNavigation({ ...navigation, index });
-    cameraPreservedSelection.current = undefined;
+    cameraPreservedSelection.current = id;
+    setFocusRequest(undefined);
     setSelectedId(id);
     setRightTab('inspect');
-    centerNode(id, filters);
   }
   function updateFilters(filters: GraphFilters) {
+    setFocusRequest(undefined);
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
@@ -1784,6 +1806,8 @@ export default function App() {
     setWorkbench(next);
   }
   function prepareIsolation(ids: string[], preserveFilters = false) {
+    cameraPreservedSelection.current = ids[0];
+    setFocusRequest(undefined);
     const transactionIds = [
       ...new Set(
         ids.flatMap((nodeId) => {
@@ -1844,13 +1868,13 @@ export default function App() {
     }, false);
     setReturnWorkbench('analysis');
     switchWorkbench('graph', true);
-    select(target.selectedId);
+    select(target.selectedId, { preserveCamera: isolate });
     if (target.usedSupportingTransaction)
       setNotice(
         'The requested entity cannot be opened directly. Showing its supporting transaction.',
       );
     updateFilters(isolate ? { includeIds: target.ids, preserveContext: true } : {});
-    setFocusRequest({ id: target.selectedId, token: Date.now() });
+    if (!isolate) setFocusRequest({ id: target.selectedId, token: Date.now() });
     setMobilePanel('graph');
     return true;
   }
@@ -1861,15 +1885,56 @@ export default function App() {
       false,
     );
   }
+  async function updateAllGraphOutputs(action: 'hide' | 'show') {
+    if (!w) return;
+    const ownerId = w.id;
+    const generation = selectionGeneration.current;
+    await run(async (signal) => {
+      setOperation(
+        action === 'hide' ? 'Hiding unconnected inputs/outputs…' : 'Showing all inputs/outputs…',
+      );
+      // Give the busy state a paint before a potentially large membership update.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      signal.throwIfAborted();
+      if (wRef.current?.id !== ownerId || selectionGeneration.current !== generation) return;
+      cameraPreservedSelection.current = selectedId;
+      setFocusRequest(undefined);
+      ws.update(ownerId, (current) => {
+        if (action === 'hide') {
+          const evidence = fullGraphMembershipEvidence(current);
+          const initialized = ensureGraphMembership(current);
+          const hidden = new Set(initialized.view.hiddenNodeIds);
+          const participating = new Set(
+            initialized.view.graphNodeIds!.filter((id) => !hidden.has(id)),
+          );
+          return setNodesHidden(
+            initialized,
+            graphUnconnectedOutputIds(evidence, participating),
+            true,
+          );
+        }
+        const expanded = showAllGraphOutputs(current);
+        return { ...expanded, view: { ...expanded.view, smallAmountThreshold: undefined } };
+      });
+      if (action === 'show') setGraphFilters({});
+    });
+  }
   const contextTransaction =
     graphFlowContext && w?.transactions[graphFlowContext.transactionId.slice(3)];
-  const contextSideIds = contextTransaction
-    ? {
-        inputs: transactionNodeIds(contextTransaction, 'inputs'),
-        outputs: transactionNodeIds(contextTransaction, 'outputs'),
-      }
-    : undefined;
-  const visibleIds = new Set(visibleGraph.nodes.map((node) => node.id));
+  const contextSideIds = useMemo(
+    () =>
+      contextTransaction
+        ? {
+            inputs: transactionNodeIds(contextTransaction, 'inputs'),
+            outputs: transactionNodeIds(contextTransaction, 'outputs'),
+          }
+        : undefined,
+    [contextTransaction],
+  );
+  const showAllOutputCount = useMemo(
+    () => [...allGraphOutputIds].filter((id) => !canvasIds.has(id)).length,
+    [allGraphOutputIds, canvasIds],
+  );
   const contextSides =
     contextSideIds &&
     (Object.fromEntries(
@@ -1877,16 +1942,21 @@ export default function App() {
         side,
         {
           total: contextSideIds[side].length,
-          shown: contextSideIds[side].filter((id) => visibleIds.has(id)).length,
+          shown: contextSideIds[side].filter((id) => canvasIds.has(id)).length,
           hidden: contextSideIds[side].filter((id) => admittedIds.has(id) && hiddenIds.has(id))
             .length,
           added: contextSideIds[side].filter((id) => admittedIds.has(id)).length,
+          unconnectedShown: contextSideIds[side].filter(
+            (id) => canvasIds.has(id) && unconnectedForHide.has(id),
+          ).length,
+          unconnectedAdded: contextSideIds[side].filter((id) => unconnectedForRemoval.has(id))
+            .length,
         },
       ]),
     ) as
       | {
-          inputs: { total: number; shown: number; hidden: number; added: number };
-          outputs: { total: number; shown: number; hidden: number; added: number };
+          inputs: GraphContextSideCounts;
+          outputs: GraphContextSideCounts;
         }
       | undefined);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
@@ -1930,27 +2000,33 @@ export default function App() {
       onAddSide={(side) => revealGraphNodes(contextSideIds?.[side] ?? [])}
       onHideSide={(side) =>
         setEntityHidden(
-          (contextSideIds?.[side] ?? []).filter((id) => visibleIds.has(id)),
+          (contextSideIds?.[side] ?? []).filter(
+            (id) => canvasIds.has(id) && unconnectedForHide.has(id),
+          ),
           true,
         )
       }
-      onRemoveSide={(side) => removeFromGraph(contextSideIds?.[side] ?? [])}
+      onRemoveSide={(side) =>
+        removeFromGraph(
+          (contextSideIds?.[side] ?? []).filter((id) => unconnectedForRemoval.has(id)),
+        )
+      }
       canOpenCreatingTx={!!tx || canTrace}
       canOpenSpendingTx={selectedSpenders.length > 0 || canTrace}
       onOpenCreatingTx={() => void expand('funding', selectedId, { preserveCamera: true })}
       onOpenSpendingTx={openSpendingFromToolbar}
-      canShowSelection={toolbarSelection.some((id) => !visibleIds.has(id))}
-      canHideSelection={toolbarSelection.some((id) => visibleIds.has(id))}
+      canShowSelection={toolbarSelection.some((id) => !canvasIds.has(id))}
+      canHideSelection={toolbarSelection.some((id) => canvasIds.has(id))}
       canRemoveSelection={toolbarSelection.some((id) => admittedIds.has(id))}
       onShowSelection={() => revealGraphNodes(toolbarSelection)}
       onHideSelection={() =>
         setEntityHidden(
-          toolbarSelection.filter((id) => visibleIds.has(id)),
+          toolbarSelection.filter((id) => canvasIds.has(id)),
           true,
         )
       }
       onRemoveSelection={() => removeFromGraph(toolbarSelection)}
-      canHideBranch={!!graphFlowContext && visibleIds.has(graphFlowContext.transactionId)}
+      canHideBranch={!!graphFlowContext && canvasIds.has(graphFlowContext.transactionId)}
       canRemoveBranch={!!graphFlowContext && admittedIds.has(graphFlowContext.transactionId)}
       onHideBranch={() =>
         setEntityHidden(graphFlowContext ? [graphFlowContext.transactionId] : [], true)
@@ -1960,6 +2036,10 @@ export default function App() {
       }
       hiddenCount={hiddenCount}
       onRestoreHidden={showAllHidden}
+      unconnectedCount={unconnectedForHide.size}
+      showAllOutputCount={showAllOutputCount}
+      onHideUnconnected={() => void updateAllGraphOutputs('hide')}
+      onShowAllOutputs={() => void updateAllGraphOutputs('show')}
       busy={!!operation}
     />
   ) : null;
@@ -1992,7 +2072,7 @@ export default function App() {
       </button>
       <button
         aria-label="Lock to selection"
-        title="Keep the graph centered on selections from any panel"
+        title="Keep selections centered without changing zoom"
         aria-pressed={w.view.lockToSelection ?? false}
         className={`graph-lock-selection ${w.view.lockToSelection ? 'active' : ''}`}
         onClick={() => {
@@ -2901,7 +2981,6 @@ export default function App() {
                         const transaction = await getTransaction(selected.txid!, signal);
                         signal.throwIfAborted();
                         mergeTransactions(w.id, [transaction]);
-                        setNotice('Transaction refreshed from your node.');
                       })
                     }
                     canRemove={!!selectedRemovalPlan}
@@ -3174,7 +3253,7 @@ export default function App() {
                     ...current,
                     view: { ...current.view, showAddresses: true },
                   }));
-                  setNotice('Address display enabled. Other graph filters still apply.');
+                  setNotice('');
                 }}
               >
                 Enable address display

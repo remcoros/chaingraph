@@ -16,6 +16,11 @@ export default defineConfig({
   server: {
     port: 3001,
     strictPort: true,
+    watch: {
+      // Git checkouts and editor writes can briefly leave modules empty. Wait
+      // for the completed write before invalidating and transforming for HMR.
+      awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 25 },
+    },
     proxy: {
       '/api': {
         target: process.env.CHAINGRAPH_PROXY_TARGET ?? 'http://127.0.0.1:3000',

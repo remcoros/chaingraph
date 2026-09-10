@@ -435,7 +435,16 @@ visibility, and is saved per workspace. Choose **Not hidden** or **All entities*
 to inspect observations omitted by the graph amount filter, or **Hidden** to
 restore manually hidden items. Changing this list mode does not remove chain data.
 
-**Center** frames the selected node with its immediate connections.
+**Center** frames the selected node at about 24 pixels wide. **Lock** keeps the
+selection centered without changing zoom.
+Back and forward change selection without moving the camera, including with Lock
+on. **Isolate** fits the entire isolated view.
+The transaction toolbar's Hide/Remove inputs and outputs preserve further connections.
+The two bottom controls hide all I/O with zero or one connection, or show all loaded
+I/O for transactions on the graph. Show all clears canvas filters and amount limits;
+manually hidden transactions stay hidden. No additional history is fetched.
+Successful opening and tracing do not show a popup; incomplete results retain
+recovery guidance.
 **Fit graph** frames all displayed nodes. Both account for node sizes, displayed
 labels and the floating navigation toolbar, while retaining the current viewing direction. Orbiting may
 still bring nodes in front of each other; Flat and Fit provide alternate views.

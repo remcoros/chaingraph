@@ -37,17 +37,7 @@ describe('bounded previous transaction tracing', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(result.transactions).toEqual([]);
     expect(result.resolvedTransactionIds).toEqual([root.txid, parent.txid]);
-    expect(
-      ancestryNotice(result, {
-        transactions: { [root.txid]: root, [parent.txid]: parent },
-        inputContext: { [parent.txid]: [0] },
-      }),
-    ).toBe(
-      'Expanded 1 cached input transaction to show all inputs and outputs. No repeat download needed.',
-    );
-    expect(ancestryNotice(result, { transactions: { [parent.txid]: parent } })).toContain(
-      'already visible',
-    );
+    expect(ancestryNotice(result)).toBe('');
   });
   it('limits both levels together to 500 lookups and reports partial expansion', async () => {
     const roots = [
@@ -81,15 +71,13 @@ describe('bounded previous transaction tracing', () => {
     expect(result.failed).toBe(1);
     expect(result.resolvedTransactionIds).toEqual([id(1), id(3)]);
     expect(result.transactions.map((t) => t.txid)).toEqual([id(3)]);
-    expect(ancestryNotice(result, { transactions: {} })).toBe(
-      '1 previous transaction added. 1 previous transaction could not be loaded. Retry the path to continue.',
+    expect(ancestryNotice(result)).toBe(
+      '1 previous transaction could not be loaded. Retry the path to continue.',
     );
   });
   it('describes a coinbase root without a zero-added failure message', async () => {
     const result = await loadAncestors([tx(1)], {}, 1, { fetch: vi.fn() });
-    expect(ancestryNotice(result, { transactions: {} })).toBe(
-      'Coinbase transaction: no previous inputs to load.',
-    );
+    expect(ancestryNotice(result)).toBe('Coinbase transaction: no previous inputs to load.');
   });
   it('does not begin work after cancellation', async () => {
     const controller = new AbortController();

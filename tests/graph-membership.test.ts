@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   addGraphNodes,
   ensureGraphMembership,
+  fullGraphMembershipEvidence,
   hideGraphNodes,
   MAX_GRAPH_ACTION_NODES,
   MAX_GRAPH_NODES,
   parseGraphNodeIds,
   projectGraphMembership,
   removeGraphNodes,
+  showAllGraphOutputs,
 } from '../src/domain/graphMembership';
+import { graphUnconnectedOutputIds } from '../src/domain/graphBranch';
 import { outputNodeId, txNodeId, type Transaction } from '../src/domain/types';
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import { createTemplateWorkspace } from '../src/domain/workspaceTemplates';
@@ -47,6 +50,64 @@ describe('explicit canvas membership', () => {
       outputNodeId(b, 0),
     ]);
   }
+
+  it('protects connecting I/O from terminal hide/remove even when temporary filters conceal neighbors', () => {
+    const w = connectedWorkspace();
+    w.view.graphNodeIds!.push(`addr:${address}`);
+    w.inputContext = { [a]: [0] };
+    w.view.smallAmountThreshold = 200_000_000;
+    w.view.filters = { includeIds: [txNodeId(a)] };
+    const evidence = fullGraphMembershipEvidence(w);
+    const terminal = graphUnconnectedOutputIds(evidence, new Set(w.view.graphNodeIds));
+    expect(terminal).toEqual(new Set([outputNodeId(b, 0)]));
+    expect(hideGraphNodes(w, terminal).view.hiddenNodeIds).toEqual([outputNodeId(b, 0)]);
+    expect(removeGraphNodes(w, terminal).view.graphNodeIds).toContain(outputNodeId(a, 0));
+    expect(removeGraphNodes(w, terminal).view.graphNodeIds).toContain(outputNodeId(a, 1));
+
+    w.view.hiddenNodeIds = [txNodeId(b), `addr:${address}`];
+    const visible = new Set(
+      w.view.graphNodeIds!.filter((id) => !w.view.hiddenNodeIds!.includes(id)),
+    );
+    const hideable = graphUnconnectedOutputIds(evidence, visible);
+    expect(hideable).toEqual(new Set([outputNodeId(a, 0), outputNodeId(a, 1), outputNodeId(b, 0)]));
+    // Removing still protects bridges to hidden members; hiding uses manual visibility.
+    expect(graphUnconnectedOutputIds(evidence, new Set(w.view.graphNodeIds))).toEqual(terminal);
+    expect(new Set(hideGraphNodes(w, hideable).view.hiddenNodeIds)).toEqual(
+      new Set([txNodeId(b), `addr:${address}`, ...hideable]),
+    );
+  });
+
+  it('shows all loaded direct I/O of canvas transactions and restores hidden or removed I/O without fetching', () => {
+    const w = connectedWorkspace();
+    const hidden = hideGraphNodes(w, [outputNodeId(a, 0), outputNodeId(b, 0)]);
+    const removed = removeGraphNodes(hidden, [outputNodeId(a, 1)]);
+    removed.inputContext = { [a]: [0] };
+    removed.view.smallAmountThreshold = 200_000_000;
+    removed.view.filters = { includeIds: [txNodeId(a)] };
+    const shown = showAllGraphOutputs(removed);
+    expect(new Set(shown.view.graphNodeIds)).toEqual(new Set(w.view.graphNodeIds));
+    expect(shown.view.hiddenNodeIds).toBeUndefined();
+    expect(shown.transactions).toBe(w.transactions);
+    expect(shown.view.filters).toBe(removed.view.filters);
+    expect(shown.inputContext).toBe(removed.inputContext);
+    expect(showAllGraphOutputs(shown)).toBe(shown);
+  });
+
+  it('does not reveal hidden transactions or expand other loaded transactions and addresses', () => {
+    const w = connectedWorkspace();
+    const hidden = hideGraphNodes(w, [txNodeId(a)]);
+    const shown = showAllGraphOutputs(hidden);
+    expect(shown.view.hiddenNodeIds).toEqual([txNodeId(a), outputNodeId(a, 1)]);
+    expect(shown.view.graphNodeIds).not.toContain(`addr:${address}`);
+    const sparse = { ...w, view: { ...w.view, graphNodeIds: [txNodeId(b)] } };
+    expect(new Set(showAllGraphOutputs(sparse).view.graphNodeIds)).toEqual(
+      new Set([txNodeId(b), outputNodeId(a, 0), outputNodeId(b, 0)]),
+    );
+    expect(
+      showAllGraphOutputs({ ...w, view: { ...w.view, graphNodeIds: [outputNodeId(a, 0)] } }).view
+        .graphNodeIds,
+    ).toEqual([outputNodeId(a, 0)]);
+  });
 
   it('removes orphaned I/O but retains shared connections and unrelated existing orphans', () => {
     const w = connectedWorkspace();

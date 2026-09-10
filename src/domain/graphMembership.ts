@@ -1,5 +1,5 @@
 import { canonicalEntityNodeId } from './entityReferences';
-import { graphRemovalClosure } from './graphBranch';
+import { graphRemovalClosure, graphTransactionOutputIds } from './graphBranch';
 import type { GraphData, Workspace } from './types';
 import { setNodesHidden } from './visibility';
 import { buildGraph } from './workspace';
@@ -64,12 +64,25 @@ export function addGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): 
 }
 
 /** Connection checks use all loaded evidence, independent of display preferences. */
-function removalGraph(workspace: Workspace): GraphData {
+export function fullGraphMembershipEvidence(workspace: Workspace): GraphData {
   return buildGraph({
     ...workspace,
     inputContext: undefined,
     view: { ...workspace.view, showAddresses: true },
   });
+}
+
+/** Reveal loaded I/O of manually visible canvas transactions without loading or
+ * expanding their neighbors. Temporary filters and display preferences do not
+ * change the action's scope; manually hidden transactions remain hidden. */
+export function showAllGraphOutputs(workspace: Workspace): Workspace {
+  const initialized = ensureGraphMembership(workspace);
+  const hidden = new Set(initialized.view.hiddenNodeIds);
+  const participating = new Set(initialized.view.graphNodeIds!.filter((id) => !hidden.has(id)));
+  return addGraphNodes(
+    initialized,
+    graphTransactionOutputIds(fullGraphMembershipEvidence(initialized), participating),
+  );
 }
 
 /** Hide requested members and I/O orphaned by hiding their transactions. */
@@ -78,7 +91,11 @@ export function hideGraphNodes(workspace: Workspace, nodeIds: Iterable<string>):
   const initialized = ensureGraphMembership(workspace);
   const hidden = new Set(initialized.view.hiddenNodeIds);
   const participating = new Set(initialized.view.graphNodeIds!.filter((id) => !hidden.has(id)));
-  const ids = graphRemovalClosure(removalGraph(initialized), participating, requested);
+  const ids = graphRemovalClosure(
+    fullGraphMembershipEvidence(initialized),
+    participating,
+    requested,
+  );
   return setNodesHidden(initialized, ids, true);
 }
 
@@ -88,7 +105,7 @@ export function removeGraphNodes(workspace: Workspace, nodeIds: Iterable<string>
   const initialized = ensureGraphMembership(workspace);
   const previous = initialized.view.graphNodeIds!;
   const removed = new Set(
-    graphRemovalClosure(removalGraph(initialized), new Set(previous), requested),
+    graphRemovalClosure(fullGraphMembershipEvidence(initialized), new Set(previous), requested),
   );
   const graphNodeIds = previous.filter((id) => !removed.has(id));
   return graphNodeIds.length === previous.length

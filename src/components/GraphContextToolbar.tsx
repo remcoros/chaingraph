@@ -21,6 +21,8 @@ export interface GraphContextSideCounts {
   shown: number;
   hidden: number;
   added: number;
+  unconnectedShown: number;
+  unconnectedAdded: number;
 }
 
 export interface GraphContextToolbarProps {
@@ -54,6 +56,10 @@ export interface GraphContextToolbarProps {
   onRemoveBranch: () => void;
   hiddenCount?: number;
   onRestoreHidden?: () => void;
+  unconnectedCount: number;
+  showAllOutputCount: number;
+  onHideUnconnected: () => void;
+  onShowAllOutputs: () => void;
   busy?: boolean;
 }
 
@@ -150,20 +156,20 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
                 </button>
                 <button
                   type="button"
-                  disabled={counts.shown === 0}
+                  disabled={props.busy || counts.unconnectedShown === 0}
                   onClick={() => props.onHideSide(side)}
-                  aria-label={`Hide ${countLabel(counts.shown)} ${side}`}
-                  title={`Hide ${countLabel(counts.shown)} ${side}`}
+                  aria-label={`Hide ${countLabel(counts.unconnectedShown)} unconnected ${side}`}
+                  title={`Hide ${countLabel(counts.unconnectedShown)} unconnected ${side}`}
                 >
                   <Direction size={17} aria-hidden="true" />
                   <EyeOff className="graph-context-action-badge" size={10} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  disabled={counts.added === 0}
+                  disabled={props.busy || counts.unconnectedAdded === 0}
                   onClick={() => props.onRemoveSide(side)}
-                  aria-label={`Remove ${countLabel(counts.added)} ${side} from graph; keep evidence and notes`}
-                  title={`Remove ${countLabel(counts.added)} ${side} from graph`}
+                  aria-label={`Remove ${countLabel(counts.unconnectedAdded)} unconnected ${side} from graph; keep evidence and notes`}
+                  title={`Remove ${countLabel(counts.unconnectedAdded)} unconnected ${side} from graph`}
                 >
                   <Direction size={17} aria-hidden="true" />
                   <X className="graph-context-action-badge" size={10} aria-hidden="true" />
@@ -254,6 +260,30 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
           </button>
         </div>
       )}
+      <div
+        className="graph-context-section graph-context-actions"
+        role="group"
+        aria-label="All graph inputs and outputs"
+      >
+        <button
+          type="button"
+          disabled={props.busy || props.unconnectedCount === 0}
+          onClick={props.onHideUnconnected}
+          aria-label="Hide all unconnected inputs and outputs"
+          title={`Hide ${countLabel(props.unconnectedCount)} inputs/outputs with zero or one connection`}
+        >
+          <EyeOff size={17} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={props.busy || props.showAllOutputCount === 0}
+          onClick={props.onShowAllOutputs}
+          aria-label="Show all inputs and outputs"
+          title="Show all loaded inputs/outputs for transactions on the graph"
+        >
+          <Eye size={17} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }

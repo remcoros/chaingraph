@@ -322,7 +322,9 @@ Identifiers use the shared seven-character ends, with the complete outpoint inde
 hover the title or identifier for its full value. Actions and close stay right aligned on the top row.
 
 **Lock** keeps the graph centered as you select items anywhere in the
-workbench. Graph controls independently show or hide labels, tags and icons. On
+workbench without changing zoom. Center frames the selected node at about 24 pixels wide.
+Back and forward change selection without moving the camera or clearing filters.
+Isolate fits the complete isolated view. Graph controls independently show or hide labels, tags and icons. On
 desktop, **Hide panels** sits beside the 3D/Flat toggle and temporarily hides the
 side panels; it is hidden on mobile, where panels already have separate views.
 
@@ -388,6 +390,11 @@ Individual inputs and outputs can be hidden, while complete transaction records 
 Hiding or removing a transaction also hides or removes its inputs/outputs from the graph
 when they lose their last connection. Shared connections survive, and **Show all hidden**
 restores a hidden group.
+The transaction toolbar's Hide/Remove inputs and outputs affect only unconnected
+I/O, preserving further connections. Its bottom controls hide all I/O with zero
+or one connection, or show all loaded I/O for transactions on the graph.
+Show all clears canvas filters and amount limits; manually hidden transactions
+stay hidden. These actions keep the camera in place and do not fetch more history.
 Adding a creating or spending transaction from the right toolbar keeps the camera in
 place, including with Lock enabled. **Center** moves to the selected transaction explicitly.
 New branches extend beyond their source input/output sphere with clearance proportional
@@ -410,8 +417,9 @@ The timestamped observation remains under **Chain evidence** for the current sel
 A missing UTXO result is not treated as proof of spending.
 
 Successful transaction, output and address lookups focus their target even with
-Lock off. **Load previous** distinguishes new downloads from expanding
-already cached input context. Removing a transaction also removes its unused input
+Lock off. Successful opening and tracing actions are silent; incomplete results
+still explain limits and recovery. **Load previous** reuses already cached input
+context. Removing a transaction also removes its unused input
 context, including previously expanded context. Shared, independently
 added, annotated and wallet-related context is retained. Older saved workspaces
 without ancestry provenance are handled conservatively.
@@ -419,6 +427,9 @@ without ancestry provenance are handled conservatively.
 Flow arrows are visible on every transaction/output connection. Connections touching
 the selected entity use larger arrows and thicker highlighted lines. Address
 associations remain undirected.
+The expanded flow panel keeps a stable height as selection changes, capped at
+340 pixels and half the graph area (46% on narrow screens). Lists scroll inside
+the panel; Collapse returns it to its header.
 
 ### Browse a wallet
 

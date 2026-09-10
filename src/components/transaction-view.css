@@ -19,14 +19,19 @@
 .transaction-view {
   position: relative;
   flex: 0 1 auto;
-  max-height: min(50%, 340px);
   margin: 6px 8px 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   background: var(--color-paper);
   border: 1px solid var(--color-rule);
   border-radius: 7px;
   font-size: 11px;
+}
+.transaction-view[open] {
+  /* Keep the graph stationary when the selected transaction has fewer rows. */
+  height: min(50%, 340px);
+  min-height: 0;
 }
 .transaction-view > summary {
   padding: 7px 10px;
@@ -411,8 +416,10 @@
 }
 @media (max-width: 700px) {
   .transaction-view {
-    max-height: 46%;
     margin: 5px 5px 0;
+  }
+  .transaction-view[open] {
+    height: min(46%, 340px);
   }
   .transaction-view-body {
     padding: 0 5px 7px;

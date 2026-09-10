@@ -66,14 +66,13 @@ for (const depth of ['0', '1'])
     await card
       .getByRole('button', { name: /Load previous level|Open creating transaction/ })
       .click();
+    await expect(page.locator('.statusbar')).toContainText('2 transactions');
     await expect(
       page.getByRole('status').filter({
         hasText:
-          depth === '0'
-            ? 'Expanded 1 cached input transaction'
-            : 'Previous transactions are already visible',
+          /Expanded .*cached input transaction|Previous transactions are already visible|Creating transaction opened/,
       }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     expect(requests).toEqual([]);
     await page.keyboard.press('Escape');
     const row = page

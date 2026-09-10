@@ -102,11 +102,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let viewportWidth = 0;
   let viewportHeight = 0;
   let navigationInset = 0;
-  let lastFraming: { nodeId?: string } | undefined;
+  let lastFraming: { nodeId?: string; preserveZoom?: boolean } | undefined;
   let settled = false;
   let earlyFitPending = false;
   let earlyFitTicks = 0;
-  let pendingFocus: string | undefined;
+  let pendingFocus: { id: string; preserveZoom?: boolean } | undefined;
   let dead = false;
   let initialSnapshot: GraphSnapshot | undefined;
   const retainedPositions = new Map<string, GraphSnapshot['nodes'][number]>();
@@ -311,6 +311,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     transition: number,
     target?: { x: number; y: number; z: number },
     focusId?: string,
+    preserveZoom?: boolean,
   ) => {
     if (!dimensions) return;
     const camera = graph.camera() as PerspectiveCamera;
@@ -342,10 +343,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         }),
       ),
       target,
+      preserveZoom,
     });
     if (pose) {
       graph.cameraPosition(pose.position, pose.target, transition);
-      lastFraming = { nodeId: focusId };
+      lastFraming = { nodeId: focusId, preserveZoom };
     }
   };
   const tryEarlyFit = () => {
@@ -536,7 +538,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .onEngineTick(() => {
         positionsDirty = true;
         positionHalos();
-        if (pendingFocus) focus(pendingFocus);
+        if (pendingFocus) focus(pendingFocus.id, pendingFocus);
         if (earlyFitTicks > 0) earlyFitTicks--;
         tryEarlyFit();
       })
@@ -544,7 +546,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
         if (dead) return;
         positionHalos();
         settled = true;
-        if (pendingFocus) focus(pendingFocus);
+        if (pendingFocus) focus(pendingFocus.id, pendingFocus);
         earlyFitPending = false;
         if (visible && needsFit && graph.graphData().nodes.length) {
           needsFit = false;
@@ -647,11 +649,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     dispose();
     throw error;
   }
-  function focus(id: string, transition = duration()) {
+  function focus(id: string, options?: { preserveZoom?: boolean }, transition = duration()) {
     if (dead) return;
     // An explicit request owns the next camera move even when its frame has not
     // arrived yet. Never substitute the origin for uninitialized coordinates.
-    pendingFocus = id;
+    pendingFocus = { id, preserveZoom: options?.preserveZoom };
     needsFit = false;
     earlyFitPending = false;
     if (!visible) return;
@@ -677,6 +679,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       transition,
       target,
       id,
+      options?.preserveZoom,
     );
     scheduleSnapshot();
   }
@@ -802,7 +805,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           needsFit = false;
         }
       }
-      if (pendingFocus) focus(pendingFocus);
+      if (pendingFocus) focus(pendingFocus.id, pendingFocus);
     },
     resize(width, height, topInset = 0) {
       if (dead) return;
@@ -820,13 +823,13 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       halos.material.uniforms.viewportScale.value = height * graph.renderer().getPixelRatio();
       const previousFraming = lastFraming;
       tryEarlyFit();
-      if (pendingFocus) focus(pendingFocus, 0);
+      if (pendingFocus) focus(pendingFocus.id, pendingFocus, 0);
       else if (needsFit && settled && graph.graphData().nodes.length) {
         needsFit = false;
         frameNodes(graph.graphData().nodes, duration());
         scheduleSnapshot();
       } else if (changed && lastFraming && lastFraming === previousFraming) {
-        if (lastFraming.nodeId) focus(lastFraming.nodeId, 0);
+        if (lastFraming.nodeId) focus(lastFraming.nodeId, lastFraming, 0);
         else frameNodes(graph.graphData().nodes, 0);
         scheduleSnapshot();
       }

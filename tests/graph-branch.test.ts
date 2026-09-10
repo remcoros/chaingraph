@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { graphRemovalClosure, transactionGraphBranch } from '../src/domain/graphBranch';
+import {
+  graphRemovalClosure,
+  graphTransactionOutputIds,
+  graphUnconnectedOutputIds,
+  transactionGraphBranch,
+} from '../src/domain/graphBranch';
 import type { GraphData } from '../src/domain/types';
 
 it('clears a transaction footprint while keeping shared outpoints and unrelated branches', () => {
@@ -47,6 +52,51 @@ const graph: GraphData = {
   ],
 };
 const participating = () => new Set(graph.nodes.map((node) => node.id));
+
+describe('unconnected graph I/O', () => {
+  it('includes detached and terminal I/O while preserving transaction and address bridges', () => {
+    expect(graphUnconnectedOutputIds(graph, participating())).toEqual(new Set(['input', 'orphan']));
+    const visible = participating();
+    visible.delete('b');
+    visible.delete('address');
+    expect(graphUnconnectedOutputIds(graph, visible)).toEqual(
+      new Set(['input', 'shared', 'output', 'orphan']),
+    );
+    visible.delete('orphan');
+    expect(graphUnconnectedOutputIds(graph, visible).has('orphan')).toBe(false);
+  });
+
+  it('counts distinct neighbors regardless of edge direction and ignores dangling connections', () => {
+    const members = participating();
+    members.add('missing');
+    const repeated: GraphData = {
+      ...graph,
+      links: [
+        ...graph.links,
+        { id: 'reverse', source: 'a', target: 'input', kind: 'creates' },
+        { id: 'dangling', source: 'input', target: 'missing', kind: 'creates' },
+        { id: 'self', source: 'orphan', target: 'orphan', kind: 'spends' },
+      ],
+    };
+    expect(graphUnconnectedOutputIds(repeated, members)).toEqual(new Set(['input', 'orphan']));
+    expect(
+      graphUnconnectedOutputIds({ ...repeated, links: [...repeated.links].reverse() }, members),
+    ).toEqual(new Set(['input', 'orphan']));
+  });
+
+  it('finds only loaded I/O directly connected to requested transactions, without recursing', () => {
+    expect(graphTransactionOutputIds(graph, new Set(['a']))).toEqual(
+      new Set(['input', 'shared', 'output']),
+    );
+    expect(graphTransactionOutputIds(graph, new Set(['b']))).toEqual(new Set(['shared']));
+    expect(graphTransactionOutputIds(graph, new Set(['address', 'missing', 'input']))).toEqual(
+      new Set(),
+    );
+    expect(graphTransactionOutputIds(graph, new Set(['a', 'b']))).toEqual(
+      new Set(['input', 'shared', 'output']),
+    );
+  });
+});
 
 describe('simultaneous transaction I/O removal closure', () => {
   it('removes newly orphaned inputs while retaining shared outputs, addresses and existing orphans', () => {

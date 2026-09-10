@@ -58,6 +58,84 @@ function expectVisible(
 }
 
 describe('camera framing for real geometry', () => {
+  it.each([2, 3] as const)(
+    'preserves zoom when centering away from the old target in %d dimensions',
+    (dimensions) => {
+      const position = dimensions === 2 ? { x: 10, y: 20, z: 800 } : options.position;
+      const orbitTarget = dimensions === 2 ? { x: 10, y: 20, z: 0 } : options.orbitTarget;
+      const before = new Vector3(position.x, position.y, position.z).sub(
+        new Vector3(orbitTarget.x, orbitTarget.y, orbitTarget.z),
+      );
+      for (const radius of [3, 100]) {
+        const selected = node('selected', 1500, 1200, 400, radius);
+        const pose = frameCamera([selected], {
+          ...options,
+          dimensions,
+          position,
+          orbitTarget,
+          target: { x: selected.x!, y: selected.y!, z: selected.z! },
+          topInset: 90,
+          rightInset: 140,
+          nodeWidth: 24,
+          preserveZoom: true,
+        })!;
+        const after = new Vector3(pose.position.x, pose.position.y, pose.position.z).sub(
+          new Vector3(pose.target.x, pose.target.y, pose.target.z),
+        );
+        expect(after.distanceTo(before)).toBeLessThan(1e-8);
+        const camera = new PerspectiveCamera(options.fov, options.width / options.height, 0.1, 1e8);
+        camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+        camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+        camera.updateMatrixWorld();
+        const p = new Vector3(selected.x, selected.y, dimensions === 2 ? 0 : selected.z).project(
+          camera,
+        );
+        expect(((p.x + 1) * options.width) / 2).toBeCloseTo((60 + 1000 - 140) / 2);
+        expect(((1 - p.y) * options.height) / 2).toBeCloseTo((90 + 400 - 60) / 2);
+      }
+    },
+  );
+  it.each(['sphere', 'box', 'octahedron'] as const)(
+    'centers a %s at about 24 CSS pixels across viewport sizes and viewing angles',
+    (shape) => {
+      for (const radius of [3, 25])
+        for (const height of [300, 900])
+          for (const position of [options.position, { x: 500, y: 300, z: 800 }]) {
+            const selected = { ...node('selected', 1000, -200, 400, radius), shape };
+            const opts = { ...options, height, position, nodeWidth: 24 };
+            const pose = frameCamera([selected], opts)!;
+            const camera = new PerspectiveCamera(opts.fov, opts.width / opts.height, 0.1, 1e8);
+            camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+            camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+            camera.updateMatrixWorld();
+            const center = new Vector3(selected.x, selected.y, selected.z);
+            const right = new Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            const vertices: Vector3[] = [];
+            if (shape === 'box') {
+              for (const x of [-0.8, 0.8])
+                for (const y of [-0.8, 0.8])
+                  for (const z of [-0.8, 0.8]) vertices.push(new Vector3(x, y, z));
+            } else if (shape === 'octahedron') {
+              for (const sign of [-1.4, 1.4])
+                vertices.push(
+                  new Vector3(sign, 0, 0),
+                  new Vector3(0, sign, 0),
+                  new Vector3(0, 0, sign),
+                );
+            } else vertices.push(right.clone(), right.clone().negate());
+            const projected = vertices.map((vertex) =>
+              vertex.multiplyScalar(radius).add(center).project(camera),
+            );
+            const width =
+              ((Math.max(...projected.map((p) => p.x)) - Math.min(...projected.map((p) => p.x))) *
+                opts.width) /
+              2;
+            expect(width).toBeGreaterThan(21);
+            expect(width).toBeLessThanOrEqual(25);
+            expect(center.project(camera).length()).toBeLessThan(1);
+          }
+    },
+  );
   it('reserves the right action rail without shifting node positions or orbit direction', () => {
     const nodes = [node('left', -120, 0, 0, 20), node('right', 120, 10, 30, 35)];
     const before = structuredClone(nodes);

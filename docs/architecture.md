@@ -634,6 +634,24 @@ from the graph preserves evidence, annotations and cached geometry. Membership u
 survives camera/selection autosaves. Migration and canonical network validation run
 at the existing worker boundary; no backend state is added.
 
+The side toolbar's Hide/Remove I/O actions retain nodes with a further connection.
+`graphUnconnectedOutputIds` counts distinct participating neighbors, including
+address associations; zero or one neighbor qualifies. Hiding uses membership minus
+manual hiding, while removal uses full membership. Temporary filters never turn a
+bridge into a terminal. The global Show all I/O action restores direct loaded I/O
+of manually visible admitted transactions, clears canvas filters and amount limits,
+and does not fetch or recursively admit neighboring transactions. Global I/O actions
+paint their busy state before updating membership and remain undoable.
+
+Selection history changes selection without resetting filters or moving the camera,
+including when Lock is enabled. Center targets a mesh width of approximately
+24 CSS pixels while preserving the viewing direction. Lock translates the camera
+and orbit target together, retaining the current zoom distance. Isolation clears pending
+node focus and fits the entire resulting graph after layout settles. Clearing a
+focus request cancels deferred focus so an earlier action cannot move the camera
+after selection-only navigation. Successful graph opening and tracing are silent;
+partial and unavailable results retain recovery feedback.
+
 The contextual input/output experiment indexes loaded `creates`/`spends` relationships
 in `graph/flowContext.ts`. Transaction selection establishes the context; outpoint
 selection retains a related transaction from the saved flow-panel choice, falling

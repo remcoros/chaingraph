@@ -71,7 +71,10 @@ export interface GraphAdapter {
   update(frame: GraphFrame): void;
   /** topInset reserves overlaid navigation in CSS pixels, without reducing the canvas. */
   resize(width: number, height: number, topInset?: number, rightInset?: number): void;
-  focus(id: string): void;
+  /** Center a node; preserveZoom pans without changing the current camera distance. */
+  focus(id: string, options?: { preserveZoom?: boolean }): void;
+  /** Cancel deferred focus when navigation must preserve the current camera. */
+  cancelFocus?(): void;
   fit(): void;
   /** Optional viewport zoom: factor < 1 moves closer, > 1 moves away. */
   zoom?(factor: number): void;

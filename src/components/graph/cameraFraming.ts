@@ -25,6 +25,10 @@ export function frameCamera(
     rightInset?: number;
     captions?: ReadonlyMap<string, { width: number; height: number; offsetY: number }>;
     target?: Point;
+    /** Preferred CSS-pixel mesh width when centering a single node. */
+    nodeWidth?: number;
+    /** Keep the existing camera-to-orbit distance while centering a node. */
+    preserveZoom?: boolean;
   },
 ): { position: Point; target: Point } | undefined {
   if (!(options.width > 0 && options.height > 0)) return;
@@ -44,7 +48,11 @@ export function frameCamera(
     max.max(center.clone().addScalar(radius));
   }
   const target = options.target
-    ? new Vector3(options.target.x, options.target.y, options.target.z)
+    ? new Vector3(
+        options.target.x,
+        options.target.y,
+        options.dimensions === 2 ? 0 : options.target.z,
+      )
     : min.add(max).multiplyScalar(0.5);
   const backward =
     options.dimensions === 2
@@ -167,6 +175,31 @@ export function frameCamera(
       (-b.bottom + b.far * bottomSlope) / (bottomSlope - verticalShift),
       b.far + 1,
     );
+  }
+  if (positioned.length === 1 && options.nodeWidth && options.nodeWidth > 0) {
+    const node = positioned[0];
+    // Match the visible shape's horizontal extent in the current camera axes,
+    // not its enclosing sphere. The depth allowance keeps perspective faces
+    // near the requested size even when viewing a cube from an oblique angle.
+    const extent =
+      node.radius *
+      (node.shape === 'box'
+        ? 0.8 * (Math.abs(right.x) + Math.abs(right.y) + Math.abs(right.z))
+        : node.shape === 'octahedron'
+          ? 1.4 * Math.max(Math.abs(right.x), Math.abs(right.y), Math.abs(right.z))
+          : 1);
+    distance = Math.max(
+      distance,
+      (extent * options.height) / (options.nodeWidth * tanY) + nodeBoundsRadius(node),
+    );
+  }
+  if (options.preserveZoom) {
+    const currentDistance = new Vector3(
+      options.position.x - options.orbitTarget.x,
+      options.position.y - options.orbitTarget.y,
+      options.position.z - options.orbitTarget.z,
+    ).length();
+    if (Number.isFinite(currentDistance) && currentDistance > 0) distance = currentDistance;
   }
   target.addScaledVector(up, distance * verticalShift);
   target.addScaledVector(right, distance * horizontalShift);

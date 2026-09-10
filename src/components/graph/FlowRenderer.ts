@@ -104,8 +104,8 @@ export class FlowRenderer implements GraphAdapter {
   private rightInset = 0;
   private firstFit = true;
   private pendingFit = false;
-  private pendingFocus?: string;
-  private lastFrame?: { id?: string };
+  private pendingFocus?: { id: string; preserveZoom?: boolean };
+  private lastFrame?: { id?: string; preserveZoom?: boolean };
   private selectedOutpoint?: string;
   private dead = false;
   private lost = false;
@@ -775,7 +775,7 @@ export class FlowRenderer implements GraphAdapter {
     // Toolbar content can change when a transaction is opened. Retain the
     // current camera; updated overlay allowances apply to the next explicit Fit.
     if (viewportChanged && this.lastFrame && !this.pointers.size)
-      this.frameNodes(this.lastFrame.id);
+      this.frameNodes(this.lastFrame.id, this.lastFrame);
     this.fulfillCamera();
     this.invalidate();
   }
@@ -784,12 +784,12 @@ export class FlowRenderer implements GraphAdapter {
     if (this.pendingFocus) {
       // Selection may arrive before the frame containing a new watched address.
       // Retain that intent until final geometry exists; begin() cancels it on input.
-      if (!this.positions.has(this.pendingFocus)) return;
-      const id = this.pendingFocus;
+      if (!this.positions.has(this.pendingFocus.id)) return;
+      const focus = this.pendingFocus;
       this.pendingFocus = undefined;
       this.firstFit = false;
       this.pendingFit = false;
-      this.frameNodes(id);
+      this.frameNodes(focus.id, focus);
     } else if (this.firstFit || this.pendingFit) {
       this.firstFit = false;
       this.pendingFit = false;
@@ -803,21 +803,20 @@ export class FlowRenderer implements GraphAdapter {
     this.events.dismiss();
     this.fulfillCamera();
   }
-  focus(id: string) {
+  focus(id: string, options?: { preserveZoom?: boolean }) {
     if (this.dead) return;
-    this.pendingFocus = id;
+    this.pendingFocus = { id, preserveZoom: options?.preserveZoom };
     this.events.dismiss();
     this.fulfillCamera();
   }
-  private frameNodes(id?: string) {
+  cancelFocus() {
+    this.pendingFocus = undefined;
+    if (this.lastFrame?.id) this.lastFrame = undefined;
+  }
+  private frameNodes(id?: string, options?: { preserveZoom?: boolean }) {
     if (id && !this.positions.has(id)) return;
-    const neighbors = new Set([id]);
-    for (const l of this.links) {
-      if (l.source === id) neighbors.add(l.target);
-      if (l.target === id) neighbors.add(l.source);
-    }
     const nodes = this.nodes
-      .filter((n) => !id || neighbors.has(n.id))
+      .filter((n) => !id || n.id === id)
       .map((n) => ({ ...n, ...this.positions.get(n.id) }));
     const pose = frameCamera(nodes, {
       dimensions: this.dimensions,
@@ -831,10 +830,12 @@ export class FlowRenderer implements GraphAdapter {
       topInset: this.inset + 24,
       rightInset: this.rightInset,
       target: id ? this.positions.get(id) : undefined,
+      nodeWidth: id ? 24 : undefined,
+      preserveZoom: options?.preserveZoom,
     });
     if (pose) {
       this.restoreCamera({ ...pose, up: point(this.camera.up) });
-      this.lastFrame = { id };
+      this.lastFrame = { id, preserveZoom: options?.preserveZoom };
       this.schedule();
     }
   }

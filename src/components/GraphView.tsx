@@ -72,7 +72,7 @@ export interface GraphViewProps extends VisibilityProps {
   showTags?: boolean;
   showIcons?: boolean;
   fitToken: number;
-  focusRequest?: { id: string; token: number };
+  focusRequest?: { id: string; token: number; preserveZoom?: boolean };
   transactions?: Record<string, Transaction>;
   onTrace?: (id: string) => void;
   onEdit?: (id: string) => void;
@@ -371,8 +371,12 @@ export default function GraphView(props: GraphViewProps) {
   }, [adapterFactory, props.fitToken]);
 
   useEffect(() => {
-    if (props.focusRequest) graphRef.current?.focus(props.focusRequest.id);
-  }, [adapterFactory, props.focusRequest, props.dimensions]);
+    if (props.focusRequest)
+      graphRef.current?.focus(props.focusRequest.id, {
+        preserveZoom: props.focusRequest.preserveZoom,
+      });
+    else graphRef.current?.cancelFocus?.();
+  }, [adapterFactory, props.focusRequest]);
 
   const hoveredNode = hover ? props.nodes.find((node) => node.id === hover.id) : undefined;
   const hoveredIdentifier = hoveredNode

@@ -77,25 +77,11 @@ export async function loadAncestors(
   };
 }
 
-/** Cached flow inputs can gain graph context without another network download. */
-export function ancestryNotice(
-  result: Awaited<ReturnType<typeof loadAncestors>>,
-  before: Pick<Workspace, 'transactions' | 'inputContext'>,
-) {
-  const added = result.previousTransactionIds.filter((id) => !before.transactions[id]).length;
-  const revealed = result.previousTransactionIds.filter((id) => before.inputContext?.[id]).length;
+/** Successful graph changes are visible directly; only explain limits or no further inputs. */
+export function ancestryNotice(result: Awaited<ReturnType<typeof loadAncestors>>) {
   const parts: string[] = [];
-  if (added) parts.push(`${added} previous transaction${added === 1 ? '' : 's'} added.`);
-  if (revealed)
-    parts.push(
-      `Expanded ${revealed} cached input transaction${revealed === 1 ? '' : 's'} to show all inputs and outputs. No repeat download needed.`,
-    );
-  if (!added && !revealed && !result.failed && !result.truncated)
-    parts.push(
-      result.previousTransactionIds.length
-        ? 'Previous transactions are already visible. Trace a parent transaction to continue one level deeper.'
-        : 'Coinbase transaction: no previous inputs to load.',
-    );
+  if (!result.previousTransactionIds.length && !result.failed && !result.truncated)
+    parts.push('Coinbase transaction: no previous inputs to load.');
   if (result.truncated)
     parts.push(
       'Partial expansion: 500-transaction limit reached. Trace individual paths to continue.',

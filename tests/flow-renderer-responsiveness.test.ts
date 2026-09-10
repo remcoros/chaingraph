@@ -222,6 +222,107 @@ describe('latest graph layout scheduling', () => {
 });
 
 describe('default renderer responsiveness and snapshots', () => {
+  it.each([2, 3] as const)(
+    'keeps lock zoom and direction through repeated selection and resize in %d dimensions',
+    (dimensions) => {
+      const { renderer } = setup();
+      renderer.update({ ...frame(20), dimensions });
+      WorkerMock.instances[0].reply();
+      renderer.camera.position.copy(
+        dimensions === 2 ? new Vector3(10, 20, 1500) : new Vector3(600, 400, 1500),
+      );
+      renderer.controls.target.set(10, 20, 0);
+      const offset = renderer.camera.position.clone().sub(renderer.controls.target);
+      for (const id of ['n1', 'n19', 'n4']) {
+        renderer.focus(id, { preserveZoom: true });
+        expect(
+          renderer.camera.position.clone().sub(renderer.controls.target).distanceTo(offset),
+        ).toBeLessThan(1e-8);
+      }
+      renderer.resize(600, 400, 80, 90);
+      expect(
+        renderer.camera.position.clone().sub(renderer.controls.target).distanceTo(offset),
+      ).toBeLessThan(1e-8);
+      renderer.focus('n4');
+      expect(renderer.camera.position.distanceTo(renderer.controls.target)).toBeLessThan(
+        offset.length(),
+      );
+      renderer.dispose();
+    },
+  );
+
+  it('retains a deferred lock zoom and lets a subsequent Fit replace it', () => {
+    const { renderer } = setup();
+    renderer.update(frame());
+    WorkerMock.instances[0].reply();
+    const offset = renderer.camera.position.clone().sub(renderer.controls.target);
+    renderer.update(frame(100));
+    renderer.focus('n50', { preserveZoom: true });
+    WorkerMock.instances[0].reply();
+    expect(
+      renderer.camera.position.clone().sub(renderer.controls.target).distanceTo(offset),
+    ).toBeLessThan(1e-8);
+    renderer.update(frame(200));
+    renderer.focus('n150', { preserveZoom: true });
+    renderer.fit();
+    WorkerMock.instances[0].reply();
+    expect(renderer.camera.position.distanceTo(renderer.controls.target)).toBeGreaterThan(
+      offset.length(),
+    );
+    renderer.dispose();
+  });
+
+  it('centers at the same readable node size independently of distant neighbors', () => {
+    const { renderer } = setup();
+    renderer.update(frame(3));
+    WorkerMock.instances[0].reply();
+    renderer.focus('n0');
+    const initial = renderer.camera.position.clone();
+    const target = renderer.controls.target.clone();
+    const expanded = frame(100);
+    expanded.links = [...expanded.links, { ...expanded.links[0], id: 'distant', target: 'n99' }];
+    renderer.update(expanded);
+    WorkerMock.instances[0].reply();
+    renderer.focus('n0');
+    expect(renderer.camera.position.distanceTo(initial)).toBeLessThan(1e-8);
+    expect(renderer.controls.target).toEqual(target);
+    renderer.dispose();
+  });
+
+  it('fits the isolated graph after pending layout and supersedes an earlier focus', () => {
+    const { renderer } = setup();
+    renderer.update(frame());
+    WorkerMock.instances[0].reply();
+    const camera = renderer.camera.position.clone();
+    renderer.update(frame(100));
+    renderer.focus('n50');
+    renderer.fit();
+    expect(renderer.camera.position).toEqual(camera);
+    WorkerMock.instances[0].reply();
+    expect(renderer.camera.position).not.toEqual(camera);
+    renderer.camera.lookAt(renderer.controls.target);
+    renderer.camera.updateMatrixWorld();
+    for (const index of [0, 99]) {
+      const p = new Vector3(index * 20, index * 4, index * 2).project(renderer.camera);
+      expect(Math.abs(p.x)).toBeLessThan(1);
+      expect(Math.abs(p.y)).toBeLessThan(1);
+    }
+    renderer.dispose();
+  });
+
+  it('cancels a deferred focus when history navigation preserves the camera', () => {
+    const { renderer } = setup();
+    renderer.update(frame());
+    WorkerMock.instances[0].reply();
+    const camera = renderer.camera.position.clone();
+    renderer.update(frame(100));
+    renderer.focus('n50', { preserveZoom: true });
+    renderer.cancelFocus();
+    WorkerMock.instances[0].reply();
+    expect(renderer.camera.position).toEqual(camera);
+    renderer.dispose();
+  });
+
   it.each(['fit', 'focus'] as const)(
     'preserves a completed %s camera across toolbar inset changes and graph additions',
     (action) => {
