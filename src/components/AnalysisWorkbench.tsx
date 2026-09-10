@@ -550,7 +550,28 @@ export function AnalysisWorkbench({
         <div className="scan-settings-grid">
           {analysisTools.map((item) => (
             <fieldset key={item.id}>
-              <legend>{item.name}</legend>
+              <legend>
+                <span className="scan-settings-title">
+                  {item.name}
+                  {item.id === 'wallet-intersections' && (
+                    <WalletHelp title="Imported-wallet intersection options" active={active}>
+                      <p>
+                        <strong>Any inputs or outputs:</strong> Find transactions whose inputs or
+                        outputs match at least two imported wallets.
+                      </p>
+                      <p>
+                        <strong>Inputs from multiple wallets:</strong> Match at least two imported
+                        wallets using input evidence only.
+                      </p>
+                      <p>
+                        Both use already derived addresses and scripts. Overlapping imports can
+                        match the same address; matches do not prove separate participants or common
+                        ownership.
+                      </p>
+                    </WalletHelp>
+                  )}
+                </span>
+              </legend>
               {item.parameters.map((parameter) => (
                 <label
                   key={parameter.id}
