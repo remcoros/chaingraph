@@ -1,4 +1,16 @@
 import type { LayoutNode, LayoutRequest, Position } from './flowLayout';
+import {
+  flowFrame,
+  inferredAxis,
+  localPoint,
+  normalized,
+  rayExit,
+  scaled,
+  sideCenter,
+  subtract,
+  worldPoint,
+  type FlowFrame,
+} from './flowOrientation';
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const radius = (node: LayoutNode) => Math.max(2.4, node.radius ?? 5);
@@ -6,6 +18,35 @@ type Side = -1 | 1;
 type Leaf = { node: LayoutNode; hub: string; side: Side };
 type Bridge = { node: LayoutNode; source: string; target: string };
 type Pack = { leaves: Leaf[]; radius: number; outer: number };
+
+/** A compact circular glyph footprint shared by rounded bridges and branch fans. */
+function roundedFootprint(count: number, pitch: number) {
+  const extent = Math.sqrt(count) * pitch * 0.65,
+    steps = Math.ceil(extent / pitch);
+  const candidates: Position[] = [];
+  for (let row = -steps; row <= steps; row++)
+    for (let column = -steps; column <= steps; column++) {
+      const x = (column + (row % 2 ? 0.5 : 0)) * pitch,
+        y = row * pitch * 0.8660254;
+      if (x * x + y * y <= extent * extent) candidates.push({ x, y, z: 0 });
+    }
+  candidates.sort(
+    (a, b) => a.x * a.x + a.y * a.y - b.x * b.x - b.y * b.y || a.x - b.x || a.y - b.y,
+  );
+  const selected = candidates.slice(0, count);
+  const cx =
+    (Math.min(...selected.map((point) => point.x)) +
+      Math.max(...selected.map((point) => point.x))) /
+    2;
+  const cy =
+    (Math.min(...selected.map((point) => point.y)) +
+      Math.max(...selected.map((point) => point.y))) /
+    2;
+  const points = selected.map((point) => ({ x: point.x - cx, y: point.y - cy, z: 0 }));
+  const radius =
+    Math.max(...points.map((point) => Math.hypot(point.x, point.y))) * (count < 8 ? 1.12 : 1);
+  return { points, radius };
+}
 
 class Occupancy {
   private cells = new Map<string, { point: Position; radius: number }[]>();
@@ -135,47 +176,136 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
     neighbors.get(bridge.source)!.push({ id: bridge.target, bridge, side: 1 });
     neighbors.get(bridge.target)!.push({ id: bridge.source, bridge, side: -1 });
   }
+  const cached = new Map(positions);
+  const frames = new Map<string, FlowFrame>();
+  const visibleGroups: { center: Position; radius: number }[] = [];
+  for (const hub of hubs.values()) {
+    const at = cached.get(hub.id);
+    const sides = ([-1, 1] as const).map((side) => ({
+      side,
+      points: packs
+        .get(hub.id)!
+        .get(side)!
+        .leaves.map((leaf) => cached.get(leaf.node.id))
+        .filter((point): point is Position => !!point),
+    }));
+    const directions: Position[] = [];
+    if (at)
+      for (const neighbor of neighbors.get(hub.id)!) {
+        const point = cached.get(neighbor.bridge.node.id);
+        if (!point) continue;
+        directions.push(scaled(subtract(point, at), neighbor.side));
+        // An opened remote transaction promotes an existing terminal to a bridge.
+        // Include that observation in the old side's established geometry.
+        if (!cached.has(neighbor.id))
+          sides.find((item) => item.side === neighbor.side)!.points.push(point);
+      }
+    frames.set(
+      hub.id,
+      flowFrame(at ? inferredAxis(at, sides, directions, flat) : { x: 1, y: 0, z: 0 }, flat),
+    );
+    for (const side of sides)
+      if (side.points.length >= 3) {
+        const center = sideCenter(side.points, flat);
+        visibleGroups.push({
+          center,
+          radius:
+            Math.max(
+              ...side.points.map((point) =>
+                Math.hypot(point.x - center.x, point.y - center.y, flat ? 0 : point.z - center.z),
+              ),
+            ) +
+            cellSize / 2,
+        });
+      }
+  }
   const placedHubs = new Set([...hubs.keys()].filter((id) => positions.has(id)));
   const savedHubs = new Set(placedHubs);
+  const localHubs = new Set(placedHubs);
   const put = (id: string, point: Position) => {
     positions.set(id, point);
     occupancy.add(point, radius(byId.get(id)!));
   };
+  const envelope = (id: string, point: Position) => {
+    const sides = packs.get(id)!,
+      frame = frames.get(id)!;
+    const transverse = Math.max(
+      radius(hubs.get(id)!),
+      ...[...sides.values()].map((pack) => pack.radius),
+    );
+    const half = (sides.get(1)!.outer + sides.get(-1)!.outer) / 2;
+    const center = worldPoint(frame, point, {
+      x: (sides.get(1)!.outer - sides.get(-1)!.outer) / 2,
+      y: 0,
+      z: 0,
+    });
+    const extent = (axis: 'x' | 'y' | 'z') =>
+      Math.abs(frame.forward[axis]) * half +
+      (Math.abs(frame.across[axis]) + Math.abs(frame.depth[axis])) * transverse;
+    return { center, x: extent('x'), y: extent('y'), z: extent('z') };
+  };
   const groupFree = (id: string, point: Position, others: ReadonlySet<string> = placedHubs) => {
-    const sides = packs.get(id)!;
-    const ownY = Math.max(radius(hubs.get(id)!), ...[...sides.values()].map((pack) => pack.radius));
+    const own = envelope(id, point);
     for (const other of others) {
       if (other === id) continue;
-      const at = positions.get(other)!,
-        otherSides = packs.get(other)!;
-      const otherY = Math.max(
-        radius(hubs.get(other)!),
-        ...[...otherSides.values()].map((pack) => pack.radius),
-      );
+      const that = envelope(other, positions.get(other)!);
       if (
-        point.x - sides.get(-1)!.outer >= at.x + otherSides.get(1)!.outer + 8 ||
-        point.x + sides.get(1)!.outer <= at.x - otherSides.get(-1)!.outer - 8
+        Math.abs(own.center.x - that.center.x) >= own.x + that.x + 8 ||
+        Math.abs(own.center.y - that.center.y) >= own.y + that.y + 8 ||
+        (!flat && Math.abs(own.center.z - that.center.z) >= own.z + that.z + 8)
       )
         continue;
-      if (Math.abs(point.y - at.y) >= ownY + otherY + 8) continue;
-      if (!flat && Math.abs(point.z - at.z) >= ownY + otherY + 8) continue;
       return false;
     }
     return true;
   };
-  const placeNear = (hub: LayoutNode, origin: Position, side: Side) => {
-    const distance = radius(hub) + 30;
-    for (let attempt = 0; attempt < 1000; attempt++) {
-      const angle = attempt * 2.399963229728653,
-        spread = 10 * Math.sqrt(attempt);
-      const point = {
-        x: origin.x + side * (distance + Math.floor(attempt / 80) * 12),
-        y: origin.y + Math.cos(angle) * spread,
-        z: flat ? 0 : origin.z + Math.sin(angle) * Math.min(20, spread * 0.12),
-      };
-      if (occupancy.free(point, radius(hub)) && groupFree(hub.id, point)) return point;
-    }
-    return { x: origin.x + side * (distance + 100), y: origin.y, z: flat ? 0 : origin.z };
+  const placeNear = (hub: LayoutNode, anchorId: string, side: Side) => {
+    const origin = positions.get(anchorId)!;
+    const neighbor = neighbors
+      .get(hub.id)!
+      .find((item) => item.bridge.node.id === anchorId && cached.has(item.id));
+    const inherited = neighbor ? frames.get(neighbor.id)!.forward : { x: 1, y: 0, z: 0 };
+    const outward = neighbor
+      ? normalized(subtract(origin, cached.get(neighbor.id)!), flat, scaled(inherited, side))
+      : scaled(inherited, side);
+    const ray = normalized(
+      {
+        x: outward.x * 0.8 + inherited.x * side * 0.2,
+        y: outward.y * 0.8 + inherited.y * side * 0.2,
+        z: outward.z * 0.8 + inherited.z * side * 0.2,
+      },
+      flat,
+      outward,
+    );
+    const rayFrame = flowFrame(ray, flat);
+    frames.set(hub.id, flowFrame(scaled(ray, side), flat));
+    let distance = radius(hub) + radius(byId.get(anchorId)!) + 24;
+    for (const group of visibleGroups)
+      distance = Math.max(
+        distance,
+        rayExit(
+          { ...origin, z: flat ? 0 : origin.z },
+          ray,
+          { ...group.center, z: flat ? 0 : group.center.z },
+          group.radius + radius(hub) + 4,
+          distance,
+        ) + 6,
+      );
+    let fallback: Position | undefined;
+    for (const extra of [0, 12, 24, 40])
+      for (let attempt = 0; attempt < 13; attempt++) {
+        const angle = attempt * 2.399963229728653,
+          spread = attempt ? Math.min(20, distance * 0.2) * Math.sqrt(attempt / 12) : 0;
+        const point = worldPoint(rayFrame, origin, {
+          x: distance + extra,
+          y: Math.cos(angle) * spread,
+          z: flat ? 0 : Math.sin(angle) * spread,
+        });
+        if (!occupancy.free(point, radius(hub))) continue;
+        fallback ??= point;
+        if (groupFree(hub.id, point)) return point;
+      }
+    return fallback ?? worldPoint(rayFrame, origin, { x: distance + 52, y: 0, z: 0 });
   };
   // Previously displayed outpoints are the strongest reference when opening a hub.
   for (const hub of hubs.values()) {
@@ -188,12 +318,24 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
         side: (link.source === hub.id ? -1 : 1) as Side,
       }))
       .filter((item) => positions.has(item.id))
-      .sort((a, b) => compare(a.id, b.id));
+      .sort((a, b) => {
+        const origin =
+          request.expansionOrigin?.nodeId === hub.id ? request.expansionOrigin.anchorId : undefined;
+        return Number(b.id === origin) - Number(a.id === origin) || compare(a.id, b.id);
+      });
     if (attached.length) {
-      put(hub.id, placeNear(hub, positions.get(attached[0].id)!, attached[0].side));
+      const anchor = attached[0],
+        point = placeNear(hub, anchor.id, anchor.side);
+      frames.set(
+        hub.id,
+        flowFrame(scaled(subtract(point, positions.get(anchor.id)!), anchor.side), flat),
+      );
+      put(hub.id, point);
       placedHubs.add(hub.id);
+      localHubs.add(hub.id);
     }
   }
+  const siblingFans = new Map<string, ReturnType<typeof roundedFootprint>>();
   let componentY = 0;
   while (placedHubs.size < hubs.size) {
     const queue = [...placedHubs].sort(compare);
@@ -231,11 +373,47 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
         const lane =
           (siblings.indexOf(next) - (siblings.length - 1) / 2) *
           (Math.max(ownPack.radius, otherPack.radius) * 2 + 24);
-        put(next.id, {
-          x: current.x + next.side * span,
-          y: current.y + lane,
-          z: flat ? 0 : current.z,
-        });
+        // Bulk expansion can introduce both the connecting outpoint and its hub.
+        // Carry the visible branch frame through that path too; fresh components
+        // still use the common world-X skeleton below.
+        let fan: Position | undefined;
+        if (!flat && !localHubs.has(id) && siblings.length >= 3) {
+          const key = JSON.stringify([id, next.side]);
+          let rounded = siblingFans.get(key);
+          if (!rounded) {
+            const spacing = Math.max(
+              ...siblings.map(
+                (sibling) =>
+                  Math.max(
+                    radius(hubs.get(sibling.id)!),
+                    ...[...packs.get(sibling.id)!.values()].map((pack) => pack.radius),
+                  ) *
+                    2 +
+                  24,
+              ),
+            );
+            rounded = roundedFootprint(siblings.length, spacing);
+            siblingFans.set(key, rounded);
+          }
+          const at = rounded.points[siblings.indexOf(next)];
+          fan = {
+            x: Math.sqrt(Math.max(0, rounded.radius ** 2 - at.x ** 2 - at.y ** 2)),
+            y: at.x,
+            z: at.y,
+          };
+        }
+        const point = localHubs.has(id)
+          ? worldPoint(frames.get(id)!, current, { x: next.side * span, y: lane, z: 0 })
+          : {
+              x: current.x + next.side * (span + (fan?.x ?? 0)),
+              y: current.y + (fan?.y ?? lane),
+              z: flat ? 0 : current.z + (fan?.z ?? 0),
+            };
+        if (localHubs.has(id)) {
+          frames.set(next.id, flowFrame(scaled(subtract(point, current), next.side), flat));
+          localHubs.add(next.id);
+        }
+        put(next.id, point);
         placedHubs.add(next.id);
         queue.push(next.id);
       }
@@ -310,6 +488,54 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
     const source = positions.get(peers[0].source)!,
       target = positions.get(peers[0].target)!;
     const pitch = Math.max(...peers.map((peer) => radius(peer.node))) * 2 + 3;
+    if (!flat && peers.length >= 3) {
+      const delta = subtract(target, source),
+        length = Math.hypot(delta.x, delta.y, delta.z);
+      const frame = flowFrame(delta, false);
+      const center = {
+        x: (source.x + target.x) / 2,
+        y: (source.y + target.y) / 2,
+        z: (source.z + target.z) / 2,
+      };
+      // Retain distinct projected glyph footprints, then lift them onto both
+      // hemispheres. Shared outpoints remain one canonical node each.
+      const { points: footprint, radius: shellRadius } = roundedFootprint(peers.length, pitch);
+      const clearance =
+        Math.max(radius(hubs.get(peers[0].source)!), radius(hubs.get(peers[0].target)!)) +
+        pitch / 2 +
+        3;
+      const forwardScale = Math.min(1, Math.max(0, length / 2 - clearance) / shellRadius);
+      for (let i = 0; i < peers.length; i++) {
+        const bridge = peers[i];
+        if (positions.has(bridge.node.id)) continue;
+        const x = footprint[i].x,
+          y = footprint[i].y;
+        const depth =
+          Math.sqrt(Math.max(0, shellRadius * shellRadius - x * x - y * y)) * (i % 2 ? -1 : 1);
+        const local = { x: x * forwardScale, y, z: depth };
+        let point = worldPoint(frame, center, local);
+        if (!occupancy.free(point, radius(bridge.node))) {
+          const opposite = worldPoint(frame, center, { ...local, z: -depth });
+          if (occupancy.free(opposite, radius(bridge.node))) point = opposite;
+          else
+            for (let attempt = 1; attempt <= 36; attempt++) {
+              const angle = attempt * 2.399963229728653,
+                offset = pitch * Math.sqrt(attempt);
+              const candidate = worldPoint(frame, center, {
+                x: local.x,
+                y: local.y + Math.cos(angle) * offset,
+                z: local.z + Math.sin(angle) * offset,
+              });
+              if (occupancy.free(candidate, radius(bridge.node))) {
+                point = candidate;
+                break;
+              }
+            }
+        }
+        put(bridge.node.id, point);
+      }
+      continue;
+    }
     const columns = Math.ceil(Math.sqrt(peers.length)),
       rows = Math.ceil(peers.length / columns);
     const transverse = (columns - 1) * pitch >= Math.abs(target.x - source.x) - 12;
@@ -330,7 +556,8 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
   }
   for (const [hubId, sides] of [...packs].sort(([a], [b]) => compare(a, b))) {
     const hub = positions.get(hubId)!,
-      hubRadius = radius(hubs.get(hubId)!);
+      hubRadius = radius(hubs.get(hubId)!),
+      frame = frames.get(hubId)!;
     for (const [side, pack] of sides) {
       const pending = pack.leaves
         .filter((leaf) => !positions.has(leaf.node.id))
@@ -342,7 +569,7 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
       const added = new Set<string>();
       for (const leaf of pack.leaves)
         if (positions.has(leaf.node.id))
-          projection.add(positions.get(leaf.node.id)!, radius(leaf.node));
+          projection.add(localPoint(frame, hub, positions.get(leaf.node.id)!), radius(leaf.node));
       let next = 0;
       for (let expansion = 0; next < pending.length && expansion < 12; expansion++) {
         const extent = pack.radius * (1 + expansion * 0.2);
@@ -363,28 +590,24 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
         for (; next < pending.length; next++) {
           const leaf = pending[next],
             r = radius(leaf.node);
-          const z = flat ? 0 : hub.z;
           let candidate: Position | undefined;
           let cursor = head,
             previous = -1;
           while (cursor < candidates.length) {
             const local = candidates[cursor];
-            const point = {
-              x: hub.x + side * (hubRadius + 8 + extent + local.x),
-              y: hub.y + local.y,
-              z,
-            };
+            const planar = { x: side * (hubRadius + 8 + extent + local.x), y: local.y, z: 0 };
+            const point = worldPoint(frame, hub, planar);
             const corridor = neighbors.get(hubId)!.some((neighbor) => neighbor.side === side);
             const fits =
               (!corridor || Math.abs(local.y) >= r + 7) &&
-              projection.free(point, r) &&
+              projection.free(planar, r) &&
               occupancy.free(point, r);
             // Permanently occupied candidates cannot fit any remaining smaller
             // glyph. Unlink them once instead of rescanning the filled pack.
             if (
               fits ||
               (corridor && Math.abs(local.y) < smallest + 7) ||
-              !projection.free(point, smallest)
+              !projection.free(planar, smallest)
             ) {
               if (previous < 0) head = following[cursor];
               else following[previous] = following[cursor];
@@ -396,20 +619,17 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
             cursor = following[cursor];
           }
           if (!candidate) break;
-          const point = {
-            x: hub.x + side * (hubRadius + 8 + extent + candidate.x),
-            y: hub.y + candidate.y,
-            z,
-          };
+          const planar = { x: side * (hubRadius + 8 + extent + candidate.x), y: candidate.y, z: 0 };
+          const point = worldPoint(frame, hub, planar);
           put(leaf.node.id, point);
           added.add(leaf.node.id);
-          projection.add(point, r);
+          projection.add(planar, r);
         }
       }
       if (!flat && added.size) {
         const members = pack.leaves.filter((leaf) => positions.has(leaf.node.id));
-        const xs = members.map((leaf) => positions.get(leaf.node.id)!.x);
-        const ys = members.map((leaf) => positions.get(leaf.node.id)!.y);
+        const xs = members.map((leaf) => localPoint(frame, hub, positions.get(leaf.node.id)!).x);
+        const ys = members.map((leaf) => localPoint(frame, hub, positions.get(leaf.node.id)!).y);
         const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
         const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
         // The occupied footprint, rather than the oversized candidate envelope,
@@ -417,7 +637,7 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
         const shellRadius =
           Math.max(
             ...members.map((leaf) => {
-              const point = positions.get(leaf.node.id)!;
+              const point = localPoint(frame, hub, positions.get(leaf.node.id)!);
               return Math.hypot(point.x - cx, point.y - cy);
             }),
           ) * (members.length < 8 ? 1.12 : 1);
@@ -432,12 +652,13 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
           const leaf = ordered[index];
           if (!added.has(leaf.node.id)) continue;
           const point = positions.get(leaf.node.id)!;
+          const local = localPoint(frame, hub, point);
           const depth = Math.sqrt(
-            Math.max(0, shellRadius ** 2 - (point.x - cx) ** 2 - (point.y - cy) ** 2),
+            Math.max(0, shellRadius ** 2 - (local.x - cx) ** 2 - (local.y - cy) ** 2),
           );
           const sign = index % 2 ? -1 : 1;
-          const lifted = { ...point, z: hub.z + sign * depth };
-          const reverse = { ...point, z: hub.z - sign * depth };
+          const lifted = worldPoint(frame, hub, { ...local, z: sign * depth });
+          const reverse = worldPoint(frame, hub, { ...local, z: -sign * depth });
           // Existing observations may occupy either hemisphere. Keep the original
           // valid position if both shell positions are obstructed.
           const placed = occupancy.free(lifted, radius(leaf.node))

@@ -639,11 +639,25 @@ an outpoint's directed role. Shared outpoints remain single canonical nodes.
 
 The transaction skeleton determines branch placement before terminal groups are
 filled. Fresh components use topological X ordering so reconvergent paths remain
-forward. Multiple shared outpoints use a compact peer grid rather than a long strip.
-Bridge edges keep stronger strokes and arrowheads even beside dense local fans. Incremental placement keeps all cached coordinates exact, searches near
-anchored outpoints for new transactions, and avoids occupied group envelopes.
+forward. Multiple shared outpoints use a rounded shell oriented along their
+transaction connection in 3D; Flat mode retains a planar peer grid. Fresh fans of
+three or more sibling transactions use a curved 3D arrangement so outpoints shared
+with distinct neighbors also retain depth after Repack.
+Bridge edges keep stronger strokes and arrowheads even beside dense local fans.
+Incremental placement keeps all cached coordinates exact, searches near anchored
+outpoints for new transactions, and avoids occupied group envelopes.
 Consequently, a previously terminal outpoint can stay inside a group when it becomes
 a bridge. Explicit Repack rebuilds the visible skeleton and groups together.
+Incremental expansion uses the connected transaction-to-outpoint vector as a
+preferred outward direction, with a small contribution from the established branch
+axis. New terminal groups use a local coordinate frame so their inputs face upstream
+and outputs downstream even when the branch leaves the global X axis. Cached
+geometry provides the frame on subsequent additions; no orientation is persisted.
+The renderer passes a transient `LayoutRequest.expansionOrigin` when a selected
+outpoint leads to a new adjacent transaction. This disambiguates multiple attached
+outpoints, including actions that retain outpoint selection. The hint is excluded
+from the topology signature and cannot trigger a layout on selection changes.
+Fresh layouts and explicit Repack retain the common-axis transaction skeleton.
 No space is reserved for undisplayed siblings. Role outlines are restrained and
 omitted when too small to read, while node colors, selection and hover remain.
 Fit and focus reserve the right toolbar and top navigation without changing nodes.

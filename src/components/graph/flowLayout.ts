@@ -8,6 +8,8 @@ export interface LayoutRequest {
   nodes: LayoutNode[];
   links: Pick<RenderLink, 'source' | 'target' | 'directed'>[];
   previous: [string, Position][];
+  /** Transient navigation preference for placing a newly opened transaction. */
+  expansionOrigin?: { nodeId: string; anchorId: string };
 }
 export interface LayoutResult {
   revision: number;

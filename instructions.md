@@ -91,11 +91,13 @@ context. Blue brackets mark its inputs; green rings mark its outputs. Following 
 outpoint keeps the transaction chosen in the flow panel. Selecting another transaction
 changes these accents without rearranging nodes. Inputs and outputs occupy compact,
 rounded 3D groups on opposite sides of each transaction. Shared outpoints connect
-transaction branches through those groups. New branches fit around saved positions;
-opening a creator may leave its connecting outpoint inside an existing group.
+transaction branches through those groups. New branches extend from the connected transaction through the chosen outpoint,
+and newly added inputs and outputs follow that branch direction. Existing positions
+stay fixed; opening a creator may leave its connecting outpoint inside an existing
+group.
 Spacing depends on visible nodes, so undisplayed siblings do not stretch the graph.
 Use **Repack** to organize the visible branches together; it deliberately rearranges
-the visible graph. Orbiting changes the
+the visible graph while retaining rounded 3D groups for terminal and shared outpoints. Orbiting changes the
 screen direction, so use the markers and arrows to follow flow from any angle.
 
 Use **Wallets** in the graph toolbar to choose several associated wallets. An entity

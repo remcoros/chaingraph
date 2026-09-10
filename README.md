@@ -223,7 +223,7 @@ The icons-only right toolbar adds, hides or removes inputs, outputs, selections 
 transaction branches. Removing from the graph keeps evidence and annotations; branch
 actions retain shared outpoints. Inputs and outputs form compact, rounded 3D groups
 around each transaction. Shared outpoints connect transaction branches through open
-corridors. Only visible nodes determine spacing. New inputs go upstream and new
+corridors, with rounded groups for shared connections in 3D, including after Repack. Only visible nodes determine spacing. New inputs go upstream and new
 outputs downstream. Existing positions stay
 anchored until **Repack**. Workspace schema v2 saves this explicit membership and
 migrates older workspaces while preserving their existing graph.
@@ -235,9 +235,11 @@ related transaction chosen in the flow panel. Fresh layouts and explicit **Repac
 favor incoming and outgoing groups on opposite sides; selection changes only
 appearance. Saved positions and cameras remain intact, so use Repack to try the
 spacing on an existing workspace. Tag, wallet and finding colors retain precedence
-on node fills. Small role outlines fade at distant zoom levels. Newly opened branches
-fit around existing groups; shared nodes already inside a group remain there until
-Repack, so incremental connections can bend around that group.
+on node fills. Small role outlines fade at distant zoom levels. Newly opened branches continue the direction from a connected transaction through
+the chosen outpoint. New input/output groups follow that local direction. Placement
+uses nearby free space while preserving existing nodes. Shared nodes already inside
+a group remain there until Repack. Explicit Repack still organizes the visible
+transaction paths along a common axis.
 
 This isolated branch uses a purpose-built Three.js adapter with grouped transaction
 layout and a compact force fallback for other associations. Only newly added nodes

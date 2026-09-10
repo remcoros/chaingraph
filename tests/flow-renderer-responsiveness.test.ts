@@ -219,6 +219,66 @@ describe('latest graph layout scheduling', () => {
 });
 
 describe('default renderer responsiveness and snapshots', () => {
+  it.each(['transaction', 'outpoint'])(
+    'passes the chosen outpoint as an expansion origin while selecting the %s',
+    (selection) => {
+      const { renderer } = setup();
+      const original = frame(2);
+      original.nodes = original.nodes.map((node) => ({ ...node, shape: 'sphere' }));
+      original.links = [];
+      renderer.update(original);
+      WorkerMock.instances[0].reply();
+      const requests = WorkerMock.instances[0].postMessage.mock.calls.length;
+      const camera = renderer.camera.position.clone();
+      const chosen = {
+        ...original,
+        nodes: original.nodes.map((node) => ({ ...node, selected: node.id === 'n1' })),
+      };
+      renderer.update(chosen);
+      expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(requests);
+      expect(renderer.camera.position).toEqual(camera);
+
+      const opened = frame(3);
+      opened.nodes = opened.nodes.map((node) => ({
+        ...node,
+        shape: node.id === 'n2' ? 'box' : 'sphere',
+        selected: node.id === (selection === 'transaction' ? 'n2' : 'n1'),
+      }));
+      opened.links = opened.links.map((link, index) => ({
+        ...link,
+        source: `n${index}`,
+        target: 'n2',
+        directed: true,
+      }));
+      renderer.update(opened);
+      const request = WorkerMock.instances[0].postMessage.mock.calls.at(-1)![0];
+      expect(request.expansionOrigin).toEqual({ nodeId: 'n2', anchorId: 'n1' });
+      expect(request.previous).toHaveLength(2);
+      WorkerMock.instances[0].reply();
+      renderer.repack();
+      expect(
+        WorkerMock.instances[0].postMessage.mock.calls.at(-1)![0].expansionOrigin,
+      ).toBeUndefined();
+      renderer.dispose();
+    },
+  );
+
+  it('does not use an unrelated selected outpoint as an expansion origin', () => {
+    const { renderer } = setup();
+    const original = frame(1);
+    original.nodes = original.nodes.map((node) => ({ ...node, shape: 'sphere', selected: true }));
+    renderer.update(original);
+    WorkerMock.instances[0].reply();
+    const opened = frame(2);
+    opened.nodes = opened.nodes.map((node) => ({ ...node, selected: node.id === 'n1' }));
+    opened.links = [];
+    renderer.update(opened);
+    expect(
+      WorkerMock.instances[0].postMessage.mock.calls.at(-1)![0].expansionOrigin,
+    ).toBeUndefined();
+    renderer.dispose();
+  });
+
   it('reverses a pending 10,000-node expansion to the displayed subset and ignores its late result', () => {
     const { renderer, events } = setup();
     renderer.update(frame());

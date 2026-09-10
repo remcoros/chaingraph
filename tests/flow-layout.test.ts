@@ -1,6 +1,7 @@
+import { inferredAxis } from '../src/components/graph/flowOrientation';
 import { compactLayout } from '../src/components/graph/compactLayout';
 import { describe, expect, it } from 'vitest';
-import type { LayoutRequest } from '../src/components/graph/flowLayout';
+import type { LayoutRequest, Position } from '../src/components/graph/flowLayout';
 import { particleCollisions, type Particle } from '../src/components/graph/anchoredForces';
 const fixture = (count = 1): LayoutRequest => ({
   revision: 1,
@@ -17,7 +18,350 @@ const fixture = (count = 1): LayoutRequest => ({
     { source: 'output-0', target: 'address' },
   ],
 });
+// Normalized covariance determinant is positive only for genuinely spatial
+// groups, including when a planar disc is tilted away from the world axes.
+function spatialVolume(points: Position[]) {
+  const axes = ['x', 'y', 'z'] as const;
+  const means = axes.map(
+    (axis) => points.reduce((sum, point) => sum + point[axis], 0) / points.length,
+  );
+  const matrix = axes.map((a, i) =>
+    axes.map(
+      (b, j) =>
+        points.reduce((sum, p) => sum + (p[a] - means[i]) * (p[b] - means[j]), 0) / points.length,
+    ),
+  );
+  const m = matrix,
+    scale = Math.max(m[0][0], m[1][1], m[2][2]);
+  return (
+    (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+      m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+      m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])) /
+    scale ** 3
+  );
+}
 describe('grouped flow and generic compact layout', () => {
+  it.each([1, -1] as const)(
+    'continues a rotated clicked branch in direction %d and orients later side shells',
+    (side) => {
+      const graph: LayoutRequest = {
+        revision: 1,
+        dimensions: 3,
+        nodes: [
+          { id: 'known', shape: 'box' },
+          { id: 'clicked', shape: 'sphere' },
+          { id: 'opened', shape: 'box' },
+        ],
+        links:
+          side === 1
+            ? [
+                { source: 'known', target: 'clicked', directed: true },
+                { source: 'clicked', target: 'opened', directed: true },
+              ]
+            : [
+                { source: 'opened', target: 'clicked', directed: true },
+                { source: 'clicked', target: 'known', directed: true },
+              ],
+        previous: [
+          ['known', { x: 0, y: 0, z: 0 }],
+          ['clicked', { x: 20 * side, y: 30, z: 40 }],
+        ],
+        expansionOrigin: { nodeId: 'opened', anchorId: 'clicked' },
+      };
+      const opened = compactLayout(graph).positions,
+        byId = new Map(opened),
+        clicked = byId.get('clicked')!,
+        hub = byId.get('opened')!;
+      const hop = { x: hub.x - clicked.x, y: hub.y - clicked.y, z: hub.z - clicked.z };
+      const length = Math.hypot(hop.x, hop.y, hop.z);
+      expect(
+        (hop.x * clicked.x + hop.y * clicked.y + hop.z * clicked.z) /
+          (length * Math.hypot(clicked.x, clicked.y, clicked.z)),
+      ).toBeGreaterThan(0.98);
+      expect(length).toBeGreaterThan(20);
+      expect(length).toBeLessThan(90);
+      for (let i = 0; i < 14; i++)
+        for (const role of ['input', 'output']) {
+          const id = `${role}-${i}`;
+          graph.nodes.push({ id, shape: 'sphere', radius: 4 });
+          graph.links.push(
+            role === 'input'
+              ? { source: id, target: 'opened', directed: true }
+              : { source: 'opened', target: id, directed: true },
+          );
+        }
+      graph.previous = opened;
+      const sides = compactLayout(graph).positions,
+        placed = new Map(sides);
+      for (const [id, point] of opened) expect(placed.get(id)).toEqual(point);
+      for (const [id, point] of sides) {
+        const along =
+          (((point.x - hub.x) * hop.x + (point.y - hub.y) * hop.y + (point.z - hub.z) * hop.z) *
+            side) /
+          length;
+        if (id.startsWith('input')) expect(along).toBeLessThan(-8);
+        if (id.startsWith('output')) expect(along).toBeGreaterThan(8);
+      }
+      expect(
+        compactLayout({
+          ...graph,
+          nodes: [...graph.nodes].reverse(),
+          links: [...graph.links].reverse(),
+          previous: [...graph.previous].reverse(),
+        }).positions,
+      ).toEqual(sides);
+      // Later side additions cannot change any displayed observation.
+      graph.previous = sides;
+      graph.nodes.push({ id: 'a-earlier-input', shape: 'sphere' });
+      graph.links.push({ source: 'a-earlier-input', target: 'opened', directed: true });
+      const later = new Map(compactLayout(graph).positions);
+      for (const [id, point] of sides) expect(later.get(id)).toEqual(point);
+      const extra = later.get('a-earlier-input')!;
+      expect(
+        ((extra.x - hub.x) * hop.x + (extra.y - hub.y) * hop.y + (extra.z - hub.z) * hop.z) * side,
+      ).toBeLessThan(0);
+    },
+  );
+
+  it('uses the requested clicked outpoint when several cached branches meet a new transaction', () => {
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      nodes: [
+        { id: 'left', shape: 'box' },
+        { id: 'right', shape: 'box' },
+        { id: 'opened', shape: 'box' },
+        { id: 'a-first', shape: 'sphere' },
+        { id: 'z-clicked', shape: 'sphere' },
+      ],
+      links: [
+        { source: 'left', target: 'a-first', directed: true },
+        { source: 'a-first', target: 'opened', directed: true },
+        { source: 'right', target: 'z-clicked', directed: true },
+        { source: 'z-clicked', target: 'opened', directed: true },
+      ],
+      previous: [
+        ['left', { x: -200, y: 0, z: 0 }],
+        ['a-first', { x: -170, y: 0, z: 0 }],
+        ['right', { x: 0, y: 0, z: 0 }],
+        ['z-clicked', { x: 0, y: 30, z: 0 }],
+      ],
+      expansionOrigin: { nodeId: 'opened', anchorId: 'z-clicked' },
+    };
+    const placed = new Map(compactLayout(graph).positions),
+      hub = placed.get('opened')!;
+    expect(hub.y).toBeGreaterThan(50);
+    expect(Math.abs(hub.x)).toBeLessThan(15);
+    for (const [id, point] of graph.previous) expect(placed.get(id)).toEqual(point);
+  });
+
+  it('exits a clicked shell along its ray before placing the newly opened hub', () => {
+    const points = [
+      { x: 20, y: 0, z: 0 },
+      { x: 80, y: 0, z: 0 },
+      { x: 50, y: 30, z: 0 },
+      { x: 50, y: -30, z: 0 },
+      { x: 50, y: 0, z: 30 },
+      { x: 50, y: 0, z: -30 },
+    ];
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      nodes: [
+        { id: 'known', shape: 'box' },
+        { id: 'opened', shape: 'box' },
+      ],
+      links: [],
+      previous: [['known', { x: 0, y: 0, z: 0 }]],
+      expansionOrigin: { nodeId: 'opened', anchorId: 'output-0' },
+    };
+    for (let i = 0; i < points.length; i++) {
+      const id = `output-${i}`;
+      graph.nodes.push({ id, shape: 'sphere' });
+      graph.links.push({ source: 'known', target: id, directed: true });
+      graph.previous.push([id, points[i]]);
+    }
+    graph.links.push({ source: 'output-0', target: 'opened', directed: true });
+    const placed = new Map(compactLayout(graph).positions),
+      hub = placed.get('opened')!;
+    expect(hub.x).toBeGreaterThan(90);
+    expect(hub.x).toBeLessThan(145);
+    expect(Math.hypot(hub.y, hub.z)).toBeLessThan(25);
+    for (const [id, point] of graph.previous) expect(placed.get(id)).toEqual(point);
+  });
+
+  it.each([
+    { x: 0, y: 40, z: 0 },
+    { x: 0, y: 0, z: 40 },
+    { x: 0, y: 0, z: 0 },
+  ])('keeps flat vector expansion finite for vertical or degenerate rays %j', (clicked) => {
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 2,
+      nodes: [
+        { id: 'known', shape: 'box' },
+        { id: 'clicked', shape: 'sphere' },
+        { id: 'opened', shape: 'box' },
+      ],
+      links: [
+        { source: 'known', target: 'clicked', directed: true },
+        { source: 'clicked', target: 'opened', directed: true },
+      ],
+      previous: [
+        ['known', { x: 0, y: 0, z: 0 }],
+        ['clicked', clicked],
+      ],
+    };
+    const placed = new Map(compactLayout(graph).positions);
+    expect(placed.get('clicked')).toEqual(clicked);
+    expect(placed.get('opened')!.z).toBe(0);
+    expect(Object.values(placed.get('opened')!).every(Number.isFinite)).toBe(true);
+  });
+
+  it('continues an established tilted branch when a connector and transaction are added together', () => {
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      nodes: [
+        { id: 'known', shape: 'box' },
+        { id: 'old-output', shape: 'sphere' },
+        { id: 'new-bridge', shape: 'sphere' },
+        { id: 'opened', shape: 'box' },
+        { id: 'new-output', shape: 'sphere' },
+      ],
+      links: [
+        { source: 'known', target: 'old-output', directed: true },
+        { source: 'known', target: 'new-bridge', directed: true },
+        { source: 'new-bridge', target: 'opened', directed: true },
+        { source: 'opened', target: 'new-output', directed: true },
+      ],
+      previous: [
+        ['known', { x: 0, y: 0, z: 0 }],
+        ['old-output', { x: 0, y: 30, z: 40 }],
+      ],
+    };
+    const placed = new Map(compactLayout(graph).positions),
+      opened = placed.get('opened')!,
+      output = placed.get('new-output')!;
+    expect(Math.abs(opened.x)).toBeLessThan(1e-8);
+    expect(opened.y).toBeGreaterThan(30);
+    expect(opened.z).toBeGreaterThan(40);
+    expect((output.y - opened.y) * 0.6 + (output.z - opened.z) * 0.8).toBeGreaterThan(8);
+    for (const [id, point] of graph.previous) expect(placed.get(id)).toEqual(point);
+  });
+
+  it('does not let an incomplete coplanar shell override an established bridge direction', () => {
+    const r = Math.sqrt(300),
+      hub = { x: 0, y: 0, z: 0 },
+      bridge = [{ x: 1, y: 0, z: 0 }];
+    const points = [
+      { x: 50 - r, y: 0, z: 10 },
+      { x: 50 + r, y: 0, z: 10 },
+      { x: 50, y: -r, z: 10 },
+      { x: 50, y: r, z: 10 },
+    ];
+    expect(inferredAxis(hub, [{ side: 1, points }], bridge, false)).toEqual(bridge[0]);
+    expect(inferredAxis(hub, [{ side: 1, points: points.slice(0, 3) }], bridge, false)).toEqual(
+      bridge[0],
+    );
+  });
+
+  it.each([2, 3] as const)(
+    'rounds shared outpoints between the same transaction pair in %dD while preserving flow and anchors',
+    (dimensions) => {
+      const graph: LayoutRequest = {
+        revision: 1,
+        dimensions,
+        previous: [],
+        nodes: [
+          { id: 'a', shape: 'box' },
+          { id: 'b', shape: 'box' },
+        ],
+        links: [],
+      };
+      for (let i = 0; i < 80; i++) {
+        const id = `bridge-${i}`;
+        graph.nodes.push({ id, shape: 'sphere', radius: 5 });
+        graph.links.push(
+          { source: 'a', target: id, directed: true },
+          { source: id, target: 'b', directed: true },
+        );
+      }
+      const result = compactLayout(graph).positions,
+        placed = new Map(result),
+        points = result.filter(([id]) => id.startsWith('bridge')).map(([, point]) => point);
+      expect(points).toHaveLength(80);
+      if (dimensions === 3) expect(spatialVolume(points)).toBeGreaterThan(0.1);
+      else expect(points.every((point) => point.z === 0)).toBe(true);
+      for (const point of points) {
+        expect(point.x).toBeGreaterThan(placed.get('a')!.x + 5);
+        expect(point.x).toBeLessThan(placed.get('b')!.x - 5);
+      }
+      for (let i = 0; i < points.length; i++)
+        for (let j = i + 1; j < points.length; j++)
+          expect(
+            Math.hypot(
+              points[i].x - points[j].x,
+              points[i].y - points[j].y,
+              points[i].z - points[j].z,
+            ),
+          ).toBeGreaterThan(11.4);
+      for (const axis of ['x', 'y', 'z'] as const)
+        expect(
+          Math.max(...points.map((point) => point[axis])) -
+            Math.min(...points.map((point) => point[axis])),
+        ).toBeLessThan(180);
+      expect(compactLayout({ ...graph, previous: result }).positions).toEqual(result);
+      expect(
+        compactLayout({
+          ...graph,
+          nodes: [...graph.nodes].reverse(),
+          links: [...graph.links].reverse(),
+        }).positions,
+      ).toEqual(result);
+    },
+  );
+
+  it('keeps a fresh fan of distinct spending transactions and its direct outpoints genuinely spatial', () => {
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      previous: [],
+      nodes: [{ id: 'root', shape: 'box' }],
+      links: [],
+    };
+    for (let i = 0; i < 32; i++) {
+      graph.nodes.push({ id: `tx-${i}`, shape: 'box' }, { id: `bridge-${i}`, shape: 'sphere' });
+      graph.links.push(
+        { source: 'root', target: `bridge-${i}`, directed: true },
+        { source: `bridge-${i}`, target: `tx-${i}`, directed: true },
+      );
+    }
+    const result = compactLayout(graph).positions,
+      placed = new Map(result);
+    for (const prefix of ['tx-', 'bridge-']) {
+      const points = result.filter(([id]) => id.startsWith(prefix)).map(([, point]) => point);
+      expect(spatialVolume(points)).toBeGreaterThan(0.01);
+      for (const axis of ['x', 'y', 'z'] as const)
+        expect(
+          Math.max(...points.map((point) => point[axis])) -
+            Math.min(...points.map((point) => point[axis])),
+        ).toBeLessThan(260);
+    }
+    for (const link of graph.links)
+      expect(placed.get(link.source)!.x).toBeLessThan(placed.get(link.target)!.x);
+    expect(compactLayout({ ...graph, previous: result }).positions).toEqual(result);
+    expect(
+      compactLayout({
+        ...graph,
+        nodes: [...graph.nodes].reverse(),
+        links: [...graph.links].reverse(),
+      }).positions,
+    ).toEqual(result);
+    const flat = compactLayout({ ...graph, dimensions: 2 }).positions;
+    expect(flat.every(([, point]) => point.z === 0)).toBe(true);
+  });
+
   it('orders reconverging transaction paths consistently on a fresh layout', () => {
     const graph: LayoutRequest = {
       revision: 1,

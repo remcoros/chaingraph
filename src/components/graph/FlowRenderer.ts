@@ -93,6 +93,7 @@ export class FlowRenderer implements GraphAdapter {
   private pendingFit = false;
   private pendingFocus?: string;
   private lastFrame?: { id?: string };
+  private selectedOutpoint?: string;
   private dead = false;
   private lost = false;
   private active = false;
@@ -451,6 +452,9 @@ export class FlowRenderer implements GraphAdapter {
   };
   update(frame: GraphFrame) {
     if (this.dead) return;
+    const selected = frame.nodes.find((node) => node.selected);
+    if (selected?.shape === 'sphere') this.selectedOutpoint = selected.id;
+    else if (selected && this.cache.has(selected.id)) this.selectedOutpoint = undefined;
     this.requestedFrame = frame;
     this.nodes = frame.nodes.map((n) => ({ ...n }));
     const ids = new Set(this.nodes.map((n) => n.id));
@@ -494,6 +498,24 @@ export class FlowRenderer implements GraphAdapter {
       return;
     }
     this.topology = signature;
+    const anchorId = selected?.shape === 'sphere' ? selected.id : this.selectedOutpoint;
+    const attached = new Set<string>();
+    if (selected && anchorId && this.cache.has(anchorId))
+      for (const link of this.links) {
+        if (!link.directed) continue;
+        if (link.source === anchorId) attached.add(link.target);
+        if (link.target === anchorId) attached.add(link.source);
+      }
+    const opened =
+      selected && attached.size
+        ? this.nodes.filter(
+            (node) =>
+              node.shape === 'box' &&
+              !this.cache.has(node.id) &&
+              (selected.shape === 'sphere' || selected.id === node.id) &&
+              attached.has(node.id),
+          )
+        : [];
     const request: LayoutRequest = {
       revision: ++this.revision,
       dimensions: this.dimensions,
@@ -510,6 +532,8 @@ export class FlowRenderer implements GraphAdapter {
       })),
       links: this.links.map(({ source, target, directed }) => ({ source, target, directed })),
       previous: [...this.cache],
+      expansionOrigin:
+        opened.length === 1 && anchorId ? { nodeId: opened[0].id, anchorId } : undefined,
     };
     this.pending = request;
     this.canvas.setAttribute('aria-busy', 'true');
