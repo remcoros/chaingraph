@@ -69,6 +69,7 @@ export function presentGraph(
     links: readonly GraphLink[];
     dimensions: 2 | 3;
     selectedId?: string;
+    batchSelectedIds?: readonly string[];
     sizeBy: 'uniform' | 'value' | 'degree';
     glow: boolean;
     showLabels?: boolean;
@@ -80,6 +81,8 @@ export function presentGraph(
   palette: GraphPalette,
 ): GraphFrame {
   const ids = new Set(input.nodes.map((node) => node.id));
+  const activeIds = new Set(input.batchSelectedIds);
+  if (input.selectedId) activeIds.add(input.selectedId);
   const links = input.links.filter((link) => ids.has(link.source) && ids.has(link.target));
   const created = new Set(
     links.filter((link) => link.kind === 'creates').map((link) => link.target),
@@ -143,6 +146,7 @@ export function presentGraph(
             (node.cluster ? clusterColor(node.cluster) : role ? roleColor : palette[node.kind])),
         radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
         selected,
+        flowActive: activeIds.has(node.id),
         highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
         x: node.x,
         y: node.y,
@@ -174,6 +178,8 @@ export function presentGraph(
         width: bridge ? 1 : emphasized ? 0.65 : 0,
         arrowLength: link.kind === 'address' ? 0 : bridge ? 5.5 : emphasized ? 4.5 : 3.6,
         directed: link.kind !== 'address',
+        flowSide:
+          link.kind === 'spends' ? 'incoming' : link.kind === 'creates' ? 'outgoing' : undefined,
       };
     }),
   };

@@ -19,10 +19,10 @@ import { GraphContextToolbar } from './components/GraphContextToolbar';
 import {
   addGraphNodes,
   ensureGraphMembership,
+  hideGraphNodes,
   projectGraphMembership,
   removeGraphNodes,
 } from './domain/graphMembership';
-import { transactionGraphBranch } from './domain/graphBranch';
 import { GraphControls } from './components/GraphControls';
 import { EntityBadges } from './components/EntityBadges';
 import { CopyButton } from './components/CopyButton';
@@ -222,6 +222,9 @@ export default function App() {
   });
   const [focusGraph, setFocusGraph] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ id: string; token: number }>();
+  // Toolbar expansion can change selection without engaging Lock to selection.
+  // A normal selection, explicit Center, or Lock toggle resumes camera following.
+  const cameraPreservedSelection = useRef<string | undefined>(undefined);
   const [aboutOpen, setAboutOpen] = useState<false | 'guide' | 'about' | 'connection'>(false);
   const [connectionCheck, setConnectionCheck] = useState(0);
   const { networks, statuses, discoveryError } = useBackendNetworks(connectionCheck);
@@ -678,8 +681,10 @@ export default function App() {
       : undefined;
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
-    (id: string) => {
+    (id: string, options?: { preserveCamera?: boolean }) => {
       selectionGeneration.current++;
+      cameraPreservedSelection.current = options?.preserveCamera ? id : undefined;
+      if (options?.preserveCamera) setFocusRequest(undefined);
       const active = ws.getSession(wRef.current?.id ?? '')?.data;
       // A click admits exactly one entity, never its transaction's other branches.
       if (active) ws.update(active.id, (current) => addGraphNodes(current, [id]), false);
@@ -701,6 +706,7 @@ export default function App() {
   );
   useEffect(() => {
     operationRef.current?.abort();
+    cameraPreservedSelection.current = undefined;
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
@@ -805,16 +811,8 @@ export default function App() {
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
       if (hidden) selectionGeneration.current++;
-      change((current) =>
-        hidden
-          ? setNodesHidden(
-              current,
-              ids.filter((id) => admittedIds.has(id)),
-              true,
-            )
-          : addGraphNodes(current, ids),
-      );
-      if (hidden && selectedId && ids.includes(selectedId)) setFocusRequest(undefined);
+      change((current) => (hidden ? hideGraphNodes(current, ids) : addGraphNodes(current, ids)));
+      if (hidden) setFocusRequest(undefined);
       if (!hidden && !w?.view.showAddresses && ids.some((id) => id.startsWith('addr:')))
         setNotice(ADDRESS_DISPLAY_NOTICE);
     } catch (error) {
@@ -1421,7 +1419,11 @@ export default function App() {
       false,
     );
   }
-  async function expand(direction: 'funding' | 'spending', nodeId = selectedId) {
+  async function expand(
+    direction: 'funding' | 'spending',
+    nodeId = selectedId,
+    options?: { preserveCamera?: boolean },
+  ) {
     if (!w) return;
     const snapshot = ws.getSession(w.id)?.data;
     if (!snapshot) return;
@@ -1437,6 +1439,10 @@ export default function App() {
       !(direction === 'funding' && node.kind === 'output' && snapshot.transactions[node.txid])
     )
       return;
+    if (options?.preserveCamera) {
+      cameraPreservedSelection.current = selectedId;
+      setFocusRequest(undefined);
+    }
     await run(async (signal) => {
       setOperation(
         direction === 'funding'
@@ -1469,9 +1475,9 @@ export default function App() {
             }),
             false,
           );
-          select(id);
+          select(id, options);
           setGraphFilters({});
-          setFocusRequest({ id, token: Date.now() });
+          if (!options?.preserveCamera) setFocusRequest({ id, token: Date.now() });
           setNotice(
             'Creating transaction opened. Load its input details explicitly to trace further.',
           );
@@ -1696,6 +1702,7 @@ export default function App() {
       viewOwner !== w.id ||
       !w.view.lockToSelection ||
       !selectedId ||
+      cameraPreservedSelection.current === selectedId ||
       hiddenIds.has(selectedId)
     )
       return;
@@ -1738,6 +1745,7 @@ export default function App() {
       setNotice('View filters cleared to reveal this selection.');
     }
     setMobilePanel('graph');
+    cameraPreservedSelection.current = undefined;
     setFocusRequest({ id, token: Date.now() });
   }
   function navigateSelection(delta: number) {
@@ -1749,6 +1757,7 @@ export default function App() {
       : {};
     setGraphFilters(filters);
     setNavigation({ ...navigation, index });
+    cameraPreservedSelection.current = undefined;
     setSelectedId(id);
     setRightTab('inspect');
     centerNode(id, filters);
@@ -1870,9 +1879,6 @@ export default function App() {
         }
       | undefined);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
-  const contextBranch = graphFlowContext
-    ? transactionGraphBranch(graph, admittedIds, graphFlowContext.transactionId)
-    : [];
   const selectedSpenders =
     selected?.kind === 'output'
       ? graph.links
@@ -1881,7 +1887,7 @@ export default function App() {
       : [];
   const openSpendingFromToolbar = () => {
     if (!selectedId) return;
-    if (selectedSpenders.length === 1) select(selectedSpenders[0]);
+    if (selectedSpenders.length === 1) select(selectedSpenders[0], { preserveCamera: true });
     else if (selectedSpenders.length > 1) {
       change(
         (current) => ({
@@ -1894,7 +1900,7 @@ export default function App() {
         false,
       );
       setNotice('Choose a spending transaction in the transaction flow panel.');
-    } else void expand('spending', selectedId);
+    } else void expand('spending', selectedId, { preserveCamera: true });
   };
   const graphContextToolbar = w ? (
     <GraphContextToolbar
@@ -1920,7 +1926,7 @@ export default function App() {
       onRemoveSide={(side) => removeFromGraph(contextSideIds?.[side] ?? [])}
       canOpenCreatingTx={!!tx || canTrace}
       canOpenSpendingTx={selectedSpenders.length > 0 || canTrace}
-      onOpenCreatingTx={() => void expand('funding', selectedId)}
+      onOpenCreatingTx={() => void expand('funding', selectedId, { preserveCamera: true })}
       onOpenSpendingTx={openSpendingFromToolbar}
       canShowSelection={toolbarSelection.some((id) => !visibleIds.has(id))}
       canHideSelection={toolbarSelection.some((id) => visibleIds.has(id))}
@@ -1933,10 +1939,14 @@ export default function App() {
         )
       }
       onRemoveSelection={() => removeFromGraph(toolbarSelection)}
-      canHideBranch={contextBranch.some((id) => visibleIds.has(id))}
-      canRemoveBranch={contextBranch.length > 0}
-      onHideBranch={() => setEntityHidden(contextBranch, true)}
-      onRemoveBranch={() => removeFromGraph(contextBranch)}
+      canHideBranch={!!graphFlowContext && visibleIds.has(graphFlowContext.transactionId)}
+      canRemoveBranch={!!graphFlowContext && admittedIds.has(graphFlowContext.transactionId)}
+      onHideBranch={() =>
+        setEntityHidden(graphFlowContext ? [graphFlowContext.transactionId] : [], true)
+      }
+      onRemoveBranch={() =>
+        removeFromGraph(graphFlowContext ? [graphFlowContext.transactionId] : [])
+      }
       hiddenCount={hiddenCount}
       onRestoreHidden={showAllHidden}
       busy={!!operation}
@@ -1974,15 +1984,16 @@ export default function App() {
         title="Keep the graph centered on selections from any panel"
         aria-pressed={w.view.lockToSelection ?? false}
         className={`graph-lock-selection ${w.view.lockToSelection ? 'active' : ''}`}
-        onClick={() =>
+        onClick={() => {
+          cameraPreservedSelection.current = undefined;
           change(
             (current) => ({
               ...current,
               view: { ...current.view, lockToSelection: !current.view.lockToSelection },
             }),
             false,
-          )
-        }
+          );
+        }}
       >
         <Focus size={14} />
         <span className="graph-nav-caption">Lock</span>
@@ -2649,8 +2660,9 @@ export default function App() {
                             demo={w.demo}
                           />
                         }
-                        toolbar={
+                        toolbar={({ motionToggle }) => (
                           <GraphControls
+                            motionToggle={motionToggle}
                             smallAmountHiddenCount={amountGraph.hiddenCount}
                             view={w.view}
                             focusGraph={shownFocusGraph}
@@ -2662,7 +2674,7 @@ export default function App() {
                               )
                             }
                           />
-                        }
+                        )}
                         nodePresentation={batchPresentation}
                         flowContext={graphFlowContext}
                         renderMetadata={renderEntityMetadata}

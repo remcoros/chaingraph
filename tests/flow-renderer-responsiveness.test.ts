@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InstancedMesh, Vector3 } from 'three';
+import { InstancedBufferGeometry, InstancedMesh, Mesh, ShaderMaterial, Vector3 } from 'three';
 import type { GraphAdapterEvents, GraphFrame } from '../src/components/graph/adapter';
 import type { LayoutRequest, LayoutResult } from '../src/components/graph/flowLayout';
 import { cachedLayout, LayoutScheduler } from '../src/components/graph/layoutScheduler';
@@ -110,7 +110,10 @@ beforeEach(() => {
   WorkerMock.instances = [];
   harness.element = () => new Element();
   vi.stubGlobal('Worker', WorkerMock);
-  vi.stubGlobal('document', { createElement: () => new Element() });
+  vi.stubGlobal(
+    'document',
+    Object.assign(new EventTarget(), { createElement: () => new Element(), hidden: false }),
+  );
   vi.stubGlobal('window', {});
   vi.stubGlobal('devicePixelRatio', 1);
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
@@ -219,6 +222,54 @@ describe('latest graph layout scheduling', () => {
 });
 
 describe('default renderer responsiveness and snapshots', () => {
+  it.each(['fit', 'focus'] as const)(
+    'preserves a completed %s camera across toolbar inset changes and graph additions',
+    (action) => {
+      const { renderer, events } = setup();
+      renderer.update(frame());
+      WorkerMock.instances[0].reply();
+      if (action === 'fit') renderer.fit();
+      else renderer.focus('n1');
+      const camera = renderer.camera.position.clone(),
+        target = renderer.controls.target.clone(),
+        zoom = renderer.camera.zoom;
+      renderer.flushSnapshot();
+      const saved = vi.mocked(events.snapshot!).mock.calls.at(-1)![0];
+      renderer.resize(900, 600, 80, 110);
+      expect(renderer.camera.position).toEqual(camera);
+      expect(renderer.controls.target).toEqual(target);
+      expect(renderer.camera.zoom).toBe(zoom);
+      renderer.update(frame(7));
+      WorkerMock.instances[0].reply();
+      renderer.resize(900, 600, 120, 160);
+      // Adding a side can also reflow inspector content by a few CSS pixels.
+      // The earlier completed frame must not become an implicit expansion Fit.
+      renderer.resize(900, 606.421875, 120, 160);
+      expect(renderer.camera.position).toEqual(camera);
+      expect(renderer.controls.target).toEqual(target);
+      expect(renderer.camera.zoom).toBe(zoom);
+      renderer.flushSnapshot();
+      const expanded = vi.mocked(events.snapshot!).mock.calls.at(-1)![0];
+      expect(expanded.camera).toEqual(saved.camera);
+      expect(expanded.nodes.slice(0, 3)).toEqual(saved.nodes);
+      // A deliberate Fit uses the new viewport reservations and expanded graph.
+      renderer.fit();
+      expect(renderer.camera.position).not.toEqual(camera);
+      renderer.dispose();
+    },
+  );
+
+  it('continues fitting an explicitly framed graph when the actual canvas size changes', () => {
+    const { renderer } = setup();
+    renderer.update(frame(20));
+    WorkerMock.instances[0].reply();
+    renderer.fit();
+    const camera = renderer.camera.position.clone();
+    renderer.resize(400, 300, 80, 100);
+    expect(renderer.camera.position).not.toEqual(camera);
+    renderer.dispose();
+  });
+
   it.each(['transaction', 'outpoint'])(
     'passes the chosen outpoint as an expansion origin while selecting the %s',
     (selection) => {
@@ -482,6 +533,198 @@ describe('default renderer responsiveness and snapshots', () => {
     expect(worker.postMessage).toHaveBeenCalledTimes(1);
     expect(renderer.camera.position.toArray()).toEqual([44, 55, 66]);
     expect(vi.mocked(events.snapshot!).mock.calls.at(-1)![0]).toEqual(saved);
+    renderer.dispose();
+  });
+});
+
+function animationHarness() {
+  let next = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.mocked(requestAnimationFrame).mockImplementation((callback) => {
+    const id = ++next;
+    callbacks.set(id, callback);
+    return id;
+  });
+  vi.mocked(cancelAnimationFrame).mockImplementation((id) => {
+    callbacks.delete(id);
+  });
+  return {
+    callbacks,
+    step(time: number) {
+      const pending = [...callbacks];
+      for (const [id, callback] of pending) if (callbacks.delete(id)) callback(time);
+    },
+  };
+}
+function particleMesh(renderer: FlowRenderer) {
+  return renderer.scene.getObjectByName('flow-particles') as Mesh<
+    InstancedBufferGeometry,
+    ShaderMaterial
+  >;
+}
+function directedFrame(selected = true): GraphFrame {
+  const graph = frame();
+  graph.nodes = graph.nodes.map((node, index) => ({
+    ...node,
+    flowActive: selected && index === 0,
+  }));
+  graph.links = graph.links.map((link) => ({ ...link, directed: true }));
+  return graph;
+}
+describe('flow motion stays independent of graph persistence and layout', () => {
+  it('animates selected/batch flow without camera updates, node/edge uploads, activity or snapshots', () => {
+    const animation = animationHarness(),
+      { renderer, events } = setup();
+    renderer.update(directedFrame());
+    WorkerMock.instances[0].reply();
+    animation.step(0);
+    renderer.flushSnapshot();
+    const camera = renderer.camera.position.clone();
+    const node = renderer.scene.children.find(
+      (child) => child instanceof InstancedMesh,
+    ) as InstancedMesh;
+    const version = node.instanceMatrix.version;
+    const edges = renderer.scene.children.find(
+      (child) =>
+        child instanceof Mesh &&
+        child.name !== 'flow-particles' &&
+        !(child instanceof InstancedMesh),
+    ) as Mesh;
+    const start = edges.geometry.getAttribute('start');
+    const before = Array.from(start.array);
+    const particles = particleMesh(renderer),
+      phase = particles.material.uniforms.phase.value;
+    vi.mocked(renderer.controls.update).mockClear();
+    vi.mocked(events.snapshot!).mockClear();
+    vi.mocked(events.activity!).mockClear();
+    vi.mocked(renderer.renderer.render).mockClear();
+    for (let i = 1; i <= 12; i++) animation.step(i * 16);
+    expect(renderer.renderer.render).toHaveBeenCalledTimes(12);
+    expect(particles.geometry.instanceCount).toBe(4);
+    expect(particles.material.uniforms.phase.value).toBeGreaterThan(phase);
+    expect(renderer.controls.update).not.toHaveBeenCalled();
+    expect(node.instanceMatrix.version).toBe(version);
+    expect(Array.from(start.array)).toEqual(before);
+    expect(renderer.camera.position).toEqual(camera);
+    expect(events.snapshot).not.toHaveBeenCalled();
+    expect(events.activity).not.toHaveBeenCalled();
+    expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(1);
+    renderer.dispose();
+    expect(animation.callbacks.size).toBe(0);
+  });
+
+  it('uses the explicit motion toggle, stops idle/hidden/lost work and still completes layouts when paused', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const animation = animationHarness(),
+      { renderer, events } = setup();
+    expect(renderer.controls.enableDamping).toBe(true);
+    renderer.update(directedFrame());
+    WorkerMock.instances[0].reply();
+    animation.step(0);
+    animation.step(16);
+    const particles = particleMesh(renderer),
+      camera = renderer.camera.position.clone();
+    renderer.setMotion(false);
+    animation.step(32);
+    expect(particles.visible).toBe(false);
+    expect(renderer.controls.enableDamping).toBe(false);
+    expect(animation.callbacks.size).toBe(0);
+    expect(renderer.camera.position).toEqual(camera);
+    const expanded = directedFrame();
+    expanded.nodes = [...expanded.nodes, { ...expanded.nodes[0], id: 'extra' }];
+    renderer.update(expanded);
+    WorkerMock.instances[0].reply();
+    animation.step(48);
+    expect(events.layout).toHaveBeenLastCalledWith({ busy: false, nodeCount: 4 });
+    expect(particles.visible).toBe(false);
+    renderer.setMotion(true);
+    animation.step(64);
+    expect(particles.visible).toBe(true);
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(animation.callbacks.size).toBe(0);
+    const phase = particles.material.uniforms.phase.value;
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    animation.step(60_000);
+    expect(particles.material.uniforms.phase.value).toBe(phase);
+    animation.step(60_016);
+    expect(particles.material.uniforms.phase.value - phase).toBeLessThan(0.01);
+    renderer.resize(0, 0);
+    expect(animation.callbacks.size).toBe(0);
+    renderer.resize(900, 600);
+    animation.step(60_032);
+    expect(particles.visible).toBe(true);
+    renderer.canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    expect(animation.callbacks.size).toBe(0);
+    renderer.canvas.dispatchEvent(new Event('webglcontextrestored'));
+    animation.step(60_048);
+    expect(particles.visible).toBe(true);
+    renderer.update({
+      ...expanded,
+      nodes: expanded.nodes.map((node) => ({ ...node, selected: false, flowActive: false })),
+    });
+    animation.step(60_064);
+    expect(particles.visible).toBe(false);
+    expect(animation.callbacks.size).toBe(0);
+    renderer.dispose();
+    expect(animation.callbacks.size).toBe(0);
+  });
+
+  it('animates a hovered edge without selecting it or rebuilding projected endpoints on each pointer move', () => {
+    const animation = animationHarness(),
+      { renderer, events } = setup();
+    renderer.update(directedFrame(false));
+    WorkerMock.instances[0].reply();
+    animation.step(0);
+    renderer.camera.position.set(0, 0, 100);
+    renderer.camera.lookAt(0, 0, 0);
+    renderer.camera.updateMatrixWorld();
+    (renderer.controls as unknown as EventTarget).dispatchEvent(new Event('change'));
+    animation.step(16);
+    const projected = new Vector3(10, 2, 1).project(renderer.camera);
+    const pointer = {
+      pointerId: 1,
+      pointerType: 'mouse',
+      clientX: (projected.x + 1) * 450,
+      clientY: (1 - projected.y) * 300,
+    };
+    const project = vi.spyOn(
+      renderer as unknown as { project(point: unknown): Vector3 },
+      'project',
+    );
+    renderer.canvas.dispatchEvent(Object.assign(new Event('pointermove'), pointer));
+    animation.step(32);
+    animation.step(48);
+    expect(particleMesh(renderer).geometry.instanceCount).toBe(4);
+    expect(particleMesh(renderer).visible).toBe(true);
+    expect(events.select).not.toHaveBeenCalled();
+    expect(events.hover).toHaveBeenLastCalledWith(expect.objectContaining({ hit: undefined }));
+    const projections = project.mock.calls.length;
+    expect(projections).toBe(3);
+    renderer.canvas.dispatchEvent(
+      Object.assign(new Event('pointermove'), { ...pointer, clientX: pointer.clientX + 1 }),
+    );
+    animation.step(64);
+    expect(project).toHaveBeenCalledTimes(projections);
+    renderer.canvas.dispatchEvent(Object.assign(new Event('pointerleave'), pointer));
+    animation.step(80);
+    expect(particleMesh(renderer).visible).toBe(false);
+    expect(animation.callbacks.size).toBe(0);
+    renderer.dispose();
+  });
+
+  it('renders at most once when animation and a camera/style frame share the same timestamp', () => {
+    const animation = animationHarness(),
+      { renderer } = setup();
+    renderer.update(directedFrame());
+    WorkerMock.instances[0].reply();
+    vi.mocked(renderer.renderer.render).mockClear();
+    animation.step(0);
+    expect(renderer.renderer.render).toHaveBeenCalledTimes(1);
+    (renderer.controls as unknown as EventTarget).dispatchEvent(new Event('change'));
+    animation.step(16);
+    expect(renderer.renderer.render).toHaveBeenCalledTimes(2);
     renderer.dispose();
   });
 });

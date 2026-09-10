@@ -26,6 +26,24 @@ const palette: GraphPalette = {
 };
 const input = { nodes, links, dimensions: 2 as const, sizeBy: 'uniform' as const, glow: true };
 describe('shared graph semantics and presentation', () => {
+  it('marks active and batch flow neighborhoods without changing focus or treating annotations as selection', () => {
+    const frame = presentGraph(
+      { ...input, selectedId: 'tx', batchSelectedIds: ['spend'] },
+      palette,
+    );
+    expect(frame.nodes.filter((node) => node.flowActive).map((node) => node.id)).toEqual([
+      'tx',
+      'spend',
+    ]);
+    expect(frame.nodes.filter((node) => node.selected).map((node) => node.id)).toEqual(['tx']);
+    expect(frame.nodes.find((node) => node.id === 'out')?.highlight).toBe(true);
+    expect(frame.nodes.find((node) => node.id === 'out')?.flowActive).toBe(false);
+    expect(frame.links.filter((link) => link.directed).map((link) => link.id)).toEqual([
+      'create',
+      'spending',
+    ]);
+  });
+
   it('routes node and all edge kinds to the same entity for selection, trace and edit', () => {
     expect(resolveGraphHit({ type: 'node', id: 'tx' }, nodes, links)?.id).toBe('tx');
     for (const id of ['create', 'spending'])

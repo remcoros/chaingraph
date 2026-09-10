@@ -10,6 +10,8 @@ export interface RenderNode {
   highlight: boolean;
   /** Selection emphasis independent of optional glow; older adapters may ignore it. */
   selected?: boolean;
+  /** Active or batch selection participates in flow animation without changing focus. */
+  flowActive?: boolean;
   /** Screen-space role accent, independent of physical geometry and layout. */
   marker?: { shape: 'brackets' | 'ring'; color: string };
   x?: number;
@@ -28,6 +30,8 @@ export interface RenderLink {
   arrowLength: number;
   /** Stable source-to-target layout direction; independent of selection styling. */
   directed?: boolean;
+  /** Stable side of transaction flow, independent of the currently hovered endpoint. */
+  flowSide?: 'incoming' | 'outgoing';
 }
 export interface GraphFrame {
   nodes: readonly RenderNode[];
@@ -73,6 +77,8 @@ export interface GraphAdapter {
   zoom?(factor: number): void;
   /** Explicitly recompute visible node positions; never changes underlying data. */
   repack?(): void;
+  /** Toggle connection animation and camera inertia; manual navigation stays available. */
+  setMotion?(enabled: boolean): void;
   /** Synchronously publish the current view before an explicit save or workspace transition. */
   flushSnapshot?(): void;
   /** Optional initial view restoration; adapters without persistence remain valid. */

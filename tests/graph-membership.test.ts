@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addGraphNodes,
   ensureGraphMembership,
+  hideGraphNodes,
   MAX_GRAPH_ACTION_NODES,
   MAX_GRAPH_NODES,
   parseGraphNodeIds,
@@ -11,6 +12,7 @@ import {
 import { outputNodeId, txNodeId, type Transaction } from '../src/domain/types';
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import { createTemplateWorkspace } from '../src/domain/workspaceTemplates';
+import { showAllNodes } from '../src/domain/visibility';
 
 const a = 'a'.repeat(64);
 const b = 'b'.repeat(64);
@@ -34,6 +36,88 @@ const ids = (w: ReturnType<typeof workspace>) =>
   projectGraphMembership(buildGraph(w), w.view.graphNodeIds).nodes.map((node) => node.id);
 
 describe('explicit canvas membership', () => {
+  function connectedWorkspace() {
+    const w = workspace();
+    w.transactions[b] = structuredClone(spending);
+    return addGraphNodes(w, [
+      txNodeId(a),
+      txNodeId(b),
+      outputNodeId(a, 0),
+      outputNodeId(a, 1),
+      outputNodeId(b, 0),
+    ]);
+  }
+
+  it('removes orphaned I/O but retains shared connections and unrelated existing orphans', () => {
+    const w = connectedWorkspace();
+    const unrelated = outputNodeId('c'.repeat(64), 0);
+    w.view.graphNodeIds!.push(unrelated);
+    const removed = removeGraphNodes(w, [txNodeId(a)]);
+    expect(removed.view.graphNodeIds).toEqual([
+      txNodeId(b),
+      outputNodeId(a, 0),
+      outputNodeId(b, 0),
+      unrelated,
+    ]);
+    expect(removed.transactions).toBe(w.transactions);
+    expect(removed.annotations).toBe(w.annotations);
+    expect(removeGraphNodes(w, [txNodeId(a), txNodeId(b)]).view.graphNodeIds).toEqual([unrelated]);
+  });
+
+  it('hides newly orphaned I/O across sequential and batch hides and restores the group', () => {
+    const w = connectedWorkspace();
+    const first = hideGraphNodes(w, [txNodeId(a)]);
+    expect(new Set(first.view.hiddenNodeIds)).toEqual(new Set([txNodeId(a), outputNodeId(a, 1)]));
+    const second = hideGraphNodes(first, [txNodeId(b)]);
+    expect(new Set(second.view.hiddenNodeIds)).toEqual(new Set(w.view.graphNodeIds));
+    expect(new Set(hideGraphNodes(w, [txNodeId(a), txNodeId(b)]).view.hiddenNodeIds)).toEqual(
+      new Set(w.view.graphNodeIds),
+    );
+    expect(second.view.graphNodeIds).toBe(w.view.graphNodeIds);
+    expect(second.transactions).toBe(w.transactions);
+    expect(showAllNodes(second).view.hiddenNodeIds).toBeUndefined();
+    expect(addGraphNodes(second, [txNodeId(a)]).view.hiddenNodeIds).toContain(outputNodeId(a, 1));
+  });
+
+  it('counts admitted connections independently of filters, context scopes and address display', () => {
+    const w = connectedWorkspace();
+    w.view.graphNodeIds!.push(`addr:${address}`);
+    w.inputContext = { [a]: [0] };
+    w.view.smallAmountThreshold = 200_000_000;
+    w.view.filters = { includeIds: [txNodeId(a)] };
+    expect(w.view.showAddresses).toBe(false);
+    const removed = removeGraphNodes(w, [txNodeId(a), txNodeId(b)]);
+    expect(removed.view.graphNodeIds).toEqual([
+      outputNodeId(a, 0),
+      outputNodeId(a, 1),
+      `addr:${address}`,
+    ]);
+    const hidden = hideGraphNodes(w, [txNodeId(a), txNodeId(b)]);
+    expect(new Set(hidden.view.hiddenNodeIds)).toEqual(
+      new Set([txNodeId(a), txNodeId(b), outputNodeId(b, 0)]),
+    );
+    w.view.hiddenNodeIds = [txNodeId(a), `addr:${address}`];
+    expect(new Set(hideGraphNodes(w, [txNodeId(b)]).view.hiddenNodeIds)).toEqual(
+      new Set([
+        txNodeId(a),
+        `addr:${address}`,
+        txNodeId(b),
+        outputNodeId(a, 0),
+        outputNodeId(b, 0),
+      ]),
+    );
+    expect(removeGraphNodes(w, [txNodeId(b)]).view.graphNodeIds).toContain(outputNodeId(a, 0));
+  });
+
+  it('keeps output hiding exact and ignores transactions outside graph membership', () => {
+    const w = connectedWorkspace();
+    const hidden = hideGraphNodes(w, [outputNodeId(a, 0)]);
+    expect(hidden.view.hiddenNodeIds).toEqual([outputNodeId(a, 0)]);
+    w.view.graphNodeIds = [outputNodeId(a, 0)];
+    expect(hideGraphNodes(w, [txNodeId(a)]).view.hiddenNodeIds).toBeUndefined();
+    expect(removeGraphNodes(w, [txNodeId(a)]).view.graphNodeIds).toEqual(w.view.graphNodeIds);
+  });
+
   it('keeps newly loaded full transaction evidence off the canvas until explicitly added', () => {
     const w = workspace();
     expect(ids(w)).toEqual([]);

@@ -34,6 +34,48 @@ function fixture() {
   return w;
 }
 describe('workspace entity removal', () => {
+  it('does not retain an orphan input through an address edge lost with its creating transaction', () => {
+    const w = fixture();
+    const output = `out:${parent}:0`;
+    const destination = `addr:${address}`;
+    w.transactions[parent].vout[0].scriptPubKey = { address };
+    w.watchedAddresses = [address];
+    w.view.graphNodeIds = [`tx:${parent}`, output, destination];
+    const next = removeWorkspaceEntity(w, `tx:${parent}`);
+    expect(next.transactions[child]).toBe(w.transactions[child]);
+    expect(buildGraph(next).nodes.some((node) => node.id === output)).toBe(true);
+    expect(next.watchedAddresses).toEqual([address]);
+    expect(next.view.graphNodeIds).toEqual([destination]);
+    expect(parseWorkspace(next)).toEqual(next);
+  });
+
+  it.each([false, true])(
+    'cleans up a removed transaction’s input only when its loaded parent is off the canvas (parent admitted: %s)',
+    (parentAdmitted) => {
+      const w = fixture();
+      const inputId = `out:${parent}:0`;
+      w.view.graphNodeIds = [
+        ...(parentAdmitted ? [`tx:${parent}`] : []),
+        `tx:${child}`,
+        inputId,
+        `out:${child}:0`,
+      ];
+      w.annotations[inputId] = note;
+      w.tags = [
+        { id: crypto.randomUUID(), name: 'Keep evidence', color: '#339988', nodeIds: [inputId] },
+      ];
+      const next = removeWorkspaceEntity(w, `tx:${child}`);
+      expect(next.view.graphNodeIds).toEqual(parentAdmitted ? [`tx:${parent}`, inputId] : []);
+      expect(next.transactions[parent]).toBe(w.transactions[parent]);
+      expect(next.transactions[child]).toBeUndefined();
+      expect(next.annotations[inputId]).toBe(note);
+      expect(next.tags).toEqual(w.tags);
+      expect(next.transactions[parent].vout).toHaveLength(1);
+      expect(parseWorkspace(next)).toEqual(next);
+      expect(w.view.graphNodeIds).toContain(inputId);
+    },
+  );
+
   it('does not resurrect removed siblings when a transaction is reloaded, while retaining shared outpoints', () => {
     const w = fixture();
     w.transactions[parent].vout.push({ n: 1, value: 0.5, scriptPubKey: { hex: '51' } });

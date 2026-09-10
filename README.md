@@ -241,6 +241,15 @@ uses nearby free space while preserving existing nodes. Shared nodes already ins
 a group remain there until Repack. Explicit Repack still organizes the visible
 transaction paths along a common axis.
 
+The panel bar includes an icon-only **Motion** toggle before Show labels, enabled by default for the
+mounted graph. It controls directional dots and camera inertia. Hovering a node or
+connection and selecting nodes activates the related creation/spending connections;
+adaptive dot density limits visual clutter. Dots indicate transaction
+direction. Expanded transaction paths animate across the visible upstream/downstream
+trace; terminal branches fill a target of 50 per direction with a stable spatial spread.
+Larger scopes use fewer dots per connection so expanded paths remain animated.
+Motion off preserves manual navigation and static node placement.
+
 This isolated branch uses a purpose-built Three.js adapter with grouped transaction
 layout and a compact force fallback for other associations. Only newly added nodes
 are positioned when extending an investigation; saved nodes remain anchored. The floating toolbar brings Fit, zoom and an explicit
@@ -376,6 +385,13 @@ entities without losing their annotations. **Hidden** lists them for quick resto
 addresses also offer removal. Removing annotated or tagged data asks for confirmation,
 and Undo restores a removal. Stopping an address watch retains shared transaction data.
 Individual inputs and outputs can be hidden, while complete transaction records stay intact.
+Hiding or removing a transaction also hides or removes its inputs/outputs from the graph
+when they lose their last connection. Shared connections survive, and **Show all hidden**
+restores a hidden group.
+Adding a creating or spending transaction from the right toolbar keeps the camera in
+place, including with Lock enabled. **Center** moves to the selected transaction explicitly.
+New branches extend beyond their source input/output sphere with clearance proportional
+to its radius, giving large CoinJoins more space without moving existing nodes.
 
 **All amounts** in the graph toolbar and transaction flow controls each view
 independently. Both preferences are saved; the flow control hides when its panel

@@ -10,6 +10,8 @@ import {
   Minus,
   RotateCw,
   LoaderCircle,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -44,7 +46,7 @@ export interface GraphViewProps extends VisibilityProps {
   onActivity?: (active: boolean) => void;
   onRegisterSnapshotFlush?: (flush: (() => void) | undefined) => void;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
-  toolbar?: ReactNode;
+  toolbar?: ReactNode | ((controls: { motionToggle?: ReactNode }) => ReactNode);
   /** Shared controls floating over the viewport, outside the renderer event surface. */
   navigation?: ReactNode;
   /** Filter/visibility context below every floating control group. */
@@ -103,7 +105,12 @@ export default function GraphView(props: GraphViewProps) {
     busy: false,
     nodeCount: 0,
   });
-  const [rendererActions, setRendererActions] = useState({ zoom: false, repack: false });
+  const [rendererActions, setRendererActions] = useState({
+    zoom: false,
+    repack: false,
+    motion: false,
+  });
+  const [motionEnabled, setMotionEnabled] = useState(true);
   const savedSnapshot = useRef(props.snapshot);
   const lastFitToken = useRef(props.fitToken);
   const immutableNodeSource = useRef<GraphSnapshot['nodes'] | undefined>(undefined);
@@ -276,7 +283,11 @@ export default function GraphView(props: GraphViewProps) {
       });
       if (savedSnapshot.current) adapter.restoreSnapshot?.(savedSnapshot.current);
       graphRef.current = adapter;
-      setRendererActions({ zoom: !!adapter.zoom, repack: !!adapter.repack });
+      setRendererActions({
+        zoom: !!adapter.zoom,
+        repack: !!adapter.repack,
+        motion: !!adapter.setMotion,
+      });
       current.current.onRegisterSnapshotFlush?.(
         adapter.flushSnapshot ? () => adapter?.flushSnapshot?.() : undefined,
       );
@@ -318,6 +329,10 @@ export default function GraphView(props: GraphViewProps) {
     };
   }, [adapterFactory]);
 
+  useEffect(() => {
+    graphRef.current?.setMotion?.(motionEnabled);
+  }, [adapterFactory, motionEnabled]);
+
   const hasNavigation = Boolean(props.navigation);
   const hasContextToolbar = Boolean(props.contextToolbar);
   useEffect(() => {
@@ -339,6 +354,7 @@ export default function GraphView(props: GraphViewProps) {
     props.links,
     props.dimensions,
     props.selectedId,
+    props.batchSelectedIds,
     props.sizeBy,
     props.glow,
     props.showLabels,
@@ -429,7 +445,30 @@ export default function GraphView(props: GraphViewProps) {
 
   return (
     <div className="graph-view" data-testid="graph-view" onPointerLeave={scheduleCardClose}>
-      {props.toolbar && <div className="graph-shared-toolbar">{props.toolbar}</div>}
+      {props.toolbar && (
+        <div className="graph-shared-toolbar">
+          {typeof props.toolbar === 'function'
+            ? props.toolbar({
+                motionToggle: rendererActions.motion ? (
+                  <button
+                    type="button"
+                    className={`icon-button ${motionEnabled ? 'active' : ''}`}
+                    aria-label="Motion"
+                    aria-pressed={motionEnabled}
+                    title={motionEnabled ? 'Pause motion' : 'Resume motion'}
+                    onClick={() => setMotionEnabled((enabled) => !enabled)}
+                  >
+                    {motionEnabled ? (
+                      <Pause size={16} aria-hidden="true" />
+                    ) : (
+                      <Play size={16} aria-hidden="true" />
+                    )}
+                  </button>
+                ) : undefined,
+              })
+            : props.toolbar}
+        </div>
+      )}
       <div className="graph-viewport">
         <div ref={containerRef} className="graph-canvas" aria-hidden={error} />
         {!error && hover && hoveredNode && (

@@ -178,46 +178,95 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
   }
   const cached = new Map(positions);
   const frames = new Map<string, FlowFrame>();
-  const visibleGroups: { center: Position; radius: number }[] = [];
+  type GroupMember = { id: string; point: Position; radius: number };
+  const sphere = (members: GroupMember[]) => {
+    const center = sideCenter(
+      members.map((member) => member.point),
+      flat,
+    );
+    return {
+      center,
+      radius:
+        Math.max(
+          ...members.map(
+            ({ point, radius }) =>
+              Math.hypot(point.x - center.x, point.y - center.y, flat ? 0 : point.z - center.z) +
+              radius,
+          ),
+        ) + 2,
+    };
+  };
+  const visibleGroups: {
+    hubId: string;
+    side: Side;
+    members: Set<string>;
+    center: Position;
+    radius: number;
+  }[] = [];
   for (const hub of hubs.values()) {
     const at = cached.get(hub.id);
-    const sides = ([-1, 1] as const).map((side) => ({
-      side,
-      points: packs
+    const sides = ([-1, 1] as const).map((side) => {
+      const members = incident
         .get(hub.id)!
-        .get(side)!
-        .leaves.map((leaf) => cached.get(leaf.node.id))
-        .filter((point): point is Position => !!point),
-    }));
+        .flatMap((link) => {
+          if (!link.directed || (link.source === hub.id ? 1 : -1) !== side) return [];
+          const id = link.source === hub.id ? link.target : link.source;
+          const point = cached.get(id),
+            node = byId.get(id);
+          return point && node?.shape === 'sphere' ? [{ id, point, radius: radius(node) }] : [];
+        })
+        .sort((a, b) => compare(a.id, b.id));
+      const remote = new Map(
+        neighbors
+          .get(hub.id)!
+          .filter((neighbor) => cached.has(neighbor.id))
+          .map((neighbor) => [neighbor.bridge.node.id, neighbor.id]),
+      );
+      const terminal = members.filter((member) => !remote.has(member.id));
+      const terminalSphere = terminal.length ? sphere(terminal) : undefined;
+      const local: GroupMember[] = [],
+        peers = new Map<string, GroupMember[]>();
+      for (const member of members) {
+        // An outpoint promoted to a bridge stays part of its old sphere when
+        // it still lies inside it. Repacked remote bridge groups stay separate.
+        if (
+          !remote.has(member.id) ||
+          (terminalSphere &&
+            Math.hypot(
+              member.point.x - terminalSphere.center.x,
+              member.point.y - terminalSphere.center.y,
+              flat ? 0 : member.point.z - terminalSphere.center.z,
+            ) <= terminalSphere.radius)
+        ) {
+          local.push(member);
+        } else {
+          const key = remote.get(member.id)!;
+          const group = peers.get(key) ?? [];
+          group.push(member);
+          peers.set(key, group);
+        }
+      }
+      for (const group of [local, ...peers.values()])
+        if (group.length)
+          visibleGroups.push({
+            hubId: hub.id,
+            side,
+            members: new Set(group.map((member) => member.id)),
+            ...sphere(group),
+          });
+      return { side, points: local.map((member) => member.point) };
+    });
     const directions: Position[] = [];
     if (at)
       for (const neighbor of neighbors.get(hub.id)!) {
         const point = cached.get(neighbor.bridge.node.id);
         if (!point) continue;
         directions.push(scaled(subtract(point, at), neighbor.side));
-        // An opened remote transaction promotes an existing terminal to a bridge.
-        // Include that observation in the old side's established geometry.
-        if (!cached.has(neighbor.id))
-          sides.find((item) => item.side === neighbor.side)!.points.push(point);
       }
     frames.set(
       hub.id,
       flowFrame(at ? inferredAxis(at, sides, directions, flat) : { x: 1, y: 0, z: 0 }, flat),
     );
-    for (const side of sides)
-      if (side.points.length >= 3) {
-        const center = sideCenter(side.points, flat);
-        visibleGroups.push({
-          center,
-          radius:
-            Math.max(
-              ...side.points.map((point) =>
-                Math.hypot(point.x - center.x, point.y - center.y, flat ? 0 : point.z - center.z),
-              ),
-            ) +
-            cellSize / 2,
-        });
-      }
   }
   const placedHubs = new Set([...hubs.keys()].filter((id) => positions.has(id)));
   const savedHubs = new Set(placedHubs);
@@ -279,7 +328,22 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
     );
     const rayFrame = flowFrame(ray, flat);
     frames.set(hub.id, flowFrame(scaled(ray, side), flat));
-    let distance = radius(hub) + radius(byId.get(anchorId)!) + 24;
+    const sourceGroup = visibleGroups.find(
+      (group) => group.hubId === neighbor?.id && group.side === side && group.members.has(anchorId),
+    );
+    let distance = radius(hub) + radius(byId.get(anchorId)!) + 40;
+    if (sourceGroup) {
+      const exit = rayExit(
+        { ...origin, z: flat ? 0 : origin.z },
+        ray,
+        { ...sourceGroup.center, z: flat ? 0 : sourceGroup.center.z },
+        sourceGroup.radius,
+        Infinity,
+      );
+      // Measure new space from the source sphere's outer boundary. Large
+      // CoinJoin groups need proportional clearance, not a fixed-length nudge.
+      distance = Math.max(distance, exit + Math.max(40, sourceGroup.radius) + radius(hub) + 4);
+    }
     for (const group of visibleGroups)
       distance = Math.max(
         distance,

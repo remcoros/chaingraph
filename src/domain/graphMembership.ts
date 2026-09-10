@@ -1,4 +1,5 @@
 import { canonicalEntityNodeId } from './entityReferences';
+import { graphRemovalClosure } from './graphBranch';
 import type { GraphData, Workspace } from './types';
 import { setNodesHidden } from './visibility';
 import { buildGraph } from './workspace';
@@ -62,12 +63,34 @@ export function addGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): 
   return setNodesHidden(added, requested, false);
 }
 
-/** Remove only membership. Evidence, annotations, selection and saved geometry survive. */
+/** Connection checks use all loaded evidence, independent of display preferences. */
+function removalGraph(workspace: Workspace): GraphData {
+  return buildGraph({
+    ...workspace,
+    inputContext: undefined,
+    view: { ...workspace.view, showAddresses: true },
+  });
+}
+
+/** Hide requested members and I/O orphaned by hiding their transactions. */
+export function hideGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): Workspace {
+  const requested = actionNodeIds(workspace, nodeIds);
+  const initialized = ensureGraphMembership(workspace);
+  const hidden = new Set(initialized.view.hiddenNodeIds);
+  const participating = new Set(initialized.view.graphNodeIds!.filter((id) => !hidden.has(id)));
+  const ids = graphRemovalClosure(removalGraph(initialized), participating, requested);
+  return setNodesHidden(initialized, ids, true);
+}
+
+/** Remove membership and newly orphaned I/O. Evidence, metadata and geometry survive. */
 export function removeGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): Workspace {
   const requested = actionNodeIds(workspace, nodeIds);
   const initialized = ensureGraphMembership(workspace);
   const previous = initialized.view.graphNodeIds!;
-  const graphNodeIds = previous.filter((id) => !requested.has(id));
+  const removed = new Set(
+    graphRemovalClosure(removalGraph(initialized), new Set(previous), requested),
+  );
+  const graphNodeIds = previous.filter((id) => !removed.has(id));
   return graphNodeIds.length === previous.length
     ? initialized
     : { ...initialized, view: { ...initialized.view, graphNodeIds } };

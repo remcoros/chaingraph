@@ -83,8 +83,15 @@ Clicking a transaction, input or output adds only that chosen node to the graph.
 Its complete transaction record stays available in the flow panel. The icons-only
 right toolbar offers input/output Add, Hide and Remove actions, selection history,
 centering and branch cleanup. Hover a control for its action name. **Remove
-from graph** keeps evidence and annotations; branch cleanup retains outpoints shared
-with another graph transaction. **Hide** is temporary and can be reversed with Show.
+from graph** keeps evidence and annotations. Hiding or removing a transaction also
+cleans up its inputs/outputs that have no remaining graph connections. Shared nodes
+stay connected; batch actions evaluate all selected transactions together. **Hide**
+is temporary and can be reversed with **Show all hidden**.
+The right toolbar's creating/spending transaction actions preserve the camera, including
+with Lock enabled. Use **Center** when you want to move to the newly added transaction.
+New transactions extend beyond the clicked input/output group's outer boundary, with
+clearance that grows with the group's radius. This gives large CoinJoins more room for
+subsequent inputs/outputs while keeping small branches compact. Existing nodes stay in place.
 
 In this experiment, the graph legend identifies the transaction used for input/output
 context. Blue brackets mark its inputs; green rings mark its outputs. Following an
@@ -99,6 +106,16 @@ Spacing depends on visible nodes, so undisplayed siblings do not stretch the gra
 Use **Repack** to organize the visible branches together; it deliberately rearranges
 the visible graph while retaining rounded 3D groups for terminal and shared outpoints. Orbiting changes the
 screen direction, so use the markers and arrows to follow flow from any angle.
+
+Use the play/pause **Motion** icon before Show labels in the panel bar to control flowing dots and
+camera inertia. Motion starts on for each mounted graph. Selecting or hovering
+nodes, or hovering connections, shows transaction direction on nearby connections.
+Selecting or hovering a transaction animates its visible expanded paths upstream and
+downstream, including further transactions already on the graph. All expanded paths
+stay animated; terminal branches fill a target of 50 branches per direction, sampled
+across each sphere. Larger animated traces use fewer dots per connection. Hovering an
+input/output or connection follows the same visible trace from that outpoint.
+Manual pan, orbit and zoom remain available with Motion off.
 
 Use **Wallets** in the graph toolbar to choose several associated wallets. An entity
 must match at least one chosen wallet and the other active filters. **Clear** removes

@@ -1,5 +1,6 @@
 import { SmallAmountControl } from './SmallAmountControl';
 import { Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { Workspace } from '../domain/types';
 export function GraphControls({
   view,
@@ -7,8 +8,10 @@ export function GraphControls({
   focusGraph,
   onToggleFocus,
   smallAmountHiddenCount,
+  motionToggle,
 }: {
   view: Workspace['view'];
+  motionToggle?: ReactNode;
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
   smallAmountHiddenCount?: number;
   focusGraph?: boolean;
@@ -87,7 +90,8 @@ export function GraphControls({
           <option value="none">Types + findings</option>
         </select>
       </span>
-      <div className="graph-annotation-toggles" role="group" aria-label="Graph annotations">
+      <div className="graph-annotation-toggles" role="group" aria-label="Graph display">
+        {motionToggle}
         {(
           [
             ['showLabels', 'Show labels', Type],

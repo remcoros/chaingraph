@@ -36,6 +36,9 @@ import { frameCamera } from './cameraFraming';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
 import { LayoutScheduler } from './layoutScheduler';
 import { makeFlowEdges } from './flowEdges';
+import { makeFlowParticles } from './flowParticles';
+import { chooseFlowLinks, indexFlowLinks } from './flowSelection';
+import { makeEdgePickIndex } from './flowEdgePicking';
 import { createNodePickMesh, intersectNodes, syncNodePickMesh } from './nodePicking';
 import './flowRenderer.css';
 
@@ -55,6 +58,16 @@ export class FlowRenderer implements GraphAdapter {
   readonly camera = new PerspectiveCamera(50, 1, 0.1, 1e8);
   readonly controls: OrbitControls;
   private edges = makeFlowEdges();
+  private particles = makeFlowParticles();
+  private flowIndex = indexFlowLinks([]);
+  private flowNodes = new Map<string, RenderNode>();
+  private flowSelected: string[] = [];
+  private particleCount = 0;
+  private motion = true;
+  private particleRaf = 0;
+  private particleTime?: number;
+  private renderedTime?: number;
+  private edgePick?: ReturnType<typeof makeEdgePickIndex>;
   private geometries = {
     box: new BoxGeometry(1.6, 1.6, 1.6),
     sphere: new SphereGeometry(1, 16, 12),
@@ -104,6 +117,7 @@ export class FlowRenderer implements GraphAdapter {
   private pointers = new Set<number>();
   private down?: { id: number; x: number; y: number };
   private hovered?: string;
+  private hoveredLink?: string;
   private raycaster = new Raycaster();
   private labels: HTMLDivElement;
   private labelPool: HTMLSpanElement[] = [];
@@ -125,7 +139,7 @@ export class FlowRenderer implements GraphAdapter {
     container.append(this.labels);
     this.camera.position.set(260, 140, 1000);
     this.controls = new OrbitControls(this.camera, this.canvas);
-    this.controls.enableDamping = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.controls.enableDamping = this.motion;
     this.controls.dampingFactor = 0.18;
     this.controls.zoomToCursor = true;
     this.controls.screenSpacePanning = true;
@@ -137,7 +151,7 @@ export class FlowRenderer implements GraphAdapter {
     this.controls.addEventListener('end', this.schedule);
     const light = new DirectionalLight(0xffffff, 2);
     light.position.set(-250, 400, 800);
-    this.scene.add(new AmbientLight(0xffffff, 1.8), light, this.edges.mesh);
+    this.scene.add(new AmbientLight(0xffffff, 1.8), light, this.edges.mesh, this.particles.mesh);
     this.layouts = new LayoutScheduler(
       () => new Worker(new URL('./flowLayout.worker.ts', import.meta.url), { type: 'module' }),
       (result) => this.accept(result),
@@ -175,11 +189,14 @@ export class FlowRenderer implements GraphAdapter {
       cancelAnimationFrame(this.pickRaf);
       this.pickRaf = requestAnimationFrame(() => {
         this.pickRaf = 0;
-        if (this.dead) return;
-        const hit = this.pick(e.clientX, e.clientY, false);
+        if (this.dead || this.lost || this.pointers.size) return;
+        const hit = this.pick(e.clientX, e.clientY);
         const hovered = hit?.type === 'node' ? hit.id : undefined;
-        if (this.hovered !== hovered) {
+        const hoveredLink = hit?.type === 'link' ? hit.id : undefined;
+        if (this.hovered !== hovered || this.hoveredLink !== hoveredLink) {
           this.hovered = hovered;
+          this.hoveredLink = hoveredLink;
+          this.refreshParticles();
           this.invalidate();
         }
         this.canvas.style.cursor = hit ? 'pointer' : 'grab';
@@ -213,6 +230,8 @@ export class FlowRenderer implements GraphAdapter {
     listen('pointerleave', ((e: PointerEvent) => {
       cancelAnimationFrame(this.pickRaf);
       this.hovered = undefined;
+      this.hoveredLink = undefined;
+      this.refreshParticles();
       if (e.pointerType !== 'touch') this.events.hover({ point: this.pointer(e) });
       this.invalidate();
     }) as EventListener);
@@ -241,6 +260,7 @@ export class FlowRenderer implements GraphAdapter {
     listen('webglcontextlost', ((e: Event) => {
       e.preventDefault();
       this.lost = true;
+      this.syncMotion();
       cancelAnimationFrame(this.raf);
       this.raf = 0;
       cancelAnimationFrame(this.pickRaf);
@@ -265,7 +285,78 @@ export class FlowRenderer implements GraphAdapter {
       this.events.recovered?.();
       this.schedule();
     }) as EventListener);
+    document.addEventListener('visibilitychange', this.visibilityChanged);
+    this.cleanups.push(() =>
+      document.removeEventListener('visibilitychange', this.visibilityChanged),
+    );
   }
+  private visibilityChanged = () => {
+    if (document.hidden) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
+    this.syncMotion();
+    this.invalidate();
+  };
+  private refreshParticles() {
+    this.particleCount = this.particles.update(
+      chooseFlowLinks(
+        this.flowIndex,
+        this.flowSelected,
+        this.hovered,
+        this.hoveredLink,
+        this.positions,
+        this.displayedDimensions,
+      ),
+      this.flowNodes,
+      this.positions,
+      this.displayedDimensions,
+    );
+    this.syncMotion();
+  }
+  private canAnimate() {
+    return (
+      !this.dead &&
+      !this.lost &&
+      !document.hidden &&
+      this.width > 0 &&
+      this.height > 0 &&
+      this.motion &&
+      this.particleCount > 0
+    );
+  }
+  private syncMotion() {
+    this.particles.mesh.visible = this.canAnimate();
+    if (!this.canAnimate()) {
+      cancelAnimationFrame(this.particleRaf);
+      this.particleRaf = 0;
+      this.particleTime = undefined;
+    } else if (!this.particleRaf) this.particleRaf = requestAnimationFrame(this.animateParticles);
+  }
+  private animateParticles = (time: number) => {
+    this.particleRaf = 0;
+    if (!this.canAnimate()) {
+      this.particleTime = undefined;
+      return;
+    }
+    if (this.particleTime !== undefined) this.particles.advance((time - this.particleTime) / 1000);
+    this.particleTime = time;
+    // Camera/style rendering already queued for this frame will draw the updated
+    // phase. Pure flow frames never update controls, labels or persistence activity.
+    if (!this.raf && this.renderedTime !== time) {
+      this.renderer.render(this.scene, this.camera);
+      this.renderedTime = time;
+    }
+    this.particleRaf = requestAnimationFrame(this.animateParticles);
+  };
+  setMotion = (enabled: boolean) => {
+    if (this.dead || this.motion === enabled) return;
+    if (!enabled) this.stopDamping();
+    this.motion = enabled;
+    this.controls.enableDamping = enabled;
+    this.syncMotion();
+    this.invalidate();
+  };
   private pointer(e: PointerEvent) {
     const r = this.container.getBoundingClientRect();
     return {
@@ -294,6 +385,8 @@ export class FlowRenderer implements GraphAdapter {
     this.pendingFocus = undefined;
     this.lastFrame = undefined;
     this.hovered = undefined;
+    this.hoveredLink = undefined;
+    this.refreshParticles();
     cancelAnimationFrame(this.pickRaf);
     this.events.dismiss();
     this.setActive(true);
@@ -302,6 +395,7 @@ export class FlowRenderer implements GraphAdapter {
   };
   private changed = () => {
     if (this.dead || this.lost) return;
+    this.edgePick = undefined;
     this.invalidate();
     if (!this.settingCamera) {
       this.setActive(true);
@@ -324,11 +418,14 @@ export class FlowRenderer implements GraphAdapter {
     }, 1200);
   };
   private invalidate = () => {
-    if (this.raf || this.dead || this.lost || !this.width || !this.height) return;
-    this.raf = requestAnimationFrame(() => {
+    if (this.raf || this.dead || this.lost || document.hidden || !this.width || !this.height)
+      return;
+    this.raf = requestAnimationFrame((time) => {
       this.raf = 0;
+      if (this.dead || this.lost || document.hidden || !this.width || !this.height) return;
       const moving = this.controls.update();
       this.renderer.render(this.scene, this.camera);
+      this.renderedTime = time;
       this.placeLabels();
       if (moving) this.invalidate();
     });
@@ -393,6 +490,7 @@ export class FlowRenderer implements GraphAdapter {
     this.restoreCamera(parsed.data.camera);
   }
   private restoreCamera(pose: GraphSnapshot['camera']) {
+    this.edgePick = undefined;
     this.stopDamping();
     this.settingCamera = true;
     this.camera.position.copy(vector(pose.position));
@@ -427,6 +525,8 @@ export class FlowRenderer implements GraphAdapter {
     this.pendingFit = true;
     this.events.dismiss();
     this.hovered = undefined;
+    this.hoveredLink = undefined;
+    this.refreshParticles();
     this.update({
       nodes: this.requestedFrame?.nodes ?? this.nodes,
       links: this.requestedFrame?.links ?? this.links,
@@ -498,6 +598,10 @@ export class FlowRenderer implements GraphAdapter {
       return;
     }
     this.topology = signature;
+    // A completed Fit/focus described the previous graph. Later UI reflow must
+    // not turn that old framing into an implicit Fit of newly added branches.
+    // Explicit pending camera requests remain owned by fulfillCamera().
+    if (this.positions.size) this.lastFrame = undefined;
     const anchorId = selected?.shape === 'sphere' ? selected.id : this.selectedOutpoint;
     const attached = new Set<string>();
     if (selected && anchorId && this.cache.has(anchorId))
@@ -624,27 +728,40 @@ export class FlowRenderer implements GraphAdapter {
           link.id !== before.id ||
           link.source !== before.source ||
           link.target !== before.target ||
+          link.directed !== before.directed ||
+          link.flowSide !== before.flowSide ||
           link.color !== before.color ||
           link.width !== before.width ||
           link.arrowLength !== before.arrowLength
         );
       });
-    if (edgesChanged) this.edges.update(this.links, byId, this.positions, this.dimensions);
+    if (edgesChanged) {
+      this.edges.update(this.links, byId, this.positions, this.dimensions);
+      this.flowIndex = indexFlowLinks(this.links);
+      this.edgePick = undefined;
+    }
     this.displayedNodes = this.nodes;
     this.displayedLinks = this.links;
+    this.flowNodes = byId;
+    this.flowSelected = this.nodes
+      .filter((node) => node.selected || node.flowActive)
+      .map((node) => node.id);
+    if (this.hovered && !byId.has(this.hovered)) this.hovered = undefined;
+    if (this.hoveredLink && !this.links.some((link) => link.id === this.hoveredLink))
+      this.hoveredLink = undefined;
+    this.refreshParticles();
     this.invalidate();
   }
   resize(width: number, height: number, topInset = 0, rightInset = 0) {
     if (this.dead) return;
-    const changed =
-      this.width !== width ||
-      this.height !== height ||
-      this.inset !== topInset ||
-      this.rightInset !== rightInset;
+    const viewportChanged = this.width !== width || this.height !== height;
+    const changed = viewportChanged || this.inset !== topInset || this.rightInset !== rightInset;
     this.width = Math.max(0, width);
     this.height = Math.max(0, height);
     this.inset = topInset;
     this.rightInset = rightInset;
+    if (changed) this.edgePick = undefined;
+    this.syncMotion();
     if (!width || !height) {
       cancelAnimationFrame(this.raf);
       this.raf = 0;
@@ -652,9 +769,13 @@ export class FlowRenderer implements GraphAdapter {
     }
     this.renderer.setSize(width, height);
     this.edges.resize(width, height);
+    this.particles.resize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    if (changed && this.lastFrame && !this.pointers.size) this.frameNodes(this.lastFrame.id);
+    // Toolbar content can change when a transaction is opened. Retain the
+    // current camera; updated overlay allowances apply to the next explicit Fit.
+    if (viewportChanged && this.lastFrame && !this.pointers.size)
+      this.frameNodes(this.lastFrame.id);
     this.fulfillCamera();
     this.invalidate();
   }
@@ -734,31 +855,23 @@ export class FlowRenderer implements GraphAdapter {
       const b = this.batches.find((b) => b.mesh === h.object || b.pickMesh === h.object)!;
       return { type: 'node', id: b.nodes[h.instanceId!].id };
     }
-    // Hover cards are node-only. Projecting every edge on every pointermove added
-    // substantial CPU work without producing a card; retain edge hits for clicks.
     if (!includeLinks) return;
-    let best = 25,
-      hit: GraphHit | undefined;
-    for (const l of this.links) {
-      const a = this.project(this.positions.get(l.source)!),
-        b = this.project(this.positions.get(l.target)!);
-      if (Math.abs(a.z) > 1 || Math.abs(b.z) > 1) continue;
-      const ax = rect.left + ((a.x + 1) * rect.width) / 2,
-        ay = rect.top + ((1 - a.y) * rect.height) / 2,
-        dx = ((b.x - a.x) * rect.width) / 2,
-        dy = ((a.y - b.y) * rect.height) / 2;
-      const t = Math.max(
-        0,
-        Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)),
-      );
-      const distance = (x - ax - t * dx) ** 2 + (y - ay - t * dy) ** 2;
-      if (distance < best) {
-        best = distance;
-        hit = { type: 'link', id: l.id };
+    if (!this.edgePick) {
+      const projected = new Map<string, { x: number; y: number; z: number }>();
+      for (const [id, point] of this.positions) {
+        const p = this.project(point);
+        projected.set(id, {
+          x: ((p.x + 1) * rect.width) / 2,
+          y: ((1 - p.y) * rect.height) / 2,
+          z: p.z,
+        });
       }
+      this.edgePick = makeEdgePickIndex(this.links, projected, rect.width, rect.height);
     }
-    return hit;
+    const id = this.edgePick(x - rect.left, y - rect.top);
+    return id ? { type: 'link', id } : undefined;
   }
+
   private placeLabels() {
     const candidates = this.nodes
       .map((n) => {
@@ -884,6 +997,7 @@ export class FlowRenderer implements GraphAdapter {
     if (this.dead) return;
     this.flushSnapshot();
     this.dead = true;
+    this.syncMotion();
     this.cancelQuiet();
     clearTimeout(this.recovery);
     cancelAnimationFrame(this.raf);
@@ -899,6 +1013,7 @@ export class FlowRenderer implements GraphAdapter {
     Object.values(this.geometries).forEach((g) => g.dispose());
     this.material.dispose();
     this.edges.dispose();
+    this.particles.dispose();
     this.scene.clear();
     this.renderer.dispose();
     this.renderer.forceContextLoss();

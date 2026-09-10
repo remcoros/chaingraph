@@ -301,6 +301,17 @@ can list visible, hidden or all records. Hidden selection remains inspectable; c
 locking does not implicitly reveal it. Explicit show-and-center does. View writes
 preserve each undo snapshot's visibility so camera autosaves do not erase visibility undo.
 
+`domain/graphBranch.ts` computes transaction removal closure over the whole requested
+batch. Adjacent outpoints join the action only when no other participating connection
+survives, including admitted address associations. Graph removal checks full membership;
+hiding checks membership minus manually hidden nodes. Temporary filters, amount thresholds,
+address display and input-context scopes do not change the connection evidence used for
+cleanup. Only neighbors of requested participating transactions qualify; existing unrelated
+orphans remain. `domain/graphMembership.ts` applies this to hide/remove actions without
+changing observations, annotations or saved geometry. Revealing remains explicit; Show all
+hidden restores the whole hidden group. Workspace transaction deletion applies the same
+membership cleanup before pruning vanished entities.
+
 `domain/entityRemoval.ts` plans transaction and watched-address removals, counting affected
 annotations and tag memberships before confirmation. Removal keeps complete remaining
 transaction records and clears affected user metadata. Stopping an address watch retains
@@ -662,6 +673,57 @@ No space is reserved for undisplayed siblings. Role outlines are restrained and
 omitted when too small to read, while node colors, selection and hover remain.
 Fit and focus reserve the right toolbar and top navigation without changing nodes.
 No ownership or individual input-to-output value allocation is inferred.
+
+Right-toolbar creator/spender expansion suppresses automatic selection focus for that
+action, even with Lock enabled. Normal selection, explicit Center and toggling Lock
+restore camera following. Toolbar inset changes update future framing allowances without
+reframing the current camera. Graph edits retire the previous completed framing request,
+so later content-driven resizing cannot fit an expanded graph implicitly. Pending explicit
+Fit/focus requests survive; unchanged graphs retain viewport-resize fitting behavior.
+Incremental transaction placement identifies the clicked outpoint's visible group by
+transaction, input/output side and member IDs. It measures the group's sphere using
+cached positions and each member's glyph radius, exits that sphere along the local
+branch ray, then leaves at least one group radius of clearance (minimum 40 world units,
+plus the new transaction's glyph clearance). Previously traced outpoints inside the
+terminal sphere remain members; separate remote bridge groups do not inflate it.
+Other groups provide collision clearance only. Saved positions and fresh/Repack spacing
+remain unchanged. This uses displayed geometry, without reserving space for undisplayed
+siblings or assuming how many I/O a future transaction will add.
+
+The Motion control is transient GraphView state, rendered as an icon before Show
+labels in the panel bar, and calls the optional adapter `setMotion` capability.
+It defaults on for each mount. `RenderNode.flowActive` carries active/batch flow
+emphasis separately from focus and annotation glow. Only directed creation/spending
+links are eligible; address associations never animate as transaction flow.
+
+`graph/flowSelection.ts` indexes visible transaction-to-outpoint creation links and
+outpoint-to-transaction spending links using stable `RenderLink.flowSide` hints.
+Selection, node hover and edge hover share one traversal. For active transactions,
+separate upstream and downstream walks retain every complete visible transaction
+bridge across the loaded trace. A visited set per direction prevents repeated work;
+segment IDs deduplicate shared paths. A walk never reverses direction at a reached
+transaction to enter an unrelated sibling branch. Outpoint/edge interaction starts
+with that outpoint's visible creating/spending segments, then follows its creators
+upstream and spenders downstream. Missing or hidden endpoints stop traversal.
+No observations are fetched or graph members added by animation.
+
+All reached bridges animate, including when there are more than 50 in a direction.
+Fifty is a per-direction branch target for the active context: reached bridges reserve
+slots first, and terminal branches at active nodes fill the remainder. Direct hover
+is included first. Terminal choices cycle across angular/elevation sectors of their
+visible sphere, with stable per-link random ranks inside sectors and fair sharing
+between active nodes. Camera movement does not change the sample. Terminal siblings
+of a merely traversed transaction are not added to the animation scope.
+
+`graph/flowParticles.ts` renders every chosen visible segment. Dot density adapts
+from four to one per segment, aiming for about 400 particles while retaining at least
+one per segment even above that target. Instance buffers grow/shrink with the chosen
+scope; no fixed edge-count slice can silently truncate complete paths. Animation
+advances shader time without changing layout, camera, geometry snapshots or activity
+signals. Motion off disables dots and camera damping; the static layout worker still
+places explicitly added nodes. Hidden/lost/disposed renderers stop animation. Hover
+picking reuses cached projected connections after node-first hits. This adds no
+workspace fields, backend state or dependencies.
 
 `graph/defaultAdapter.ts` selects `FlowRenderer`, adopted from the flow renderer v2
 experiment. Recognized transaction/outpoint topology uses the grouped layout.

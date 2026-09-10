@@ -78,8 +78,10 @@ describe('grouped flow and generic compact layout', () => {
         (hop.x * clicked.x + hop.y * clicked.y + hop.z * clicked.z) /
           (length * Math.hypot(clicked.x, clicked.y, clicked.z)),
       ).toBeGreaterThan(0.98);
-      expect(length).toBeGreaterThan(20);
-      expect(length).toBeLessThan(90);
+      // Sparse groups retain bounded clearance beyond the clicked glyph.
+      expect(length).toBeGreaterThan(50);
+      expect(length).toBeLessThan(65);
+      for (const [id, point] of graph.previous) expect(byId.get(id)).toEqual(point);
       for (let i = 0; i < 14; i++)
         for (const role of ['input', 'output']) {
           const id = `${role}-${i}`;
@@ -122,6 +124,39 @@ describe('grouped flow and generic compact layout', () => {
       ).toBeLessThan(0);
     },
   );
+
+  it('keeps a fresh or repacked sparse connection compact while giving incremental opening extra runway', () => {
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      nodes: [
+        { id: 'known', shape: 'box' },
+        { id: 'clicked', shape: 'sphere' },
+        { id: 'opened', shape: 'box' },
+      ],
+      links: [
+        { source: 'known', target: 'clicked', directed: true },
+        { source: 'clicked', target: 'opened', directed: true },
+      ],
+      previous: [],
+    };
+    const fresh = compactLayout(graph).positions,
+      byId = new Map(fresh);
+    expect(byId.get('opened')!.x - byId.get('known')!.x).toBeLessThan(60);
+    const retained = fresh.filter(([id]) => id !== 'opened');
+    const incremental = new Map(
+      compactLayout({
+        ...graph,
+        previous: retained,
+        expansionOrigin: { nodeId: 'opened', anchorId: 'clicked' },
+      }).positions,
+    );
+    const hop = incremental.get('opened')!.x - incremental.get('clicked')!.x;
+    expect(hop).toBeGreaterThan(50);
+    expect(hop).toBeLessThan(65);
+    for (const [id, point] of retained) expect(incremental.get(id)).toEqual(point);
+    expect(compactLayout(graph).positions).toEqual(fresh);
+  });
 
   it('uses the requested clicked outpoint when several cached branches meet a new transaction', () => {
     const graph: LayoutRequest = {
@@ -189,6 +224,93 @@ describe('grouped flow and generic compact layout', () => {
     expect(Math.hypot(hub.y, hub.z)).toBeLessThan(25);
     for (const [id, point] of graph.previous) expect(placed.get(id)).toEqual(point);
   });
+
+  it.each([1, -1] as const)(
+    'scales direction %d from the containing sphere boundary, regardless of which edge is clicked',
+    (side) => {
+      for (const size of [25, 160, 500]) {
+        const center = side * (size + 20);
+        const points = [
+          { x: side * 20, y: 0, z: 0 },
+          { x: side * (2 * size + 20), y: 0, z: 0 },
+          { x: center, y: size, z: 0 },
+          { x: center, y: -size, z: 0 },
+          { x: center, y: 0, z: size },
+          { x: center, y: 0, z: -size },
+        ];
+        const positions: Position[] = [];
+        for (const clicked of [0, 1]) {
+          const graph: LayoutRequest = {
+            revision: 1,
+            dimensions: 3,
+            nodes: [
+              { id: 'known', shape: 'box' },
+              { id: 'opened', shape: 'box' },
+              ...points.map((_, i) => ({ id: `io-${i}`, shape: 'sphere' as const })),
+            ],
+            links: points.map((_, i) =>
+              side === 1
+                ? { source: 'known', target: `io-${i}`, directed: true }
+                : { source: `io-${i}`, target: 'known', directed: true },
+            ),
+            previous: [
+              ['known', { x: 0, y: 0, z: 0 }],
+              ...points.map((point, i): [string, Position] => [`io-${i}`, point]),
+            ],
+            expansionOrigin: { nodeId: 'opened', anchorId: `io-${clicked}` },
+          };
+          graph.links.push(
+            side === 1
+              ? { source: `io-${clicked}`, target: 'opened', directed: true }
+              : { source: 'opened', target: `io-${clicked}`, directed: true },
+          );
+          const opened = new Map(compactLayout(graph).positions);
+          const at = opened.get('opened')!;
+          positions.push(at);
+          const clearance = side * at.x - (2 * size + 20 + 5);
+          expect(clearance).toBeGreaterThan(Math.max(40, size));
+          expect(clearance).toBeLessThan(Math.max(40, size) + 30);
+          expect(Math.hypot(at.y, at.z)).toBeLessThan(1e-6);
+          for (const [id, point] of graph.previous) expect(opened.get(id)).toEqual(point);
+
+          // A previously traced member stays in the same sphere, while a
+          // separate repacked bridge and its large glyph cannot inflate it.
+          graph.nodes.push(
+            { id: 'traced', shape: 'box' },
+            { id: 'remote', shape: 'box' },
+            { id: 'far-bridge', shape: 'sphere', radius: 80 },
+          );
+          graph.previous.push(
+            ['traced', { x: side * 7000, y: 1000, z: 0 }],
+            ['remote', { x: side * 7000, y: 0, z: 0 }],
+            ['far-bridge', { x: side * 6000, y: 0, z: 0 }],
+          );
+          graph.links.push(
+            ...(side === 1
+              ? [
+                  { source: 'io-2', target: 'traced', directed: true },
+                  { source: 'known', target: 'far-bridge', directed: true },
+                  { source: 'far-bridge', target: 'remote', directed: true },
+                ]
+              : [
+                  { source: 'traced', target: 'io-2', directed: true },
+                  { source: 'far-bridge', target: 'known', directed: true },
+                  { source: 'remote', target: 'far-bridge', directed: true },
+                ]),
+          );
+          const withOtherBranches = new Map(compactLayout(graph).positions).get('opened')!;
+          expect(
+            Math.hypot(
+              withOtherBranches.x - at.x,
+              withOtherBranches.y - at.y,
+              withOtherBranches.z - at.z,
+            ),
+          ).toBeLessThan(1e-6);
+        }
+        expect(Math.abs(positions[0].x - positions[1].x)).toBeLessThan(1e-6);
+      }
+    },
+  );
 
   it.each([
     { x: 0, y: 40, z: 0 },
