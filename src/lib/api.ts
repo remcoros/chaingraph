@@ -372,7 +372,6 @@ export async function scanWallet(
   const fetchHints: TransactionFetchHints = {
     ...options.fetchHints,
     priority: 'background',
-    kind: 'refresh',
     observation: {},
   };
   const addresses: Wallet['addresses'] = [];
@@ -505,7 +504,6 @@ export async function loadAddress(
   const fetchHints: TransactionFetchHints = {
     ...hints,
     priority: 'background',
-    kind: 'refresh',
     observation: {},
   };
   const history = await fetchHistory(network, addressToScriptHash(address, network), signal);

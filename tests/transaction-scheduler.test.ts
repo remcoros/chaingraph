@@ -213,8 +213,7 @@ describe('bounded transaction scheduler', () => {
     h.scheduler.dispose(h.scope);
   });
 
-  it('isolates workspace sessions and networks, clears activity on close, and rejects old tokens after reopen', async () => {
-    vi.useFakeTimers();
+  it('isolates workspace sessions and networks, clears scoped jobs on close, and rejects old tokens after reopen', async () => {
     const h = harness();
     const second = new TransactionFetchScope('mainnet');
     const p1 = h.request('same').catch((e: Error) => e.name);
@@ -223,10 +222,9 @@ describe('bounded transaction scheduler', () => {
     });
     await tick();
     expect(h.calls).toHaveLength(2);
-    vi.advanceTimersByTime(80);
-    expect(h.scope.getSummary()).toBe('1:0');
+    expect(h.scope.jobs.size).toBe(1);
     h.scheduler.dispose(h.scope);
-    expect(h.scope.getSnapshot()).toEqual([]);
+    expect(h.scope.jobs.size).toBe(0);
     expect(await p1).toBe('AbortError');
     await expect(h.request('late')).rejects.toMatchObject({ name: 'AbortError' });
     await expect(
@@ -234,15 +232,12 @@ describe('bounded transaction scheduler', () => {
     ).rejects.toThrow('different network');
     h.calls.forEach((call) => call.resolve(tx));
     await p2;
-    expect(h.scope.getSnapshot()).toEqual([]);
+    expect(h.scope.jobs.size).toBe(0);
     h.scheduler.dispose(second);
   });
 
-  it('coalesces notifications, bounds recent history, and does not cache resolved results', async () => {
-    vi.useFakeTimers();
+  it('does not cache resolved results or retain completed jobs', async () => {
     const h = harness();
-    const listener = vi.fn();
-    h.scope.subscribe(listener);
     for (let i = 0; i < 35; i++) {
       const request = h.request('same');
       await tick();
@@ -250,12 +245,7 @@ describe('bounded transaction scheduler', () => {
       await request;
     }
     expect(h.calls).toHaveLength(35);
-    expect(listener).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(80);
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(h.scope.getSnapshot()[0].done).toBe(30);
-    h.scope.clearRecent();
-    expect(h.scope.getSnapshot()).toEqual([]);
+    expect(h.scope.jobs.size).toBe(0);
     h.scheduler.dispose(h.scope);
   });
 });

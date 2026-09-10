@@ -1,5 +1,4 @@
 import { TransactionFetchShell } from './lib/useTransactionFetch';
-import { TransactionActivity } from './components/TransactionActivity';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
 import { resolveGraphHandoff } from './domain/graphHandoff';
 import { resolveWalletUtxoObservation } from './domain/walletUtxoObservation';
@@ -934,7 +933,6 @@ export default function App() {
         : fetchTransaction(w.network, id, signal, undefined, {
             scope: fetchScope,
             priority: 'visible',
-            kind: 'inputs',
           });
     },
     update: ws.update,
@@ -1409,7 +1407,7 @@ export default function App() {
           outputIndex,
           signal,
           spendingOffsets.current.get(searchKey) ?? 0,
-          { scope: fetchScope, priority: 'background', kind: 'spending' },
+          { scope: fetchScope, priority: 'background' },
         );
         signal.throwIfAborted();
         const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
@@ -2787,14 +2785,6 @@ export default function App() {
                 </>
               )}
             </span>
-            {fetchScope && (
-              <TransactionActivity
-                key={w.id}
-                scope={fetchScope}
-                operation={operation || undefined}
-                onCancel={() => operationRef.current?.abort()}
-              />
-            )}
             <span className="save-status">
               <LockKeyhole size={12} />
               {ws.storageError

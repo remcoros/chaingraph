@@ -84,7 +84,7 @@ describe('encrypted save scheduling around graph interaction', () => {
     await store.lock(id);
     expect(store.getSession(id)).toBeUndefined();
     expect(oldScope.closed).toBe(true);
-    expect(oldScope.getSnapshot()).toEqual([]);
+    expect(oldScope.jobs.size).toBe(0);
     expect(await decryptWorkspace(JSON.parse(raw()!)[0].envelope, password)).toMatchObject({
       view: { glow: false },
     });

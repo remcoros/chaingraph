@@ -115,7 +115,7 @@ export function WalletItemDetail({
   relatedSelection?: ReactNode;
   resolveInputs?: boolean;
 }) {
-  const fetchTransaction = useTransactionFetch('visible', 'inputs');
+  const fetchTransaction = useTransactionFetch('visible');
   const [chosenContext, setChosenContext] = useState('');
   const [flowOpen, setFlowOpen] = useState(true);
   const [evidenceLimits, setEvidenceLimits] = useState({

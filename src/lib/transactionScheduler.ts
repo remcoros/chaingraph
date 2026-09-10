@@ -1,17 +1,6 @@
 import type { Network, Transaction } from '../domain/types';
 
 export type FetchPriority = 'navigation' | 'visible' | 'background';
-export type FetchKind = 'transaction' | 'inputs' | 'refresh' | 'spending';
-type State = 'active' | 'queued' | 'done' | 'failed' | 'cancelled';
-export interface ActivityRow {
-  kind: FetchKind;
-  network: Network;
-  active: number;
-  queued: number;
-  done: number;
-  failed: number;
-  cancelled: number;
-}
 const MAX_ACTIVE_TRANSACTIONS = 12;
 const MAX_ACTIVE_PER_NETWORK = 8;
 const MAX_NON_NAVIGATION_TRANSACTIONS = 10;
@@ -19,88 +8,26 @@ const MAX_NON_NAVIGATION_PER_NETWORK = 3;
 export const TRANSACTION_BATCH_CONCURRENCY = 4;
 
 const rank = { navigation: 0, visible: 1, background: 2 };
-const empty: readonly ActivityRow[] = [];
 const abortError = () => new DOMException('Transaction request cancelled.', 'AbortError');
 
-/** One unlocked session owns this transient state. No transaction IDs or error payloads in activity. */
+/** One unlocked session owns its in-flight transaction requests. */
 export class TransactionFetchScope {
   closed = false;
   readonly jobs = new Set<Job>();
-  private recent: { kind: FetchKind; network: Network; state: State }[] = [];
-  private listeners = new Set<() => void>();
-  private timer?: ReturnType<typeof setTimeout>;
-  private snapshot: readonly ActivityRow[] = empty;
   constructor(readonly network?: Network) {}
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  };
-  getSnapshot = () => this.snapshot;
-  // Primitive summary keeps the closed-panel indicator independent of history updates.
-  getSummary = () =>
-    `${this.snapshot.reduce((n, r) => n + r.active, 0)}:${this.snapshot.reduce((n, r) => n + r.queued, 0)}`;
-  changed() {
-    if (this.closed || this.timer) return;
-    this.timer = setTimeout(() => {
-      this.timer = undefined;
-      this.publish();
-    }, 80);
-  }
-  record(job: Job, state: State) {
-    if (this.closed) return;
-    this.recent.push({ kind: job.kind, network: job.network, state });
-    this.recent = this.recent.slice(-30);
-    this.changed();
-  }
-  clearRecent = () => {
-    this.recent = [];
-    this.publish();
-  };
   close() {
     this.closed = true;
-    clearTimeout(this.timer);
-    this.timer = undefined;
     this.jobs.clear();
-    this.recent = [];
-    this.snapshot = empty;
-    for (const listener of this.listeners) listener();
-  }
-  private publish() {
-    if (this.closed) return;
-    const rows = new Map<string, ActivityRow>();
-    for (const item of [...this.recent, ...this.jobs]) {
-      const key = `${item.network}:${item.kind}`;
-      let row = rows.get(key);
-      if (!row) {
-        row = {
-          kind: item.kind,
-          network: item.network,
-          active: 0,
-          queued: 0,
-          done: 0,
-          failed: 0,
-          cancelled: 0,
-        };
-        rows.set(key, row);
-      }
-      row[item.state]++;
-    }
-    this.snapshot = [...rows.values()];
-    for (const listener of this.listeners) listener();
   }
 }
 export interface TransactionFetchHints {
   scope?: TransactionFetchScope;
   priority?: FetchPriority;
-  kind?: FetchKind;
   /** Unique per refresh operation. Never join a read that started before this observation. */
   observation?: object;
 }
 interface Consumer {
   priority: FetchPriority;
-  kind: FetchKind;
   resolve: (value: Transaction) => void;
   reject: (reason: unknown) => void;
   detach: () => void;
@@ -111,7 +38,6 @@ interface Job {
   key: string;
   observation?: object;
   priority: FetchPriority;
-  kind: FetchKind;
   state: 'queued' | 'active';
   controller: AbortController;
   consumers: Set<Consumer>;
@@ -137,7 +63,6 @@ export class TransactionScheduler {
     if (scope.network && scope.network !== network)
       return Promise.reject(new Error('Transaction request belongs to a different network.'));
     const priority = hints.priority ?? 'visible';
-    const kind = hints.kind ?? 'transaction';
     let job = [...scope.jobs].find(
       (j) =>
         j.network === network &&
@@ -158,7 +83,6 @@ export class TransactionScheduler {
         key,
         observation: hints.observation,
         priority,
-        kind,
         state: 'queued',
         controller: new AbortController(),
         consumers: new Set(),
@@ -178,16 +102,13 @@ export class TransactionScheduler {
         if (!owned.consumers.size) {
           owned.controller.abort();
           owned.scope.jobs.delete(owned);
-          owned.scope.record(owned, 'cancelled');
           // Keep an aborted physical loader counted until it actually settles.
           if (owned.state === 'queued') this.jobs.delete(owned);
         } else this.promote(owned);
-        owned.scope.changed();
         this.drain();
       };
       const consumer: Consumer = {
         priority,
-        kind,
         resolve,
         reject,
         detach: () => signal?.removeEventListener('abort', cancel),
@@ -196,7 +117,6 @@ export class TransactionScheduler {
       signal?.addEventListener('abort', cancel, { once: true });
     });
     this.promote(owned);
-    scope.changed();
     this.drain();
     return promise;
   }
@@ -218,7 +138,6 @@ export class TransactionScheduler {
     const first = [...job.consumers].sort((a, b) => rank[a.priority] - rank[b.priority])[0];
     if (first) {
       job.priority = first.priority;
-      job.kind = first.kind;
     }
   }
   private drain() {
@@ -250,7 +169,6 @@ export class TransactionScheduler {
         if (!job) break;
         job.state = 'active';
         this.lastNetwork = job.network;
-        job.scope.changed();
         // Promise boundary catches synchronous loaders and prevents reentrant queue deadlocks.
         void Promise.resolve()
           .then(() => {
@@ -270,7 +188,6 @@ export class TransactionScheduler {
     this.jobs.delete(job);
     job.scope.jobs.delete(job);
     if (job.consumers.size) {
-      job.scope.record(job, value ? 'done' : 'failed');
       for (const consumer of job.consumers) {
         consumer.detach();
         if (!value) consumer.reject(error);
@@ -285,7 +202,6 @@ export class TransactionScheduler {
       }
       job.consumers.clear();
     }
-    job.scope.changed();
     this.drain();
   }
 }

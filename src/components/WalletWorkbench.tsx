@@ -267,7 +267,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
       wallet.scannedAt,
     ],
   );
-  const fetchTransaction = useTransactionFetch('background', 'inputs');
+  const fetchTransaction = useTransactionFetch('background');
   const counterparties = useWalletCounterparties({
     workspace,
     wallet,

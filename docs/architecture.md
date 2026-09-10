@@ -605,31 +605,18 @@ the existing bounded immutable block-coordinate cache remains unchanged.
 
 Each `WorkspaceSessionStore` session owns a transient fetch scope. Successful lock
 closes it synchronously before removing the session, rejecting its consumers and
-clearing activity. A reopened workspace gets a different token. React callbacks
+clearing scoped jobs. A reopened workspace gets a different token. React callbacks
 capture their token; existing cancellation and selection/source guards govern all
 workspace mutations. The scheduler itself never adds graph branches or annotations.
 Unscoped library callers use a standalone scope; every currently mounted workspace
 transaction-fetch path supplies its session scope. Retained, unmounted Trace code
 can use the API default and must receive a session scope if restored to the UI.
 
-The bottom Activity popover counts transaction jobs, grouped by purpose and network,
-with only 30 recent outcomes. It includes transaction phases of wallet/address
-refresh, Graph navigation/explicit previous-depth/spending search, Wallet visible
-input details and bounded source-input loading. It excludes history discovery,
-UTXO/status checks, local Analysis scans, encryption and renderer work. It does not
-add speculative prefetch. Existing explicit previous-depth navigation retains its
-own traversal budget. The popover can cancel the current statusbar action through
-its existing owner, never indiscriminately abort other consumers.
+The scheduler keeps only in-flight jobs and consumer ownership, with no activity
+history, UI subscription or notification timer. Existing statusbar progress and
+its Cancel action remain attached to the current operation. Explicit previous-depth
+navigation retains its traversal budget and does not add speculative prefetch.
 
-The popup separates current loads into Task / Loading / Waiting columns. It shows
-the actual current action beside its Cancel button; recent outcomes are collapsed
-by default, with failures and a short recovery hint visible without expansion.
-Zero outcome counts and scheduler implementation notes are omitted from normal UI.
-Clearing recent results preserves current work and retains keyboard focus inside
-the dialog. The footer is quiet while idle and only shows nonzero request counts.
-
-Notifications coalesce at 80 ms. Only the small indicator subscribes while closed;
-detailed rows subscribe when opened. Activity never enters workspace state or
-storage. Parsing and per-consumer cloning remain synchronous and no end-to-end
+Parsing and per-consumer cloning remain synchronous and no end-to-end
 latency or rendering improvement is claimed. Reservation can reduce background-only
 throughput, and sustained higher-priority traffic can defer background work.
