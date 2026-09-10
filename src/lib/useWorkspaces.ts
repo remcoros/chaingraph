@@ -4,6 +4,7 @@ import type { Transaction, Workspace } from '../domain/types';
 import {
   MAX_SCAN_EVIDENCE_TRANSACTIONS,
   MAX_SCAN_RECORD_BYTES,
+  scanResultEvidenceIds,
 } from '../domain/connectionScanRecords';
 import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
 import { carryScanMetadata, walletEvidenceChanged } from '../domain/walletActivity';
@@ -28,11 +29,7 @@ function scanRecordsForUndo(snapshot: Workspace, current: Workspace): Workspace[
   if (!records || snapshot.transactions === current.transactions) return records;
   const needed = new Set(
     records.runs.flatMap((run) =>
-      run.results.flatMap((result) =>
-        result.path
-          .filter((node) => node.startsWith('tx:') || result.path.length === 1)
-          .map((node) => node.split(':')[1]),
-      ),
+      run.results.flatMap((result) => [...scanResultEvidenceIds(result)]),
     ),
   );
   const evidence: Record<string, Transaction> = {};

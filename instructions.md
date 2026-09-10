@@ -69,21 +69,47 @@ transactions, 60 seconds and a 200-branch boundary. Cached transactions and
 spending-history candidates share the same allowance with target-side searches.
 Scopes above 1,000 targets require a smaller visible graph or filter scope.
 
-Results appear as they are found. Connection rows use a green check; stopping
-points identify branch limits, missing chain data or failed lookups. Each result
-card shows its endpoint and hop count, with a short explanation for stopping points. Hop and time
-limits do not create result rows. The global status is green when the bounded
-scan completes and amber when it stops early or data is unavailable; expand the
-checked count for the run's settings and scope.
+Results stream into compact cards. The default **Findings** filter shows
+connections first, then branch choices and evidence problems. **Endpoints** is a
+separate filter for natural path endings.
 
-Expand **Path** to inspect directed steps and new nodes. **Select** selects its endpoint;
-**Add (+N)** adds exactly the displayed path with N new nodes in one Undo action,
-without sibling outputs. Both actions sit at the card's bottom right, below the
-path details. Longer paths offer **Path length** to choose an explicit prefix. Adding reveals the path and resets graph filters, preserving annotations
-and the camera. From a stopping point, add the path, select its endpoint and use
-**Scan selection** to scan from there. Missing saved path evidence is reported before
-adding; reload it or rerun. Use a row's **Dismiss result** icon to remove it from
-the list, including while scanning.
+| Finding | Meaning |
+| --- | --- |
+| Upstream / downstream connection | An observed funding or spending path links the selection to a graph target. |
+| Shared ancestor / shared descendant | Two paths meet at an earlier or later transaction or output. The card identifies both the target and meeting point. |
+| Many inputs / many outputs | The transaction's input or output count reaches the branch threshold. Add its path, inspect the transaction, and select one branch to continue. |
+| Unspent output | A positive UTXO check, with its time and mempool scope. This is a recorded observation, not a live balance. |
+| Coinbase origin | An upstream path reaches a coinbase transaction. |
+| Unspendable output | A downstream path ends at a verified OP_RETURN script. |
+| Transaction unavailable | A transaction needed to continue could not be loaded. |
+| Spend status unknown | Neither a verified spender nor a positive current UTXO observation is available. |
+| Lookup failed | A request timed out, failed or returned invalid data. |
+| Conflicting evidence | Observations contradict the proposed path. Only a verified prefix can be added. |
+
+Expand **Path** to inspect directed steps and new nodes. Alternative paths to the
+same finding share one card; choose an alternative inside it. **Select** selects
+the endpoint. **Add (+N)** adds the displayed path with N new nodes in one Undo
+action, without siblings. Both actions sit at the bottom right. **Path length**
+lets you choose a shorter prefix when needed. Adding reveals the path and resets
+graph filters, preserving annotations and the camera. Select a branch after adding
+its transaction, then use **Scan selection** to continue.
+
+**Recheck endpoint**, the circular-arrow button on evidence problems and unspent
+observations, checks that endpoint again without replacing other findings. It
+uses a fresh bounded lookup, not a resumed scan. A resolved problem disappears;
+a new terminal observation moves to **Endpoints**. Recheck is available after the
+scan finishes. Cancel, Clear, leaving Scan or closing the workspace aborts it.
+An unconfirmed or explicitly outdated path is marked on its card; contradictory
+or explicitly outdated observations cannot be added. Missing proof must be reloaded.
+Dismiss removes the finding and all of its alternative paths, including while scanning.
+
+Time, transaction, result and hop limits never create cards. Completion and
+coverage appear globally. Backend outages and rate limits stop the scan with one
+global reason. Offline scans follow loaded evidence only. Expand the checked count
+for settings and omitted-result counts. Each scan admits at most 10 natural
+endpoints and 10 evidence problems, reserving room in the 50-path allowance for
+connections and branch choices. Explicit rechecks may recategorize retained paths
+within that overall allowance.
 
 Only the latest scan's results are retained. Starting another scan replaces them;
 there is no scan history to manage. **Clear all results** clears the set, cancels

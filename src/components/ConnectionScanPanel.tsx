@@ -5,6 +5,7 @@ import {
   Info,
   LoaderCircle,
   Plus,
+  RotateCw,
   ScanLine,
   Square,
   Trash2,
@@ -18,25 +19,42 @@ import {
   type ScanResult,
   type ScanRun,
   type ScanSettings,
-  type ScanStopReason,
 } from '../domain/connectionScan';
 import { replaceScanRun, clearScanRuns, prepareScanPath } from '../domain/connectionScanRecords';
 import { runConnectionScanInWorker } from '../lib/connectionScanRunner';
 import type { TransactionFetchScope } from '../lib/transactionScheduler';
 import { traceSourceExists } from '../lib/tracing';
 import { indexLoadedSpends } from '../domain/transactionFlow';
-import { presentScanRun, scanStatus } from '../domain/connectionScanPresentation';
+import {
+  presentScanRun,
+  scanStatus,
+  resultFinding,
+  resultCategory,
+  type ScanResultFinding,
+} from '../domain/connectionScanPresentation';
+import {
+  groupScanResults,
+  scanResultGroupKey,
+  scanMeetingNode,
+} from '../domain/connectionScanGroups';
+import { retryConnectionScanResult, applyScanRecheck } from '../lib/connectionScanRetry';
+import { transactionStatus } from '../domain/transactionStatus';
 import './connection-scan.css';
 
-const reasons: Record<ScanStopReason, string> = {
-  depth: 'Hop limit',
-  'fan-out': 'Branch limit',
-  time: 'Time limit',
-  transactions: 'Transaction limit',
-  unknown: 'Missing chain data',
-  failure: 'Lookup failed',
-  results: 'Result limit',
-  cancelled: 'Cancelled',
+const titles: Record<ScanResultFinding, string> = {
+  'upstream-connection': 'Upstream connection',
+  'downstream-connection': 'Downstream connection',
+  'shared-ancestor': 'Shared ancestor',
+  'shared-descendant': 'Shared descendant',
+  'many-inputs': 'Many inputs',
+  'many-outputs': 'Many outputs',
+  unspent: 'Unspent output',
+  coinbase: 'Coinbase origin',
+  unspendable: 'Unspendable output',
+  'transaction-unavailable': 'Transaction unavailable',
+  'spend-unknown': 'Spend status unknown',
+  'lookup-failed': 'Lookup failed',
+  'conflicting-evidence': 'Conflicting evidence',
 };
 const eligible = (id?: string): id is string => !!id && /^(tx|out):/.test(id);
 const nameFor = (workspace: Workspace, id: string) => workspace.annotations[id]?.label || short(id);
@@ -66,7 +84,13 @@ export function ConnectionScanPanel(props: Props) {
   const [transientEvidence, setTransientEvidence] = useState<Record<string, Transaction>>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'connection' | 'boundary'>('all');
+  const [filter, setFilter] = useState<'findings' | 'connection' | 'branch' | 'issue' | 'endpoint'>(
+    'findings',
+  );
+  const [retrying, setRetrying] = useState<string>();
+  const [retryNotice, setRetryNotice] = useState('');
+  const retryController = useRef<AbortController | undefined>(undefined);
+  const dismissedGroups = useRef(new Set<string>());
   const controller = useRef<AbortController | undefined>(undefined);
   const mounted = useRef(true);
   const dismissed = useRef(new Set<string>());
@@ -89,27 +113,50 @@ export function ConnectionScanPanel(props: Props) {
     return () => {
       mounted.current = false;
       controller.current?.abort();
+      retryController.current?.abort();
     };
   }, []);
   useEffect(() => {
-    if (!active) controller.current?.abort();
+    if (!active) {
+      controller.current?.abort();
+      retryController.current?.abort();
+    }
   }, [active]);
 
   function clearResults() {
     controller.current?.abort();
     controller.current = undefined;
+    retryController.current?.abort();
+    retryController.current = undefined;
+    setRetrying(undefined);
+    setRetryNotice('');
+    dismissedGroups.current.clear();
     setBusy(false);
     setLiveRun(undefined);
     setTransientEvidence(undefined);
     setError('');
-    setFilter('all');
+    setFilter('findings');
     dismissed.current.clear();
     latestProgress.current = undefined;
     onChange(clearScanRuns, false);
   }
 
+  function presentIncoming(incoming: ScanRun) {
+    return presentScanRun(
+      {
+        ...incoming,
+        results: incoming.results.map((result) =>
+          dismissedGroups.current.has(scanResultGroupKey(result))
+            ? { ...result, dismissed: true }
+            : result,
+        ),
+      },
+      dismissed.current,
+    );
+  }
+
   function retainResult(incoming: { run: ScanRun; evidence: Record<string, Transaction> }) {
-    const result = { ...incoming, run: presentScanRun(incoming.run, dismissed.current) };
+    const result = { ...incoming, run: presentIncoming(incoming.run) };
     latestProgress.current = result;
     setLiveRun(result.run);
     try {
@@ -131,7 +178,7 @@ export function ConnectionScanPanel(props: Props) {
   }
 
   async function start(startSource: string | undefined) {
-    if (!eligible(startSource) || busy || controller.current) return;
+    if (!eligible(startSource) || busy || controller.current || retryController.current) return;
     setError('');
     const frozenSettings = { ...settings };
     for (const [key, label, maximum] of [
@@ -190,11 +237,13 @@ export function ConnectionScanPanel(props: Props) {
     controller.current = abort;
     setBusy(true);
     dismissed.current.clear();
+    dismissedGroups.current.clear();
+    setRetryNotice('');
     latestProgress.current = { run: initial, evidence: {} };
     setSettings(frozenSettings);
     setTransientEvidence(undefined);
     setLiveRun(initial);
-    setFilter('all');
+    setFilter('findings');
     try {
       const result = await runConnectionScanInWorker({
         request: {
@@ -219,7 +268,7 @@ export function ConnectionScanPanel(props: Props) {
         onProgress: (progress, evidence) => {
           if (!mounted.current || controller.current !== abort || !current.current.isCurrent())
             return;
-          const next = presentScanRun(progress, dismissed.current);
+          const next = presentIncoming(progress);
           if (next.results.length !== latestProgress.current?.run.results.length) {
             retainResult({ run: next, evidence });
           } else {
@@ -250,9 +299,83 @@ export function ConnectionScanPanel(props: Props) {
     }
   }
 
-  const results = run?.results.filter((item) => !item.dismissed) ?? [];
+  async function retry(result: ScanResult) {
+    if (!run || busy || retryController.current) return;
+    const abort = new AbortController();
+    retryController.current = abort;
+    setRetrying(result.id);
+    setRetryNotice('');
+    const runId = run.id;
+    try {
+      const currentEvidence = {
+        ...workspace.connectionScans?.evidence,
+        ...transientEvidence,
+        ...latestProgress.current?.evidence,
+      };
+      const checked = await retryConnectionScanResult({
+        run,
+        result,
+        network: workspace.network,
+        transactions: { ...currentEvidence, ...workspace.transactions },
+        scope,
+        signal: abort.signal,
+        allowNetwork: canQuery,
+        loadedSpenders: (id) => [
+          ...new Set([
+            ...(props.loadedSpenders.get(id) ?? []),
+            ...(savedSpenders.get(id)?.map((tx) => tx.txid) ?? []),
+          ]),
+        ],
+        isCurrent: () =>
+          mounted.current && retryController.current === abort && current.current.isCurrent(),
+      });
+      if (
+        abort.signal.aborted ||
+        retryController.current !== abort ||
+        !mounted.current ||
+        !current.current.isCurrent()
+      )
+        return;
+      if (checked.globalReason) {
+        setRetryNotice(
+          checked.globalReason === 'rate-limited'
+            ? 'Backend rate limit reached. Retry later.'
+            : checked.globalReason === 'offline'
+              ? 'Connect the backend to retry this lookup.'
+              : 'Lookup could not finish. Retry when the backend is available.',
+        );
+        return;
+      }
+      const latest = latestProgress.current?.run ?? run;
+      if (latest.id !== runId) return;
+      retainResult({
+        run: applyScanRecheck(latest, result, checked.observation),
+        evidence: { ...currentEvidence, ...checked.evidence },
+      });
+      setRetryNotice(
+        checked.observation ? '' : `Lookup resolved for ${nameFor(workspace, result.endpoint)}.`,
+      );
+    } catch {
+      if (
+        !abort.signal.aborted &&
+        retryController.current === abort &&
+        mounted.current &&
+        current.current.isCurrent()
+      )
+        setRetryNotice('Lookup could not finish. Retry with the backend connected.');
+    } finally {
+      if (retryController.current === abort) {
+        retryController.current = undefined;
+        if (mounted.current) setRetrying(undefined);
+      }
+    }
+  }
+
+  const groups = groupScanResults(run?.results ?? []);
   const status = run ? scanStatus(run, busy) : undefined;
-  const shownResults = results.filter((item) => filter === 'all' || item.kind === filter);
+  const shownGroups = groups.filter((group) =>
+    filter === 'findings' ? group.category !== 'endpoint' : group.category === filter,
+  );
   return (
     <div className="connection-scan" hidden={!active}>
       <section className="panel-section">
@@ -359,8 +482,14 @@ export function ConnectionScanPanel(props: Props) {
             </details>
           </fieldset>
           <div className="connection-scan-actions">
-            {busy ? (
-              <button type="button" onClick={() => controller.current?.abort()}>
+            {busy || retrying ? (
+              <button
+                type="button"
+                onClick={() => {
+                  controller.current?.abort();
+                  retryController.current?.abort();
+                }}
+              >
                 <Square size={13} />
                 Cancel
               </button>
@@ -436,8 +565,25 @@ export function ConnectionScanPanel(props: Props) {
               <dd>{run.settings.maxMilliseconds / 1000} seconds</dd>
               <dt>Stop at</dt>
               <dd>{run.settings.fanOut} branches</dd>
+              {!!run.omittedResults?.endpoints && (
+                <>
+                  <dt>Other endpoints</dt>
+                  <dd>{run.omittedResults.endpoints} omitted</dd>
+                </>
+              )}
+              {!!run.omittedResults?.issues && (
+                <>
+                  <dt>Other issues</dt>
+                  <dd>{run.omittedResults.issues} omitted</dd>
+                </>
+              )}
             </dl>
           </details>
+          {retryNotice && (
+            <p className="small muted" role="status">
+              {retryNotice}
+            </p>
+          )}
           {!busy && !run.results.some((item) => item.kind === 'connection') && (
             <p className="small muted">No connection found within these limits.</p>
           )}
@@ -448,12 +594,20 @@ export function ConnectionScanPanel(props: Props) {
                 value={filter}
                 onChange={(event) => setFilter(event.target.value as typeof filter)}
               >
-                <option value="all">All ({results.length})</option>
-                <option value="connection">
-                  Connections ({results.filter((item) => item.kind === 'connection').length})
+                <option value="findings">
+                  Findings ({groups.filter((g) => g.category !== 'endpoint').length})
                 </option>
-                <option value="boundary">
-                  Stopping points ({results.filter((item) => item.kind === 'boundary').length})
+                <option value="connection">
+                  Connections ({groups.filter((g) => g.category === 'connection').length})
+                </option>
+                <option value="branch">
+                  Branch choices ({groups.filter((g) => g.category === 'branch').length})
+                </option>
+                <option value="issue">
+                  Evidence problems ({groups.filter((g) => g.category === 'issue').length})
+                </option>
+                <option value="endpoint">
+                  Endpoints ({groups.filter((g) => g.category === 'endpoint').length})
                 </option>
               </select>
             </label>
@@ -467,9 +621,9 @@ export function ConnectionScanPanel(props: Props) {
               <Trash2 size={14} /> Clear
             </button>
           </div>
-          {shownResults.map((result) => (
-            <ScanResultRow
-              key={`${run.id}:${result.id}`}
+          {shownGroups.map((group) => (
+            <ScanResultGroup
+              key={`${run.id}:${group.id}`}
               workspace={
                 transientEvidence
                   ? {
@@ -484,13 +638,16 @@ export function ConnectionScanPanel(props: Props) {
                     }
                   : workspace
               }
-              result={result}
-              fanOut={run.settings.fanOut}
+              group={group}
+              retrying={retrying}
+              retryDisabled={busy || !!retrying}
+              onRetry={retry}
               visibleNodeIds={props.visibleNodeIds}
               onSelect={onSelect}
               onAdd={(row, length) => props.onAdd(row, length, transientEvidence)}
               onDismiss={() => {
-                dismissed.current.add(result.id);
+                dismissedGroups.current.add(group.id);
+                for (const result of group.results) dismissed.current.add(result.id);
                 retainResult({
                   run: latestProgress.current?.run ?? run,
                   evidence:
@@ -502,7 +659,7 @@ export function ConnectionScanPanel(props: Props) {
               }}
             />
           ))}
-          {!shownResults.length && results.length > 0 && (
+          {!shownGroups.length && groups.length > 0 && (
             <p className="small muted">No results match this filter.</p>
           )}
         </section>
@@ -511,24 +668,59 @@ export function ConnectionScanPanel(props: Props) {
   );
 }
 
-function ScanResultRow({
-  workspace,
-  result,
-  fanOut,
-  visibleNodeIds,
-  onSelect,
-  onAdd,
-  onDismiss,
-}: {
+type ResultRowProps = {
   workspace: Workspace;
   result: ScanResult;
-  fanOut: number;
+  alternatives: ScanResult[];
+  onPathChange: (id: string) => void;
   visibleNodeIds: string[];
   onSelect: (id: string) => void;
   onAdd: (result: ScanResult, prefixLength: number) => void;
   onDismiss: () => void;
+  onRetry: (result: ScanResult) => void;
+  retrying?: string;
+  retryDisabled: boolean;
+};
+
+function ScanResultGroup({
+  group,
+  ...props
+}: Omit<ResultRowProps, 'result' | 'alternatives' | 'onPathChange'> & {
+  group: ReturnType<typeof groupScanResults>[number];
 }) {
-  const [prefixLength, setPrefixLength] = useState(result.path.length);
+  const [selected, setSelected] = useState(group.results[0].id);
+  const result = group.results.find((item) => item.id === selected) ?? group.results[0];
+  return (
+    <ScanResultRow
+      {...props}
+      key={result.id}
+      result={result}
+      alternatives={group.results}
+      onPathChange={setSelected}
+    />
+  );
+}
+
+function ScanResultRow({
+  workspace,
+  result,
+  alternatives,
+  onPathChange,
+  visibleNodeIds,
+  onSelect,
+  onAdd,
+  onDismiss,
+  onRetry,
+  retrying,
+  retryDisabled,
+}: ResultRowProps) {
+  const finding = resultFinding(result)!;
+  const category = resultCategory(result);
+  const hasDirection = !!(result.scanDirection ?? result.directions[0]);
+  const conflict = finding === 'conflicting-evidence';
+  const [prefixLength, setPrefixLength] = useState(
+    conflict ? Math.max(1, result.path.length - 1) : result.path.length,
+  );
   const [error, setError] = useState('');
   const fullPlan = useMemo(
     () => prepareScanPath(workspace, result),
@@ -543,62 +735,119 @@ function ScanResultRow({
     prefixLength === result.path.length
       ? fullPlan
       : prepareScanPath(workspace, result, prefixLength);
-  const connection = result.kind === 'connection';
-  const relation =
-    result.relationship === 'shared-ancestor'
-      ? 'Shared ancestor'
-      : result.relationship === 'shared-descendant'
-        ? 'Shared descendant'
-        : 'Connection';
-  const title = connection ? relation : reasons[result.reason ?? 'unknown'];
+  const connection = category === 'connection';
+  const title = titles[finding];
   const visible = new Set(visibleNodeIds);
   const obscured = plan.nodeIds.some((id) => !visible.has(id) && !plan.newNodeIds.includes(id));
-  const description = connection
-    ? undefined
-    : result.reason === 'fan-out'
-      ? `Stopped at ${fanOut}+ ${result.endpoint.startsWith('tx:') ? 'inputs or outputs' : 'connected transactions'}.`
-      : result.reason === 'unknown'
-        ? 'Further chain data is unavailable.'
-        : result.reason === 'failure'
-          ? 'Could not load the next step.'
-          : result.reason === 'transactions'
-            ? 'Transaction budget reached at this step.'
-            : result.reason === 'cancelled'
-              ? 'Scan cancelled at this step.'
-              : 'Scan stopped at this step.';
+  const tx =
+    workspace.transactions[result.endpoint.split(':')[1]] ??
+    workspace.connectionScans?.evidence[result.endpoint.split(':')[1]];
+  const count =
+    result.branchCount ??
+    (finding === 'many-inputs'
+      ? tx?.vin.filter((input) => input.txid && input.vout !== undefined).length
+      : finding === 'many-outputs'
+        ? tx?.vout.length
+        : undefined);
+  const descriptions: Partial<Record<ScanResultFinding, string>> = {
+    'many-inputs': `${count === undefined ? 'Many' : count} inputs. Choose an input to continue tracing.`,
+    'many-outputs': `${count === undefined ? 'Many' : count} outputs. Choose an output to continue tracing.`,
+    coinbase: 'Mining reward transaction; no earlier funding inputs.',
+    unspendable: 'This output cannot be spent.',
+    unspent: 'Unspent at the recorded check, including the mempool.',
+    'transaction-unavailable': 'The transaction needed to continue is unavailable.',
+    'spend-unknown': 'No verified spender or current unspent observation.',
+    'lookup-failed':
+      result.issueCode === 'timeout'
+        ? 'The next lookup timed out.'
+        : result.issueCode === 'invalid-response'
+          ? 'The backend returned an invalid response.'
+          : 'Could not load the next step.',
+    'conflicting-evidence': 'Observations disagree. Only the preceding verified path can be added.',
+  };
+  const meeting = scanMeetingNode(result);
+  const statuses = result.path.map(
+    (id) =>
+      transactionStatus(
+        workspace.transactions[id.split(':')[1]] ??
+          workspace.connectionScans?.evidence[id.split(':')[1]],
+      ).kind,
+  );
+  const outsideChain = statuses.includes('conflicted');
+  const unconfirmed = statuses.includes('mempool');
   return (
     <article
-      className={`connection-scan-result ${connection ? 'is-connection' : result.reason === 'failure' ? 'is-failure' : 'is-boundary'}`}
+      className={`connection-scan-result ${connection ? 'is-connection' : finding === 'lookup-failed' || conflict ? 'is-failure' : category === 'endpoint' ? 'is-endpoint' : 'is-boundary'}`}
       aria-label={`${title}: ${nameFor(workspace, result.endpoint)}`}
     >
       <div className="connection-scan-result-heading">
-        {connection ? <Check size={15} /> : <TriangleAlert size={15} />}
+        {connection ? (
+          <Check size={15} />
+        ) : category === 'endpoint' ? (
+          <Info size={15} />
+        ) : (
+          <TriangleAlert size={15} />
+        )}
         <strong>{title}</strong>
         <button
           type="button"
           className="text-button connection-scan-dismiss"
           onClick={onDismiss}
-          title="Dismiss result"
+          title="Dismiss finding and its paths"
           aria-label={`Dismiss ${nameFor(workspace, result.endpoint)}`}
         >
           <X size={15} />
         </button>
       </div>
       <div className="connection-scan-result-endpoint">
-        <span title={result.endpoint}>{nameFor(workspace, result.endpoint)}</span>
+        <span title={result.endpoint}>{short(result.endpoint)}</span>
         <small>
           {result.hops} {result.hops === 1 ? 'hop' : 'hops'}
         </small>
       </div>
       <div className="connection-scan-result-body">
-        {description && <p className="connection-scan-result-description">{description}</p>}
+        {workspace.annotations[result.endpoint]?.label && (
+          <p className="small">{workspace.annotations[result.endpoint].label}</p>
+        )}
+        {descriptions[finding] && (
+          <p className="connection-scan-result-description">{descriptions[finding]}</p>
+        )}
+        {category === 'issue' && !hasDirection && (
+          <p className="small muted">Start a new scan to refresh this older result.</p>
+        )}
+        {meeting && (
+          <div className="connection-scan-meeting">
+            <span className="muted">Meeting point</span>
+            <span title={meeting}>{nameFor(workspace, meeting)}</span>
+          </div>
+        )}
+        {(outsideChain || unconfirmed) && (
+          <p className="small connection-scan-evidence-status">
+            {outsideChain
+              ? 'Path includes an observation outside the active chain.'
+              : 'Path includes an unconfirmed transaction.'}
+          </p>
+        )}
+        {result.checkedAt && (
+          <p
+            className="small muted"
+            title={result.bestBlock ? `Observed at block ${result.bestBlock}` : undefined}
+          >
+            Checked{' '}
+            <time dateTime={result.checkedAt}>{new Date(result.checkedAt).toLocaleString()}</time>
+          </p>
+        )}
         {connection && fullPlan.newNodeIds.includes(result.endpoint) && (
           <p className="small muted">Endpoint removed from graph. Add restores it.</p>
         )}
-
         {plan.missingTxids.length > 0 && (
           <p className="small connection-scan-error">
             Path evidence must be reloaded before adding.
+          </p>
+        )}
+        {plan.blockedByConflict && (
+          <p className="small connection-scan-error">
+            Choose an earlier verified step or refresh the conflicting evidence.
           </p>
         )}
         {obscured && (
@@ -614,9 +863,25 @@ function ScanResultRow({
             Path{' '}
             <span>
               {prefixLength} {prefixLength === 1 ? 'node' : 'nodes'}
+              {alternatives.length > 1 ? ` · ${alternatives.length} alternatives` : ''}
             </span>
           </summary>
-          {(result.path.length > 5 || fullPlan.missingTxids.length > 0) &&
+          {alternatives.length > 1 && (
+            <label>
+              Alternative path
+              <select value={result.id} onChange={(event) => onPathChange(event.target.value)}>
+                {alternatives.map((path, index) => (
+                  <option key={path.id} value={path.id}>
+                    Path {index + 1}: {path.hops} hops
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {(result.path.length > 5 ||
+            fullPlan.missingTxids.length > 0 ||
+            conflict ||
+            fullPlan.blockedByConflict) &&
             result.path.length > 1 && (
               <label>
                 Path length
@@ -646,6 +911,22 @@ function ScanResultRow({
         </details>
       </div>
       <footer className="connection-scan-result-actions">
+        {(category === 'issue' || finding === 'unspent') && (
+          <button
+            type="button"
+            disabled={retryDisabled || !hasDirection}
+            onClick={() => onRetry(result)}
+            className="connection-scan-recheck"
+            aria-label={retrying === result.id ? 'Rechecking endpoint' : 'Recheck endpoint'}
+            title={
+              hasDirection
+                ? 'Recheck this endpoint without replacing other findings'
+                : 'Start a new scan to recheck this older result'
+            }
+          >
+            {retrying === result.id ? <LoaderCircle size={14} /> : <RotateCw size={14} />}
+          </button>
+        )}
         <button
           type="button"
           disabled={!traceSourceExists(workspace, result.endpoint)}
@@ -657,7 +938,7 @@ function ScanResultRow({
         </button>
         <button
           type="button"
-          disabled={plan.missingTxids.length > 0}
+          disabled={plan.missingTxids.length > 0 || plan.blockedByConflict}
           title={`Add path: ${plan.newNodeIds.length} new nodes`}
           aria-label={`Add path: ${plan.newNodeIds.length} new nodes`}
           onClick={() => {

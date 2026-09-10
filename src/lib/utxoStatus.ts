@@ -29,6 +29,15 @@ export interface UtxoObservation {
   bestblock?: string;
   confirmations?: number;
 }
+export class UtxoObservationError extends Error {
+  constructor(readonly code: 'invalid-response' | 'conflicting-evidence') {
+    super(
+      code === 'invalid-response'
+        ? 'The node returned an invalid UTXO response.'
+        : 'The UTXO response disagrees with the loaded output.',
+    );
+  }
+}
 
 /** A point-in-time Core UTXO-set observation, not a claim about cached spender history. */
 export async function fetchCurrentUtxo(
@@ -58,14 +67,14 @@ export async function fetchCurrentUtxo(
   };
   if (response === null) return { ...base, status: 'absent' };
   const parsed = resultSchema.safeParse(response);
-  if (!parsed.success) throw new Error('The node returned an invalid UTXO response.');
+  if (!parsed.success) throw new UtxoObservationError('invalid-response');
   if (
     expected &&
     (sats(parsed.data.value) !== sats(expected.value) ||
       (expected.scriptPubKey.hex !== undefined &&
         parsed.data.scriptPubKey.hex.toLowerCase() !== expected.scriptPubKey.hex.toLowerCase()))
   )
-    throw new Error('The UTXO response disagrees with the loaded output.');
+    throw new UtxoObservationError('conflicting-evidence');
   return {
     ...base,
     status: 'unspent',

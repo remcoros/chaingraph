@@ -24,9 +24,31 @@ class RpcError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    readonly status?: number,
+    readonly failure?: RpcFailureKind,
   ) {
     super(message);
   }
+}
+export type RpcFailureKind =
+  | 'backend-unavailable'
+  | 'rate-limited'
+  | 'timeout'
+  | 'invalid-response'
+  | 'lookup-failed'
+  | 'conflicting-evidence';
+/** Stable categories only. Never infer status from or return upstream message text. */
+export function classifyRpcFailure(error: unknown): RpcFailureKind {
+  if (error instanceof RpcError) {
+    if (error.code === 'network_not_configured') return 'backend-unavailable';
+    if (error.status === 429) return 'rate-limited';
+    // Optional spending-index capability loss still permits the existing history fallback.
+    if (error.code === 'core_spender_unavailable') return 'lookup-failed';
+    if (error.status === 503) return 'backend-unavailable';
+    if (error.status === 408 || error.status === 504) return 'timeout';
+    return error.failure ?? 'lookup-failed';
+  }
+  return error instanceof z.ZodError ? 'invalid-response' : 'lookup-failed';
 }
 export async function rpc<T>(
   network: Network,
@@ -41,14 +63,39 @@ export async function rpc<T>(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ network, target, method, params }),
     signal,
+  }).catch((error: unknown) => {
+    signal?.throwIfAborted();
+    throw new RpcError('Backend request unavailable.', undefined, undefined, 'backend-unavailable');
   });
-  const payload = await response.json();
+  const payload = await response.json().catch(() => {
+    signal?.throwIfAborted();
+    throw new RpcError(
+      'Invalid upstream response.',
+      undefined,
+      response.status,
+      'invalid-response',
+    );
+  });
   signal?.throwIfAborted();
-  if (!payload || typeof payload !== 'object') throw new Error('Invalid upstream response.');
+  if (!payload || typeof payload !== 'object')
+    throw new RpcError(
+      'Invalid upstream response.',
+      undefined,
+      response.status,
+      'invalid-response',
+    );
   if (!response.ok || payload.error)
     throw new RpcError(
       typeof payload.error === 'string' ? payload.error : 'Upstream request failed.',
       typeof payload.code === 'string' ? payload.code : undefined,
+      response.status,
+    );
+  if (!Object.hasOwn(payload, 'result'))
+    throw new RpcError(
+      'Invalid upstream response.',
+      undefined,
+      response.status,
+      'invalid-response',
     );
   return payload.result as T;
 }
@@ -215,6 +262,7 @@ async function fetchTransactionRequest(
     );
   } catch (e) {
     if (signal?.aborted) throw e;
+    if (classifyRpcFailure(e) === 'rate-limited') throw e;
     if (e instanceof RpcError && e.code === 'core_prevout_unavailable') {
       try {
         data = await rpc(
@@ -226,6 +274,7 @@ async function fetchTransactionRequest(
         );
       } catch (fallbackError) {
         if (signal?.aborted) throw fallbackError;
+        if (classifyRpcFailure(fallbackError) === 'rate-limited') throw fallbackError;
         fromCore = false;
         data = await rpc(
           network,
@@ -247,8 +296,24 @@ async function fetchTransactionRequest(
     }
   }
   const tx = parseTransaction(data);
-  if (tx.txid !== txid.toLowerCase()) throw new Error('Upstream returned a different transaction.');
-  validateTransactionAddresses(tx, network);
+  if (tx.txid !== txid.toLowerCase())
+    throw new RpcError(
+      'Upstream returned a different transaction.',
+      undefined,
+      undefined,
+      'conflicting-evidence',
+    );
+  try {
+    validateTransactionAddresses(tx, network);
+  } catch (error) {
+    // These messages originate in our network/script validator, not upstream exception text.
+    throw new RpcError(
+      error instanceof Error ? error.message : 'Invalid transaction network.',
+      undefined,
+      undefined,
+      'conflicting-evidence',
+    );
+  }
   // These are application observations, not fields supplied by verbose RPC.
   delete tx.blockHeight;
   delete tx.mempool;
@@ -705,6 +770,11 @@ export async function fetchIndexedSpenders(
       }
   } catch (error) {
     signal?.throwIfAborted();
+    if (
+      beforeInspect &&
+      ['backend-unavailable', 'rate-limited'].includes(classifyRpcFailure(error))
+    )
+      throw error;
     return {
       transactions: [...transactions.values()],
       unresolved: unique,
@@ -780,6 +850,11 @@ export async function fetchIndexedSpenders(
         unresolved.push(...group.map(({ txid, vout }) => ({ txid, vout })));
     } catch (error) {
       signal?.throwIfAborted();
+      if (
+        beforeInspect &&
+        ['backend-unavailable', 'rate-limited'].includes(classifyRpcFailure(error))
+      )
+        throw error;
       unresolved.push(...group.map(({ txid, vout }) => ({ txid, vout })));
     }
   });

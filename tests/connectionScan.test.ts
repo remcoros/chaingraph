@@ -8,6 +8,7 @@ import {
   validateScanSettings,
   type ConnectionScanOptions,
   type ScanDirection,
+  type ScanObservation,
 } from '../src/domain/connectionScan';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
@@ -76,6 +77,8 @@ describe('bounded connection traversal', () => {
       const result = run.results.find((item) => item.relationship === relationship)!;
       expect(result).toBeDefined();
       expect(result.endpoint).toBe(tx(3));
+      expect(result.meetingNode).toBe(tx(2));
+      expect(result.scanDirection).toBe(direction);
       expect(result.path[0]).toBe(tx(1));
       expect(result.path.at(-1)).toBe(tx(3));
       expect(result.hops).toBe(2);
@@ -145,6 +148,11 @@ describe('bounded connection traversal', () => {
     const boundary = run.results.find((result) => result.reason === 'fan-out')!;
     expect(boundary.path).toEqual([tx(1), out(1), tx(2)]);
     expect(boundary.endpoint).toBe(tx(2));
+    expect(boundary).toMatchObject({
+      finding: 'many-outputs',
+      branchCount: 3,
+      scanDirection: 'downstream',
+    });
     expect(run.results.every((result) => !result.path.includes(out(2)))).toBe(true);
   });
 
@@ -250,7 +258,7 @@ describe('bounded connection traversal', () => {
     );
     expect(run.examined).toBe(2);
     expect(run.stopReasons).toContain('transactions');
-    expect(run.results.some((result) => result.reason === 'transactions')).toBe(true);
+    expect(run.results).toEqual([]);
   });
 
   it('alternates source/target and direction fronts deterministically', async () => {
@@ -355,7 +363,7 @@ describe('bounded connection traversal', () => {
     );
     expect(run.status).toBe('cancelled');
     expect(run.stopReasons).toContain('cancelled');
-    expect(run.results.every((result) => result.path.length === 1)).toBe(true);
+    expect(run.results).toEqual([]);
   });
 
   it('sanitizes resolver failures into useful boundaries', async () => {
@@ -379,7 +387,7 @@ describe('bounded connection traversal', () => {
         resolveNeighbors: async (id) =>
           id === tx(1)
             ? { nodeIds: Array.from({ length: 60 }, (_, index) => out(1, index)) }
-            : { nodeIds: [], stopReason: 'unknown' },
+            : { nodeIds: [], stopReason: 'fan-out' },
       }),
     );
     expect(run.results).toHaveLength(SCAN_LIMITS.maxResults);
@@ -402,6 +410,124 @@ describe('bounded connection traversal', () => {
     expect(calls).toBe(0);
     expect(run.status).toBe('cancelled');
     expect(run.examined).toBe(0);
+  });
+
+  it.each([
+    ['unspent', 'downstream', out(1), 'endpoint'],
+    ['coinbase', 'upstream', tx(1), 'endpoint'],
+    ['unspendable', 'downstream', out(1), 'endpoint'],
+    ['many-inputs', 'upstream', tx(1), 'boundary'],
+    ['many-outputs', 'downstream', tx(1), 'boundary'],
+    ['transaction-unavailable', 'upstream', tx(1), 'boundary'],
+    ['spend-unknown', 'downstream', out(1), 'boundary'],
+    ['lookup-failed', 'downstream', out(1), 'boundary'],
+    ['conflicting-evidence', 'downstream', out(1), 'boundary'],
+  ] as const)(
+    'retains %s observation context without inventing path edges',
+    async (finding, direction, source, kind) => {
+      const observation: ScanObservation = {
+        finding,
+        ...(finding === 'many-inputs' || finding === 'many-outputs' ? { branchCount: 70 } : {}),
+        ...(finding === 'unspent'
+          ? {
+              checkedAt: '2026-09-11T00:00:00.000Z',
+              bestBlock: 'a'.repeat(64),
+              includesMempool: true,
+            }
+          : {}),
+        ...(finding === 'lookup-failed' ? { issueCode: 'timeout' as const } : {}),
+      };
+      const run = await runConnectionScan(
+        options([], {
+          source,
+          targetIds: [],
+          settings: { ...DEFAULT_SCAN_SETTINGS, direction },
+          resolveNeighbors: async () => ({ nodeIds: [], observation }),
+        }),
+      );
+      expect(run.results).toHaveLength(1);
+      expect(run.results[0]).toMatchObject({
+        ...observation,
+        kind,
+        scanDirection: direction,
+        path: [source],
+        directions: [],
+        endpoint: source,
+      });
+    },
+  );
+
+  it.each([
+    'time',
+    'transactions',
+    'results',
+    'cancelled',
+    'backend-unavailable',
+    'rate-limited',
+  ] as const)('stops all fronts for %s without resource or lifecycle cards', async (stopReason) => {
+    const resolveNeighbors = vi.fn(async () => ({ nodeIds: [out(1)], stopReason }));
+    const run = await runConnectionScan(options([], { resolveNeighbors }));
+    expect(resolveNeighbors).toHaveBeenCalledTimes(1);
+    expect(run.stopReasons).toContain(stopReason);
+    expect(run.results).toEqual([]);
+    expect(run.status).toBe(stopReason === 'cancelled' ? 'cancelled' : 'complete');
+  });
+
+  it('keeps loaded directed searches useful during offline coverage without creating offline cards', async () => {
+    const input = options(pathEdges, {
+      settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream' },
+    });
+    const original = input.resolveNeighbors;
+    input.resolveNeighbors = async (...args) => ({
+      ...(await original(...args)),
+      stopReason: 'offline',
+    });
+    const run = await runConnectionScan(input);
+    expect(run.stopReasons).toContain('offline');
+    expect(run.results.some((result) => result.relationship === 'direct')).toBe(true);
+    expect(run.results.every((result) => result.kind === 'connection')).toBe(true);
+  });
+
+  it('reserves primary finding capacity while counting omitted endpoints and issues', async () => {
+    const progress = vi.fn();
+    const run = await runConnectionScan(
+      options([], {
+        settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream', fanOut: 100 },
+        onProgress: progress,
+        resolveNeighbors: async (node) => {
+          if (node === tx(1))
+            return {
+              nodeIds: [
+                ...Array.from({ length: 13 }, (_, i) => out(1, i)),
+                ...Array.from({ length: 13 }, (_, i) => out(1, i + 20)),
+                out(1, 99),
+              ],
+            };
+          if (node === tx(3)) return { nodeIds: [] };
+          const index = Number(node.split(':')[2]);
+          if (index < 13) return { nodeIds: [], observation: { finding: 'unspendable' } };
+          if (index < 33)
+            return {
+              nodeIds: [],
+              observation: { finding: 'lookup-failed', issueCode: 'lookup-failed' },
+            };
+          return { nodeIds: [tx(3)] };
+        },
+      }),
+    );
+    expect(run.results.filter((result) => result.kind === 'endpoint')).toHaveLength(
+      SCAN_LIMITS.maxEndpointResults,
+    );
+    expect(run.results.filter((result) => result.finding === 'lookup-failed')).toHaveLength(
+      SCAN_LIMITS.maxIssueResults,
+    );
+    expect(run.results.some((result) => result.relationship === 'direct')).toBe(true);
+    expect(run.omittedResults).toEqual({ endpoints: 3, issues: 3 });
+    expect(run.stopReasons).not.toContain('results');
+    const snapshots = progress.mock.calls
+      .map(([snapshot]) => snapshot.omittedResults)
+      .filter(Boolean);
+    expect(snapshots.some((snapshot) => snapshot.issues < 3)).toBe(true);
   });
 
   it('validates hard bounds, canonical ids and target caps without silent truncation', async () => {

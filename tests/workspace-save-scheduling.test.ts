@@ -183,6 +183,60 @@ describe('latest scan results across graph Undo', () => {
     expect(() => parseWorkspace(restored)).not.toThrow();
   });
 
+  it('retains the creator proof of a timestamped outpoint endpoint after Add and Undo', () => {
+    const { store, id } = fixture();
+    const point = output(1);
+    store.update(
+      id,
+      (w) => ({
+        ...w,
+        transactions: { [txid(2)]: transaction(2, 1) },
+        view: { ...w.view, graphNodeIds: [point] },
+      }),
+      false,
+    );
+    const run: ScanRun = {
+      id: 'public-endpoint',
+      source: point,
+      targetIds: [],
+      settings: { ...DEFAULT_SCAN_SETTINGS },
+      startedAt: '2026-09-10T12:00:00.000Z',
+      status: 'complete',
+      examined: 1,
+      stopReasons: [],
+      results: [
+        {
+          id: 'public-endpoint:1',
+          kind: 'endpoint',
+          finding: 'unspent',
+          scanDirection: 'downstream',
+          endpoint: point,
+          path: [point],
+          directions: [],
+          hops: 0,
+          checkedAt: '2026-09-10T12:00:01.000Z',
+          bestBlock: txid(99),
+          includesMempool: true,
+        },
+      ],
+    };
+    const evidence = { [txid(1)]: transaction(1) };
+    store.update(id, (w) => replaceScanRun(w, run, evidence), false);
+    store.update(id, (w) => addScanPath(w, run.results[0]));
+    store.update(
+      id,
+      (w) =>
+        replaceScanRun(w, { ...run, results: [{ ...run.results[0], dismissed: true }] }, evidence),
+      false,
+    );
+    store.undo(id);
+    const restored = store.getSession(id)!.data;
+    expect(restored.transactions[txid(1)]).toBeUndefined();
+    expect(restored.connectionScans!.evidence[txid(1)]).toEqual(evidence[txid(1)]);
+    expect(prepareScanPath(restored, run.results[0]).missingTxids).toEqual([]);
+    expect(() => parseWorkspace(restored)).not.toThrow();
+  });
+
   it('keeps replacement and clear current through older user-edit Undo', () => {
     const { store, id, run } = scanFixture();
     store.update(id, (w) => ({ ...w, description: 'Public annotation' }));

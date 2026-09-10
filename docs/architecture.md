@@ -247,9 +247,18 @@ records a run-level reason without producing result rows or consuming the result
 allowance. Time limits also produce only a global stopping reason; earlier
 actionable findings remain available. The run status distinguishes normal
 completion within configured branch bounds from early stops and unavailable data.
-Fan-out, depth, time, transaction and result limits, unknown evidence, failures
-and cancellation remain distinct. Stopping paths can be reviewed and accepted
-without admitting siblings. Partial results are not exhaustive or globally
+Typed observations distinguish four connection relationships, many-input/output
+branch decisions, three natural endpoints, and four evidence problems. Connections
+retain their exact meeting node. The adapter emits counts, positive UTXO check
+metadata and safe error categories; the traversal supplies path direction.
+Legacy global-limit rows are hidden; ambiguous legacy root fan-out rows are not
+guessed into input/output findings. Backend-unavailable and rate-limit responses
+stop all fronts; offline coverage skips unavailable reads but continues loaded
+work. None of these run states produces a node card. Each scan admits at most 10
+endpoint paths and 10 issue paths within the 50-path total, recording omitted
+counts without terminating the other fronts. This preserves room for primary
+findings. Rechecks may recategorize already-retained paths within the overall cap.
+Partial results remain bounded observations, without exhaustive or globally
 shortest-path guarantees.
 
 `lib/connectionScanFetch.ts` reuses loaded transactions and attached prevouts in
@@ -261,8 +270,17 @@ returns budget charges for every cached or fetched candidate. Existing scheduler
 background priority, session scope, optional Core spender-index lookup and
 bounded Electrum histories are reused. `fetchIndexedSpenders` has an optional
 pre-inspection gate so its candidate work consumes the same scan allowance.
-An empty spender reply remains unknown. The first verified fallback spender is
-sufficient; candidate failures leave an explicit failure boundary. There are
+An empty spender reply remains unknown. A non-null validated Core UTXO observation
+can establish an unspent endpoint only with creator proof, check time, best-block
+identity and mempool inclusion. Cached spend observations take priority; contradictory
+or multiple spending observations produce a conflict. Exact indexed spending
+proof can be used without downloading an absent creator. Coinbase detection uses
+actual coinbase input structure; unspendable detection requires the raw OP_RETURN
+script. Script labels alone do not establish terminality. Identity, network and
+edge mismatches never become accepted path edges. Safe typed error codes distinguish
+systemic outages/rate limits from local unavailable transactions and failed reads;
+no upstream exception text enters a result. The first verified fallback spender is
+sufficient; every history candidate still shares the run's transaction budget. There are
 no new backend endpoints, jobs, indexes or caches.
 
 `lib/connectionScanRunner.ts` aborts leaf requests on cancellation/deadline and
@@ -298,10 +316,24 @@ Accepting a complete path or explicit prefix merges only supporting transactions
 and calls existing graph membership APIs once, producing one Undo step. It reveals
 those nodes, resets graph filters, and preserves annotations and camera geometry.
 Sidebar controls and result cards use their own CSS namespace and a vertical layout.
-Each card groups its path in the body and actions at the bottom right,
+Cards group alternative paths to the same finding using their type, endpoint,
+direction and meeting node. Alternative paths remain flat bounded records;
+there is no persisted grouping index. Connections precede branch decisions and
+evidence problems; natural endpoints have a separate filter. Each card groups
+its path in the body and actions at the bottom right,
 independent of the Analysis workbench's two-column results. Clearing the latest
 results does not remove accepted nodes or annotations. Scan details
 never enter the public saved-workspace index.
+
+`lib/connectionScanRetry.ts` rechecks one endpoint with fresh evidence under the
+original time and transaction bounds. It does not resume traversal. Other findings
+and dismissals remain intact; success updates or removes only matching alternative
+paths. Clear, cancellation, tab/workspace changes and late-session replies remain
+guarded. The run's original coverage flags describe the original search, even if
+a later endpoint check resolves a local problem. Only retained path proof is
+carried back from the retry. `prepareScanPath` checks the selected prefix against
+available evidence and blocks disputed edges, full conflict findings and explicitly
+out-of-chain transactions. Missing proof remains a separate recoverable state.
 
 ## Analysis extension point
 

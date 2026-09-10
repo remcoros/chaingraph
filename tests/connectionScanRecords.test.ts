@@ -399,3 +399,288 @@ describe('compact connection scan records', () => {
     ).toThrow('missing explicit');
   });
 });
+
+describe('scan finding evidence and metadata', () => {
+  function findingFixture(finding: NonNullable<ScanResult['finding']>) {
+    const { workspace, run } = fixture();
+    const upstream = finding === 'many-inputs' || finding === 'coinbase';
+    const outpoint = ['unspent', 'unspendable', 'spend-unknown'].includes(finding);
+    const natural = ['unspent', 'unspendable', 'coinbase'].includes(finding);
+    const many = finding === 'many-inputs' || finding === 'many-outputs';
+    if (finding === 'many-inputs')
+      workspace.transactions[id(1)] = {
+        ...transaction(1),
+        vin: [
+          { txid: id(8), vout: 0 },
+          { txid: id(9), vout: 0 },
+        ],
+      };
+    if (finding === 'unspendable') workspace.transactions[id(1)].vout[0].scriptPubKey.hex = '6a';
+    const result: ScanResult = {
+      id: `finding:${finding}`,
+      kind: natural ? 'endpoint' : 'boundary',
+      finding,
+      endpoint: outpoint ? out(1) : tn(1),
+      path: outpoint ? [tn(1), out(1)] : [tn(1)],
+      directions: outpoint ? ['downstream'] : [],
+      hops: 0,
+      scanDirection: upstream ? 'upstream' : 'downstream',
+      ...(natural
+        ? {}
+        : {
+            reason: many
+              ? 'fan-out'
+              : ['transaction-unavailable', 'spend-unknown'].includes(finding)
+                ? 'unknown'
+                : 'failure',
+          }),
+      ...(many ? { branchCount: 2 } : {}),
+      ...(finding === 'unspent'
+        ? { checkedAt: '2026-09-10T12:00:01.000Z', bestBlock: id(99), includesMempool: true }
+        : {}),
+      ...(finding === 'lookup-failed' ? { issueCode: 'timeout' } : {}),
+    };
+    return {
+      workspace,
+      result,
+      run: { ...run, targetIds: [], settings: { ...run.settings, fanOut: 2 }, results: [result] },
+    };
+  }
+
+  it.each([
+    'many-inputs',
+    'many-outputs',
+    'unspent',
+    'coinbase',
+    'unspendable',
+    'transaction-unavailable',
+    'spend-unknown',
+    'lookup-failed',
+    'conflicting-evidence',
+  ] as const)('validates %s with its required observed proof', (finding) => {
+    const { workspace, run, result } = findingFixture(finding);
+    const saved = replaceScanRun(workspace, run);
+    expect(parseWorkspace(saved).connectionScans!.runs[0].results[0]).toEqual(result);
+  });
+
+  it('round trips timestamped unspent observations without treating them as current spend status', async () => {
+    const { workspace, run, result } = findingFixture('unspent');
+    workspace.transactions[id(2)] = transaction(2, 1);
+    const saved = replaceScanRun(workspace, run);
+    const restored = await decryptAndValidateWorkspace(
+      await validateAndEncryptWorkspace(saved, 'public fixture password'),
+      'public fixture password',
+    );
+    expect(restored.connectionScans!.runs[0].results[0]).toEqual(result);
+  });
+
+  it('rejects forged natural endpoints, branch counts and metadata combinations', () => {
+    for (const finding of ['coinbase', 'unspendable', 'many-inputs', 'many-outputs'] as const) {
+      const { workspace, run, result } = findingFixture(finding);
+      if (finding === 'coinbase') workspace.transactions[id(1)] = transaction(1, 8);
+      if (finding === 'unspendable') workspace.transactions[id(1)].vout[0].scriptPubKey.hex = '51';
+      if (finding.startsWith('many-')) result.branchCount = 3;
+      expect(() => replaceScanRun(workspace, run)).toThrow('not supported');
+    }
+    const invalidCoinbase = findingFixture('coinbase');
+    invalidCoinbase.workspace.transactions[id(1)].vin[0].coinbase = 'not script bytes';
+    expect(() => replaceScanRun(invalidCoinbase.workspace, invalidCoinbase.run)).toThrow(
+      'not supported',
+    );
+    const { workspace, run, result } = findingFixture('unspent');
+    for (const patch of [
+      { checkedAt: undefined },
+      { bestBlock: undefined },
+      { includesMempool: false },
+      { scanDirection: 'upstream' },
+      { kind: 'boundary' },
+      { reason: 'unknown' },
+      { branchCount: 5 },
+      { issueCode: 'timeout' },
+      { bestBlock: 'invalid' },
+      { checkedAt: 'not a date' },
+    ]) {
+      expect(() =>
+        replaceScanRun(workspace, { ...run, results: [{ ...result, ...patch } as ScanResult] }),
+      ).toThrow();
+    }
+    const many = findingFixture('many-outputs');
+    expect(() =>
+      replaceScanRun(many.workspace, {
+        ...many.run,
+        results: [{ ...many.result, branchCount: undefined }],
+      }),
+    ).toThrow('branch count');
+    const legacy = fixture();
+    expect(() =>
+      replaceScanRun(
+        legacy.workspace,
+        { ...legacy.run, results: [{ ...legacy.result, checkedAt: '2026-09-10T12:00:00.000Z' }] },
+        legacy.evidence,
+      ),
+    ).toThrow('finding type');
+  });
+
+  it('checks the exact shared meeting node while retaining legacy paths without this metadata', () => {
+    const { workspace, run } = fixture();
+    workspace.transactions = { [id(2)]: transaction(2, 1), [id(3)]: transaction(3, 1) };
+    const result: ScanResult = {
+      id: 'shared',
+      kind: 'connection',
+      relationship: 'shared-ancestor',
+      endpoint: tn(3),
+      path: [tn(2), out(1), tn(3)],
+      directions: ['upstream', 'downstream'],
+      hops: 1,
+      scanDirection: 'upstream',
+      meetingNode: out(1),
+    };
+    const shared = { ...run, source: tn(2), results: [result] };
+    expect(() => replaceScanRun(workspace, shared)).not.toThrow();
+    expect(() =>
+      replaceScanRun(workspace, { ...shared, results: [{ ...result, meetingNode: tn(3) }] }),
+    ).toThrow('meeting node');
+    expect(() =>
+      replaceScanRun(workspace, {
+        ...shared,
+        results: [{ ...result, scanDirection: 'downstream' }],
+      }),
+    ).toThrow('direction');
+  });
+
+  it('blocks contradictory selected edges and full conflicting findings, but accepts verified prefixes', () => {
+    const { workspace, run, result, evidence } = fixture();
+    const conflict: ScanResult = {
+      ...result,
+      kind: 'boundary',
+      relationship: undefined,
+      finding: 'conflicting-evidence',
+      reason: 'failure',
+      scanDirection: 'downstream',
+    };
+    const saved = replaceScanRun(workspace, { ...run, results: [conflict] }, evidence);
+    expect(prepareScanPath(saved, conflict).blockedByConflict).toBe(true);
+    expect(() => addScanPath(saved, conflict)).toThrow('conflicts');
+    expect(prepareScanPath(saved, conflict, 4).blockedByConflict).toBe(false);
+    expect(addScanPath(saved, conflict, 4).view.graphNodeIds).toContain(out(2));
+    const changed = {
+      ...saved,
+      transactions: { ...saved.transactions, [id(3)]: transaction(3, 8) },
+    };
+    expect(prepareScanPath(changed, result).blockedByConflict).toBe(true);
+    expect(() => addScanPath(changed, result)).toThrow('conflicts');
+    expect(prepareScanPath(changed, result, 3).blockedByConflict).toBe(false);
+    const stale = {
+      ...saved,
+      transactions: { ...saved.transactions, [id(2)]: { ...evidence[id(2)], confirmations: -1 } },
+    };
+    expect(prepareScanPath(stale, result).blockedByConflict).toBe(true);
+    expect(() => addScanPath(stale, result)).toThrow('conflicts');
+    expect(prepareScanPath(stale, result, 2).blockedByConflict).toBe(false);
+    const malformed = { ...result, directions: [] };
+    expect(prepareScanPath(saved, malformed).blockedByConflict).toBe(true);
+    expect(() => addScanPath(saved, malformed)).toThrow('conflicts');
+    const singleton = findingFixture('conflicting-evidence');
+    expect(prepareScanPath(singleton.workspace, singleton.result).blockedByConflict).toBe(true);
+  });
+
+  it('retains only an explicitly disputed terminal edge and adds only a consistent prefix', () => {
+    const { workspace, run } = fixture();
+    workspace.transactions = { [id(1)]: transaction(1), [id(3)]: transaction(3, 2) };
+    workspace.view.graphNodeIds = [tn(3)];
+    const disputed = { ...transaction(2), vin: [{ txid: id(1), vout: 3 }] };
+    const result: ScanResult = {
+      id: 'terminal-conflict',
+      kind: 'boundary',
+      finding: 'conflicting-evidence',
+      reason: 'failure',
+      scanDirection: 'upstream',
+      endpoint: out(1, 3),
+      path: [tn(3), out(2), tn(2), out(1, 3)],
+      directions: ['upstream', 'upstream', 'upstream'],
+      hops: 1,
+    };
+    const saved = replaceScanRun(
+      workspace,
+      { ...run, source: tn(3), targetIds: [], results: [result] },
+      { [id(2)]: disputed },
+    );
+    expect(() => parseWorkspace(saved)).not.toThrow();
+    expect(prepareScanPath(saved, result).blockedByConflict).toBe(true);
+    expect(() => addScanPath(saved, result)).toThrow('conflicts');
+    // The preceding transaction also has a disputed input, so keep the prefix
+    // before that transaction rather than introducing invalid observations.
+    expect(prepareScanPath(saved, result, 3).blockedByConflict).toBe(true);
+    expect(prepareScanPath(saved, result, 2).blockedByConflict).toBe(false);
+    const added = addScanPath(saved, result, 2);
+    expect(added.transactions[id(2)]).toBeUndefined();
+    expect(added.view.graphNodeIds).toEqual([tn(3), out(2)]);
+    expect(() => parseWorkspace(added)).not.toThrow();
+    const interior: ScanResult = {
+      ...result,
+      endpoint: tn(1),
+      path: [...result.path, tn(1)],
+      directions: [...result.directions, 'upstream'],
+      hops: 2,
+    };
+    expect(() =>
+      replaceScanRun(
+        workspace,
+        { ...run, source: tn(3), targetIds: [], results: [interior] },
+        { [id(2)]: disputed },
+      ),
+    ).toThrow('not supported');
+    const ordinary: ScanResult = { ...result, finding: 'lookup-failed' };
+    expect(() =>
+      replaceScanRun(
+        workspace,
+        { ...run, source: tn(3), targetIds: [], results: [ordinary] },
+        { [id(2)]: disputed },
+      ),
+    ).toThrow('not supported');
+  });
+
+  it('requires creator proof for an unspent outpoint even when a spender represents that output', () => {
+    const { workspace, run, result } = findingFixture('unspent');
+    workspace.transactions = { [id(2)]: transaction(2, 1) };
+    const endpoint = { ...result, path: [out(1)], directions: [], endpoint: out(1) };
+    const saved = replaceScanRun(workspace, { ...run, source: out(1), results: [endpoint] });
+    expect(prepareScanPath(saved, endpoint).missingTxids).toEqual([id(1)]);
+    expect(() => addScanPath(saved, endpoint)).toThrow('missing');
+    const proven = replaceScanRun(
+      saved,
+      { ...run, source: out(1), results: [endpoint] },
+      { [id(1)]: transaction(1) },
+    );
+    expect(Object.keys(proven.connectionScans!.evidence)).toEqual([id(1)]);
+    expect(prepareScanPath(proven, endpoint).missingTxids).toEqual([]);
+  });
+
+  it('allows rechecks to recategorize an eleventh endpoint within the global result cap', () => {
+    const { workspace, run, result } = findingFixture('unspent');
+    const rechecked = replaceScanRun(workspace, {
+      ...run,
+      results: Array.from({ length: 11 }, (_, i) => ({ ...result, id: `endpoint:${i}` })),
+    });
+    expect(parseWorkspace(rechecked).connectionScans!.runs[0].results).toHaveLength(11);
+    expect(() =>
+      replaceScanRun(workspace, {
+        ...run,
+        results: Array.from({ length: 51 }, (_, i) => ({ ...result, id: `endpoint:${i}` })),
+      }),
+    ).toThrow();
+    const saved = replaceScanRun(workspace, {
+      ...run,
+      omittedResults: { endpoints: 4, issues: 2 },
+      stopReasons: ['backend-unavailable', 'rate-limited', 'offline'],
+    });
+    expect(parseWorkspace(saved).connectionScans!.runs[0].omittedResults).toEqual({
+      endpoints: 4,
+      issues: 2,
+    });
+    expect(() =>
+      replaceScanRun(workspace, { ...run, omittedResults: { endpoints: -1, issues: 0 } }),
+    ).toThrow();
+    expect(() => replaceScanRun(workspace, { ...run, stopReasons: ['time', 'time'] })).toThrow();
+  });
+});

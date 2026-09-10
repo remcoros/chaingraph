@@ -252,3 +252,27 @@
 .connection-scan {
   min-width: 0;
 }
+
+.connection-scan-result.is-endpoint .connection-scan-result-heading > svg {
+  color: var(--color-muted);
+}
+.connection-scan-meeting {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  font-size: var(--text-sm);
+}
+.connection-scan-meeting > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.connection-scan-evidence-status {
+  color: var(--color-warning);
+}
+.connection-scan-recheck {
+  width: 30px;
+  padding: 5px;
+}
+.connection-scan-result-body p {
+  overflow-wrap: anywhere;
+}

@@ -1,12 +1,25 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import type { Network, Transaction, TxOutputDetails } from '../domain/types';
-import type { ScanBudget, ScanDirection, ScanNeighbors } from '../domain/connectionScan';
-import { ScanBudgetExceeded } from '../domain/connectionScan';
+import type { Network, Transaction } from '../domain/types';
+import type {
+  ScanBudget,
+  ScanDirection,
+  ScanNeighbors,
+  ScanObservation,
+} from '../domain/connectionScan';
+import { ScanBudgetExceeded, isScanNodeId } from '../domain/connectionScan';
 import { outputAddress } from '../domain/workspace';
 import { addressToScriptHash } from './wallet';
 import { fetchHistory, fetchIndexedSpenders, fetchTransaction } from './api';
 import type { TransactionFetchScope } from './transactionScheduler';
+import {
+  fetchScanUtxo,
+  isProvablyUnspendable,
+  isVerifiedCoinbase,
+  scanLookupFailure,
+  ScanEvidenceConflict,
+  validateScanTransaction,
+} from './connectionScanEvidence';
 
 export interface ConnectionScanFetchOptions {
   network: Network;
@@ -15,15 +28,36 @@ export interface ConnectionScanFetchOptions {
   signal: AbortSignal;
   allowNetwork?: boolean;
   fanOut?: number;
+  /** Explicit retry: refresh each needed transaction once within this run's budget. */
+  refresh?: boolean;
   /** Existing graph/result evidence index; values are transaction IDs, verified before use. */
   loadedSpenders?: (nodeId: string) => readonly string[];
 }
-export const connectionScanTransport = { fetchHistory, fetchIndexedSpenders, fetchTransaction };
+export const connectionScanTransport = {
+  fetchHistory,
+  fetchIndexedSpenders,
+  fetchTransaction,
+  fetchUtxo: fetchScanUtxo,
+};
+export type ConnectionScanTransport = Omit<typeof connectionScanTransport, 'fetchUtxo'> & {
+  /** Injection may omit the new leaf lookup; never fall through to real network in tests. */
+  fetchUtxo?: typeof fetchScanUtxo;
+};
+const unknownSpend = (): ScanNeighbors => ({
+  nodeIds: [],
+  stopReason: 'unknown',
+  observation: { finding: 'spend-unknown' },
+});
+const conflict = (): ScanNeighbors => ({
+  nodeIds: [],
+  stopReason: 'failure',
+  observation: { finding: 'conflicting-evidence' },
+});
 
 /** One run owns this transient evidence. Nothing enters workspace observations here. */
 export function createConnectionScanFetch(
   options: ConnectionScanFetchOptions,
-  transport = connectionScanTransport,
+  transport: ConnectionScanTransport = connectionScanTransport,
 ) {
   if (options.scope.network && options.scope.network !== options.network)
     throw new Error('Scan belongs to a different Bitcoin network.');
@@ -32,7 +66,8 @@ export function createConnectionScanFetch(
   const signal = AbortSignal.any([options.signal, options.scope.signal]);
   const evidence = { ...options.transactions };
   const spenders = new Map<string, Set<string>>();
-  const prevouts = new Map<string, TxOutputDetails>();
+  const refreshed = new Set<string>();
+  const utxoChecks = new Map<string, ScanObservation | undefined>();
   let indexedInputs = 0;
   const index = async (tx: Transaction, budget: ScanBudget) => {
     for (const input of tx.vin) {
@@ -46,54 +81,67 @@ export function createConnectionScanFetch(
       const ids = spenders.get(key) ?? new Set<string>();
       ids.add(tx.txid);
       spenders.set(key, ids);
-      if (input.prevout) prevouts.set(key, input.prevout);
     }
   };
   let initialIndex: Promise<void> | undefined;
   const ensureIndexed = (budget: ScanBudget) =>
     (initialIndex ??= (async () => {
-      // Yield while preparing loaded relationships, including inside large inputs.
       for (const txid in options.transactions) {
         budget.examine(txid);
         await index(options.transactions[txid]!, budget);
       }
     })());
   const hints = { scope: options.scope, priority: 'background' as const, observation: {} };
+  const checkpoint = (budget: ScanBudget) => {
+    signal.throwIfAborted();
+    budget.checkpoint();
+  };
   const load = async (txid: string, budget: ScanBudget, height?: number) => {
-    budget.checkpoint();
-    signal.throwIfAborted();
+    checkpoint(budget);
     budget.examine(txid);
-    if (evidence[txid]) return evidence[txid];
+    if (evidence[txid] && (!options.refresh || refreshed.has(txid))) return evidence[txid];
     if (options.allowNetwork === false) return undefined;
-    const tx = await transport.fetchTransaction(options.network, txid, signal, height, hints);
-    signal.throwIfAborted();
-    budget.checkpoint();
+    const value = await transport.fetchTransaction(options.network, txid, signal, height, hints);
+    checkpoint(budget);
+    const tx = validateScanTransaction(value, txid, options.network);
     evidence[txid] = tx;
+    refreshed.add(txid);
     await index(tx, budget);
     return tx;
   };
+  const unavailable = (): ScanNeighbors =>
+    options.allowNetwork === false
+      ? { nodeIds: [], stopReason: 'offline' }
+      : { nodeIds: [], stopReason: 'unknown', observation: { finding: 'transaction-unavailable' } };
   const resolveNeighbors = async (
     nodeId: string,
-    direction: Exclude<ScanDirection, 'both'>,
+    direction: ScanDirection,
     budget: ScanBudget,
   ): Promise<ScanNeighbors> => {
+    let failureContext: 'transaction' | 'spend' = 'transaction';
     try {
-      signal.throwIfAborted();
-      budget.checkpoint();
-      const match = /^(tx|out):([0-9a-f]{64})(?::([0-9]+))?$/.exec(nodeId);
-      if (!match || (match[1] === 'out') !== (match[3] !== undefined))
-        return { nodeIds: [], stopReason: 'failure' };
-      const [, kind, txid, voutText] = match;
+      checkpoint(budget);
+      if (!isScanNodeId(nodeId)) return conflict();
+      const [kind, txid, voutText] = nodeId.split(':');
       if (kind === 'tx') {
-        const tx = await load(txid, budget);
-        if (!tx) return { nodeIds: [], stopReason: 'unknown' };
-        const branchLimit = options.fanOut ?? 200;
-        let branches = direction === 'downstream' ? tx.vout.length : 0;
-        if (direction === 'upstream')
-          for (const input of tx.vin) {
-            if (input.txid && input.vout !== undefined && ++branches >= branchLimit) break;
-          }
-        if (branches >= branchLimit) return { nodeIds: [], stopReason: 'fan-out' };
+        const tx = await load(txid!, budget);
+        if (!tx) return unavailable();
+        if (direction === 'upstream' && isVerifiedCoinbase(tx))
+          return { nodeIds: [], observation: { finding: 'coinbase' } };
+        const branches =
+          direction === 'downstream'
+            ? tx.vout.length
+            : tx.vin.filter((input) => input.txid && input.vout !== undefined).length;
+        if (branches >= (options.fanOut ?? 200))
+          return {
+            nodeIds: [],
+            stopReason: 'fan-out',
+            observation: {
+              finding: direction === 'downstream' ? 'many-outputs' : 'many-inputs',
+              branchCount: branches,
+            },
+          };
+        if (direction === 'upstream' && !branches) return conflict();
         return {
           nodeIds:
             direction === 'downstream'
@@ -103,37 +151,77 @@ export function createConnectionScanFetch(
                 ),
         };
       }
-      const point = { txid, vout: Number(voutText) };
+      const point = { txid: txid!, vout: Number(voutText) };
       if (direction === 'upstream') {
-        const creator = await load(txid, budget);
-        if (!creator) return { nodeIds: [], stopReason: 'unknown' };
-        return creator.vout.some((output) => output.n === point.vout)
-          ? { nodeIds: [`tx:${txid}`] }
-          : { nodeIds: [], stopReason: 'failure' };
+        const creator = await load(point.txid, budget);
+        if (!creator) return unavailable();
+        if (!creator.vout.some((output) => output.n === point.vout)) {
+          delete evidence[point.txid];
+          return conflict();
+        }
+        return { nodeIds: [`tx:${txid}`] };
       }
       if (!options.loadedSpenders) await ensureIndexed(budget);
-      signal.throwIfAborted();
-      budget.checkpoint();
+      checkpoint(budget);
       const known = [
         ...new Set([...(options.loadedSpenders?.(nodeId) ?? []), ...(spenders.get(nodeId) ?? [])]),
       ].sort();
       if (known.length) {
         const nodeIds: string[] = [];
-        let stopReason: ScanNeighbors['stopReason'];
         for (const id of known) {
           const spender = await load(id, budget);
-          if (!spender) {
-            stopReason ??= 'unknown';
-            continue;
+          if (!spender) return unavailable();
+          if (
+            !spender.vin.some((input) => input.txid === point.txid && input.vout === point.vout)
+          ) {
+            delete evidence[id];
+            return conflict();
           }
-          if (spender.vin.some((input) => input.txid === txid && input.vout === point.vout))
-            nodeIds.push(`tx:${id}`);
-          else stopReason = 'failure';
+          const attached = spender.vin.find(
+            (input) => input.txid === point.txid && input.vout === point.vout,
+          )?.prevout;
+          if (attached && isProvablyUnspendable(attached)) return conflict();
+          nodeIds.push(`tx:${id}`);
         }
-        return { nodeIds, ...(stopReason ? { stopReason } : {}) };
+        if (evidence[point.txid]) {
+          const creator = await load(point.txid, budget);
+          const output = creator?.vout.find((item) => item.n === point.vout);
+          if (!output || isProvablyUnspendable(output)) return conflict();
+        }
+        return nodeIds.length > 1 ? conflict() : { nodeIds };
       }
-      if (options.allowNetwork === false) return { nodeIds: [], stopReason: 'unknown' };
-      // A single exact outpoint keeps optional-index candidates tightly bounded.
+      // Reuse a loaded creator, but do not fetch a missing parent before exact spender lookup.
+      let creator = options.refresh ? undefined : evidence[point.txid];
+      if (creator) budget.examine(point.txid);
+      let output = creator?.vout.find((item) => item.n === point.vout);
+      if (creator && !output) {
+        delete evidence[point.txid];
+        return conflict();
+      }
+      if (output && isProvablyUnspendable(output))
+        return { nodeIds: [], observation: { finding: 'unspendable' } };
+      if (options.allowNetwork === false) return { nodeIds: [], stopReason: 'offline' };
+      failureContext = 'spend';
+      const currentUtxo = async (expected: NonNullable<typeof output>) => {
+        if (!transport.fetchUtxo) return undefined;
+        if (!utxoChecks.has(nodeId)) {
+          checkpoint(budget);
+          const observation = await transport.fetchUtxo(
+            options.network,
+            point.txid,
+            point.vout,
+            expected,
+            signal,
+          );
+          checkpoint(budget);
+          utxoChecks.set(nodeId, observation);
+        }
+        return utxoChecks.get(nodeId);
+      };
+      if (output) {
+        const observation = await currentUtxo(output);
+        if (observation) return { nodeIds: [], observation };
+      }
       const indexed = await transport.fetchIndexedSpenders(
         options.network,
         [point],
@@ -141,54 +229,65 @@ export function createConnectionScanFetch(
         signal,
         hints,
         (id) => {
-          signal.throwIfAborted();
-          budget.checkpoint();
+          checkpoint(budget);
           budget.examine(id);
         },
       );
-      signal.throwIfAborted();
-      budget.checkpoint();
-      for (const tx of indexed?.transactions ?? []) {
+      checkpoint(budget);
+      const validIndexed: Transaction[] = [];
+      for (const value of indexed?.transactions ?? []) {
+        budget.examine(value.txid);
+        const tx = validateScanTransaction(value, value.txid, options.network);
+        if (!tx.vin.some((input) => input.txid === point.txid && input.vout === point.vout))
+          throw new ScanEvidenceConflict();
+        validIndexed.push(tx);
+      }
+      if (validIndexed.length > 1) return conflict();
+      for (const tx of validIndexed) {
         evidence[tx.txid] = tx;
         await index(tx, budget);
       }
-      if (indexed && !indexed.unresolved.length)
-        return indexed.transactions.length
-          ? { nodeIds: indexed.transactions.map((tx) => `tx:${tx.txid}`) }
-          : { nodeIds: [], stopReason: 'unknown' };
-      // Attached prevouts often avoid loading a creator merely for its script.
-      budget.examine(txid);
-      let output: TxOutputDetails | undefined =
-        evidence[txid]?.vout.find((value) => value.n === point.vout) ?? prevouts.get(nodeId);
-      if (!output)
-        output = (await load(txid, budget))?.vout.find((value) => value.n === point.vout);
-      if (!output) return { nodeIds: [], stopReason: 'unknown' };
+      if (validIndexed.length) return { nodeIds: validIndexed.map((tx) => `tx:${tx.txid}`) };
+      if (!output) {
+        failureContext = 'transaction';
+        creator = await load(point.txid, budget);
+        if (!creator) return unavailable();
+        output = creator.vout.find((item) => item.n === point.vout);
+        if (!output) {
+          delete evidence[point.txid];
+          return conflict();
+        }
+        if (isProvablyUnspendable(output))
+          return { nodeIds: [], observation: { finding: 'unspendable' } };
+        failureContext = 'spend';
+        const observation = await currentUtxo(output);
+        if (observation) return { nodeIds: [], observation };
+      }
+      if (indexed && !indexed.unresolved.length) return unknownSpend();
       const hex = output.scriptPubKey.hex;
-      const address = outputAddress({ ...output, n: point.vout });
+      const address = outputAddress(output);
       const hash =
         hex !== undefined
           ? bytesToHex(sha256(hexToBytes(hex)).reverse())
           : address
             ? addressToScriptHash(address, options.network)
             : undefined;
-      if (!hash) return { nodeIds: [], stopReason: 'unknown' };
+      if (!hash) return unknownSpend();
       const history = await transport.fetchHistory(options.network, hash, signal);
-      signal.throwIfAborted();
-      budget.checkpoint();
+      checkpoint(budget);
       const candidates = new Map(history.map((row) => [row.tx_hash, row.height]));
       for (const id of [...candidates.keys()].sort()) {
-        if (id === txid) continue;
-        // This gate charges every history candidate, including unrelated cached ones.
+        if (id === point.txid) continue;
+        failureContext = 'transaction';
         const tx = await load(id, budget, candidates.get(id));
-        if (tx?.vin.some((input) => input.txid === txid && input.vout === point.vout))
-          return { nodeIds: [`tx:${tx.txid}`] };
+        if (tx?.vin.some((input) => input.txid === point.txid && input.vout === point.vout))
+          return { nodeIds: [`tx:${id}`] };
       }
-      const retained = [...(spenders.get(nodeId) ?? [])].sort();
-      return { nodeIds: retained.map((id) => `tx:${id}`), stopReason: 'unknown' };
+      return unknownSpend();
     } catch (error) {
       if (error instanceof ScanBudgetExceeded) throw error;
       signal.throwIfAborted();
-      return { nodeIds: [], stopReason: 'failure' };
+      return scanLookupFailure(error, failureContext);
     }
   };
   return { resolveNeighbors, evidence };

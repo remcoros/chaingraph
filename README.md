@@ -10,12 +10,16 @@ The Graph inspector's **Scan** tab searches from a transaction or outpoint for
 direct connections and shared ancestors or descendants among visible or added
 graph nodes. Searches default to 3 transaction hops, 200 examined transactions,
 30 seconds and a 50-branch stopping point. Findings appear during the scan and
-can be dismissed individually. Review exact paths, add a path or an
-explicit prefix in one undoable action, and continue from a stopping point.
+can be dismissed individually. Connection and branch-choice cards identify exact
+paths and shared meeting points. Evidence problems offer a bounded endpoint recheck;
+verified unspent, coinbase and unspendable endings live under **Endpoints**.
+Scan-wide resource limits appear only in the completion status.
+Review exact paths, add a path or an explicit prefix in one undoable action,
+and continue from a stopping point.
 Only the latest results and path evidence stay encrypted; a new scan replaces
 them and **Clear all results** clears them without removing added paths. The
-explored search space is discarded. Results are bounded observations, not exhaustive paths or ownership
-claims. See [connection scan instructions](instructions.md#connection-scans).
+explored search space is discarded. Results are bounded observations, not
+exhaustive paths or ownership claims. See [connection scan instructions](instructions.md#connection-scans).
 
 ![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)
 
