@@ -39,7 +39,7 @@ import {
 } from '../domain/walletReviewCategories';
 import type { AnalysisScan } from '../domain/analysisScan';
 import { useRecordSelection } from '../lib/useRecordSelection';
-import { useWalletUtxos } from '../lib/useWalletUtxos';
+import type { WalletUtxoController } from '../lib/useWalletUtxos';
 import { useWalletScan } from '../lib/useWalletScan';
 import { useWalletCounterparties } from '../lib/useWalletCounterparties';
 import { fetchTransaction } from '../lib/api';
@@ -71,6 +71,7 @@ export interface WalletWorkbenchProps {
   tourPreview?: { tab: 'review' | 'sources'; example?: Workspace };
   workspace: Workspace;
   wallet?: Wallet;
+  walletUtxos: WalletUtxoController;
   canQuery: boolean;
   busy: boolean;
   queryDisabledReason?: string;
@@ -108,6 +109,7 @@ const STATUS_LABELS = {
 // Even programmatic events in a preview cannot reach workspace edits or network actions.
 const noop = () => {};
 const PREVIEW_ACTIONS = {
+  walletUtxos: { loading: false, error: '', check: async () => {} },
   updateEvidence: noop,
   onScanComplete: noop,
   onSelectWallet: noop,
@@ -214,12 +216,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
   const [notice, setNotice] = useState('');
   const detailRef = useRef<HTMLElement>(null);
   const previousRow = useRef<WalletRow | undefined>(undefined);
-  const {
-    utxos,
-    loading: utxoLoading,
-    error: utxoError,
-    check,
-  } = useWalletUtxos({ workspace, wallet, enabled: active && canQuery });
+  const { utxos, loading: utxoLoading, error: utxoError, check } = props.walletUtxos;
   const currentUtxos = useMemo(
     () =>
       (utxos?.records ?? [])
@@ -575,7 +572,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
           (currentScan?.scope.kind === 'wallet' &&
           currentScan.scope.label === `Wallet ${wallet.name}`
             ? `${currentScan.findings.length} findings`
-            : 'Ready for local analysis')
+            : '')
         }
         scanIssues={currentScan?.reports
           .filter((report) => report.status === 'error')
@@ -613,14 +610,11 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
           </button>
         ))}
       </nav>
-      <div aria-live="polite" className="wallet-review-status-line">
-        {notice && <p className="small wallet-review-notice">{notice}</p>}
-      </div>
       <div className="wallet-review-body">
         <div className="wallet-record-filters" data-tour="wallet-filters">
           {tab !== 'addresses' && (
             <label>
-              {tab === 'review' ? 'Show' : 'Review'}
+              <span className="sr-only">{tab === 'review' ? 'Show' : 'Review'}</span>
               <select
                 aria-label={tab === 'review' ? 'Review filter' : 'Review state filter'}
                 value={status}
@@ -635,7 +629,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             </label>
           )}
           <label>
-            Labels
+            <span>Labels</span>
             <select
               aria-label="Label filter"
               value={labelFilter}
@@ -647,7 +641,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             </select>
           </label>
           <label>
-            Tags
+            <span>Tags</span>
             <select
               aria-label="Tag filter"
               value={tagFilter}
@@ -671,7 +665,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             />
           )}
           <label className="wallet-record-search">
-            Search
+            <span className="sr-only">Search</span>
             <input
               type="search"
               aria-label="Filter wallet records"
@@ -723,6 +717,9 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
               Show more review items ({review.omittedItems})
             </button>
           )}
+          <span className="wallet-review-notice" role="status" title={notice}>
+            {notice}
+          </span>
         </div>
         {tab === 'sources' && (
           <div className="wallet-input-status" role="status">

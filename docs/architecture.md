@@ -137,7 +137,7 @@ The seven built-in tools cover privacy patterns, value/structure and imported wa
 
 `domain/analysisScan.ts` resolves the selected transaction, output, address or wallet into loaded transaction IDs, or uses the complete loaded workspace. It runs the existing registry with independent reports and cancellation between tools. Loaded parents can supply evidence without becoming targets. Exclusions survive reruns only with matching node/transaction evidence. Wallet evidence or transaction mutations mark findings stale; labels remain independent.
 
-The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Wallet, Graph and Analysis are the enabled modes. The Trace workbench is disabled, and saved `workbench: trace` opens Graph. A saved `workbench: wallet` opens Graph when the workspace has no wallets. The return control appears whenever a workbench handoff recorded an origin, beside the mode buttons so the floating workspace actions cannot cover it. Analysis consumes the shared workspace and selection, with no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Locking cancels pending work. The displayed **Selection (type)** scope retains the existing `context` session value for compatibility. An absent scope value remains automatic: `context` when a wallet is selected, otherwise `workspace`. Existing session values are explicit choices and are preserved, including after Wallet scans. Context retains graph-entity precedence over the wallet, and its option label comes from the resolved scope. Missing selections disable Scan without falling back to all transactions; selections with no loaded evidence remain empty. No scope preference is added to the encrypted workspace schema. Every affected entity and supporting transaction in a finding has an individual graph navigation control; output values and addresses come from the same loaded workspace records.
+The workbench mode is an optional encrypted view field. Old `rightTab: analysis` restores Analysis and an Inspector right tab. Graph stays mounted while hidden, retaining its adapter, camera and layout. Workbench transitions flush the current camera. Wallet, Graph and Analysis are the enabled modes. The Trace workbench is disabled, and saved `workbench: trace` opens Graph. A saved `workbench: wallet` opens Graph when the workspace has no wallets. The return control appears whenever a workbench handoff recorded an origin, beside the mode buttons so the floating workspace actions cannot cover it. Analysis consumes the shared workspace and selection, with no alternate graph, annotation store or server state. Analysis controls and reports use an App-owned memory map, pruned when a workspace locks or closes. Locking cancels pending work. The displayed **Selection (type)** scope retains the existing `context` session value for compatibility. An absent scope value remains automatic: `context` when a wallet is selected, otherwise `workspace`. Existing session values are explicit choices and are preserved, including after Wallet scans. Context retains graph-entity precedence over the wallet, and its option label comes from the resolved scope. Missing selections disable Scan without falling back to all transactions; selections with no loaded evidence remain empty. No scope preference is added to the encrypted workspace schema. Every affected entity and supporting transaction in a finding has an individual graph navigation control; output values and addresses come from the same loaded workspace records. Handoffs promote compact loaded context before selecting it. If a requested outpoint has no loaded creator, navigation opens a loaded supporting transaction and explains the fallback, preserving unknown inputs without automatically fetching parents. If neither exists, Analysis keeps the finding open with a recovery message.
 
 The dormant `domain/traceWorkbench.ts` and Trace component remain for a later iteration; they are not mounted or reachable through the current workbench navigation. Their original bounded lookup design and limitations remain documented in [Trace semantics and limits](research/simple-trace.md). Existing graph transaction traversal is independent of this disabled workbench.
 
@@ -323,8 +323,13 @@ known address histories and verified loaded script matches, without requiring al
 transactions to be present. Selecting an unloaded row fetches one transaction and
 uses the shared selection/focus path. Failed or cancelled loads retain the graph.
 
-Wallet UTXO observations are component-local, keyed by workspace and wallet.
-Electrum queries use already discovered scripts in bounded batches; tab changes,
+Wallet UTXO observations are App-owned transient state, keyed by workspace, network,
+wallet and discovery revision. Completed checks survive workbench navigation but
+clear on wallet/workspace changes and locking. Wallet, Graph records, Inspector
+and transaction flow share the same controller. Positive observations retain their
+check timestamp and require an exact loaded amount/script match; absence from a
+check never establishes spending. They are not persisted in the workspace.
+Electrum queries use already discovered scripts in bounded batches; leaving an active check,
 wallet changes and discovery updates cancel pending work. Coverage and failure
 counts stay explicit. Loaded outpoints must match observed amount and script before
 being displayed or selected. They are never inferred from missing loaded spends.
@@ -455,7 +460,11 @@ The selected row and explicit batch keys are independent. Single clicks open
 details; modifier/checkbox selection replaces only the detail footprint, never
 the list width. Filters retain hidden batch targets and report them next to the
 actions. Address context choices use verified loaded input/output matches,
-not an arbitrary history transaction.
+not an arbitrary history transaction. The default context is newest by observed
+mempool status, block height and timestamp, with a stable identifier fallback
+when ordering evidence is absent. Manual choices persist for the selected item.
+No related loaded transaction produces an explicit info state, separately noting
+known unloaded wallet history.
 
 Wallet Scan reuses the local analysis scope, registry and findings merge used by
 Analysis. It is distinct from chain-history refresh. Visible flow prevouts use

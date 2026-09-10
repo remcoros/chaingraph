@@ -1064,7 +1064,7 @@ test('wallet records support range selection, additive toggles and an explicit h
   await expect(bar).toBeHidden();
 });
 
-test('address details require an explicit verified transaction context and transactions stay directly editable', async ({
+test('address details open the latest verified transaction context and transactions stay directly editable', async ({
   page,
 }) => {
   await seed(page, (workspace) => {
@@ -1080,12 +1080,11 @@ test('address details require an explicit verified transaction context and trans
   await expect(addressRow).toHaveCount(1);
   await addressRow.locator('.wallet-review-record-body').click();
   const chooser = walletDetail(page).getByLabel('Transaction context', { exact: true });
-  await expect(chooser).toHaveValue('');
-  await expect(chooser.locator('option')).toHaveCount(3);
-  await expect(chooser.locator('option[value=""]')).toHaveText('Choose transaction (2)');
+  await expect(chooser).toHaveValue(TX_MID);
+  await expect(chooser.locator('option')).toHaveCount(2);
   await expect(chooser.locator(`option[value="${TX_SECOND}"]`)).toHaveCount(0);
-  await expect(walletFlow(page)).toHaveCount(0);
-  await expect(walletDetail(page)).toContainText('Choose a transaction to show its flow.');
+  await expect(walletFlow(page)).toBeVisible();
+  await expect(walletFlow(page).locator('.wallet-flow-transaction-node')).toContainText('2222222');
   await expect(
     walletDetail(page).getByRole('group', { name: 'Edit entity metadata' }),
   ).toBeVisible();
@@ -1098,7 +1097,8 @@ test('address details require an explicit verified transaction context and trans
   await expect(walletFlow(page).locator('.ownership-external')).toHaveCount(1);
   await expect(chooser).toHaveValue(TX_MID);
   await expect(walletDetail(page).getByLabel('Identifiers and tags')).toBeVisible();
-  await screenshot(page, 'address-transaction-context');
+  await mkdir('artifacts/ui-review/feedback', { recursive: true });
+  await page.screenshot({ path: 'artifacts/ui-review/feedback/address-transaction-context.png' });
 
   await walletTab(page, 'Transactions').click();
   await rows
@@ -1110,7 +1110,6 @@ test('address details require an explicit verified transaction context and trans
   );
   await expect(walletFlow(page)).toContainText('Editing transaction');
   const metadata = walletDetail(page).getByRole('group', { name: 'Edit entity metadata' });
-  await expect(metadata.locator('.batch-scope')).toHaveText('transaction');
   await metadata.getByRole('button', { name: 'Label', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
   await editor.getByLabel('Batch label').fill('Verified transaction context');

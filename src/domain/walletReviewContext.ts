@@ -68,6 +68,24 @@ export interface WalletReviewContextSubject {
   reason?: string;
 }
 
+/** Newest observed context first, matching the wallet history's mempool/height/time
+ * ordering. Unknown dates remain unknown; their identifiers provide a stable fallback. */
+export function orderWalletContextTransactions(
+  ids: readonly string[],
+  transactions: ReadonlyMap<string, Transaction>,
+): string[] {
+  return [...ids].sort((left, right) => {
+    const a = transactions.get(left);
+    const b = transactions.get(right);
+    return (
+      Number(b?.mempool === true) - Number(a?.mempool === true) ||
+      (b?.blockHeight ?? -1) - (a?.blockHeight ?? -1) ||
+      (b?.blocktime ?? b?.time ?? -1) - (a?.blocktime ?? a?.time ?? -1) ||
+      left.localeCompare(right)
+    );
+  });
+}
+
 function outpoint(id: string): { txid: string; vout: number } | undefined {
   const match = /^out:([0-9a-f]{64}):(\d+)$/.exec(id);
   return match ? { txid: match[1], vout: Number(match[2]) } : undefined;

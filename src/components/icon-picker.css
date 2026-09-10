@@ -101,7 +101,18 @@
   margin: 10px 0 0;
 }
 .related-transactions > button {
+  display: inline-flex;
+  min-width: 0;
   max-width: 100%;
   text-align: left;
-  overflow-wrap: anywhere;
+  gap: 4px;
+}
+.related-transactions > button > span {
+  flex-shrink: 0;
+}
+.related-transactions > button > code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

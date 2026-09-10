@@ -1,3 +1,7 @@
+import {
+  matchingWalletUtxoObservation,
+  type WalletUtxoObservation,
+} from '../domain/walletUtxoObservation';
 import { SmallAmountControl } from './SmallAmountControl';
 import { isSmallAmount } from '../domain/smallAmounts';
 import { transactionStatus } from '../domain/transactionStatus';
@@ -30,6 +34,7 @@ import type { EntitySelection } from '../lib/useEntitySelection';
 
 interface Props extends VisibilityProps {
   workspace: Workspace;
+  walletUtxoObservation?: WalletUtxoObservation;
   selected?: GraphNode;
   onSelect: (id: string) => void;
   onEdit: (id: string, target?: 'label' | 'tags' | 'icon') => void;
@@ -413,6 +418,7 @@ function TransactionRows({
 export function TransactionView(props: Props) {
   const {
     workspace,
+    walletUtxoObservation,
     selected,
     onSelect,
     onTrace,
@@ -457,6 +463,15 @@ export function TransactionView(props: Props) {
       : undefined;
   const selectedUnspendable = isOpReturn(selectedOutput?.scriptPubKey.hex);
   const loadedSpenders = selected.kind === 'output' ? (spends.get(selected.id) ?? []) : [];
+  const walletObservation =
+    selected.kind === 'output'
+      ? matchingWalletUtxoObservation(
+          walletUtxoObservation,
+          workspace,
+          selected.txid,
+          selected.vout,
+        )
+      : undefined;
   const preview = (direction: 'previous' | 'next') => {
     const active =
       direction === 'previous' ? leg?.direction === 'previous' : leg?.direction === 'next';
@@ -526,7 +541,11 @@ export function TransactionView(props: Props) {
             {direction === 'previous' && <ArrowLeft size={15} />}
             <span>
               <small>
-                {direction === 'previous' ? 'Previous transaction' : 'Spend status unknown'}
+                {direction === 'previous'
+                  ? 'Previous transaction'
+                  : walletObservation
+                    ? 'Unspent at wallet check'
+                    : 'Spend status unknown'}
               </small>
               <strong>
                 {direction === 'previous'
@@ -715,7 +734,17 @@ export function TransactionView(props: Props) {
             >
               {loadedSpenders.length
                 ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
-                : 'Spend status unknown'}
+                : walletObservation
+                  ? 'No spending transaction loaded'
+                  : 'Spend status unknown'}
+              {walletObservation && (
+                <span>
+                  {' · Unspent at wallet check · '}
+                  <time dateTime={walletObservation.checkedAt}>
+                    {new Date(walletObservation.checkedAt).toLocaleString()}
+                  </time>
+                </span>
+              )}
               {loadedSpenders.length > 0 && (
                 <button
                   type="button"

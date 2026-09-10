@@ -56,7 +56,7 @@ test('saved block heights and explicit mempool observations are distinct from un
     await expect(page.locator('.transaction-view > summary small')).toHaveText(status);
     const chainStatus = page
       .locator('.selection-facts > div')
-      .filter({ has: page.locator('dt', { hasText: /^Chain status$/ }) });
+      .filter({ has: page.locator('dt', { hasText: /^Block$/ }) });
     await expect(chainStatus.locator('dd')).toContainText(status);
     if (id === TX_FUNDING) {
       await expect(page.locator('.transaction-identity-select')).toContainText(

@@ -51,7 +51,7 @@ test('flow hydrates previous outputs with lookup prefetch off and follows exact 
   await expect(
     page.getByRole('status').filter({ hasText: '1 spending transaction found; 0 added' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: /^Spending transaction:/ }).click();
+  await page.getByRole('button', { name: /^Spending tx:/ }).click();
   await expect(page.locator('.selection-heading .eyebrow')).toHaveText('TRANSACTION');
   await expect(
     page.locator(`.selection-heading .selection-facts code[title="${TX_SPENDING}"]`),

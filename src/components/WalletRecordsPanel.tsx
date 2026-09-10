@@ -16,7 +16,7 @@ import {
   verifyWalletUtxo,
   type WalletUtxoRecord,
 } from '../domain/walletRecords';
-import { useWalletUtxos } from '../lib/useWalletUtxos';
+import type { WalletUtxoController } from '../lib/useWalletUtxos';
 import './wallet-records.css';
 
 export type WalletRecordsTab = 'addresses' | 'transactions' | 'utxos';
@@ -26,6 +26,7 @@ const PAGE_SIZE = 40;
 export function WalletRecordsPanel({
   workspace,
   wallet,
+  walletUtxos,
   active,
   canQuery,
   busy,
@@ -34,6 +35,7 @@ export function WalletRecordsPanel({
 }: {
   workspace: Workspace;
   wallet: Wallet;
+  walletUtxos: WalletUtxoController;
   active?: WalletRecordsTab;
   canQuery: boolean;
   busy: boolean;
@@ -46,12 +48,7 @@ export function WalletRecordsPanel({
   );
   const [queries, setQueries] = useState({ addresses: '', transactions: '', utxos: '' });
   const [pages, setPages] = useState({ addresses: 0, transactions: 0, utxos: 0 });
-  const {
-    utxos,
-    loading,
-    error,
-    check: checkUtxos,
-  } = useWalletUtxos({ workspace, wallet, enabled: active === 'utxos' && canQuery });
+  const { utxos, loading, error, check: checkUtxos } = walletUtxos;
   const query = active ? queries[active].trim().toLowerCase() : '';
 
   if (!active) return null;

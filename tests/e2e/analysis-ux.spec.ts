@@ -12,7 +12,7 @@ import {
   type MockCall,
 } from '../fixtures/bitcoin';
 const password = 'public-analysis-recovery-fixture';
-const shots = 'artifacts/analysis-ux';
+const shots = 'artifacts/ui-review/improvements/analysis';
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Workbench', exact: true });
 
 async function prepare(page: Page, attached = false, rawScripts = false, automatic = false) {
@@ -100,9 +100,10 @@ async function prepare(page: Page, attached = false, rawScripts = false, automat
   await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(page.locator('.analysis-workbench')).toBeVisible();
   if (!automatic) {
-    await page.getByText('Optional settings', { exact: true }).click();
+    await expect(
+      page.getByLabel('Load missing input data before scanning', { exact: true }),
+    ).toBeVisible();
     await page.getByLabel('Load missing input data before scanning', { exact: true }).uncheck();
-    await page.getByText('Optional settings', { exact: true }).click();
   }
   await mkdir(shots + '/followup', { recursive: true });
   return { w, calls, state };
@@ -378,9 +379,18 @@ test('cancelling automatic loading does not replace saved findings or start pare
     .getByRole('button', { name: 'Scan', exact: true })
     .click();
   await expect.poll(() => !!state.release).toBe(true);
+  await expect(
+    page.getByRole('button', { name: 'Scan: loading input data…', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel('Load missing input data before scanning', { exact: true }),
+  ).toBeDisabled();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   state.release!();
   await expect(page.locator('.scan-notice').first()).toContainText('cancelled');
+  await expect(
+    page.getByLabel('Load missing input data before scanning', { exact: true }),
+  ).toBeEnabled();
   await expect(page.locator('.scan-result-list')).toHaveCount(0);
   expect(calls).toHaveLength(1);
 });
@@ -407,4 +417,49 @@ test.describe('automatic phone scan', () => {
     ).toBe(true);
     expect(calls).toHaveLength(1);
   });
+});
+
+test('scan opens higher review priority first and keeps guidance prominent above linked evidence', async ({
+  page,
+}) => {
+  const { calls } = await prepare(page, true);
+  await page.getByText('Optional settings', { exact: true }).click();
+  await page.getByRole('spinbutton', { name: /^Review threshold \(sat\/vB\)/ }).fill('1');
+  await page.getByText('Optional settings', { exact: true }).click();
+  await scan(page);
+  const results = page.locator('.scan-result-list > button');
+  await expect(results.first()).toContainText('Fee threshold reached:');
+  await expect(results.first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(results.first().locator('.scan-priority-icon')).toHaveAttribute(
+    'aria-label',
+    'high review priority',
+  );
+  const priorityOrder = await results
+    .locator('.scan-priority-icon')
+    .evaluateAll((icons) => icons.map((icon) => icon.getAttribute('aria-label')));
+  expect(priorityOrder).toContain('medium review priority');
+  const ranks = priorityOrder.map((label) =>
+    ['high review priority', 'medium review priority', 'low review priority'].indexOf(label ?? ''),
+  );
+  expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+  const detail = page.getByRole('article', { name: 'Selected finding' });
+  const evidence = detail.getByRole('list', { name: 'Related transactions and outputs' });
+  const guidance = detail.getByRole('complementary', { name: 'Tip', exact: true });
+  await expect(evidence).toBeVisible();
+  await expect(guidance).toBeVisible();
+  await expect(guidance).toContainText('Compare your wallet’s fee options before sending.');
+  for (const width of [1366, 640]) {
+    await page.setViewportSize({ width, height: 768 });
+    const guidanceBounds = await guidance.boundingBox();
+    const evidenceBounds = await evidence.boundingBox();
+    expect(guidanceBounds).not.toBeNull();
+    expect(evidenceBounds).not.toBeNull();
+    expect(guidanceBounds!.y + guidanceBounds!.height).toBeLessThan(evidenceBounds!.y);
+    await guidance.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${shots}/guidance-${width}.png` });
+  }
+  await detail.getByText('Interpretation and limits', { exact: true }).click();
+  await expect(guidance).toBeVisible();
+  await expect(detail.locator('.scan-guidance')).toHaveCount(1);
+  expect(calls).toHaveLength(0);
 });

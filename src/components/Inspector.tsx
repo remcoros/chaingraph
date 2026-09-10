@@ -1,3 +1,8 @@
+import { listWalletAddresses } from '../domain/walletRecords';
+import {
+  matchingWalletUtxoObservation,
+  type WalletUtxoObservation,
+} from '../domain/walletUtxoObservation';
 import { useUtxoStatus } from '../lib/useUtxoStatus';
 import './utxo-status.css';
 import { TransactionBlockTime } from './TransactionBlockTime';
@@ -138,9 +143,9 @@ export function WalletInspector({
   onRemove: () => void;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const addresses = new Set(wallet.addresses.map((a) => a.address));
-  const outputs = Object.values(workspace.transactions).flatMap((t) =>
-    t.vout.filter((o) => addresses.has(outputAddress(o) ?? '')),
+  const receivedOutputCount = listWalletAddresses(workspace, wallet).reduce(
+    (total, address) => total + address.loadedOutputCount,
+    0,
   );
   const histories = new Set(
     wallet.addresses.flatMap((a) => a.history?.map((h) => h.tx_hash) ?? []),
@@ -226,7 +231,7 @@ export function WalletInspector({
         </div>
         <div>
           <dt>Loaded received outputs</dt>
-          <dd>{outputs.length}</dd>
+          <dd>{receivedOutputCount}</dd>
         </div>
       </dl>
       <p className="small muted">
@@ -263,6 +268,7 @@ export const emptyAnnotation: Annotation = {
 };
 interface NodeInspectorProps extends VisibilityProps {
   tagsPanel?: ReactNode;
+  walletUtxoObservation?: WalletUtxoObservation;
   w: Workspace;
   selected: GraphNode;
   tx?: Transaction;
@@ -285,6 +291,7 @@ interface NodeInspectorProps extends VisibilityProps {
 }
 export function NodeInspector({
   tagsPanel,
+  walletUtxoObservation,
   w,
   selected,
   tx,
@@ -334,6 +341,14 @@ export function NodeInspector({
     selected.kind === 'output' ? selected.vout : undefined,
     selectedOutput,
   );
+  const walletObservation =
+    selected.kind === 'output'
+      ? matchingWalletUtxoObservation(walletUtxoObservation, w, selected.txid, selected.vout)
+      : undefined;
+  const showWalletObservation =
+    !!walletObservation &&
+    (!utxo.observation ||
+      Date.parse(walletObservation.checkedAt) > Date.parse(utxo.observation.checkedAt));
   const opReturn = decodeOpReturn(selectedOutput?.scriptPubKey.hex);
   const spendingReason =
     unavailable ||
@@ -473,7 +488,7 @@ export function NodeInspector({
           </div>
           {tx && (
             <div>
-              <dt>Chain status</dt>
+              <dt>Block</dt>
               <dd>
                 <TransactionBlockTime transaction={tx} />
               </dd>
@@ -493,7 +508,9 @@ export function NodeInspector({
               ? 'OP_RETURN · Unspendable output'
               : spendingCount
                 ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
-                : 'Spend status unknown. No spending transaction loaded.'}
+                : walletObservation || utxo.observation
+                  ? 'No spending transaction loaded.'
+                  : 'Spend status unknown. No spending transaction loaded.'}
           </p>
         )}
         {selected.kind === 'output' && selected.txid && selected.vout !== undefined && (
@@ -521,7 +538,18 @@ export function NodeInspector({
                 {utxo.error}
               </p>
             )}
-            {utxo.observation && (
+            {showWalletObservation && walletObservation && (
+              <div role="status">
+                <strong>Unspent at wallet check</strong>
+                <small>
+                  <time dateTime={walletObservation.checkedAt}>
+                    {new Date(walletObservation.checkedAt).toLocaleString()}
+                  </time>
+                  {' · Status can change'}
+                </small>
+              </div>
+            )}
+            {utxo.observation && !showWalletObservation && (
               <div role="status">
                 <strong>
                   {utxo.observation.status === 'unspent'
@@ -577,22 +605,22 @@ export function NodeInspector({
             {selected.kind === 'output' && tx && (
               <button
                 type="button"
-                className="text-button mono"
+                className="text-button"
                 title={tx.txid}
                 onClick={() => onSelectNode?.(txNodeId(tx.txid))}
               >
-                Creating transaction: {short(tx.txid)}
+                <span>Creating tx:</span> <code>{short(tx.txid)}</code>
               </button>
             )}
             {spendingNodes.slice(0, 5).map((id) => (
               <button
                 key={id}
                 type="button"
-                className="text-button mono"
+                className="text-button"
                 title={id.slice(3)}
                 onClick={() => onSelectNode?.(id)}
               >
-                Spending transaction: {short(id.slice(3))}
+                <span>Spending tx:</span> <code>{short(id.slice(3))}</code>
               </button>
             ))}
             {spendingCount > 5 && (

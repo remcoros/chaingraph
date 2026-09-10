@@ -1,4 +1,7 @@
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
+import { resolveGraphHandoff } from './domain/graphHandoff';
+import { resolveWalletUtxoObservation } from './domain/walletUtxoObservation';
+import { useWalletUtxos } from './lib/useWalletUtxos';
 import { addressToScriptHash } from './lib/wallet';
 import {
   verifiedWalletAddresses,
@@ -851,6 +854,21 @@ export default function App() {
               ? `${w?.network ?? displayNetwork ?? 'Bitcoin'} backend is unavailable.`
               : undefined);
   const canTrace = canQuery;
+  const evidenceWallet = wallet ?? w?.wallets[0];
+  const walletUtxos = useWalletUtxos({
+    workspace: w,
+    wallet: evidenceWallet,
+    enabled:
+      canQuery &&
+      viewOwner === w?.id &&
+      !lockingWorkspace &&
+      !tourStep &&
+      (workbench === 'wallet' || (workbench === 'graph' && rightTab === 'utxos')),
+  });
+  const walletUtxoObservation = useMemo(
+    () => resolveWalletUtxoObservation(w, evidenceWallet, walletUtxos.utxos, selectedId),
+    [w?.id, w?.network, w?.transactions, evidenceWallet, walletUtxos.utxos, selectedId],
+  );
   const getTransaction = async (id: string, signal?: AbortSignal) => {
     signal?.throwIfAborted();
     if (!w) throw new Error('Open a workspace first.');
@@ -1547,21 +1565,44 @@ export default function App() {
         ? { workspaceId: w.id, element: invoker }
         : undefined;
   }
-  function showFindingOnGraph(ids: string[], isolate = false) {
+  function showFindingOnGraph(ids: string[], isolate = false, supportingTxids: string[] = []) {
+    const current = w && ws.getSession(w.id)?.data;
+    if (!current) return false;
+    const target = resolveGraphHandoff(current, ids, supportingTxids);
+    if (!target) return false;
     recordHandoffInvoker('analysis');
+    change((latest) => {
+      const resolved = resolveGraphHandoff(latest, ids, supportingTxids);
+      if (!resolved) return latest;
+      const revealed = setNodesHidden(resolved.workspace, [resolved.selectedId], false);
+      return {
+        ...revealed,
+        view: {
+          ...revealed.view,
+          smallAmountThreshold: undefined,
+          ...(resolved.usedSupportingTransaction
+            ? {
+                transactionFlow: {
+                  ...revealed.view.transactionFlow,
+                  open: true,
+                  transactionId: resolved.selectedId.slice(3),
+                },
+              }
+            : {}),
+        },
+      };
+    }, false);
     setReturnWorkbench('analysis');
     switchWorkbench('graph', true);
-    const id = ids.find((candidate) => !hiddenIds.has(candidate)) ?? ids[0];
-    if (isolate) {
-      prepareIsolation(ids);
-      updateFilters({ includeIds: ids, preserveContext: true });
-    }
-    if (id) {
-      select(id);
-      if (isolate) setFocusRequest({ id, token: Date.now() });
-      else centerNode(id);
-    }
+    select(target.selectedId);
+    if (target.usedSupportingTransaction)
+      setNotice(
+        'The requested entity cannot be opened directly. Showing its supporting transaction.',
+      );
+    updateFilters(isolate ? { includeIds: target.ids, preserveContext: true } : {});
+    setFocusRequest({ id: target.selectedId, token: Date.now() });
     setMobilePanel('graph');
+    return true;
   }
   function resetGraphFilters() {
     updateFilters({});
@@ -2149,6 +2190,7 @@ export default function App() {
               <div className="graph-stage-content">
                 {viewOwner === w.id && (
                   <TransactionView
+                    walletUtxoObservation={walletUtxoObservation}
                     key={w.id}
                     state={
                       tourStep?.view?.flowOpen
@@ -2370,6 +2412,7 @@ export default function App() {
               <div className="inspector-scroll" ref={inspectorScroll}>
                 {wallet && (
                   <WalletRecordsPanel
+                    walletUtxos={walletUtxos}
                     key={`${w.id}:${wallet.id}`}
                     workspace={w}
                     wallet={wallet}
@@ -2414,6 +2457,7 @@ export default function App() {
                   />
                 ) : selected ? (
                   <NodeInspector
+                    walletUtxoObservation={walletUtxoObservation}
                     tagsPanel={
                       <SelectedTags
                         key={selected.id}
@@ -2503,6 +2547,7 @@ export default function App() {
             aria-label="Wallet workspace"
           >
             <WalletWorkbench
+              walletUtxos={walletUtxos}
               tourPreview={
                 tourStep?.view?.workbench === 'wallet'
                   ? { tab: tourStep.view.walletTab ?? 'review', example: tourExample }

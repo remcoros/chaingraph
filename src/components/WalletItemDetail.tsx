@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Clock3, Filter, Network, Search, Undo2 } from 'lucide-react';
+import { Clock3, Filter, Info, Network, Search, Undo2 } from 'lucide-react';
 import { formatSats, short, type Wallet, type Workspace, type WorkspaceTag } from '../domain/types';
 import { isCompletedReview, type WalletReviewItem } from '../domain/walletReview';
 import {
   buildWalletReviewContext,
+  orderWalletContextTransactions,
   type WalletReviewFlowEntry,
 } from '../domain/walletReviewContext';
 import { walletRowRelationship, type WalletRow } from '../domain/walletWorkbenchRows';
@@ -125,11 +126,21 @@ export function WalletItemDetail({
     transactionId?: string;
     inputs: readonly WalletReviewFlowEntry[];
   }>({ inputs: [] });
-  const contextId = row.contextTransactionIds.includes(chosenContext)
+  const contextTransactionIds = useMemo(
+    () => orderWalletContextTransactions(row.contextTransactionIds, selectionIndex.transactions),
+    [row.contextTransactionIds, selectionIndex],
+  );
+  const contextId = contextTransactionIds.includes(chosenContext)
     ? chosenContext
-    : row.kind === 'address' && row.contextTransactionIds.length > 1
-      ? ''
-      : row.contextTransactionIds[0];
+    : contextTransactionIds[0];
+  const hasUnloadedHistory =
+    !contextId &&
+    row.kind === 'address' &&
+    wallet.addresses.some(
+      (entry) =>
+        entry.address === row.address &&
+        entry.history?.some((transaction) => !selectionIndex.transactions.has(transaction.tx_hash)),
+    );
   const context = useMemo(
     () =>
       contextId
@@ -212,6 +223,25 @@ export function WalletItemDetail({
   );
   return (
     <>
+      <header className="wallet-subject-header wallet-detail-heading">
+        <div>
+          {annotation?.label && <span className="wallet-subject-kind">{subjectTitle}</span>}
+          <h2 className="wallet-item-title">
+            {annotation?.icon && (
+              <span className="wallet-entity-icon" aria-hidden="true">
+                {annotation.icon}
+              </span>
+            )}
+            {annotation?.label || subjectTitle}
+          </h2>
+        </div>
+        {row.reviews.length > 0 && (
+          <span className={`wallet-subject-status status-${row.status}`}>{statusLabel}</span>
+        )}
+        <WalletHelp title="Review guidance" active={active}>
+          {guidance}
+        </WalletHelp>
+      </header>
       <div
         className="wallet-detail-toolbar"
         aria-label="Selected item actions"
@@ -222,7 +252,7 @@ export function WalletItemDetail({
           workspace={workspace}
           ids={[row.nodeId]}
           single
-          scopeLabel={row.kind}
+          scopeLabel=""
           disabled={
             busy || awaitingAddress || (row.kind === 'output' && !row.address && flowInputs.loading)
           }
@@ -256,10 +286,7 @@ export function WalletItemDetail({
           </button>
         </div>
       </div>
-      <p className="wallet-review-guidance" role="note">
-        {guidance}
-      </p>
-      {(context || row.contextTransactionIds.length > 0) && (
+      {context ? (
         <details
           className="wallet-flow-disclosure"
           open={flowOpen}
@@ -268,7 +295,7 @@ export function WalletItemDetail({
           <summary>Transaction flow</summary>
           {flowOpen && (
             <>
-              {row.contextTransactionIds.length > 1 && (
+              {contextTransactionIds.length > 1 && (
                 <div className="wallet-context-chooser">
                   <select
                     aria-label="Transaction context"
@@ -276,12 +303,7 @@ export function WalletItemDetail({
                     value={contextId ?? ''}
                     onChange={(event) => setChosenContext(event.target.value)}
                   >
-                    {row.kind === 'address' && (
-                      <option value="">
-                        Choose transaction ({row.contextTransactionIds.length})
-                      </option>
-                    )}
-                    {row.contextTransactionIds.map((txid) => (
+                    {contextTransactionIds.map((txid) => (
                       <option value={txid} key={txid} title={txid}>
                         {workspace.annotations[`tx:${txid}`]?.label || short(txid)}
                       </option>
@@ -290,20 +312,16 @@ export function WalletItemDetail({
                   {contextId && <CopyButton value={contextId} label="Copy transaction ID" />}
                 </div>
               )}
-              {context ? (
-                <WalletReviewFlow
-                  key={contextId}
-                  context={context}
-                  workspace={workspace}
-                  walletName={wallet.name}
-                  editedNodeId={row.nodeId}
-                  onShowInGraph={onShowInGraph}
-                  onVisibleInputsChange={onVisibleInputsChange}
-                  active={active}
-                />
-              ) : (
-                <p className="small muted">Choose a transaction to show its flow.</p>
-              )}
+              <WalletReviewFlow
+                key={contextId}
+                context={context}
+                workspace={workspace}
+                walletName={wallet.name}
+                editedNodeId={row.nodeId}
+                onShowInGraph={onShowInGraph}
+                onVisibleInputsChange={onVisibleInputsChange}
+                active={active}
+              />
               <div className="wallet-flow-load-state" role="status">
                 {flowInputs.loading && <span>Loading input details...</span>}
                 {flowInputs.error && (
@@ -324,24 +342,16 @@ export function WalletItemDetail({
             </>
           )}
         </details>
+      ) : (
+        <div className="wallet-flow-empty" role="status">
+          <Info size={16} aria-hidden="true" />
+          <div>
+            <span>No related transaction found in loaded data.</span>
+            {hasUnloadedHistory && <span>Some wallet history is not loaded.</span>}
+          </div>
+        </div>
       )}
       <section className="wallet-subject-card" aria-label={`${subjectTitle} details`}>
-        <header className="wallet-subject-header">
-          <div>
-            {annotation?.label && <span className="wallet-subject-kind">{subjectTitle}</span>}
-            <h2 className="wallet-item-title">
-              {annotation?.icon && (
-                <span className="wallet-entity-icon" aria-hidden="true">
-                  {annotation.icon}
-                </span>
-              )}
-              {annotation?.label || subjectTitle}
-            </h2>
-          </div>
-          {row.reviews.length > 0 && (
-            <span className={`wallet-subject-status status-${row.status}`}>{statusLabel}</span>
-          )}
-        </header>
         <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
           <div className="wallet-subject-identifier">
             <dt>

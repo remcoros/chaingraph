@@ -56,7 +56,6 @@ export function WalletOverview({
     <>
       <header className="wallet-review-header" data-tour="wallet-overview">
         <div className="wallet-identity">
-          <span className="wallet-eyebrow">Watch-only wallet</span>
           <div className="wallet-picker-row">
             <label className="wallet-picker">
               <WalletIcon size={19} style={{ color: wallet.color }} aria-hidden="true" />
@@ -114,29 +113,7 @@ export function WalletOverview({
           </button>
         </div>
       </header>
-      <p className="small muted wallet-operation-hint">
-        Refresh discovers wallet history. Check UTXOs updates unspent status. Analysis uses loaded
-        data.
-      </p>
       <dl className="wallet-coverage" aria-label="Wallet coverage">
-        <div>
-          <dt>Wallet refreshed</dt>
-          <dd title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}>
-            {walletCheckAge(wallet.scannedAt)}
-          </dd>
-        </div>
-        <div>
-          <dt>Addresses</dt>
-          <dd>
-            {coverage.usedAddresses} used of {coverage.discoveredAddresses} discovered
-          </dd>
-        </div>
-        <div>
-          <dt>History</dt>
-          <dd>
-            {coverage.loadedTransactions}/{coverage.knownTransactions} transactions loaded
-          </dd>
-        </div>
         <div>
           <dt>Current UTXOs</dt>
           <dd>
@@ -153,6 +130,24 @@ export function WalletOverview({
                 {coverage.utxoCount} unspent · {formatSats(coverage.utxoBalanceSats)}
               </>
             )}
+          </dd>
+        </div>
+        <div>
+          <dt>Wallet refreshed</dt>
+          <dd title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}>
+            {walletCheckAge(wallet.scannedAt)}
+          </dd>
+        </div>
+        <div>
+          <dt>Addresses</dt>
+          <dd>
+            {coverage.usedAddresses} used of {coverage.discoveredAddresses} discovered
+          </dd>
+        </div>
+        <div>
+          <dt>History</dt>
+          <dd>
+            {coverage.loadedTransactions}/{coverage.knownTransactions} transactions loaded
           </dd>
         </div>
       </dl>

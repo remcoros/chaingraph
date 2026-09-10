@@ -1,7 +1,11 @@
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
-import { buildWalletReviewContext, matchRelatedEntities } from '../src/domain/walletReviewContext';
+import {
+  buildWalletReviewContext,
+  matchRelatedEntities,
+  orderWalletContextTransactions,
+} from '../src/domain/walletReviewContext';
 import { buildWalletReview, type WalletReviewItem } from '../src/domain/walletReview';
 import { newWorkspace } from '../src/domain/workspace';
 import { outputNodeId, type Transaction, type Wallet, type Workspace } from '../src/domain/types';
@@ -85,6 +89,36 @@ function item(
 }
 
 describe('wallet selected review context', () => {
+  it('opens the newest observed context first, including mempool activity', () => {
+    const transactions = new Map<string, Transaction>([
+      [id(1), { ...parent, blockHeight: 800000, blocktime: 100 }],
+      [id(2), { ...parent, txid: id(2), blockHeight: 800002, blocktime: 102 }],
+      [id(3), { ...shared, blockHeight: 800001, blocktime: 101 }],
+      [id(4), { ...parent, txid: id(4), mempool: true }],
+    ]);
+    const ids = [id(1), id(3), id(2), id(4)];
+    expect(orderWalletContextTransactions(ids, transactions)).toEqual([id(4), id(2), id(3), id(1)]);
+    expect(ids).toEqual([id(1), id(3), id(2), id(4)]);
+    transactions.delete(id(4));
+    expect(orderWalletContextTransactions(ids, transactions)).toEqual([id(2), id(3), id(1), id(4)]);
+  });
+
+  it('uses saved times when heights are unavailable and keeps undated contexts deterministic', () => {
+    const transactions = new Map<string, Transaction>([
+      [id(1), { ...parent, blocktime: 100 }],
+      [id(2), { ...parent, txid: id(2), time: 200 }],
+      [id(3), shared],
+    ]);
+    expect(orderWalletContextTransactions([id(4), id(3), id(1), id(2)], transactions)).toEqual([
+      id(2),
+      id(1),
+      id(3),
+      id(4),
+    ]);
+    expect(orderWalletContextTransactions([], transactions)).toEqual([]);
+    expect(transactions.get(id(3))?.blocktime).toBeUndefined();
+  });
+
   it('shows a direct funding subject as the selected canonical input in an explicit receiving context', () => {
     const context = buildWalletReviewContext(
       fixture(),

@@ -262,6 +262,13 @@ a {
   flex-shrink: 0;
   margin-left: auto;
 }
+.selection-heading .selection-facts {
+  margin: 4px 0;
+  gap: 0;
+}
+.selection-heading .selection-facts > div {
+  min-height: 22px;
+}
 .selection-heading h2 {
   font-size: 15px;
   margin: 6px 0;

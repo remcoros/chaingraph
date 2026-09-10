@@ -97,7 +97,9 @@ The coverage strip states
 the last check, partial discovery, used and discovered addresses, loaded versus
 known transactions, and the current UTXO count and balance from a verified check.
 There is no completeness percentage; when no UTXO check has run, the workbench
-says so and offers the action.
+says so and offers the action. Completed wallet checks remain available in Graph
+with their original timestamp. They clear when switching wallets or workspaces,
+refreshing wallet discovery, or locking; missing observations remain unknown.
 
 Row navigation reuses a browser-memory index of loaded transactions and wallet
 scripts, avoiding repeated history scans when selecting records in larger wallets.
@@ -129,8 +131,7 @@ refresh keeps them. Only an item whose underlying observations actually changed 
 flagged for another look, with the date of your earlier decision. A scan never
 resets the queue.
 
-A short sentence under the actions explains why each item is here and what to do
-next. Used wallet addresses can be labelled by purpose; unused gap-discovery
+Contextual review help explains why each item is here and what to do next. Used wallet addresses can be labelled by purpose; unused gap-discovery
 addresses are not added to the queue. Source and destination guidance asks for a
 sender, exchange, shop or recipient the user recognizes, not an inferred identity.
 Individual counterparty outputs are no longer offered as new review tasks.
@@ -140,8 +141,9 @@ not as new work to complete.
 One Wallet navigation row offers **To review**, **UTXOs**, **Transactions**,
 **Addresses**, **Sources** and **Destinations**. All six tabs use the same selectable
 list and detail panel, with direct single-entity label, tag and icon editing.
-Identifiers and tags stay visible. Address flow contexts with several verified
-loaded transactions require an explicit transaction choice.
+Identifiers and tags stay visible. Address flow contexts automatically show the latest observed related transaction.
+Use the transaction selector to inspect another one. Items without a related loaded
+transaction show an information box; known unloaded history stays explicit.
 
 **Finding types** in To review is a multi-select, including zero-count categories.
 Selected types match by union (OR); counts overlap and are computed before the

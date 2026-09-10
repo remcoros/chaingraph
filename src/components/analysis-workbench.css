@@ -2,12 +2,12 @@
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 24px clamp(16px, 3vw, 44px) 40px;
+  padding: 16px clamp(16px, 2vw, 28px) 32px;
   background: var(--color-paper);
 }
 .analysis-workbench h1 {
   margin: 0;
-  font-size: 23px;
+  font-size: 20px;
 }
 .analysis-workbench h2 {
   font-size: 17px;
@@ -27,48 +27,85 @@
 .scan-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 20px;
   padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-rule);
 }
-.scan-header p {
-  font-size: 12px;
+.scan-header > .button-row {
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 .scan-scope {
   display: flex;
-  align-items: start;
-  gap: 24px;
-  border-block: 1px solid var(--color-rule);
-  padding: 10px 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+  flex: 1;
   font-size: 12px;
 }
-.scan-scope > div {
-  max-width: 800px;
+.scan-scope-name {
+  max-width: 240px;
+  overflow-wrap: anywhere;
 }
 .scan-scope label,
 .scan-results-heading label {
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
   flex-direction: row;
   font-size: 12px;
 }
 .scan-scope select,
 .scan-results-heading select {
   width: auto;
+  max-width: 100%;
   padding: 5px 30px 5px 8px;
+}
+.scan-secondary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-rule);
+  font-size: 12px;
+}
+.scan-secondary > details[open] {
+  flex-basis: 100%;
+  order: 1;
 }
 .analysis-settings,
 .scan-coverage {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--color-rule);
   font-size: 12px;
 }
 .analysis-settings summary,
 .scan-coverage summary,
 .scan-detail summary {
   cursor: pointer;
+  min-height: 24px;
+  align-content: center;
+}
+.scan-auto-load,
+.scan-auto-load label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.scan-auto-load input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+}
+.scan-secondary .scan-run-note {
+  margin: 0;
+  padding: 0;
+  color: var(--color-muted);
 }
 .scan-settings-grid {
   display: grid;
@@ -178,8 +215,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  margin: 14px 0 10px;
+  gap: 8px 12px;
+  margin: 10px 0 8px;
 }
 .scan-results-heading h2 {
   margin: 0;
@@ -191,7 +228,7 @@
   display: grid;
   grid-template-columns: minmax(230px, 30%) minmax(0, 1fr);
   align-items: start;
-  gap: 28px;
+  gap: 24px;
 }
 .scan-result-list {
   display: flex;
@@ -209,7 +246,7 @@
   flex-direction: column;
   white-space: normal;
   gap: 5px;
-  padding: 13px 12px;
+  padding: 10px 12px;
   border: 0;
   border-bottom: 1px solid var(--color-rule);
   border-left: 2px solid transparent;
@@ -221,9 +258,7 @@
   background: var(--color-raised);
 }
 .scan-result-kind {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 12px;
   color: var(--color-muted);
 }
 .scan-result-list > button > .muted {
@@ -235,13 +270,13 @@
   padding: 10px 0 30px;
   overflow-wrap: anywhere;
   font-size: 13px;
-  line-height: 1.8;
+  line-height: 1.6;
 }
 .scan-detail h2 {
   margin-top: 8px;
 }
 .scan-detail > .button-row {
-  margin: 18px 0;
+  margin: 12px 0;
   flex-wrap: wrap;
 }
 .scan-evidence {
@@ -296,29 +331,20 @@
     padding: 18px 16px 36px;
   }
   .scan-header {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 4px 8px;
-  }
-  .scan-header > div:first-child {
-    display: contents;
-  }
-  .scan-header h1 {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .scan-header .button-row {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .scan-header p {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    gap: 8px 12px;
   }
   .scan-scope {
-    flex-direction: column;
-    gap: 10px;
+    flex-basis: 100%;
+    order: 1;
+  }
+  .scan-scope-name {
+    max-width: 100%;
+  }
+  .scan-header .button-row {
+    gap: 6px;
+  }
+  .scan-secondary {
+    gap: 6px 14px;
   }
   .scan-results {
     grid-template-columns: 1fr;
@@ -384,11 +410,6 @@
   }
 }
 
-.analysis-settings .scan-auto-load {
-  grid-template-columns: 15px minmax(0, auto) auto;
-  justify-content: start;
-  margin: 12px 0 0;
-}
 .analysis-settings > button {
   margin-bottom: 6px;
 }
@@ -400,8 +421,7 @@
   gap: 10px;
   margin: 12px 0;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--guidance-color) 45%, var(--color-rule));
-  border-radius: 5px;
+  border-left: 3px solid var(--guidance-color);
   background: color-mix(in srgb, var(--guidance-color) 9%, var(--color-paper));
   line-height: 1.6;
 }
