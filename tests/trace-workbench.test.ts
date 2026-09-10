@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchHistory, fetchTransaction } from '../src/lib/api';
+import { fetchHistory, fetchTransaction, fetchIndexedSpenders } from '../src/lib/api';
 import { fetchCurrentUtxo } from '../src/lib/utxoStatus';
 import { newWorkspace } from '../src/domain/workspace';
 import {
@@ -11,7 +11,11 @@ import {
 } from '../src/domain/traceWorkbench';
 import type { Transaction } from '../src/domain/types';
 
-vi.mock('../src/lib/api', () => ({ fetchHistory: vi.fn(), fetchTransaction: vi.fn() }));
+vi.mock('../src/lib/api', () => ({
+  fetchHistory: vi.fn(),
+  fetchTransaction: vi.fn(),
+  fetchIndexedSpenders: vi.fn(),
+}));
 vi.mock('../src/lib/utxoStatus', () => ({ fetchCurrentUtxo: vi.fn() }));
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const point = { txid: id(1), vout: 0 };
@@ -76,6 +80,57 @@ describe('trace branch semantics', () => {
 });
 
 describe('bounded network-scoped spender lookup', () => {
+  it('uses shared exact lookup without script history or UTXO inference', async () => {
+    vi.mocked(fetchIndexedSpenders).mockResolvedValue({
+      transactions: [tx(2)],
+      unresolved: [],
+      inspected: 1,
+      unavailableTxids: [],
+    });
+    const result = await searchTraceSpenders(workspace(), point, new AbortController().signal);
+    expect(result).toMatchObject({ transactions: [tx(2)], inspected: 1, failed: 0 });
+    expect(result.observation).toBeUndefined();
+    expect(fetchHistory).not.toHaveBeenCalled();
+    expect(fetchCurrentUtxo).not.toHaveBeenCalled();
+  });
+  it('retains known indexed transaction failures when fallback history is empty', async () => {
+    vi.mocked(fetchIndexedSpenders).mockResolvedValue({
+      transactions: [],
+      unresolved: [point],
+      inspected: 1,
+      unavailableTxids: [id(2)],
+    });
+    expect(
+      await searchTraceSpenders(workspace(), point, new AbortController().signal),
+    ).toMatchObject({ inspected: 1, failed: 1, remaining: 0 });
+  });
+  it('resolves indexed failures from bounded exact history matches', async () => {
+    vi.mocked(fetchIndexedSpenders).mockResolvedValue({
+      transactions: [],
+      unresolved: [point],
+      inspected: 1,
+      unavailableTxids: [id(2)],
+    });
+    vi.mocked(fetchHistory).mockResolvedValue(
+      Array.from({ length: 20 }, (_, n) => ({ tx_hash: id(n + 2), height: 1 })),
+    );
+    vi.mocked(fetchTransaction).mockImplementation(async (_network, txid) => ({ ...tx(2), txid }));
+    const result = await searchTraceSpenders(workspace(), point, new AbortController().signal);
+    expect(result).toMatchObject({ inspected: 12, remaining: 9, failed: 0 });
+    expect(fetchTransaction).toHaveBeenCalledTimes(11);
+  });
+  it('reports failed history as partial after an indexed failure', async () => {
+    vi.mocked(fetchIndexedSpenders).mockResolvedValue({
+      transactions: [],
+      unresolved: [point],
+      inspected: 1,
+      unavailableTxids: [id(2)],
+    });
+    vi.mocked(fetchHistory).mockRejectedValue(new Error('Synthetic history failure'));
+    expect(
+      await searchTraceSpenders(workspace(), point, new AbortController().signal),
+    ).toMatchObject({ failed: 2 });
+  });
   it('queries only the workspace network and selected outpoint; absence remains unknown', async () => {
     const signal = new AbortController().signal;
     const result = await searchTraceSpenders(workspace(), point, signal);

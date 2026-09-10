@@ -18,6 +18,7 @@ export interface NetworkConfig {
   readonly queueTimeoutMs: number;
   readonly coreConcurrency: number;
   readonly corePending: number;
+  readonly useTxoSpenderIndex: boolean;
   readonly electrumConcurrency: number;
   readonly electrumPending: number;
   readonly maxResponseBytes: number;
@@ -81,6 +82,8 @@ export function loadNetworkConfig(network: Network, env: NodeJS.ProcessEnv): Net
     throw new Error('Configure exactly one Bitcoin RPC authentication mode');
   if (!['true', 'false'].includes(env.FULCRUM_TLS ?? 'false'))
     throw new Error('Invalid configuration: FULCRUM_TLS');
+  if (!['true', 'false'].includes(env.CHAINGRAPH_USE_TXOSPENDERINDEX ?? 'false'))
+    throw new Error('Invalid configuration: CHAINGRAPH_USE_TXOSPENDERINDEX');
   const electrumHost = required(env, 'FULCRUM_HOST');
   if (electrumHost.length > 253 || /[\s\/@?#]/.test(electrumHost))
     throw new Error('Invalid configuration: FULCRUM_HOST');
@@ -99,6 +102,7 @@ export function loadNetworkConfig(network: Network, env: NodeJS.ProcessEnv): Net
     queueTimeoutMs: integer(env, 'UPSTREAM_QUEUE_TIMEOUT_MS', 30000),
     coreConcurrency: integer(env, 'CORE_RPC_MAX_CONCURRENCY', 16, 1, 256),
     corePending: integer(env, 'CORE_RPC_MAX_PENDING', 256, 0, 10000),
+    useTxoSpenderIndex: env.CHAINGRAPH_USE_TXOSPENDERINDEX === 'true',
     electrumConcurrency: integer(env, 'FULCRUM_MAX_CONCURRENCY', 16, 1, 256),
     electrumPending: integer(env, 'FULCRUM_MAX_PENDING', 256, 0, 10000),
     maxResponseBytes: integer(env, 'MAX_RESPONSE_BYTES', 5242880, 1024, 67108864),

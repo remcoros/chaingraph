@@ -529,7 +529,7 @@ export function TransactionView(props: Props) {
             title={
               disabledReason ||
               (direction === 'next'
-                ? 'No spending transaction loaded. Query this exact output’s script history.'
+                ? 'No spending transaction loaded. Check this exact output for spending transactions.'
                 : 'Load this input’s creating transaction.')
             }
             onClick={() =>
@@ -752,8 +752,7 @@ export function TransactionView(props: Props) {
                   aria-label="Check this output for spends"
                   disabled={!!disabledReason}
                   title={
-                    disabledReason ||
-                    'Check this output’s script history for additional spending transactions'
+                    disabledReason || 'Check this exact output for additional spending transactions'
                   }
                   onClick={() => onTrace('spending', selected.id)}
                 >

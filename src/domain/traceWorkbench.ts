@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { fetchHistory, fetchTransaction } from '../lib/api';
+import type { TransactionFetchHints } from '../lib/transactionScheduler';
+import { fetchHistory, fetchTransaction, fetchIndexedSpenders } from '../lib/api';
 import { addressToScriptHash } from '../lib/wallet';
 import { fetchCurrentUtxo, type UtxoObservation } from '../lib/utxoStatus';
 import { outputAddress } from './workspace';
@@ -82,13 +83,35 @@ export interface TraceSearchResult {
   statusUnavailable: boolean;
 }
 
-/** One script history, at most 12 candidate transactions, only exact spenders returned. */
+/** Optional exact lookup, then one script history; at most 12 candidates in total. */
 export async function searchTraceSpenders(
   workspace: Workspace,
   point: TraceOutpoint,
   signal: AbortSignal,
+  hints: TransactionFetchHints = {},
 ): Promise<TraceSearchResult> {
+  if (hints.scope) signal = AbortSignal.any([signal, hints.scope.signal]);
   signal.throwIfAborted();
+  const fetchHints: TransactionFetchHints = {
+    ...hints,
+    priority: 'background',
+    observation: hints.observation ?? {},
+  };
+  const indexed = await fetchIndexedSpenders(
+    workspace.network,
+    [point],
+    workspace.transactions,
+    signal,
+    fetchHints,
+  );
+  if (indexed && !indexed.unresolved.length)
+    return {
+      transactions: indexed.transactions,
+      inspected: indexed.inspected,
+      remaining: 0,
+      failed: 0,
+      statusUnavailable: false,
+    };
   const resolution = resolvePreviousOutput(workspace, point, indexPreviousOutputs(workspace));
   const output =
     resolution.status === 'loaded' || resolution.status === 'attached'
@@ -98,11 +121,12 @@ export async function searchTraceSpenders(
     throw new Error(
       'Previous-output details are unavailable. Load the creating transaction first.',
     );
+  const failedIds = new Set(indexed?.unavailableTxids ?? []);
   const result: TraceSearchResult = {
-    transactions: [],
-    inspected: 0,
+    transactions: indexed?.transactions ?? [],
+    inspected: indexed?.inspected ?? 0,
     remaining: 0,
-    failed: 0,
+    failed: failedIds.size,
     statusUnavailable: false,
   };
   try {
@@ -129,29 +153,50 @@ export async function searchTraceSpenders(
         : undefined;
   if (hash === undefined)
     throw new Error('Output script data is missing. Reload its creating transaction in Graph.');
-  const history = await fetchHistory(workspace.network, hash, signal);
+  let history;
+  try {
+    history = await fetchHistory(workspace.network, hash, signal);
+  } catch (error) {
+    signal.throwIfAborted();
+    if (!indexed) throw error;
+    result.failed++;
+    return result;
+  }
   signal.throwIfAborted();
   const candidates = [
     ...new Map(
       history.filter((item) => item.tx_hash !== point.txid).map((item) => [item.tx_hash, item]),
     ).values(),
   ];
-  result.remaining = Math.max(0, candidates.length - TRACE_CANDIDATE_LIMIT);
-  for (const candidate of candidates.slice(0, TRACE_CANDIDATE_LIMIT)) {
+  const budget = TRACE_CANDIDATE_LIMIT - result.inspected;
+  result.remaining = Math.max(0, candidates.length - budget);
+  for (const candidate of candidates.slice(0, budget)) {
     signal.throwIfAborted();
     try {
       const candidateTx =
         workspace.transactions[candidate.tx_hash] ??
-        (await fetchTransaction(workspace.network, candidate.tx_hash, signal, candidate.height));
+        (await fetchTransaction(
+          workspace.network,
+          candidate.tx_hash,
+          signal,
+          candidate.height,
+          fetchHints,
+        ));
       signal.throwIfAborted();
-      if (candidateTx.vin.some((input) => input.txid === point.txid && input.vout === point.vout))
-        result.transactions.push(candidateTx);
+      if (candidateTx.vin.some((input) => input.txid === point.txid && input.vout === point.vout)) {
+        result.transactions = [
+          ...result.transactions.filter((tx) => tx.txid !== candidateTx.txid),
+          candidateTx,
+        ];
+        if ((candidateTx.confirmations ?? 0) >= 0) failedIds.delete(candidateTx.txid);
+      }
     } catch (error) {
       signal.throwIfAborted();
-      result.failed++;
+      failedIds.add(candidate.tx_hash);
     }
     result.inspected++;
   }
   signal.throwIfAborted();
+  result.failed = failedIds.size;
   return result;
 }

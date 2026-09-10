@@ -12,11 +12,14 @@ const abortError = () => new DOMException('Transaction request cancelled.', 'Abo
 
 /** One unlocked session owns its in-flight transaction requests. */
 export class TransactionFetchScope {
+  private readonly lifetime = new AbortController();
+  readonly signal = this.lifetime.signal;
   closed = false;
   readonly jobs = new Set<Job>();
   constructor(readonly network?: Network) {}
   close() {
     this.closed = true;
+    this.lifetime.abort();
     this.jobs.clear();
   }
 }

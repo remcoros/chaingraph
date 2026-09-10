@@ -2,7 +2,8 @@ export class SafeError extends Error {
   constructor(
     message: string,
     public status = 502,
-    public code?: 'network_not_configured' | 'core_prevout_unavailable',
+    public code?:
+      'network_not_configured' | 'core_prevout_unavailable' | 'core_spender_unavailable',
   ) {
     super(message);
   }

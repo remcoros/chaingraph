@@ -16,6 +16,7 @@ const networkConfig = (env: NodeJS.ProcessEnv = {}) =>
 import { CoreClient } from './core';
 import { ElectrumClient } from './electrum';
 import { Limiter } from './limit';
+import { NetworkRegistry } from './networks';
 
 const hash = 'a'.repeat(64),
   otherHash = 'b'.repeat(64);
@@ -761,5 +762,266 @@ describe('Core stale keep-alive transport', () => {
     // connect timer but never extends the overall request budget.
     expect(Date.now() - started).toBeLessThan(1400);
     expect(stub.requests).toHaveLength(3);
+  });
+});
+
+describe('optional exact-outpoint spender lookup', () => {
+  const options = { mempool_only: false, return_spending_tx: false };
+  const outputs = [{ txid: hash, vout: 0 }];
+  const enabled = { CHAINGRAPH_USE_TXOSPENDERINDEX: 'true' };
+  it('is absent from discovery by default and rejects direct calls before touching upstreams', async () => {
+    const f = await fixture();
+    expect(await (await fetch(`${f.base}/api/networks`)).json()).toEqual({
+      networks: ['testnet4'],
+    });
+    const response = await f.rpc('gettxspendingprevout', [outputs, options], 'core');
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: 'core_spender_unavailable' });
+    expect(f.coreCalls).toEqual([]);
+    expect(f.electrumCalls).toEqual([]);
+  });
+  it('strictly bounds the opt-in RPC and never permits implicit mempool-only coverage', async () => {
+    const f = await fixture({ env: enabled });
+    for (const params of [
+      [outputs],
+      [outputs, false, false],
+      [outputs, {}],
+      [outputs, { ...options, mempool_only: true }],
+      [outputs, { ...options, return_spending_tx: true }],
+      [outputs, { ...options, extra: false }],
+      [[{ ...outputs[0], extra: 1 }], options],
+      [[{ txid: hash, vout: 0x80000000 }], options],
+      [[{ txid: hash, vout: -1 }], options],
+      [[{ txid: 'bad', vout: 0 }], options],
+      [[], options],
+      [Array.from({ length: 501 }, () => outputs[0]), options],
+    ])
+      expect((await f.rpc('gettxspendingprevout', params, 'core')).status).toBe(400);
+    expect(f.coreCalls).toEqual([]);
+  });
+  it('advertises opt-in, deduplicates outpoints and preserves confirmed, mempool and empty observations', async () => {
+    const f = await fixture({
+      env: enabled,
+      core: (rpc, response) => {
+        if (rpc.method !== 'gettxspendingprevout') return false;
+        const queried = rpc.params[0] as typeof outputs;
+        response.end(
+          JSON.stringify({
+            id: rpc.id,
+            result: queried.map((point) => ({
+              ...point,
+              ...(point.vout === 0
+                ? { spendingtxid: otherHash, blockhash: 'c'.repeat(64) }
+                : point.vout === 1
+                  ? { spendingtxid: 'd'.repeat(64) }
+                  : {}),
+            })),
+          }),
+        );
+        return true;
+      },
+    });
+    expect(await (await fetch(`${f.base}/api/networks`)).json()).toEqual({
+      networks: ['testnet4'],
+      spenderIndexNetworks: ['testnet4'],
+    });
+    const points = [
+      outputs[0],
+      { txid: hash.toUpperCase(), vout: 0 },
+      { txid: hash, vout: 1 },
+      { txid: hash, vout: 2 },
+    ];
+    expect(await (await f.rpc('gettxspendingprevout', [points, options], 'core')).json()).toEqual({
+      result: [
+        { txid: hash, vout: 0, spendingtxid: otherHash, blockhash: 'c'.repeat(64) },
+        { txid: hash, vout: 1, spendingtxid: 'd'.repeat(64) },
+        { txid: hash, vout: 2 },
+      ],
+    });
+    expect(f.coreCalls[1].params).toEqual([[outputs[0], points[2], points[3]], options]);
+    // No server result cache: the next action asks Core again.
+    await f.rpc('gettxspendingprevout', [outputs, options], 'core');
+    expect(f.coreCalls.filter((call) => call.method === 'gettxspendingprevout')).toHaveLength(2);
+    expect(f.electrumCalls).toEqual([]);
+  });
+  it('supports the maximum batch within the HTTP body bound', async () => {
+    const f = await fixture({
+      env: enabled,
+      core: (rpc, response) => {
+        if (rpc.method !== 'gettxspendingprevout') return false;
+        response.end(JSON.stringify({ id: rpc.id, result: rpc.params[0] }));
+        return true;
+      },
+    });
+    const points = Array.from({ length: 500 }, (_, vout) => ({ txid: hash, vout }));
+    expect((await f.rpc('gettxspendingprevout', [points, options], 'core')).status).toBe(200);
+  });
+  it('normalizes accepted response hashes and correlates spender block observations without casing differences', async () => {
+    const points = [outputs[0], { txid: hash, vout: 1 }];
+    const f = await fixture({
+      env: enabled,
+      core: (rpc, response) => {
+        if (rpc.method !== 'gettxspendingprevout') return false;
+        response.end(
+          JSON.stringify({
+            id: rpc.id,
+            result: [
+              {
+                txid: hash.toUpperCase(),
+                vout: 0,
+                spendingtxid: otherHash.toUpperCase(),
+                blockhash: 'C'.repeat(64),
+              },
+              { txid: hash, vout: 1, spendingtxid: otherHash, blockhash: 'c'.repeat(64) },
+            ],
+          }),
+        );
+        return true;
+      },
+    });
+    const response = await f.rpc('gettxspendingprevout', [points, options], 'core');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      result: points.map((point) => ({
+        ...point,
+        spendingtxid: otherHash,
+        blockhash: 'c'.repeat(64),
+      })),
+    });
+  });
+  it.each([
+    ['c'.repeat(64), 'd'.repeat(64)],
+    [undefined, 'c'.repeat(64)],
+    ['c'.repeat(64), undefined],
+  ])(
+    'rejects conflicting block observations for the same spender and cools down: %j',
+    async (first, second) => {
+      const points = [outputs[0], { txid: hash, vout: 1 }];
+      const f = await fixture({
+        env: enabled,
+        core: (rpc, response) => {
+          if (rpc.method !== 'gettxspendingprevout') return false;
+          response.end(
+            JSON.stringify({
+              id: rpc.id,
+              result: [
+                { ...points[0], spendingtxid: otherHash.toUpperCase(), blockhash: first },
+                { ...points[1], spendingtxid: otherHash, blockhash: second },
+              ],
+            }),
+          );
+          return true;
+        },
+      });
+      const response = await f.rpc('gettxspendingprevout', [points, options], 'core');
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: 'Bitcoin RPC spender lookup is unavailable; retry later',
+        code: 'core_spender_unavailable',
+      });
+      const before = f.coreCalls.length;
+      expect((await f.rpc('gettxspendingprevout', [points, options], 'core')).status).toBe(503);
+      expect(f.coreCalls).toHaveLength(before);
+    },
+  );
+  it.each([-1, -32601, -32602, -8])(
+    'sanitizes index/readiness or old-Core error %s and allows recovery after cooldown',
+    async (code) => {
+      let failed = true;
+      const f = await fixture({
+        env: enabled,
+        core: (rpc, response) => {
+          if (rpc.method !== 'gettxspendingprevout') return false;
+          response.end(
+            JSON.stringify({
+              id: rpc.id,
+              ...(failed
+                ? { error: { code, message: 'private upstream detail must not escape' } }
+                : { result: outputs }),
+            }),
+          );
+          return true;
+        },
+      });
+      const response = await f.rpc('gettxspendingprevout', [outputs, options], 'core');
+      expect(response.status).toBe(503);
+      const body = await response.json();
+      expect(body).toMatchObject({ code: 'core_spender_unavailable' });
+      expect(JSON.stringify(body)).not.toContain('private');
+      failed = false;
+      const before = f.coreCalls.length;
+      expect((await f.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(503);
+      expect(f.coreCalls).toHaveLength(before);
+      const now = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 30_001);
+      try {
+        expect((await f.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(200);
+      } finally {
+        clock.mockRestore();
+      }
+    },
+  );
+  it.each([
+    null,
+    {},
+    [],
+    [{ txid: hash, vout: 1 }],
+    [
+      { txid: hash, vout: 0 },
+      { txid: hash, vout: 0 },
+    ],
+    [{ txid: hash, vout: 0, spendingtxid: 'bad' }],
+    [{ txid: hash, vout: 0, blockhash: otherHash }],
+    [{ txid: hash, vout: 0, spendingtx: '00' }],
+  ])('rejects malformed or partial coverage and cools down: %j', async (result) => {
+    const f = await fixture({
+      env: enabled,
+      core: (rpc, response) => {
+        if (rpc.method !== 'gettxspendingprevout') return false;
+        response.end(JSON.stringify({ id: rpc.id, result }));
+        return true;
+      },
+    });
+    expect((await f.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(503);
+    const before = f.coreCalls.length;
+    expect((await f.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(503);
+    expect(f.coreCalls).toHaveLength(before);
+  });
+  it('cools down timeouts and preserves the network boundary', async () => {
+    const f = await fixture({
+      env: { ...enabled, UPSTREAM_REQUEST_TIMEOUT_MS: '30' },
+      core: (rpc) => rpc.method === 'gettxspendingprevout',
+    });
+    expect((await f.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(503);
+    const before = f.coreCalls.length;
+    expect((await f.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(503);
+    expect(f.coreCalls).toHaveLength(before);
+    const mismatch = await fixture({ env: enabled, chain: 'main' });
+    expect((await mismatch.rpc('gettxspendingprevout', [outputs, options], 'core')).status).toBe(
+      503,
+    );
+    expect(mismatch.coreCalls.map((call) => call.method)).toEqual(['getblockchaininfo']);
+  });
+  it('does not cool down a caller-cancelled lookup', async () => {
+    const controller = new AbortController();
+    let cancel = true;
+    const f = await fixture({
+      env: enabled,
+      core: (rpc, response) => {
+        if (rpc.method !== 'gettxspendingprevout') return false;
+        if (cancel) controller.abort();
+        else response.end(JSON.stringify({ id: rpc.id, result: outputs }));
+        return true;
+      },
+    });
+    const registry = new NetworkRegistry(loadConfig({}, { testnet4: f.config }));
+    cleanups.push(() => registry.close());
+    const pair = registry.get('testnet4');
+    await expect(pair.spendingPrevouts([outputs, options], controller.signal)).rejects.toThrow();
+    cancel = false;
+    await expect(
+      pair.spendingPrevouts([outputs, options], new AbortController().signal),
+    ).resolves.toEqual(outputs);
+    expect(f.coreCalls.filter((call) => call.method === 'gettxspendingprevout')).toHaveLength(2);
   });
 });

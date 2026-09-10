@@ -63,7 +63,58 @@ Account-level public keys stay in the browser. The derivation module accepts sup
 
 Scan orchestration is client-side. It queries addresses in bounded batches, stops using configured gap/index bounds, limits concurrent requests, and reuses workspace transactions where appropriate. The existing client snapshot therefore acts as the hint for avoiding unnecessary downloads. Skipped eligible transactions are retained as a client-side continuation queue; subsequent scans prioritize that queue and missing transactions. The backend remains unaware of complete wallets and does not retain scan progress or chain results. In-flight requests and connection state are operational state, not an application index.
 
-Transaction loading requests Bitcoin Core `getrawtransaction` verbosity 2, then falls back to Fulcrum when Core cannot find or serve the transaction. A sanitized `core_prevout_unavailable` response permits one narrower Core verbosity-1 retry when Core reports an internal block/undo read failure; unrelated Core errors do not trigger that extra request. Coinbase, mempool, and pruned observations can validly arrive without `prevout`. Spending discovery queries output-script histories (hashing raw scripts, with address fallback) and checks candidate transaction inputs; it cannot establish completeness when an output has no usable script or address or a history/candidate limit is reached. The optional activity monitor polls wallet/address histories every 30 seconds while unlocked. The first implementation polls status over HTTP and does not use Electrum subscriptions or a browser WebSocket feed.
+Transaction loading requests Bitcoin Core `getrawtransaction` verbosity 2, then falls back to Fulcrum when Core cannot find or serve the transaction. A sanitized `core_prevout_unavailable` response permits one narrower Core verbosity-1 retry when Core reports an internal block/undo read failure; unrelated Core errors do not trigger that extra request. Coinbase, mempool, and pruned observations can validly arrive without `prevout`. Default spending discovery queries output-script histories (hashing raw scripts, with address fallback) and checks candidate transaction inputs; it cannot establish completeness when an output has no usable script or address or a history/candidate limit is reached. The optional activity monitor polls wallet/address histories every 30 seconds while unlocked. The first implementation polls status over HTTP and does not use Electrum subscriptions or a browser WebSocket feed.
+
+### Optional exact-output spender lookup
+
+`CHAINGRAPH_USE_TXOSPENDERINDEX` defaults to false in each isolated network file.
+`/api/networks` optionally advertises `spenderIndexNetworks`, describing configured
+application use rather than index readiness. The browser captures this capability
+at network discovery; configuration changes require backend restart and browser
+reload. The server gates `gettxspendingprevout` before upstream access and allows
+only `[outpoints, {mempool_only:false, return_spending_tx:false}]`. Batches are
+strictly bounded to 500 outpoints, deduplicated and validated against complete,
+correlated reply rows. Opted-in servers use a 64 KiB body limit; default servers
+retain 16 KiB. No `getindexinfo` polling or raw-spender decoder is added.
+
+Each pair retains only a 30-second operational failure cooldown, never spender
+results. Unsupported methods/options, absent or syncing indexes, invalid replies
+and upstream failures produce sanitized unavailable responses. A later explicit
+action retries after expiry; caller cancellation does not disable the capability.
+The direct RPC's explicit coverage requirement avoids silent mempool-only empties.
+An all-mempool answer does not independently certify index readiness.
+
+The browser's shared `fetchIndexedSpenders` validates exact outpoint correspondence,
+deduplicates spending IDs, reuses loaded transaction bytes, and validates candidate
+IDs, network-compatible addresses/scripts and requested input links. Confirmed
+block hints flow through `fetchTransaction`, allowing retrieval without `txindex`;
+`in_active_chain=false` becomes an outside-active-chain observation. Local confirmed
+bytes require a fresh header observation, never cached active-chain status.
+No lookup result or negative-spender cache persists between actions. Existing
+competing exact spends remain saved observations rather than being erased.
+
+`loadSpending` first uses this helper when opted in, then uses bounded Electrum history for incomplete lookups. Fallback always uses
+the complete selected script set, and continuation pages skip the index so a
+capability recovery cannot shift the candidate list addressed by an offset. At most 250 distinct direct
+spender candidates reserve fallback capacity within its 500-candidate action
+budget and four-way concurrency. Larger than 500-output selections retain history
+search. Complete empty direct rows skip history, but cannot establish UTXO status;
+failed history/candidate reads and unresolved known spenders remain partial.
+History pagination retains explicit continuation and can change with upstream
+history between actions. The browser continuation also carries known unavailable spender IDs until
+validated by a later page; finishing history cannot silently clear that failure.
+A failed fallback history or transaction read withholds continuation so retries
+cannot skip failed bytes or advance an offset into an incomplete history union.
+It is not a pinned chain snapshot.
+
+Graph hover expansion, Inspector and TransactionView share the existing App
+expansion/merge path. TransactionView cached navigation stays local. Retained
+`searchTraceSpenders` also uses the helper while preserving its 12-candidate budget
+and separate UTXO observation fallback; Trace UI remains disabled. Wallet loaded
+spender indexes and relationships consume the merged exact inputs, with no new
+wallet scan. Address discovery and activity remain Electrum based. Forward spender
+discovery is independent from backward prevout enrichment. See [verified Core 31
+research and limitations](research/core-31-spender-index.md).
 
 ## Graph semantics
 
@@ -589,10 +640,13 @@ retains four. Per-network backend concurrency defaults to 16 for both Core and
 Fulcrum, with 256 pending requests per transport; explicit configuration overrides
 still apply.
 
-`fetchTransaction` accepts optional `TransactionFetchHints` after `historyHeight`.
-Identity includes the unlocked session token, network, normalized transaction ID,
-exact history height and observation token. Wallet/address scans create a new
-observation token on every invocation. Refresh cannot join an earlier navigation
+`fetchTransaction` accepts optional `TransactionFetchHints` after `historyHeight`,
+then an optional containing-block hash. Identity includes the unlocked session
+token, network, normalized transaction ID, exact history height, block hint and
+observation token. Wallet/address scans and explicit spender actions create a new
+observation token on every invocation by default. A spender action carries the
+same token, session scope and background priority through indexed transaction
+loading and history fallback. Refresh cannot join an earlier navigation
 or refresh observation. There is no resolved transaction cache or TTL. Callers
 reuse loaded facts before requesting; each fetched consumer receives a deep copy.
 
@@ -605,7 +659,11 @@ the existing bounded immutable block-coordinate cache remains unchanged.
 
 Each `WorkspaceSessionStore` session owns a transient fetch scope. Successful lock
 closes it synchronously before removing the session, rejecting its consumers and
-clearing scoped jobs. A reopened workspace gets a different token. React callbacks
+clearing scoped jobs. Its lifecycle AbortSignal also cancels spender-index RPCs,
+history discovery and fresh header checks for reused spender bytes, which do not
+acquire transaction scheduler slots. These bounded leaf requests combine caller
+and session cancellation, and reject mismatched or closed scopes before network
+access. A reopened workspace gets a different token. React callbacks
 capture their token; existing cancellation and selection/source guards govern all
 workspace mutations. The scheduler itself never adds graph branches or annotations.
 Unscoped library callers use a standalone scope; every currently mounted workspace
