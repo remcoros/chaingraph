@@ -621,6 +621,13 @@ add speculative prefetch. Existing explicit previous-depth navigation retains it
 own traversal budget. The popover can cancel the current statusbar action through
 its existing owner, never indiscriminately abort other consumers.
 
+The popup separates current loads into Task / Loading / Waiting columns. It shows
+the actual current action beside its Cancel button; recent outcomes are collapsed
+by default, with failures and a short recovery hint visible without expansion.
+Zero outcome counts and scheduler implementation notes are omitted from normal UI.
+Clearing recent results preserves current work and retains keyboard focus inside
+the dialog. The footer is quiet while idle and only shows nonzero request counts.
+
 Notifications coalesce at 80 ms. Only the small indicator subscribes while closed;
 detailed rows subscribe when opened. Activity never enters workspace state or
 storage. Parsing and per-consumer cloning remain synchronous and no end-to-end

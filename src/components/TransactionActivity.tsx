@@ -1,59 +1,128 @@
 import { memo, useRef, useState, useSyncExternalStore } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, ChevronDown } from 'lucide-react';
 import { AnchoredPopover } from './AnchoredPopover';
 import type { TransactionFetchScope, FetchKind } from '../lib/transactionScheduler';
 import './transaction-activity.css';
 
 const labels: Record<FetchKind, string> = {
-  transaction: 'Loading transactions',
-  inputs: 'Loading input details',
+  transaction: 'Transactions',
+  inputs: 'Input details',
   refresh: 'Wallet / address refresh',
-  spending: 'Checking spending transactions',
+  spending: 'Spending search',
 };
-function ActivityDetails({ scope }: { scope: TransactionFetchScope }) {
+function ActivityDetails({
+  scope,
+  operation,
+  onCancel,
+}: {
+  scope: TransactionFetchScope;
+  operation?: string;
+  onCancel: () => void;
+}) {
   const rows = useSyncExternalStore(scope.subscribe, scope.getSnapshot);
-  const failed = rows.some((row) => row.failed > 0);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const current = rows.filter((row) => row.active + row.queued > 0);
+  const recent = rows.filter((row) => row.done + row.failed + row.cancelled > 0);
+  const failed = rows.reduce((count, row) => count + row.failed, 0);
+  const multipleNetworks = new Set(rows.map((row) => row.network)).size > 1;
   return (
     <>
-      <p>
-        Transaction fetching only. History discovery, UTXO checks, analysis and encryption are not
-        counted.
-      </p>
-      {rows.length ? (
-        <ul className="transaction-activity-list">
-          {rows.map((row) => (
-            <li key={`${row.network}:${row.kind}`}>
-              <strong>{labels[row.kind]}</strong>
-              <small>{row.network}</small>
-              <span>
-                {row.active} active · {row.queued} queued
-              </span>
-              <span>
-                {row.done} done · {row.failed} failed · {row.cancelled} cancelled
-              </span>
-            </li>
-          ))}
-        </ul>
+      {operation && (
+        <div className="transaction-activity-action">
+          <span>{operation}</span>
+          <button type="button" aria-label="Cancel current action" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {current.length ? (
+        <table className="transaction-activity-current" aria-label="Current transaction loads">
+          <thead>
+            <tr>
+              <th scope="col">Task</th>
+              <th scope="col">Loading</th>
+              <th scope="col">Waiting</th>
+            </tr>
+          </thead>
+          <tbody>
+            {current.map((row) => (
+              <tr key={`${row.network}:${row.kind}`}>
+                <th scope="row">
+                  {labels[row.kind]}
+                  {multipleNetworks && <small>{row.network}</small>}
+                </th>
+                <td>{row.active}</td>
+                <td>{row.queued}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : (
-        <p>No transaction fetch activity in this session.</p>
+        <p className="transaction-activity-empty">No transactions loading.</p>
       )}
-      <p>
-        Up to 6 active requests, with room for navigation. Shared requests count once. Recent
-        results cover the last 30 requests.
-      </p>
-      {failed && (
-        <p role="status">
-          Some transactions could not load. Check the connection, then retry from the original view.
-          A failure is not an empty result.
-        </p>
+      <div role="status" aria-atomic="true" className="transaction-activity-failure">
+        {failed > 0 && (
+          <>
+            <strong>
+              {failed} {failed === 1 ? 'load failed' : 'loads failed'}
+            </strong>
+            <span>Retry from the original view.</span>
+          </>
+        )}
+      </div>
+      {recent.length > 0 && (
+        <div className="transaction-activity-recent">
+          <button
+            type="button"
+            className="transaction-activity-disclosure"
+            aria-expanded={recentOpen}
+            aria-controls="transaction-activity-recent"
+            onClick={() => setRecentOpen((value) => !value)}
+          >
+            <ChevronDown size={13} aria-hidden="true" />
+            Recent results
+          </button>
+          {recentOpen && (
+            <div id="transaction-activity-recent">
+              <ul className="transaction-activity-results">
+                {recent.map((row) => (
+                  <li key={`${row.network}:${row.kind}`}>
+                    <span>
+                      {labels[row.kind]}
+                      {multipleNetworks && <small>{row.network}</small>}
+                    </span>
+                    <span className="transaction-activity-outcomes">
+                      {row.done > 0 && <span>{row.done} loaded</span>}
+                      {row.failed > 0 && (
+                        <span className="transaction-activity-error">{row.failed} failed</span>
+                      )}
+                      {row.cancelled > 0 && <span>{row.cancelled} cancelled</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="transaction-activity-history-footer">
+                <span>Last 30 results</span>
+                <button
+                  type="button"
+                  aria-label="Clear recent results"
+                  onClick={(event) => {
+                    // The history controls disappear after clearing; retain focus in the dialog.
+                    event.currentTarget
+                      .closest('[role="dialog"]')
+                      ?.querySelector<HTMLButtonElement>('button')
+                      ?.focus();
+                    scope.clearRecent();
+                    setRecentOpen(false);
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
-      <button
-        type="button"
-        onClick={scope.clearRecent}
-        disabled={!rows.some((r) => r.done + r.failed + r.cancelled)}
-      >
-        Clear recent results
-      </button>
     </>
   );
 }
@@ -67,9 +136,12 @@ export const TransactionActivity = memo(function TransactionActivity({
   onCancel: () => void;
 }) {
   const summary = useSyncExternalStore(scope.subscribe, scope.getSummary);
-  const [active, queued] = summary.split(':');
+  const [active, queued] = summary.split(':').map(Number);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const counts = [active > 0 ? `${active} loading` : '', queued > 0 ? `${queued} waiting` : '']
+    .filter(Boolean)
+    .join(' · ');
   return (
     <>
       <button
@@ -81,10 +153,8 @@ export const TransactionActivity = memo(function TransactionActivity({
         aria-controls={open ? 'transaction-activity' : undefined}
         onClick={() => setOpen((value) => !value)}
       >
-        <Activity size={13} /> Activity{' '}
-        <span>
-          {active} active · {queued} queued
-        </span>
+        <Activity size={13} aria-hidden="true" /> Activity
+        {(counts || operation) && <span>{counts || 'Working'}</span>}
       </button>
       {open && trigger.current && (
         <AnchoredPopover
@@ -95,18 +165,7 @@ export const TransactionActivity = memo(function TransactionActivity({
           className="transaction-activity"
           onClose={() => setOpen(false)}
         >
-          <ActivityDetails scope={scope} />
-          {operation && (
-            <div className="transaction-activity-cancel">
-              <button type="button" onClick={onCancel}>
-                Cancel current action
-              </button>
-              <p>
-                Cancels the action shown in the statusbar. Other views can still need a shared
-                request. Completed work is retained.
-              </p>
-            </div>
-          )}
+          <ActivityDetails scope={scope} operation={operation} onCancel={onCancel} />
         </AnchoredPopover>
       )}
     </>

@@ -70,6 +70,9 @@ stores the password; reopen a saved workspace to unlock it. The header **Export 
 button saves an encrypted workspace backup; **Export BIP329 labels · plaintext**
 in the workspace menu saves unencrypted labels.
 
+**Activity** in the footer shows current transaction loads and waiting requests.
+Expand **Recent results** for outcomes; **Cancel** stops the named current action.
+
 ## Current boundaries
 
 - Wallet import accepts account-level public keys at depth 3: `xpub`/`ypub`/`zpub` on mainnet and `tpub`/`upub`/`vpub` on testnet4. Supported single-key scripts are legacy P2PKH, nested SegWit, native SegWit, and BIP86 Taproot. Descriptors, multisig, private keys, signing, and spending are unsupported.

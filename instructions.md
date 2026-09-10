@@ -266,6 +266,17 @@ Saved workspace contents use authenticated encryption. The browser storage entry
 
 **BIP329 label exchange is different from workspace export.** Label files are plaintext JSON Lines. They can include address/output/transaction references, labels, and wallet extended public keys. They do not preserve the complete workspace, notes, bookmarks, graph settings, or analysis results. Only share them intentionally. Unsupported label record types and records that omit the label field are skipped during import, leaving existing values unchanged; an explicit empty label clears the existing label. Records with malformed references are rejected with their line numbers.
 
+## Check loading progress
+
+Open **Activity** in the footer to see which transaction loads are running or waiting.
+The current action appears beside **Cancel**. Failed loads remain visible; retry them
+from the view where you started them. Expand **Recent results** to inspect the last
+30 outcomes. **Clear** removes those results without stopping active work.
+
+The counters cover transaction loading. Address-history checks, UTXO queries,
+Analysis and encryption are not included. Cancelling an action leaves requests
+needed by other views running.
+
 ## Understand freshness and limits
 
 Enable **Check activity every 30s** to rescan wallets and watched addresses while this workspace is unlocked. This is browser-driven polling, and configured bounds still apply. The connection indicator is also polled. It reports backend/upstream status and height, not continuous synchronization of every loaded transaction. Saved confirmation counts can be stale, and historical records are not automatically rebuilt after a reorganization. Reload a transaction when its current state matters.

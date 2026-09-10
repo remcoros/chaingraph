@@ -2791,7 +2791,7 @@ export default function App() {
               <TransactionActivity
                 key={w.id}
                 scope={fetchScope}
-                operation={operation ? 'Current action' : undefined}
+                operation={operation || undefined}
                 onCancel={() => operationRef.current?.abort()}
               />
             )}
