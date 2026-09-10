@@ -59,6 +59,11 @@ packaging workflows do not apply here.
 - `npm run build` checks types and builds; `npm test` runs domain/backend tests;
   `npm run test:e2e` runs browser journeys. Match checks to the change and current
   user instructions. Documentation-only edits do not need an application test suite.
+- Agents normally run focused checks, not full end-to-end/browser suites. Run a full
+  browser suite only when explicitly requested or included in an agreed release/QA
+  pass. A targeted browser regression or small visual check is appropriate when it
+  verifies the change; avoid repeating broad checks during iteration. This default
+  does not prohibit `npm test`, and later user instructions can expand validation.
 - Test complex domain/security logic and end-to-end user workflows; avoid tests that
   merely repeat implementation. Exercise real services read-only when available.
 - State exactly what was validated. A build or mocked RPC test is not live validation.
