@@ -38,6 +38,15 @@ Open **http://127.0.0.1:3001**. The development launcher reads the configured ba
 
 The backend discovers `.env.mainnet` and `.env.testnet4` in the working directory, or in `CHAINGRAPH_NETWORK_CONFIG_DIR` when set. At least one valid file is required. Each file is parsed independently, and its filename selects its network; upstream credentials are never merged into the process environment. `.env` and `.env.live` are not loaded. `dev:live` and `start:live` are aliases for the same discovery-based launchers. RPC accepts either a user/password pair or a cookie file, as shown in [.env.example](.env.example).
 
+Optional exact-output spending acceleration is **off by default**. Set
+`CHAINGRAPH_USE_TXOSPENDERINDEX=true` in the relevant isolated network file only
+when you want Chaingraph to use an already configured Bitcoin Core 31+
+`txospenderindex`. This does not configure Core. Restart the backend and reload
+the browser after changing the option. Missing, syncing or unsupported indexes
+use bounded Electrum history fallback, with a short retry cooldown. Electrum
+still handles address and wallet discovery. A missing spender does not prove an
+output is unspent. See [configuration and limits](docs/deployment.md#optional-exact-output-spender-lookup).
+
 The frontend discovers configured networks before creating a workspace and routes every lookup through that workspace’s network. A disconnected upstream does not remove its configured network or disable another pair. Importing or unlocking a workspace for an unconfigured network still opens its saved data for offline inspection and editing. A clear backend-network error explains why live queries are disabled.
 
 To serve the built application from one local origin:

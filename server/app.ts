@@ -79,7 +79,11 @@ export function createApp(
     }
     next();
   });
-  app.use('/api', express.json({ limit: '16kb', strict: true }));
+  // A 500-outpoint request fits within 64 KiB. RPC schemas still bound every method.
+  app.use(
+    '/api',
+    express.json({ limit: networks.spenderIndexNetworks().length ? '64kb' : '16kb', strict: true }),
+  );
   const requestSignal = (res: express.Response, statusNetwork?: string) => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -100,7 +104,13 @@ export function createApp(
     return controller.signal;
   };
   // Discovery is independent of health: an unavailable pair cannot hide another.
-  app.get('/api/networks', (_req, res) => res.json({ networks: networks.configured() }));
+  app.get('/api/networks', (_req, res) => {
+    const spenderIndexNetworks = networks.spenderIndexNetworks();
+    res.json({
+      networks: networks.configured(),
+      ...(spenderIndexNetworks.length ? { spenderIndexNetworks } : {}),
+    });
+  });
   app.get('/api/status', async (req, res) => {
     let pair: ReturnType<NetworkRegistry['get']>;
     try {
@@ -132,13 +142,18 @@ export function createApp(
         throw new SafeError('Content-Type must be application/json', 415);
       const { network, target, method, params } = parseRpc(req.body);
       const pair = networks.get(network);
-      const info = await pair.core.chainInfo(signal);
-      const result =
-        target === 'core'
-          ? method === 'getblockchaininfo'
-            ? info
-            : await pair.core.call(method, params, signal)
-          : await pair.electrum.call(method, params, await pair.genesis(signal), signal);
+      let result: unknown;
+      if (target === 'core' && method === 'gettxspendingprevout') {
+        result = await pair.spendingPrevouts(params, signal);
+      } else {
+        const info = await pair.core.chainInfo(signal);
+        result =
+          target === 'core'
+            ? method === 'getblockchaininfo'
+              ? info
+              : await pair.core.call(method, params, signal)
+            : await pair.electrum.call(method, params, await pair.genesis(signal), signal);
+      }
       if (!res.headersSent) {
         const body = JSON.stringify({ result });
         if (

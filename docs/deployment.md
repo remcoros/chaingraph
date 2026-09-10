@@ -10,6 +10,35 @@ These files use dotenv syntax: quote values containing `#`, and keep any intenti
 
 Core and Fulcrum must both serve the file's network. Their reported chain/genesis is checked before relevant requests. `GET /api/networks` reports configured networks; `GET /api/status?network=mainnet` checks one pair. The frontend uses the workspace network on every request and shows each pair's health independently. Newly created workspaces can select only configured networks. Importing or unlocking a workspace for an unconfigured network opens its saved data for offline inspection and editing, with a clear backend-network error and disabled live queries.
 
+## Optional exact-output spender lookup
+
+`CHAINGRAPH_USE_TXOSPENDERINDEX=false` is the default in each isolated network
+file. Set it to `true` for a chosen network to use an already configured Core 31+
+`txospenderindex`. Only the literal values `true` and `false` are accepted. This
+application setting does not enable, build or change any index on Bitcoin Core.
+The Core index requires an unpruned node and time to synchronize; index storage
+and initialization remain the node operator's responsibility. Restart Chaingraph
+and reload the browser after changing its option. Enabling mainnet does not
+implicitly enable testnet4, and setting this option in the shared process
+environment does not override isolated network files.
+
+Exact spending checks explicitly require confirmed-index coverage. If Core is
+older, the index is missing/syncing, a request times out, or the reply/data cannot
+be validated, Chaingraph uses bounded Electrum history fallback. A failed direct
+RPC pauses further upstream index attempts on that network for 30 seconds; a
+later user action retries after expiry. Discovery advertises the application
+opt-in, not index health. Errors are sanitized and do not distinguish missing
+from syncing indexes using upstream exception text.
+
+An opted-in backend permits 64 KiB request bodies for batches up to 500 exact
+outpoints; the default body limit stays 16 KiB. Normal response, queue, concurrency
+and timeout settings still apply. Browser expansion uses at most 500 candidate
+transactions per action, reserving history-fallback capacity. Partial work needs
+explicit continuation. Graph expansion remains explicit, saved conflicting spends
+are retained, and a missing spender is never proof of an unspent output. Electrum
+is still required for wallet/address discovery and fallback. See [verified
+protocol research](research/core-31-spender-index.md) for reorg and coverage limits.
+
 ## Local production container
 
 Requires Docker with BuildKit and a current Docker Compose v2. From this repository, start with a dedicated configuration directory:

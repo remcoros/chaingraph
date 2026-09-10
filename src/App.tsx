@@ -336,7 +336,9 @@ export default function App() {
   const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const [scanLimit, setScanLimit] = useState(200);
   const [gap, setGap] = useState(20);
-  const spendingOffsets = useRef(new Map<string, number>());
+  const spendingOffsets = useRef(
+    new Map<string, { offset: number; unavailableTxids?: string[] }>(),
+  );
   const operationRef = useRef<AbortController | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const labelsInput = useRef<HTMLInputElement>(null);
@@ -1406,8 +1408,9 @@ export default function App() {
           w,
           outputIndex,
           signal,
-          spendingOffsets.current.get(searchKey) ?? 0,
+          spendingOffsets.current.get(searchKey)?.offset ?? 0,
           { scope: fetchScope, priority: 'background' },
+          spendingOffsets.current.get(searchKey)?.unavailableTxids,
         );
         signal.throwIfAborted();
         const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
@@ -1422,11 +1425,14 @@ export default function App() {
         )
           return;
         if ('nextOffset' in result && result.nextOffset !== undefined)
-          spendingOffsets.current.set(searchKey, result.nextOffset);
+          spendingOffsets.current.set(searchKey, {
+            offset: result.nextOffset,
+            unavailableTxids: result.unavailableTxids,
+          });
         else spendingOffsets.current.delete(searchKey);
 
         setNotice(
-          `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts could not be searched.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked history; this does not prove the output is unspent.' : ''}`,
+          `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.lookup === 'electrum-fallback' ? ' Exact lookup was incomplete; checked available script history.' : ''}${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts or transactions could not be checked.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked data; this does not prove the output is unspent.' : ''}`,
         );
       }
       // Tracing extends the investigation without taking over its camera.

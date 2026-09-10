@@ -20,7 +20,7 @@ async function listen(server: http.Server | net.Server) {
   cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
   return (server.address() as net.AddressInfo).port;
 }
-async function upstream(network: Network) {
+async function upstream(network: Network, useSpenderIndex = false) {
   const coreCalls: Rpc[] = [],
     electrumCalls: Rpc[] = [];
   const coreSockets = new Set<net.Socket>(),
@@ -31,6 +31,7 @@ async function upstream(network: Network) {
     disconnectNext: false,
     badGenesis: false,
     badChain: false,
+    spenderFailure: false,
   };
   const height = network === 'mainnet' ? 900000 : 151000;
   const core = http.createServer(async (req, res) => {
@@ -42,6 +43,15 @@ async function upstream(network: Network) {
       `Basic ${Buffer.from(`${network}:public-${network}`).toString('base64')}`,
     );
     if (state.stallCore) return;
+    if (state.spenderFailure && call.method === 'gettxspendingprevout') {
+      res.end(
+        JSON.stringify({
+          id: call.id,
+          error: { code: -1, message: 'synthetic unavailable index' },
+        }),
+      );
+      return;
+    }
     const result =
       call.method === 'getblockchaininfo'
         ? {
@@ -50,7 +60,9 @@ async function upstream(network: Network) {
           }
         : call.method === 'getblockhash'
           ? genesis[network]
-          : { network, txid: call.params[0] };
+          : call.method === 'gettxspendingprevout'
+            ? call.params[0]
+            : { network, txid: call.params[0] };
     res.end(JSON.stringify({ id: call.id, result }));
   });
   core.on('connection', (socket) => {
@@ -116,12 +128,15 @@ async function upstream(network: Network) {
     CORE_RPC_MAX_PENDING: '0',
     FULCRUM_MAX_CONCURRENCY: '1',
     FULCRUM_MAX_PENDING: '0',
+    CHAINGRAPH_USE_TXOSPENDERINDEX: String(useSpenderIndex),
   });
   return { state, config, height, coreCalls, electrumCalls, coreSockets, electrumSockets };
 }
-async function fixture(onlyMainnet = false) {
-  const mainnet = await upstream('mainnet');
-  const testnet4 = onlyMainnet ? undefined : await upstream('testnet4');
+async function fixture(onlyMainnet = false, spenderIndexNetworks: Network[] = []) {
+  const mainnet = await upstream('mainnet', spenderIndexNetworks.includes('mainnet'));
+  const testnet4 = onlyMainnet
+    ? undefined
+    : await upstream('testnet4', spenderIndexNetworks.includes('testnet4'));
   const config = loadConfig(
     {},
     { mainnet: mainnet.config, ...(testnet4 ? { testnet4: testnet4.config } : {}) },
@@ -153,6 +168,28 @@ async function fixture(onlyMainnet = false) {
 }
 
 describe('simultaneous network routing and isolation', () => {
+  it('isolates spender opt-in and operational cooldown by configured pair', async () => {
+    const f = await fixture(false, ['testnet4']);
+    expect(await (await fetch(`${f.base}/api/networks`)).json()).toEqual({
+      networks: ['mainnet', 'testnet4'],
+      spenderIndexNetworks: ['testnet4'],
+    });
+    const params = [
+      [{ txid: queryHash, vout: 0 }],
+      { mempool_only: false, return_spending_tx: false },
+    ];
+    expect((await f.rpc('mainnet', 'core', 'gettxspendingprevout', params)).status).toBe(503);
+    expect(f.mainnet.coreCalls).toHaveLength(0);
+    expect((await f.rpc('testnet4', 'core', 'gettxspendingprevout', params)).status).toBe(200);
+    const both = await fixture(false, ['mainnet', 'testnet4']);
+    both.mainnet.state.spenderFailure = true;
+    expect((await both.rpc('mainnet', 'core', 'gettxspendingprevout', params)).status).toBe(503);
+    expect((await both.rpc('mainnet', 'core', 'gettxspendingprevout', params)).status).toBe(503);
+    expect(
+      both.mainnet.coreCalls.filter((call) => call.method === 'gettxspendingprevout'),
+    ).toHaveLength(1);
+    expect((await both.rpc('testnet4', 'core', 'gettxspendingprevout', params)).status).toBe(200);
+  });
   it('routes identical transaction IDs, script hashes and subscription requests to independent pairs', async () => {
     const f = await fixture();
     expect(await (await fetch(`${f.base}/api/networks`)).json()).toEqual({

@@ -59,6 +59,7 @@ test('selecting an input hydrates its previous output with prefetch off and foll
   await expect(
     page.getByRole('status').filter({ hasText: '1 spending transaction found; 0 added' }),
   ).toBeVisible();
+  expect(calls.some((c) => c.method === 'gettxspendingprevout')).toBe(false);
   await page.getByRole('button', { name: /^Spending tx:/ }).click();
   await expect(page.locator('.selection-heading .eyebrow')).toHaveText('TRANSACTION');
   await expect(
@@ -89,6 +90,35 @@ test('explicit previous-level prefetch exposes input output values without anoth
     TX_FUNDING,
   ]);
 });
+test('explicit input detail loading deduplicates parents and exposes output values', async ({
+  page,
+}) => {
+  const calls = await mockBitcoin(page);
+  await create(page);
+  await page.getByLabel('Prefetch previous levels').selectOption('0');
+  await add(page, TX_SPENDING);
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  await page
+    .locator('.transaction-view')
+    .getByRole('button', { name: 'Load missing input details (1)', exact: true })
+    .click();
+  await expect(page.locator('.statusbar')).toContainText('2 transactions');
+  expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
+    TX_SPENDING,
+    TX_FUNDING,
+  ]);
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByLabel('Entity type').selectOption('output');
+  await page.getByLabel('Filter graph entities').fill(TX_FUNDING);
+  await page.locator('.entity-row').first().click();
+  await expect(
+    page
+      .locator('.selection-facts > div')
+      .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
+      .locator('dd'),
+  ).toHaveText('100,000,000 sats');
+  await expect(page.locator('.statusbar')).toContainText('2 transactions');
+});
 test('saved incoming and outgoing paths remain navigable offline and survive locking', async ({
   page,
 }) => {
@@ -96,6 +126,7 @@ test('saved incoming and outgoing paths remain navigable offline and survive loc
   await openLaboratoryFixture(page, 'Saved path study', password);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await expect(page.locator('.entity-row')).toHaveCount(1);
   await page.locator('.entity-row').click();
   const view = page.locator('.transaction-view');
   const parent = (2000).toString(16).padStart(64, '0');
@@ -139,6 +170,7 @@ test('previously saved synthetic workspaces keep live queries disabled on a conn
   await openFixtureWorkspace(page, legacy, password);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await expect(page.locator('.entity-row')).toHaveCount(1);
   await page.locator('.entity-row').click();
   await expect(page.locator('.details')).toContainText('150 / 150');
   await page

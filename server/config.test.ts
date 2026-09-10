@@ -40,6 +40,7 @@ describe('isolated runtime network configuration', () => {
       BITCOIN_RPC_PASSWORD: 'different-password',
       CORE_RPC_MAX_CONCURRENCY: '2',
       FULCRUM_MAX_CONCURRENCY: '3',
+      CHAINGRAPH_USE_TXOSPENDERINDEX: 'true',
     };
     await writeFile(path.join(dir, '.env.mainnet'), text(main));
     await writeFile(path.join(dir, '.env.testnet4'), text(test));
@@ -48,6 +49,7 @@ describe('isolated runtime network configuration', () => {
       ...values('ignored-ambient'),
       CHAINGRAPH_NETWORK_CONFIG_DIR: dir,
       SERVER_PORT: '4321',
+      CHAINGRAPH_USE_TXOSPENDERINDEX: 'true',
     });
     expect(Object.keys(config.networks)).toEqual(['mainnet', 'testnet4']);
     expect(config.port).toBe(4321);
@@ -59,6 +61,7 @@ describe('isolated runtime network configuration', () => {
       electrumTls: true,
       coreConcurrency: 16,
       electrumConcurrency: 16,
+      useTxoSpenderIndex: false,
     });
     expect(config.networks.testnet4).toMatchObject({
       network: 'testnet4',
@@ -66,6 +69,7 @@ describe('isolated runtime network configuration', () => {
       corePassword: test.BITCOIN_RPC_PASSWORD,
       coreConcurrency: 2,
       electrumConcurrency: 3,
+      useTxoSpenderIndex: true,
     });
     expect(process.env.BITCOIN_RPC_PASSWORD).toBe(before);
     expect(Object.isFrozen(config.networks.mainnet)).toBe(true);
@@ -152,5 +156,25 @@ describe('isolated runtime network configuration', () => {
     expect(() =>
       loadNetworkConfig('mainnet', { ...values('mainnet'), BITCOIN_RPC_COOKIE_FILE: '/cookie' }),
     ).toThrow('authentication mode');
+  });
+  it('defaults spender lookup off and accepts only literal boolean configuration values', () => {
+    for (const setting of [undefined, 'false'])
+      expect(
+        loadNetworkConfig('mainnet', {
+          ...values('mainnet'),
+          CHAINGRAPH_USE_TXOSPENDERINDEX: setting,
+        }).useTxoSpenderIndex,
+      ).toBe(false);
+    expect(
+      loadNetworkConfig('mainnet', { ...values('mainnet'), CHAINGRAPH_USE_TXOSPENDERINDEX: 'true' })
+        .useTxoSpenderIndex,
+    ).toBe(true);
+    for (const setting of ['', '1', 'TRUE', 'yes'])
+      expect(() =>
+        loadNetworkConfig('mainnet', {
+          ...values('mainnet'),
+          CHAINGRAPH_USE_TXOSPENDERINDEX: setting,
+        }),
+      ).toThrow('CHAINGRAPH_USE_TXOSPENDERINDEX');
   });
 });
