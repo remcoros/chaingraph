@@ -12,6 +12,8 @@ Browser and screenshot validation require explicit user request or an agreed QA 
 Review the criteria below through source inspection and appropriate non-browser checks by default. Perform browser exercises and screenshot inspection only when authorized, in a fresh browser context and within the agreed scope.
 
 - Check keyboard access, visible focus, control labels, modal focus return, reduced motion, and narrow screens.
+- Review complete UI text in context, including conditional fragments assembled in code. Flag internal reasoning, implementation reminders, repeated caveats, blanket disclaimers, and paragraphs that mix descriptions, settings, and status. Check for awkward joins and abrupt punctuation from appended copy; propose a complete, concise rewrite that helps the user understand the state or act.
+- Prefer fixing misleading controls or state labels over adding explanatory prose. For example, an unrun scan should say "Not scanned", rather than show zero and explain why it is not a result. Preserve necessary uncertainty and consequences beside the affected result or action.
 - Exercise filters, empty results, missing funding, stale findings and disconnected state. Show the difference between loaded observations and hypotheses.
 - Keep explicit controls to restore the whole graph and navigate back from a selection. Do not silently truncate results or call an output unspent from absent graph evidence.
 - Check realistic long identifiers, labels and large transaction structures; inspect screenshots only when authorized.

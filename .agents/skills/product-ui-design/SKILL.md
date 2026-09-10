@@ -120,6 +120,10 @@ Use these as defaults, not absolute limits:
 
 ### Copy rules
 
+UI copy should help the user understand the current state or take the next action. Express state through controls and labels before adding explanatory prose. Do not turn implementation constraints, validation rules, internal reasoning, or hypothetical misunderstandings into permanent disclaimers. Keep necessary qualifications next to the result or action they affect.
+
+- When adding information, rewrite the complete text instead of appending another caveat. Read conditional fragments together as the user will encounter them; avoid joining unrelated purposes with abrupt punctuation.
+- Keep descriptions, settings, and current status separate. Fix misleading state presentation rather than explaining it away: show "Not scanned" instead of a zero count followed by a disclaimer that no scan has run.
 - Prefer labels, values, rows, columns, grouping, and state indicators over sentences.
 - Do not add a subtitle under every heading.
 - Do not add helper text just because a control can be explained.
