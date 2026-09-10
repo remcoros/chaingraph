@@ -12,6 +12,12 @@ export interface ActivityRow {
   failed: number;
   cancelled: number;
 }
+const MAX_ACTIVE_TRANSACTIONS = 12;
+const MAX_ACTIVE_PER_NETWORK = 8;
+const MAX_NON_NAVIGATION_TRANSACTIONS = 10;
+const MAX_NON_NAVIGATION_PER_NETWORK = 6;
+export const TRANSACTION_BATCH_CONCURRENCY = 6;
+
 const rank = { navigation: 0, visible: 1, background: 2 };
 const empty: readonly ActivityRow[] = [];
 const abortError = () => new DOMException('Transaction request cancelled.', 'AbortError');
@@ -221,16 +227,18 @@ export class TransactionScheduler {
     try {
       for (;;) {
         const active = [...this.jobs].filter((j) => j.state === 'active');
-        if (active.length >= 6) break;
+        if (active.length >= MAX_ACTIVE_TRANSACTIONS) break;
         const candidates = [...this.jobs]
           .filter((j) => {
             if (j.state !== 'queued') return false;
             const sameNetwork = active.filter((a) => a.network === j.network);
-            if (sameNetwork.length >= 4) return false;
+            if (sameNetwork.length >= MAX_ACTIVE_PER_NETWORK) return false;
             return (
               j.priority === 'navigation' ||
-              (active.filter((a) => a.priority !== 'navigation').length < 4 &&
-                sameNetwork.filter((a) => a.priority !== 'navigation').length < 3)
+              (active.filter((a) => a.priority !== 'navigation').length <
+                MAX_NON_NAVIGATION_TRANSACTIONS &&
+                sameNetwork.filter((a) => a.priority !== 'navigation').length <
+                  MAX_NON_NAVIGATION_PER_NETWORK)
             );
           })
           .sort(

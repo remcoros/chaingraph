@@ -39,6 +39,7 @@ describe('isolated runtime network configuration', () => {
       ...values('testnet4'),
       BITCOIN_RPC_PASSWORD: 'different-password',
       CORE_RPC_MAX_CONCURRENCY: '2',
+      FULCRUM_MAX_CONCURRENCY: '3',
     };
     await writeFile(path.join(dir, '.env.mainnet'), text(main));
     await writeFile(path.join(dir, '.env.testnet4'), text(test));
@@ -57,12 +58,14 @@ describe('isolated runtime network configuration', () => {
       electrumHost: 'mainnet-electrum.invalid',
       electrumTls: true,
       coreConcurrency: 16,
+      electrumConcurrency: 16,
     });
     expect(config.networks.testnet4).toMatchObject({
       network: 'testnet4',
       coreUser: 'testnet4-user',
       corePassword: test.BITCOIN_RPC_PASSWORD,
       coreConcurrency: 2,
+      electrumConcurrency: 3,
     });
     expect(process.env.BITCOIN_RPC_PASSWORD).toBe(before);
     expect(Object.isFrozen(config.networks.mainnet)).toBe(true);

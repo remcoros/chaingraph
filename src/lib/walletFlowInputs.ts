@@ -1,3 +1,4 @@
+import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
 import type { Network, Transaction, Workspace } from '../domain/types';
 import type { WalletReviewFlowEntry } from '../domain/walletReviewContext';
 import {
@@ -141,7 +142,7 @@ export async function loadWalletFlowInputWave(
   const unique = [...new Set(ids)]
     .filter((id) => /^[0-9a-f]{64}$/.test(id))
     .slice(0, WALLET_FLOW_INPUT_WAVE_LIMIT);
-  await mapLimit(unique, 4, async (id) => {
+  await mapLimit(unique, TRANSACTION_BATCH_CONCURRENCY, async (id) => {
     signal.throwIfAborted();
     try {
       const result = await fetch(network, id, signal);

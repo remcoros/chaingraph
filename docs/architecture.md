@@ -76,7 +76,7 @@ layout, camera state and workspace snapshots remain independent of this margin.
 
 The fundamental flow is `transaction → output → spending transaction`. Outputs persist as entities after spending. A loaded input may retain optional validated `prevout` value and script evidence from Core without fabricating or loading the complete creating transaction. The shared `indexPreviousOutputs` and `resolvePreviousOutput` contract reports `loaded`, `attached`, `missing`, or `conflict` for each canonical outpoint. Conflicts remain unknown to consumers and imported workspaces containing them are rejected. Attached evidence supplies graph placeholders, flow values, wallet script matches, filters, and analysis, but creates no transaction node or `creates` edge and does not prove that an output is currently unspent.
 
-Selecting one input still loads only its creating transaction when missing. Explicit backward navigation and Previous expansion load full parents, while the bulk flow action fetches only parents whose output details remain missing or conflicting. Requests are deduplicated within a cancellation scope, capped at 500 transactions with four concurrent requests, and cancelled on workspace or displayed-selection changes. Optional encrypted `inputContext` maps automatically fetched parents to the outputs used by the displayed flow. `buildGraph` renders those parent transactions and relevant outputs without their unrelated branches. The full observed transactions remain available for analysis and inspection; explicit parent navigation promotes the transaction to its full graph context. Context validation bounds references and requires each referenced output to exist. Optional address nodes describe destinations; they do not imply a wallet or person.
+Selecting one input still loads only its creating transaction when missing. Explicit backward navigation and Previous expansion load full parents, while the bulk flow action fetches only parents whose output details remain missing or conflicting. Requests are deduplicated within a cancellation scope, capped at 500 transactions with six concurrent requests, and cancelled on workspace or displayed-selection changes. Optional encrypted `inputContext` maps automatically fetched parents to the outputs used by the displayed flow. `buildGraph` renders those parent transactions and relevant outputs without their unrelated branches. The full observed transactions remain available for analysis and inspection; explicit parent navigation promotes the transaction to its full graph context. Context validation bounds references and requires each referenced output to exist. Optional address nodes describe destinations; they do not imply a wallet or person.
 
 The graph is derived from workspace transactions and annotations. Only active, non-stale analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
 
@@ -376,7 +376,7 @@ See [protocol and record validation](research/wallet-records.md).
 
 Flow input hydration now loads only the creating transaction of a selected
 outpoint. Selecting a transaction performs no automatic parent fan-out. The
-flow panel's explicit bulk action loads up to 500 missing parents with four
+flow panel's explicit bulk action loads up to 500 missing parents with six
 concurrent requests; progress, partial errors and continuation remain visible.
 
 Wallet address records reuse verified script claims and count matching outputs in one
@@ -575,14 +575,17 @@ nodes. No layout-strategy schema or picker remains. See the
 
 ### Frontend transaction scheduler experiment
 
-`lib/transactionScheduler.ts` coordinates existing transaction fetches. Six physical
-jobs can run globally, four per network. Non-navigation work uses at most four
-global slots and three on one network, leaving capacity for explicit navigation.
+`lib/transactionScheduler.ts` coordinates existing transaction fetches. Twelve physical
+jobs can run globally, eight per network. Non-navigation work uses at most ten
+global slots and six on one network, leaving capacity for explicit navigation.
 Queued navigation precedes visible input evidence, which precedes refresh and
 bounded source-input work. Equal-priority admissions alternate eligible networks;
 there is no preemption. The queue holds at most 128 jobs, with its last 16 places
 reserved for navigation; excess callers get a retryable error. Each job accepts at
-most 64 consumers. Existing caller wave limits still apply.
+most 64 consumers. Transaction batches use six caller workers; history discovery
+retains four. Per-network backend concurrency defaults to 16 for both Core and
+Fulcrum, with 256 pending requests per transport; explicit configuration overrides
+still apply.
 
 `fetchTransaction` accepts optional `TransactionFetchHints` after `historyHeight`.
 Identity includes the unlocked session token, network, normalized transaction ID,

@@ -58,18 +58,18 @@ describe('bounded transaction scheduler', () => {
   it('removes abandoned queued work and aborts physical work only after its last consumer leaves', async () => {
     const h = harness();
     const owner = new AbortController();
-    const pending = ['a', 'b', 'c', 'queued'].map((id) =>
+    const pending = ['a', 'b', 'c', 'd', 'e', 'f', 'queued'].map((id) =>
       h.request(id, 'background', owner.signal).catch((e: Error) => e.name),
     );
     await tick();
-    expect(h.calls).toHaveLength(3);
+    expect(h.calls).toHaveLength(6);
     owner.abort();
-    expect(await Promise.all(pending)).toEqual(Array(4).fill('AbortError'));
+    expect(await Promise.all(pending)).toEqual(Array(7).fill('AbortError'));
     expect(h.calls.every((call) => call.signal.aborted)).toBe(true);
     // Aborted but unsettled physical work still occupies slots; navigation can use the reserve.
     const navigation = h.request('selected', 'navigation');
     await tick();
-    expect(h.calls.map((call) => call.id)).toEqual(['a', 'b', 'c', 'selected']);
+    expect(h.calls.map((call) => call.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'selected']);
     h.calls.forEach((call) => call.resolve(tx));
     await navigation;
     h.scheduler.dispose(h.scope);
@@ -78,17 +78,17 @@ describe('bounded transaction scheduler', () => {
   it('admits selected navigation before queued bulk work and promotes a shared queued job', async () => {
     const h = harness();
     const owner = new AbortController();
-    const pending = ['a', 'b', 'c', 'bulk', 'selected'].map((id) =>
+    const pending = ['a', 'b', 'c', 'd', 'e', 'f', 'bulk', 'selected'].map((id) =>
       h.request(id, 'background', owner.signal).catch(() => undefined),
     );
     await tick();
     const selected = h.request('selected', 'navigation');
     await tick();
-    expect(h.calls.map((call) => call.id)).toEqual(['a', 'b', 'c', 'selected']);
-    h.calls[3].resolve(tx);
+    expect(h.calls.map((call) => call.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'selected']);
+    h.calls[6].resolve(tx);
     await selected;
     owner.abort();
-    h.calls.slice(0, 3).forEach((call) => call.resolve(tx));
+    h.calls.slice(0, 6).forEach((call) => call.resolve(tx));
     await Promise.all(pending);
     h.scheduler.dispose(h.scope);
   });
@@ -97,11 +97,11 @@ describe('bounded transaction scheduler', () => {
     const h = harness();
     const other = new TransactionFetchScope('testnet4');
     const owner = new AbortController();
-    const pending = Array.from({ length: 8 }, (_, i) =>
+    const pending = Array.from({ length: 12 }, (_, i) =>
       h.request(`m${i}`, 'navigation', owner.signal).catch(() => undefined),
     );
     pending.push(
-      ...Array.from({ length: 8 }, (_, i) =>
+      ...Array.from({ length: 12 }, (_, i) =>
         h.scheduler
           .request('testnet4', `t${i}`, h.load(`t${i}`), owner.signal, {
             scope: other,
@@ -111,11 +111,69 @@ describe('bounded transaction scheduler', () => {
       ),
     );
     await tick();
-    expect(h.calls.map((call) => call.id)).toEqual(['m0', 'm1', 'm2', 'm3', 't0', 't1']);
+    expect(h.calls.map((call) => call.id)).toEqual([
+      'm0',
+      'm1',
+      'm2',
+      'm3',
+      'm4',
+      'm5',
+      'm6',
+      'm7',
+      't0',
+      't1',
+      't2',
+      't3',
+    ]);
     h.calls[0].resolve(tx);
     h.calls[1].resolve(tx);
     await tick();
-    expect(h.calls.slice(6).map((call) => call.id)).toEqual(['m4', 't2']);
+    expect(h.calls.slice(12).map((call) => call.id)).toEqual(['m8', 't4']);
+    owner.abort();
+    h.calls.forEach((call) => call.resolve(tx));
+    await Promise.all(pending);
+    h.scheduler.dispose(h.scope);
+    h.scheduler.dispose(other);
+  });
+
+  it('reserves two global slots for navigation when both networks have background work', async () => {
+    const h = harness();
+    const other = new TransactionFetchScope('testnet4');
+    const owner = new AbortController();
+    const pending = Array.from({ length: 8 }, (_, i) =>
+      h.request(`m${i}`, 'background', owner.signal).catch(() => undefined),
+    );
+    pending.push(
+      ...Array.from({ length: 8 }, (_, i) =>
+        h.scheduler
+          .request('testnet4', `t${i}`, h.load(`t${i}`), owner.signal, {
+            scope: other,
+            priority: 'background',
+          })
+          .catch(() => undefined),
+      ),
+    );
+    await tick();
+    expect(h.calls.map((call) => call.id)).toEqual([
+      'm0',
+      'm1',
+      'm2',
+      'm3',
+      'm4',
+      'm5',
+      't0',
+      't1',
+      't2',
+      't3',
+    ]);
+    pending.push(
+      ...['selected1', 'selected2', 'queued-navigation'].map((id) =>
+        h.request(id, 'navigation', owner.signal).catch(() => undefined),
+      ),
+    );
+    await tick();
+    expect(h.calls).toHaveLength(12);
+    expect(h.calls.slice(10).map((call) => call.id)).toEqual(['selected1', 'selected2']);
     owner.abort();
     h.calls.forEach((call) => call.resolve(tx));
     await Promise.all(pending);
@@ -126,14 +184,14 @@ describe('bounded transaction scheduler', () => {
   it('bounds queue admission, reserves navigation space, and releases slots on async and sync failures', async () => {
     const h = harness();
     const owner = new AbortController();
-    const promises = Array.from({ length: 115 }, (_, i) =>
+    const promises = Array.from({ length: 118 }, (_, i) =>
       h.request(`${i}`, 'background', owner.signal).catch(() => undefined),
     );
     await tick();
     await expect(h.request('overflow')).rejects.toThrow('queue is full');
     const navigation = h.request('selected', 'navigation');
     await tick();
-    h.calls[3].reject(new Error('synthetic failure'));
+    h.calls[6].reject(new Error('synthetic failure'));
     await expect(navigation).rejects.toThrow('synthetic failure');
     const sync = h.scheduler.request(
       'mainnet',

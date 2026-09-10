@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { transactionScheduler, type TransactionFetchHints } from './transactionScheduler';
+import {
+  transactionScheduler,
+  TRANSACTION_BATCH_CONCURRENCY,
+  type TransactionFetchHints,
+} from './transactionScheduler';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
@@ -449,7 +453,7 @@ export async function scanWallet(
   }
   const toLoad = pending.slice(0, MAX_SCAN_TRANSACTIONS);
   let loaded = 0;
-  const transactions = await mapLimit(toLoad, 4, async (id) => {
+  const transactions = await mapLimit(toLoad, TRANSACTION_BATCH_CONCURRENCY, async (id) => {
     const tx = await fetchTransaction(network, id, options.signal, heights.get(id), fetchHints);
     options.onProgress?.({
       done: checked,
@@ -519,13 +523,17 @@ export async function loadAddress(
     ),
   ];
   let loaded = 0;
-  const transactions = await mapLimit(ids.slice(0, MAX_SCAN_TRANSACTIONS), 4, async (id) => {
-    onProgress?.({
-      done: loaded,
-      message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
-    });
-    return fetchTransaction(network, id, signal, heights.get(id), fetchHints);
-  });
+  const transactions = await mapLimit(
+    ids.slice(0, MAX_SCAN_TRANSACTIONS),
+    TRANSACTION_BATCH_CONCURRENCY,
+    async (id) => {
+      onProgress?.({
+        done: loaded,
+        message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
+      });
+      return fetchTransaction(network, id, signal, heights.get(id), fetchHints);
+    },
+  );
   const requested = new Set(ids);
   for (const id of allIds) {
     if (!existing[id] || requested.has(id)) continue;
@@ -548,7 +556,9 @@ export async function loadFunding(
   const ids = [...new Set(tx.vin.flatMap((i) => (i.txid && !existing[i.txid] ? [i.txid] : [])))];
   if (ids.length > 500)
     throw new Error('Funding expansion is limited to 500 transactions at a time.');
-  return mapLimit(ids, 4, (id) => fetchTransaction(network, id, signal, undefined, hints));
+  return mapLimit(ids, TRANSACTION_BATCH_CONCURRENCY, (id) =>
+    fetchTransaction(network, id, signal, undefined, hints),
+  );
 }
 export async function loadSpending(
   tx: Transaction,
@@ -581,10 +591,13 @@ export async function loadSpending(
     .sort();
   const wanted = new Set(outputs.map((o) => o.n));
   const nextOffset = offset + 500 < ids.length ? offset + 500 : undefined;
-  const candidates = await mapLimit(ids.slice(offset, offset + 500), 4, (id) =>
-    w.transactions[id]
-      ? Promise.resolve(withHistoryHeight(w.transactions[id], heights.get(id)!))
-      : fetchTransaction(w.network, id, signal, heights.get(id), hints),
+  const candidates = await mapLimit(
+    ids.slice(offset, offset + 500),
+    TRANSACTION_BATCH_CONCURRENCY,
+    (id) =>
+      w.transactions[id]
+        ? Promise.resolve(withHistoryHeight(w.transactions[id], heights.get(id)!))
+        : fetchTransaction(w.network, id, signal, heights.get(id), hints),
   );
   return {
     transactions: candidates.filter((t) =>

@@ -1,3 +1,4 @@
+import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
 import { useEffect, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
@@ -135,7 +136,7 @@ export function useFlowInputs(options: {
       const loaded: Transaction[] = [];
       let failed = 0;
       const reasons = new Set<string>();
-      await mapLimit(missing.slice(0, 500), 4, async (id) => {
+      await mapLimit(missing.slice(0, 500), TRANSACTION_BATCH_CONCURRENCY, async (id) => {
         try {
           const tx = await fetch(id, controller.signal);
           controller.signal.throwIfAborted();

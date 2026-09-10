@@ -1,3 +1,4 @@
+import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
 import type { Transaction, Workspace } from '../domain/types';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from './api';
 
@@ -47,7 +48,7 @@ export async function loadAncestors(
     truncated ||= batch.length < missing.length;
     requested += batch.length;
     let done = 0;
-    await mapLimit(batch, 4, async (id) => {
+    await mapLimit(batch, TRANSACTION_BATCH_CONCURRENCY, async (id) => {
       options.signal?.throwIfAborted();
       try {
         const tx = await options.fetch(id, options.signal);

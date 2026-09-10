@@ -99,7 +99,7 @@ export function loadNetworkConfig(network: Network, env: NodeJS.ProcessEnv): Net
     queueTimeoutMs: integer(env, 'UPSTREAM_QUEUE_TIMEOUT_MS', 30000),
     coreConcurrency: integer(env, 'CORE_RPC_MAX_CONCURRENCY', 16, 1, 256),
     corePending: integer(env, 'CORE_RPC_MAX_PENDING', 256, 0, 10000),
-    electrumConcurrency: integer(env, 'FULCRUM_MAX_CONCURRENCY', 8, 1, 256),
+    electrumConcurrency: integer(env, 'FULCRUM_MAX_CONCURRENCY', 16, 1, 256),
     electrumPending: integer(env, 'FULCRUM_MAX_PENDING', 256, 0, 10000),
     maxResponseBytes: integer(env, 'MAX_RESPONSE_BYTES', 5242880, 1024, 67108864),
     maxHistory: integer(env, 'MAX_ADDRESS_HISTORY_TXS', 1000, 1, 1000000),

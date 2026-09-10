@@ -227,7 +227,7 @@ describe('visible Wallet evidence merges', () => {
 });
 
 describe('bounded Wallet input request waves', () => {
-  it('deduplicates requests, limits each wave and never exceeds four concurrent fetches', async () => {
+  it('deduplicates requests, limits each wave and never exceeds six concurrent fetches', async () => {
     const ids = Array.from({ length: 25 }, (_, index) => index.toString(16).padStart(64, '0'));
     let active = 0;
     let maximum = 0;
@@ -246,7 +246,7 @@ describe('bounded Wallet input request waves', () => {
       new AbortController().signal,
     );
     expect(fetch).toHaveBeenCalledTimes(20);
-    expect(maximum).toBe(4);
+    expect(maximum).toBe(6);
     expect(result.loaded).toHaveLength(20);
     expect(result.failed).toEqual([]);
   });
@@ -264,11 +264,11 @@ describe('bounded Wallet input request waves', () => {
       fetch,
       controller.signal,
     );
-    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetch).toHaveBeenCalledTimes(6);
     controller.abort();
     releases.forEach((release) => release());
     await expect(wave).rejects.toMatchObject({ name: 'AbortError' });
-    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetch).toHaveBeenCalledTimes(6);
   });
 
   it('categorizes wrong identity, network mismatch and backend failures without exposing raw exceptions', async () => {
