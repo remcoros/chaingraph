@@ -349,6 +349,10 @@ carried back from the retry. `prepareScanPath` checks the selected prefix agains
 available evidence and blocks disputed edges, full conflict findings and explicitly
 out-of-chain transactions. Missing proof remains a separate recoverable state.
 
+Search changes are checked against named input/output reconvergence fixtures and
+an independent small-graph path oracle. See [scan regression checks](connection-scan-testing.md)
+for the focused command, protected contracts and coverage limits.
+
 ## Analysis extension point
 
 `analysisTools` in `src/domain/analysis.ts` is the extension point. Shared contracts and tool definitions live in `src/domain/analysis/`. A tool declares metadata, an evidence category, source reference and typed parameter descriptors. `analyze(workspace, optionalTransactionIds, options)` returns findings, scope IDs, summary, coverage statistics and a no-match explanation. `run` remains a convenience wrapper returning findings only. Pure tools make no network requests.
