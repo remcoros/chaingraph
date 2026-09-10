@@ -584,9 +584,8 @@ export default function GraphView(props: GraphViewProps) {
               {transaction && hoveredNode.kind === 'transaction' && (
                 <div>
                   <dt>Structure</dt>
-                  <dd>
-                    {transaction.vin.length} {transaction.vin.length === 1 ? 'input' : 'inputs'} ·{' '}
-                    {transaction.vout.length} {transaction.vout.length === 1 ? 'output' : 'outputs'}
+                  <dd title="Inputs / outputs">
+                    ({transaction.vin.length} / {transaction.vout.length})
                   </dd>
                 </div>
               )}

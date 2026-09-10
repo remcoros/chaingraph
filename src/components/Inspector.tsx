@@ -7,7 +7,7 @@ import { useUtxoStatus } from '../lib/useUtxoStatus';
 import './utxo-status.css';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { transactionStatus } from '../domain/transactionStatus';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -38,6 +38,7 @@ import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from './IconPicker';
 import { OpReturnData } from './OpReturnData';
 import { decodeOpReturn } from '../domain/opReturn';
+import { indexLoadedSpends } from '../domain/transactionFlow';
 import type { WalletMatch } from '../domain/tags';
 import { WalletHelp } from './WalletHelp';
 
@@ -327,6 +328,33 @@ export function NodeInspector({
   onSave,
 }: NodeInspectorProps) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const loadedSpends = useMemo(() => indexLoadedSpends(w.transactions), [w.transactions]);
+  const spendingByNode = useMemo(() => {
+    const creatingNodes = new Map(
+      graph.nodes
+        .filter((node) => node.kind === 'output' && node.txid)
+        .map((node) => [node.id, txNodeId(node.txid!)]),
+    );
+    const index = new Map<string, Set<string>>();
+    // Retain the graph's exact scope and link order for transaction-level navigation.
+    for (const link of graph.links) {
+      if (link.kind !== 'spends') continue;
+      for (const id of [link.source, creatingNodes.get(link.source)]) {
+        if (!id) continue;
+        const targets = index.get(id) ?? new Set<string>();
+        targets.add(link.target);
+        index.set(id, targets);
+      }
+    }
+    return index;
+  }, [graph]);
+  const spendingNodes = useMemo(
+    () =>
+      [...(spendingByNode.get(selected.id) ?? [])].filter(
+        (id) => id.startsWith('tx:') && !!w.transactions[id.slice(3)],
+      ),
+    [spendingByNode, selected.id, w.transactions],
+  );
   const selectedHidden = hiddenNodeIds.includes(selected.id);
   const unavailable = busy
     ? 'Wait for the current operation to finish.'
@@ -370,20 +398,6 @@ export function NodeInspector({
       : !tx
         ? 'Load the transaction that created this output before finding its spends.'
         : undefined);
-  const sources = new Set(
-    selected.kind === 'output'
-      ? [selected.id]
-      : graph.nodes
-          .filter((node) => node.kind === 'output' && node.txid === selected.txid)
-          .map((node) => node.id),
-  );
-  const spendingNodes = [
-    ...new Set(
-      graph.links
-        .filter((link) => link.kind === 'spends' && sources.has(link.source))
-        .map((link) => link.target),
-    ),
-  ].filter((id) => id.startsWith('tx:') && !!w.transactions[id.slice(3)]);
   const spendingCount = spendingNodes.length;
   const identifier = selected.id.replace(/^(tx|out|addr):/, '');
   const previousHint = !tx
@@ -754,9 +768,10 @@ export function NodeInspector({
         </details>
       )}
       <ScriptInspector
-        key={`scripts:${w.id}:${selected.id}`}
+        key={`scripts:${w.id}`}
         workspace={w}
         selected={selected}
+        loadedSpends={loadedSpends}
         canQuery={canQuery && !busy}
       />
       {(showRefresh || showRemove) && (

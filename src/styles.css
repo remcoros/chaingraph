@@ -466,17 +466,23 @@ small,
   margin-top: 3px;
 }
 .workbench-toolbar {
-  min-height: 50px;
+  position: relative;
+  z-index: 30;
+  min-height: 46px;
   flex-shrink: 0;
-  display: flex;
+  display: grid;
+  grid-template-areas: 'navigation lookup actions';
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, 720px) minmax(max-content, 1fr);
   align-items: center;
   gap: 12px;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-bottom: 1px solid var(--color-rule);
+  background: var(--color-surface);
 }
 .search-form {
   display: flex;
   align-items: center;
+  height: 34px;
   gap: 10px;
   min-width: 0;
   flex: 1;
@@ -490,22 +496,25 @@ small,
   flex-shrink: 0;
 }
 .search-form input {
+  min-width: 0;
   background: transparent;
   border: 0;
   width: 100%;
-  padding: 8px 0;
+  padding: 5px 0;
   outline-offset: 0;
   font-size: var(--text-xs);
 }
 .search-go {
   font-size: var(--text-xs);
   flex-shrink: 0;
-  margin: 3px;
+  margin: 2px;
   background: var(--color-raised);
-  padding: 5px 9px;
-  min-height: 29px;
+  padding: 3px 9px;
+  min-height: 28px;
 }
 .workspace-actions {
+  grid-area: actions;
+  justify-self: end;
   display: flex;
   gap: 5px;
   position: relative;
@@ -1649,24 +1658,31 @@ small,
 
 /* Keep lookup centered while workspace actions retain their right edge. */
 .lookup-controls {
+  grid-area: lookup;
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
-@media (min-width: 1200px) {
+@media (max-width: 1199px) {
+  .search-go > span,
+  .workbench-toolbar .export-button > span {
+    display: none;
+  }
+}
+@media (max-width: 999px) {
   .workbench-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 720px) minmax(0, 1fr);
+    grid-template-areas: 'navigation actions';
+    grid-template-columns: minmax(0, 1fr) auto;
   }
-  .lookup-controls {
-    grid-column: 2;
-    width: 100%;
+  .workbench-toolbar.mode-graph {
+    grid-template-areas:
+      'navigation actions'
+      'lookup lookup';
   }
-  .workbench-toolbar .workspace-actions {
-    grid-column: 3;
-    justify-self: end;
+  .workbench-nav {
+    flex-wrap: wrap;
   }
 }
 @media (max-width: 760px) {
@@ -1730,13 +1746,10 @@ small,
   font-size: 11px;
   text-align: right;
 }
-.transaction-summary-content .small-amount-control select {
+.transaction-flow-amounts .small-amount-control select {
   min-width: 100px;
   min-height: 32px;
   font-size: 11px;
-}
-.transaction-view .transaction-lane-header {
-  top: 38px;
 }
 .transaction-amount-recovery {
   font-size: 11px;

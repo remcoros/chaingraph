@@ -210,11 +210,11 @@ export function WalletRecordsPanel({
                     row.mempool,
                   )}
                 />
-                <span>
+                <span title={!row.utxo && row.transaction ? 'Inputs / outputs' : undefined}>
                   {row.utxo
                     ? formatSats(row.utxo.valueSats)
                     : row.transaction
-                      ? `${row.transaction.vin.length} in / ${row.transaction.vout.length} out`
+                      ? `(${row.transaction.vin.length} / ${row.transaction.vout.length})`
                       : 'Load transaction'}
                 </span>
               </span>

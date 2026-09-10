@@ -6,10 +6,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 12px;
-  border-bottom: 1px solid var(--color-rule);
-  background: var(--color-surface);
-  flex-shrink: 0;
+  min-width: 0;
+  grid-area: navigation;
 }
 .workbench-nav button {
   display: inline-flex;
@@ -25,8 +23,7 @@
   color: var(--color-accent);
   border-color: var(--color-rule);
 }
-/* The workspace actions float over the right edge away from Graph, so the return
- * control stays beside the mode buttons instead of underneath them. */
+/* Keep cross-workbench return beside the mode buttons. */
 .workbench-nav .workbench-return {
   margin-left: 8px;
   padding-left: 12px;
@@ -41,10 +38,6 @@
 .workbench-toolbar:not(.mode-graph) .lookup-controls {
   display: none;
 }
-.workbench-toolbar:not(.mode-graph) {
-  min-height: 0;
-  padding-block: 4px;
-}
 .graph-filter-status {
   flex-wrap: wrap;
   align-items: center;
@@ -56,7 +49,6 @@
 }
 @media (max-width: 600px) {
   .workbench-nav {
-    padding: 4px 6px;
     flex-wrap: wrap;
   }
   .workbench-nav button {
@@ -64,30 +56,5 @@
   }
   .workbench-nav .workbench-return {
     font-size: 11px;
-  }
-}
-/* The workspace actions share the navigation row away from Graph. */
-.workbench-toolbar:not(.mode-graph) {
-  position: absolute;
-  display: flex;
-  width: max-content;
-  max-width: calc(100% - 16px);
-  top: 49px;
-  right: 8px;
-  /* Keep workspace Undo above the sticky Wallet detail toolbar. */
-  z-index: 30;
-  background: transparent;
-  border: 0;
-  padding: 3px 0;
-}
-.workbench-nav {
-  padding-right: 175px;
-}
-@media (max-width: 760px) {
-  .workbench-nav {
-    padding-right: 46px;
-  }
-  .workbench-toolbar:not(.mode-graph) {
-    right: 5px;
   }
 }

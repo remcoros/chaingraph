@@ -1,6 +1,6 @@
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { GraphNode, Workspace } from '../domain/types';
+import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { short } from '../domain/types';
 import {
   inspectScript,
@@ -40,19 +40,43 @@ function HexField({
   );
 }
 
-export function ScriptInspector({
-  workspace,
-  selected,
-  canQuery,
-}: {
+interface ScriptInspectorProps {
   workspace: Workspace;
   selected: GraphNode;
   canQuery: boolean;
-}) {
+  loadedSpends: ReadonlyMap<string, readonly Transaction[]>;
+}
+
+export function ScriptInspector(props: ScriptInspectorProps) {
+  const { workspace, selected, loadedSpends } = props;
+  const [open, setOpen] = useState(false);
   const related = useMemo(
-    () => relatedTransactions(workspace.transactions, selected),
-    [workspace.transactions, selected.id],
+    () => relatedTransactions(workspace.transactions, selected, loadedSpends),
+    [workspace.transactions, selected.id, loadedSpends],
   );
+  if (!related.length) return null;
+  return (
+    <details
+      className="panel-section script-inspector"
+      open={open}
+      onToggle={(event) => {
+        if (event.target === event.currentTarget) setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary>Scripts and raw transaction</summary>
+      {open && <ScriptInspectorBody key={selected.id} {...props} related={related} />}
+    </details>
+  );
+}
+
+function ScriptInspectorBody({
+  workspace,
+  selected,
+  canQuery,
+  related,
+}: ScriptInspectorProps & {
+  related: ReturnType<typeof relatedTransactions>;
+}) {
   const [choice, setChoice] = useState('');
   const transaction = related.find(({ tx }) => tx.txid === choice)?.tx ?? related[0]?.tx;
   const [raw, setRaw] = useState<RawInspection>();
@@ -96,138 +120,135 @@ export function ScriptInspector({
     raw?.outputs[outputIndex]?.script ?? transaction?.vout[outputIndex]?.scriptPubKey.hex;
   const input = raw?.inputs[inputIndex];
   return (
-    <details className="panel-section script-inspector">
-      <summary>Scripts and raw transaction</summary>
-      <div className="script-inspector-body">
-        <p className="small mono" title={transaction?.txid}>
-          {related.find(({ tx }) => tx.txid === transaction?.txid)?.role} transaction:{' '}
-          {short(transaction?.txid ?? '')}
-        </p>
-        <TransactionBlockTime transaction={transaction} />
-        {related.length > 1 && (
-          <label>
-            Inspect transaction
-            <select
-              aria-label="Script transaction"
-              value={transaction?.txid}
-              onChange={(e) => setChoice(e.target.value)}
-            >
-              {related.map(({ tx, role }) => (
-                <option key={tx.txid} value={tx.txid}>
-                  {role}: {short(tx.txid)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <p className="small muted">
-          Hex is exact data. ASM is a display-only decode, not script execution or validation.
-        </p>
+    <div className="script-inspector-body">
+      <p className="small mono" title={transaction?.txid}>
+        {related.find(({ tx }) => tx.txid === transaction?.txid)?.role} transaction:{' '}
+        {short(transaction?.txid ?? '')}
+      </p>
+      <TransactionBlockTime transaction={transaction} />
+      {related.length > 1 && (
         <label>
-          Output script
+          Inspect transaction
           <select
-            aria-label="Inspect output script"
-            value={outputIndex}
-            onChange={(e) => setOutputIndex(Number(e.target.value))}
+            aria-label="Script transaction"
+            value={transaction?.txid}
+            onChange={(e) => setChoice(e.target.value)}
           >
-            {transaction?.vout.map((output) => (
-              <option key={output.n} value={output.n}>
-                Output #{output.n} · {output.scriptPubKey.type ?? 'Unknown type'}
+            {related.map(({ tx, role }) => (
+              <option key={tx.txid} value={tx.txid}>
+                {role}: {short(tx.txid)}
               </option>
             ))}
           </select>
         </label>
-        <HexField title="scriptPubKey hex" value={outputHex} decode />
-        <OpReturnData hex={outputHex} />
-        {!raw && (
-          <>
-            <button
-              type="button"
-              disabled={loading || !canQuery || workspace.demo}
-              onClick={() => void load()}
-            >
-              {loading ? 'Loading raw transaction…' : 'Load raw transaction'}
-            </button>
-            <p className="small muted">
-              {workspace.demo
-                ? 'Legacy synthetic data: raw transaction and witness data are unavailable.'
-                : !canQuery
-                  ? 'Connect to this workspace network to load raw data.'
-                  : 'Loads scriptSig, witness, version, locktime and raw hex from your node. Held only while inspecting this selection.'}
-            </p>
-          </>
-        )}
-        {error && (
-          <p role="alert" className="warning small">
-            {error}
+      )}
+      <p className="small muted">
+        Hex is exact data. ASM is a display-only decode, not script execution or validation.
+      </p>
+      <label>
+        Output script
+        <select
+          aria-label="Inspect output script"
+          value={outputIndex}
+          onChange={(e) => setOutputIndex(Number(e.target.value))}
+        >
+          {transaction?.vout.map((output) => (
+            <option key={output.n} value={output.n}>
+              Output #{output.n} · {output.scriptPubKey.type ?? 'Unknown type'}
+            </option>
+          ))}
+        </select>
+      </label>
+      <HexField title="scriptPubKey hex" value={outputHex} decode />
+      <OpReturnData hex={outputHex} />
+      {!raw && (
+        <>
+          <button
+            type="button"
+            disabled={loading || !canQuery || workspace.demo}
+            onClick={() => void load()}
+          >
+            {loading ? 'Loading raw transaction…' : 'Load raw transaction'}
+          </button>
+          <p className="small muted">
+            {workspace.demo
+              ? 'Legacy synthetic data: raw transaction and witness data are unavailable.'
+              : !canQuery
+                ? 'Connect to this workspace network to load raw data.'
+                : 'Loads scriptSig, witness, version, locktime and raw hex from your node. Held only while inspecting this selection.'}
           </p>
-        )}
-        {raw && (
-          <>
-            <dl className="details">
-              <div>
-                <dt>Version</dt>
-                <dd>{raw.version}</dd>
-              </div>
-              <div>
-                <dt>Locktime</dt>
-                <dd>{raw.locktime}</dd>
-              </div>
-              <div>
-                <dt>Size / virtual size</dt>
-                <dd>
-                  {raw.size} B / {raw.vsize} vB
-                </dd>
-              </div>
-              <div>
-                <dt>Weight</dt>
-                <dd>{raw.weight} WU</dd>
-              </div>
-            </dl>
-            <label>
-              Input script
-              <select
-                aria-label="Inspect input script"
-                value={inputIndex}
-                onChange={(e) => setInputIndex(Number(e.target.value))}
-              >
-                {transaction?.vin.map((i, index) => (
-                  <option key={index} value={index}>
-                    Input #{index}
-                    {i.coinbase !== undefined ? ' · Coinbase' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="small mono">
-              Sequence: {input?.sequence} (0x{input?.sequence.toString(16).padStart(8, '0')})
+        </>
+      )}
+      {error && (
+        <p role="alert" className="warning small">
+          {error}
+        </p>
+      )}
+      {raw && (
+        <>
+          <dl className="details">
+            <div>
+              <dt>Version</dt>
+              <dd>{raw.version}</dd>
+            </div>
+            <div>
+              <dt>Locktime</dt>
+              <dd>{raw.locktime}</dd>
+            </div>
+            <div>
+              <dt>Size / virtual size</dt>
+              <dd>
+                {raw.size} B / {raw.vsize} vB
+              </dd>
+            </div>
+            <div>
+              <dt>Weight</dt>
+              <dd>{raw.weight} WU</dd>
+            </div>
+          </dl>
+          <label>
+            Input script
+            <select
+              aria-label="Inspect input script"
+              value={inputIndex}
+              onChange={(e) => setInputIndex(Number(e.target.value))}
+            >
+              {transaction?.vin.map((i, index) => (
+                <option key={index} value={index}>
+                  Input #{index}
+                  {i.coinbase !== undefined ? ' · Coinbase' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="small mono">
+            Sequence: {input?.sequence} (0x{input?.sequence.toString(16).padStart(8, '0')})
+          </p>
+          <HexField title="scriptSig hex" value={input?.script} decode />
+          <details>
+            <summary>Witness stack ({input?.witness.length ?? 0} items)</summary>
+            <p className="small muted">
+              Witness items are stack bytes, not necessarily scripts. A matching txid does not
+              authenticate witness bytes against a block commitment.
             </p>
-            <HexField title="scriptSig hex" value={input?.script} decode />
-            <details>
-              <summary>Witness stack ({input?.witness.length ?? 0} items)</summary>
-              <p className="small muted">
-                Witness items are stack bytes, not necessarily scripts. A matching txid does not
-                authenticate witness bytes against a block commitment.
-              </p>
-              <div className="witness-items">
-                {input?.witness.slice(0, witnessLimit).map((item, index) => (
-                  <HexField key={index} title={`Witness item ${index}`} value={item} />
-                ))}
-                {(input?.witness.length ?? 0) > witnessLimit && (
-                  <button type="button" onClick={() => setWitnessLimit((limit) => limit + 20)}>
-                    Show next witness items ({witnessLimit} of {input?.witness.length} shown)
-                  </button>
-                )}
-              </div>
-            </details>
-            <details>
-              <summary>Raw transaction hex</summary>
-              <HexField title="Raw transaction hex" value={raw.hex} />
-              <HexField title="Witness transaction ID" value={raw.wtxid} />
-            </details>
-          </>
-        )}
-      </div>
-    </details>
+            <div className="witness-items">
+              {input?.witness.slice(0, witnessLimit).map((item, index) => (
+                <HexField key={index} title={`Witness item ${index}`} value={item} />
+              ))}
+              {(input?.witness.length ?? 0) > witnessLimit && (
+                <button type="button" onClick={() => setWitnessLimit((limit) => limit + 20)}>
+                  Show next witness items ({witnessLimit} of {input?.witness.length} shown)
+                </button>
+              )}
+            </div>
+          </details>
+          <details>
+            <summary>Raw transaction hex</summary>
+            <HexField title="Raw transaction hex" value={raw.hex} />
+            <HexField title="Witness transaction ID" value={raw.wtxid} />
+          </details>
+        </>
+      )}
+    </div>
   );
 }

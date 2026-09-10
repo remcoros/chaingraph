@@ -25,6 +25,7 @@ export function inspectScript(hex: string | undefined): {
 export function relatedTransactions(
   transactions: Record<string, Transaction>,
   selected: GraphNode,
+  loadedSpends?: ReadonlyMap<string, readonly Transaction[]>,
 ): { tx: Transaction; role: 'Selected' | 'Creating' | 'Spending' | 'Related' }[] {
   if (selected.kind === 'transaction') {
     const tx = transactions[selected.txid ?? ''];
@@ -34,6 +35,11 @@ export function relatedTransactions(
   if (selected.kind === 'output') {
     const creating = transactions[selected.txid ?? ''];
     if (creating) result.push({ tx: creating, role: 'Creating' });
+    if (loadedSpends) {
+      for (const tx of loadedSpends.get(outputNodeId(selected.txid ?? '', selected.vout!)) ?? [])
+        result.push({ tx, role: 'Spending' });
+      return result;
+    }
     for (const tx of Object.values(transactions)) {
       if (tx.vin.some((input) => input.txid === selected.txid && input.vout === selected.vout))
         result.push({ tx, role: 'Spending' });

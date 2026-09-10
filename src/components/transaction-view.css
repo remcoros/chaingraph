@@ -46,22 +46,19 @@
   padding: 0 8px 7px;
 }
 .transaction-flow {
+  --transaction-flow-gap: 20px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(136px, 19%, 184px) minmax(0, 1fr);
-  grid-template-areas: 'previous identity next' 'inputs identity outputs';
-  column-gap: 20px;
+  grid-template-areas: 'inputs identity outputs';
+  column-gap: var(--transaction-flow-gap);
   align-items: start;
 }
-.transaction-flow-previous {
-  grid-area: previous;
-}
-.transaction-flow-next {
-  grid-area: next;
-}
 .transaction-flow-inputs {
+  --transaction-connector-cover-offset: var(--transaction-flow-gap);
   grid-area: inputs;
 }
 .transaction-flow-outputs {
+  --transaction-connector-cover-offset: calc(-1 * var(--transaction-flow-gap));
   grid-area: outputs;
 }
 .transaction-flow-hint {
@@ -127,13 +124,28 @@
 }
 /* The transaction is the junction. Selection occupies the complete card face;
    annotation controls are sibling buttons, so keyboard and pointer actions agree. */
-.transaction-view-identity {
+.transaction-flow-center {
   grid-area: identity;
   position: sticky;
-  top: 66px;
+  top: var(--transaction-center-top, 76px);
   align-self: start;
   min-width: 0;
   margin-top: 38px;
+  display: grid;
+  gap: 8px;
+}
+.transaction-flow-amounts {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+.transaction-flow-amounts .small-amount-control {
+  min-width: 0;
+  max-width: 100%;
+}
+.transaction-view-identity {
+  position: relative;
+  min-width: 0;
   border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-rule));
   border-radius: 9px;
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper));
@@ -221,13 +233,21 @@
 }
 .transaction-flow section {
   min-width: 0;
-  /* Keep both sticky lane headers inside the same full-height grid row. */
+  /* Give sticky headings and shorter lists the full opposite lane to travel in. */
   align-self: stretch;
 }
-.transaction-lane-header {
+.transaction-lane-context {
   position: sticky;
-  top: 29px;
+  top: var(--transaction-lane-top, 38px);
   z-index: 1;
+  display: grid;
+  max-height: var(--transaction-context-max-height);
+  overflow: auto;
+  gap: 4px;
+  margin-bottom: 4px;
+  background: var(--color-paper);
+}
+.transaction-lane-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -237,7 +257,6 @@
   padding: 3px 0;
   background: var(--color-paper);
   border-bottom: 1px solid var(--color-rule);
-  margin-bottom: 4px;
 }
 .transaction-flow h4 {
   margin: 0;
@@ -246,7 +265,10 @@
   font-weight: 500;
 }
 .transaction-rows {
-  display: grid;
+  position: sticky;
+  top: var(--transaction-rows-top, 71px);
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 .transaction-row {
@@ -275,6 +297,26 @@
 .transaction-row.is-selected {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.transaction-row.is-pinned {
+  /* Pin visually without moving every preceding row in the DOM on each click.
+     Keyboard and screen-reader traversal retain the original outpoint order. */
+  order: -1;
+  position: sticky;
+  top: var(--transaction-selected-top, 71px);
+  z-index: 1;
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-paper));
+}
+.transaction-lane-context,
+.transaction-row.is-pinned {
+  /* Cover the connector gutter along with rows scrolling behind pinned content. */
+  box-shadow: var(--transaction-connector-cover-offset) 0 0 0 var(--color-paper);
+}
+.transaction-row.is-pinned .transaction-row-content {
+  max-height: calc(
+    var(--transaction-selected-max-height) - var(--transaction-row-tools-space, 0px)
+  );
+  overflow: auto;
 }
 .transaction-row.is-selected::after {
   background: var(--color-accent);
@@ -376,11 +418,10 @@
     padding: 0 5px 7px;
   }
   .transaction-flow {
+    --transaction-flow-gap: 7px;
     grid-template-columns: minmax(0, 1fr) 110px minmax(0, 1fr);
-    column-gap: 7px;
   }
-  .transaction-view-identity {
-    top: 39px;
+  .transaction-flow-center {
     margin-top: 30px;
   }
   .transaction-view-identity::before,
@@ -418,6 +459,7 @@
   }
   .transaction-row {
     flex-direction: column;
+    --transaction-row-tools-space: 34px;
   }
   .transaction-row-select {
     padding: 7px 4px;

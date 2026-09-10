@@ -6,7 +6,15 @@ import { SmallAmountControl } from './SmallAmountControl';
 import { isSmallAmount } from '../domain/smallAmounts';
 import { transactionStatus } from '../domain/transactionStatus';
 import { TransactionBlockTime } from './TransactionBlockTime';
-import { useMemo, useState, useRef, useLayoutEffect, type ReactNode } from 'react';
+import {
+  memo,
+  useMemo,
+  useState,
+  useRef,
+  useLayoutEffect,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Pencil, ArrowLeft, ArrowRight, Box, Tags, Smile, Eye, EyeOff } from 'lucide-react';
 import {
   type GraphNode,
@@ -59,6 +67,182 @@ interface Row {
   coinbase: boolean;
 }
 
+interface FlowRowActions {
+  onSelect: Props['onSelect'];
+  onEdit: Props['onEdit'];
+  onTrace: Props['onTrace'];
+  onSetHidden: Props['onSetHidden'];
+  onNavigate: (txid: string, outputId: string) => void;
+  toggleSelection?: (id: string) => void;
+}
+
+// A selection change should update two rows, not recreate every expanded row.
+const TransactionFlowRow = memo(function TransactionFlowRow({
+  row,
+  inputs,
+  selected,
+  pinned,
+  belowThreshold,
+  label,
+  loaded,
+  spendCount,
+  spendId,
+  hidden,
+  batchMode,
+  batchSelected,
+  canShowHidden,
+  renderMetadata,
+  disabledReason,
+  inputLoading,
+  actions,
+}: {
+  row: Row;
+  inputs: boolean;
+  selected: boolean;
+  pinned: boolean;
+  belowThreshold: boolean;
+  label?: string;
+  loaded: boolean;
+  spendCount: number;
+  spendId?: string;
+  hidden: boolean;
+  batchMode: boolean;
+  batchSelected: boolean;
+  canShowHidden: boolean;
+  renderMetadata?: Props['renderMetadata'];
+  disabledReason?: string;
+  inputLoading?: boolean;
+  actions: RefObject<FlowRowActions>;
+}) {
+  const address = row.output && outputAddress(row.output);
+  const opReturn = isOpReturn(row.output?.scriptPubKey.hex);
+  const navigate = () => {
+    if (!row.id) return;
+    if (inputs) {
+      if (loaded) actions.current.onNavigate(row.previousTxid!, row.id);
+      else {
+        actions.current.onSelect(row.id);
+        actions.current.onTrace('funding', row.id);
+      }
+    } else if (spendCount === 1) actions.current.onNavigate(spendId!, row.id);
+    else {
+      actions.current.onSelect(row.id);
+      if (!spendCount) actions.current.onTrace('spending', row.id);
+    }
+  };
+  const navigationLabel = inputs
+    ? `${loaded ? 'Go to' : 'Load'} previous transaction for input ${row.index}`
+    : spendCount > 1
+      ? `Choose among ${spendCount} loaded spends of output ${row.index}`
+      : spendCount === 1
+        ? `Go to spending transaction for output ${row.index}`
+        : `Check output ${row.index} for spends`;
+  return (
+    <div
+      key={row.index}
+      className={`transaction-row ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
+      data-selected={selected}
+    >
+      {batchMode && row.id && (
+        <SelectionCheckbox
+          id={row.id}
+          label={`${inputs ? 'input' : 'output'} ${row.index}`}
+          checked={batchSelected}
+          onToggle={(id) => actions.current.toggleSelection?.(id)}
+        />
+      )}
+      <div className="transaction-row-content">
+        <button
+          type="button"
+          className="transaction-row-select"
+          disabled={!row.id}
+          aria-label={`${inputs ? 'Input' : 'Output'} ${row.index}${row.id ? `: ${row.id.slice(4)}` : ': Coinbase'}`}
+          aria-pressed={selected}
+          title={row.id ? `${address ? `${address}\n` : ''}${row.id.slice(4)}` : 'Coinbase'}
+          onClick={(event) => {
+            if (!row.id) return;
+            if (actions.current.toggleSelection && (event.ctrlKey || event.metaKey))
+              actions.current.toggleSelection?.(row.id);
+            else actions.current.onSelect(row.id);
+          }}
+        >
+          <span className="transaction-row-index">#{row.index}</span>
+          <span className="transaction-row-main">
+            <strong>
+              {row.coinbase
+                ? 'Coinbase'
+                : label ||
+                  (opReturn
+                    ? 'OP_RETURN'
+                    : address
+                      ? short(address)
+                      : !row.output
+                        ? inputLoading && selected
+                          ? 'Loading previous output…'
+                          : 'Select to load previous output'
+                        : 'Script output')}
+            </strong>
+            <span>
+              {row.coinbase
+                ? 'Newly created coins'
+                : formatSats(row.output ? sats(row.output.value) : undefined)}
+            </span>
+            {selected && belowThreshold && (
+              <span
+                className="amount-selection-badge"
+                title="The selected output stays visible below the amount filter."
+              >
+                Selected · outside filter
+              </span>
+            )}
+            {row.id && hidden && (
+              <span className="entity-hidden-badge">
+                <EyeOff size={10} /> Hidden
+              </span>
+            )}
+            {row.id && renderMetadata?.(row.id)}
+          </span>
+        </button>
+        {opReturn && <OpReturnData hex={row.output!.scriptPubKey.hex} />}
+      </div>
+      {row.id && (
+        <div className="transaction-row-tools">
+          {hidden && canShowHidden && (
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={`Show ${inputs ? 'input' : 'output'} ${row.index} in graph`}
+              onClick={() => actions.current.onSetHidden?.([row.id!], false)}
+            >
+              <Eye size={12} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="icon-button transaction-row-edit"
+            aria-label={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
+            onClick={() => actions.current.onEdit(row.id!)}
+          >
+            <Pencil size={12} />
+          </button>
+          {!opReturn && (
+            <button
+              type="button"
+              className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
+              aria-label={navigationLabel}
+              title={!loaded && disabledReason ? disabledReason : navigationLabel}
+              disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
+              onClick={navigate}
+            >
+              {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
 function TransactionRows({
   tx,
   workspace,
@@ -92,7 +276,24 @@ function TransactionRows({
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
   const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const flow = useRef<HTMLDivElement>(null);
-  const selectedRow = useRef<HTMLDivElement>(null);
+  const actions = useRef<FlowRowActions>({
+    onSelect,
+    onEdit,
+    onTrace,
+    onSetHidden,
+    onNavigate,
+    toggleSelection: selection?.toggle,
+  });
+  useLayoutEffect(() => {
+    actions.current = {
+      onSelect,
+      onEdit,
+      onTrace,
+      onSetHidden,
+      onNavigate,
+      toggleSelection: selection?.toggle,
+    };
+  });
   const [localInputs, setLocalInputs] = useState(false);
   const [localOutputs, setLocalOutputs] = useState(false);
   const controlled = state?.transactionId === tx.txid;
@@ -119,103 +320,127 @@ function TransactionRows({
   useLayoutEffect(() => {
     if (expandedInputs || expandedOutputs) return;
     const panel = flow.current?.closest<HTMLDetailsElement>('.transaction-view');
-    // Return compact lists to their start; the selection visibility effect below
-    // then brings an explicitly selected outpoint back into view when necessary.
+    // Return compact lists to their start. The selected outpoint stays pinned.
     if (panel) panel.scrollTop = 0;
   }, [expandedInputs, expandedOutputs]);
   useLayoutEffect(() => {
-    const row = selectedRow.current;
-    const panel = row?.closest<HTMLDetailsElement>('.transaction-view');
-    if (!row || !panel) return;
-    let followSelection = true;
+    const container = flow.current;
+    const panel = container?.closest<HTMLDetailsElement>('.transaction-view');
+    if (!container || !panel) return;
+    const summary = panel.querySelector<HTMLElement>(':scope > summary');
+    const feedback = panel.querySelector<HTMLElement>('.transaction-input-feedback');
+    const center = container.querySelector<HTMLElement>('.transaction-flow-center');
+    const actions = panel.querySelector<HTMLElement>(
+      '.transaction-view-body > .transaction-view-actions',
+    );
+    const lanes = Array.from(container.querySelectorAll<HTMLElement>(':scope > section')).map(
+      (section) => ({
+        section,
+        header: section.querySelector<HTMLElement>('.transaction-lane-context')!,
+        rows: section.querySelector<HTMLElement>('.transaction-rows')!,
+      }),
+    );
+    const measure = () => {
+      if (!panel.open || !panel.clientHeight) return;
+      const top = summary?.offsetHeight ?? 38;
+      const bottom = panel.clientHeight - (feedback?.offsetHeight ?? 0) - 8;
+      container.style.setProperty('--transaction-lane-top', `${top}px`);
+      if (center) {
+        // Match the resting position, including any input-loading controls above
+        // the flow, so scrolling never moves the transaction before it sticks.
+        const flowTop =
+          container.getBoundingClientRect().top -
+          panel.getBoundingClientRect().top -
+          panel.clientTop +
+          panel.scrollTop;
+        container.style.setProperty(
+          '--transaction-center-top',
+          `${flowTop + parseFloat(getComputedStyle(center).marginTop)}px`,
+        );
+      }
+      // Leave room for a row even with wrapped controls in a short panel.
+      container.style.setProperty(
+        '--transaction-context-max-height',
+        `${Math.max(48, bottom - top - 68)}px`,
+      );
+      for (const { section, header, rows } of lanes) {
+        section.style.setProperty(
+          '--transaction-selected-top',
+          `${top + header.offsetHeight + 4}px`,
+        );
+        section.style.setProperty(
+          '--transaction-selected-max-height',
+          `${Math.max(48, bottom - top - header.offsetHeight - 4)}px`,
+        );
+        // Short lists stay below their heading. Taller lists scroll until their
+        // final rows reach the bottom, then stay beside the longer opposite lane.
+        section.style.setProperty(
+          '--transaction-rows-top',
+          `${Math.min(top + header.offsetHeight + 4, bottom - rows.offsetHeight)}px`,
+        );
+      }
+    };
     let frame = 0;
-    const visibleBounds = () => {
-      if (!panel.open || !panel.getClientRects().length) return;
-      const bounds = panel.getBoundingClientRect();
-      const heading = panel.querySelector(':scope > summary')?.getBoundingClientRect();
-      const laneHeading = row.closest('section')?.querySelector('.transaction-lane-header');
-      return {
-        top:
-          (heading?.bottom ?? bounds.top) + (laneHeading?.getBoundingClientRect().height ?? 0) + 4,
-        bottom:
-          bounds.bottom -
-          8 -
-          (panel.querySelector('.transaction-input-feedback')?.getBoundingClientRect().height ?? 0),
-        row: row.getBoundingClientRect(),
-      };
-    };
-    const keepVisible = () => {
-      const bounds = visibleBounds();
-      if (!bounds || !followSelection) return;
-      const delta =
-        bounds.row.height > bounds.bottom - bounds.top || bounds.row.top < bounds.top
-          ? bounds.row.top - bounds.top
-          : Math.max(0, bounds.row.bottom - bounds.bottom);
-      // Scroll this panel only. scrollIntoView can also move outer page containers.
-      panel.scrollTop += delta;
-    };
-    const rememberScroll = () => {
-      const bounds = visibleBounds();
-      if (!bounds) return;
-      // Browsing away from the selection is intentional. Geometry changes must
-      // not pull the user back. Scrolling the selection into view resumes following.
-      followSelection =
-        bounds.row.top >= bounds.top - 1 &&
-        (bounds.row.bottom <= bounds.bottom + 1 ||
-          (bounds.row.height > bounds.bottom - bounds.top && bounds.row.top <= bounds.top + 1));
-    };
-    const schedule = () => {
+    const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(keepVisible);
-    };
-    keepVisible();
-    panel.addEventListener('scroll', rememberScroll, { passive: true });
-    const observer = new ResizeObserver(schedule);
-    observer.observe(row);
+      frame = requestAnimationFrame(measure);
+    });
     observer.observe(panel);
-    const body = panel.querySelector('.transaction-view-body');
-    if (body) observer.observe(body);
+    if (summary) observer.observe(summary);
+    if (feedback) observer.observe(feedback);
+    if (center) observer.observe(center);
+    if (actions) observer.observe(actions);
+    for (const { header, rows } of lanes) {
+      observer.observe(header);
+      observer.observe(rows);
+    }
+    measure();
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
-      panel.removeEventListener('scroll', rememberScroll);
     };
   }, [
-    selected?.id,
+    tx.txid,
     expandedInputs,
     expandedOutputs,
     workspace.view.flowAmountThreshold,
     inputLoading,
     inputError,
   ]);
-  const inputRows: Row[] = tx.vin.map((input, index) => {
-    const resolution = resolvePreviousOutput(workspace, input, previousOutputs);
-    return {
-      id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
-      index,
-      output:
-        resolution.status === 'loaded' || resolution.status === 'attached'
-          ? resolution.output
-          : undefined,
-      previousTxid: input.txid,
-      coinbase: input.coinbase !== undefined,
-    };
-  });
-  const outputRows: Row[] = tx.vout.map((output) => ({
-    id: outputNodeId(tx.txid, output.n),
-    index: output.n,
-    output,
-    coinbase: false,
-  }));
+  const inputRows = useMemo<Row[]>(
+    () =>
+      tx.vin.map((input, index) => {
+        const resolution = resolvePreviousOutput(workspace, input, previousOutputs);
+        return {
+          id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
+          index,
+          output:
+            resolution.status === 'loaded' || resolution.status === 'attached'
+              ? resolution.output
+              : undefined,
+          previousTxid: input.txid,
+          coinbase: input.coinbase !== undefined,
+        };
+      }),
+    [tx, workspace.transactions, workspace.network, previousOutputs],
+  );
+  const outputRows = useMemo<Row[]>(
+    () =>
+      tx.vout.map((output) => ({
+        id: outputNodeId(tx.txid, output.n),
+        index: output.n,
+        output,
+        coinbase: false,
+      })),
+    [tx],
+  );
   const columns = [
     { name: 'Inputs', rows: inputRows, expanded: expandedInputs, toggle: setExpandedInputs },
     { name: 'Outputs', rows: outputRows, expanded: expandedOutputs, toggle: setExpandedOutputs },
   ];
   return (
     <div ref={flow} className="transaction-columns transaction-flow">
-      <div className="transaction-flow-previous">{previous}</div>
       {identity}
-      <div className="transaction-flow-next">{next}</div>
       {columns.map(({ name, rows, expanded, toggle }) => {
         const inputs = name === 'Inputs';
         const matches = (row: Row) =>
@@ -241,172 +466,66 @@ function TransactionRows({
             aria-label={`${name} of displayed transaction`}
             aria-busy={inputs && inputLoading ? true : undefined}
           >
-            <div className="transaction-lane-header">
-              <h4>
-                {rows.length}{' '}
-                {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
-              </h4>
-              {retained.length > 3 && (
-                <button
-                  type="button"
-                  className="text-button transaction-expand"
-                  aria-expanded={expanded}
-                  onClick={() => toggle(!expanded)}
-                >
-                  {expanded
-                    ? `Collapse ${name.toLowerCase()}`
-                    : `Show all ${retained.length} ${name.toLowerCase()}`}
-                </button>
-              )}
-            </div>
-            {filteredCount > 0 && (
-              <button
-                type="button"
-                className="text-button transaction-amount-recovery"
-                aria-label={`Show ${filteredCount} amount-filtered ${name.toLowerCase()}`}
-                onClick={() => onSmallAmountThresholdChange?.(0)}
-              >
-                {filteredCount} filtered · Show
-              </button>
-            )}
-            <div className="transaction-rows">
-              {shown.map((row) => {
-                const address = row.output && outputAddress(row.output);
-                const opReturn = isOpReturn(row.output?.scriptPubKey.hex);
-                const label = row.id && workspace.annotations[row.id]?.label;
-                const destinations = row.id ? (spends.get(row.id) ?? []) : [];
-                const loaded = inputs
-                  ? !!workspace.transactions[row.previousTxid ?? '']
-                  : destinations.length > 0;
-                const navigate = () => {
-                  if (!row.id) return;
-                  if (inputs) {
-                    if (loaded) onNavigate(row.previousTxid!, row.id);
-                    else {
-                      onSelect(row.id);
-                      onTrace('funding', row.id);
-                    }
-                  } else if (destinations.length === 1) onNavigate(destinations[0].txid, row.id);
-                  else {
-                    onSelect(row.id);
-                    if (!destinations.length) onTrace('spending', row.id);
-                  }
-                };
-                const navigationLabel = inputs
-                  ? `${loaded ? 'Go to' : 'Load'} previous transaction for input ${row.index}`
-                  : destinations.length > 1
-                    ? `Choose among ${destinations.length} loaded spends of output ${row.index}`
-                    : destinations.length === 1
-                      ? `Go to spending transaction for output ${row.index}`
-                      : `Check output ${row.index} for spends`;
-                return (
-                  <div
-                    key={row.index}
-                    className={`transaction-row ${matches(row) ? 'is-selected' : ''} ${row.id && selection?.has(row.id) ? 'is-batch-selected' : ''}`}
-                    data-selected={matches(row)}
-                    ref={matches(row) ? selectedRow : undefined}
+            <div className="transaction-lane-context">
+              <div className={inputs ? 'transaction-flow-previous' : 'transaction-flow-next'}>
+                {inputs ? previous : next}
+              </div>
+              <div className="transaction-lane-header">
+                <h4>
+                  {rows.length}{' '}
+                  {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
+                </h4>
+                {retained.length > 3 && (
+                  <button
+                    type="button"
+                    className="text-button transaction-expand"
+                    aria-expanded={expanded}
+                    onClick={() => toggle(!expanded)}
                   >
-                    {selection?.mode && row.id && (
-                      <SelectionCheckbox
-                        id={row.id}
-                        label={`${inputs ? 'input' : 'output'} ${row.index}`}
-                        checked={selection.has(row.id)}
-                        onToggle={selection.toggle}
-                      />
-                    )}
-                    <div className="transaction-row-content">
-                      <button
-                        type="button"
-                        className="transaction-row-select"
-                        disabled={!row.id}
-                        aria-label={`${inputs ? 'Input' : 'Output'} ${row.index}${row.id ? `: ${row.id.slice(4)}` : ': Coinbase'}`}
-                        aria-pressed={matches(row)}
-                        title={
-                          row.id ? `${address ? `${address}\n` : ''}${row.id.slice(4)}` : 'Coinbase'
-                        }
-                        onClick={(event) => {
-                          if (!row.id) return;
-                          if (selection && (event.ctrlKey || event.metaKey))
-                            selection.toggle(row.id);
-                          else onSelect(row.id);
-                        }}
-                      >
-                        <span className="transaction-row-index">#{row.index}</span>
-                        <span className="transaction-row-main">
-                          <strong>
-                            {row.coinbase
-                              ? 'Coinbase'
-                              : label ||
-                                (opReturn
-                                  ? 'OP_RETURN'
-                                  : address
-                                    ? short(address)
-                                    : !row.output
-                                      ? inputLoading && matches(row)
-                                        ? 'Loading previous output…'
-                                        : 'Select to load previous output'
-                                      : 'Script output')}
-                          </strong>
-                          <span>
-                            {row.coinbase
-                              ? 'Newly created coins'
-                              : formatSats(row.output ? sats(row.output.value) : undefined)}
-                          </span>
-                          {matches(row) && belowThreshold(row) && (
-                            <span
-                              className="amount-selection-badge"
-                              title="The selected output stays visible below the amount filter."
-                            >
-                              Selected · outside filter
-                            </span>
-                          )}
-                          {row.id && hidden.has(row.id) && (
-                            <span className="entity-hidden-badge">
-                              <EyeOff size={10} /> Hidden
-                            </span>
-                          )}
-                          {row.id && renderMetadata?.(row.id)}
-                        </span>
-                      </button>
-                      {opReturn && <OpReturnData hex={row.output!.scriptPubKey.hex} />}
-                    </div>
-                    {row.id && (
-                      <div className="transaction-row-tools">
-                        {hidden.has(row.id) && onSetHidden && (
-                          <button
-                            type="button"
-                            className="icon-button"
-                            aria-label={`Show ${inputs ? 'input' : 'output'} ${row.index} in graph`}
-                            onClick={() => onSetHidden([row.id!], false)}
-                          >
-                            <Eye size={12} />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="icon-button transaction-row-edit"
-                          aria-label={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
-                          onClick={() => onEdit(row.id!)}
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        {!opReturn && (
-                          <button
-                            type="button"
-                            className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
-                            aria-label={navigationLabel}
-                            title={!loaded && disabledReason ? disabledReason : navigationLabel}
-                            disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
-                            onClick={navigate}
-                          >
-                            {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    {expanded
+                      ? `Collapse ${name.toLowerCase()}`
+                      : `Show all ${retained.length} ${name.toLowerCase()}`}
+                  </button>
+                )}
+                {filteredCount > 0 && (
+                  <button
+                    type="button"
+                    className="text-button transaction-amount-recovery"
+                    aria-label={`Show ${filteredCount} amount-filtered ${name.toLowerCase()}`}
+                    onClick={() => onSmallAmountThresholdChange?.(0)}
+                  >
+                    {filteredCount} filtered · Show
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="transaction-rows">
+              {shown.map((row) => (
+                <TransactionFlowRow
+                  key={row.index}
+                  row={row}
+                  inputs={inputs}
+                  selected={Boolean(matches(row))}
+                  pinned={row.id === selected?.id}
+                  belowThreshold={belowThreshold(row)}
+                  label={row.id ? workspace.annotations[row.id]?.label : undefined}
+                  loaded={
+                    inputs
+                      ? !!workspace.transactions[row.previousTxid ?? '']
+                      : !!spends.get(row.id ?? '')?.length
+                  }
+                  spendCount={spends.get(row.id ?? '')?.length ?? 0}
+                  spendId={spends.get(row.id ?? '')?.[0]?.txid}
+                  hidden={!!row.id && hidden.has(row.id)}
+                  batchMode={selection?.mode ?? false}
+                  batchSelected={!!row.id && !!selection?.has(row.id)}
+                  canShowHidden={!!onSetHidden}
+                  renderMetadata={renderMetadata}
+                  disabledReason={disabledReason}
+                  inputLoading={inputLoading}
+                  actions={actions}
+                />
+              ))}
             </div>
           </section>
         );
@@ -429,11 +548,11 @@ export function TransactionView(props: Props) {
     inputError,
     onRetryInputs,
   } = props;
-  const related = useMemo(
-    () => (selected ? relatedTransactions(workspace.transactions, selected) : []),
-    [workspace.transactions, selected?.id],
-  );
   const spends = useMemo(() => indexLoadedSpends(workspace.transactions), [workspace.transactions]);
+  const related = useMemo(
+    () => (selected ? relatedTransactions(workspace.transactions, selected, spends) : []),
+    [workspace.transactions, selected?.id, spends],
+  );
   const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const [choice, setChoice] = useState('');
   const current =
@@ -574,13 +693,6 @@ export function TransactionView(props: Props) {
       <summary>
         <span className="transaction-summary-content">
           <span>Transaction flow</span>
-          {(state?.open ?? true) && props.onSmallAmountThresholdChange && (
-            <SmallAmountControl
-              context="flow"
-              threshold={workspace.view.flowAmountThreshold}
-              onChange={props.onSmallAmountThresholdChange}
-            />
-          )}
           <small title={current ? transactionStatus(current.tx).title : undefined}>
             {current ? transactionStatus(current.tx).label : 'Not loaded'}
           </small>
@@ -621,102 +733,113 @@ export function TransactionView(props: Props) {
             previous={preview('previous')}
             next={preview('next')}
             identity={
-              <div
-                className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
-              >
-                <button
-                  type="button"
-                  className="transaction-identity-select"
-                  aria-label={`Select displayed transaction ${current.tx.txid}`}
-                  aria-pressed={selected.id === txNodeId(current.tx.txid)}
-                  title={current.tx.txid}
-                  onClick={() => onSelect(txNodeId(current.tx.txid))}
-                >
-                  <Box size={25} aria-hidden="true" />
-                  <span>
-                    {current.role === 'Selected' ? 'Transaction' : `${current.role} transaction`} (
-                    {current.tx.vin.length} in/{current.tx.vout.length} out)
-                  </span>
-                  <strong className="mono">{short(current.tx.txid)}</strong>
-                  {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
-                    <strong
-                      className="transaction-identity-label"
-                      title={workspace.annotations[txNodeId(current.tx.txid)].label}
-                    >
-                      {workspace.annotations[txNodeId(current.tx.txid)].label}
-                    </strong>
-                  )}
-                  {props.renderMetadata?.(txNodeId(current.tx.txid))}
-                </button>
-                <TransactionBlockTime transaction={current.tx} />
+              <div className="transaction-flow-center">
                 <div
-                  className="transaction-identity-tools"
-                  role="group"
-                  aria-label="Transaction annotation tools"
+                  className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
                 >
                   <button
                     type="button"
-                    className="icon-button"
-                    aria-label="Edit displayed transaction annotation"
-                    title="Edit transaction label"
-                    onClick={() => props.onEdit(txNodeId(current.tx.txid), 'label')}
+                    className="transaction-identity-select"
+                    aria-label={`Select displayed transaction ${current.tx.txid}`}
+                    aria-pressed={selected.id === txNodeId(current.tx.txid)}
+                    title={current.tx.txid}
+                    onClick={() => onSelect(txNodeId(current.tx.txid))}
                   >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label="Edit displayed transaction tags"
-                    title="Choose transaction tags"
-                    onClick={() => props.onEdit(txNodeId(current.tx.txid), 'tags')}
-                  >
-                    <Tags size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label="Edit displayed transaction icon"
-                    title="Choose transaction icon"
-                    onClick={() => props.onEdit(txNodeId(current.tx.txid), 'icon')}
-                  >
-                    <Smile size={13} />
-                  </button>
-                  <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
-                </div>
-                {props.hiddenNodeIds?.includes(txNodeId(current.tx.txid)) && (
-                  <div className="transaction-hidden-state">
-                    <span className="entity-hidden-badge">
-                      <EyeOff size={10} /> Hidden
+                    <Box size={25} aria-hidden="true" />
+                    <span title="Inputs / outputs">
+                      {current.role === 'Selected' ? 'Transaction' : `${current.role} transaction`}{' '}
+                      ({current.tx.vin.length} / {current.tx.vout.length})
                     </span>
-                    {props.onSetHidden && (
-                      <button
-                        type="button"
-                        className="text-button"
-                        aria-label="Show displayed transaction in graph"
-                        onClick={() => props.onSetHidden?.([txNodeId(current.tx.txid)], false)}
+                    <strong className="mono">{short(current.tx.txid)}</strong>
+                    {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
+                      <strong
+                        className="transaction-identity-label"
+                        title={workspace.annotations[txNodeId(current.tx.txid)].label}
                       >
-                        Show
-                      </button>
+                        {workspace.annotations[txNodeId(current.tx.txid)].label}
+                      </strong>
                     )}
-                  </div>
-                )}
-                {related.length > 1 && (
-                  <select
-                    className="transaction-choice"
-                    aria-label="Displayed transaction"
-                    value={current.tx.txid}
-                    onChange={(e) => choose(e.target.value)}
+                    {props.renderMetadata?.(txNodeId(current.tx.txid))}
+                  </button>
+                  <TransactionBlockTime transaction={current.tx} />
+                  <div
+                    className="transaction-identity-tools"
+                    role="group"
+                    aria-label="Transaction annotation tools"
                   >
-                    {related.map(({ tx, role }) => (
-                      <option key={tx.txid} value={tx.txid}>
-                        {role}:{' '}
-                        {workspace.annotations[txNodeId(tx.txid)]?.label
-                          ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
-                          : ''}
-                        {short(tx.txid)}
-                      </option>
-                    ))}
-                  </select>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Edit displayed transaction annotation"
+                      title="Edit transaction label"
+                      onClick={() => props.onEdit(txNodeId(current.tx.txid), 'label')}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Edit displayed transaction tags"
+                      title="Choose transaction tags"
+                      onClick={() => props.onEdit(txNodeId(current.tx.txid), 'tags')}
+                    >
+                      <Tags size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Edit displayed transaction icon"
+                      title="Choose transaction icon"
+                      onClick={() => props.onEdit(txNodeId(current.tx.txid), 'icon')}
+                    >
+                      <Smile size={13} />
+                    </button>
+                    <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
+                  </div>
+                  {props.hiddenNodeIds?.includes(txNodeId(current.tx.txid)) && (
+                    <div className="transaction-hidden-state">
+                      <span className="entity-hidden-badge">
+                        <EyeOff size={10} /> Hidden
+                      </span>
+                      {props.onSetHidden && (
+                        <button
+                          type="button"
+                          className="text-button"
+                          aria-label="Show displayed transaction in graph"
+                          onClick={() => props.onSetHidden?.([txNodeId(current.tx.txid)], false)}
+                        >
+                          Show
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {related.length > 1 && (
+                    <select
+                      className="transaction-choice"
+                      aria-label="Displayed transaction"
+                      value={current.tx.txid}
+                      onChange={(e) => choose(e.target.value)}
+                    >
+                      {related.map(({ tx, role }) => (
+                        <option key={tx.txid} value={tx.txid}>
+                          {role}:{' '}
+                          {workspace.annotations[txNodeId(tx.txid)]?.label
+                            ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
+                            : ''}
+                          {short(tx.txid)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {props.onSmallAmountThresholdChange && (
+                  <div className="transaction-flow-amounts">
+                    <SmallAmountControl
+                      context="flow"
+                      threshold={workspace.view.flowAmountThreshold}
+                      onChange={props.onSmallAmountThresholdChange}
+                    />
+                  </div>
                 )}
               </div>
             }

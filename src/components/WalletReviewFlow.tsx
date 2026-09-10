@@ -95,8 +95,8 @@ export function WalletReviewFlow({
               .join(' · ')}
           >
             <Box className="wallet-flow-transaction-icon" size={25} aria-hidden="true" />
-            <span className="wallet-flow-role">
-              Transaction ({context.inputs.length} in/{context.outputs.length} out)
+            <span className="wallet-flow-role" title="Inputs / outputs">
+              Transaction ({context.inputs.length} / {context.outputs.length})
             </span>
             {editingTransaction && (
               <span className="wallet-flow-editing">

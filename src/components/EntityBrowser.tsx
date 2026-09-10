@@ -305,7 +305,7 @@ export default function EntityBrowser({
                 <strong>{node.label}</strong>
                 <small>
                   {node.kind === 'transaction' && transactions[node.txid ?? '']
-                    ? `(${transactions[node.txid!].vin.length} in / ${transactions[node.txid!].vout.length} out)`
+                    ? `(${transactions[node.txid!].vin.length} / ${transactions[node.txid!].vout.length})`
                     : node.kind}
                   {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
                     <span className="entity-chain-status">

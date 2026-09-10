@@ -1,18 +1,32 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
-import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
+import {
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  type PreviousOutputIndex,
+} from '../domain/prevouts';
+import { indexLoadedSpends } from '../domain/transactionFlow';
 import { mergeTransactionObservations } from '../domain/prevouts';
 import { mapLimit } from './api';
 
 /** Default navigation resolves only the selected outpoint. Bulk input details are explicit. */
-export function flowInputPlan(workspace: Workspace, selected?: GraphNode, allInputs = false) {
-  const related = selected ? relatedTransactions(workspace.transactions, selected) : [];
+export function flowInputPlan(
+  workspace: Workspace,
+  selected?: GraphNode,
+  allInputs = false,
+  prepared?: {
+    related: ReturnType<typeof relatedTransactions>;
+    prevouts: PreviousOutputIndex;
+  },
+) {
+  const related =
+    prepared?.related ?? (selected ? relatedTransactions(workspace.transactions, selected) : []);
   const current =
     related.find(({ tx }) => tx.txid === workspace.view.transactionFlow?.transactionId) ??
     related[0];
-  const prevouts = indexPreviousOutputs(workspace);
+  const prevouts = allInputs ? (prepared?.prevouts ?? indexPreviousOutputs(workspace)) : undefined;
   const missing = new Set(
     allInputs
       ? (current?.tx.vin.flatMap((input) => {
@@ -67,15 +81,17 @@ export function mergeFlowInputs(
     ...workspace,
     inputContext,
     contextTransactionIds: provenance.size ? [...provenance] : undefined,
-    transactions: {
-      ...workspace.transactions,
-      ...Object.fromEntries(
-        loaded.map((tx) => [
-          tx.txid,
-          mergeTransactionObservations(workspace.transactions[tx.txid], tx, workspace.network),
-        ]),
-      ),
-    },
+    transactions: loaded.length
+      ? {
+          ...workspace.transactions,
+          ...Object.fromEntries(
+            loaded.map((tx) => [
+              tx.txid,
+              mergeTransactionObservations(workspace.transactions[tx.txid], tx, workspace.network),
+            ]),
+          ),
+        }
+      : workspace.transactions,
   };
 }
 
@@ -88,7 +104,41 @@ export function useFlowInputs(options: {
 }) {
   const latest = useRef(options);
   latest.current = options;
-  const plan = options.workspace ? flowInputPlan(options.workspace, options.selected) : undefined;
+  const workspace = options.workspace;
+  // Selection and view changes reuse chain-evidence indexes. Rebuilding these
+  // during every render can dominate click latency in a large loaded wallet.
+  const spends = useMemo(
+    () => (workspace ? indexLoadedSpends(workspace.transactions) : undefined),
+    [workspace?.transactions],
+  );
+  const related = useMemo(
+    () =>
+      workspace && options.selected
+        ? relatedTransactions(workspace.transactions, options.selected, spends)
+        : [],
+    [workspace?.transactions, options.selected?.id, spends],
+  );
+  const prevouts = useMemo(
+    () => (workspace ? indexPreviousOutputs(workspace) : new Map()),
+    [workspace?.transactions, workspace?.network],
+  );
+  const plans = useMemo(
+    () =>
+      workspace
+        ? {
+            selected: flowInputPlan(workspace, options.selected, false, { related, prevouts }),
+            all: flowInputPlan(workspace, options.selected, true, { related, prevouts }),
+          }
+        : undefined,
+    [
+      workspace?.transactions,
+      workspace?.view.transactionFlow?.transactionId,
+      options.selected?.id,
+      related,
+      prevouts,
+    ],
+  );
+  const plan = plans?.selected;
   const target =
     options.workspace && options.selected
       ? `${options.workspace.id}:${options.workspace.network}:${plan?.transactionId ?? ''}:${options.selected.id}`
@@ -99,15 +149,13 @@ export function useFlowInputs(options: {
   const allInputs = bulkTarget === target;
   // Returning to an earlier selection must not silently repeat a bulk action.
   useEffect(() => setBulkTarget(''), [target]);
-  const missingInputCount = options.workspace
-    ? flowInputPlan(options.workspace, options.selected, true).missing.length
-    : 0;
+  const missingInputCount = plans?.all.missing.length ?? 0;
   const [state, setState] = useState({ target: '', loading: false, error: '' });
   useEffect(() => {
     if (!target || !enabled) return;
     const { workspace, selected, fetch, update } = latest.current;
     if (!workspace) return;
-    const { transactionId, missing } = flowInputPlan(workspace, selected, allInputs);
+    const { transactionId, missing } = (allInputs ? plans?.all : plans?.selected)!;
     update(
       workspace.id,
       (current) => mergeFlowInputs(current, transactionId, selected, [], allInputs),

@@ -501,9 +501,16 @@ export default function App() {
     ],
     [w?.contextTransactionIds, w?.inputContext],
   );
+  const amountSelectionId = w?.view.smallAmountThreshold ? selectedId : undefined;
   const amountGraph = useMemo(
-    () => filterSmallAmounts(graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds),
-    [graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds],
+    () =>
+      filterSmallAmounts(
+        graph,
+        w?.view.smallAmountThreshold,
+        amountSelectionId,
+        automaticContextIds,
+      ),
+    [graph, w?.view.smallAmountThreshold, amountSelectionId, automaticContextIds],
   );
   const amountFilterIndex = useMemo(() => buildGraphFilterIndex(amountGraph), [amountGraph]);
   const canvasFilterResult = useMemo(
@@ -596,12 +603,12 @@ export default function App() {
     entityVisibility,
     visibleGraph,
   ]);
-  const graphIds = useMemo(
-    () => recoveryGraph.nodes.map((node) => node.id).join('|'),
+  const recoveryNodesById = useMemo(
+    () => new Map(recoveryGraph.nodes.map((node) => [node.id, node])),
     [recoveryGraph],
   );
   useEffect(() => {
-    const available = new Set(recoveryGraph.nodes.map((node) => node.id));
+    const available = recoveryNodesById;
     setNavigation((current) => {
       const ids = current.ids.filter((id) => available.has(id));
       if (ids.length === current.ids.length) return current;
@@ -614,22 +621,25 @@ export default function App() {
     const removed = selection.ids.filter((id) => !available.has(id));
     if (removed.length) selection.remove(removed);
     if (selectedId && !available.has(selectedId)) setSelectedId(undefined);
-  }, [graphIds, selectedId]);
-  const renderEntityMetadata = (id: string) => {
-    const match = walletMatches.get(id);
-    return (
-      <EntityBadges
-        tags={tagIndex.get(id) ?? []}
-        wallets={
-          w?.wallets
-            .filter((wallet) => match?.walletIds.includes(wallet.id))
-            .map((wallet) => wallet.name) ?? []
-        }
-        related={match?.kind === 'transaction'}
-      />
-    );
-  };
-  const selected = recoveryGraph.nodes.find((n) => n.id === selectedId);
+  }, [recoveryNodesById, selectedId]);
+  const renderEntityMetadata = useCallback(
+    (id: string) => {
+      const match = walletMatches.get(id);
+      return (
+        <EntityBadges
+          tags={tagIndex.get(id) ?? []}
+          wallets={
+            w?.wallets
+              .filter((wallet) => match?.walletIds.includes(wallet.id))
+              .map((wallet) => wallet.name) ?? []
+          }
+          related={match?.kind === 'transaction'}
+        />
+      );
+    },
+    [walletMatches, tagIndex, w?.wallets],
+  );
+  const selected = selectedId ? recoveryNodesById.get(selectedId) : undefined;
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
   }, [w?.id, selectedId, selectedWallet, rightTab]);
@@ -884,6 +894,34 @@ export default function App() {
   };
   const connected = !!status?.connected && !statusError;
   const canQuery = connected && !!w && !!networks?.includes(w.network) && !w.demo;
+  const loadedLookupIds = useMemo(() => {
+    const ids = new Set((w?.watchedAddresses ?? []).map(addressNodeId));
+    for (const transaction of Object.values(w?.transactions ?? {})) {
+      ids.add(txNodeId(transaction.txid));
+      for (const output of transaction.vout) {
+        ids.add(outputNodeId(transaction.txid, output.n));
+        const address = outputAddress(output);
+        if (address) ids.add(addressNodeId(address));
+      }
+      for (const input of transaction.vin) {
+        if (!input.txid || input.vout === undefined) continue;
+        if (!w?.inputContext?.[transaction.txid]) ids.add(outputNodeId(input.txid, input.vout));
+        const address = input.prevout && outputAddress({ ...input.prevout, n: input.vout });
+        if (address) ids.add(addressNodeId(address));
+      }
+    }
+    return ids;
+  }, [w?.transactions, w?.watchedAddresses, w?.inputContext]);
+  function loadedLookupId(text: string) {
+    const match = /^([0-9a-f]{64})(?::(\d+))?$/i.exec(text);
+    const id = match
+      ? match[2] === undefined
+        ? txNodeId(match[1].toLowerCase())
+        : outputNodeId(match[1].toLowerCase(), Number(match[2]))
+      : addressNodeId(/^(bc1|tb1)/i.test(text) ? text.toLowerCase() : text);
+    return loadedLookupIds.has(id) ? id : undefined;
+  }
+
   const queryDisabledReason = w?.demo
     ? 'Legacy synthetic workspace. Live lookups are disabled; create an example workspace to explore real transactions.'
     : unsupportedNetwork
@@ -1161,9 +1199,45 @@ export default function App() {
     setQueryError('');
     await addQuery(text);
   }
+  function revealLookup(id: string) {
+    if (!w) return;
+    const address = id.startsWith('addr:') ? id.slice(5) : undefined;
+    ws.update(w.id, (current) => ({
+      ...setNodesHidden(current, [id], false),
+      watchedAddresses: address
+        ? [...new Set([...current.watchedAddresses, address])]
+        : current.watchedAddresses,
+      view: {
+        ...current.view,
+        hiddenNodeIds: current.view.hiddenNodeIds?.filter((hidden) => hidden !== id),
+        smallAmountThreshold: undefined,
+        showAddresses: !!address || current.view.showAddresses,
+      },
+    }));
+    select(id);
+    setGraphFilters({});
+    setLeftTab('entities');
+    setMobilePanel('graph');
+    setFocusRequest({ id, token: Date.now() });
+  }
   async function addQuery(text: string) {
-    if (!w || !canQuery) return;
-    if (!text) return;
+    if (!w || !text || operationRef.current) return;
+    text = text.trim();
+    if (/^(bc1|tb1)/i.test(text)) text = text.toLowerCase();
+    const existing = loadedLookupId(text);
+    if (existing) {
+      setError('');
+      setNotice('');
+      if (!existing.startsWith('addr:')) mergeTransactions(w.id, [], [existing.split(':')[1]]);
+      revealLookup(existing);
+      // Cached navigation needs no backend. Explicit ancestry and address-history
+      // loading can still continue after the selected entity is already in view.
+      if (!canQuery || (!existing.startsWith('addr:') && !prefetchDepth)) {
+        setQuery('');
+        return;
+      }
+    }
+    if (!canQuery) return;
     const generation = selectionGeneration.current;
     await run(async (signal) => {
       if (/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
@@ -1183,11 +1257,7 @@ export default function App() {
         mergeTransactions(w.id, cached ? [] : [t], [t.txid]);
         const requestedId =
           index === undefined ? txNodeId(t.txid) : outputNodeId(t.txid, Number(index));
-        ws.update(w.id, (current) => setNodesHidden(current, [requestedId], false));
-        select(requestedId);
-        setGraphFilters({});
-        setFocusRequest({ id: requestedId, token: Date.now() });
-        setLeftTab('entities');
+        revealLookup(requestedId);
         if (prefetchDepth) {
           const before = ws.getSession(w.id)!.data;
           const result = await loadAncestors([t], before.transactions, prefetchDepth, {
@@ -1236,16 +1306,7 @@ export default function App() {
           }),
           false,
         );
-        ws.update(w.id, (current) => setNodesHidden(current, [addressNodeId(text)], false));
-        ws.update(
-          w.id,
-          (current) => ({ ...current, view: { ...current.view, showAddresses: true } }),
-          false,
-        );
-        select(addressNodeId(text));
-        setGraphFilters({});
-        setFocusRequest({ id: addressNodeId(text), token: Date.now() });
-        setLeftTab('entities');
+        revealLookup(addressNodeId(text));
         setNotice(
           result.truncated
             ? 'Partial address history: 500-transaction limit reached. Search again to load more.'
@@ -1986,35 +2047,35 @@ export default function App() {
         />
       ) : (
         <>
-          <nav className="workbench-nav" aria-label="Workbench">
-            {(['wallet', 'graph', 'analysis'] as const).map((mode) => (
-              <button
-                key={mode}
-                aria-pressed={shownWorkbench === mode}
-                className={shownWorkbench === mode ? 'active' : ''}
-                onClick={() => switchWorkbench(mode)}
-              >
-                {mode === 'wallet' ? (
-                  <WalletIcon size={15} />
-                ) : mode === 'graph' ? (
-                  <GitBranch size={15} />
-                ) : (
-                  <Search size={15} />
-                )}
-                {WORKBENCH_LABELS[mode]}
-              </button>
-            ))}
-            {!tourStep && returnWorkbench && returnWorkbench !== workbench && (
-              <button
-                className="workbench-return"
-                onClick={() => switchWorkbench(returnWorkbench, true)}
-              >
-                <ArrowLeft size={14} />
-                Back to {WORKBENCH_LABELS[returnWorkbench]}
-              </button>
-            )}
-          </nav>
           <div className={`workbench-toolbar mode-${shownWorkbench}`}>
+            <nav className="workbench-nav" aria-label="Workbench">
+              {(['wallet', 'graph', 'analysis'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  aria-pressed={shownWorkbench === mode}
+                  className={shownWorkbench === mode ? 'active' : ''}
+                  onClick={() => switchWorkbench(mode)}
+                >
+                  {mode === 'wallet' ? (
+                    <WalletIcon size={15} />
+                  ) : mode === 'graph' ? (
+                    <GitBranch size={15} />
+                  ) : (
+                    <Search size={15} />
+                  )}
+                  {WORKBENCH_LABELS[mode]}
+                </button>
+              ))}
+              {!tourStep && returnWorkbench && returnWorkbench !== workbench && (
+                <button
+                  className="workbench-return"
+                  onClick={() => switchWorkbench(returnWorkbench, true)}
+                >
+                  <ArrowLeft size={14} />
+                  Back to {WORKBENCH_LABELS[returnWorkbench]}
+                </button>
+              )}
+            </nav>
             <div className="lookup-controls" data-tour="chain-lookup">
               <form className="search-form" onSubmit={search}>
                 <Search size={17} />
@@ -2034,9 +2095,12 @@ export default function App() {
                 <button
                   type="submit"
                   className="search-go"
-                  disabled={!canQuery || !!operation || !query.trim()}
+                  aria-label="Add to graph"
+                  disabled={
+                    (!canQuery && !loadedLookupId(query.trim())) || !!operation || !query.trim()
+                  }
                 >
-                  Add to graph <Plus size={14} />
+                  <span>Add to graph</span> <Plus size={14} />
                 </button>
               </form>
               {!w.demo && (
