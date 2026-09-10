@@ -22,6 +22,7 @@ export function frameCamera(
     height: number;
     padding: number;
     topInset?: number;
+    rightInset?: number;
     captions?: ReadonlyMap<string, { width: number; height: number; offsetY: number }>;
     target?: Point;
   },
@@ -143,8 +144,14 @@ export function frameCamera(
     Math.max(options.padding, options.topInset ?? 0),
     options.height * 0.5,
   );
-  const usableX =
-    ((tanY * options.width) / options.height) * (1 - (2 * horizontalPadding) / options.width);
+  const tanX = (tanY * options.width) / options.height;
+  const rightPadding = Math.min(
+    Math.max(horizontalPadding, options.rightInset ?? 0),
+    options.width * 0.5,
+  );
+  const leftSlope = tanX * (1 - (2 * horizontalPadding) / options.width);
+  const rightSlope = tanX * (1 - (2 * rightPadding) / options.width);
+  const horizontalShift = (tanX * (rightPadding - horizontalPadding)) / options.width;
   const topSlope = tanY * (1 - (2 * topPadding) / options.height);
   const bottomSlope = tanY * (1 - (2 * bottomPadding) / options.height);
   const verticalShift = (tanY * (topPadding - bottomPadding)) / options.height;
@@ -154,13 +161,15 @@ export function frameCamera(
   for (const b of bounds) {
     distance = Math.max(
       distance,
-      b.far + Math.max(Math.abs(b.left), Math.abs(b.right)) / usableX,
+      (b.right + b.far * rightSlope) / (rightSlope + horizontalShift),
+      (-b.left + b.far * leftSlope) / (leftSlope - horizontalShift),
       (b.top + b.far * topSlope) / (topSlope + verticalShift),
       (-b.bottom + b.far * bottomSlope) / (bottomSlope - verticalShift),
       b.far + 1,
     );
   }
   target.addScaledVector(up, distance * verticalShift);
+  target.addScaledVector(right, distance * horizontalShift);
   return {
     target: { x: target.x, y: target.y, z: target.z },
     position: {

@@ -6,7 +6,7 @@ export interface LayoutRequest {
   revision: number;
   dimensions?: 2 | 3;
   nodes: LayoutNode[];
-  links: Pick<RenderLink, 'source' | 'target'>[];
+  links: Pick<RenderLink, 'source' | 'target' | 'directed'>[];
   previous: [string, Position][];
 }
 export interface LayoutResult {

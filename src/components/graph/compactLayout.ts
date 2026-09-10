@@ -9,6 +9,7 @@ import {
 } from 'd3-force-3d';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
 import { anchoredForces, particleCollisions, type Particle } from './anchoredForces';
+import { groupedFlowLayout } from './groupedFlowLayout';
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const hash = (id: string) => {
@@ -20,6 +21,8 @@ const hash = (id: string) => {
 /** Static, deterministic force layout. d3 mutates only worker-owned particles/links.
  * Fixed anchors preserve the investigation across expansion and visibility changes. */
 export function compactLayout(request: LayoutRequest): LayoutResult {
+  const grouped = groupedFlowLayout(request);
+  if (grouped.length) request = { ...request, previous: [...request.previous, ...grouped] };
   const dimensions = request.dimensions ?? 3;
   const anchors = new Map(request.previous);
   const nodes = [...request.nodes].sort((a, b) => compare(a.id, b.id));
@@ -35,14 +38,14 @@ export function compactLayout(request: LayoutRequest): LayoutResult {
       revision: request.revision,
       positions: nodes.map((n) => [n.id, { ...anchors.get(n.id)! }]),
     };
-  const adjacent = new Map(nodes.map((n) => [n.id, [] as string[]]));
+  const adjacent = new Map(nodes.map((n) => [n.id, [] as { id: string; offset: number }[]]));
   const links = request.links
     .filter((l) => adjacent.has(l.source) && adjacent.has(l.target))
     .map((l) => ({ ...l }))
     .sort((a, b) => compare(a.source, b.source) || compare(a.target, b.target));
   for (const l of links) {
-    adjacent.get(l.source)!.push(l.target);
-    adjacent.get(l.target)!.push(l.source);
+    adjacent.get(l.source)!.push({ id: l.target, offset: l.directed ? 32 : 0 });
+    adjacent.get(l.target)!.push({ id: l.source, offset: l.directed ? -32 : 0 });
   }
   // Multi-source traversal seeds additions near their closest existing observation.
   const centers = new Map<string, Position>();
@@ -53,9 +56,10 @@ export function compactLayout(request: LayoutRequest): LayoutResult {
       queue.push(n.id);
     }
   for (let i = 0; i < queue.length; i++)
-    for (const id of adjacent.get(queue[i])!) {
+    for (const { id, offset } of adjacent.get(queue[i])!) {
       if (centers.has(id)) continue;
-      centers.set(id, centers.get(queue[i])!);
+      const point = centers.get(queue[i])!;
+      centers.set(id, { ...point, x: point.x + offset });
       queue.push(id);
     }
   const particles: Particle[] = nodes

@@ -1,11 +1,16 @@
+import { short } from '../domain/types';
+import type { GraphFlowContext } from './graph/flowContext';
+
 export function GraphLegend({
   dimensions,
   showAddresses,
   demo,
+  flowContext,
 }: {
   dimensions: 2 | 3;
   showAddresses: boolean;
   demo: boolean;
+  flowContext?: GraphFlowContext;
 }) {
   return (
     <>
@@ -15,14 +20,34 @@ export function GraphLegend({
         </div>
       )}
       <div className="graph-legend">
+        {flowContext && (
+          <span
+            className="graph-flow-context"
+            title={`Flow through ${flowContext.transactionId.slice(3)}`}
+          >
+            Flow · {short(flowContext.transactionId.slice(3))}
+          </span>
+        )}
         <span>
           <i className="entity-dot transaction" />
           Transaction
         </span>
         <span>
           <i className="entity-dot output" />
-          Output
+          {flowContext ? 'Other outputs' : 'Output'}
         </span>
+        {flowContext && (
+          <>
+            <span>
+              <i className="graph-flow-key input" />
+              Inputs
+            </span>
+            <span>
+              <i className="graph-flow-key output" />
+              Outputs
+            </span>
+          </>
+        )}
         {showAddresses && (
           <span>
             <i className="entity-dot address" />

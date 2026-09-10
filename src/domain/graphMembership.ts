@@ -1,0 +1,74 @@
+import { canonicalEntityNodeId } from './entityReferences';
+import type { GraphData, Workspace } from './types';
+import { setNodesHidden } from './visibility';
+import { buildGraph } from './workspace';
+import {
+  assertGraphNodeBudget,
+  MAX_GRAPH_ACTION_NODES,
+  MAX_GRAPH_NODES,
+} from './graphMembershipValidation';
+export {
+  assertGraphNodeBudget,
+  graphNodeIdsSchema,
+  MAX_GRAPH_ACTION_NODES,
+  MAX_GRAPH_NODES,
+  parseGraphNodeIds,
+} from './graphMembershipValidation';
+
+/** Seed legacy canvas membership before merging any newly loaded observations. */
+export function ensureGraphMembership(workspace: Workspace): Workspace {
+  if (workspace.view.graphNodeIds !== undefined) return workspace;
+  const graphNodeIds = buildGraph(workspace).nodes.map((node) => node.id);
+  assertGraphNodeBudget(graphNodeIds);
+  return { ...workspace, view: { ...workspace.view, graphNodeIds } };
+}
+
+/** Membership is independent of filters, temporary hiding and complete chain evidence. */
+export function projectGraphMembership(graph: GraphData, nodeIds?: Iterable<string>): GraphData {
+  if (nodeIds === undefined) return graph;
+  const admitted = new Set(nodeIds);
+  const nodes = graph.nodes.filter((node) => admitted.has(node.id));
+  const present = new Set(nodes.map((node) => node.id));
+  return {
+    nodes,
+    links: graph.links.filter((link) => present.has(link.source) && present.has(link.target)),
+  };
+}
+
+function actionNodeIds(workspace: Workspace, nodeIds: Iterable<string>): Set<string> {
+  const ids = new Set<string>();
+  let supplied = 0;
+  for (const value of nodeIds) {
+    if (++supplied > MAX_GRAPH_ACTION_NODES)
+      throw new Error('A graph action supports at most 50,000 entity references.');
+    ids.add(canonicalEntityNodeId(value, workspace.network));
+  }
+  return ids;
+}
+
+/** Add and reveal exactly the requested nodes without expanding their transactions. */
+export function addGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): Workspace {
+  const requested = actionNodeIds(workspace, nodeIds);
+  const initialized = ensureGraphMembership(workspace);
+  const admitted = new Set(initialized.view.graphNodeIds);
+  const previousSize = admitted.size;
+  for (const id of requested) admitted.add(id);
+  if (admitted.size > MAX_GRAPH_NODES)
+    throw new Error('Workspace exceeds the 110,000 graph entity limit.');
+  const added =
+    admitted.size === previousSize
+      ? initialized
+      : { ...initialized, view: { ...initialized.view, graphNodeIds: [...admitted] } };
+  return setNodesHidden(added, requested, false);
+}
+
+/** Remove only membership. Evidence, annotations, selection and saved geometry survive. */
+export function removeGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): Workspace {
+  const requested = actionNodeIds(workspace, nodeIds);
+  const initialized = ensureGraphMembership(workspace);
+  const previous = initialized.view.graphNodeIds!;
+  const graphNodeIds = previous.filter((id) => !requested.has(id));
+  return graphNodeIds.length === previous.length
+    ? initialized
+    : { ...initialized, view: { ...initialized.view, graphNodeIds } };
+}

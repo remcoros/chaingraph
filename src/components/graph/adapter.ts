@@ -10,6 +10,8 @@ export interface RenderNode {
   highlight: boolean;
   /** Selection emphasis independent of optional glow; older adapters may ignore it. */
   selected?: boolean;
+  /** Screen-space role accent, independent of physical geometry and layout. */
+  marker?: { shape: 'brackets' | 'ring'; color: string };
   x?: number;
   y?: number;
   z?: number;
@@ -24,6 +26,8 @@ export interface RenderLink {
   color: string;
   width: number;
   arrowLength: number;
+  /** Stable source-to-target layout direction; independent of selection styling. */
+  directed?: boolean;
 }
 export interface GraphFrame {
   nodes: readonly RenderNode[];
@@ -62,7 +66,7 @@ export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;
   update(frame: GraphFrame): void;
   /** topInset reserves overlaid navigation in CSS pixels, without reducing the canvas. */
-  resize(width: number, height: number, topInset?: number): void;
+  resize(width: number, height: number, topInset?: number, rightInset?: number): void;
   focus(id: string): void;
   fit(): void;
   /** Optional viewport zoom: factor < 1 moves closer, > 1 moves away. */

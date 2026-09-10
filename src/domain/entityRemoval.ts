@@ -1,6 +1,6 @@
 import { canonicalAddress, canonicalEntityNodeId } from './entityReferences';
 import { outputNodeId, short, txNodeId, type Workspace } from './types';
-import { outputAddress } from './workspace';
+import { buildGraph, outputAddress } from './workspace';
 import { buildWalletMatches } from './tags';
 
 export interface EntityRemovalPlan {
@@ -163,6 +163,26 @@ export function planEntityRemoval(
   };
 }
 
+/** Forget vanished entities without dropping shared outpoints or unrelated future references. */
+function pruneRemovedGraphMembership(before: Workspace, after: Workspace): Workspace {
+  const admitted = before.view.graphNodeIds;
+  if (!admitted?.length) return after;
+  const fullGraph = (workspace: Workspace) =>
+    buildGraph({
+      ...workspace,
+      inputContext: undefined,
+      view: { ...workspace.view, showAddresses: true },
+    });
+  const remaining = new Set(fullGraph(after).nodes.map((node) => node.id));
+  const vanished = new Set(
+    fullGraph(before).nodes.flatMap((node) => (remaining.has(node.id) ? [] : [node.id])),
+  );
+  const graphNodeIds = admitted.filter((id) => !vanished.has(id));
+  return graphNodeIds.length === admitted.length
+    ? after
+    : { ...after, view: { ...after.view, graphNodeIds } };
+}
+
 /** Re-plan at application time; callers confirm against the active workspace immediately before calling. */
 export function removeWorkspaceEntity(workspace: Workspace, reference: string): Workspace {
   const plan = planEntityRemoval(workspace, reference);
@@ -176,14 +196,14 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
     nodeIds: tag.nodeIds.filter((id) => !affected.has(id)),
   }));
   if (plan.kind === 'watched-address')
-    return {
+    return pruneRemovedGraphMembership(workspace, {
       ...workspace,
       watchedAddresses: workspace.watchedAddresses.filter(
         (address) => canonicalAddress(address) !== plan.nodeId.slice(5),
       ),
       annotations,
       tags,
-    };
+    });
   const removed = new Set(plan.removedTransactionIds);
   const transactions = { ...workspace.transactions };
   for (const id of removed) delete transactions[id];
@@ -219,7 +239,7 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
       }),
   );
   const filters = workspace.view.filters;
-  return {
+  return pruneRemovedGraphMembership(workspace, {
     ...workspace,
     inputContext: Object.keys(inputContext).length ? inputContext : undefined,
     contextTransactionIds: workspace.contextTransactionIds?.filter((id) => !removed.has(id)),
@@ -257,5 +277,5 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
           ? { ...workspace.view.transactionFlow, transactionId: undefined }
           : workspace.view.transactionFlow,
     },
-  };
+  });
 }

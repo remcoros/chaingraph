@@ -88,6 +88,7 @@ export class FlowRenderer implements GraphAdapter {
   private width = 0;
   private height = 0;
   private inset = 0;
+  private rightInset = 0;
   private firstFit = true;
   private pendingFit = false;
   private pendingFocus?: string;
@@ -485,7 +486,7 @@ export class FlowRenderer implements GraphAdapter {
     }
     const signature = JSON.stringify([
       this.nodes.map((n) => [n.id, n.shape, n.fx ?? n.x, n.fy ?? n.y, n.fz ?? n.z]),
-      this.links.map((l) => [l.source, l.target]),
+      this.links.map((l) => [l.source, l.target, l.directed]),
     ]);
     if (signature === this.topology) {
       this.refresh();
@@ -507,7 +508,7 @@ export class FlowRenderer implements GraphAdapter {
         fy,
         fz,
       })),
-      links: this.links.map(({ source, target }) => ({ source, target })),
+      links: this.links.map(({ source, target, directed }) => ({ source, target, directed })),
       previous: [...this.cache],
     };
     this.pending = request;
@@ -609,12 +610,17 @@ export class FlowRenderer implements GraphAdapter {
     this.displayedLinks = this.links;
     this.invalidate();
   }
-  resize(width: number, height: number, topInset = 0) {
+  resize(width: number, height: number, topInset = 0, rightInset = 0) {
     if (this.dead) return;
-    const changed = this.width !== width || this.height !== height || this.inset !== topInset;
+    const changed =
+      this.width !== width ||
+      this.height !== height ||
+      this.inset !== topInset ||
+      this.rightInset !== rightInset;
     this.width = Math.max(0, width);
     this.height = Math.max(0, height);
     this.inset = topInset;
+    this.rightInset = rightInset;
     if (!width || !height) {
       cancelAnimationFrame(this.raf);
       this.raf = 0;
@@ -678,6 +684,7 @@ export class FlowRenderer implements GraphAdapter {
       height: this.height,
       padding: Math.min(46, this.height * 0.2),
       topInset: this.inset + 24,
+      rightInset: this.rightInset,
       target: id ? this.positions.get(id) : undefined,
     });
     if (pose) {
@@ -731,7 +738,8 @@ export class FlowRenderer implements GraphAdapter {
   private placeLabels() {
     const candidates = this.nodes
       .map((n) => {
-        if (!n.text && !n.selected && !n.highlight && n.id !== this.hovered) return undefined;
+        if (!n.text && !n.selected && !n.highlight && !n.marker && n.id !== this.hovered)
+          return undefined;
         const p = this.positions.get(n.id);
         if (!p) return undefined;
         const world = new Vector3(p.x, p.y, this.dimensions === 2 ? 0 : p.z);
@@ -782,6 +790,20 @@ export class FlowRenderer implements GraphAdapter {
       el.style.height = `${h}px`;
       el.style.setProperty('--node-tint', color);
     };
+    // Role markers are appearance only. They never change mesh size, picking or placement.
+    for (const { n, p, radius } of candidates) {
+      if (!n.marker || (radius < 3 && !n.selected && n.id !== this.hovered)) continue;
+      const r = Math.max(4, radius + 1.5);
+      append(
+        '',
+        ((p.x + 1) * this.width) / 2 - r,
+        ((1 - p.y) * this.height) / 2 - r,
+        r * 2,
+        r * 2,
+        `flow-node-marker flow-marker-${n.marker.shape}${n.selected || n.id === this.hovered ? ' active' : ''}`,
+        n.marker.color,
+      );
+    }
     // Selection brackets and restrained glow remain visible even with all text off.
     for (const { n, p, radius } of candidates) {
       if (!n.selected && !n.highlight && n.id !== this.hovered) continue;

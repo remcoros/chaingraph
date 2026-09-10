@@ -378,13 +378,50 @@ describe('default renderer responsiveness and snapshots', () => {
     renderer.update({
       ...original,
       nodes: original.nodes.map((node, i) =>
-        i ? node : { ...node, text: 'My label', selected: true },
+        i
+          ? node
+          : {
+              ...node,
+              text: 'My label',
+              selected: true,
+              marker: { shape: 'brackets', color: '#83baff' },
+            },
       ),
     });
     expect(mesh.instanceMatrix.version).toBe(version);
     expect(bounds).not.toHaveBeenCalled();
     expect(edge.geometry.getAttribute('start').version).toBe(edgeVersion);
     expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(1);
+    renderer.dispose();
+  });
+
+  it('keeps contextual marker changes out of pending layout jobs and preserves the settled camera and positions', () => {
+    const { renderer, events } = setup();
+    const original = frame(100);
+    renderer.update(original);
+    const worker = WorkerMock.instances[0];
+    const contextual = (shape: 'brackets' | 'ring'): GraphFrame => ({
+      ...original,
+      nodes: original.nodes.map((n, i) =>
+        i ? n : { ...n, selected: true, marker: { shape, color: '#83baff' } },
+      ),
+      links: original.links.map((l) => ({ ...l, color: '#83baff' })),
+    });
+    renderer.update(contextual('brackets'));
+    renderer.update(contextual('ring'));
+    expect(worker.postMessage).toHaveBeenCalledTimes(1);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    worker.reply();
+    renderer.camera.position.set(44, 55, 66);
+    renderer.flushSnapshot();
+    const saved = vi.mocked(events.snapshot!).mock.calls.at(-1)![0];
+    vi.mocked(events.layout!).mockClear();
+    renderer.update(contextual('brackets'));
+    renderer.flushSnapshot();
+    expect(events.layout).not.toHaveBeenCalled();
+    expect(worker.postMessage).toHaveBeenCalledTimes(1);
+    expect(renderer.camera.position.toArray()).toEqual([44, 55, 66]);
+    expect(vi.mocked(events.snapshot!).mock.calls.at(-1)![0]).toEqual(saved);
     renderer.dispose();
   });
 });

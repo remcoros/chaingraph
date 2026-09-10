@@ -381,7 +381,11 @@ export class WorkspaceSessionStore {
                         current.data,
                         data,
                       ),
-                      view: { ...data.view, hiddenNodeIds: snapshot.view.hiddenNodeIds },
+                      view: {
+                        ...data.view,
+                        hiddenNodeIds: snapshot.view.hiddenNodeIds,
+                        graphNodeIds: snapshot.view.graphNodeIds,
+                      },
                     })),
             },
       ),

@@ -124,6 +124,22 @@ describe('browser encrypted-save worker lifecycle', () => {
 });
 
 describe('browser workspace read worker lifecycle', () => {
+  it('rejects a worker response that has not migrated the workspace schema', async () => {
+    setup();
+    const result = decryptWorkspaceOffThread(envelope, 'public fixture password');
+    const rejected = expect(result).rejects.toThrow('unexpected result');
+    const worker = await latest();
+    worker.onmessage?.({
+      data: {
+        type: 'workspace-decrypted',
+        id: worker.request!.id,
+        workspace: { ...workspace, version: 1 },
+      },
+    } as MessageEvent);
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
   it('sends encrypted files to the worker and returns the validated workspace', async () => {
     setup();
     const file = new Blob(['encrypted file fixture']);

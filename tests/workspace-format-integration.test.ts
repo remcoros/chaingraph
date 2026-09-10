@@ -1,8 +1,12 @@
 import { createCipheriv, pbkdf2Sync } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
-import { encryptWorkspace, type EncryptedEnvelope } from '../src/lib/crypto';
-import { decryptAndValidateWorkspace } from '../src/lib/workspaceEncryption';
+import { buildGraph, newWorkspace } from '../src/domain/workspace';
+import type { Workspace } from '../src/domain/types';
+import { decryptWorkspace, encryptWorkspace, type EncryptedEnvelope } from '../src/lib/crypto';
+import {
+  decryptAndValidateWorkspace,
+  validateAndEncryptWorkspace,
+} from '../src/lib/workspaceEncryption';
 import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
 import { transactionScheduler } from '../src/lib/transactionScheduler';
 
@@ -55,6 +59,28 @@ function savedIndex(workspace: { id: string; name: string }, envelope: unknown) 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('workspace format at persistence and import boundaries', () => {
+  it('validates legacy observations before persisting migrated membership without dropping other fields', async () => {
+    const current = newWorkspace('Legacy save fixture', 'mainnet');
+    const txid = 'a'.repeat(64);
+    current.transactions[txid] = {
+      txid,
+      vin: [{ coinbase: '00' }],
+      vout: [{ n: 0, value: 1, scriptPubKey: {} }],
+    };
+    const { graphNodeIds: _membership, ...view } = current.view;
+    const legacy = { ...current, version: 1, view, retainedField: 'public fixture metadata' };
+    const original = structuredClone(legacy);
+    const saved = await validateAndEncryptWorkspace(legacy as unknown as Workspace, password);
+    expect(await decryptWorkspace(saved, password)).toMatchObject({
+      version: 2,
+      view: { graphNodeIds: buildGraph(current).nodes.map((node) => node.id) },
+      retainedField: 'public fixture metadata',
+    });
+    const restored = await decryptAndValidateWorkspace(saved, password);
+    expect(restored.view.graphNodeIds).toEqual(buildGraph(current).nodes.map((node) => node.id));
+    expect(legacy).toEqual(original);
+  });
+
   it('unlocks a versionless v1 save without rewriting it, then checkpoints edits and exports v2', async () => {
     const current = newWorkspace('Legacy fixture', 'testnet4');
     const { version: _version, ...legacy } = current;

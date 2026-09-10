@@ -1,4 +1,5 @@
 import type { Workspace } from '../domain/types';
+import { CURRENT_WORKSPACE_VERSION } from '../domain/workspaceMigrations';
 import { MAX_ENCRYPTED_FILE_BYTES, type EncryptedEnvelope } from './crypto';
 import { decryptAndValidateWorkspace, validateAndEncryptWorkspace } from './workspaceEncryption';
 import { operationError, operationErrorCode } from './workspaceOperationError';
@@ -79,7 +80,7 @@ function workerJob(request: Request, signal?: AbortSignal): Promise<EncryptedEnv
         if (
           result.type !== 'workspace-decrypted' ||
           !workspace ||
-          workspace.version !== 1 ||
+          workspace.version !== CURRENT_WORKSPACE_VERSION ||
           typeof workspace.id !== 'string'
         ) {
           finish(operationError('worker-unexpected'));

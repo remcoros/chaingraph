@@ -52,7 +52,7 @@ These are independent contracts. The outer envelope `version` describes encrypti
 | Contract | Reads | Writes |
 | --- | --- | --- |
 | Encrypted envelope | v1 raw UTF-8 JSON; v2 authenticated `compression: "none"` or `"gzip"` | v2 only |
-| Decrypted workspace schema | absent version (legacy) migrates to 1; explicit version 1 | version 1 |
+| Decrypted workspace schema | versionless and v1 migrate to v2; explicit v2 | version 2 |
 | Browser storage | existing public index and IndexedDB names/references | unchanged coordination and publication protocol |
 
 Both envelope versions fix AES-256-GCM, PBKDF2-SHA256 with 600,000 iterations, a fresh 16-byte salt, and a fresh 12-byte IV per encryption. Keys are still derived per operation; compression does not change password or key lifetime. Import cannot request arbitrary KDF work. V1 additional authenticated data retains its exact original JSON key order: `format`, `version`, `cipher`, `kdf`, `iterations`, `salt`, `iv`. V2 uses that order with `compression` inserted before `salt`. The format version defines the codec contract, so a separate codec revision field would be redundant: v2 gzip means exactly one complete RFC 1952 member, and none means raw UTF-8 JSON. Unknown fields, unsupported versions/codecs/settings, and invalid encodings are rejected. Changing between supported codecs or stripping compression and changing to v1 fails authentication.
@@ -61,7 +61,7 @@ Saves validate the workspace, serialize UTF-8 JSON, and attempt native gzip befo
 
 AES-GCM authentication completes before any decompressor is constructed. Compressed input is fed in at most 1 KiB chunks, and output chunks are counted before retention. Crossing 32 MiB cancels the stream immediately; no unbounded `Response.arrayBuffer()` collector is used. Truncated members, invalid checksums, trailing data, invalid UTF-8/JSON and excessive expansion reject before domain use. The same 32 MiB plaintext bound applies before encryption and to legacy reads; ciphertext/file bounds remain based on uncompressed capacity so old large backups stay readable. Native codec internals, structured cloning, JSON objects/strings and final bounded buffer assembly still consume memory beyond that byte count. Buffer zeroing is best effort and is not secure erasure from JavaScript memory. Browser quotas are separate limits.
 
-`src/domain/workspaceMigrations.ts` is the single small migration boundary called by `parseWorkspace`. Only an absent own `version` identifies legacy data; explicit null, zero, unknown or future values are not guessed. Migration creates a new root object and stamps schema 1 without mutating the decoded original; the existing budget, Zod, network, prevout consistency and wallet-binding checks run afterward. Existing supported domain fields retain their validation semantics. To add a data change, increment `CURRENT_WORKSPACE_VERSION`, update domain types/schema, and add explicit deterministic old-to-new steps here with round-trip, failure and data-preservation fixtures. New persisted fields or changed meanings must advance the schema version so an older reader rejects them instead of stripping unfamiliar data. Do not put migrations in UI components or persistence callbacks.
+`src/domain/workspaceMigrations.ts` is the single small migration boundary called by `parseWorkspace`. Versionless and v1 data migrate to schema v2; explicit null, zero, unknown or future values are not guessed. Migration creates a new root object without mutating the decoded original. After budget, Zod, network, prevout consistency and wallet-binding validation, legacy data receives explicit graph membership from its previous scoped graph. Current v2 data must include membership, including an empty list for an intentionally empty canvas. Existing supported domain fields retain their validation semantics. To add a data change, increment `CURRENT_WORKSPACE_VERSION`, update domain types/schema, and add explicit deterministic old-to-new steps here with round-trip, failure and data-preservation fixtures. New persisted fields or changed meanings must advance the schema version so an older reader rejects them instead of stripping unfamiliar data. Do not put migrations in UI components or persistence callbacks.
 
 Unlock/import never writes a migration back by itself. The next successful write of edited data, or an export, uses envelope v2 and the current schema. An unchanged legacy workspace can remain v1 until a write is needed. Unsupported future inline formats make the saved index read-only rather than permitting overwrite; referenced-envelope and schema failures cannot open a session. Failed saves retain the previous encrypted index/blob, unlocked edits and the same transient transaction fetch scope. Compression workers receive only `Session.data`, never the session or its fetch scope. Scope disposal remains after successful lock publication, and reopening creates a fresh scope. Original imported files are never modified. Older app releases cannot read v2, so retain originals when crossing releases. See [wallet and encryption research](research/wallet-security.md).
 
@@ -341,11 +341,12 @@ the collapsed window.
 New successful lookups issue an explicit adapter focus request, independently of
 selection locking. Requests wait for finite node coordinates and run once; manual
 navigation or Fit cancels pending focus. Input loading and failed tracing do not
-refit the camera. Value sizing uses an absolute bounded square-root radius, stable across filtering
-and later additions: `2.4 + 17.6 * sqrt(sats / (sats + 1e12))`. Zero retains a
-selectable radius of 2.4; unknown amounts use the default 3.2. The smooth upper
-limit of 20 avoids an abrupt plateau for large outputs. This is visual emphasis,
-not proportional sphere volume or projected area. Selected flow arrows are larger.
+refit the camera. Value sizing uses the fixed logarithmic radius
+`1.6 + 0.9 * log10(1 + sats / 10000)`, stable across filtering and additions.
+Zero retains a selectable radius of 1.6; unknown amounts use the default 3.2.
+20,000 sats has radius 2.03 and 150,000,000 sats radius 5.36; the full Bitcoin
+supply remains below radius 12. There is no high-value plateau. This is logarithmic
+visual emphasis, not proportional sphere volume or projected area. Selected flow arrows are larger.
 
 Amount presets use strict greater-than semantics. `filterSmallAmounts` compares
 reachability from independent transaction roots and the selection before/after
@@ -608,13 +609,51 @@ addresses or the scan time change and never enter storage.
 
 ### Default flow renderer
 
-`graph/defaultAdapter.ts` selects `FlowRenderer`, adopted from the flow renderer v2 experiment.
-Fresh layouts use a stopped d3-force-3d simulation. Incremental layouts simulate
-only new nodes: fixed links act as tethers, and a static spatial grid resolves
-nearby fixed-node collisions. Existing coordinates never receive simulation ticks.
-Moving-node collision resolution uses a numeric spatial grid over adjacent cells,
-avoiding repeated octree allocation while retaining deterministic simulation and
-exact saved anchors. One worker job runs at a time. A newer topology terminates
+Workspace schema v2 stores explicit `view.graphNodeIds`, independently of complete
+transaction observations and manual hiding. Graph derives full loaded evidence
+without `inputContext` restrictions, then projects membership before canvas filters.
+Selection admits only the clicked node; explicit tracing admits requested transactions
+and connecting outpoints. New examples begin with their root and chosen selection.
+The icons-only right toolbar exposes exact input/output group and batch actions;
+branch removal keeps outpoints connected to another admitted transaction. Removing
+from the graph preserves evidence, annotations and cached geometry. Membership undo
+survives camera/selection autosaves. Migration and canonical network validation run
+at the existing worker boundary; no backend state is added.
+
+The contextual input/output experiment indexes loaded `creates`/`spends` relationships
+in `graph/flowContext.ts`. Transaction selection establishes the context; outpoint
+selection retains a related transaction from the saved flow-panel choice, falling
+back to its loaded creator or first loaded spender. Address selection is neutral.
+Roles are projected before canvas filtering and remain transient presentation.
+Screen-space bracket/ring markers and edge colors distinguish roles without changing
+mesh shapes, radii, node identity or layout signatures. Annotation/finding colors
+retain node-fill precedence, and the selection accent remains independent.
+An optional stable `RenderLink.directed` hint carries observed source-to-target
+relationships into `graph/groupedFlowLayout.ts`. It separates terminal outpoints
+from shared bridge outpoints using visible directed relationships. Terminal inputs
+and outputs occupy bounded local groups attached to their transaction. Packing uses
+actual node radii and spaced X/Y footprints, then lifts new nodes onto a rounded
+front/back shell with depth proportional to the occupied group radius. Flat mode
+keeps the two-dimensional footprint. Address associations do not change
+an outpoint's directed role. Shared outpoints remain single canonical nodes.
+
+The transaction skeleton determines branch placement before terminal groups are
+filled. Fresh components use topological X ordering so reconvergent paths remain
+forward. Multiple shared outpoints use a compact peer grid rather than a long strip.
+Bridge edges keep stronger strokes and arrowheads even beside dense local fans. Incremental placement keeps all cached coordinates exact, searches near
+anchored outpoints for new transactions, and avoids occupied group envelopes.
+Consequently, a previously terminal outpoint can stay inside a group when it becomes
+a bridge. Explicit Repack rebuilds the visible skeleton and groups together.
+No space is reserved for undisplayed siblings. Role outlines are restrained and
+omitted when too small to read, while node colors, selection and hover remain.
+Fit and focus reserve the right toolbar and top navigation without changing nodes.
+No ownership or individual input-to-output value allocation is inferred.
+
+`graph/defaultAdapter.ts` selects `FlowRenderer`, adopted from the flow renderer v2
+experiment. Recognized transaction/outpoint topology uses the grouped layout.
+Remaining associations use a stopped d3-force-3d simulation anchored to the grouped
+positions. Fixed links act as tethers and spatial grids resolve nearby collisions.
+Existing coordinates never receive simulation ticks. One worker job runs at a time. A newer topology terminates
 obsolete work immediately; stale or duplicate replies cannot replace the latest
 request. Views whose nodes already have cached positions restore synchronously
 without simulation, including turning off a large neighbor expansion.

@@ -39,3 +39,19 @@
 .flow-node-ring.glow {
   box-shadow: 0 0 10px 2px color-mix(in srgb, var(--node-tint) 24%, transparent);
 }
+.flow-node-marker {
+  color: var(--node-tint);
+  opacity: 0.55;
+}
+.flow-node-marker.active {
+  opacity: 1;
+}
+.flow-marker-brackets {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  mask: linear-gradient(to right, #000 0 28%, transparent 28% 72%, #000 72% 100%);
+}
+.flow-marker-ring {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}

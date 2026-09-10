@@ -642,6 +642,7 @@ export async function createTemplateWorkspace(
     showTags: true,
     showIcons: true,
     selectionId: selected,
+    graphNodeIds: [...new Set([txNodeId(snapshot.roots[0]), selected])],
     leftTab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks',
     rightTab: 'inspect',
     prefetchDepth: 0,

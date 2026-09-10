@@ -20,6 +20,7 @@ import {
   type Transaction,
 } from '../domain/types';
 import './graph.css';
+import type { GraphFlowContext } from './graph/flowContext';
 import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
 import {
   graphSnapshotSchema,
@@ -48,9 +49,12 @@ export interface GraphViewProps extends VisibilityProps {
   navigation?: ReactNode;
   /** Filter/visibility context below every floating control group. */
   navigationStatus?: ReactNode;
+  /** Contextual actions float along the right edge without remounting the renderer. */
+  contextToolbar?: ReactNode;
   renderMetadata?: (nodeId: string) => ReactNode;
   legend?: ReactNode;
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
+  flowContext?: GraphFlowContext;
   nodes: GraphNode[];
   links: GraphLink[];
   selectedId?: string;
@@ -84,6 +88,7 @@ export default function GraphView(props: GraphViewProps) {
   current.current = props;
   const cardRef = useRef<HTMLElement>(null);
   const navigationRef = useRef<HTMLDivElement>(null);
+  const contextToolbarRef = useRef<HTMLDivElement>(null);
   const resizeGraph = useRef<(() => void) | undefined>(undefined);
   const pointer = useRef({ x: 0, y: 0, touch: false });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -287,7 +292,10 @@ export default function GraphView(props: GraphViewProps) {
         const topInset = navigation?.height
           ? Math.max(0, navigation.bottom - element.getBoundingClientRect().top + 8)
           : 0;
-        adapter?.resize(width, height, topInset);
+        const context = contextToolbarRef.current?.getBoundingClientRect();
+        const rightInset = context?.width ? context.width + 24 : 0;
+        element.parentElement?.style.setProperty('--graph-context-right-inset', `${rightInset}px`);
+        adapter?.resize(width, height, topInset, rightInset);
       };
       resizeGraph.current = resize;
       resize();
@@ -311,14 +319,16 @@ export default function GraphView(props: GraphViewProps) {
   }, [adapterFactory]);
 
   const hasNavigation = Boolean(props.navigation);
+  const hasContextToolbar = Boolean(props.contextToolbar);
   useEffect(() => {
     const navigation = navigationRef.current;
     resizeGraph.current?.();
     if (!navigation) return;
     const observer = new ResizeObserver(() => resizeGraph.current?.());
     observer.observe(navigation);
+    if (contextToolbarRef.current) observer.observe(contextToolbarRef.current);
     return () => observer.disconnect();
-  }, [hasNavigation, adapterFactory]);
+  }, [hasNavigation, hasContextToolbar, adapterFactory]);
 
   useEffect(() => {
     if (containerRef.current)
@@ -335,6 +345,7 @@ export default function GraphView(props: GraphViewProps) {
     props.showTags,
     props.showIcons,
     props.nodePresentation,
+    props.flowContext,
   ]);
 
   useEffect(() => {
@@ -354,6 +365,7 @@ export default function GraphView(props: GraphViewProps) {
       : hoveredNode.txid || hoveredNode.address || hoveredNode.id
     : '';
   const hoveredPresentation = hoveredNode && props.nodePresentation?.get(hoveredNode.id);
+  const hoveredRole = hoveredNode && props.flowContext?.nodes.get(hoveredNode.id);
   // Explicit annotation metadata distinguishes human labels, even hex-shaped ones,
   // from generated identifiers. Keep the legacy display-label fallback for callers
   // without that metadata, shortening only an exact raw/canonical reference.
@@ -450,9 +462,15 @@ export default function GraphView(props: GraphViewProps) {
             <div className="graph-card-heading">
               <span
                 className={`graph-card-kind graph-card-kind-${hoveredNode.kind}`}
-                title={hoveredNode.kind}
+                title={
+                  hoveredRole
+                    ? `${hoveredRole === 'input' ? 'Input to' : 'Output from'} ${props.flowContext?.transactionId.slice(3)}`
+                    : hoveredNode.kind
+                }
               >
-                {hoveredNode.kind}
+                {hoveredRole
+                  ? `${hoveredRole === 'input' ? 'Input to' : 'Output from'} transaction`
+                  : hoveredNode.kind}
               </span>
               <div className="graph-card-actions" role="group" aria-label="Graph item actions">
                 <VisibilityActions
@@ -463,6 +481,7 @@ export default function GraphView(props: GraphViewProps) {
                       : undefined
                   }
                   hiddenNodeIds={props.hiddenNodeIds}
+                  graphNodeIds={props.graphNodeIds}
                   onSetHidden={props.onSetHidden}
                   onOpenChange={(open) => {
                     visibilityOpen.current = open;
@@ -723,6 +742,16 @@ export default function GraphView(props: GraphViewProps) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {props.contextToolbar && (
+          <div
+            ref={contextToolbarRef}
+            className="graph-context-overlay"
+            onPointerEnter={() => dismissCard()}
+            onFocusCapture={() => dismissCard()}
+          >
+            {props.contextToolbar}
           </div>
         )}
         {props.legend}

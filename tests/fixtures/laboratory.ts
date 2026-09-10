@@ -1,4 +1,4 @@
-import { newWorkspace } from '../../src/domain/workspace';
+import { buildGraph, newWorkspace } from '../../src/domain/workspace';
 import type { Transaction, Workspace } from '../../src/domain/types';
 // Deliberately synthetic, deterministic fixture; never presented as chain data.
 export function laboratoryWorkspace(): Workspace {
@@ -54,5 +54,7 @@ export function laboratoryWorkspace(): Workspace {
       };
     }
   }
+  // This fixture intentionally exercises a fully populated canvas.
+  w.view.graphNodeIds = buildGraph(w).nodes.map((node) => node.id);
   return w;
 }
