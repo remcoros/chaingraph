@@ -115,22 +115,17 @@ describe('bounded connection traversal', () => {
     expect(displayed.results.filter((result) => result.kind === 'connection')).toEqual([]);
   });
 
-  it('stops at targets rather than expanding through them', async () => {
-    const calls: string[] = [];
+  it('stops a newly discovered direct path at its first target', async () => {
     const input = options(pathEdges, {
-      targetIds: [tx(2)],
+      targetIds: [tx(2), tx(3)],
+      displayedNodeIds: [tx(1), tx(2), tx(3)],
       settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream' },
     });
-    const original = input.resolveNeighbors;
-    input.resolveNeighbors = async (...args) => {
-      calls.push(args[0]);
-      return original(...args);
-    };
     const run = await runConnectionScan(input);
     expect(
       run.results.some((result) => result.endpoint === tx(2) && result.kind === 'connection'),
     ).toBe(true);
-    // The target-side meeting front may expand its own root, but source never reports farther endpoints.
+    // The first path adds out(1); stop there even though tx(3) is also a target.
     expect(
       run.results
         .filter((result) => result.kind === 'connection')

@@ -50,8 +50,10 @@ function referenceConnections(
     : [direction]) {
     function walk(path: string[], directions: ScanDirection[], turned: boolean, hops: number) {
       const node = path.at(-1)!;
-      if (path.length > 1 && targetSet.has(node)) {
-        if (path.some((id) => !shown.has(id))) {
+      const reachesTarget = path.length > 1 && targetSet.has(node);
+      const hasNewNode = path.some((id) => !shown.has(id));
+      if (reachesTarget) {
+        if (hasNewNode) {
           const relationship = turned
             ? initial === 'upstream'
               ? 'shared-ancestor'
@@ -59,13 +61,13 @@ function referenceConnections(
             : 'direct';
           found.add(`${node}|${relationship}`);
         }
-        // A graph target may itself be a meeting point, but cannot be
-        // traversed farther in the original direction.
+        // Displayed paths are context, not discoveries: continue through them
+        // to find a new route beyond the selected transaction's immediate I/O.
+        // A newly discovered target can still be a direction-change point.
         if (turned) return;
       }
       const current = directions.at(-1) ?? initial;
-      const nextDirections: ScanDirection[] =
-        path.length > 1 && targetSet.has(node) ? [] : [current];
+      const nextDirections: ScanDirection[] = reachesTarget && hasNewNode ? [] : [current];
       if (!turned && path.length > 1) {
         nextDirections.push(current === 'upstream' ? 'downstream' : 'upstream');
       }
@@ -161,6 +163,27 @@ async function scanConnections(
 
 describe('connection search independent DAG oracle', () => {
   it.each(['upstream', 'downstream', 'both'] as const)(
+    'matches selected transactions with their whole immediate input/output neighborhood for %s searches',
+    async (direction) => {
+      for (let mask = 0; mask < 64; mask++) {
+        const edges = transactionDag(mask);
+        for (let sourceIndex = 1; sourceIndex <= 4; sourceIndex++) {
+          const source = tx(sourceIndex);
+          const targets = [
+            ...new Set(
+              edges.flatMap(([from, to]) => (from === source ? [to] : to === source ? [from] : [])),
+            ),
+          ];
+          const displayed = [source, ...targets];
+          const expected = referenceConnections(edges, source, targets, displayed, direction, 4);
+          const actual = await scanConnections(edges, source, targets, direction, 4, displayed);
+          expect(actual, `neighborhood DAG mask ${mask}, source ${source}`).toEqual(expected);
+        }
+      }
+    },
+  );
+
+  it.each(['upstream', 'downstream', 'both'] as const)(
     'matches seeded seven-transaction DAGs with hidden targets and renamed IDs for %s searches',
     async (direction) => {
       let random = 0x5eed;
@@ -202,7 +225,7 @@ describe('connection search independent DAG oracle', () => {
               );
               expect(
                 actual,
-                `seeded fixture ${fixture}, reversed ${reversed}, source ${source}, hops ${maxHops}`,
+                `seeded fixture ${fixture}, reversed ${reversed}, source ${source}, targets ${targets.join(',')}, hops ${maxHops}`,
               ).toEqual(expected);
             }
           }

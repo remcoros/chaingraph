@@ -169,7 +169,9 @@ interface Front {
   queue: Visit[];
   cursor: number;
   visited: Map<string, Visit>;
-  /** Reverse edges preserve target branches that meet an already visited node. */
+  /** A displayed-only arrival can continue where a novel target arrival stopped. */
+  displayedVisits: Set<string>;
+  /** Retain reconverging branches without fetching every possible path. */
   predecessors: Map<string, Set<string>>;
   successors: Map<string, Set<string>>;
 }
@@ -241,6 +243,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         queue: visits,
         cursor: 0,
         visited: new Map(ids.map((id, i) => [id, visits[i]!])),
+        displayedVisits: new Set(ids.filter((id) => displayed.has(id))),
         predecessors: new Map<string, Set<string>>(),
         successors: new Map<string, Set<string>>(),
       };
@@ -319,35 +322,95 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     });
   };
   let reconstructionSteps = 0;
+  const reconstructionCheckpoint = async () => {
+    if (++reconstructionSteps % 256 === 0)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    budget.checkpoint();
+  };
+  const sourcePath = async (
+    front: Front,
+    witness: Visit,
+    forbidden: Set<string>,
+    maxHops: number,
+    needsNewNode: boolean,
+  ): Promise<Visit | undefined> => {
+    const meetingNode = witness.path.at(-1)!;
+    if (
+      witness.hops <= maxHops &&
+      !witness.path.some((id) => forbidden.has(id)) &&
+      (!needsNewNode || witness.path.some((id) => !displayed.has(id)))
+    )
+      return witness;
+    // A short displayed route, or one through the other leg, must not erase
+    // a longer useful route. Each node has at most two reconstruction states.
+    const queue = [{ path: [options.source], hops: 0, novel: !displayed.has(options.source) }];
+    const seen = new Set([`${options.source}:${queue[0]!.novel}`]);
+    for (let cursor = 0; cursor < queue.length; cursor++) {
+      await reconstructionCheckpoint();
+      if (reasons.has('results')) return;
+      const visit = queue[cursor]!;
+      const node = visit.path.at(-1)!;
+      if (node === meetingNode && (!needsNewNode || visit.novel)) return visit;
+      if (node !== options.source && targets.has(node) && visit.novel) continue;
+      for (const next of front.successors.get(node) ?? []) {
+        if (forbidden.has(next) || visit.path.includes(next)) continue;
+        const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
+        if (hops > maxHops) continue;
+        const novel = visit.novel || !displayed.has(next);
+        const key = `${next}:${novel}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        queue.push({ path: [...visit.path, next], hops, novel });
+      }
+    }
+  };
   const reportMeetings = async (direction: ScanDirection, sourceVisit: Visit) => {
-    // Expand each target node once, but retain every observed incoming edge.
-    // A first target witness must not erase later branches joining its ancestry.
     if (sourceVisit.path.length === 1) return;
+    const source = fronts.find(
+      (front) => front.side === 'source' && front.direction === direction,
+    )!;
     const target = fronts.find(
       (front) => front.side === 'target' && front.direction === direction,
     )!;
     const meetingNode = sourceVisit.path.at(-1)!;
+    if (targets.has(meetingNode)) {
+      const path = await sourcePath(source, sourceVisit, new Set(), settings.maxHops, true);
+      if (path)
+        addResult({
+          kind: 'connection',
+          relationship: 'direct',
+          endpoint: meetingNode,
+          scanDirection: direction,
+          path: path.path,
+          directions: Array<ScanDirection>(path.path.length - 1).fill(direction),
+        });
+    }
     if (!target.predecessors.has(meetingNode)) return;
-    const sourceNodes = new Set(sourceVisit.path);
     const visited = new Set([meetingNode]);
-    const queue = [{ path: [meetingNode], hops: sourceVisit.hops }];
+    const queue = [{ path: [meetingNode], hops: 0 }];
     for (let cursor = 0; cursor < queue.length; cursor++) {
-      if (++reconstructionSteps % 256 === 0)
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      budget.checkpoint();
+      await reconstructionCheckpoint();
       if (reasons.has('results')) return;
       const visit = queue[cursor]!;
       const node = visit.path.at(-1)!;
       if (visit.path.length > 1 && targets.has(node)) {
+        const prefix = await sourcePath(
+          source,
+          sourceVisit,
+          new Set(visit.path.slice(1)),
+          settings.maxHops - visit.hops,
+          visit.path.every((id) => displayed.has(id)),
+        );
+        if (!prefix) continue;
         addResult({
           kind: 'connection',
           relationship: direction === 'upstream' ? 'shared-ancestor' : 'shared-descendant',
           endpoint: node,
           meetingNode,
           scanDirection: direction,
-          path: [...sourceVisit.path, ...visit.path.slice(1)],
+          path: [...prefix.path, ...visit.path.slice(1)],
           directions: [
-            ...Array<ScanDirection>(sourceVisit.path.length - 1).fill(direction),
+            ...Array<ScanDirection>(prefix.path.length - 1).fill(direction),
             ...Array<ScanDirection>(visit.path.length - 1).fill(reverseDirection(direction)),
           ],
         });
@@ -355,7 +418,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
       }
       for (const next of target.predecessors.get(node) ?? []) {
         budget.checkpoint();
-        if (sourceNodes.has(next) || visited.has(next)) continue;
+        if (next === options.source || visited.has(next)) continue;
         const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
         if (hops > settings.maxHops) continue;
         visited.add(next);
@@ -372,7 +435,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
             .visited.get(visit.path.at(-1)!);
     if (sourceVisit) await reportMeetings(front.direction, sourceVisit);
   };
-  const refreshTargetMeetings = async (front: Front, node: string) => {
+  const refreshMeetings = async (front: Front, node: string) => {
     // A late branch can join below an intersection already processed above it.
     // Refresh those intersections now so a later timeout cannot hide found paths.
     const source = fronts.find(
@@ -381,9 +444,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     const seen = new Set([node]);
     const queue = [node];
     for (let cursor = 0; cursor < queue.length; cursor++) {
-      if (++reconstructionSteps % 256 === 0)
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      budget.checkpoint();
+      await reconstructionCheckpoint();
       if (reasons.has('results')) return;
       const current = queue[cursor]!;
       const visit = source.visited.get(current);
@@ -419,15 +480,10 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         await meeting(front, visit);
         if (reasons.has('results')) break scan;
         if (front.side === 'source' && targets.has(nodeId)) {
-          addResult({
-            kind: 'connection',
-            relationship: 'direct',
-            scanDirection: front.direction,
-            endpoint: nodeId,
-            path: visit.path,
-            directions: Array<ScanDirection>(visit.path.length - 1).fill(front.direction),
-          });
-          continue;
+          // A fully displayed prefix is existing graph context, not a new
+          // connection. Keep tracing through it so a selected transaction's
+          // visible inputs/outputs cannot fence off all undiscovered paths.
+          if (visit.path.some((id) => !displayed.has(id))) continue;
         }
         if (front.side === 'target' && nodeId === options.source) continue;
         // Entering the next transaction would exceed the hop limit. Do not
@@ -509,19 +565,26 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
             boundary(front, visit, 'depth');
             continue;
           }
-          if (front.side === 'target') {
-            const predecessors = front.predecessors.get(id) ?? new Set<string>();
-            predecessors.add(nodeId);
-            front.predecessors.set(id, predecessors);
-            const successors = front.successors.get(nodeId) ?? new Set<string>();
-            successors.add(id);
-            front.successors.set(nodeId, successors);
-          }
+          const predecessors = front.predecessors.get(id) ?? new Set<string>();
+          predecessors.add(nodeId);
+          front.predecessors.set(id, predecessors);
+          const successors = front.successors.get(nodeId) ?? new Set<string>();
+          successors.add(id);
+          front.successors.set(nodeId, successors);
+          const next = { path: [...visit.path, id], hops };
           if (front.visited.has(id)) {
-            if (front.side === 'target') await refreshTargetMeetings(front, id);
+            await refreshMeetings(front, id);
+            if (
+              front.side === 'source' &&
+              !front.displayedVisits.has(id) &&
+              next.path.every((node) => displayed.has(node))
+            ) {
+              front.displayedVisits.add(id);
+              front.queue.push(next);
+            }
             continue;
           }
-          const next = { path: [...visit.path, id], hops };
+          if (next.path.every((node) => displayed.has(node))) front.displayedVisits.add(id);
           front.visited.set(id, next);
           front.queue.push(next);
           await meeting(front, next);

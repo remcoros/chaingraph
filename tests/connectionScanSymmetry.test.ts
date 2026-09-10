@@ -44,6 +44,48 @@ function scan(edges: Edge[], overrides: Partial<ConnectionScanOptions>) {
 const connections = (results: ScanResult[]) => results.filter((item) => item.kind === 'connection');
 
 describe('connection search topology regressions', () => {
+  const bypassEdges: Edge[] = [
+    creates(1),
+    spends(1, 2),
+    creates(2),
+    spends(2, 3),
+    creates(1, 1),
+    spends(1, 3, 1),
+  ];
+  it.each([
+    ['upstream', tx(3), [tx(3), out(2), tx(2), out(1), tx(1), out(1, 1)]],
+    ['downstream', tx(1), [tx(1), out(1), tx(2), out(2), tx(3), out(1, 1)]],
+  ] as const)(
+    'retains a hidden %s bypass when the first meeting witness contains the target',
+    async (direction, source, path) => {
+      const run = await scan(bypassEdges, {
+        source,
+        targetIds: [out(1, 1)],
+        displayedNodeIds: [source, out(1, 1)],
+        settings: { ...DEFAULT_SCAN_SETTINGS, direction, maxHops: 2 },
+      });
+      expect(connections(run.results)).toContainEqual(
+        expect.objectContaining({ path: [...path], hops: 2 }),
+      );
+    },
+  );
+
+  it('retains a new direct route when a shorter fully displayed route reached the target first', async () => {
+    const run = await scan(bypassEdges, {
+      source: tx(3),
+      targetIds: [out(1, 1), tx(1)],
+      displayedNodeIds: [tx(3), out(1, 1), tx(1)],
+      settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'upstream', maxHops: 2 },
+    });
+    expect(connections(run.results)).toContainEqual(
+      expect.objectContaining({
+        relationship: 'direct',
+        path: [tx(3), out(2), tx(2), out(1), tx(1)],
+        hops: 2,
+      }),
+    );
+  });
+
   const branches = Array.from({ length: 5 }, (_, index) => ({
     index,
     first: 20 + index * 10,
