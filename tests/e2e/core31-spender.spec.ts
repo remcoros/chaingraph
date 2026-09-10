@@ -20,6 +20,10 @@ async function mockIndexedBitcoin(page: Page, mode: LookupMode) {
   );
   await page.route('**/api/rpc', async (route) => {
     const call = route.request().postDataJSON() as MockCall;
+    if (call.method === 'gettxout' && mode === 'empty') {
+      calls.push(call);
+      return route.fulfill({ json: { result: null } });
+    }
     if (call.method === 'gettxspendingprevout') {
       calls.push(call);
       if (mode === 'unavailable')
@@ -169,7 +173,7 @@ test('an unavailable confirmed index falls back to bounded history and loads the
   ).toBeVisible();
 });
 
-test('a complete empty index observation leaves spending status unknown without history lookup', async ({
+test('a complete empty index observation checks the UTXO set without history lookup', async ({
   page,
 }) => {
   const calls = await mockIndexedBitcoin(page, 'empty');
@@ -177,10 +181,11 @@ test('a complete empty index observation leaves spending status unknown without 
   const view = page.locator('.transaction-view');
   await view.getByRole('button', { name: 'Check output 0 for spends', exact: true }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: '0 spending transactions found; 0 added' }),
+    page.getByRole('status').filter({ hasText: "Not in your node's current UTXO set" }),
   ).toBeVisible();
   await expect(view).toContainText('Spend status unknown');
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
   expect(calls.filter((call) => call.method === 'gettxspendingprevout')).toHaveLength(1);
+  expect(calls.filter((call) => call.method === 'gettxout')).toHaveLength(1);
   expect(calls.some((call) => call.target === 'electrum')).toBe(false);
 });

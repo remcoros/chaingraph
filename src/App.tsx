@@ -1,4 +1,5 @@
 import { TransactionFetchShell } from './lib/useTransactionFetch';
+import { spendingNotice } from './lib/spendingNotice';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
 import { resolveGraphHandoff } from './domain/graphHandoff';
 import { resolveWalletUtxoObservation } from './domain/walletUtxoObservation';
@@ -297,7 +298,7 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [noticeSequence, setNoticeSequence] = useState(0);
   useEffect(() => {
-    if (!notice || /partial|cancelled|could not/i.test(notice)) return;
+    if (!notice || /partial|incomplete|cancelled|could not/i.test(notice)) return;
     const timer = setTimeout(() => setNotice(''), 8000);
     return () => clearTimeout(timer);
   }, [notice, noticeSequence]);
@@ -1478,7 +1479,6 @@ export default function App() {
           spendingOffsets.current.get(searchKey)?.unavailableTxids,
         );
         signal.throwIfAborted();
-        const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;
         if (
           !mergeTransactions(
             w.id,
@@ -1496,9 +1496,20 @@ export default function App() {
           });
         else spendingOffsets.current.delete(searchKey);
 
-        setNotice(
-          `${result.transactions.length} spending transaction${result.transactions.length === 1 ? '' : 's'} found; ${added} added to the graph.${result.lookup === 'electrum-fallback' ? ' Exact lookup was incomplete; checked available script history.' : ''}${result.truncated ? ('nextOffset' in result && result.nextOffset !== undefined ? ' Partial search: click Find spending transactions again to check the next batch.' : ' Partial search: some output scripts or transactions could not be checked.') : ''}${!result.transactions.length ? ' No spending transaction found in the checked data; this does not prove the output is unspent.' : ''}`,
-        );
+        if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
+        if (!result.transactions.length && outputIndex !== undefined)
+          setOperation('Checking current UTXO status…');
+        const notice = await spendingNotice(result, transaction, w.network, outputIndex, signal);
+        signal.throwIfAborted();
+        const active = ws.getSession(w.id)?.data;
+        if (
+          notice &&
+          active &&
+          selectionGeneration.current === generation &&
+          wRef.current?.id === w.id &&
+          traceSourceExists(active, traceSourceId)
+        )
+          setNotice(notice);
       }
       // Tracing extends the investigation without taking over its camera.
       // Initial framing, explicit Fit and Lock to selection own camera changes.

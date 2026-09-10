@@ -41,6 +41,7 @@ test('empty, partial and failed spending searches retain the manually positioned
   );
   await page.route('**/api/rpc', async (route) => {
     const request = route.request().postDataJSON();
+    if (request.method === 'gettxout') return route.fulfill({ json: { result: null } });
     if (request.method === 'blockchain.scripthash.get_history') {
       if (mode === 'error')
         return route.fulfill({
@@ -92,10 +93,15 @@ test('empty, partial and failed spending searches retain the manually positioned
       ).toBeVisible();
     else {
       await expect(
-        page.getByRole('status').filter({ hasText: '0 spending transactions found; 0 added' }),
+        page
+          .getByRole('status')
+          .filter({
+            hasText:
+              outcome === 'partial'
+                ? 'Spending search incomplete'
+                : "Not in your node's current UTXO set",
+          }),
       ).toBeVisible();
-      if (outcome === 'partial')
-        await expect(page.getByRole('status').filter({ hasText: 'Partial search' })).toBeVisible();
     }
     await expect(page.locator('.statusbar')).toContainText('1 transaction');
     await expect(canvas).toHaveAttribute('data-camera-instance', 'same-canvas');

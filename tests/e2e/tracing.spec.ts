@@ -57,8 +57,9 @@ test('selecting an input hydrates its previous output with prefetch off and foll
   ).toHaveText('100,000,000 sats');
   await page.getByRole('button', { name: 'Find spending transactions', exact: true }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: '1 spending transaction found; 0 added' }),
-  ).toBeVisible();
+    page.getByRole('button', { name: 'Find spending transactions', exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator('.toast')).toHaveCount(0);
   expect(calls.some((c) => c.method === 'gettxspendingprevout')).toBe(false);
   await page.getByRole('button', { name: /^Spending tx:/ }).click();
   await expect(page.locator('.selection-heading .eyebrow')).toHaveText('TRANSACTION');
