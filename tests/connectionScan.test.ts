@@ -289,15 +289,58 @@ describe('bounded connection traversal', () => {
       options(pathEdges, {
         now: () => now,
         resolveNeighbors: async () => {
-          now = 15_001;
+          now = DEFAULT_SCAN_SETTINGS.maxMilliseconds + 1;
           return { nodeIds: [out(1)] };
         },
       }),
     );
     expect(run.stopReasons).toContain('time');
-    expect(run.results[0]).toMatchObject({ path: [tx(1)], reason: 'time' });
-    expect(run.results.every((result) => result.path.length === 1)).toBe(true);
+    expect(run.results).toEqual([]);
   });
+
+  it.each(['source', 'target'] as const)(
+    'keeps earlier findings when the %s frontier times out without adding time rows',
+    async (side) => {
+      let now = 0;
+      const progress = vi.fn();
+      const input = options(pathEdges, {
+        targetIds: side === 'source' ? [] : [tx(2), tx(9)],
+        settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream' },
+        now: () => now,
+        onProgress: progress,
+      });
+      const original = input.resolveNeighbors;
+      input.resolveNeighbors = async (...args) => {
+        const [id] = args;
+        if (side === 'source') {
+          if (id === tx(1)) return { nodeIds: [out(1), out(1, 1)] };
+          if (id === out(1)) return { nodeIds: [], stopReason: 'fan-out' };
+          now = DEFAULT_SCAN_SETTINGS.maxMilliseconds + 1;
+          return { nodeIds: [] };
+        }
+        // The target-side outpoint follows the direct source->tx(2) finding.
+        if (id === out(2)) {
+          now = DEFAULT_SCAN_SETTINGS.maxMilliseconds + 1;
+          return { nodeIds: [] };
+        }
+        return original(...args);
+      };
+      const run = await runConnectionScan(input);
+      expect(run.stopReasons).toContain('time');
+      expect(run.results.length).toBeGreaterThan(0);
+      expect(run.results.every((result) => result.reason !== 'time')).toBe(true);
+      expect(
+        progress.mock.calls.some(
+          ([snapshot]) => snapshot.status === 'running' && snapshot.results.length > 0,
+        ),
+      ).toBe(true);
+      expect(
+        run.results.some((result) =>
+          side === 'source' ? result.reason === 'fan-out' : result.relationship === 'direct',
+        ),
+      ).toBe(true);
+    },
+  );
 
   it('cancels pending work without accepting its late neighbors', async () => {
     const controller = new AbortController();

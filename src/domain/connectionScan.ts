@@ -47,7 +47,7 @@ export const DEFAULT_SCAN_SETTINGS: ScanSettings = {
   targetScope: 'visible',
   maxHops: 3,
   maxTransactions: 200,
-  maxMilliseconds: 15_000,
+  maxMilliseconds: 30_000,
   fanOut: 50,
 };
 export function isScanNodeId(id: string): boolean {
@@ -210,7 +210,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
   };
   const boundary = (front: Front, visit: Visit, reason: ScanStopReason) => {
     reasons.add(reason);
-    if (front.side === 'source' && reason !== 'depth')
+    if (front.side === 'source' && reason !== 'depth' && reason !== 'time')
       addResult({
         kind: 'boundary',
         endpoint: visit.path.at(-1)!,

@@ -59,26 +59,29 @@ Choose upstream, downstream or both, then **Visible graph** or **All added nodes
 (including hidden and filtered nodes) as targets. Inputs use their previous
 outpoint identity. Addresses and the entire workspace are outside this scan scope.
 
-**Scan** searches for directed connections and shared ancestors or descendants.
-The source and targets are frozen for that run. Selecting another graph node does
-not change or restart it; use **Selection** to start from that node.
-Defaults are 3 transaction hops, 200 examined transactions, 15 seconds and a
+**Scan selection** searches from the selected node for directed connections and
+shared ancestors or descendants. Selecting another node prepares the next scan;
+it never changes or restarts the active run. Existing results keep their original
+source under **Results from**; select that source there to scan it again.
+Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
 transactions, 60 seconds and a 200-branch boundary. Cached transactions and
 spending-history candidates share the same allowance with target-side searches.
 Scopes above 1,000 targets require a smaller visible graph or filter scope.
 
 Results appear as they are found. Connection rows use a green check; stopping
-points identify large transactions, missing chain data or failed lookups. Hop
-limits end branches without adding result rows. The completion status explains
-why the scan stopped; expand the checked count for the run's settings and scope.
+points identify branch limits, missing chain data or failed lookups. Each result
+card shows its endpoint and hop count, with a short explanation for stopping points. Hop and time
+limits do not create result rows. The global status is green when the bounded
+scan completes and amber when it stops early or data is unavailable; expand the
+checked count for the run's settings and scope.
 
-Expand a result to inspect its directed path. **Select** selects its endpoint;
+Expand **Path** to inspect directed steps and new nodes. **Select** selects its endpoint;
 **Add (+N)** adds exactly the displayed path with N new nodes in one Undo action,
-without sibling outputs. Longer paths offer **Path length** to choose an explicit
-prefix. Adding reveals the path and resets graph filters, preserving annotations
+without sibling outputs. Both actions sit at the card's bottom right, below the
+path details. Longer paths offer **Path length** to choose an explicit prefix. Adding reveals the path and resets graph filters, preserving annotations
 and the camera. From a stopping point, add the path, select its endpoint and use
-**Selection** to scan from there. Missing saved path evidence is reported before
+**Scan selection** to scan from there. Missing saved path evidence is reported before
 adding; reload it or rerun. Use a row's **Dismiss result** icon to remove it from
 the list, including while scanning.
 

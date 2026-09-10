@@ -9,7 +9,7 @@ Filter the graph by entity type, labels, tags, wallet membership, notes, bookmar
 The Graph inspector's **Scan** tab searches from a transaction or outpoint for
 direct connections and shared ancestors or descendants among visible or added
 graph nodes. Searches default to 3 transaction hops, 200 examined transactions,
-15 seconds and a 50-branch stopping point. Findings appear during the scan and
+30 seconds and a 50-branch stopping point. Findings appear during the scan and
 can be dismissed individually. Review exact paths, add a path or an
 explicit prefix in one undoable action, and continue from a stopping point.
 Only the latest results and path evidence stay encrypted; a new scan replaces

@@ -25,12 +25,12 @@ import { runConnectionScanInWorker } from '../lib/connectionScanRunner';
 import type { TransactionFetchScope } from '../lib/transactionScheduler';
 import { traceSourceExists } from '../lib/tracing';
 import { indexLoadedSpends } from '../domain/transactionFlow';
-import { presentScanRun, scanStatusLabel } from '../domain/connectionScanPresentation';
+import { presentScanRun, scanStatus } from '../domain/connectionScanPresentation';
 import './connection-scan.css';
 
 const reasons: Record<ScanStopReason, string> = {
   depth: 'Hop limit',
-  'fan-out': 'Large transaction',
+  'fan-out': 'Branch limit',
   time: 'Time limit',
   transactions: 'Transaction limit',
   unknown: 'Missing chain data',
@@ -78,7 +78,7 @@ export function ConnectionScanPanel(props: Props) {
   const runs = workspace.connectionScans?.runs ?? [];
   const rawRun = liveRun ?? runs.at(-1);
   const run = rawRun ? presentScanRun(rawRun, dismissed.current) : undefined;
-  const source = run?.source ?? selectionId;
+  const source = selectionId;
   const savedSpenders = useMemo(
     () => indexLoadedSpends(workspace.connectionScans?.evidence ?? {}),
     [workspace.connectionScans?.evidence],
@@ -251,29 +251,18 @@ export function ConnectionScanPanel(props: Props) {
   }
 
   const results = run?.results.filter((item) => !item.dismissed) ?? [];
+  const status = run ? scanStatus(run, busy) : undefined;
   const shownResults = results.filter((item) => filter === 'all' || item.kind === filter);
   return (
     <div className="connection-scan" hidden={!active}>
       <section className="panel-section">
         <div className="connection-scan-source">
-          <span className="muted">From</span>
+          <span className="muted">Selected node</span>
           <strong title={source}>
             {source && eligible(source)
               ? nameFor(workspace, source)
               : 'Select a transaction or output'}
           </strong>
-          {eligible(source) && (
-            <button
-              className="text-button"
-              disabled={!traceSourceExists(workspace, source)}
-              aria-label="Select source"
-              title="Select source"
-              onClick={() => onSelect(source)}
-            >
-              <Crosshair size={14} />
-              Select
-            </button>
-          )}
         </div>
         <form
           onSubmit={(event) => {
@@ -378,18 +367,7 @@ export function ConnectionScanPanel(props: Props) {
             ) : (
               <button className="primary" disabled={!eligible(source)} type="submit">
                 <ScanLine size={15} />
-                Scan
-              </button>
-            )}
-            {eligible(selectionId) && selectionId !== source && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void start(selectionId)}
-                aria-label="Scan current selection"
-                title="Scan current selection"
-              >
-                <ScanLine size={15} /> Selection
+                Scan selection
               </button>
             )}
           </div>
@@ -401,22 +379,35 @@ export function ConnectionScanPanel(props: Props) {
           </p>
         )}
       </section>
-      {run && (
+      {run && status && (
         <section className="panel-section connection-scan-results" aria-label="Scan results">
-          <div className="connection-scan-status-row">
-            <div className="connection-scan-status" role="status" aria-live="polite">
-              <strong>
-                {busy && <LoaderCircle size={14} />} {scanStatusLabel(run, busy)}
-              </strong>
-            </div>
+          <div className="connection-scan-results-source">
+            <span className="muted">Results from</span>
             <button
-              className="text-button connection-scan-clear"
-              onClick={clearResults}
-              aria-label="Clear all results"
-              title="Clear all results"
+              type="button"
+              className="text-button"
+              disabled={!traceSourceExists(workspace, run.source)}
+              title={run.source}
+              aria-label={`Select scan source: ${nameFor(workspace, run.source)}`}
+              onClick={() => onSelect(run.source)}
             >
-              <Trash2 size={15} />
+              <Crosshair size={14} />
+              <span>{nameFor(workspace, run.source)}</span>
             </button>
+          </div>
+          <div
+            className={`connection-scan-status is-${status.tone}`}
+            role="status"
+            aria-live="polite"
+          >
+            {status.tone === 'running' ? (
+              <LoaderCircle size={15} />
+            ) : status.tone === 'complete' ? (
+              <Check size={15} />
+            ) : (
+              <TriangleAlert size={15} />
+            )}
+            <strong>{status.label}</strong>
           </div>
           <details className="connection-scan-run-details">
             <summary
@@ -450,21 +441,32 @@ export function ConnectionScanPanel(props: Props) {
           {!busy && !run.results.some((item) => item.kind === 'connection') && (
             <p className="small muted">No connection found within these limits.</p>
           )}
-          <label className="connection-scan-result-filter">
-            Results
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as typeof filter)}
+          <div className="connection-scan-results-toolbar">
+            <label className="connection-scan-result-filter">
+              Results
+              <select
+                value={filter}
+                onChange={(event) => setFilter(event.target.value as typeof filter)}
+              >
+                <option value="all">All ({results.length})</option>
+                <option value="connection">
+                  Connections ({results.filter((item) => item.kind === 'connection').length})
+                </option>
+                <option value="boundary">
+                  Stopping points ({results.filter((item) => item.kind === 'boundary').length})
+                </option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="text-button connection-scan-clear"
+              onClick={clearResults}
+              aria-label="Clear all results"
+              title="Clear all results"
             >
-              <option value="all">All ({results.length})</option>
-              <option value="connection">
-                Connections ({results.filter((item) => item.kind === 'connection').length})
-              </option>
-              <option value="boundary">
-                Stopping points ({results.filter((item) => item.kind === 'boundary').length})
-              </option>
-            </select>
-          </label>
+              <Trash2 size={14} /> Clear
+            </button>
+          </div>
           {shownResults.map((result) => (
             <ScanResultRow
               key={`${run.id}:${result.id}`}
@@ -483,6 +485,7 @@ export function ConnectionScanPanel(props: Props) {
                   : workspace
               }
               result={result}
+              fanOut={run.settings.fanOut}
               visibleNodeIds={props.visibleNodeIds}
               onSelect={onSelect}
               onAdd={(row, length) => props.onAdd(row, length, transientEvidence)}
@@ -511,6 +514,7 @@ export function ConnectionScanPanel(props: Props) {
 function ScanResultRow({
   workspace,
   result,
+  fanOut,
   visibleNodeIds,
   onSelect,
   onAdd,
@@ -518,6 +522,7 @@ function ScanResultRow({
 }: {
   workspace: Workspace;
   result: ScanResult;
+  fanOut: number;
   visibleNodeIds: string[];
   onSelect: (id: string) => void;
   onAdd: (result: ScanResult, prefixLength: number) => void;
@@ -548,35 +553,69 @@ function ScanResultRow({
   const title = connection ? relation : reasons[result.reason ?? 'unknown'];
   const visible = new Set(visibleNodeIds);
   const obscured = plan.nodeIds.some((id) => !visible.has(id) && !plan.newNodeIds.includes(id));
+  const description = connection
+    ? undefined
+    : result.reason === 'fan-out'
+      ? `Stopped at ${fanOut}+ ${result.endpoint.startsWith('tx:') ? 'inputs or outputs' : 'connected transactions'}.`
+      : result.reason === 'unknown'
+        ? 'Further chain data is unavailable.'
+        : result.reason === 'failure'
+          ? 'Could not load the next step.'
+          : result.reason === 'transactions'
+            ? 'Transaction budget reached at this step.'
+            : result.reason === 'cancelled'
+              ? 'Scan cancelled at this step.'
+              : 'Scan stopped at this step.';
   return (
-    <div className="connection-scan-result-row">
-      <details
-        className={`connection-scan-result ${connection ? 'is-connection' : result.reason === 'failure' ? 'is-failure' : 'is-boundary'}`}
-      >
-        <summary>
-          {connection ? <Check size={15} /> : <TriangleAlert size={15} />}
-          <span>
-            <strong>{title}</strong>
-            <span title={result.endpoint}>{nameFor(workspace, result.endpoint)}</span>
-            <small>
-              {result.hops} {result.hops === 1 ? 'hop' : 'hops'}
-            </small>
-          </span>
-        </summary>
-        <div className="connection-scan-result-detail">
-          {connection && fullPlan.newNodeIds.includes(result.endpoint) && (
-            <p className="small muted">Endpoint removed from graph. Add path restores it.</p>
-          )}
-          <div className="connection-scan-actions">
-            <button
-              disabled={!traceSourceExists(workspace, result.endpoint)}
-              aria-label="Select endpoint"
-              title="Select endpoint"
-              onClick={() => onSelect(result.endpoint)}
-            >
-              <Crosshair size={14} /> Select
-            </button>
-          </div>
+    <article
+      className={`connection-scan-result ${connection ? 'is-connection' : result.reason === 'failure' ? 'is-failure' : 'is-boundary'}`}
+      aria-label={`${title}: ${nameFor(workspace, result.endpoint)}`}
+    >
+      <div className="connection-scan-result-heading">
+        {connection ? <Check size={15} /> : <TriangleAlert size={15} />}
+        <strong>{title}</strong>
+        <button
+          type="button"
+          className="text-button connection-scan-dismiss"
+          onClick={onDismiss}
+          title="Dismiss result"
+          aria-label={`Dismiss ${nameFor(workspace, result.endpoint)}`}
+        >
+          <X size={15} />
+        </button>
+      </div>
+      <div className="connection-scan-result-endpoint">
+        <span title={result.endpoint}>{nameFor(workspace, result.endpoint)}</span>
+        <small>
+          {result.hops} {result.hops === 1 ? 'hop' : 'hops'}
+        </small>
+      </div>
+      <div className="connection-scan-result-body">
+        {description && <p className="connection-scan-result-description">{description}</p>}
+        {connection && fullPlan.newNodeIds.includes(result.endpoint) && (
+          <p className="small muted">Endpoint removed from graph. Add restores it.</p>
+        )}
+
+        {plan.missingTxids.length > 0 && (
+          <p className="small connection-scan-error">
+            Path evidence must be reloaded before adding.
+          </p>
+        )}
+        {obscured && (
+          <p className="small muted">Adding reveals hidden nodes and resets graph filters.</p>
+        )}
+        {error && (
+          <p className="connection-scan-error" role="alert">
+            {error}
+          </p>
+        )}
+        <details className="connection-scan-path-section">
+          <summary>
+            Path{' '}
+            <span>
+              {prefixLength} {prefixLength === 1 ? 'node' : 'nodes'}
+            </span>
+          </summary>
           {(result.path.length > 5 || fullPlan.missingTxids.length > 0) &&
             result.path.length > 1 && (
               <label>
@@ -604,44 +643,35 @@ function ScanResultRow({
               </li>
             ))}
           </ol>
-          {plan.missingTxids.length > 0 ? (
-            <p className="small connection-scan-error">
-              Path evidence must be reloaded before adding.
-            </p>
-          ) : (
-            <button
-              title={`Add path: ${plan.newNodeIds.length} new nodes`}
-              aria-label={`Add path: ${plan.newNodeIds.length} new nodes`}
-              onClick={() => {
-                try {
-                  onAdd(result, prefixLength);
-                  setError('');
-                } catch (cause) {
-                  setError(cause instanceof Error ? cause.message : 'Path could not be added.');
-                }
-              }}
-            >
-              <Plus size={15} /> Add (+{plan.newNodeIds.length})
-            </button>
-          )}
-          {obscured && (
-            <p className="small muted">Adding reveals hidden nodes and resets graph filters.</p>
-          )}
-          {error && (
-            <p className="connection-scan-error" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-      </details>
-      <button
-        className="text-button connection-scan-dismiss"
-        onClick={onDismiss}
-        title="Dismiss result"
-        aria-label={`Dismiss ${nameFor(workspace, result.endpoint)}`}
-      >
-        <X size={15} />
-      </button>
-    </div>
+        </details>
+      </div>
+      <footer className="connection-scan-result-actions">
+        <button
+          type="button"
+          disabled={!traceSourceExists(workspace, result.endpoint)}
+          aria-label="Select endpoint"
+          title="Select endpoint"
+          onClick={() => onSelect(result.endpoint)}
+        >
+          <Crosshair size={14} /> Select
+        </button>
+        <button
+          type="button"
+          disabled={plan.missingTxids.length > 0}
+          title={`Add path: ${plan.newNodeIds.length} new nodes`}
+          aria-label={`Add path: ${plan.newNodeIds.length} new nodes`}
+          onClick={() => {
+            try {
+              onAdd(result, prefixLength);
+              setError('');
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : 'Path could not be added.');
+            }
+          }}
+        >
+          <Plus size={15} /> Add (+{plan.newNodeIds.length})
+        </button>
+      </footer>
+    </article>
   );
 }

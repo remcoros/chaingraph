@@ -229,8 +229,9 @@ The entity list remains the alternative interaction path for keyboard access and
 
 ## Bounded graph connection scans
 
-The right inspector's Scan tab owns an explicit frozen source, target snapshot
-and settings. `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
+The right inspector's Scan form follows the current selection. Its primary action
+starts a new run from that selection; existing results retain a separately labeled
+source. Each run owns its frozen source, target snapshot and settings. `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
 deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
 same-direction walks at a meeting point and retain per-edge directions; no
@@ -239,11 +240,13 @@ Target fronts keep the first deterministic witness for each reached node rather
 than enumerating every target/path. Fully displayed connection paths are omitted.
 
 All fronts share one unique-transaction budget, a deadline, total path-hop and
-result bounds. Defaults are 3 hops, 200 transactions, 15 seconds and a 50-branch
+result bounds. Defaults are 3 hops, 200 transactions, 30 seconds and a 50-branch
 boundary; hard limits are 8 hops, 1,000 transactions, 60 seconds, 200 branches,
 1,000 targets and 50 results. Depth stops before further spender lookups and
 records a run-level reason without producing result rows or consuming the result
-allowance.
+allowance. Time limits also produce only a global stopping reason; earlier
+actionable findings remain available. The run status distinguishes normal
+completion within configured branch bounds from early stops and unavailable data.
 Fan-out, depth, time, transaction and result limits, unknown evidence, failures
 and cancellation remain distinct. Stopping paths can be reviewed and accepted
 without admitting siblings. Partial results are not exhaustive or globally
@@ -294,7 +297,8 @@ evidence fits. Missing proof remains explicit if a snapshot reaches those caps.
 Accepting a complete path or explicit prefix merges only supporting transactions
 and calls existing graph membership APIs once, producing one Undo step. It reveals
 those nodes, resets graph filters, and preserves annotations and camera geometry.
-Sidebar controls and results use their own CSS namespace and a vertical layout,
+Sidebar controls and result cards use their own CSS namespace and a vertical layout.
+Each card groups its path in the body and actions at the bottom right,
 independent of the Analysis workbench's two-column results. Clearing the latest
 results does not remove accepted nodes or annotations. Scan details
 never enter the public saved-workspace index.
