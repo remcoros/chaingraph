@@ -8,6 +8,7 @@ import { txNodeId, outputNodeId, addressNodeId, short, sats } from './types';
 import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tags';
 import { assertWalletReviewBudget, walletReviewsSchema } from './walletReview';
 import { indexPreviousOutputs } from './prevouts';
+import { CURRENT_WORKSPACE_VERSION, migrateWorkspace } from './workspaceMigrations';
 import {
   addressToScriptHash,
   inspectExtendedPublicKey,
@@ -205,7 +206,7 @@ const walletSchema = z.object({
     .optional(),
 });
 const workspaceSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(CURRENT_WORKSPACE_VERSION),
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
   description: text.optional(),
@@ -459,8 +460,9 @@ export function parseTransaction(data: unknown): Transaction {
   return transactionSchema.parse(data);
 }
 export function parseWorkspace(data: unknown, verifyDerivation = true): Workspace {
-  assertWorkspaceBudget(data);
-  const parsed = workspaceSchema.parse(data);
+  const migrated = migrateWorkspace(data);
+  assertWorkspaceBudget(migrated);
+  const parsed = workspaceSchema.parse(migrated);
   if (parsed.view.hiddenNodeIds !== undefined)
     parsed.view.hiddenNodeIds = parseHiddenNodeIds(parsed.view.hiddenNodeIds, parsed.network);
   if (parsed.tags !== undefined) parsed.tags = parseWorkspaceTags(parsed.tags, parsed.network);
@@ -530,7 +532,7 @@ export function parseWorkspace(data: unknown, verifyDerivation = true): Workspac
 }
 export function newWorkspace(name: string, network: Workspace['network']): Workspace {
   return {
-    version: 1,
+    version: CURRENT_WORKSPACE_VERSION,
     id: crypto.randomUUID(),
     name,
     network,

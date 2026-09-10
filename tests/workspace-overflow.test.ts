@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { newWorkspace } from '../src/domain/workspace';
 import { decryptWorkspace, encryptWorkspace, type EncryptedEnvelope } from '../src/lib/crypto';
 import type { EnvelopeStorage } from '../src/lib/envelopeStorage';
@@ -58,7 +59,8 @@ describe('encrypted workspace overflow storage', () => {
     for (let i = 0; i < 120; i++)
       workspace.annotations[`tx:${i.toString(16).padStart(64, '0')}`] = {
         label: '',
-        note: 'private annotation '.repeat(500),
+        // Synthetic high-entropy notes keep this fixture above the storage threshold after gzip.
+        note: 'private annotation ' + randomBytes(6750).toString('base64'),
         bookmarked: false,
         icon: '',
       };

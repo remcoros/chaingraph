@@ -102,6 +102,7 @@ export interface TransactionFlowState {
   open?: boolean;
 }
 export interface Workspace {
+  /** Decrypted data schema version, independent of the encrypted envelope format. */
   version: 1;
   id: string;
   name: string;

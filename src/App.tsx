@@ -3015,11 +3015,12 @@ export default function App() {
       {unlock && (
         <UnlockDialog
           entry={unlock}
-          onUnlock={async (entry, password) => {
+          onUnlock={async (entry, password, signal) => {
             await saveBeforeLeaving();
+            signal.throwIfAborted();
             const current = ws.getSaved(entry.id);
             if (!current) throw new Error('Saved workspace changed; reload before unlocking.');
-            return ws.unlock(current, password);
+            return ws.unlock(current, password, signal);
           }}
           onClose={() => setUnlock(undefined)}
         />

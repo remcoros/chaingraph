@@ -5,6 +5,8 @@ import { parseWorkspace, assertWorkspaceBudget } from '../domain/workspace';
 import { carryScanMetadata, walletEvidenceChanged } from '../domain/walletActivity';
 import { carryObservationContext } from '../domain/observationContext';
 import {
+  assertEnvelopeHeader,
+  WorkspaceCryptoError,
   encryptWorkspace,
   decryptWorkspace,
   MAX_ENCRYPTED_FILE_BYTES,
@@ -12,8 +14,9 @@ import {
 } from './crypto';
 
 import { indexedEnvelopeStorage, type EnvelopeStorage } from './envelopeStorage';
+import { operationError, operationErrorCode } from './workspaceOperationError';
 import { validateAndEncryptWorkspace } from './workspaceEncryption';
-import { encryptWorkspaceOffThread } from './workspaceEncryptionClient';
+import { decryptWorkspaceOffThread, encryptWorkspaceOffThread } from './workspaceEncryptionClient';
 
 export const INLINE_INDEX_LIMIT = 1024 * 1024;
 export const STORAGE_KEY = 'chaingraph.encrypted-workspaces.v1';
@@ -56,9 +59,12 @@ function validEnvelope(e: unknown): e is EncryptedEnvelope {
   const value = e as EncryptedEnvelope;
   return !(
     Object.keys(value).sort().join(',') !==
-      'cipher,ciphertext,format,iterations,iv,kdf,salt,version' ||
+      (value.version === 2
+        ? 'cipher,ciphertext,compression,format,iterations,iv,kdf,salt,version'
+        : 'cipher,ciphertext,format,iterations,iv,kdf,salt,version') ||
     value.format !== 'chaingraph-workspace' ||
-    value.version !== 1 ||
+    (value.version !== 1 && value.version !== 2) ||
+    (value.version === 2 && !['none', 'gzip'].includes(value.compression)) ||
     value.cipher !== 'AES-256-GCM' ||
     value.kdf !== 'PBKDF2-SHA256' ||
     value.iterations !== 600000 ||
@@ -82,6 +88,7 @@ function parseSaved(raw: string | null): SavedWorkspace[] {
   const ids = new Set<string>();
   for (const record of records) {
     const e = record?.envelope;
+    if (e) assertEnvelopeHeader(e);
     if (
       !record ||
       typeof record.id !== 'string' ||
@@ -138,10 +145,12 @@ export class WorkspaceSessionStore {
     try {
       this.storedRaw = this.storage().getItem(STORAGE_KEY);
       this.state.saved = parseSaved(this.storedRaw);
-    } catch {
+    } catch (error) {
       this.storageInvalid = true;
       this.state.storageError =
-        'Saved workspace storage is unreadable or malformed. Existing data was preserved. Export any open workspace; repair or restore browser storage before saving.';
+        error instanceof WorkspaceCryptoError && error.code === 'unsupported-format'
+          ? operationError(error.code).message
+          : 'Saved workspace storage is unreadable or malformed. Existing data was preserved. Export any open workspace; repair or restore browser storage before saving.';
     }
   }
 
@@ -278,7 +287,8 @@ export class WorkspaceSessionStore {
   open = (data: Workspace, password: string) => {
     this.add(data, password, false);
   };
-  unlock = async (entry: SavedWorkspace, password: string) => {
+  unlock = async (entry: SavedWorkspace, password: string, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
     if (!this.state.saved.includes(entry))
       throw new Error('Saved workspace changed; reload before unlocking.');
     // Leaving another open workspace may still be publishing its save. Wait before
@@ -288,6 +298,7 @@ export class WorkspaceSessionStore {
       pending = this.writing;
       await pending.catch(() => {});
     } while (pending !== this.writing);
+    signal?.throwIfAborted();
     this.assertStorageUnchanged();
     // An inline-to-IndexedDB migration can replace this entry without editing its
     // workspace. Resolve its current reference only after our queued writes settle.
@@ -298,13 +309,21 @@ export class WorkspaceSessionStore {
     const envelope = entry.envelopeRef
       ? await this.envelopes?.read(entry.envelopeRef)
       : entry.envelope;
+    if (envelope) {
+      try {
+        assertEnvelopeHeader(envelope);
+      } catch (error) {
+        throw operationError(operationErrorCode(error));
+      }
+    }
     if (!validEnvelope(envelope))
       throw new Error(
         'Encrypted workspace data is missing or malformed. Restore an exported backup.',
       );
-    const data = parseWorkspace(
-      await (this.options.decrypt ?? decryptWorkspace)(envelope, password),
-    );
+    const data = this.options.decrypt
+      ? parseWorkspace(await this.options.decrypt(envelope, password))
+      : await decryptWorkspaceOffThread(envelope, password, signal);
+    signal?.throwIfAborted();
     if (data.id !== entry.id)
       throw new Error('Workspace identity does not match its encrypted contents.');
     this.assertStorageUnchanged();

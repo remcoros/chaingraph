@@ -28,7 +28,10 @@ for (const mode of ['large', 'quota', 'without-web-locks'] as const) {
           for (let i = 0; i < 120; i++)
             workspace.annotations[`tx:${i.toString(16).padStart(64, '0')}`] = {
               label: '',
-              note: 'private annotation '.repeat(500),
+              // Synthetic noise keeps this storage fixture large after gzip.
+              note:
+                'private annotation ' +
+                btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(6750)))),
               bookmarked: false,
               icon: '',
             };

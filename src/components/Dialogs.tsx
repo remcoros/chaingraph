@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { X, LockKeyhole, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { Network, ScriptType, Wallet, Workspace } from '../domain/types';
-import { newWorkspace, parseWorkspace } from '../domain/workspace';
+import { newWorkspace } from '../domain/workspace';
 import type { WorkspaceTemplate } from '../domain/workspaceTemplates';
 import { loadTemplateWorkspace } from '../lib/templateWorkspace';
 import { inspectExtendedPublicKey, deriveAddresses } from '../lib/wallet';
-import { decryptWorkspace } from '../lib/crypto';
+import { decryptWorkspaceOffThread } from '../lib/workspaceEncryptionClient';
+import { WorkspaceOperationError } from '../lib/workspaceOperationError';
 import type { SavedWorkspace } from '../lib/useWorkspaces';
 import './dialogs.css';
 export function useDialogFocus(
@@ -430,13 +431,30 @@ export function CreateDialog({
     </Modal>
   );
 }
+function useWorkspaceRead(onClose: () => void) {
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
+  return {
+    start: () => {
+      pending.current?.abort();
+      const controller = new AbortController();
+      pending.current = controller;
+      return controller.signal;
+    },
+    close: () => {
+      pending.current?.abort();
+      onClose();
+    },
+  };
+}
+
 export function UnlockDialog({
   entry,
   onUnlock,
   onClose,
 }: {
   entry: SavedWorkspace;
-  onUnlock: (e: SavedWorkspace, p: string) => Promise<void>;
+  onUnlock: (e: SavedWorkspace, p: string, signal: AbortSignal) => Promise<void>;
   onClose: () => void;
 }) {
   const [password, setPassword] = useState('');
@@ -444,8 +462,9 @@ export function UnlockDialog({
   const errorId = useId();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const read = useWorkspaceRead(onClose);
   return (
-    <Modal title="Unlock workspace" onClose={onClose}>
+    <Modal title="Unlock workspace" onClose={read.close}>
       <p className="muted">
         Saved {new Date(entry.savedAt).toLocaleString()}. Workspace names are public. Descriptions,
         wallet names and contents stay encrypted until unlocked.
@@ -463,15 +482,20 @@ export function UnlockDialog({
           }
           setError('');
           setBusy(true);
+          const signal = read.start();
           try {
-            await onUnlock(entry, password);
+            await onUnlock(entry, password, signal);
+            signal.throwIfAborted();
             onClose();
-          } catch {
+          } catch (error) {
+            if (signal.aborted) return;
             setError(
-              'Could not unlock. Check your password. If browser data was cleared or is unavailable, restore an exported workspace backup.',
+              error instanceof WorkspaceOperationError
+                ? error.message
+                : 'Could not unlock. Check your password. If browser data was cleared or is unavailable, restore an exported workspace backup.',
             );
           } finally {
-            setBusy(false);
+            if (!signal.aborted) setBusy(false);
           }
         }}
       >
@@ -701,8 +725,9 @@ export function ImportDialog({
   const errorId = useId();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const read = useWorkspaceRead(onClose);
   return (
-    <Modal title="Open encrypted workspace" onClose={onClose}>
+    <Modal title="Open encrypted workspace" onClose={read.close}>
       <p className="muted wrap">{file.name}</p>
       <form
         className="stack"
@@ -717,16 +742,21 @@ export function ImportDialog({
           }
           setError('');
           setBusy(true);
+          const signal = read.start();
           try {
-            const data = parseWorkspace(
-              await decryptWorkspace(JSON.parse(await file.text()), password),
-            );
+            const data = await decryptWorkspaceOffThread(file, password, signal);
+            signal.throwIfAborted();
             onImport(data, password);
             onClose();
-          } catch {
-            setError('Could not open this workspace. Check the password and file format.');
+          } catch (error) {
+            if (signal.aborted) return;
+            setError(
+              error instanceof WorkspaceOperationError
+                ? error.message
+                : 'Could not open this workspace. Check the password and file format.',
+            );
           } finally {
-            setBusy(false);
+            if (!signal.aborted) setBusy(false);
           }
         }}
       >
