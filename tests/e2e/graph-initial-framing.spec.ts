@@ -1,24 +1,16 @@
+import { captureGraphPixels, type SampledCanvas } from '../fixtures/graph-pixels';
 import { expect, test, type Page } from '@playwright/test';
 import { encryptWorkspace } from '../../src/lib/crypto';
 import { newWorkspace } from '../../src/domain/workspace';
 import { mockBitcoin, TX_FUNDING } from '../fixtures/bitcoin';
 
 async function coloredGraphPixels(page: Page) {
+  await captureGraphPixels(page.locator('.graph-canvas canvas'));
   return page.locator('.graph-canvas canvas').evaluate(
     (canvas) =>
       new Promise<number>((resolve) =>
         requestAnimationFrame(() => {
-          const gl = (canvas as HTMLCanvasElement).getContext('webgl2')!;
-          const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
-          gl.readPixels(
-            0,
-            0,
-            gl.drawingBufferWidth,
-            gl.drawingBufferHeight,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
-            pixels,
-          );
+          const { pixels } = (canvas as SampledCanvas).testPixels;
           let colored = 0;
           for (let index = 0; index < pixels.length; index += 4)
             if (Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) > 60) colored++;

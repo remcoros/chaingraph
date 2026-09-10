@@ -48,7 +48,7 @@ test('expanded output controls remain at the top while browsing a large transact
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
-  await page.getByRole('button', { name: 'Graph', exact: true }).click();
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
   const view = page.locator('.transaction-view');
   await view.getByRole('button', { name: 'Show all 150 outputs', exact: true }).click();
   await view.getByRole('button', { name: /^Output 149:/ }).click();

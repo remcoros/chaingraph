@@ -16,6 +16,7 @@ const change = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 1, 0, 1);
 const derived = [...receive, ...change];
 // A public non-wallet destination used as the counterparty in fixture payments.
 const EXTERNAL = bitcoinAddress.toBech32(new Uint8Array(20).fill(7), 0, 'bc');
+const EXTERNAL_SECOND = bitcoinAddress.toBech32(new Uint8Array(20).fill(8), 0, 'bc');
 const script = (address: string) => bytesToHex(bitcoinAddress.toOutputScript(address));
 const TX_OLD = '1'.repeat(64);
 const TX_MID = '2'.repeat(64);
@@ -227,14 +228,14 @@ test('derives a resumable review queue from current coins and their sources', as
   await expect(rows.first()).toContainText('Current UTXO');
   await expect(rows.first()).toContainText('60,000,000 sats');
   await expect(reviewList(page)).toContainText('Earlier wallet receipt');
-  await expect(reviewList(page)).toContainText('Direct funding source');
-  await expect(reviewList(page)).toContainText('Counterparty');
+  await expect(reviewList(page)).toContainText('Wallet address');
+  await expect(reviewList(page)).toContainText('Destination address');
   // A labelled UTXO is still reviewable but never jumps ahead of unlabelled coins.
   await expect(rows.nth(1)).toContainText('Exchange A withdrawal');
   await screenshot(page, 'review-queue-desktop');
 
   await rows.first().click();
-  await expect(detail(page)).toContainText('Unspent at the last check');
+  await expect(detail(page)).toContainText('This current UTXO has no label or tags');
   await expect(detail(page).getByRole('button', { name: /Reviewed, source unknown/ })).toHaveCount(
     0,
   );
@@ -292,7 +293,7 @@ test('saved source-unknown decisions remain completed in Review and UTXOs after 
   await page.getByLabel('Review filter').selectOption('decided');
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(1);
   await expect(reviewList(page)).toContainText('Source unknown');
-  await expect(detail(page)).toContainText('This is a completed decision');
+  await expect(detail(page)).toContainText('Previously reviewed with the source unknown');
   await expect(detail(page).getByRole('button', { name: 'Reopen', exact: true })).toBeVisible();
   await expect(
     detail(page).getByRole('button', { name: /Mark reviewed|Reviewed, source unknown/ }),
@@ -329,38 +330,45 @@ test('finding types expose zero counts, match by OR and keep counts independent 
   const menu = page.getByRole('dialog', { name: 'Wallet finding types' });
   const category = (name: string) =>
     menu.locator('.wallet-category-option').filter({
-      has: page.locator('.wallet-category-name').filter({
-        hasText: new RegExp(`^${name}\\s*\\d`),
-      }),
+      has: page.getByRole('checkbox', { name, exact: true }),
     });
   const count = (name: string) => category(name).locator('.wallet-count');
-  await expect(menu.getByRole('checkbox')).toHaveCount(18);
-  await expect(menu.getByRole('checkbox', { checked: true })).toHaveCount(18);
-  await expect(menu).toContainText('Match any selected type (OR)');
-  await expect(menu).toContainText('Counts are partial');
-  await expect(count('All current UTXOs')).toHaveText('2+');
-  await expect(count('Direct funding source')).toHaveText('2+');
-  await expect(count('New activity')).toHaveText('0+');
-  await expect(count('UTXOs missing labels')).toHaveText('1+');
-  await expect(count('UTXOs missing tags')).toHaveText('2+');
-  await expect(count('UTXOs missing labels and tags')).toHaveText('1+');
+  await expect(menu.getByRole('checkbox')).toHaveCount(19);
+  await expect(menu.getByRole('checkbox', { checked: true })).toHaveCount(19);
+  await menu.getByRole('img', { name: 'Finding type counts', exact: true }).focus();
+  await expect(page.getByRole('tooltip')).toContainText('Match any selected type');
+  await expect(page.getByRole('tooltip')).toContainText('Counts overlap');
+  await expect(count('All current UTXOs')).toHaveText('2');
+  await expect(count('Source address')).toHaveText('0');
+  await expect(count('Earlier wallet receipt')).toHaveText('1');
+  await expect(count('New activity')).toHaveText('0');
+  await expect(count('UTXOs missing labels')).toHaveText('1');
+  await expect(count('UTXOs missing tags')).toHaveText('2');
+  await expect(count('UTXOs missing labels and tags')).toHaveText('1');
   for (const tool of analysisTools) {
     await expect(category(tool.name).getByRole('checkbox')).toBeEnabled();
-    await expect(count(tool.name)).toHaveText('0+');
+    await expect(count(tool.name)).toHaveText('0');
+    const help = category(tool.name).getByRole('img', { name: tool.name, exact: true });
+    await help.focus();
+    await expect(help).toHaveAttribute('aria-describedby', /.+/);
+    await expect(
+      page.locator(`[id="${await help.getAttribute('aria-describedby')}"]`),
+    ).toContainText('Not scanned in this session');
   }
   await menu.getByRole('button', { name: 'Clear types', exact: true }).click();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(0);
   await expect(reviewList(page)).toContainText('No finding types selected');
   await category('All current UTXOs').getByRole('checkbox').check();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(2);
-  await category('Counterparty').getByRole('checkbox').check();
+  await category('Destination address').getByRole('checkbox').check();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(3);
-  await expect(count('Direct funding source')).toHaveText('2+');
+  await expect(count('Source address')).toHaveText('0');
+  await expect(count('Earlier wallet receipt')).toHaveText('1');
   await category('All current UTXOs').getByRole('checkbox').uncheck();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(1);
-  await expect(reviewList(page)).toContainText('Counterparty');
+  await expect(reviewList(page)).toContainText('Destination address');
   await menu.getByRole('button', { name: 'Reset to all types', exact: true }).click();
-  await expect(reviewList(page).getByRole('listitem')).toHaveCount(6);
+  await expect(reviewList(page).getByRole('listitem')).toHaveCount(7);
   await menu.getByRole('button', { name: 'Clear types', exact: true }).click();
   await category('UTXOs missing labels').getByRole('checkbox').check();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(1);
@@ -374,18 +382,36 @@ test('finding types expose zero counts, match by OR and keep counts independent 
 
   await page.getByLabel('Label filter', { exact: true }).selectOption('labeled');
   await trigger.click();
-  await expect(count('All current UTXOs')).toHaveText('1+');
-  await expect(count('Counterparty')).toHaveText('0+');
-  await expect(count('UTXOs missing labels')).toHaveText('0+');
-  await expect(count('UTXOs missing tags')).toHaveText('1+');
+  await expect(count('All current UTXOs')).toHaveText('1');
+  await expect(count('Destination address')).toHaveText('0');
+  await expect(count('UTXOs missing labels')).toHaveText('0');
+  await expect(count('UTXOs missing tags')).toHaveText('1');
   await menu.getByRole('button', { name: 'Clear types', exact: true }).click();
-  await category('Counterparty').getByRole('checkbox').check();
+  await category('Destination address').getByRole('checkbox').check();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(0);
-  await expect(menu.getByRole('checkbox')).toHaveCount(18);
+  await expect(menu.getByRole('checkbox')).toHaveCount(19);
   await menu.getByRole('button', { name: 'Reset to all types', exact: true }).click();
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(1);
   await expect(reviewList(page)).toContainText('Exchange A withdrawal');
-  expect(chain.calls).toHaveLength(callsBefore);
+  // Filtering twice reveals the labelled coin's missing direct input. Each
+  // visible-detail activation may retry Core and Electrum; choosing finding
+  // types must not discover history, scan a wallet or expand deeper ancestry.
+  expect(chain.calls.slice(callsBefore)).toEqual(
+    Array.from({ length: 2 }, () => [
+      {
+        network: 'mainnet',
+        target: 'core',
+        method: 'getrawtransaction',
+        params: ['8'.repeat(64), 2],
+      },
+      {
+        network: 'mainnet',
+        target: 'electrum',
+        method: 'blockchain.transaction.get',
+        params: ['8'.repeat(64), true],
+      },
+    ]).flat(),
+  );
   await screenshot(page, 'finding-types-zero-counts');
 });
 
@@ -394,14 +420,39 @@ for (const [tab, firstId, secondId] of [
   ['UTXOs', UTXO_MID, UTXO_SECOND],
   ['Transactions', `tx:${TX_MID}`, `tx:${TX_SECOND}`],
   ['Addresses', `addr:${receive[1].address}`, `addr:${receive[2].address}`],
-  ['Sources', SOURCE_OLD, `out:${'8'.repeat(64)}:1`],
-  ['Destinations', UTXO_MID, `out:${TX_MID}:1`],
+  ['Sources', `addr:${EXTERNAL}`, `addr:${EXTERNAL_SECOND}`],
+  ['Destinations', `addr:${EXTERNAL}`, `addr:${EXTERNAL_SECOND}`],
 ] as const) {
   test(`${tab} uses one fixed list and detail layout for direct and batch metadata edits`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await seed(page, (workspace) => {
+      // These tabs edit addresses. Supply two distinct known address subjects,
+      // keeping the same single-record and two-record metadata assertions.
+      if (tab === 'Sources') {
+        for (const [id, index, address] of [
+          ['9'.repeat(64), 3, EXTERNAL],
+          ['8'.repeat(64), 1, EXTERNAL_SECOND],
+        ] as const) {
+          workspace.transactions[id] = {
+            txid: id,
+            vin: [{ coinbase: '00' }],
+            vout: Array.from({ length: index + 1 }, (_, n) => ({
+              n,
+              value: 1,
+              scriptPubKey: { hex: script(address) },
+            })),
+          };
+        }
+      }
+      if (tab === 'Destinations') {
+        workspace.transactions[TX_MID].vout.push({
+          n: 2,
+          value: 0.001,
+          scriptPubKey: { hex: script(EXTERNAL_SECOND) },
+        });
+      }
       workspace.annotations[firstId] = {
         label: `Original ${tab} label`,
         note: 'Visible record context',
@@ -537,11 +588,15 @@ test('batch labels, tags and icons apply to the explicit selection in one undoab
     'aria-pressed',
     'true',
   );
-  await page.getByRole('button', { name: /Select all 2 results/ }).click();
+  await page.getByRole('button', { name: 'Select all (2)', exact: true }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
-  await expect(bar).toContainText('2 UTXOs selected');
+  await expect(bar.locator('.batch-scope')).toHaveText('2 selected');
   // Evidence-based guidance, not a score or a guarantee.
-  await expect(bar).toContainText('1 of the selected outputs has no recorded source');
+  await page.getByRole('img', { name: 'Combining these UTXOs' }).focus();
+  await expect(page.getByRole('tooltip')).toContainText(
+    '1 of the selected outputs has no recorded source',
+  );
+  await page.keyboard.press('Escape');
 
   await bar.getByRole('button', { name: 'Label' }).click();
   const labelEditor = page.getByRole('dialog', { name: 'Label selected records' });
@@ -588,15 +643,16 @@ test('carries a record into Graph and Analysis and offers a way back', async ({ 
   await page.getByRole('button', { name: 'Back to Wallet' }).click();
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
 
-  await detail(page).getByRole('button', { name: 'Analyze' }).click();
+  await detail(page).getByRole('button', { name: 'Show in Graph' }).click();
+  await workbench(page, 'Analysis').click();
   await expect(workbench(page, 'Analysis')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.scan-scope')).toContainText('Output');
-  await page.getByRole('button', { name: 'Analyse loaded', exact: true }).click();
+  await page.getByRole('button', { name: 'Scan', exact: true }).click();
   await expect(page.locator('.scan-run-note')).toBeVisible();
   await page.getByRole('button', { name: 'Back to Wallet' }).click();
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
   // Returning keeps the queue and the previously selected item.
-  await expect(detail(page)).toContainText('Unspent at the last check');
+  await expect(detail(page)).toContainText('This current UTXO has no label or tags');
 });
 
 test('a refresh keeps decisions, flags new activity and stays inside one wallet', async ({
@@ -637,7 +693,7 @@ test('stays usable on a phone viewport', async ({ page }) => {
   await expect(detail(page).getByRole('button', { name: 'Mark reviewed' })).toBeVisible();
   await screenshot(page, 'review-queue-phone');
   await walletTab(page, 'UTXOs').click();
-  await page.getByRole('button', { name: /Select all 2 results/ }).click();
+  await page.getByRole('button', { name: 'Select all (2)', exact: true }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
   await bar.getByRole('button', { name: 'Label' }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
@@ -755,7 +811,7 @@ test('Review later keeps refreshed activity discoverable across views and a relo
   await page.getByRole('button', { name: 'Refresh wallet' }).click();
   await expect(page.locator('.wallet-coverage')).toContainText('3 unspent', { timeout: 20000 });
   await reviewList(page).getByRole('listitem').filter({ hasText: 'New activity' }).click();
-  await expect(detail(page)).toContainText('New activity since your last review');
+  await expect(detail(page)).toContainText('Found during a wallet refresh');
   await detail(page).getByRole('button', { name: 'Review later' }).click();
 
   // Deferred work moves out of To review into its own view, without completion.
@@ -831,26 +887,27 @@ test('batch editors never stack and the icon palette stays keyboard usable', asy
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-// RUX-005: Inspect reveals the Inspector, so focus must land there, not on a hidden canvas.
-test('keyboard Inspect on a phone focuses the revealed Inspector', async ({ page }) => {
+// Keyboard Show reveals Graph and must focus its visible canvas, then return to the invoker.
+test('keyboard Show on a phone focuses the revealed graph', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await seed(page);
   await waitForUtxoCheck(page);
   await reviewList(page).getByRole('listitem').first().click();
-  const invoker = detail(page).getByRole('button', { name: 'Inspect', exact: true });
+  const invoker = detail(page).getByRole('button', { name: 'Show in Graph', exact: true });
   await invoker.focus();
   await page.keyboard.press('Enter');
   await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.right-panel')).toBeVisible();
+  await expect(page.locator('.graph-stage')).toBeVisible();
   const landed = await page.evaluate(() => {
     const active = document.activeElement as HTMLElement | null;
     return {
       tag: active?.tagName ?? 'NONE',
-      inPanel: !!active && !!document.querySelector('.right-panel')?.contains(active),
+      inGraph:
+        !!active && !!document.querySelector('[aria-label="Graph workspace"]')?.contains(active),
     };
   });
   expect(landed.tag).not.toBe('BODY');
-  expect(landed.inPanel).toBe(true);
+  expect(landed.inGraph).toBe(true);
   // The accepted return contract still restores the exact invoker.
   const back = page.getByRole('button', { name: 'Back to Wallet' });
   await back.focus();
@@ -863,8 +920,8 @@ test('review rows expose button semantics with a pressed state', async ({ page }
   await seed(page);
   await waitForUtxoCheck(page);
   const rows = reviewList(page).getByRole('listitem');
-  const firstButton = rows.first().getByRole('button');
-  const secondButton = rows.nth(1).getByRole('button');
+  const firstButton = rows.first().locator('button.wallet-row-button');
+  const secondButton = rows.nth(1).locator('button.wallet-row-button');
   await expect(firstButton).toHaveCount(1);
   // The queue opens on its first row, so the pressed state must track selection.
   await expect(firstButton).toHaveAttribute('aria-pressed', 'true');
@@ -901,7 +958,12 @@ for (const phone of [false, true]) {
     };
     await checkUndo(true);
     const callsBeforeInspect = chain.calls.length;
-    await detail(page).getByRole('button', { name: 'Inspect', exact: true }).click();
+    await detail(page).getByRole('button', { name: 'Show in Graph', exact: true }).click();
+    if (phone)
+      await page
+        .locator('.mobile-switch')
+        .getByRole('button', { name: 'Inspector', exact: true })
+        .click();
     await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('Cached coin label');
     await checkUndo(true);
     expect(chain.calls).toHaveLength(callsBeforeInspect);
@@ -949,7 +1011,7 @@ for (const viewport of [
     await seed(page);
     await waitForUtxoCheck(page);
     await screenshot(page, `polish-${viewport.name}-initial`);
-    await reviewList(page).getByRole('listitem').nth(1).getByRole('button').click();
+    await reviewList(page).getByRole('listitem').nth(1).locator('button.wallet-row-button').click();
     const initialCount = await reviewList(page).getByRole('listitem').count();
     const bar = detail(page).getByRole('group', { name: 'Edit entity metadata' });
     await bar.getByRole('button', { name: 'Label', exact: true }).click();
@@ -992,10 +1054,10 @@ for (const viewport of [
     await expect(reviewList(page)).toContainText('❄️');
     if (viewport.name === 'desktop') {
       await detail(page)
-        .getByRole('button', { name: 'Analyze', exact: true })
+        .getByRole('button', { name: 'Show in Graph', exact: true })
         .scrollIntoViewIfNeeded();
       const actions = await detail(page)
-        .getByRole('button', { name: 'Analyze', exact: true })
+        .getByRole('button', { name: 'Show in Graph', exact: true })
         .boundingBox();
       const panel = await page.locator('.wallet-workbench').boundingBox();
       expect(actions!.y + actions!.height).toBeLessThanOrEqual(panel!.y + panel!.height);
@@ -1024,11 +1086,11 @@ test('wallet records support range selection, additive toggles and an explicit h
   await bodies.nth(1).click({ modifiers: ['Control'] });
   await expect(checks.nth(1)).not.toBeChecked();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
-  await expect(bar).toContainText('2 transactions selected');
+  await expect(bar.locator('.batch-scope')).toHaveText('2 selected');
   await page.getByLabel('Filter wallet records').fill(TX_OLD);
   await expect(page.locator('.wallet-review-records').getByRole('listitem')).toHaveCount(1);
-  await expect(batchDetail(page).getByText(/1 selected record is outside/)).toBeVisible();
-  await expect(bar).toContainText('2 transactions selected');
+  await expect(batchDetail(page).getByText(/1 selected outside this filter/)).toBeVisible();
+  await expect(bar.locator('.batch-scope')).toHaveText('2 selected');
   await bar.getByRole('button', { name: 'Label', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
   await editor.getByLabel('Batch label').fill('Selected transfers');
@@ -1036,22 +1098,24 @@ test('wallet records support range selection, additive toggles and an explicit h
   await page.getByLabel('Filter wallet records').fill('');
   await expect(rows.filter({ hasText: 'Selected transfers' })).toHaveCount(2);
   await expect(rows.nth(1)).not.toContainText('Selected transfers');
-  // Select all explicitly replaces the old scope; clearing a filter never expands it.
+  // Toggling all filtered rows preserves selections outside the filter.
   await page.getByLabel('Filter wallet records').fill(TX_OLD);
-  await page.getByRole('button', { name: 'Select all 1 results', exact: true }).click();
-  await expect(batchDetail(page)).toContainText('1 unique metadata targets');
-  await expect(batchDetail(page).getByText(/outside the current filter/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Unselect all (1)', exact: true }).click();
+  await expect(bar.locator('.batch-scope')).toHaveText('1 selected');
+  await expect(batchDetail(page)).toContainText('1 selected outside this filter');
   await page.getByLabel('Filter wallet records').fill('');
-  await expect(batchDetail(page)).toContainText('1 unique metadata targets');
+  await expect(bar.locator('.batch-scope')).toHaveText('1 selected');
+  await expect(checks.first()).toBeChecked();
+  await expect(checks.last()).not.toBeChecked();
   await bar.getByRole('button', { name: 'Label', exact: true }).click();
-  await editor.getByLabel('Batch label').fill('Replacement scope only');
+  await editor.getByLabel('Batch label').fill('Remaining scope only');
   await editor.getByLabel('Replace existing labels').check();
   await editor.getByRole('button', { name: 'Apply label' }).click();
-  await expect(rows.filter({ hasText: 'Replacement scope only' })).toHaveCount(1);
-  await expect(rows.last()).toContainText('Replacement scope only');
-  await expect(rows.first()).toContainText('Selected transfers');
-  await expect(rows.nth(1)).not.toContainText('Replacement scope only');
-  await bar.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(rows.filter({ hasText: 'Remaining scope only' })).toHaveCount(1);
+  await expect(rows.first()).toContainText('Remaining scope only');
+  await expect(rows.last()).toContainText('Selected transfers');
+  await expect(rows.nth(1)).not.toContainText('Remaining scope only');
+  await batchDetail(page).getByRole('button', { name: 'Clear selection' }).click();
   // Checkbox ranges include the intermediate rows and remain keyboard accessible.
   await checks.first().click();
   await checks.nth(2).click({ modifiers: ['Shift'] });
@@ -1141,16 +1205,17 @@ test('Select all includes results below Show more without growing after a filter
   await expect(
     list.getByRole('button', { name: 'Show more (6 remaining)', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Select all 46 results', exact: true }).click();
-  await expect(batchDetail(page)).toContainText('46 unique metadata targets');
+  await page.getByRole('button', { name: 'Select all (46)', exact: true }).click();
+  await expect(batchDetail(page)).toContainText('46 selected');
   await expect(rows.getByRole('checkbox', { checked: true })).toHaveCount(40);
   await page.getByLabel('Filter wallet records').fill(receive[2].address);
   await expect(rows).toHaveCount(1);
-  await expect(batchDetail(page)).toContainText('45 selected records are outside');
-  await page.getByRole('button', { name: 'Select all 1 results', exact: true }).click();
-  await expect(batchDetail(page)).toContainText('1 unique metadata targets');
+  await expect(batchDetail(page)).toContainText('45 selected outside this filter');
+  await batchDetail(page).getByRole('button', { name: 'Clear selection', exact: true }).click();
+  await page.getByRole('button', { name: 'Select all (1)', exact: true }).click();
+  await expect(batchDetail(page)).toContainText('1 selected');
   await page.getByLabel('Filter wallet records').fill('');
-  await expect(batchDetail(page)).toContainText('1 unique metadata targets');
+  await expect(batchDetail(page)).toContainText('1 selected');
   await list.getByRole('button', { name: 'Show more (6 remaining)', exact: true }).click();
   await expect(rows).toHaveCount(46);
   await expect(rows.getByRole('checkbox', { checked: true })).toHaveCount(1);
@@ -1192,10 +1257,9 @@ test('batch review rows sharing one subject edit one canonical metadata target',
   await sameSubject.nth(0).getByRole('checkbox').check();
   await sameSubject.nth(1).getByRole('checkbox').check();
   const batch = batchDetail(page);
-  await expect(batch).toContainText('2 selected review items; 1 unique metadata targets');
-  await expect(
-    batch.getByRole('region', { name: 'Batch review decisions' }).getByRole('heading'),
-  ).toHaveText('2 review items in this selection');
+  await expect(batch.locator('.batch-scope')).toHaveText('1 selected');
+  await expect(batch).toContainText('2 rows · 2 review decisions');
+  await expect(batch.getByRole('button', { name: 'Mark reviewed', exact: true })).toBeEnabled();
   await batch.getByRole('button', { name: 'Label', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
   await expect(editor).toContainText('1 of 1 records change');
@@ -1232,41 +1296,64 @@ test('one-hop Sources and Destinations keep missing evidence and creating-transa
   await walletTab(page, 'Sources').click();
   const list = page.locator('.wallet-review-records');
   const rows = list.getByRole('listitem');
-  await expect(rows).toHaveCount(4);
-  await expect(rows.filter({ hasText: 'Previous output not loaded' })).toHaveCount(2);
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('.wallet-input-status')).toContainText('2 input lookups failed');
   await expect(list).not.toContainText(historyOnlyId.slice(0, 12));
-  const source = rows.filter({ has: page.locator(`.wallet-item-title[title="${TX_OLD}:0"]`) });
-  await source.locator('.wallet-review-record-body').click();
-  await expect(walletDetail(page)).toContainText('not an exchange identity');
-  await expect(page.locator('.wallet-relationship-coverage')).toContainText('One hop only');
-  await expect(page.locator('.wallet-relationship-coverage')).toContainText('No exact allocation');
+  const source = rows.filter({ has: page.locator(`.wallet-item-title[title="${EXTERNAL}"]`) });
+  await source.locator('.wallet-row-button').click();
+  await expect(walletDetail(page)).toContainText('Source address');
+  await expect(walletDetail(page)).toContainText('10,000,000 sats');
+  await expect(walletDetail(page)).toContainText(fundingId.slice(0, 12));
+  // Only missing direct parents are requested; neither this known source's
+  // ancestry nor a transaction associated only by address history is expanded.
+  expect(
+    [
+      ...new Set(
+        chain.calls
+          .slice(callsBefore)
+          .filter((call) => call.method === 'getrawtransaction')
+          .map((call) => call.params[0]),
+      ),
+    ].sort(),
+  ).toEqual(['8'.repeat(64), '9'.repeat(64)]);
+  const callsAfterSources = chain.calls.length;
   await page.getByRole('button', { name: 'Select related', exact: true }).click();
   const related = page.getByRole('dialog', { name: 'Select related results' });
-  await expect(
-    related.getByRole('button', { name: 'Same transaction 1', exact: true }),
-  ).toBeEnabled();
   await related.getByRole('button', { name: 'Same transaction 1', exact: true }).click();
-  await expect(batchDetail(page)).toContainText('1 unique metadata targets');
+  await expect(batchDetail(page).locator('.batch-scope')).toHaveText('1 selected');
   await expect(source.getByRole('checkbox')).toBeChecked();
-  await expect(rows.getByRole('checkbox', { checked: true })).toHaveCount(1);
-  await page.getByLabel('Wallet match filter').selectOption('external');
-  await expect(rows).toHaveCount(1);
-  await expect(list).toContainText(fundingId.slice(0, 12));
-  await expect(batchDetail(page)).toContainText('1 selected record is outside');
-  await page.getByRole('button', { name: 'Select all 1 results', exact: true }).click();
-  await expect(batchDetail(page)).not.toContainText('outside the current filter');
+  await page.getByLabel('Filter wallet records').fill('no matching source');
+  await expect(rows).toHaveCount(0);
+  await expect(batchDetail(page)).toContainText('1 selected outside this filter');
+  await page.getByLabel('Filter wallet records').fill('');
+  await expect(source.getByRole('checkbox')).toBeChecked();
+  await expect(batchDetail(page)).not.toContainText('outside this filter');
 
   await walletTab(page, 'Destinations').click();
   await expect(batchDetail(page)).toHaveCount(0);
-  await expect(rows).toHaveCount(2);
-  await expect(rows.filter({ hasText: 'Wallet match: own transfer or change' })).toHaveCount(1);
-  await expect(rows.filter({ hasText: 'No wallet match: possible external party' })).toHaveCount(1);
-  await page.getByLabel('Wallet match filter').selectOption('external');
   await expect(rows).toHaveCount(1);
-  await rows.locator('.wallet-review-record-body').click();
-  await expect(walletDetail(page)).toContainText('undiscovered wallet address');
-  await expect(walletFlow(page).locator('.is-selected')).toHaveClass(/ownership-external/);
-  expect(chain.calls).toHaveLength(callsBefore);
+  await expect(rows).toContainText(EXTERNAL.slice(0, 12));
+  await rows.locator('.wallet-row-button').click();
+  await expect(walletDetail(page).locator('.wallet-match-value')).toHaveText(
+    'No match in this wallet',
+  );
+  await expect(walletDetail(page)).toContainText('39,000,000 sats');
+  await page.getByRole('img', { name: 'Wallet relationship', exact: true }).focus();
+  await expect(page.getByRole('tooltip')).toContainText('undiscovered wallet address');
+  await page.keyboard.press('Escape');
+  await expect(walletFlow(page).locator('.is-selected')).toHaveClass([
+    /ownership-external/,
+    /ownership-external/,
+  ]);
+  await expect(walletFlow(page).locator('.is-selected').first()).toHaveAttribute(
+    'title',
+    new RegExp(fundingId),
+  );
+  await expect(walletFlow(page).locator('.is-selected').last()).toHaveAttribute(
+    'title',
+    new RegExp(TX_MID),
+  );
+  expect(chain.calls).toHaveLength(callsAfterSources);
   await screenshot(page, 'one-hop-destination-evidence');
 });
 
@@ -1277,13 +1364,13 @@ test('queue selection batches metadata, defers to untouched work and reopens int
   await waitForUtxoCheck(page);
   const rows = reviewList(page).getByRole('listitem');
   // Shift range starts at the ordinary selected review row, not only at a checkbox.
-  await rows.first().getByRole('button').click();
+  await rows.first().locator('button.wallet-row-button').click();
   await rows
     .nth(1)
-    .getByRole('button')
+    .locator('button.wallet-row-button')
     .click({ modifiers: ['Shift'] });
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
-  await expect(bar).toContainText('2 entities selected');
+  await expect(bar.locator('.batch-scope')).toHaveText('2 selected');
   await expect(detail(page)).toBeHidden();
   await bar.getByRole('button', { name: 'Label', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
@@ -1292,12 +1379,9 @@ test('queue selection batches metadata, defers to untouched work and reopens int
   await editor.getByRole('button', { name: 'Apply label' }).click();
   await expect(rows.filter({ hasText: 'Wallet savings' })).toHaveCount(2);
   const initialCount = await rows.count();
-  await batchDetail(page)
-    .getByRole('region', { name: 'Batch review decisions' })
-    .getByRole('button', { name: 'Review later', exact: true })
-    .click();
+  await batchDetail(page).getByRole('button', { name: 'Review later', exact: true }).click();
   await expect(rows).toHaveCount(initialCount - 2);
-  await expect(detail(page)).toContainText('This wallet output was spent into 1 current UTXO');
+  await expect(detail(page)).toContainText('This wallet address has no label or tags');
   await expect(reviewList(page)).not.toContainText('Wallet savings');
   await page.getByLabel('Review filter').selectOption('later');
   await expect(rows).toHaveCount(2);
@@ -1359,13 +1443,13 @@ for (const phone of [false, true]) {
     await seed(page);
     await waitForUtxoCheck(page);
     const filter = page.getByLabel('Review filter');
-    await expect(filter.locator('option[value="open"]')).toHaveText('To review (6+)');
-    await expect(filter.locator('option[value="later"]')).toHaveText('Review later (0+)');
-    await expect(filter.locator('option[value="decided"]')).toHaveText('Reviewed (0+)');
-    await expect(filter.locator('option[value="all"]')).toHaveText('All items (6+)');
+    await expect(filter.locator('option[value="open"]')).toHaveText('To review (7)');
+    await expect(filter.locator('option[value="later"]')).toHaveText('Review later (0)');
+    await expect(filter.locator('option[value="decided"]')).toHaveText('Reviewed (0)');
+    await expect(filter.locator('option[value="all"]')).toHaveText('All items (7)');
     const flow = walletFlow(page);
     await expect(flow).toBeVisible();
-    await expect(detail(page).locator('.wallet-context-badge')).toHaveText('Wallet match');
+    await expect(detail(page).locator('.wallet-match-value')).toHaveText('In this wallet');
     await expect(flow.locator('.ownership-wallet')).toHaveCount(2);
     await expect(flow.locator('.ownership-external')).toHaveCount(1);
     await expect(flow.locator('.is-selected')).toContainText('60,000,000 sats');
@@ -1375,7 +1459,11 @@ for (const phone of [false, true]) {
     const headingBox = (await detail(page).getByRole('heading', { level: 2 }).boundingBox())!;
     expect(flowBox.width).toBeGreaterThan(panelBox.width * 0.8);
     expect(flowBox.y + flowBox.height).toBeLessThanOrEqual(headingBox.y);
-    await reviewList(page).getByRole('listitem').first().getByRole('button').click();
+    await reviewList(page)
+      .getByRole('listitem')
+      .first()
+      .locator('button.wallet-row-button')
+      .click();
     await screenshot(page, `wallet-context-${phone ? 'phone' : 'desktop'}`);
     const input = flow.getByRole('button', {
       name: `Show input ${TX_OLD}:0 on graph`,
@@ -1388,17 +1476,19 @@ for (const phone of [false, true]) {
     await expect(input).toBeFocused();
     await reviewList(page)
       .getByRole('listitem')
-      .filter({ hasText: 'Counterparty' })
-      .getByRole('button')
+      .filter({ hasText: 'Destination address' })
+      .locator('button.wallet-row-button')
       .click();
-    await expect(detail(page).locator('.wallet-context-badge')).toHaveText('No wallet match');
+    await expect(detail(page).locator('.wallet-match-value')).toHaveText('No match in this wallet');
     await expect(flow.locator('.is-selected')).toHaveClass(/ownership-external/);
     await expect(flow.locator('.is-selected')).toContainText('No wallet match');
     await screenshot(page, `wallet-counterparty-${phone ? 'phone' : 'desktop'}`);
-    await expect(detail(page)).toContainText('a label does not identify its controller');
+    await page.getByRole('img', { name: 'Wallet relationship', exact: true }).focus();
+    await expect(page.getByRole('tooltip')).toContainText('or identify its owner');
+    await page.keyboard.press('Escape');
     await detail(page).getByRole('button', { name: 'Mark reviewed', exact: true }).click();
-    await expect(filter.locator('option[value="open"]')).toHaveText('To review (5+)');
-    await expect(filter.locator('option[value="decided"]')).toHaveText('Reviewed (1+)');
+    await expect(filter.locator('option[value="open"]')).toHaveText('To review (6)');
+    await expect(filter.locator('option[value="decided"]')).toHaveText('Reviewed (1)');
     await page.getByRole('button', { name: 'Add wallet', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Add a wallet', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
@@ -1418,24 +1508,28 @@ test('related selection uses exact addresses and transactions within the current
   await waitForUtxoCheck(page);
   const rows = reviewList(page).getByRole('listitem');
   await expect(rows).toHaveCount(7);
-  await rows.filter({ hasText: 'Counterparty' }).first().getByRole('button').click();
+  await expect(rows.filter({ hasText: 'Destination address' })).toHaveCount(1);
+  await rows.first().locator('button.wallet-row-button').click();
   await page.getByRole('button', { name: 'Select related', exact: true }).click();
   const menu = page.getByRole('dialog', { name: 'Select related results' });
   await expect(menu.getByRole('button', { name: 'Same address 2' })).toBeEnabled();
-  await expect(menu.getByRole('button', { name: 'Same transaction 3' })).toBeEnabled();
+  await expect(menu.getByRole('button', { name: 'Same transaction 2' })).toBeEnabled();
   await menu.getByRole('button', { name: 'Same address 2' }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
-  await expect(bar).toContainText('2 entities selected');
-  await expect(rows.filter({ hasText: 'Counterparty' }).getByRole('checkbox')).toHaveCount(2);
-  await expect(rows.first().getByRole('checkbox')).not.toBeChecked();
+  await expect(bar.locator('.batch-scope')).toHaveText('2 selected');
+  await expect(rows.getByRole('checkbox', { checked: true })).toHaveCount(2);
+  await expect(rows.first().getByRole('checkbox')).toBeChecked();
+  await expect(
+    rows.filter({ hasText: 'Destination address' }).getByRole('checkbox'),
+  ).not.toBeChecked();
   await bar.getByRole('button', { name: 'Label', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
-  await editor.getByLabel('Batch label').fill('Neighborhood shop');
+  await editor.getByLabel('Batch label').fill('Wallet purpose');
   await editor.getByRole('button', { name: 'Apply label' }).click();
-  await expect(rows.filter({ hasText: 'Neighborhood shop' })).toHaveCount(2);
-  await expect(rows.first()).not.toContainText('Neighborhood shop');
-  await page.getByRole('button', { name: 'Select all 7 results', exact: true }).click();
-  await expect(bar).toContainText('7 entities selected');
+  await expect(rows.filter({ hasText: 'Wallet purpose' })).toHaveCount(2);
+  await expect(rows.filter({ hasText: 'Destination address' })).not.toContainText('Wallet purpose');
+  await page.getByRole('button', { name: 'Select all (7)', exact: true }).click();
+  await expect(bar.locator('.batch-scope')).toHaveText('7 selected');
   await screenshot(page, 'wallet-related-selection');
 });
 
@@ -1447,7 +1541,7 @@ test('compact wallet flow keeps a late selected output visible and expands a bou
       workspace.transactions[TX_MID].vout.push({
         n,
         value: 0.001,
-        scriptPubKey: { hex: script(EXTERNAL) },
+        scriptPubKey: { hex: script(n === 8 ? EXTERNAL_SECOND : EXTERNAL) },
       });
     workspace.annotations[`out:${TX_MID}:8`] = {
       label: 'Final shop payment',
@@ -1455,12 +1549,15 @@ test('compact wallet flow keeps a late selected output visible and expands a bou
       icon: '',
       bookmarked: false,
     };
+    workspace.annotations[`addr:${EXTERNAL_SECOND}`] = {
+      ...workspace.annotations[`out:${TX_MID}:8`],
+    };
   });
   await waitForUtxoCheck(page);
   await reviewList(page)
     .getByRole('listitem')
     .filter({ hasText: 'Final shop payment' })
-    .getByRole('button')
+    .locator('button.wallet-row-button')
     .click();
   const flow = walletFlow(page);
   await expect(flow.locator('.is-selected')).toContainText('Final shop payment');

@@ -50,7 +50,7 @@ test('a real WabiSabi input opens its creating CoinJoin without downloading its 
   await expect(
     flow.getByRole('button', { name: `Select displayed transaction ${parent.txid}` }),
   ).toBeVisible();
-  await expect(flow.getByRole('button', { name: /^Load all input details/ })).toBeVisible();
+  await expect(flow.getByRole('button', { name: /^Load missing input details/ })).toBeVisible();
   await expect(page.locator('.statusbar')).toContainText(count);
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });

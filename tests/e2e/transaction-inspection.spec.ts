@@ -100,7 +100,7 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
-  await page.getByRole('button', { name: 'Graph', exact: true }).click();
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
   const view = page.locator('.transaction-view');
   await expect(view.locator('.transaction-row')).toHaveCount(6);
   await view.getByRole('button', { name: 'Show all 150 outputs', exact: true }).click();

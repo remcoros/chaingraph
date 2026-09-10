@@ -85,7 +85,7 @@ test('input selection and backward navigation follow one outpoint; bulk details 
   await flow.getByRole('button', { name: `Select displayed transaction ${TX_FUNDING}` }).click();
   await settleRendering(page);
   expect(fetched).toEqual([TX_SPENDING, TX_FUNDING]);
-  await flow.getByRole('button', { name: /^Load all input details/ }).click();
+  await flow.getByRole('button', { name: /^Load missing input details/ }).click();
   await expect(page.locator('.statusbar')).toContainText('3 transactions');
   expect(fetched).toEqual([TX_SPENDING, TX_FUNDING, TX_OLDER]);
 });

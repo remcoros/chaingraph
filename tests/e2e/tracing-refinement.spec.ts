@@ -48,7 +48,8 @@ for (const depth of ['0', '1'])
     await setup(page);
     await page.getByLabel('Prefetch previous levels').selectOption(depth);
     await add(page, TX_SPENDING);
-    if (depth === '0') await page.getByRole('button', { name: /Load all input details/ }).click();
+    if (depth === '0')
+      await page.getByRole('button', { name: /Load missing input details/ }).click();
     await expect(page.locator('.statusbar')).toContainText('2 transactions');
     const requests: string[] = [];
     page.on('request', (request) => {
@@ -91,7 +92,7 @@ test('successful output lookup focuses that output with selection locking disabl
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await setup(page);
   await add(page, TX_FUNDING);
-  await page.getByRole('button', { name: /Load all input details/ }).click();
+  await page.getByRole('button', { name: /Load missing input details/ }).click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await expect(
     page.getByRole('button', { name: 'Lock to selection', exact: true }),

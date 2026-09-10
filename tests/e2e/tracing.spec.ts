@@ -25,13 +25,21 @@ async function add(page: Page, value: string) {
   await page.getByLabel('Transaction, output, or address').fill(value);
   await page.getByRole('button', { name: 'Add to graph', exact: true }).click();
 }
-test('flow hydrates previous outputs with lookup prefetch off and follows exact spends', async ({
+test('selecting an input hydrates its previous output with prefetch off and follows exact spends', async ({
   page,
 }) => {
   const calls = await mockBitcoin(page);
   await create(page);
   await expect(page.getByLabel('Prefetch previous levels')).toHaveValue('0');
   await add(page, TX_SPENDING);
+  await expect(page.locator('.statusbar')).toContainText('1 transaction');
+  expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
+    TX_SPENDING,
+  ]);
+  await page
+    .locator('.transaction-view')
+    .getByRole('button', { name: /^Input 0:/ })
+    .click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
     TX_SPENDING,
@@ -57,12 +65,12 @@ test('flow hydrates previous outputs with lookup prefetch off and follows exact 
     page.locator(`.selection-heading .selection-facts code[title="${TX_SPENDING}"]`),
   ).toBeVisible();
 });
-test('automatically loaded input outputs expose their value without a manual fetch', async ({
+test('explicit previous-level prefetch exposes input output values without another fetch', async ({
   page,
 }) => {
-  await mockBitcoin(page);
+  const calls = await mockBitcoin(page);
   await create(page);
-  await page.getByLabel('Prefetch previous levels').selectOption('0');
+  await page.getByLabel('Prefetch previous levels').selectOption('1');
   await add(page, TX_SPENDING);
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
@@ -76,6 +84,10 @@ test('automatically loaded input outputs expose their value without a manual fet
       .locator('dd'),
   ).toHaveText('100,000,000 sats');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
+  expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
+    TX_SPENDING,
+    TX_FUNDING,
+  ]);
 });
 test('saved incoming and outgoing paths remain navigable offline and survive locking', async ({
   page,

@@ -1,3 +1,4 @@
+import { captureGraphPixels, type SampledCanvas } from '../fixtures/graph-pixels';
 import { test, expect, type Page } from '@playwright/test';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -56,7 +57,7 @@ const [caption,setCaption]=React.useState('Followed output');
 const [labels,setLabels]=React.useState(true),[tags,setTags]=React.useState(true),[icons,setIcons]=React.useState(true);
 window.fixture={setCaption,setLoaded,setSelected,setShown,setHidden,setBusy,setLabels,setTags,setIcons};
 return <><input id="notes" aria-label="Notes editor"/><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="action">{action}</output><output style={{display:"block",overflowWrap:"anywhere",height:36,overflow:"hidden"}} data-testid="selected">{selected||'none'}</output>
-<div><button onClick={()=>setDimensions(d=>d===2?3:2)}>Toggle dimensions</button><button onClick={()=>setFit(n=>n+1)}>Fit graph</button><button onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Focus output</button><button onClick={()=>setLoaded(true)}>Load data</button></div>
+<div><button onClick={()=>setDimensions(d=>d===2?3:2)}>Toggle dimensions</button><button onClick={()=>setFit(n=>n+1)}>Fixture fit graph</button><button onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Focus output</button><button onClick={()=>setLoaded(true)}>Load data</button></div>
 <div id="fixture-graph" style={{display:hidden?'none':undefined,position:'relative',height:'600px',width:'min(900px, 100%)','--color-paper':'#111a20','--color-muted':'#74818b','--color-accent':'#eab66b'}}>
 {shown && <Graph navigation={params.has('contract')||params.has('navigation')||captionFit?<button style={{pointerEvents:'auto',height:captionFit?64:undefined,width:captionFit?420:undefined}} onClick={()=>setFocus({id:'out:'+a+':0',token:Date.now()})}>Shared center</button>:undefined} toolbar={params.has('contract')?<button onClick={()=>setFit(n=>n+1)}>Shared fit</button>:undefined} legend={params.has('contract')?<span style={{position:'absolute',bottom:0}}>Shared legend</span>:undefined} adapterFactory={params.has('contract')?contractFactory:undefined} nodes={loaded?nodes:[]} links={loaded?links:[]} transactions={transactions} selectedId={selected} onSelect={setSelected} dimensions={dimensions} sizeBy="uniform" glow={false} fitToken={fit} focusRequest={focus}
 showLabels={labels} showTags={tags} showIcons={icons} nodePresentation={captionFit?new Map(nodes.map(node=>[node.id,{label:node.kind==='output'?caption:''}])):params.has('captions')?new Map(nodes.map(node=>[node.id,{label:node.kind==='output'?'Deposit':'',icon:node.kind==='output'?'★':'',tags:node.kind==='output'?['Exchange']:[]}])):new Map(nodes.map(node=>[node.id,{label:''}]))}
@@ -94,20 +95,17 @@ async function render(page: Page, query = '') {
   return errors;
 }
 
-// Read the rendered frame during RAF before compositing clears its back buffer.
+// Read the composited frame, including when the renderer has stopped drawing.
 // Colors identify the visible meshes; interactions below still use mouse picking.
 async function visibleMeshes(page: Page) {
+  await captureGraphPixels(page.locator('canvas'));
   const bounds = await page.locator('canvas').boundingBox();
   if (!bounds) throw new Error('Missing graph canvas');
   const meshes = await page.locator('canvas').evaluate(
     (canvas) =>
       new Promise<Record<string, { x: number; y: number; taper: number }>>((resolve) =>
         requestAnimationFrame(() => {
-          const gl = (canvas as HTMLCanvasElement).getContext('webgl2')!;
-          const width = gl.drawingBufferWidth,
-            height = gl.drawingBufferHeight;
-          const pixels = new Uint8Array(width * height * 4);
-          gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          const { width, height, pixels } = (canvas as SampledCanvas).testPixels;
           const groups: Record<string, { xs: number[]; ys: number[] }> = {};
           for (let y = 0; y < height; y++)
             for (let x = 0; x < width; x++) {
@@ -359,7 +357,7 @@ test('shared GraphView handles a substitute adapter with identical semantic acti
   await page.evaluate(() => (window as any).fixture.setLoaded(false));
   await expect(card).toBeHidden();
   await page.getByRole('button', { name: 'Load data' }).click();
-  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page.getByRole('button', { name: 'Fixture fit graph' }).click();
   await page.getByRole('button', { name: 'Focus output' }).click();
   await page.getByRole('button', { name: 'Toggle dimensions' }).click();
   const calls = await page.evaluate(() => (window as any).contract.calls);
@@ -402,7 +400,7 @@ test('fits first data after an empty mount, pans in 2D, focuses and fits, then o
   const focused = await visibleMeshes(page);
   expect(Math.abs(focused.output.x - bounds.x - bounds.width / 2)).toBeLessThan(4);
   expect(Math.abs(focused.output.y - bounds.y - bounds.height / 2)).toBeLessThan(4);
-  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page.getByRole('button', { name: 'Fixture fit graph' }).click();
   await page.waitForTimeout(800);
   const fitted = await visibleMeshes(page);
   expect(Object.keys(fitted)).toHaveLength(4);
@@ -419,7 +417,7 @@ test('fits first data after an empty mount, pans in 2D, focuses and fits, then o
     ),
   ).toBeGreaterThan(10);
   await expect(page.getByTestId('selected')).toHaveText('none');
-  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page.getByRole('button', { name: 'Fixture fit graph' }).click();
   await page.waitForTimeout(800);
   expect(Object.keys(await visibleMeshes(page))).toHaveLength(4);
   await page.screenshot({ path: test.info().outputPath('desktop-force.png') });
@@ -487,7 +485,7 @@ test('mobile touch taps select without hover and touch drags pan without selecti
   await expect(page.getByTestId('selected')).toHaveText('none');
   await expect(page.getByRole('dialog', { name: 'Graph item details' })).toBeHidden();
 
-  await page.getByRole('button', { name: 'Fit graph' }).tap();
+  await page.getByRole('button', { name: 'Fixture fit graph' }).tap();
   await page.waitForTimeout(800);
   await page.evaluate((id) => (window as any).fixture.setSelected(id), outputId);
   await page.locator('canvas').focus();
@@ -531,7 +529,7 @@ test('fit keeps nodes visible and selectable in a short transaction-panel canvas
       '#fixture-graph { height: 110px !important; width: 390px !important; } .graph-view { min-height: 0; }',
   });
   await expect.poll(async () => (await page.locator('canvas').boundingBox())?.height).toBe(110);
-  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await page.getByRole('button', { name: 'Fixture fit graph' }).click();
   await page.waitForTimeout(800);
   const meshes = await visibleMeshes(page);
   expect(Object.keys(meshes).sort()).toEqual(['address', 'creating', 'output', 'spending']);
@@ -552,16 +550,13 @@ test('fit protects an upper label from floating navigation and reframes a resize
   const errors = await render(page, '?caption-fit');
   await page.addStyleTag({ content: '.graph-view { min-height: 0; }' });
   const canvas = page.locator('canvas');
-  const captionBounds = () =>
-    canvas.evaluate(
+  const captionBounds = async () => {
+    await captureGraphPixels(canvas, true);
+    return canvas.evaluate(
       (canvas) =>
         new Promise<{ top: number; pixels: number }>((resolve) =>
           requestAnimationFrame(() => {
-            const gl = (canvas as HTMLCanvasElement).getContext('webgl2')!;
-            const width = gl.drawingBufferWidth,
-              height = gl.drawingBufferHeight;
-            const pixels = new Uint8Array(width * height * 4);
-            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            const { width, height, pixels } = (canvas as SampledCanvas).testPixels;
             let top = height,
               count = 0;
             for (let y = 0; y < height; y++)
@@ -580,6 +575,7 @@ test('fit protects an upper label from floating navigation and reframes a resize
           }),
         ),
     );
+  };
   const assertCaptionClear = async () => {
     const navigation = (await page.getByRole('button', { name: 'Shared center' }).boundingBox())!;
     await expect.poll(async () => (await captionBounds()).pixels).toBeGreaterThan(20);
@@ -587,7 +583,7 @@ test('fit protects an upper label from floating navigation and reframes a resize
       .poll(async () => (await captionBounds()).top)
       .toBeGreaterThan(navigation.y + navigation.height + 4);
   };
-  await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
+  await page.getByRole('button', { name: 'Fixture fit graph', exact: true }).click();
   await assertCaptionClear();
   await page.screenshot({ path: test.info().outputPath('fit-upper-caption.png') });
   await page.locator('#fixture-graph').evaluate((element) => (element.style.height = '280px'));
@@ -598,7 +594,7 @@ test('fit protects an upper label from floating navigation and reframes a resize
   await page.evaluate(() =>
     (window as any).fixture.setCaption('Followed output with a longer annotation'),
   );
-  await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
+  await page.getByRole('button', { name: 'Fixture fit graph', exact: true }).click();
   await assertCaptionClear();
   const bounds = (await canvas.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width * 0.8, bounds.y + bounds.height * 0.75);
@@ -620,26 +616,17 @@ test('fit protects an upper label from floating navigation and reframes a resize
   expect(errors).toEqual([]);
 });
 
-test('annotation captions render on the real canvas and all three display toggles remove them', async ({
+test('annotation captions render over the graph and all three display toggles remove them', async ({
   page,
 }) => {
   const errors = await render(page, '?captions');
-  const captionPixels = () =>
-    page.locator('canvas').evaluate(
+  const captionPixels = async () => {
+    await captureGraphPixels(page.locator('canvas'), true);
+    return page.locator('canvas').evaluate(
       (canvas) =>
         new Promise<number>((resolve) =>
           requestAnimationFrame(() => {
-            const gl = (canvas as HTMLCanvasElement).getContext('webgl2')!;
-            const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
-            gl.readPixels(
-              0,
-              0,
-              gl.drawingBufferWidth,
-              gl.drawingBufferHeight,
-              gl.RGBA,
-              gl.UNSIGNED_BYTE,
-              pixels,
-            );
+            const { pixels } = (canvas as SampledCanvas).testPixels;
             let count = 0;
             for (let offset = 0; offset < pixels.length; offset += 4) {
               const colors = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
@@ -650,6 +637,7 @@ test('annotation captions render on the real canvas and all three display toggle
           }),
         ),
     );
+  };
   await expect.poll(captionPixels).toBeGreaterThan(40);
   const visibleCaptionPixels = await captionPixels();
   await page.screenshot({ path: test.info().outputPath('graph-annotation-captions.png') });

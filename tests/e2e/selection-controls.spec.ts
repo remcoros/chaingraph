@@ -1,3 +1,4 @@
+import { PerspectiveCamera, Vector3 } from 'three';
 import { expect, test } from '@playwright/test';
 import { mockBitcoin, TX_FUNDING, TX_SPENDING } from '../fixtures/bitcoin';
 import { decryptWorkspace } from '../../src/lib/crypto';
@@ -41,33 +42,56 @@ test('selection lock and display options persist, and mobile panels ignore deskt
   for (const name of ['Show labels', 'Show tags', 'Show icons'])
     await page.getByRole('button', { name, exact: true }).click();
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
+  const readSaved = async () => {
+    const stored = await page.evaluate(() =>
+      localStorage.getItem('chaingraph.encrypted-workspaces.v1')!,
+    );
+    return (await decryptWorkspace(JSON.parse(stored)[0].envelope, password)) as Workspace;
+  };
+  await expect
+    .poll(async () => (await readSaved()).view, { timeout: 15000 })
+    .toMatchObject({
+      selectionId: `tx:${TX_FUNDING}`,
+      lockToSelection: true,
+      showLabels: false,
+      showTags: false,
+      showIcons: false,
+    });
+  const canvas = page.locator('.graph-canvas canvas');
+  const selectedScreenPoint = async () => {
+    const snapshot = (await readSaved()).view.graphSnapshot!;
+    const node = snapshot.nodes.find((n) => n.id === `tx:${TX_FUNDING}`)!;
+    const bounds = (await canvas.boundingBox())!;
+    const camera = new PerspectiveCamera(50, bounds.width / bounds.height, 0.1, 1e8);
+    camera.position.copy(snapshot.camera.position);
+    camera.up.copy(snapshot.camera.up);
+    camera.lookAt(new Vector3().copy(snapshot.camera.target));
+    camera.updateMatrixWorld();
+    const point = new Vector3(node.x, node.y, snapshot.dimensions === 2 ? 0 : node.z).project(
+      camera,
+    );
+    return {
+      x: bounds.x + ((point.x + 1) * bounds.width) / 2,
+      y: bounds.y + ((1 - point.y) * bounds.height) / 2,
+    };
+  };
+  // Focus centers the selection horizontally and reserves screen space above it
+  // for navigation. A fixed distance in world units depends on zoom and viewport.
   await expect
     .poll(
       async () => {
-        const stored = await page.evaluate(() =>
-          localStorage.getItem('chaingraph.encrypted-workspaces.v1')!,
-        );
-        const w = (await decryptWorkspace(JSON.parse(stored)[0].envelope, password)) as Workspace;
-        const snapshot = w.view.graphSnapshot;
-        const node = snapshot?.nodes.find((n) => n.id === `tx:${TX_FUNDING}`);
-        if (!node || !snapshot) return false;
-        // Floating filter chips reserve space above the canvas, so a centered
-        // selection sits slightly below the camera target.
-        return (
-          Math.hypot(
-            node.x - snapshot.camera.target.x,
-            node.y - snapshot.camera.target.y,
-            node.z - snapshot.camera.target.z,
-          ) < 4 &&
-          w.view.lockToSelection === true &&
-          w.view.showLabels === false &&
-          w.view.showTags === false &&
-          w.view.showIcons === false
-        );
+        const bounds = (await canvas.boundingBox())!;
+        return (await selectedScreenPoint()).x - (bounds.x + bounds.width / 2);
       },
       { timeout: 15000 },
     )
-    .toBe(true);
+    .toBeCloseTo(0, 0);
+  const bounds = (await canvas.boundingBox())!;
+  const navigation = (await page.locator('.graph-navigation-overlay').boundingBox())!;
+  const selectedPoint = await selectedScreenPoint();
+  expect(selectedPoint.y).toBeGreaterThan(navigation.y + navigation.height);
+  expect(selectedPoint.y).toBeGreaterThanOrEqual(bounds.y + bounds.height / 2);
+  expect(selectedPoint.y).toBeLessThan(bounds.y + bounds.height * 0.75);
   const focus = page.getByRole('button', { name: 'Hide panels', exact: true });
   await focus.click();
   await expect(page.locator('.right-panel')).toBeHidden();
