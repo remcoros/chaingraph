@@ -386,48 +386,52 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         });
     }
     if (!target.predecessors.has(meetingNode)) return;
-    // Custom targets can sit beyond displayed non-target context. Preserve a
-    // novel target leg even when a shorter displayed leg reaches the same node.
-    const queue = [{ path: [meetingNode], hops: 0, novel: !displayed.has(meetingNode) }];
-    const visited = new Set([`${meetingNode}:${queue[0]!.novel}`]);
-    for (let cursor = 0; cursor < queue.length; cursor++) {
-      await reconstructionCheckpoint();
-      if (reasons.has('results')) return;
-      const visit = queue[cursor]!;
-      const node = visit.path.at(-1)!;
-      if (visit.path.length > 1 && targets.has(node)) {
-        const prefix = await sourcePath(
-          source,
-          sourceVisit,
-          new Set(visit.path.slice(1)),
-          settings.maxHops - visit.hops,
-          !visit.novel,
-        );
-        if (!prefix) continue;
-        addResult({
-          kind: 'connection',
-          relationship: direction === 'upstream' ? 'shared-ancestor' : 'shared-descendant',
-          endpoint: node,
-          meetingNode,
-          scanDirection: direction,
-          path: [...prefix.path, ...visit.path.slice(1)],
-          directions: [
-            ...Array<ScanDirection>(prefix.path.length - 1).fill(direction),
-            ...Array<ScanDirection>(visit.path.length - 1).fill(reverseDirection(direction)),
-          ],
-        });
-        continue;
-      }
-      for (const next of target.predecessors.get(node) ?? []) {
-        budget.checkpoint();
-        if (next === options.source || visit.path.includes(next)) continue;
-        const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
-        if (hops > settings.maxHops) continue;
-        const novel = visit.novel || !displayed.has(next);
-        const key = `${next}:${novel}`;
-        if (visited.has(key)) continue;
-        visited.add(key);
-        queue.push({ path: [...visit.path, next], hops, novel });
+    // Prefer target legs disjoint from the known source witness. Otherwise a
+    // shorter conflicting leg can hide a usable leg at the same target. A second
+    // bounded pass can pair an unconstrained target leg with another source path.
+    const targetLegExclusions = [new Set(sourceVisit.path.slice(0, -1)), new Set<string>()];
+    for (const forbidden of targetLegExclusions) {
+      const queue = [{ path: [meetingNode], hops: 0, novel: !displayed.has(meetingNode) }];
+      const visited = new Set([`${meetingNode}:${queue[0]!.novel}`]);
+      for (let cursor = 0; cursor < queue.length; cursor++) {
+        await reconstructionCheckpoint();
+        if (reasons.has('results')) return;
+        const visit = queue[cursor]!;
+        const node = visit.path.at(-1)!;
+        if (visit.path.length > 1 && targets.has(node)) {
+          const prefix = await sourcePath(
+            source,
+            sourceVisit,
+            new Set(visit.path.slice(1)),
+            settings.maxHops - visit.hops,
+            !visit.novel,
+          );
+          if (!prefix) continue;
+          addResult({
+            kind: 'connection',
+            relationship: direction === 'upstream' ? 'shared-ancestor' : 'shared-descendant',
+            endpoint: node,
+            meetingNode,
+            scanDirection: direction,
+            path: [...prefix.path, ...visit.path.slice(1)],
+            directions: [
+              ...Array<ScanDirection>(prefix.path.length - 1).fill(direction),
+              ...Array<ScanDirection>(visit.path.length - 1).fill(reverseDirection(direction)),
+            ],
+          });
+          continue;
+        }
+        for (const next of target.predecessors.get(node) ?? []) {
+          budget.checkpoint();
+          if (next === options.source || forbidden.has(next) || visit.path.includes(next)) continue;
+          const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
+          if (hops > settings.maxHops) continue;
+          const novel = visit.novel || !displayed.has(next);
+          const key = `${next}:${novel}`;
+          if (visited.has(key)) continue;
+          visited.add(key);
+          queue.push({ path: [...visit.path, next], hops, novel });
+        }
       }
     }
   };

@@ -404,14 +404,13 @@ export default function App() {
       return {
         targetCount: prepareCustomScanTargets({
           pickedNodeIds: scanTargetDraft.ids,
-          transactions: { ...w.connectionScans?.evidence, ...w.transactions },
           source: scanTargetDraft.source,
         }).length,
       };
     } catch (cause) {
       return { error: cause instanceof Error ? cause.message : 'Targets could not be prepared.' };
     }
-  }, [scanTargetDraft, w?.id, w?.transactions, w?.connectionScans?.evidence]);
+  }, [scanTargetDraft, w?.id]);
   const [live, setLive] = useState(false);
   const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const [scanLimit, setScanLimit] = useState(200);

@@ -240,11 +240,10 @@ shared selection actions toggle picks while the source remains fixed. Done commi
 the draft, Escape discards it, and leaving Scan or changing workspace ends picking.
 The floating bar follows the existing selection toolbar placement. The picker
 does not add graph members or fetch evidence. `domain/connectionScanTargets.ts`
-expands explicitly picked transactions to their immediate input prevouts and
-outputs from loaded workspace/path evidence, without recursion. It deduplicates,
-excludes the source and rejects missing evidence or more than 1,000 expanded targets.
-Only the custom scope and frozen expanded target IDs enter the existing encrypted
-run record; picks and picker state reset on workspace changes.
+freezes only explicitly picked transaction/outpoint IDs without inspecting or
+expanding transaction evidence. It deduplicates, excludes the source and rejects
+more than 1,000 targets. Only the custom scope and frozen target IDs enter the
+existing encrypted run record; picks and picker state reset on workspace changes.
 `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
 deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
@@ -254,11 +253,12 @@ Both fronts retain transient directed edges when other branches join a reached
 node. Meeting reconstruction follows target edges back to distinct frozen targets.
 When the first source witness overlaps that target leg or contains no new node,
 a bounded source reconstruction looks for an admissible alternative, excluding
-the other leg's nodes. Source and target reconstruction each track at most two
-states per node, distinguishing an already displayed path from one containing new
-nodes. This also preserves new paths through visible non-target context in custom
-scopes. A late joining branch
-on either side refreshes previously reached intersections immediately; found paths
+the other leg's nodes. Target reconstruction first excludes the initial source
+path, then allows alternate source witnesses in a second pass. Each pass tracks
+at most two states per node, distinguishing an already displayed path from one
+containing new nodes. This also preserves new paths through visible non-target
+context in custom scopes. A late joining branch on either side refreshes previously
+reached intersections immediately; found paths
 stream before later cancellation or timeout.
 Reconstruction shares the deadline, combined hop cap and result limit, periodically
 yields for cancellation, and performs no additional fetching. Fronts keep the first

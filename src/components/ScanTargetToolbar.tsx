@@ -54,7 +54,7 @@ export function ScanTargetToolbar({
           <span
             className="scan-target-toolbar-count"
             role="status"
-            title="Scan targets include the inputs and outputs of picked transactions."
+            title="Only picked nodes are scan targets."
           >
             {targetCount.toLocaleString('en-US')} {targetCount === 1 ? 'target' : 'targets'}
           </span>

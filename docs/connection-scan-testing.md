@@ -16,7 +16,7 @@ query a real backend. The normal `npm test` command also includes them.
 | --- | --- |
 | `connectionScanLoops` | An 11-node graph containing five inputs, their transaction and five outputs can find five-hop shared ancestry from any selected input. Other target histories cannot erase the expected input connections. Findings survive later cancellation and can be validated, retained and added. |
 | `connectionScanVisibleTargets` | A selected five-input/five-output transaction finds a hidden reconnection beyond its visible inputs. A 247-output creator does not block its one-input Sources direction. The exact path survives proof validation and graph acceptance. |
-| `connectionScanTargets` | Custom picks expand only explicitly picked transactions to immediate input/output targets, including hidden outpoints. Deduplication, missing evidence, source exclusion, the expanded target cap and encrypted custom-scope restoration remain exact. |
+| `connectionScanTargets` | Custom scans use only explicitly picked transactions or outputs, without inspecting or expanding transaction I/O. Deduplication, source exclusion, the target cap and encrypted custom-scope restoration remain exact. |
 | `connectionScanSymmetry` | The five-output shared-descendant mirror; uneven path lengths; late target branches joining already explored ancestry; exact outpoint identity; transaction/output hop accounting; hidden bypasses masked by shorter visible paths. |
 | `connectionScanOracle` | An independent exhaustive simple-path search over all 64 four-transaction DAG topologies and fixed-seed seven-transaction fixtures. Compare reachable endpoints and relationships across Sources, Destinations and Both, mixed target types, target sets, hidden targets, renamed IDs and hop caps. Check the actual returned edges as well. |
 | `connectionScanBounds` | Meeting reconstruction respects deadlines, shared transaction/result caps, branch boundaries and unavailable evidence. Earlier valid findings survive limits; traversal state stays out of results. |
@@ -39,8 +39,8 @@ producing plausible counts.
 
 Its fixtures assign each spend a distinct output and use acyclic transaction
 ordering. Visible/added scopes include every displayed eligible node as a source
-or frozen target. Custom-scope fixtures also display nodes outside the target set,
-and expand picked transactions to their immediate input/output targets. Additional
+or frozen target. Custom-scope fixtures also display nodes outside the exact picked
+target set. Additional
 hidden targets are allowed. A source walk continues
 through a target when its entire prefix is already displayed. A new path to a
 target stops that directed walk. Fully displayed paths are omitted. At most one

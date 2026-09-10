@@ -63,10 +63,9 @@ For custom targets, choose **Pick target(s)**. Click transactions or outputs in 
 graph to add or remove them; the source stays fixed while picking. The floating
 bar lists removable short IDs. **Done** applies the picks; **Esc** or its close
 button cancels the edit. Normal selection and batch metadata selection are separate.
-Each picked transaction includes its immediate inputs and outputs as scan targets,
-even if those outpoints are hidden or not added to the graph. Picked outputs stay
-individual targets. The displayed target count includes this expansion, deduplicates
-overlap and excludes the source. Expansion does not follow further transactions.
+Custom scans target exactly the picked transactions or outputs. A transaction's
+inputs and outputs are not automatically included. The target count deduplicates
+picks and excludes the source.
 Picks last for the current workspace session; the completed run retains its frozen
 target IDs with the encrypted results.
 
@@ -80,8 +79,8 @@ Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 transactions, 60 seconds and a 200-branch boundary. Cached transactions and
 spending-history candidates share the same allowance with target-side searches.
 Scopes above 1,000 targets require custom picks or a smaller visible graph or filter
-scope. Custom picks including their inputs/outputs must also fit that limit;
-oversized or unavailable target sets are rejected without silently dropping nodes.
+scope. Custom picks must also fit that limit; oversized target sets are rejected
+without silently dropping nodes.
 
 Results stream into compact cards. The default **Findings** filter shows
 connections first, then branch choices and evidence problems. **Endpoints** is a

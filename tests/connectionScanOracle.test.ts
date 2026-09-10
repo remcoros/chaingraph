@@ -167,6 +167,14 @@ describe('connection search independent DAG oracle', () => {
   it.each([
     {
       direction: 'upstream' as const,
+      mask: 59,
+      source: out(2, 0),
+      target: tx(4),
+      hidden: tx(1),
+      relationship: 'shared-ancestor',
+    },
+    {
+      direction: 'upstream' as const,
       mask: 47,
       source: tx(4),
       target: out(3, 0),
@@ -205,16 +213,7 @@ describe('connection search independent DAG oracle', () => {
         for (const source of nodes) {
           for (const target of nodes) {
             if (source === target) continue;
-            const targets = [
-              ...new Set([
-                target,
-                ...(target.startsWith('tx:')
-                  ? edges.flatMap(([from, to]) =>
-                      from === target ? [to] : to === target ? [from] : [],
-                    )
-                  : []),
-              ]),
-            ].filter((node) => node !== source);
+            const targets = [target];
             for (const hidden of nodes) {
               if (hidden === source || hidden === target) continue;
               // Custom scope decouples target membership from displayed context.

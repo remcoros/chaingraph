@@ -8,8 +8,8 @@ Filter the graph by entity type, labels, tags, wallet membership, notes, bookmar
 
 The Graph inspector's **Scan** tab searches from a transaction or outpoint for
 direct connections and shared ancestors or descendants among visible, added or
-custom-picked graph nodes. **Pick target(s)** uses a floating multi-target picker;
-picked transactions also include their immediate inputs and outputs. Searches
+custom-picked graph nodes. **Pick target(s)** uses a floating multi-target picker
+and targets exactly the picked transactions or outputs. Searches
 default to 3 transaction hops, 200 examined transactions,
 30 seconds and a 50-branch stopping point. Findings appear during the scan and
 can be dismissed individually. Connection and branch-choice cards identify exact

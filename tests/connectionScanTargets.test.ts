@@ -1,114 +1,70 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SCAN_SETTINGS, runConnectionScan } from '../src/domain/connectionScan';
 import { prepareCustomScanTargets } from '../src/domain/connectionScanTargets';
-import type { Transaction } from '../src/domain/types';
-
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;
 const out = (n: number, index = 0) => `out:${id(n)}:${index}`;
-const transaction = (n: number, parent?: number, count = 2): Transaction => ({
-  txid: id(n),
-  vin: parent === undefined ? [{ coinbase: '00' }] : [{ txid: id(parent), vout: 7 }],
-  vout: Array.from({ length: count }, (_, n) => ({
-    n,
-    value: 1,
-    scriptPubKey: { hex: '51' },
-  })),
-});
 
 describe('custom scan targets', () => {
-  it('includes only picked transactions and their exact immediate I/O, deduplicated without the source', () => {
-    const transactions = {
-      [id(1)]: transaction(1, 9),
-      [id(2)]: transaction(2, 1),
-      [id(3)]: transaction(3, 2),
-    };
-    const targets = prepareCustomScanTargets({
-      pickedNodeIds: [tx(2), out(2), tx(2), out(1, 7), out(3, 1)],
-      transactions,
-      source: out(2),
-    });
-    expect(targets).toEqual([tx(2), out(1, 7), out(2, 1), out(3, 1)].sort());
-    expect(targets).not.toContain(tx(1));
-    expect(targets).not.toContain(out(9, 7));
-    expect(targets).not.toContain(tx(3));
-    expect(transactions[id(2)].vout).toHaveLength(2);
+  it('keeps exactly the picked IDs, deduplicated without the source', () => {
+    expect(
+      prepareCustomScanTargets({
+        pickedNodeIds: [tx(2), out(2), tx(2), out(1, 7), out(3, 1)],
+        source: out(2),
+      }),
+    ).toEqual([tx(2), out(1, 7), out(3, 1)].sort());
   });
 
   it('picks an exact outpoint without requiring or expanding its creator', () => {
     expect(
       prepareCustomScanTargets({
         pickedNodeIds: [out(2, 150), out(2, 150)],
-        transactions: {},
         source: tx(1),
       }),
     ).toEqual([out(2, 150)]);
   });
 
-  it('does not create a prevout target for coinbase inputs', () => {
-    expect(
-      prepareCustomScanTargets({
-        pickedNodeIds: [tx(2)],
-        transactions: { [id(2)]: transaction(2) },
-        source: tx(1),
-      }),
-    ).toEqual([tx(2), out(2), out(2, 1)].sort());
+  it('counts a picked transaction once without inspecting or expanding its I/O', () => {
+    // Preparation accepts IDs alone, regardless of how many inputs or outputs
+    // the transaction has or whether its evidence has been loaded.
+    expect(prepareCustomScanTargets({ pickedNodeIds: [tx(2)], source: tx(1) })).toEqual([tx(2)]);
   });
 
-  it('refuses a partial target set when a picked transaction is not loaded', () => {
-    expect(() =>
-      prepareCustomScanTargets({
-        pickedNodeIds: [out(3), tx(2)],
-        transactions: {},
-        source: tx(1),
-      }),
-    ).toThrow('Load the picked transaction');
+  it('allows an empty target set after excluding the source', () => {
+    expect(prepareCustomScanTargets({ pickedNodeIds: [], source: tx(1) })).toEqual([]);
+    expect(prepareCustomScanTargets({ pickedNodeIds: [tx(1), tx(1)], source: tx(1) })).toEqual([]);
   });
 
-  it('accepts exactly 1,000 expanded targets after source exclusion and rejects overflow', () => {
-    const picked = transaction(2, undefined, 1000);
+  it('accepts exactly 1,000 unique picks after source exclusion and rejects overflow', () => {
+    const picked = Array.from({ length: 1000 }, (_, n) => out(2, n));
     expect(
       prepareCustomScanTargets({
-        pickedNodeIds: [tx(2), out(2), tx(2)],
-        transactions: { [id(2)]: picked },
-        source: out(2),
+        pickedNodeIds: [...picked, tx(1), picked[0]!],
+        source: tx(1),
       }),
     ).toHaveLength(1000);
     expect(() =>
       prepareCustomScanTargets({
-        pickedNodeIds: [tx(2)],
-        transactions: { [id(2)]: picked },
+        pickedNodeIds: [...picked, tx(2)],
         source: tx(1),
       }),
-    ).toThrow('exceed 1,000 targets');
+    ).toThrow('at most 1,000 targets');
   });
 
-  it('rejects malformed picks, mismatched transaction identity and incomplete prevouts', () => {
+  it('rejects malformed source and picked node IDs', () => {
     for (const picked of ['addr:unknown', out(2, -1), out(2, 0x100000000)]) {
-      expect(() =>
-        prepareCustomScanTargets({ pickedNodeIds: [picked], transactions: {}, source: tx(1) }),
-      ).toThrow('valid transactions or outputs');
+      expect(() => prepareCustomScanTargets({ pickedNodeIds: [picked], source: tx(1) })).toThrow(
+        'valid transactions or outputs',
+      );
     }
     expect(() =>
-      prepareCustomScanTargets({
-        pickedNodeIds: [tx(2)],
-        transactions: { [id(2)]: transaction(3) },
-        source: tx(1),
-      }),
-    ).toThrow('does not match its ID');
-    expect(() =>
-      prepareCustomScanTargets({
-        pickedNodeIds: [tx(2)],
-        transactions: { [id(2)]: { ...transaction(2), vin: [{ txid: id(1) }] } },
-        source: tx(1),
-      }),
-    ).toThrow('input references are incomplete');
+      prepareCustomScanTargets({ pickedNodeIds: [tx(2)], source: 'addr:unknown' }),
+    ).toThrow('Choose a transaction or output');
   });
 
-  it('finds a hidden picked transaction input as a target without its creator being picked', async () => {
+  it('traverses hidden inputs to the picked transaction without making those inputs targets', async () => {
     const targetIds = prepareCustomScanTargets({
       pickedNodeIds: [tx(3)],
-      transactions: { [id(3)]: transaction(3, 2) },
       source: tx(1),
     });
     const edges = [
@@ -133,10 +89,11 @@ describe('custom scan targets', () => {
     expect(run.results).toContainEqual(
       expect.objectContaining({
         kind: 'connection',
-        endpoint: out(2, 7),
-        path: [tx(1), out(1), tx(2), out(2, 7)],
+        endpoint: tx(3),
+        path: [tx(1), out(1), tx(2), out(2, 7), tx(3)],
       }),
     );
-    expect(run.targetIds).not.toContain(tx(2));
+    expect(run.targetIds).toEqual([tx(3)]);
+    expect(run.results.filter((result) => result.kind === 'connection')).toHaveLength(1);
   });
 });

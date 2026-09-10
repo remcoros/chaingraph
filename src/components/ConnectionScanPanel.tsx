@@ -120,7 +120,6 @@ export function ConnectionScanPanel(props: Props) {
       return {
         ids: prepareCustomScanTargets({
           pickedNodeIds: props.customTargetIds,
-          transactions: { ...workspace.connectionScans?.evidence, ...workspace.transactions },
           source,
         }),
         error: '',
@@ -131,13 +130,7 @@ export function ConnectionScanPanel(props: Props) {
         error: cause instanceof Error ? cause.message : 'Targets could not be prepared.',
       };
     }
-  }, [
-    props.customTargetIds,
-    source,
-    settings.targetScope,
-    workspace.transactions,
-    workspace.connectionScans?.evidence,
-  ]);
+  }, [props.customTargetIds, source, settings.targetScope]);
   const savedSpenders = useMemo(
     () => indexLoadedSpends(workspace.connectionScans?.evidence ?? {}),
     [workspace.connectionScans?.evidence],
@@ -247,7 +240,6 @@ export function ConnectionScanPanel(props: Props) {
         frozenSettings.targetScope === 'custom'
           ? prepareCustomScanTargets({
               pickedNodeIds: props.customTargetIds,
-              transactions: { ...workspace.connectionScans?.evidence, ...workspace.transactions },
               source: startSource,
             })
           : [
@@ -526,9 +518,6 @@ export function ConnectionScanPanel(props: Props) {
                         </button>
                       ))}
                     </div>
-                    <span className="small muted">
-                      Includes picked transactions’ inputs and outputs.
-                    </span>
                   </>
                 )}
                 {customTargetPlan.error && (
