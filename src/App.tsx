@@ -907,7 +907,11 @@ export default function App() {
     () => resolveWalletUtxoObservation(w, evidenceWallet, walletUtxos.utxos, selectedId),
     [w?.id, w?.network, w?.transactions, evidenceWallet, walletUtxos.utxos, selectedId],
   );
-  const getTransaction = async (id: string, signal?: AbortSignal) => {
+  const getTransaction = async (
+    id: string,
+    signal?: AbortSignal,
+    priority: 'navigation' | 'background' = 'navigation',
+  ) => {
     signal?.throwIfAborted();
     if (!w) throw new Error('Open a workspace first.');
     if (w.demo) throw new Error('Live lookups are disabled for legacy synthetic workspaces.');
@@ -915,7 +919,7 @@ export default function App() {
       w.transactions[id] ??
       fetchTransaction(w.network, id, signal, undefined, {
         scope: fetchScope,
-        priority: 'navigation',
+        priority,
       })
     );
   };
@@ -1183,7 +1187,7 @@ export default function App() {
         if (prefetchDepth) {
           const before = ws.getSession(w.id)!.data;
           const result = await loadAncestors([t], before.transactions, prefetchDepth, {
-            fetch: getTransaction,
+            fetch: (id, signal) => getTransaction(id, signal, 'background'),
             signal,
             onProgress: setOperation,
           });
@@ -1381,7 +1385,7 @@ export default function App() {
           const before = ws.getSession(w.id)!.data;
           const result = await loadAncestors([transaction], before.transactions, 1, {
             signal,
-            fetch: getTransaction,
+            fetch: (id, signal) => getTransaction(id, signal, 'background'),
             onProgress: setOperation,
           });
           signal.throwIfAborted();
@@ -1405,7 +1409,7 @@ export default function App() {
           outputIndex,
           signal,
           spendingOffsets.current.get(searchKey) ?? 0,
-          { scope: fetchScope, priority: 'navigation', kind: 'spending' },
+          { scope: fetchScope, priority: 'background', kind: 'spending' },
         );
         signal.throwIfAborted();
         const added = result.transactions.filter((t) => !w.transactions[t.txid]).length;

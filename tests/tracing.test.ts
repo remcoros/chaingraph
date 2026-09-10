@@ -69,7 +69,7 @@ describe('bounded previous transaction tracing', () => {
     expect(fetch).toHaveBeenCalledTimes(500);
     expect(result.transactions).toHaveLength(500);
     expect(result.truncated).toBe(true);
-    expect(peak).toBe(6);
+    expect(peak).toBe(4);
   });
   it('retains successful branches when a previous transaction is unavailable', async () => {
     const result = await loadAncestors([tx(1, [2, 3])], {}, 2, {

@@ -15,8 +15,8 @@ export interface ActivityRow {
 const MAX_ACTIVE_TRANSACTIONS = 12;
 const MAX_ACTIVE_PER_NETWORK = 8;
 const MAX_NON_NAVIGATION_TRANSACTIONS = 10;
-const MAX_NON_NAVIGATION_PER_NETWORK = 6;
-export const TRANSACTION_BATCH_CONCURRENCY = 6;
+const MAX_NON_NAVIGATION_PER_NETWORK = 3;
+export const TRANSACTION_BATCH_CONCURRENCY = 4;
 
 const rank = { navigation: 0, visible: 1, background: 2 };
 const empty: readonly ActivityRow[] = [];
