@@ -48,7 +48,7 @@ import {
   type ReviewPriority,
 } from '../domain/analysisReview';
 import { analysisDataGaps, recoverAnalysisData, recoveryLimits } from '../domain/analysisRecovery';
-import { fetchTransaction } from '../lib/api';
+import { useTransactionFetch } from '../lib/useTransactionFetch';
 import './analysis-workbench.css';
 
 const allTypes = () => analysisTools.map((tool) => tool.id);
@@ -175,6 +175,7 @@ export function AnalysisWorkbench({
   active,
   cache,
 }: AnalysisWorkbenchProps) {
+  const fetchTransaction = useTransactionFetch('background');
   const saved = cache?.get(workspace.id);
   const [scopeMode, setScopeMode] = useState(saved?.scopeMode);
   const [options, setOptions] = useState(saved?.options ?? scanDefaults);
