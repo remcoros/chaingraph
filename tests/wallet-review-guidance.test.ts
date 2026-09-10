@@ -139,17 +139,17 @@ describe('guided wallet review', () => {
     const source = reviewRow(items.find((item) => item.reason === 'source-address')!);
     expect(source.ownership).toBe('external');
     expect(walletSubjectTitle(source)).toBe('Source address');
-    expect(walletReviewGuidance(source, { tagCount: 0 })).toContain('exchange or sender');
-    expect(walletReviewGuidance(source, { tagCount: 1 })).not.toContain('No label or tags');
+    expect(walletReviewGuidance(source, { tagCount: 0 })).toContain('sender or source');
+    expect(walletReviewGuidance(source, { tagCount: 1 })).not.toContain('has no label or tags');
     expect(walletReviewGuidance(source, { label: 'Exchange', tagCount: 0 })).toContain(
-      'mark reviewed',
+      'Mark reviewed',
     );
     const destination = reviewRow(items.find((item) => item.reason === 'destination-address')!);
-    expect(walletReviewGuidance(destination, { tagCount: 0 })).toContain('shop or recipient');
+    expect(walletReviewGuidance(destination, { tagCount: 0 })).toContain('recipient or purpose');
     const own = reviewRow(items.find((item) => item.reason === 'wallet-address')!);
     expect(walletReviewGuidance(own, { tagCount: 0 })).toContain('what you use it for');
     const utxo = reviewRow(items.find((item) => item.reason === 'current-utxo')!);
-    expect(walletReviewGuidance(utxo, { tagCount: 0 })).toContain('current UTXO');
+    expect(walletReviewGuidance(utxo, { tagCount: 0 })).toContain('where you received it');
   });
 
   it('does not tell users to label completed or deferred decisions as if they were new', () => {

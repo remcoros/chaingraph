@@ -1017,7 +1017,9 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                       selectedReviews.some(
                         (item) =>
                           item.reason === 'link' &&
-                          (item.changed || !isCompletedReview({ status: item.status })),
+                          (item.changed ||
+                            item.status === 'open' ||
+                            !isCompletedReview({ status: item.status })),
                       )
                         ? ['tags']
                         : undefined
