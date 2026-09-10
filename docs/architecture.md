@@ -239,8 +239,17 @@ deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
 same-direction walks at a meeting point and retain per-edge directions; no
 alternating-direction flood fill, ownership claim or value allocation is used.
-Target fronts keep the first deterministic witness for each reached node rather
-than enumerating every target/path. Fully displayed connection paths are omitted.
+Target fronts expand each reached node once and retain transient directed edges
+when other target branches join it. Meeting reconstruction follows those edges
+back to distinct frozen targets, so one input's history cannot hide another input's
+connection at a shared ancestor. A late joining branch refreshes previously reached
+intersections immediately; found paths stream before later cancellation or timeout.
+Reconstruction shares the deadline, combined hop cap and result limit, periodically
+yields for cancellation, and performs no additional fetching. Source fronts still
+keep one deterministic witness per reached node; alternative paths are not exhaustive.
+Fully displayed connection paths are omitted. Reaching a direct graph target
+still stops that source branch.
+Only result paths and their proof persist; these traversal edges are discarded.
 
 All fronts share one unique-transaction budget, a deadline, total path-hop and
 result bounds. Defaults are 3 hops, 200 transactions, 30 seconds and a 50-branch
