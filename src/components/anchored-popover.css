@@ -45,6 +45,7 @@
 }
 .anchored-popover-body select,
 .anchored-popover-body input[type='text'],
+.anchored-popover-body input[type='number'],
 .anchored-popover-body input[type='search'] {
   font-size: 11px;
   padding: 6px 8px;
@@ -60,6 +61,7 @@
 @media (max-width: 999px) {
   .anchored-popover-body select,
   .anchored-popover-body input[type='text'],
+  .anchored-popover-body input[type='number'],
   .anchored-popover-body input[type='search'],
   .anchored-popover-body button {
     min-height: 38px;

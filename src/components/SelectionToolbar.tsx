@@ -17,6 +17,7 @@ export interface SelectionToolbarProps {
   hiddenSelectedCount: number;
   /** Explicit match scope offered for one-step selection, without context nodes. */
   matching?: { label: string; ids: string[] };
+  matchingPending?: boolean;
   /** Applies one batch and returns the undo head it created, or undefined when
    * nothing changed or the edit failed. */
   onApply: (summary: string, update: (workspace: Workspace) => Workspace) => number | undefined;
@@ -34,6 +35,7 @@ export function SelectionToolbar({
   visibleSelectedCount,
   hiddenSelectedCount,
   matching,
+  matchingPending = false,
   onApply,
   undoToken,
   onSetHidden,
@@ -103,7 +105,10 @@ export function SelectionToolbar({
           type="button"
           className="selection-toolbar-select-matching"
           title="Replace the selection with the entities matching the current filters. Connected context entities are excluded."
-          onClick={() => selection.replace(matching.ids)}
+          disabled={matchingPending}
+          onClick={() => {
+            if (!matchingPending) selection.replace(matching.ids);
+          }}
         >
           <Plus size={13} /> Select {matching.label}
         </button>

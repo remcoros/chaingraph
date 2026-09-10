@@ -22,6 +22,7 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -71,14 +72,22 @@ import { AboutDialog } from './components/AboutDialog';
 import {
   describeMatchScope,
   filterGraph,
+  buildGraphFilterIndex,
   hasActiveFilters,
   intersectIds,
+  matchingWalletFilterNodeIds,
+  selectedWalletFilterIds,
   valueFilterError,
   type GraphFilters,
 } from './domain/graphFilters';
 import { useEntitySelection } from './lib/useEntitySelection';
 import { SelectionToolbar } from './components/SelectionToolbar';
-import { FilterChips, GraphFilterButton } from './components/GraphFilterControls';
+import {
+  FilterChips,
+  GraphConnectionsAction,
+  GraphFilterButton,
+} from './components/GraphFilterControls';
+import { GraphWalletFilter } from './components/GraphWalletFilter';
 import { setNodesHidden, showAllNodes } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
@@ -280,14 +289,25 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [queryError, setQueryError] = useState('');
   const [notice, setNotice] = useState('');
+  const [noticeSequence, setNoticeSequence] = useState(0);
   useEffect(() => {
     if (!notice || /partial|cancelled|could not/i.test(notice)) return;
     const timer = setTimeout(() => setNotice(''), 8000);
     return () => clearTimeout(timer);
-  }, [notice]);
+  }, [notice, noticeSequence]);
   const [error, setError] = useState('');
   const [operation, setOperation] = useState('');
   const [fitToken, setFitToken] = useState(0);
+  // Controls commit first; expensive graph/list projection can yield to newer input.
+  const graphRenderRequest = useMemo(
+    () => ({ workspaceId: w?.id, filters: graphFilters, fitToken }),
+    [w?.id, graphFilters, fitToken],
+  );
+  const deferredGraphRequest = useDeferredValue(graphRenderRequest);
+  const appliedGraphRequest =
+    deferredGraphRequest.workspaceId === w?.id ? deferredGraphRequest : graphRenderRequest;
+  const appliedGraphFilters = appliedGraphRequest.filters;
+  const graphFiltering = appliedGraphRequest !== graphRenderRequest;
   const [tour, setTour] = useState<string>();
   const tourSteps = availableTourSteps(WORKBENCH_TOUR, {
     hasSelection: !!selectedId,
@@ -446,30 +466,26 @@ export default function App() {
     sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
     sourceTags: ReadonlyMap<string, unknown>,
   ): GraphFilters => {
-    const includes: (string[] | undefined)[] = [graphFilters.includeIds];
+    const includes: (string[] | undefined)[] = [appliedGraphFilters.includeIds];
     const excludes: string[] = [];
-    if (graphFilters.walletId)
-      includes.push(
-        [...sourceMatches]
-          .filter(([, match]) => match.walletIds.includes(graphFilters.walletId!))
-          .map(([id]) => id),
-      );
-    if (graphFilters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
-    else if (graphFilters.walletMatch === 'unmatched') excludes.push(...sourceMatches.keys());
-    if (graphFilters.tagId) {
-      const tag = w?.tags?.find((entry) => entry.id === graphFilters.tagId);
+    includes.push(matchingWalletFilterNodeIds(appliedGraphFilters, sourceMatches));
+    if (appliedGraphFilters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
+    else if (appliedGraphFilters.walletMatch === 'unmatched')
+      excludes.push(...sourceMatches.keys());
+    if (appliedGraphFilters.tagId) {
+      const tag = w?.tags?.find((entry) => entry.id === appliedGraphFilters.tagId);
       includes.push(tag ? tagNodeIds(tag, source) : []);
     }
-    if (graphFilters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
-    else if (graphFilters.tagState === 'untagged') excludes.push(...sourceTags.keys());
+    if (appliedGraphFilters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
+    else if (appliedGraphFilters.tagState === 'untagged') excludes.push(...sourceTags.keys());
     const includeIds = intersectIds(includes);
     return includeIds || excludes.length
-      ? { ...graphFilters, includeIds, excludeIds: excludes.length ? excludes : undefined }
-      : graphFilters;
+      ? { ...appliedGraphFilters, includeIds, excludeIds: excludes.length ? excludes : undefined }
+      : appliedGraphFilters;
   };
   const effectiveFilters = useMemo(
     () => membershipFilters(graph, walletMatches, tagIndex),
-    [graphFilters, w?.tags, graph, walletMatches, tagIndex],
+    [appliedGraphFilters, w?.tags, graph, walletMatches, tagIndex],
   );
   const automaticContextIds = useMemo(
     () => [
@@ -481,20 +497,33 @@ export default function App() {
     () => filterSmallAmounts(graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds),
     [graph, w?.view.smallAmountThreshold, selectedId, automaticContextIds],
   );
-  const visibleGraph = useMemo(() => {
-    const filtered = filterGraph(
+  const amountFilterIndex = useMemo(() => buildGraphFilterIndex(amountGraph), [amountGraph]);
+  const canvasFilterResult = useMemo(
+    () =>
+      filterGraph(
+        amountGraph,
+        { ...effectiveFilters, showAddresses: w?.view.showAddresses },
+        w?.annotations,
+        { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
+        { index: amountFilterIndex, previewContext: true },
+      ),
+    [
       amountGraph,
-      { ...effectiveFilters, showAddresses: w?.view.showAddresses },
+      amountFilterIndex,
+      effectiveFilters,
+      w?.view.showAddresses,
+      w?.view.hiddenNodeIds,
       w?.annotations,
-      { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
-    );
+    ],
+  );
+  const visibleGraph = useMemo(() => {
     return w?.view.smallAmountThreshold ||
       effectiveFilters.minSats !== undefined ||
       effectiveFilters.maxSats !== undefined
-      ? omitAmountOrphans(filtered, selectedId)
-      : filtered;
+      ? omitAmountOrphans(canvasFilterResult, selectedId)
+      : canvasFilterResult;
   }, [
-    amountGraph,
+    canvasFilterResult,
     effectiveFilters,
     w?.view.smallAmountThreshold,
     w?.view.showAddresses,
@@ -527,8 +556,10 @@ export default function App() {
     [graph, hiddenIds],
   );
   const entityVisibility = w?.view.entityVisibility ?? 'visible';
+  const recoveryFilterIndex = useMemo(() => buildGraphFilterIndex(recoveryGraph), [recoveryGraph]);
   const entityGraph = useMemo(() => {
     if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
+    if (entityVisibility === 'visible' && !w?.view.smallAmountThreshold) return canvasFilterResult;
     const source = entityVisibility === 'visible' ? graph : recoveryGraph;
     const filters =
       source === graph || !w
@@ -539,12 +570,16 @@ export default function App() {
       { ...filters, showAddresses: entityVisibility === 'visible' ? w?.view.showAddresses : true },
       w?.annotations,
       { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
+      { index: source === recoveryGraph ? recoveryFilterIndex : undefined },
     );
   }, [
     graph,
     recoveryGraph,
     effectiveFilters,
-    graphFilters,
+    appliedGraphFilters,
+    recoveryFilterIndex,
+    canvasFilterResult,
+    w?.view.smallAmountThreshold,
     w?.wallets,
     w?.tags,
     w?.annotations,
@@ -1533,7 +1568,7 @@ export default function App() {
     flushActiveGraph();
     setWorkbench(next);
   }
-  function prepareIsolation(ids: string[]) {
+  function prepareIsolation(ids: string[], preserveFilters = false) {
     const transactionIds = [
       ...new Set(
         ids.flatMap((nodeId) => {
@@ -1547,7 +1582,7 @@ export default function App() {
         ...promoteInputContext(current, transactionIds),
         view: {
           ...current.view,
-          smallAmountThreshold: undefined,
+          smallAmountThreshold: preserveFilters ? current.view.smallAmountThreshold : undefined,
           showAddresses:
             ids.some((nodeId) => nodeId.startsWith('addr:')) || current.view.showAddresses,
         },
@@ -1636,7 +1671,7 @@ export default function App() {
         onClick={() => centerNode()}
       >
         <Crosshair size={14} />
-        <span className="graph-nav-caption">Center selection</span>
+        <span className="graph-nav-caption">Center</span>
       </button>
       <button
         aria-label="Lock to selection"
@@ -1654,7 +1689,7 @@ export default function App() {
         }
       >
         <Focus size={14} />
-        <span className="graph-nav-caption">Lock to selection</span>
+        <span className="graph-nav-caption">Lock</span>
       </button>
       <button
         aria-label="Isolate selection"
@@ -1663,15 +1698,15 @@ export default function App() {
         className={`graph-isolate-selection ${graphFilters.focus ? 'active' : ''}`}
         disabled={!graphFilters.focus && (!selected || hiddenIds.has(selected.id))}
         onClick={() => {
-          if (graphFilters.focus) resetGraphFilters();
+          if (graphFilters.focus) updateFilters({ ...graphFilters, focus: undefined });
           else if (selectedId) {
-            prepareIsolation([selectedId]);
-            updateFilters({ focus: { id: selectedId, hops: 1 } });
+            prepareIsolation([selectedId], true);
+            updateFilters({ ...graphFilters, focus: { id: selectedId, hops: 1 } });
           }
         }}
       >
         <Filter size={14} />
-        <span className="graph-nav-caption">Isolate selection</span>
+        <span className="graph-nav-caption">Isolate</span>
       </button>
       <label>
         <span className="graph-path-label">Paths</span>
@@ -1697,6 +1732,13 @@ export default function App() {
           <option value={2}>2 hops</option>
         </select>
       </label>
+      <GraphWalletFilter
+        key={w.id}
+        active={workbench === 'graph'}
+        filters={graphFilters}
+        wallets={w.wallets}
+        onChange={updateFilters}
+      />
       <GraphFilterButton
         filters={graphFilters}
         onChange={updateFilters}
@@ -1732,6 +1774,9 @@ export default function App() {
           onChange={updateFilters}
           names={{
             walletName: w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name,
+            walletNames: selectedWalletFilterIds(graphFilters).map(
+              (id) => w.wallets.find((wallet) => wallet.id === id)?.name ?? 'Removed wallet',
+            ),
             tagName: w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name,
           }}
           hiddenCount={hiddenCount}
@@ -1758,6 +1803,12 @@ export default function App() {
               </button>
             </span>
           )}
+          <GraphConnectionsAction
+            filters={graphFilters}
+            onChange={updateFilters}
+            extraNodeCount={canvasFilterResult.availableContextNodeCount}
+            pending={graphFiltering}
+          />
         </FilterChips>
         {selectionOffCanvas && (
           <span className="view-summary">
@@ -2171,6 +2222,8 @@ export default function App() {
                     : recoveryGraph.nodes.length
               }
               contextCount={entityVisibility === 'visible' ? visibleGraph.contextNodeIds.length : 0}
+              contextNodeCount={canvasFilterResult.availableContextNodeCount}
+              contextPreviewPending={graphFiltering}
               hiddenNodeIds={w.view.hiddenNodeIds}
               onSetHidden={setEntityHidden}
               visibility={entityVisibility}
@@ -2251,6 +2304,7 @@ export default function App() {
                       }
                     >
                       <GraphView
+                        filtering={graphFiltering}
                         key={w.id}
                         snapshot={w.view.graphSnapshot}
                         onActivity={(active) => {
@@ -2315,7 +2369,7 @@ export default function App() {
                         showLabels={w.view.showLabels ?? true}
                         showTags={w.view.showTags ?? true}
                         showIcons={w.view.showIcons ?? true}
-                        fitToken={fitToken}
+                        fitToken={appliedGraphRequest.fitToken}
                         transactions={w.transactions}
                         onTrace={(id) => void expand('funding', id)}
                         onEdit={editNode}
@@ -2458,6 +2512,19 @@ export default function App() {
                 ) : selected ? (
                   <NodeInspector
                     walletUtxoObservation={walletUtxoObservation}
+                    walletMatch={walletMatches.get(selected.id)}
+                    onNotify={(message) => {
+                      setNotice(message);
+                      setNoticeSequence((value) => value + 1);
+                    }}
+                    onSelectWallet={(id) => {
+                      selectionGeneration.current++;
+                      operationRef.current?.abort();
+                      setSelectedWallet(id);
+                      setSelectedId(undefined);
+                      setRightTab('inspect');
+                      setMobilePanel('right');
+                    }}
                     tagsPanel={
                       <SelectedTags
                         key={selected.id}
@@ -2465,7 +2532,6 @@ export default function App() {
                         selected={selected}
                         openToken={editTarget === 'tags' ? editToken : 0}
                         onOpenHandled={() => setEditToken(0)}
-                        graph={graph}
                         onChange={changeTags}
                         onManage={() => {
                           setLeftTab('tags');
@@ -2636,6 +2702,7 @@ export default function App() {
             visibleSelectedCount={selectionOnCanvas}
             hiddenSelectedCount={selection.count - selectionOnCanvas}
             matching={matchingScope}
+            matchingPending={graphFiltering}
             onApply={applyBatch}
             undoToken={undoToken}
             onSetHidden={setEntityHidden}

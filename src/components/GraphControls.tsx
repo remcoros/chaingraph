@@ -44,7 +44,7 @@ export function GraphControls({
           <span>{focusGraph ? 'Show panels' : 'Hide panels'}</span>
         </button>
       )}
-      <label className="size-control">
+      <span className="size-control">
         <span>Size by</span>
         <select
           aria-label="Size nodes by"
@@ -61,7 +61,7 @@ export function GraphControls({
           <option value="value">Value</option>
           <option value="degree">Connections</option>
         </select>
-      </label>
+      </span>
       <SmallAmountControl
         context="graph"
         threshold={view.smallAmountThreshold}
@@ -70,7 +70,7 @@ export function GraphControls({
           onChange((current) => ({ ...current, smallAmountThreshold }))
         }
       />
-      <label className="highlight-control">
+      <span className="highlight-control">
         <select
           aria-label="Highlight entities"
           value={view.highlightMode ?? 'all'}
@@ -86,7 +86,7 @@ export function GraphControls({
           <option value="tags">Manual tags</option>
           <option value="none">Types + findings</option>
         </select>
-      </label>
+      </span>
       <div className="graph-annotation-toggles" role="group" aria-label="Graph annotations">
         {(
           [

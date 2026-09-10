@@ -274,7 +274,14 @@ const workspaceSchema = z.object({
     filters: z
       .object({
         tagId: z.string().max(200).optional(),
+        tagState: z.enum(['all', 'tagged', 'untagged']).optional(),
         walletId: z.string().max(200).optional(),
+        walletIds: z
+          .array(z.string().min(1).max(200))
+          .max(100)
+          .transform((ids) => [...new Set(ids)])
+          .optional(),
+        walletMatch: z.enum(['all', 'matched', 'unmatched']).optional(),
         query: z.string().max(10000).optional(),
         kind: z.enum(['all', 'transaction', 'output', 'address']).optional(),
         label: z.enum(['all', 'labeled', 'unlabeled']).optional(),

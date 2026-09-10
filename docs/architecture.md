@@ -67,6 +67,13 @@ Transaction loading requests Bitcoin Core `getrawtransaction` verbosity 2, then 
 
 ## Graph semantics
 
+The active instanced renderer gives node picking a 25% shape-preserving margin.
+Exact visible-mesh intersections win before the padded fallback, which is shared
+by hover and click/tap selection. Unrendered picking meshes share instance matrices
+with the visible batches and refresh their bounds after layout or sizing changes.
+They add no draw calls; misses perform a second raycast pass. Rendering geometry,
+layout, camera state and workspace snapshots remain independent of this margin.
+
 The fundamental flow is `transaction → output → spending transaction`. Outputs persist as entities after spending. A loaded input may retain optional validated `prevout` value and script evidence from Core without fabricating or loading the complete creating transaction. The shared `indexPreviousOutputs` and `resolvePreviousOutput` contract reports `loaded`, `attached`, `missing`, or `conflict` for each canonical outpoint. Conflicts remain unknown to consumers and imported workspaces containing them are rejected. Attached evidence supplies graph placeholders, flow values, wallet script matches, filters, and analysis, but creates no transaction node or `creates` edge and does not prove that an output is currently unspent.
 
 Selecting one input still loads only its creating transaction when missing. Explicit backward navigation and Previous expansion load full parents, while the bulk flow action fetches only parents whose output details remain missing or conflicting. Requests are deduplicated within a cancellation scope, capped at 500 transactions with four concurrent requests, and cancelled on workspace or displayed-selection changes. Optional encrypted `inputContext` maps automatically fetched parents to the outputs used by the displayed flow. `buildGraph` renders those parent transactions and relevant outputs without their unrelated branches. The full observed transactions remain available for analysis and inspection; explicit parent navigation promotes the transaction to its full graph context. Context validation bounds references and requires each referenced output to exist. Optional address nodes describe destinations; they do not imply a wallet or person.
@@ -87,6 +94,20 @@ unions in the workbench, using the existing wallet-match and tag indexes; the do
 filter never derives membership itself. Manual hiding stays in `view.hiddenNodeIds`
 and is unaffected by any filter reset. Wallet membership is derived-address evidence,
 not an ownership claim, and an output without a loaded spend remains unknown.
+
+`GraphConnectionsAction` offers **Show connections (+N)** beside filtered results
+in the entity list and graph filter summary only when eligible loaded one-hop
+neighbors exist. **Hide connections** stays available while enabled, including
+pending changes or zero extra nodes. This action replaces the context checkbox in
+Filters; selection exploration continues to use Isolate/Paths. It retains the
+existing `preserveContext` field and removable scope chip. Expansion is nonrecursive and respects
+manual hiding, address visibility and the selected path scope. A graph-scoped lazy
+index reuses adjacency and spend/funding evidence; neighbor expansion scans links
+once. The ordinary entity list reuses the canvas filter result when their scopes
+agree. React defers graph-filter projection behind immediate control updates,
+keeping each deferred request paired with its fit token and workspace identity.
+Pending result sets show a filtering status and cannot replace batch selection
+until current. Explicit individual selection remains available.
 
 `useEntitySelection` holds selection mode and an ordered set of identifiers as shared
 UI state. It is cleared when the active workspace changes, is pruned only for entities
@@ -113,7 +134,7 @@ the existing resize observer clamps placement after content or viewport changes.
 
 `graph/presentation.ts` projects the visible domain graph into a `GraphFrame`: nodes contain stable IDs, resolved shapes/colors/radii/highlights, optional display text and transient coordinate hints; links contain stable IDs and string endpoints with resolved colors, widths and arrows. Neither workspace records nor domain action callbacks enter the engine. `GraphView.nodePresentation` accepts an optional `ReadonlyMap<string, NodePresentation>` with `color`, `highlight` and `scale` overrides. Callers interpret tags, wallet matches or findings. Selection color takes precedence, and the existing glow toggle gates halos. The renderer-neutral text projection independently includes labels, tags and icons according to saved display toggles; it does not mutate annotations. Missing overrides retain kind/cluster/value/degree defaults. The contract does not imply ownership from presentation.
 
-`graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`, optional `flushSnapshot`, and a canvas reference for shared accessibility focus. Factories receive hover/select events containing only `{ type: 'node' | 'link', id }` and container-local CSS pointer coordinates plus pointer type. Background events omit the hit. Lightweight activity events pause autosave during gestures and their quiet period. Error events expose the shared fallback, and an optional recovery event clears it after WebGL restoration. Adapters own picking, camera controls, gesture recognition, simulation/layout and all GPU resources. They suppress touch hover and prevent drag, cancellation or multiple-pointer gestures from becoming selections. `graph/defaultAdapter.ts` selects the default factory, while `GraphView.adapterFactory` permits an injected adapter; another renderer uses exactly the same React interaction surface.
+`graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`, optional `flushSnapshot`, and a canvas reference for shared accessibility focus. Factories receive hover/select events containing only `{ type: 'node' | 'link', id }` and container-local CSS pointer coordinates plus pointer type. Background events omit the hit. Lightweight activity events pause autosave during gestures and their quiet period. Optional layout events report busy state, requested node count and recoverable failure to the shared navigation status. Error events expose the shared fallback, and an optional recovery event clears it after WebGL restoration. Adapters own picking, camera controls, gesture recognition, simulation/layout and all GPU resources. They suppress touch hover and prevent drag, cancellation or multiple-pointer gestures from becoming selections. `graph/defaultAdapter.ts` selects the default factory, while `GraphView.adapterFactory` permits an injected adapter; another renderer uses exactly the same React interaction surface.
 
 Resize metadata optionally supplies the measured top inset occupied by floating
 navigation without changing canvas or picking coordinates. The force adapter
@@ -127,7 +148,7 @@ The force adapter clones incoming render data because the engine mutates positio
 
 2D constrains depth and maps mouse/one-finger dragging to pan; 3D maps those gestures to orbit. Both modes retain two-finger pan/pinch and pointer-directed zoom. Empty data does not consume automatic fitting. Hidden canvases keep their last nonzero viewport and defer fit/focus until reveal, preventing a 1-pixel viewport from consuming first-data framing. New graphs receive an early fit once initial coordinates are valid and a final fit after layout settlement. Manual camera interaction cancels pending automatic fitting and completed gestures can save the current view before settlement. Restored snapshots bypass initial fitting. Reduced motion disables damping and camera transitions.
 
-The entity list remains the alternative interaction path for keyboard access and WebGL failure. Individual node dragging remains disabled due to the verified upstream pointer-event incompatibility. Camera and node coordinates use a bounded, renderer-neutral snapshot inside the encrypted workspace. Selection, filters, pane choices and transaction-flow expansion are restored alongside display settings. The optional Lock to selection preference routes every shared selection change to the adapter’s focus API and reveals selections hidden by filters. Desktop Focus graph sits with the 3D/Flat controls and is hidden at mobile widths. Adapters may implement optional snapshot restoration and events without acquiring business logic. The custom Three.js and Studio proposals now use the shared feature foundation and remain separate local branches for comparison. Their renderer receives the same neutral display contract; the main default remains the force adapter. See the [running preview comparison](experiments/comparison.md). See [rendering research and validation](research/graph.md) and the [boundary report](experiments/graph-boundary.md).
+The entity list remains the alternative interaction path for keyboard access and WebGL failure. Individual node dragging remains disabled due to the verified upstream pointer-event incompatibility. Camera and node coordinates use a bounded, renderer-neutral snapshot inside the encrypted workspace. Selection, filters, pane choices and transaction-flow expansion are restored alongside display settings. The optional Lock to selection preference routes every shared selection change to the adapter’s focus API and reveals selections hidden by filters. Desktop Focus graph sits with the 3D/Flat controls and is hidden at mobile widths. Adapters may implement optional snapshot restoration and events without acquiring business logic. The custom Three.js and Studio proposals now use the shared feature foundation and remain separate local branches for comparison. Their renderer receives the same neutral display contract; the main default is FlowRenderer, described below. See the [running preview comparison](experiments/comparison.md). See [rendering research and validation](research/graph.md) and the [boundary report](experiments/graph-boundary.md).
 
 ## Analysis extension point
 
@@ -141,7 +162,7 @@ The workbench mode is an optional encrypted view field. Old `rightTab: analysis`
 
 The dormant `domain/traceWorkbench.ts` and Trace component remain for a later iteration; they are not mounted or reachable through the current workbench navigation. Their original bounded lookup design and limitations remain documented in [Trace semantics and limits](research/simple-trace.md). Existing graph transaction traversal is independent of this disabled workbench.
 
-Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. **Isolate selection** reuses the existing Paths focus filter, defaults to one hop and follows shared selection changes. Paths can expand it to two hops. Turning the toggle off clears graph filters, leaving manual hiding intact. Finding isolation and the graph batch toolbar use explicit include IDs with connected context, with separate chips for isolation and context. Removing a chip clears its own filter dimension; other filters and manual hiding remain in effect.
+Graph filter status exposes isolation, focus and other include filters; reset clears filters and the graph amount threshold while preserving manual hiding. **Isolate selection** reuses the existing Paths focus filter, defaults to one hop and follows shared selection changes. Paths can expand it to two hops. Turning the toggle off clears only its focus restriction, preserving other filters and manual hiding. Finding isolation and the graph batch toolbar use explicit include IDs with connected context, with separate chips for isolation and context. Removing a chip clears its own filter dimension; other filters and manual hiding remain in effect.
 
 ## Verification boundaries
 
@@ -156,6 +177,15 @@ Browser ancestry traversal in `src/lib/tracing.ts` is breadth-first, deduplicate
 `TransactionView` projects loaded creating/spending relationships through `domain/transactionInspection.ts`. It uses shared selection, annotation and bounded tracing callbacks; an optional `renderMetadata(nodeId)` slot supports non-interactive tag or wallet badges. The panel occupies normal flow above the renderer and can collapse without changing selection. `ScriptInspector` is a separate inspector section. `lib/transactionInspection.ts` makes an explicit raw transaction request through the existing read-only RPC bridge, validates it against its ID and loaded input/output observations with bitcoinjs, and returns display data. Raw bytes and decoded witness stacks live only in the mounted inspector, with cancellation on transaction changes and unmount. No workspace schema or server cache is added. See [research and validation limits](research/transaction-inspection.md).
 
 ## Manual groups and wallet presentation
+
+Graph wallet filters store a bounded `walletIds` selection, with `walletId` retained
+as a legacy fallback. Matching nodes are the union across the chosen wallets,
+intersected with existing tag/isolation membership before the normal value, search,
+type, visibility and context projection. An empty wallet selection adds no restriction.
+The toolbar dropdown and full filter panel share checkbox controls and the same state.
+Wallet-match and tag-state dimensions also survive encrypted workspace validation.
+The graph Isolate toggle adds/removes its path restriction while preserving other
+filters and the canvas amount threshold.
 
 Optional version-1 workspace tags hold bounded named/color groups of canonical
 transaction, output and address references. References may precede loaded graph
@@ -172,6 +202,15 @@ prevouts, never from a common-input heuristic or a history entry alone. The App
 resolves optional node color/highlight presentation outside the renderer. Manual
 tag colors take precedence over wallet colors; selection stays visible. These
 projections do not mutate findings, labels or observed chain data.
+
+The Inspector reuses the App's wallet-match projection in a Wallet section below
+Annotations. Wallet names open the existing wallet inspector through local selection,
+without putting workspace identifiers into URLs. Optional help explains script
+matching and transaction association. The
+annotation form contains label, notes, tags and compact icon/bookmark controls.
+Tag assignment retains the shared popup and explicit output/address scope;
+wallet association is not an editable tag. Metadata edits keep their existing
+immediate-save and undo grouping behavior.
 
 ## Returning-wallet activity
 
@@ -497,16 +536,30 @@ the UI no longer offers them as a new action.
 record panel and the wallet workbench. They are discarded when discovered
 addresses or the scan time change and never enter storage.
 
-### Isolated flow renderer v2 experiment
+### Default flow renderer
 
-On this experiment branch, `graph/defaultAdapter.ts` selects `FlowRenderer`.
+`graph/defaultAdapter.ts` selects `FlowRenderer`, adopted from the flow renderer v2 experiment.
 Fresh layouts use a stopped d3-force-3d simulation. Incremental layouts simulate
 only new nodes: fixed links act as tethers, and a static spatial grid resolves
 nearby fixed-node collisions. Existing coordinates never receive simulation ticks.
-One worker job runs at a time, with at most one latest replacement request.
-Automatic quiet-period snapshots wait for layout completion; explicit flush still
-resolves pending geometry. Instanced node/edge buffers reuse geometric capacity
-between expansions and release resources when resized or disposed.
+Moving-node collision resolution uses a numeric spatial grid over adjacent cells,
+avoiding repeated octree allocation while retaining deterministic simulation and
+exact saved anchors. One worker job runs at a time. A newer topology terminates
+obsolete work immediately; stale or duplicate replies cannot replace the latest
+request. Views whose nodes already have cached positions restore synchronously
+without simulation, including turning off a large neighbor expansion.
+
+Automatic quiet-period snapshots wait for layout completion. Explicit flush saves
+the current camera and last displayed geometry without running an unfinished
+layout on the UI thread. Worker construction, dispatch or execution failure keeps
+the displayed scene, reports a recoverable layout error and permits Repack/Retry;
+there is no synchronous simulation fallback. Instanced node/edge buffers reuse
+geometric capacity between expansions and release resources when resized or
+disposed. Presentation-only updates skip unchanged edge projection and GPU matrix
+uploads. Hover picking considers nodes without projecting every edge; explicit
+edge selection remains available on click. GraphView indexes loaded spenders once
+per transaction collection instead of scanning all inputs for every hover update.
+See the [responsiveness measurements and checks](reviews/2026-09-10-graph-responsiveness.md).
 
 GraphView owns floating Fit/zoom/Repack controls and the separate status footer.
 Optional adapter `zoom(factor)` and `repack()` methods expose only renderer actions;

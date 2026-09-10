@@ -67,6 +67,7 @@
 }
 .entity-result-count {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 6px;

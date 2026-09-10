@@ -281,8 +281,65 @@ a {
   margin: 6px 0;
   overflow-wrap: anywhere;
 }
-.annotation-editor .section-title small {
-  font-size: 10px;
+.selection-wallet-link {
+  width: 100%;
+  gap: 7px;
+  text-align: left;
+  white-space: normal;
+}
+.selection-wallet-link > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.selection-wallet-link > svg {
+  flex: none;
+}
+.annotation-heading,
+.annotation-utilities {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.annotation-heading {
+  justify-content: space-between;
+}
+.annotation-heading h3 {
+  margin: 0;
+  font-size: 12px;
+}
+.annotation-editor > label {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.annotation-editor .annotation-utilities .icon-picker-trigger,
+.annotation-editor .annotation-bookmark {
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+.annotation-editor .annotation-bookmark {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-raised);
+  cursor: pointer;
+}
+.annotation-bookmark input[type='checkbox'] {
+  width: 13px;
+  height: 13px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+.annotation-bookmark:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .selection-facts code.outpoint-identity {

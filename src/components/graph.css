@@ -319,6 +319,21 @@
   padding: 4px 7px;
   font-size: 11px;
 }
+.graph-layout-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 3px 1px;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-ink);
+  font-size: 12px;
+}
+.graph-layout-status button {
+  min-height: 26px;
+  padding: 2px 7px;
+  font-size: 11px;
+}
 /* Keep this breakpoint aligned with the desktop side panels in styles.css. */
 @media (min-width: 1000px) {
   .graph-controls .graph-focus-toggle {

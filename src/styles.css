@@ -806,6 +806,19 @@ small,
 .graph-controls > * {
   pointer-events: auto;
 }
+.graph-controls .small-amount-control,
+.graph-controls .highlight-control {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+}
+.graph-controls select {
+  height: 32px;
+  min-height: 32px;
+  padding: 4px 23px 4px 7px;
+  font-size: 11px;
+}
 .view-toggle {
   display: flex;
   border: 1px solid var(--color-rule);
@@ -827,21 +840,18 @@ small,
   color: var(--color-ink);
 }
 .size-control {
-  display: flex;
+  display: inline-flex;
   flex-direction: row;
   align-items: center;
-  gap: 3px;
-  font-size: 10px;
+  min-width: 0;
+  gap: 4px;
+  font-size: 11px;
   margin-left: auto;
 }
 .size-control > span {
   display: none;
 }
 .size-control select {
-  padding: 6px 26px 6px 8px;
-  font-size: 10px;
-  border-color: transparent;
-  background-color: var(--color-paper);
   max-width: 118px;
 }
 .graph-controls .icon-button {
@@ -1108,19 +1118,6 @@ small,
 .annotation-editor input,
 .annotation-editor textarea {
   font-size: var(--text-xs);
-}
-.annotation-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-.annotation-actions .switch-label {
-  margin-bottom: 11px;
-}
-.annotation-save {
-  margin-left: auto;
-  min-height: 40px;
-  padding-inline: 20px;
 }
 .inspector-empty {
   color: var(--color-muted);

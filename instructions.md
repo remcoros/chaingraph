@@ -31,8 +31,10 @@ only the selected input's creator. If loading fails, the clicked input stays
 selected and the displayed transaction remains open. The flow shows the failure
 and **Retry previous outputs** retries the lookup without adding the root again.
 
-For an output's current availability, use **Check current UTXO status** in the
-Inspector. This queries Core with mempool spends included and timestamps the result.
+For an output's current availability, use the refresh icon in the Inspector's top bar
+(**Check current UTXO status**). This queries Core with mempool spends included and
+timestamps the result. The notification can be dismissed and hides after eight seconds;
+the last successful observation remains under **Chain evidence** for the current selection.
 A positive result means **Unspent at check**. **Not in current UTXO set** does not
 by itself prove a spend, since an output may also belong to a transaction outside
 the active chain. Checks stay in memory for the current selection and can be
@@ -77,13 +79,20 @@ Select an item to add a label, note, icon, or bookmark in its inspector. The ico
 
 ## Filter and navigate
 
+Use **Wallets** in the graph toolbar to choose several associated wallets. An entity
+must match at least one chosen wallet and the other active filters. **Clear** removes
+only this wallet restriction; choosing none leaves wallet membership unrestricted.
+The same choices are available in **Filters** and **More filters**, and survive
+locking and reopening the workspace. Connected context can still show neighboring
+entities outside the matches when that option is enabled.
+
 The **Entities** panel filters both the list and canvas. Search identifiers, labels or notes; choose transaction, output or address types; or open **More filters** for label state, tag state or one tag, wallet membership, bookmarks, whole-satoshi bounds, loaded spend evidence and missing funding details. The graph navigation has the same **Filters** popover. Sorting and pagination expose every matching entity. Invalid value bounds produce a visible error rather than silently changing the query.
 
-Active filters appear as removable chips under the graph navigation. Remove one chip to drop one restriction, or choose **Reset filters** to clear all of them, including the canvas amount threshold. The transaction flow keeps its independent amount setting. Manual hiding is deliberately separate: a dashed chip counts manually hidden entities and restores them, and resetting filters never unhides anything. The batch toolbar and finding **Isolate** actions show an **Isolated N entities** chip. Removing it clears that isolation while retaining other filters. The navigation toggle **Isolate selection** instead shows a **1 hop from selection** or **2 hops from selection** chip. Wallet membership comes from derived addresses and is not proof of ownership. An output with no loaded spend is unknown, never proven unspent.
+Active filters appear as removable chips under the graph navigation. Remove one chip to drop one restriction, or choose **Reset filters** to clear all of them, including the canvas amount threshold. The transaction flow keeps its independent amount setting. Manual hiding is deliberately separate: a dashed chip counts manually hidden entities and restores them, and resetting filters never unhides anything. The batch toolbar and finding **Isolate** actions show an **Isolated N entities** chip. Removing it clears that isolation while retaining other filters. The navigation toggle **Isolate** instead shows a **1 hop from selection** or **2 hops from selection** chip. Wallet membership comes from derived addresses and is not proof of ownership. An output with no loaded spend is unknown, never proven unspent.
 
 Navigation floats at the top of the graph canvas once transactions are loaded. On narrow screens, navigation uses compact icons with accessible names and tooltips.
 
-**Show connected context on canvas** adds adjacent entities that do not match your filters; the count distinguishes these from matches. **Select matching** excludes connected context, while a context entity you tick or Ctrl/Cmd click yourself stays a batch target. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Isolate selection**, next to **Lock to selection**, toggles the same path filter. It starts at one connection and follows your selection; choose two connections in **Paths** for a wider view. Turning isolation off or choosing **Reset filters** clears graph filters while preserving deliberate manual hiding. **Center selection** reveals selections omitted by filters and moves the camera. Manually hidden entities remain hidden until explicitly restored. Previous/next selection buttons revisit your inspection history. **Lock to selection** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Hide panels**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
+**Show connections (+N)** appears beside filtered results in **Entities** and the graph’s active filters when it can add extra loaded nodes one connection from the matches. It acts on filter results, not the selection; use **Isolate / Paths** to explore a selected entity. It can show neighbors outside the other filters, but respects manual hiding and the selected path scope. It does not fetch more transactions or expand recursively. **Hide connections** cancels any pending expansion and returns to matches. The graph navigation shows **Filtering graph…** or **Arranging N nodes…** while work is pending; filters stay usable and the latest change replaces obsolete work. If arranging fails, the displayed graph stays available with **Retry**. **Select matching** excludes connected context, while a context entity you tick or Ctrl/Cmd click yourself stays a batch target. **Paths** restricts the view to one or two connections around the current selection. **All paths** clears these restrictions. **Isolate**, next to **Lock**, toggles the same path filter. It starts at one connection and follows your selection; choose two connections in **Paths** for a wider view. Turning **Isolate** off removes only its path restriction; other filters remain active. **Reset filters** clears all filters while preserving deliberate manual hiding. **Center** reveals selections omitted by filters and moves the camera. Manually hidden entities remain hidden until explicitly restored. Previous/next selection buttons revisit your inspection history. **Lock** keeps the camera centered as selections change from the graph, flow diagram, inspector or entity list, revealing selections hidden by filters. Its setting is saved with the workspace. **Hide panels**, beside 3D/Flat, hides desktop side panels until you choose **Show panels**. It is hidden on mobile, where panels already occupy separate views.
 
 ## Select several entities and edit them together
 
@@ -291,6 +300,14 @@ The Inspector’s **Scripts and raw transaction** section shows saved output scr
 
 ## Tags and wallet matches
 
+The Inspector's **Annotations** section groups the label, notes and tags with compact
+icon and bookmark controls. Edits save automatically. The **Wallet** section below
+links to each associated wallet's details and identifies a derived-address/script
+match or, for a transaction, a matching input or output. These associations are
+independent of your tags and do not establish transaction ownership.
+Each assigned tag fills a row with a bin button to remove its assignment while keeping the tag.
+Address-level removal asks you to confirm its effect on the address's other outputs.
+
 Use **Add or choose tags** in the inspector to search, create and assign a group
 without leaving the selection. It uses the same tag editor as Wallet and the
 Graph selection toolbar, including color choices and name/description search. Choose **This output** for an individual output or
@@ -351,7 +368,7 @@ filtered output from Entities without resetting the threshold.
 **Size by → Value** makes large outputs more prominent using a bounded square-root
 curve. The sizes are visual emphasis, not a proportional volume scale; perspective
 and minimum/maximum sizes affect apparent ratios. New lookups focus the requested transaction, output or address automatically.
-Lock to selection additionally follows selections made throughout the workbench.
+Lock additionally follows selections made throughout the workbench.
 
 **Load previous** can reveal a cached parent's full inputs and outputs without
 another download. The notice now says when that happens. Removing the original
@@ -373,7 +390,7 @@ visibility, and is saved per workspace. Choose **Not hidden** or **All entities*
 to inspect observations omitted by the graph amount filter, or **Hidden** to
 restore manually hidden items. Changing this list mode does not remove chain data.
 
-**Center selection** frames the selected node with its immediate connections.
+**Center** frames the selected node with its immediate connections.
 **Fit graph** frames all displayed nodes. Both account for node sizes, displayed
 labels and the floating navigation toolbar, while retaining the current viewing direction. Orbiting may
 still bring nodes in front of each other; Flat and Fit provide alternate views.

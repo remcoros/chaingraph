@@ -1,6 +1,7 @@
 import { compactLayout } from '../src/components/graph/compactLayout';
 import { describe, expect, it } from 'vitest';
 import type { LayoutRequest } from '../src/components/graph/flowLayout';
+import { particleCollisions, type Particle } from '../src/components/graph/anchoredForces';
 const fixture = (count = 1): LayoutRequest => ({
   revision: 1,
   previous: [],
@@ -118,4 +119,55 @@ it('places additions around nearby fixed obstacles without moving or dropping un
       previous: [...request.previous].reverse(),
     }).positions,
   ).toEqual([...result]);
+});
+
+describe('local particle collisions', () => {
+  const particle = (id: string, x: number, radius = 5): Particle => ({
+    id,
+    x,
+    y: 0,
+    z: 0,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    radius,
+    center: { x: 0, y: 0, z: 0 },
+  });
+
+  it.each([2, 3] as const)(
+    'separates overlaps across negative cell boundaries in %dD without affecting distant nodes',
+    (dimensions) => {
+      const nodes = [particle('left', -1, 5), particle('right', 1, 10), particle('distant', 500)];
+      particleCollisions(nodes, dimensions)(1);
+      expect(nodes[0].vx).toBeLessThan(0);
+      expect(nodes[1].vx).toBeGreaterThan(0);
+      // Larger nodes move less, while the complete overlapping distance is resolved.
+      expect(Math.abs(nodes[0].vx!)).toBeGreaterThan(Math.abs(nodes[1].vx!));
+      expect(nodes[1].x! + nodes[1].vx! - nodes[0].x! - nodes[0].vx!).toBeCloseTo(27);
+      expect(nodes[2]).toEqual(particle('distant', 500));
+      expect(nodes.every((n) => n.vz === 0)).toBe(true);
+    },
+  );
+
+  it.each([2, 3] as const)(
+    'separates coincident particles finitely and deterministically in %dD',
+    (dimensions) => {
+      const initial = [particle('a', 0), particle('b', 0)];
+      const nodes = structuredClone(initial),
+        repeated = structuredClone(initial);
+      particleCollisions(nodes, dimensions)(1);
+      particleCollisions(repeated, dimensions)(1);
+      expect(nodes).toEqual(repeated);
+      const velocities = nodes.flatMap((n) => [n.vx!, n.vy!, n.vz!]);
+      expect(velocities.every(Number.isFinite)).toBe(true);
+      expect(
+        Math.hypot(
+          nodes[0].vx! - nodes[1].vx!,
+          nodes[0].vy! - nodes[1].vy!,
+          nodes[0].vz! - nodes[1].vz!,
+        ),
+      ).toBeCloseTo(20);
+      if (dimensions === 2) expect(nodes.every((n) => n.vz === 0)).toBe(true);
+    },
+  );
 });

@@ -34,8 +34,9 @@ import {
 } from '../../domain/graphSnapshot';
 import { frameCamera } from './cameraFraming';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
-import { compactLayout } from './compactLayout';
+import { LayoutScheduler } from './layoutScheduler';
 import { makeFlowEdges } from './flowEdges';
+import { createNodePickMesh, intersectNodes, syncNodePickMesh } from './nodePicking';
 import './flowRenderer.css';
 
 const shapes = ['box', 'sphere', 'octahedron'] as const;
@@ -62,6 +63,7 @@ export class FlowRenderer implements GraphAdapter {
   private material = new MeshLambertMaterial();
   private batches: {
     mesh: InstancedMesh<BufferGeometry, MeshLambertMaterial>;
+    pickMesh: InstancedMesh;
     nodes: RenderNode[];
   }[] = [];
   private nodes: RenderNode[] = [];
@@ -72,14 +74,17 @@ export class FlowRenderer implements GraphAdapter {
   private snapshotSignature = '';
   private topology = '';
   private revision = 0;
-  private worker?: Worker;
+  private layouts: LayoutScheduler;
+  private requestedFrame?: GraphFrame;
+  private displayedNodes: RenderNode[] = [];
+  private displayedLinks: RenderLink[] = [];
+  private displayedDimensions: 2 | 3 = 3;
   private pending?: LayoutRequest;
   private dimensions: 2 | 3 = 3;
   private modes = new Map<
     number,
     { positions: Map<string, Position>; camera: GraphSnapshot['camera'] }
   >();
-  private workerRevision?: number;
   private width = 0;
   private height = 0;
   private inset = 0;
@@ -131,25 +136,21 @@ export class FlowRenderer implements GraphAdapter {
     const light = new DirectionalLight(0xffffff, 2);
     light.position.set(-250, 400, 800);
     this.scene.add(new AmbientLight(0xffffff, 1.8), light, this.edges.mesh);
-    try {
-      this.worker = new Worker(new URL('./flowLayout.worker.ts', import.meta.url), {
-        type: 'module',
-      });
-      this.worker.onmessage = (e: MessageEvent<LayoutResult>) => {
-        this.workerRevision = undefined;
-        this.accept(e.data);
-        this.dispatchLayout();
-      };
-      this.worker.onerror = (e) => {
-        e.preventDefault();
-        this.worker?.terminate();
-        this.worker = undefined;
-        this.workerRevision = undefined;
-        if (this.pending) this.accept(compactLayout(this.pending));
-      };
-    } catch {
-      /* Bounded synchronous fallback uses the same layout. */
-    }
+    this.layouts = new LayoutScheduler(
+      () => new Worker(new URL('./flowLayout.worker.ts', import.meta.url), { type: 'module' }),
+      (result) => this.accept(result),
+      (revision) => {
+        if (this.dead || this.pending?.revision !== revision) return;
+        const nodeCount = this.pending.nodes.length;
+        this.pending = undefined;
+        this.topology = '';
+        this.nodes = this.displayedNodes;
+        this.links = this.displayedLinks;
+        this.canvas.setAttribute('aria-busy', 'false');
+        this.events.layout?.({ busy: false, nodeCount, error: true });
+        this.schedule();
+      },
+    );
     const listen = (name: string, fn: EventListener, options?: AddEventListenerOptions) => {
       this.canvas.addEventListener(name, fn, options);
       this.cleanups.push(() => this.canvas.removeEventListener(name, fn, options));
@@ -173,7 +174,7 @@ export class FlowRenderer implements GraphAdapter {
       this.pickRaf = requestAnimationFrame(() => {
         this.pickRaf = 0;
         if (this.dead) return;
-        const hit = this.pick(e.clientX, e.clientY);
+        const hit = this.pick(e.clientX, e.clientY, false);
         const hovered = hit?.type === 'node' ? hit.id : undefined;
         if (this.hovered !== hovered) {
           this.hovered = hovered;
@@ -258,7 +259,7 @@ export class FlowRenderer implements GraphAdapter {
       this.contextExtension = this.renderer.getContext().getExtension('WEBGL_lose_context');
       this.lost = false;
       this.labels.hidden = false;
-      this.refresh();
+      this.refresh(true);
       this.events.recovered?.();
       this.schedule();
     }) as EventListener);
@@ -355,27 +356,26 @@ export class FlowRenderer implements GraphAdapter {
   flushSnapshot = () => {
     if (this.dead) return;
     this.stopDamping();
-    // Explicit workspace transitions cannot wait on a layout worker reply.
-    if (this.pending) this.accept(compactLayout(this.pending));
+    // Persist the view actually on screen, even while its replacement is computing.
+    // Lock/export must never run an unfinished force simulation on the UI thread.
     this.cancelQuiet();
-    if (this.positions.size && !this.pending) {
-      if (!this.snapshotNodes) {
-        this.snapshotNodes = [...this.positions].map(([id, p]) =>
-          Object.freeze({ id, ...p, z: this.dimensions === 2 ? 0 : p.z }),
-        );
-        Object.freeze(this.snapshotNodes);
-      }
-      const camera = this.cameraRecord();
-      const signature = JSON.stringify([this.dimensions, camera, this.revision]);
-      if (signature !== this.snapshotSignature) {
-        this.snapshotSignature = signature;
-        this.events.snapshot?.({
-          version: 1,
-          dimensions: this.dimensions,
-          camera,
-          nodes: this.snapshotNodes,
-        });
-      }
+    const dimensions = this.positions.size ? this.displayedDimensions : this.dimensions;
+    if (!this.snapshotNodes) {
+      this.snapshotNodes = [...this.positions].map(([id, p]) =>
+        Object.freeze({ id, ...p, z: dimensions === 2 ? 0 : p.z }),
+      );
+      Object.freeze(this.snapshotNodes);
+    }
+    const camera = this.cameraRecord();
+    const signature = JSON.stringify([dimensions, camera, this.revision]);
+    if (signature !== this.snapshotSignature) {
+      this.events.snapshot?.({
+        version: 1,
+        dimensions,
+        camera,
+        nodes: this.snapshotNodes,
+      });
+      this.snapshotSignature = signature;
     }
     if (!this.pointers.size) this.setActive(false);
   };
@@ -426,8 +426,8 @@ export class FlowRenderer implements GraphAdapter {
     this.events.dismiss();
     this.hovered = undefined;
     this.update({
-      nodes: this.nodes,
-      links: this.links,
+      nodes: this.requestedFrame?.nodes ?? this.nodes,
+      links: this.requestedFrame?.links ?? this.links,
       dimensions: this.dimensions,
       background: `#${this.renderer.getClearColor(new Color()).getHexString()}`,
     });
@@ -448,19 +448,9 @@ export class FlowRenderer implements GraphAdapter {
     this.controls.update();
     this.changed();
   };
-  private dispatchLayout() {
-    if (this.dead || !this.pending) return;
-    if (!this.worker) {
-      this.accept(compactLayout(this.pending));
-      return;
-    }
-    // One running request and one latest replacement, never a queue of obsolete layouts.
-    if (this.workerRevision !== undefined) return;
-    this.workerRevision = this.pending.revision;
-    this.worker.postMessage(this.pending);
-  }
   update(frame: GraphFrame) {
     if (this.dead) return;
+    this.requestedFrame = frame;
     this.nodes = frame.nodes.map((n) => ({ ...n }));
     const ids = new Set(this.nodes.map((n) => n.id));
     this.links = frame.links
@@ -494,8 +484,8 @@ export class FlowRenderer implements GraphAdapter {
       this.snapshotNodes = undefined;
     }
     const signature = JSON.stringify([
-      this.nodes.map((n) => [n.id, n.shape, n.fx ?? n.x, n.fy ?? n.y, n.fz ?? n.z]).sort(),
-      this.links.map((l) => [l.source, l.target]).sort(),
+      this.nodes.map((n) => [n.id, n.shape, n.fx ?? n.x, n.fy ?? n.y, n.fz ?? n.z]),
+      this.links.map((l) => [l.source, l.target]),
     ]);
     if (signature === this.topology) {
       this.refresh();
@@ -522,13 +512,14 @@ export class FlowRenderer implements GraphAdapter {
     };
     this.pending = request;
     this.canvas.setAttribute('aria-busy', 'true');
-    this.dispatchLayout();
+    this.events.layout?.({ busy: true, nodeCount: request.nodes.length });
+    this.layouts.request(request);
   }
   private accept(result: LayoutResult) {
     if (this.dead || !this.pending || result.revision !== this.revision) return;
     this.pending = undefined;
-    this.canvas.setAttribute('aria-busy', 'false');
     this.positions = new Map(result.positions);
+    this.displayedDimensions = this.dimensions;
     this.snapshotNodes = undefined;
     for (const [id, p] of result.positions) {
       this.cache.delete(id);
@@ -539,43 +530,81 @@ export class FlowRenderer implements GraphAdapter {
     this.batches = shapes.map((shape, index) => {
       const nodes = this.nodes.filter((n) => n.shape === shape);
       let mesh = this.batches[index]?.mesh;
+      let pickMesh = this.batches[index]?.pickMesh;
       const capacity = mesh?.instanceMatrix.count ?? 0;
       if (!mesh || nodes.length > capacity || (capacity > 4 && nodes.length < capacity / 4)) {
         if (mesh) {
           this.scene.remove(mesh);
           mesh.dispose();
+          pickMesh?.geometry.dispose();
+          pickMesh?.dispose();
         }
         const size = Math.max(4, 2 ** Math.ceil(Math.log2(Math.max(1, nodes.length))));
         mesh = new InstancedMesh(this.geometries[shape], this.material, size);
+        pickMesh = createNodePickMesh(mesh);
         this.scene.add(mesh);
       }
       mesh.count = nodes.length;
-      return { mesh, nodes };
+      return { mesh, pickMesh: pickMesh!, nodes };
     });
-    this.refresh();
+    this.refresh(true);
     this.fulfillCamera();
+    this.canvas.setAttribute('aria-busy', 'false');
+    this.events.layout?.({ busy: false, nodeCount: this.nodes.length });
     this.schedule();
   }
-  private refresh() {
+  private refresh(geometryChanged = false) {
     if (this.pending) return;
     const byId = new Map(this.nodes.map((n) => [n.id, n]));
     const matrix = new Matrix4();
     const tint = new Color();
+    let radiiChanged = false;
     for (const batch of this.batches) {
-      batch.nodes = batch.nodes.map((n) => byId.get(n.id)!);
-      batch.nodes.forEach((n, i) => {
-        const p = this.positions.get(n.id)!;
-        matrix
-          .makeScale(n.radius, n.radius, n.radius)
-          .setPosition(p.x, p.y, this.dimensions === 2 ? 0 : p.z);
-        batch.mesh.setMatrixAt(i, matrix);
-        batch.mesh.setColorAt(i, tint.set(n.color));
+      let matricesChanged = geometryChanged,
+        colorsChanged = geometryChanged;
+      batch.nodes = batch.nodes.map((before, i) => {
+        const n = byId.get(before.id)!;
+        if (geometryChanged || n.radius !== before.radius) {
+          const p = this.positions.get(n.id)!;
+          matrix
+            .makeScale(n.radius, n.radius, n.radius)
+            .setPosition(p.x, p.y, this.dimensions === 2 ? 0 : p.z);
+          batch.mesh.setMatrixAt(i, matrix);
+          matricesChanged = true;
+          radiiChanged ||= n.radius !== before.radius;
+        }
+        if (geometryChanged || n.color !== before.color) {
+          batch.mesh.setColorAt(i, tint.set(n.color));
+          colorsChanged = true;
+        }
+        return n;
       });
-      batch.mesh.instanceMatrix.needsUpdate = true;
-      if (batch.mesh.instanceColor) batch.mesh.instanceColor.needsUpdate = true;
-      batch.mesh.computeBoundingSphere();
+      if (matricesChanged) {
+        batch.mesh.instanceMatrix.needsUpdate = true;
+        batch.mesh.computeBoundingSphere();
+        syncNodePickMesh(batch.mesh, batch.pickMesh);
+      }
+      if (colorsChanged && batch.mesh.instanceColor) batch.mesh.instanceColor.needsUpdate = true;
     }
-    this.edges.update(this.links, byId, this.positions, this.dimensions);
+    // Selection and captions often change without changing any edge geometry or style.
+    const edgesChanged =
+      geometryChanged ||
+      radiiChanged ||
+      this.links.length !== this.displayedLinks.length ||
+      this.links.some((link, i) => {
+        const before = this.displayedLinks[i];
+        return (
+          link.id !== before.id ||
+          link.source !== before.source ||
+          link.target !== before.target ||
+          link.color !== before.color ||
+          link.width !== before.width ||
+          link.arrowLength !== before.arrowLength
+        );
+      });
+    if (edgesChanged) this.edges.update(this.links, byId, this.positions, this.dimensions);
+    this.displayedNodes = this.nodes;
+    this.displayedLinks = this.links;
     this.invalidate();
   }
   resize(width: number, height: number, topInset = 0) {
@@ -658,7 +687,7 @@ export class FlowRenderer implements GraphAdapter {
   private project(p: Position) {
     return new Vector3(p.x, p.y, this.dimensions === 2 ? 0 : p.z).project(this.camera);
   }
-  private pick(x: number, y: number): GraphHit | undefined {
+  private pick(x: number, y: number, includeLinks = true): GraphHit | undefined {
     if (this.lost || this.pending || !this.width || !this.height) return;
     const rect = this.canvas.getBoundingClientRect();
     this.camera.updateMatrixWorld();
@@ -667,15 +696,14 @@ export class FlowRenderer implements GraphAdapter {
       new Vector2(((x - rect.left) / rect.width) * 2 - 1, 1 - ((y - rect.top) / rect.height) * 2),
       this.camera,
     );
-    const hits = this.raycaster.intersectObjects(
-      this.batches.map((b) => b.mesh),
-      false,
-    );
-    if (hits.length) {
-      const h = hits[0],
-        b = this.batches.find((b) => b.mesh === h.object)!;
+    const h = intersectNodes(this.raycaster, this.batches);
+    if (h) {
+      const b = this.batches.find((b) => b.mesh === h.object || b.pickMesh === h.object)!;
       return { type: 'node', id: b.nodes[h.instanceId!].id };
     }
+    // Hover cards are node-only. Projecting every edge on every pointermove added
+    // substantial CPU work without producing a card; retain edge hits for clicks.
+    if (!includeLinks) return;
     let best = 25,
       hit: GraphHit | undefined;
     for (const l of this.links) {
@@ -701,6 +729,7 @@ export class FlowRenderer implements GraphAdapter {
   private placeLabels() {
     const candidates = this.nodes
       .map((n) => {
+        if (!n.text && !n.selected && !n.highlight && n.id !== this.hovered) return undefined;
         const p = this.positions.get(n.id);
         if (!p) return undefined;
         const world = new Vector3(p.x, p.y, this.dimensions === 2 ? 0 : p.z);
@@ -714,7 +743,10 @@ export class FlowRenderer implements GraphAdapter {
             (2 * Math.tan((this.camera.fov * Math.PI) / 360) * Math.max(0.1, -view.z)),
         };
       })
-      .filter((v): v is NonNullable<typeof v> => Boolean(v) && Math.abs(v!.p.z) <= 1)
+      .filter(
+        (v): v is NonNullable<typeof v> =>
+          Boolean(v) && Math.abs(v!.p.z) <= 1 && Math.abs(v!.p.x) <= 1.1 && Math.abs(v!.p.y) <= 1.1,
+      )
       .sort(
         (a, b) =>
           Number(b.n.selected) - Number(a.n.selected) ||
@@ -808,10 +840,14 @@ export class FlowRenderer implements GraphAdapter {
     clearTimeout(this.recovery);
     cancelAnimationFrame(this.raf);
     cancelAnimationFrame(this.pickRaf);
-    this.worker?.terminate();
+    this.layouts.dispose();
     this.controls.dispose();
     this.cleanups.forEach((fn) => fn());
-    this.batches.forEach(({ mesh }) => mesh.dispose());
+    this.batches.forEach(({ mesh, pickMesh }) => {
+      mesh.dispose();
+      pickMesh.geometry.dispose();
+      pickMesh.dispose();
+    });
     Object.values(this.geometries).forEach((g) => g.dispose());
     this.material.dispose();
     this.edges.dispose();

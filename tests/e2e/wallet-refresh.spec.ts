@@ -316,15 +316,17 @@ test('shows wallet script matches without making requests or acknowledging new a
   await page.getByRole('button', { name: 'Show wallet matches', exact: true }).click();
   await expect(page.locator('.filter-chip')).toContainText([
     'Wallet: Public BIP84 wallet',
-    'Connected context shown',
+    'Neighboring nodes included',
   ]);
   expect(fixture.calls).toHaveLength(requests);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('output');
   await page.locator('.entity-list .entity-row').first().click();
-  await expect(page.getByRole('region', { name: 'Tags and wallet matches' })).toContainText(
-    'Wallet match: Public BIP84 wallet',
-  );
+  const association = page.getByRole('region', { name: 'Wallet', exact: true });
+  await expect(association).toContainText('Address/script match');
+  await expect(
+    association.getByRole('button', { name: 'Public BIP84 wallet', exact: true }),
+  ).toBeVisible();
   await expect(page.locator('.transaction-row.is-selected .entity-badges')).toContainText(
     'Wallet: Public BIP84 wallet',
   );

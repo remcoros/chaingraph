@@ -72,7 +72,7 @@ test('inline tags group imported labels and addresses without disrupting notes, 
     'Exchange',
   );
   await page.getByLabel('Node notes', { exact: true }).fill('Unsaved draft survives tag updates');
-  const selectedTags = page.getByRole('region', { name: 'Tags and wallet matches' });
+  const selectedTags = page.getByRole('region', { name: 'Tags', exact: true });
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
   const picker = page.getByRole('dialog', { name: 'Tag selected records' });
   await expect(picker.getByLabel('Find or create tag')).toBeFocused();

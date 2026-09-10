@@ -84,7 +84,7 @@ Choose an example on the welcome screen or under **Help and samples → Example 
 
 See [template sources and verification](docs/research/workspace-templates.md). Examples are real chain observations, not attributed wallets or proof of ownership. The former synthetic laboratory is no longer offered; existing saved synthetic workspaces remain readable with live lookups disabled.
 
-This branch enables three compact workbenches: **Wallet**, **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Selection (Wallet/Transaction/Output/Address)** or **Loaded workspace** scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate selection**, beside **Lock to selection**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
+This branch enables three compact workbenches: **Wallet**, **Graph** and **Analysis**. Graph retains the accepted renderer, Inspector, wallet tabs and transaction flow. Analysis runs all applicable registry tools in one loaded-data scan using **Selection (Wallet/Transaction/Output/Address)** or **Loaded workspace** scope, with individual links to affected outputs, addresses and supporting transactions. Show on graph reveals a selection; explicit isolation exposes a resettable filter. **Isolate**, beside **Lock**, follows the current selection with the same one- or two-hop filter as **Paths**. Turning it off or resetting filters preserves manual hiding. The Trace workbench is disabled for now; saved Trace mode opens Graph. Its source remains available for later work. Shared annotations remain encrypted. See [the workflow](instructions.md#run-analysis) and [proposal validation](docs/experiments/simple-workbenches.md).
 
 ### Review a wallet (experimental)
 
@@ -268,21 +268,29 @@ follow the exact outpoint. Selection resolves only the chosen outpoint; explicit
 OP_RETURN outputs show decoded text when possible, with a short preview and expandable,
 selectable, copyable full data. Binary data stays hex; script decoding never executes it.
 Tags can be searched, created and assigned from **Add or choose tags** in the inspector.
+The Inspector groups label, notes, tags, icon and bookmark controls under **Annotations**.
+The **Wallet** section below links to matching imported watch-only wallets. On a transaction,
+the association means a matching input or output, not ownership of the whole transaction.
 
 Graph hover cards wrap long annotations and metadata within the graph viewport.
+Node hover and selection targets extend slightly beyond the visible shapes.
 Identifiers use the shared seven-character ends, with the complete outpoint index;
 hover the title or identifier for its full value. Actions and close stay right aligned on the top row.
 
-**Lock to selection** keeps the graph centered as you select items anywhere in the
+**Lock** keeps the graph centered as you select items anywhere in the
 workbench. Graph controls independently show or hide labels, tags and icons. On
 desktop, **Hide panels** sits beside the 3D/Flat toggle and temporarily hides the
 side panels; it is hidden on mobile, where panels already have separate views.
 
 ### Filters, multiple selection and batch metadata
 
+The graph toolbar's **Wallets** dropdown matches any checked wallet and combines
+with the other filters. **Clear** removes only the wallet restriction. The selection
+is saved with the workspace; the same choices are available under **Filters**.
+
 The floating **Filters** popover holds the shared filter set: entity type, labels,
 tags, wallet membership, satoshi bounds, loaded spend and funding evidence,
-bookmarks and connected context. **More filters** in **Entities** opens the same
+and bookmarks. **More filters** in **Entities** opens the same
 controls. Active filters appear as removable chips under the graph navigation,
 with **Reset filters** clearing all of them. Manual hiding is separate: its own
 chip counts manually hidden entities and restores them, and **Reset filters**
@@ -290,6 +298,20 @@ never unhides anything. Isolation appears as its own **Isolated N entities** chi
 Wallet membership comes from derived addresses; it is not proof of ownership, and
 a missing loaded spend still means unknown rather than unspent. The canvas amount
 threshold and the transaction flow threshold stay independent.
+
+**Show connections (+N)** appears beside filtered results in **Entities** and the
+graph's active filters only when extra loaded neighbors are available. The count
+shows how many nodes it will add, one connection from the current filter matches.
+Selection alone does not change these matches; use **Isolate / Paths** to explore
+a selection. These neighbors may fall outside
+your filters; manual hiding and the selected path scope still apply.
+It does not fetch transactions or recursively expand the graph. Choose **Hide connections** to
+return to matches and cancel any unfinished expansion. Numeric Min/Max sats fields
+accept whole satoshi amounts; blank fields impose no limit.
+
+Filtering and layout work show a busy status in the graph navigation. You can
+change filters while a layout runs; the latest choice replaces obsolete work.
+A layout failure keeps the displayed graph available and offers **Retry**.
 
 **Select** in the graph navigation or in **Entities** turns on selection mode,
 which adds checkboxes to entity rows and transaction flow rows. Ctrl or Cmd click
@@ -331,12 +353,13 @@ filtered outputs. **Size by Value** uses a bounded square-root curve so small
 outputs remain selectable while large transfers stand out. Sizes stay stable
 when filtering or adding data.
 
-The Inspector offers **Check current UTXO status** for outputs. It queries Core
-with mempool spends included and shows a timestamped, temporary observation.
+The Inspector's top-bar refresh icon checks an output's current UTXO status. It queries Core
+with mempool spends included and shows a dismissible notification that hides after eight seconds.
+The timestamped observation remains under **Chain evidence** for the current selection.
 A missing UTXO result is not treated as proof of spending.
 
 Successful transaction, output and address lookups focus their target even with
-Lock to selection off. **Load previous** distinguishes new downloads from expanding
+Lock off. **Load previous** distinguishes new downloads from expanding
 already cached input context. Removing a transaction also removes its unused input
 context, including previously expanded context. Shared, independently
 added, annotated and wallet-related context is retained. Older saved workspaces

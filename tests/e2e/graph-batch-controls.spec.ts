@@ -236,8 +236,11 @@ test('context entities shown to explain links never become batch targets', async
   await page.locator('.graph-navigation').getByRole('button', { name: 'Filters' }).click();
   const filters = page.getByRole('dialog', { name: 'Graph filters' });
   await filters.getByLabel('Entity type filter').selectOption('transaction');
-  await filters.getByLabel('Show connected context on canvas').check();
   await page.keyboard.press('Escape');
+  await page
+    .locator('.graph-navigation-status')
+    .getByRole('button', { name: /^Show connections/ })
+    .click();
   await page.getByLabel('Entity visibility').selectOption('graph');
   await page.locator('.left-panel').getByRole('button', { name: 'Select', exact: true }).click();
 

@@ -81,7 +81,9 @@ test('combines note, label and bookmark filters and reports invalid amount bound
   await more.getByLabel('Entity label state').selectOption('labeled');
   await more.getByLabel('Bookmarked only').check();
   await expect(rows).toHaveCount(1);
-  await more.getByLabel('Minimum entity value in sats').fill('not a number');
+  await expect(more.getByLabel('Minimum entity value in sats')).toHaveAttribute('type', 'number');
+  await expect(more.getByLabel('Maximum entity value in sats')).toHaveAttribute('type', 'number');
+  await more.getByLabel('Minimum entity value in sats').fill('1.5');
   await expect(more.locator('.filter-field-error')).toContainText('whole satoshi amounts');
   await expect(rows).toHaveCount(0);
   await more.getByLabel('Minimum entity value in sats').fill('1001001');
@@ -113,18 +115,25 @@ test('shows nonmatching canvas context explicitly and clears it with the shared 
   );
   await openMoreFilters(page);
   const more = page.getByRole('dialog', { name: 'More filters' });
-  await more.getByLabel('Show connected context on canvas').check();
+  await expect(more.getByLabel('Include neighboring nodes')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const results = page.locator('.entity-result-count');
+  await results.getByRole('button', { name: 'Show connections (+2)', exact: true }).click();
   await expect(page.locator('.entity-browser .entity-row')).toHaveCount(1);
   await expect(page.locator('.entity-context-note')).toContainText('2 connected context entities');
   await expect(page.getByLabel('Active graph filters', { exact: true })).toContainText(
-    'Connected context shown',
+    'Neighboring nodes included',
   );
   await expect(page.getByLabel('Active graph filters', { exact: true })).toContainText(
     'Search: Unique pagination',
   );
-  await more.getByRole('button', { name: 'Reset filters' }).click();
-  await expect(more.getByLabel('Show connected context on canvas')).not.toBeChecked();
-  await page.keyboard.press('Escape');
+  await results.getByRole('button', { name: 'Hide connections', exact: true }).click();
+  await expect(page.locator('.entity-context-note')).toHaveCount(0);
+  await expect(
+    results.getByRole('button', { name: 'Show connections (+2)', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Clear entity and graph filters' }).click();
+  await expect(results.getByRole('button', { name: /^Show connections/ })).toHaveCount(0);
   await expect(page.locator('.entity-context-note')).toHaveCount(0);
   await expect(page.locator('.filter-chip')).toHaveCount(0);
   await expect(page.locator('.entity-result-count')).toContainText(

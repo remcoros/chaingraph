@@ -28,12 +28,16 @@ export function useUtxoStatus(
     setState({ key });
     return () => request.current?.abort();
   }, [key]);
-  const check = async () => {
+  const check = async (): Promise<CheckState | undefined> => {
     if (!txid || vout === undefined) return;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    setState({ key, loading: true });
+    setState((current) => ({
+      key,
+      loading: true,
+      observation: current.key === key ? current.observation : undefined,
+    }));
     try {
       const observation = await fetchCurrentUtxo(
         network,
@@ -42,11 +46,28 @@ export function useUtxoStatus(
         expected,
         AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
       );
-      if (!controller.signal.aborted && activeKey.current === key && request.current === controller)
-        setState({ key, observation });
+      if (
+        !controller.signal.aborted &&
+        activeKey.current === key &&
+        request.current === controller
+      ) {
+        const result = { key, observation };
+        setState(result);
+        return result;
+      }
     } catch {
-      if (!controller.signal.aborted && activeKey.current === key && request.current === controller)
-        setState({ key, error: 'Could not verify this output with the node. Try again.' });
+      if (
+        !controller.signal.aborted &&
+        activeKey.current === key &&
+        request.current === controller
+      ) {
+        const result = { key, error: 'Could not verify this output with the node. Try again.' };
+        setState((current) => ({
+          ...result,
+          observation: current.key === key ? current.observation : undefined,
+        }));
+        return result;
+      }
     }
   };
   return { ...(state.key === key ? state : { key }), check };

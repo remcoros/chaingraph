@@ -77,13 +77,15 @@
   overflow-wrap: anywhere;
 }
 .selected-tags {
-  padding-block: 12px;
+  min-width: 0;
 }
-.selected-tags summary {
+.selected-tags-heading {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  cursor: pointer;
+  font-size: 11px;
+  color: var(--color-muted);
 }
 .tag-members {
   max-height: 210px;
@@ -102,11 +104,6 @@
 .tags-panel summary {
   cursor: pointer;
   font-size: 12px;
-}
-.wallet-match {
-  font-size: 11px;
-  margin-bottom: 9px;
-  overflow-wrap: anywhere;
 }
 .wallet-match-dot {
   background: var(--color-output);
@@ -129,11 +126,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 5px;
-}
-.selected-tag-chips > svg {
-  flex: none;
-  color: var(--color-muted);
-  margin-right: 2px;
+  margin-top: 5px;
 }
 .selected-tag-chip,
 .selected-tag-add {
@@ -146,13 +139,42 @@
   padding: 3px 7px;
   font-size: 11px;
 }
-.selected-tag-chip > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.selected-tag-chip {
+  width: 100%;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-raised);
+}
+.selected-tag-edit {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 5px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+}
+.selected-tag-edit > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
+}
+.selected-tag-remove {
+  flex: none;
+  width: 24px;
+  min-height: 24px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
 }
 .selected-tag-add {
-  border-style: dashed;
   color: var(--color-muted);
 }
 .tag-scope {

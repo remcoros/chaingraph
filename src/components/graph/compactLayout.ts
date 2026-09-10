@@ -2,14 +2,13 @@ import {
   forceSimulation,
   forceLink,
   forceManyBody,
-  forceCollide,
   forceX,
   forceY,
   forceZ,
   type SimulationLink,
 } from 'd3-force-3d';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
-import { anchoredForces, type Particle } from './anchoredForces';
+import { anchoredForces, particleCollisions, type Particle } from './anchoredForces';
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const hash = (id: string) => {
@@ -90,10 +89,7 @@ export function compactLayout(request: LayoutRequest): LayoutResult {
         .distance((l) => (l.source as Particle).radius + (l.target as Particle).radius + 22),
     )
     .force('charge', forceManyBody<Particle>().strength(-32))
-    .force(
-      'collision',
-      forceCollide<Particle>((n) => n.radius * 1.4 + 3),
-    )
+    .force('collision', particleCollisions(particles, dimensions))
     .force('x', forceX<Particle>((n) => n.center.x).strength(0.018))
     .force('y', forceY<Particle>((n) => n.center.y).strength(0.018));
   if (dimensions === 3) simulation.force('z', forceZ<Particle>((n) => n.center.z).strength(0.018));

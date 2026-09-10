@@ -9,8 +9,9 @@ import {
   Plus,
   Minus,
   RotateCw,
+  LoaderCircle,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   short,
   formatSats,
@@ -71,6 +72,7 @@ export interface GraphViewProps extends VisibilityProps {
   onEdit?: (id: string) => void;
   traceDisabledReason?: string;
   busy?: boolean;
+  filtering?: boolean;
 }
 
 type HoverCard = { type: 'node'; id: string; x: number; y: number };
@@ -92,6 +94,10 @@ export default function GraphView(props: GraphViewProps) {
   const visibleNode = useRef<string | undefined>(undefined);
   const [hover, setHover] = useState<HoverCard>();
   const [error, setError] = useState(false);
+  const [layout, setLayout] = useState<{ busy: boolean; nodeCount: number; error?: boolean }>({
+    busy: false,
+    nodeCount: 0,
+  });
   const [rendererActions, setRendererActions] = useState({ zoom: false, repack: false });
   const savedSnapshot = useRef(props.snapshot);
   const lastFitToken = useRef(props.fitToken);
@@ -194,6 +200,7 @@ export default function GraphView(props: GraphViewProps) {
       }
     };
     setError(false);
+    setLayout({ busy: false, nodeCount: 0 });
     dismissCard();
     try {
       adapter = adapterFactory(element, {
@@ -217,6 +224,14 @@ export default function GraphView(props: GraphViewProps) {
         dismiss: () => dismissCard(),
         error: () => setError(true),
         recovered: () => setError(false),
+        layout: (next) =>
+          setLayout((previous) =>
+            previous.busy === next.busy &&
+            previous.nodeCount === next.nodeCount &&
+            previous.error === next.error
+              ? previous
+              : next,
+          ),
         activity: (active) => current.current.onActivity?.(active),
         snapshot: (next) => {
           if (!next || typeof next !== 'object') return;
@@ -354,18 +369,23 @@ export default function GraphView(props: GraphViewProps) {
   const missingCreatingTransaction =
     hoveredNode?.kind === 'output' &&
     Boolean(props.transactions && hoveredNode.txid && !transaction);
+  const loadedSpenders = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const transaction of Object.values(props.transactions ?? {})) {
+      const outpoints = new Set(
+        transaction.vin.flatMap((input) =>
+          input.txid !== undefined && input.vout !== undefined
+            ? [`${input.txid}:${input.vout}`]
+            : [],
+        ),
+      );
+      for (const outpoint of outpoints) counts.set(outpoint, (counts.get(outpoint) ?? 0) + 1);
+    }
+    return counts;
+  }, [props.transactions]);
   const loadedSpendingCount =
     hoveredNode?.kind === 'output'
-      ? Object.values(props.transactions ?? {}).reduce(
-          (count, transaction) =>
-            count +
-            Number(
-              transaction.vin.some(
-                (input) => input.txid === hoveredNode.txid && input.vout === hoveredNode.vout,
-              ),
-            ),
-          0,
-        )
+      ? (loadedSpenders.get(`${hoveredNode.txid}:${hoveredNode.vout}`) ?? 0)
       : 0;
   const traceReason = props.busy
     ? 'Another operation is running.'
@@ -620,7 +640,7 @@ export default function GraphView(props: GraphViewProps) {
             <span>No visible graph nodes</span>
           </div>
         )}
-        {props.navigation && (
+        {(props.navigation || props.filtering || layout.busy || layout.error) && (
           <div
             ref={navigationRef}
             className="graph-navigation-overlay"
@@ -674,6 +694,30 @@ export default function GraphView(props: GraphViewProps) {
                   )}
                 </div>
               </div>
+              {!error && (props.filtering || layout.busy || layout.error) && (
+                <div
+                  className="graph-layout-status"
+                  role={layout.error && !props.filtering ? 'alert' : 'status'}
+                >
+                  {props.filtering || layout.busy ? (
+                    <>
+                      <LoaderCircle size={15} className="spin" aria-hidden="true" />
+                      <span>
+                        {props.filtering
+                          ? 'Filtering graph…'
+                          : `Arranging ${layout.nodeCount.toLocaleString()} nodes…`}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Could not arrange the graph.</span>
+                      <button type="button" onClick={() => graphRef.current?.repack?.()}>
+                        Retry
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               {props.navigationStatus && (
                 <div className="graph-navigation-status" role="status">
                   {props.navigationStatus}

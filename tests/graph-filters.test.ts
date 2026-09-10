@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeFilterChips,
+  buildGraphFilterIndex,
   clearFilterKey,
   describeMatchScope,
   filterGraph,
   hasActiveFilters,
   intersectIds,
+  matchingWalletFilterNodeIds,
+  selectedWalletFilterIds,
   sortEntities,
   valueFilterError,
 } from '../src/domain/graphFilters';
@@ -56,6 +59,130 @@ describe('loaded graph filtering', () => {
         (link) => ids(filtered).includes(link.source) && ids(filtered).includes(link.target),
       ),
     ).toBe(true);
+  });
+
+  it('previews exact neighboring node counts without widening matches, and toggles back exactly', () => {
+    const filters = { query: 'salary' };
+    const before = filterGraph(graph, filters, annotations);
+    const preview = filterGraph(graph, filters, annotations, {}, { previewContext: true });
+    expect(preview.availableContextNodeCount).toBe(2);
+    expect(preview.nodes).toEqual(before.nodes);
+    expect(preview.links).toEqual(before.links);
+    expect(preview.contextNodeIds).toEqual([]);
+    const expanded = filterGraph(graph, { ...filters, preserveContext: true }, annotations);
+    expect(expanded.availableContextNodeCount).toBe(2);
+    expect(expanded.matchedNodes).toEqual(before.matchedNodes);
+    const restored = filterGraph(graph, { ...filters, preserveContext: false }, annotations);
+    expect(restored).toEqual(before);
+    expect(filterGraph(graph, {}, {}, {}, { previewContext: true }).availableContextNodeCount).toBe(
+      0,
+    );
+    expect(
+      filterGraph(graph, { includeIds: [] }, {}, {}, { previewContext: true })
+        .availableContextNodeCount,
+    ).toBe(0);
+  });
+
+  it('counts only neighbors permitted by focus, manual hiding and address visibility', () => {
+    const options = { previewContext: true, index: buildGraphFilterIndex(graph) };
+    const preview = filterGraph(graph, { query: 'Second output' }, {}, {}, options);
+    expect(preview.availableContextNodeCount).toBe(2);
+    expect(
+      filterGraph(graph, { query: 'Second output', showAddresses: false }, {}, {}, options)
+        .availableContextNodeCount,
+    ).toBe(1);
+    expect(
+      filterGraph(graph, { query: 'Second output' }, {}, { hiddenNodeIds: ['tx:b'] }, options)
+        .availableContextNodeCount,
+    ).toBe(1);
+    expect(
+      filterGraph(graph, { query: 'Spending', focus: { id: 'out:a:0', hops: 1 } }, {}, {}, options)
+        .availableContextNodeCount,
+    ).toBe(1);
+    expect(
+      filterGraph(
+        graph,
+        { query: 'Spending', focus: { id: 'out:a:0', hops: 2 } },
+        {},
+        { hiddenNodeIds: ['tx:b'] },
+        options,
+      ).availableContextNodeCount,
+    ).toBe(0);
+  });
+
+  it('keeps large fan-out context one hop and fully removes it on toggle-off', () => {
+    const outputs = Array.from({ length: 20_000 }, (_, index) => ({
+      id: `out:fanout:${index}`,
+      kind: 'output' as const,
+      label: `Output ${index}`,
+      value: index,
+    }));
+    const fanout: GraphData = {
+      nodes: [{ id: 'tx:fanout', kind: 'transaction', label: 'Fan-out' }, ...outputs],
+      links: outputs.map((node) => ({
+        id: `create:${node.id}`,
+        source: 'tx:fanout',
+        target: node.id,
+        kind: 'creates',
+      })),
+    };
+    const index = buildGraphFilterIndex(fanout);
+    const match = { includeIds: [outputs[0].id] };
+    const preview = filterGraph(fanout, match, {}, {}, { index, previewContext: true });
+    expect(preview.availableContextNodeCount).toBe(1);
+    const expanded = filterGraph(fanout, { ...match, preserveContext: true }, {}, {}, { index });
+    expect(ids(expanded)).toEqual(['tx:fanout', outputs[0].id]);
+    expect(expanded.contextNodeIds).toEqual(['tx:fanout']);
+    expect(
+      ids(filterGraph(fanout, { ...match, preserveContext: false }, {}, {}, { index })),
+    ).toEqual([outputs[0].id]);
+    const allNeighbors = filterGraph(
+      fanout,
+      { includeIds: ['tx:fanout'] },
+      {},
+      {},
+      { index, previewContext: true },
+    );
+    expect(allNeighbors.availableContextNodeCount).toBe(20_000);
+    expect(ids(allNeighbors)).toEqual(['tx:fanout']);
+    const allShown = filterGraph(
+      fanout,
+      { includeIds: ['tx:fanout'], preserveContext: true },
+      {},
+      {},
+      { index },
+    );
+    expect(allShown.contextNodeIds).toHaveLength(20_000);
+    expect(allShown.nodes).toHaveLength(20_001);
+    expect(
+      ids(
+        filterGraph(
+          fanout,
+          { includeIds: ['tx:fanout'], preserveContext: false },
+          {},
+          {},
+          { index },
+        ),
+      ),
+    ).toEqual(['tx:fanout']);
+  });
+
+  it('reuses a topology index across visibility changes without retaining hidden paths or stale evidence', () => {
+    const index = buildGraphFilterIndex(graph);
+    const focused = { focus: { id: 'out:a:0', hops: 2 as const } };
+    expect(filterGraph(graph, focused, {}, {}, { index })).toEqual(filterGraph(graph, focused));
+    expect(ids(filterGraph(graph, focused, {}, { hiddenNodeIds: ['tx:b'] }, { index }))).toEqual([
+      'tx:a',
+      'out:a:0',
+    ]);
+    expect(filterGraph(graph, { spend: 'observed', funding: 'loaded' }, {}, {}, { index })).toEqual(
+      filterGraph(graph, { spend: 'observed', funding: 'loaded' }),
+    );
+    const updated = {
+      nodes: graph.nodes,
+      links: graph.links.filter((link) => link.kind !== 'spends'),
+    };
+    expect(ids(filterGraph(updated, { spend: 'observed' }, {}, {}, { index }))).toEqual([]);
   });
 
   it('searches annotations, notes and addresses while distinguishing user labels from default labels/icons', () => {
@@ -254,6 +381,55 @@ describe('membership exclusions and active filter chips', () => {
         (chip) => chip.label,
       ),
     ).toEqual(['Tag: Removed tag', 'Wallet: Savings']);
+  });
+
+  it('groups multiple wallets into one removable dimension and leaves other filters intact', () => {
+    const filters = { walletIds: ['w1', 'w2', 'w1'], walletId: 'old', tagId: 't1' };
+    expect(selectedWalletFilterIds(filters)).toEqual(['w1', 'w2']);
+    expect(activeFilterChips(filters, { walletNames: ['Savings', 'Spending'] })).toEqual([
+      { key: 'tagId', kind: 'match', label: 'Tag: Removed tag' },
+      { key: 'walletId', kind: 'match', label: 'Wallets: Savings, Spending' },
+    ]);
+    expect(clearFilterKey(filters, 'walletId')).toEqual({ tagId: 't1' });
+    expect(filters.walletIds).toEqual(['w1', 'w2', 'w1']);
+    expect(selectedWalletFilterIds({ walletId: 'old' })).toEqual(['old']);
+    expect(clearFilterKey({ walletId: 'old' }, 'walletId')).toEqual({});
+    expect(hasActiveFilters({ walletIds: [], walletId: 'old' })).toBe(false);
+    expect(activeFilterChips({ walletIds: ['missing'] })[0].label).toBe('Wallet: Removed wallet');
+  });
+
+  it('unions chosen wallet matches before intersecting tags, isolation and ordinary filters', () => {
+    const matches = new Map([
+      ['tx:a', { walletIds: ['w1'] }],
+      ['out:a:0', { walletIds: ['w1', 'w2'] }],
+      ['out:b:0', { walletIds: ['w2'] }],
+      ['addr:c', { walletIds: ['w3'] }],
+    ]);
+    const walletIds = matchingWalletFilterNodeIds({ walletIds: ['w1', 'w2', 'w1'] }, matches);
+    expect(walletIds).toEqual(['tx:a', 'out:a:0', 'out:b:0']);
+    expect(matchingWalletFilterNodeIds({ walletId: 'w2' }, matches)).toEqual([
+      'out:a:0',
+      'out:b:0',
+    ]);
+    expect(matchingWalletFilterNodeIds({ walletIds: [], walletId: 'w1' }, matches)).toBeUndefined();
+    expect(matchingWalletFilterNodeIds({}, matches)).toBeUndefined();
+    expect(matchingWalletFilterNodeIds({ walletIds: ['removed'] }, matches)).toEqual([]);
+
+    const tagMembers = ['tx:a', 'out:a:0', 'addr:c'];
+    const isolated = ['out:a:0', 'out:b:0'];
+    const filtered = filterGraph(graph, {
+      includeIds: intersectIds([walletIds, tagMembers, isolated]),
+      kind: 'output',
+      minSats: 95,
+      preserveContext: true,
+    });
+    expect(filtered.matchedNodes.map((node) => node.id)).toEqual(['out:a:0']);
+    expect(filtered.contextNodeIds).toEqual(['tx:a', 'tx:b']);
+    expect(
+      filterGraph(graph, { includeIds: walletIds, maxSats: 95 }).matchedNodes.map(
+        (node) => node.id,
+      ),
+    ).toEqual(['out:b:0']);
   });
 
   it('describes an exact batch scope for one entity kind and for mixed results', () => {

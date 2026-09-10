@@ -5,7 +5,10 @@ export interface GraphFilters {
   tagId?: string;
   /** Any tag membership, independent of one chosen tag. */
   tagState?: 'all' | 'tagged' | 'untagged';
+  /** Legacy single-wallet selection, retained for saved workspaces. */
   walletId?: string;
+  /** Match any selected wallet; an empty list leaves wallet membership unrestricted. */
+  walletIds?: string[];
   /** Derived wallet-address membership, never an ownership claim. */
   walletMatch?: 'all' | 'matched' | 'unmatched';
   query?: string;
@@ -27,6 +30,76 @@ export interface GraphFilters {
 export interface FilteredGraph extends GraphData {
   matchedNodes: GraphNode[];
   contextNodeIds: string[];
+  /** Exact extra loaded one-hop nodes, present when context is enabled or previewed. */
+  availableContextNodeCount?: number;
+}
+
+export interface GraphFilterIndex {
+  readonly graph: GraphData;
+  readonly neighbors: ReadonlyMap<string, ReadonlySet<string>>;
+  readonly spentIds: ReadonlySet<string>;
+  readonly fundedIds: ReadonlySet<string>;
+}
+
+/** Reuse for one immutable graph projection; topology is built only when a filter needs it. */
+export function buildGraphFilterIndex(graph: GraphData): GraphFilterIndex {
+  let nodeIds: Set<string> | undefined;
+  let neighbors: Map<string, Set<string>> | undefined;
+  let evidence: { spentIds: Set<string>; fundedIds: Set<string> } | undefined;
+  const validLink = (source: string, target: string) => {
+    nodeIds ??= new Set(graph.nodes.map((node) => node.id));
+    return nodeIds.has(source) && nodeIds.has(target);
+  };
+  const getEvidence = () => {
+    if (!evidence) {
+      evidence = { spentIds: new Set(), fundedIds: new Set() };
+      for (const link of graph.links) {
+        if (!validLink(link.source, link.target)) continue;
+        if (link.kind === 'spends') evidence.spentIds.add(link.source);
+        if (link.kind === 'creates') evidence.fundedIds.add(link.target);
+      }
+    }
+    return evidence;
+  };
+  return {
+    graph,
+    get neighbors() {
+      if (!neighbors) {
+        neighbors = new Map();
+        for (const link of graph.links) {
+          if (!validLink(link.source, link.target)) continue;
+          if (!neighbors.has(link.source)) neighbors.set(link.source, new Set());
+          if (!neighbors.has(link.target)) neighbors.set(link.target, new Set());
+          neighbors.get(link.source)!.add(link.target);
+          neighbors.get(link.target)!.add(link.source);
+        }
+      }
+      return neighbors;
+    },
+    get spentIds() {
+      return getEvidence().spentIds;
+    },
+    get fundedIds() {
+      return getEvidence().fundedIds;
+    },
+  };
+}
+
+/** Explicit multi-selection takes precedence over an older saved single selection. */
+export function selectedWalletFilterIds(filters: GraphFilters): string[] {
+  return [...new Set(filters.walletIds ?? (filters.walletId ? [filters.walletId] : []))];
+}
+
+/** Resolve the union of derived-script matches; callers intersect other filter dimensions. */
+export function matchingWalletFilterNodeIds(
+  filters: GraphFilters,
+  matches: ReadonlyMap<string, { walletIds: string[] }>,
+): string[] | undefined {
+  const selected = new Set(selectedWalletFilterIds(filters));
+  if (!selected.size) return undefined;
+  return [...matches]
+    .filter(([, match]) => match.walletIds.some((id) => selected.has(id)))
+    .map(([nodeId]) => nodeId);
 }
 
 export function valueFilterError(filters: GraphFilters): string | undefined {
@@ -51,9 +124,18 @@ export function filterGraph(
   filters: GraphFilters = {},
   annotations: Record<string, Annotation> = {},
   visibility: { hiddenNodeIds?: readonly string[]; mode?: EntityVisibility } = {},
+  options: { index?: GraphFilterIndex; previewContext?: boolean } = {},
 ): FilteredGraph {
   if (valueFilterError(filters))
-    return { nodes: [], links: [], matchedNodes: [], contextNodeIds: [] };
+    return {
+      nodes: [],
+      links: [],
+      matchedNodes: [],
+      contextNodeIds: [],
+      ...(options.previewContext || filters.preserveContext
+        ? { availableContextNodeCount: 0 }
+        : {}),
+    };
   const hidden = new Set(visibility.hiddenNodeIds ?? []);
   const mode = visibility.mode ?? 'visible';
   const visible = new Set(
@@ -65,22 +147,12 @@ export function filterGraph(
       )
       .map((node) => node.id),
   );
-  const neighbors = new Map<string, Set<string>>();
-  const spent = new Set<string>();
-  const funded = new Set<string>();
-  const allIds = new Set(graph.nodes.map((node) => node.id));
-  for (const link of graph.links) {
-    if (!allIds.has(link.source) || !allIds.has(link.target)) continue;
-    if (link.kind === 'spends') spent.add(link.source);
-    if (link.kind === 'creates') funded.add(link.target);
-    if (!visible.has(link.source) || !visible.has(link.target)) continue;
-    if (!neighbors.has(link.source)) neighbors.set(link.source, new Set());
-    if (!neighbors.has(link.target)) neighbors.set(link.target, new Set());
-    neighbors.get(link.source)!.add(link.target);
-    neighbors.get(link.target)!.add(link.source);
-  }
+  const index = options.index?.graph === graph ? options.index : buildGraphFilterIndex(graph);
+  const spent = filters.spend && filters.spend !== 'all' ? index.spentIds : undefined;
+  const funded = filters.funding && filters.funding !== 'all' ? index.fundedIds : undefined;
   let allowed = visible;
   if (filters.focus) {
+    const neighbors = index.neighbors;
     const { id, hops } = filters.focus;
     allowed = new Set(visible.has(id) ? [id] : []);
     let frontier = [...allowed];
@@ -88,7 +160,7 @@ export function filterGraph(
       const next: string[] = [];
       for (const nodeId of frontier)
         for (const neighbor of neighbors.get(nodeId) ?? []) {
-          if (!allowed.has(neighbor)) {
+          if (visible.has(neighbor) && !allowed.has(neighbor)) {
             allowed.add(neighbor);
             next.push(neighbor);
           }
@@ -126,27 +198,38 @@ export function filterGraph(
     if (filters.maxSats !== undefined && (node.value === undefined || node.value > filters.maxSats))
       return false;
     if (filters.spend && filters.spend !== 'all') {
-      if (node.kind !== 'output' || (filters.spend === 'observed') !== spent.has(node.id))
+      if (node.kind !== 'output' || (filters.spend === 'observed') !== spent!.has(node.id))
         return false;
     }
     if (filters.funding && filters.funding !== 'all') {
-      const missing = !funded.has(node.id) || node.value === undefined;
+      const missing = !funded!.has(node.id) || node.value === undefined;
       if (node.kind !== 'output' || (filters.funding === 'missing') !== missing) return false;
     }
     return true;
   });
   const matches = new Set(matchedNodes.map((node) => node.id));
-  const retained = new Set(matches);
-  if (filters.preserveContext)
-    for (const id of matches)
-      for (const neighbor of neighbors.get(id) ?? []) {
-        if (allowed.has(neighbor)) retained.add(neighbor);
-      }
+  const previewContext = options.previewContext || filters.preserveContext;
+  const context = new Set<string>();
+  // Visit original matches only. A high-fan-out neighbor must not start a second hop.
+  // A single edge pass avoids allocating adjacency sets for ordinary filtering/context.
+  if (previewContext && matches.size && matches.size < allowed.size) {
+    for (const link of graph.links) {
+      if (matches.has(link.source) && !matches.has(link.target) && allowed.has(link.target))
+        context.add(link.target);
+      if (matches.has(link.target) && !matches.has(link.source) && allowed.has(link.source))
+        context.add(link.source);
+    }
+  }
+  const contextNodeIds = filters.preserveContext ? [...context] : [];
+  const retained = contextNodeIds.length ? new Set([...matches, ...contextNodeIds]) : matches;
   return {
-    nodes: graph.nodes.filter((node) => retained.has(node.id)),
+    nodes: contextNodeIds.length
+      ? graph.nodes.filter((node) => retained.has(node.id))
+      : matchedNodes,
     links: graph.links.filter((link) => retained.has(link.source) && retained.has(link.target)),
     matchedNodes,
-    contextNodeIds: [...retained].filter((id) => !matches.has(id)),
+    contextNodeIds,
+    ...(previewContext ? { availableContextNodeCount: context.size } : {}),
   };
 }
 
@@ -207,7 +290,7 @@ export function activeFilterKeys(filters: GraphFilters): FilterKey[] {
   if (filters.tagState && filters.tagState !== 'all') keys.push('tagState');
   if (filters.tagId) keys.push('tagId');
   if (filters.walletMatch && filters.walletMatch !== 'all') keys.push('walletMatch');
-  if (filters.walletId) keys.push('walletId');
+  if (selectedWalletFilterIds(filters).length) keys.push('walletId');
   if (filters.bookmarkedOnly) keys.push('bookmarkedOnly');
   if (filters.minSats !== undefined || filters.maxSats !== undefined) keys.push('value');
   if (filters.spend && filters.spend !== 'all') keys.push('spend');
@@ -228,13 +311,16 @@ export function clearFilterKey(filters: GraphFilters, key: FilterKey): GraphFilt
   if (key === 'value') {
     delete next.minSats;
     delete next.maxSats;
+  } else if (key === 'walletId') {
+    delete next.walletId;
+    delete next.walletIds;
   } else delete next[key];
   return next;
 }
 
 export function activeFilterChips(
   filters: GraphFilters,
-  names: { walletName?: string; tagName?: string } = {},
+  names: { walletName?: string; walletNames?: string[]; tagName?: string } = {},
 ): FilterChip[] {
   const value = (amount?: number) => (amount === undefined ? '' : amount.toLocaleString('en-US'));
   return activeFilterKeys(filters).map((key): FilterChip => {
@@ -271,8 +357,20 @@ export function activeFilterChips(
           kind: 'match',
           label: filters.walletMatch === 'matched' ? 'Wallet match' : 'No wallet match',
         };
-      case 'walletId':
-        return { key, kind: 'match', label: `Wallet: ${names.walletName ?? 'Removed wallet'}` };
+      case 'walletId': {
+        const ids = selectedWalletFilterIds(filters);
+        const labels = ids.map(
+          (_, index) =>
+            names.walletNames?.[index] ??
+            (ids.length === 1 ? names.walletName : undefined) ??
+            'Removed wallet',
+        );
+        return {
+          key,
+          kind: 'match',
+          label: `${ids.length === 1 ? 'Wallet' : 'Wallets'}: ${labels.join(', ')}`,
+        };
+      }
       case 'bookmarkedOnly':
         return { key, kind: 'match', label: 'Bookmarked' };
       case 'value':
@@ -311,7 +409,7 @@ export function activeFilterChips(
           label: `Isolated ${filters.includeIds!.length.toLocaleString('en-US')} entities`,
         };
       default:
-        return { key, kind: 'scope', label: 'Connected context shown' };
+        return { key, kind: 'scope', label: 'Neighboring nodes included' };
     }
   });
 }

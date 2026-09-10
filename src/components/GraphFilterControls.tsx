@@ -5,10 +5,12 @@ import {
   activeFilterKeys,
   clearFilterKey,
   valueFilterError,
+  selectedWalletFilterIds,
   type FilterKey,
   type GraphFilters,
 } from '../domain/graphFilters';
 import { AnchoredPopover } from './AnchoredPopover';
+import { WalletFilterOptions } from './GraphWalletFilter';
 import './graph-filters.css';
 
 export function SatoshiBound({
@@ -27,8 +29,11 @@ export function SatoshiBound({
   return (
     <input
       aria-label={label}
-      type="text"
+      type="number"
       inputMode="numeric"
+      min={0}
+      max={2_100_000_000_000_000}
+      step={1}
       placeholder="No limit"
       value={text}
       aria-invalid={
@@ -38,7 +43,11 @@ export function SatoshiBound({
       onChange={(event) => {
         const raw = event.target.value;
         setText(raw);
-        onChange(raw === '' ? undefined : /^\d+$/.test(raw) ? Number(raw) : Number.NaN);
+        onChange(
+          raw === '' && !event.currentTarget.validity.badInput
+            ? undefined
+            : event.currentTarget.valueAsNumber,
+        );
       }}
     />
   );
@@ -47,7 +56,7 @@ export function SatoshiBound({
 export interface FilterFieldProps {
   filters: GraphFilters;
   onChange: (filters: GraphFilters) => void;
-  wallets?: readonly { id: string; name: string }[];
+  wallets?: readonly { id: string; name: string; color?: string }[];
   tags?: readonly { id: string; name: string }[];
   /** Optional canvas amount threshold; the transaction flow keeps its own control. */
   amountControl?: ReactNode;
@@ -62,7 +71,7 @@ export function FilterFields({
   amountControl,
 }: FilterFieldProps) {
   const patch = (change: Partial<GraphFilters>) => onChange({ ...filters, ...change });
-  const walletValue = filters.walletId ? `id:${filters.walletId}` : (filters.walletMatch ?? 'all');
+  const selectedWallets = selectedWalletFilterIds(filters);
   const tagValue = filters.tagId ? `id:${filters.tagId}` : (filters.tagState ?? 'all');
   const error = valueFilterError(filters);
   return (
@@ -123,30 +132,27 @@ export function FilterFields({
         Wallet membership
         <select
           aria-label="Wallet membership"
-          value={walletValue}
-          onChange={(event) => {
-            const value = event.target.value;
-            patch(
-              value.startsWith('id:')
-                ? { walletId: value.slice(3), walletMatch: undefined }
-                : {
-                    walletId: undefined,
-                    walletMatch:
-                      value === 'all' ? undefined : (value as GraphFilters['walletMatch']),
-                  },
-            );
-          }}
+          value={filters.walletMatch ?? 'all'}
+          onChange={(event) =>
+            patch({
+              walletMatch:
+                event.target.value === 'all'
+                  ? undefined
+                  : (event.target.value as GraphFilters['walletMatch']),
+            })
+          }
         >
           <option value="all">Any wallet state</option>
           <option value="matched">Matches an imported wallet</option>
           <option value="unmatched">No wallet match</option>
-          {wallets.map((wallet) => (
-            <option key={wallet.id} value={`id:${wallet.id}`}>
-              Wallet: {wallet.name}
-            </option>
-          ))}
         </select>
       </label>
+      <details className="wallet-filter-details">
+        <summary>
+          Wallets{selectedWallets.length ? ` · ${selectedWallets.length} selected` : ''}
+        </summary>
+        <WalletFilterOptions filters={filters} wallets={wallets} onChange={onChange} />
+      </details>
       <div className="filter-field-pair">
         <label>
           Min sats
@@ -213,19 +219,46 @@ export function FilterFields({
         />
         Bookmarked only
       </label>
-      <label className="checkbox-label">
-        <input
-          type="checkbox"
-          checked={filters.preserveContext ?? false}
-          onChange={(event) => patch({ preserveContext: event.target.checked })}
-        />
-        Show connected context on canvas
-      </label>
-      <p>
-        Context adds directly connected neighbors outside the matches. Select matching excludes
-        connected context; a context entity you select explicitly stays a batch target.
-      </p>
     </div>
+  );
+}
+
+/** Context is an action on filtered results, not a filter or selection expansion. */
+export function GraphConnectionsAction({
+  filters,
+  onChange,
+  extraNodeCount = 0,
+  pending = false,
+}: {
+  filters: GraphFilters;
+  onChange: (filters: GraphFilters) => void;
+  extraNodeCount?: number;
+  pending?: boolean;
+}) {
+  const enabled = filters.preserveContext ?? false;
+  if (!enabled && extraNodeCount === 0) return null;
+  return (
+    <button
+      type="button"
+      className="text-button graph-connections-action"
+      disabled={!enabled && pending}
+      title={
+        enabled
+          ? 'Return to filter matches and cancel any unfinished connection layout.'
+          : 'Add loaded nodes one connection from these filter matches to the canvas. Does not fetch more data.'
+      }
+      onClick={(event) => {
+        // Turning context off can remove this action after the result count settles.
+        if (enabled) event.currentTarget.parentElement?.focus();
+        onChange({ ...filters, preserveContext: !enabled });
+      }}
+    >
+      {enabled
+        ? 'Hide connections'
+        : pending
+          ? 'Show connections'
+          : `Show connections (+${extraNodeCount.toLocaleString()})`}
+    </button>
   );
 }
 
@@ -242,7 +275,7 @@ export function FilterChips({
 }: {
   filters: GraphFilters;
   onChange: (filters: GraphFilters) => void;
-  names?: { walletName?: string; tagName?: string };
+  names?: { walletName?: string; walletNames?: string[]; tagName?: string };
   hiddenCount?: number;
   onShowAllHidden?: () => void;
   onReset?: () => void;
@@ -252,7 +285,7 @@ export function FilterChips({
   const chips = activeFilterChips(filters, names);
   if (!chips.length && !hiddenCount && !children) return null;
   return (
-    <div className="filter-chips" aria-label="Active graph filters">
+    <div className="filter-chips" aria-label="Active graph filters" tabIndex={-1}>
       {chips.map((chip) => (
         <span key={chip.key} className={`filter-chip filter-chip-${chip.kind}`}>
           <span>{chip.label}</span>
@@ -310,7 +343,9 @@ export function GraphFilterButton({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
-  const count = activeFilterKeys(props.filters).length + Number(extraFiltersActive);
+  const count =
+    activeFilterKeys(props.filters).filter((key) => key !== 'preserveContext').length +
+    Number(extraFiltersActive);
   return (
     <>
       <button

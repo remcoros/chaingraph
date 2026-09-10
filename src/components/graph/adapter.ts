@@ -55,6 +55,8 @@ export interface GraphAdapterEvents {
   snapshot?(snapshot: GraphSnapshot): void;
   /** Lightweight activity signal; includes the quiet period before snapshot publication. */
   activity?(active: boolean): void;
+  /** Geometry computation is independent of camera gestures and can fail/retry. */
+  layout?(state: { busy: boolean; nodeCount: number; error?: boolean }): void;
 }
 export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;

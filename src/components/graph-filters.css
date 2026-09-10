@@ -12,7 +12,7 @@
   color: var(--color-muted);
 }
 .filter-fields select,
-.filter-fields input[type='text'] {
+.filter-fields input[type='number'] {
   font-size: 11px;
   padding: 6px 8px;
   min-height: 32px;
@@ -61,6 +61,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 5px;
+}
+.graph-connections-action {
+  min-height: 24px;
+  padding: 3px 5px;
+  font-size: 10px;
 }
 .filter-chip {
   display: inline-flex;
@@ -133,6 +138,64 @@
   background: var(--color-accent);
   color: var(--color-accent-ink);
   font-size: 9px;
+}
+.wallet-filter-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wallet-filter-tools .text-button {
+  font-size: 11px;
+}
+.wallet-filter-options input[type='search'] {
+  width: 100%;
+  min-width: 0;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.wallet-filter-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.wallet-filter-list label.wallet-filter-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  margin: 0;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.wallet-filter-option:hover {
+  background: var(--color-hover);
+}
+.wallet-filter-option input[type='checkbox'] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+  margin: 0;
+}
+.wallet-filter-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-muted);
+}
+.wallet-filter-option > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wallet-filter-details summary {
+  cursor: pointer;
+  font-size: 11px;
+  padding: 5px 0;
 }
 @media (max-width: 999px) {
   .filter-chip > button {

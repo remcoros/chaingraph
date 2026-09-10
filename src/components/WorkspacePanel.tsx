@@ -55,6 +55,8 @@ interface Props {
   onResetGraphFilters?: () => void;
   entityTotalCount?: number;
   contextCount?: number;
+  contextNodeCount?: number;
+  contextPreviewPending?: boolean;
   hiddenNodeIds?: readonly string[];
   onSetHidden?: (ids: string[], hidden: boolean) => void;
   visibility?: 'visible' | 'hidden' | 'all' | 'graph';
@@ -99,6 +101,8 @@ export function WorkspacePanel({
   onResetGraphFilters,
   entityTotalCount,
   contextCount,
+  contextNodeCount,
+  contextPreviewPending,
   hiddenNodeIds,
   onSetHidden,
   visibility,
@@ -283,6 +287,8 @@ export function WorkspacePanel({
           onSelect={onSelectNode}
           totalCount={entityTotalCount}
           contextCount={contextCount}
+          contextNodeCount={contextNodeCount}
+          contextPreviewPending={contextPreviewPending}
           hiddenNodeIds={hiddenNodeIds}
           onSetHidden={onSetHidden}
           visibility={visibility}

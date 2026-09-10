@@ -12,7 +12,6 @@ import {
   listTagsForNode,
   tagNodeIds,
   tagsFromLabels,
-  buildWalletMatches,
   MAX_TAG_MEMBERS,
   MAX_WORKSPACE_TAGS,
 } from '../domain/tags';
@@ -23,6 +22,9 @@ import {
   TAG_COLORS as colors,
 } from './MetadataEditors';
 import './tags.css';
+import { applyBatchTag } from '../domain/batchMetadata';
+import { canonicalAddress } from '../domain/entityReferences';
+import { useDialogFocus } from './Dialogs';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
 function TagForm({
@@ -99,7 +101,6 @@ function TagForm({
 export function SelectedTags({
   workspace,
   selected,
-  graph,
   onChange,
   onManage,
   openToken,
@@ -107,18 +108,19 @@ export function SelectedTags({
 }: {
   workspace: Workspace;
   selected: GraphNode;
-  graph: GraphData;
   onChange: Change;
   onManage: () => void;
   openToken?: number;
   onOpenHandled?: () => void;
 }) {
   const effective = listTagsForNode(workspace, selected);
-  const matches = useMemo(() => buildWalletMatches(workspace, graph), [workspace, graph]);
-  const match = matches.get(selected.id);
   const [open, setOpen] = useState(false);
+  const [removal, setRemoval] = useState<{ tag: WorkspaceTag; anchor: HTMLElement } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  useEffect(() => setOpen(false), [workspace.id, selected.id]);
+  useEffect(() => {
+    setOpen(false);
+    setRemoval(null);
+  }, [workspace.id, selected.id]);
   useEffect(() => {
     if (!openToken) return;
     trigger.current?.focus();
@@ -127,35 +129,9 @@ export function SelectedTags({
   }, [openToken]);
   const id = useId();
   return (
-    <section className="panel-section selected-tags" aria-label="Tags and wallet matches">
-      {match && (
-        <p className="wallet-match">
-          <span className="wallet-match-dot" />
-          {match.kind === 'transaction' ? 'Wallet-related transaction' : 'Wallet match'}:{' '}
-          {workspace.wallets
-            .filter((wallet) => match.walletIds.includes(wallet.id))
-            .map((wallet) => wallet.name)
-            .join(', ')}
-        </p>
-      )}
-      <div className="selected-tag-chips">
-        <Tag size={14} aria-hidden="true" />
-        {effective.map((tag) => (
-          <button
-            type="button"
-            key={tag.id}
-            className="selected-tag-chip"
-            title={tag.name}
-            aria-label={`Edit assignment for ${tag.name}`}
-            onClick={() => {
-              trigger.current?.focus();
-              setOpen(true);
-            }}
-          >
-            <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-            <span>{tag.name}</span>
-          </button>
-        ))}
+    <section className="selected-tags" aria-label="Tags">
+      <div className="selected-tags-heading">
+        <span>Tags</span>
         <button
           ref={trigger}
           type="button"
@@ -166,9 +142,53 @@ export function SelectedTags({
           aria-controls={open ? id : undefined}
           onClick={() => setOpen((current) => !current)}
         >
-          <Plus size={13} /> Add tag
+          <Plus size={13} /> Add
         </button>
       </div>
+      {effective.length > 0 && (
+        <div className="selected-tag-chips">
+          {effective.map((tag) => (
+            <span key={tag.id} className="selected-tag-chip">
+              <button
+                type="button"
+                className="selected-tag-edit"
+                title={tag.name}
+                aria-label={`Edit assignment for ${tag.name}`}
+                onClick={() => {
+                  trigger.current?.focus();
+                  setOpen(true);
+                }}
+              >
+                <span className="tag-dot" style={{ backgroundColor: tag.color }} />
+                <span>{tag.name}</span>
+              </button>
+              <button
+                type="button"
+                className="selected-tag-remove"
+                title={`Remove ${tag.name} from selection`}
+                aria-label={`Remove ${tag.name} from selection`}
+                onClick={(event) => {
+                  const addressId = selected.address
+                    ? addressNodeId(canonicalAddress(selected.address))
+                    : undefined;
+                  if (
+                    selected.kind !== 'transaction' &&
+                    addressId &&
+                    tag.nodeIds.includes(addressId)
+                  ) {
+                    setRemoval({ tag, anchor: event.currentTarget });
+                  } else {
+                    onChange((current) => applyBatchTag(current, [selected.id], tag.id, false));
+                    trigger.current?.focus();
+                  }
+                }}
+              >
+                <Trash2 size={13} aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       {open && trigger.current && (
         <TagAssignmentPicker
           key={selected.id}
@@ -184,7 +204,55 @@ export function SelectedTags({
           }}
         />
       )}
+      {removal && (
+        <MetadataPopover anchor={removal.anchor} onClose={() => setRemoval(null)}>
+          <RemoveAddressTag
+            tag={removal.tag}
+            onClose={() => setRemoval(null)}
+            onRemove={() => {
+              const ids = [selected.id, addressNodeId(canonicalAddress(selected.address!))];
+              onChange((current) => applyBatchTag(current, ids, removal.tag.id, false));
+              trigger.current?.focus();
+              setRemoval(null);
+            }}
+          />
+        </MetadataPopover>
+      )}
     </section>
+  );
+}
+
+function RemoveAddressTag({
+  tag,
+  onClose,
+  onRemove,
+}: {
+  tag: WorkspaceTag;
+  onClose: () => void;
+  onRemove: () => void;
+}) {
+  const ref = useDialogFocus(onClose, undefined, false);
+  return (
+    <div
+      ref={ref}
+      className="metadata-editor"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Remove address tag"
+    >
+      <strong>Remove {tag.name}?</strong>
+      <p>
+        This tag is applied to the address. Removing it also affects the address’s other outputs.
+      </p>
+      <div className="button-row">
+        <button type="button" data-autofocus onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" onClick={onRemove}>
+          Remove from address + outputs
+        </button>
+      </div>
+    </div>
   );
 }
 

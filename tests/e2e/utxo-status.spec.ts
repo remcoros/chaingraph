@@ -70,24 +70,44 @@ test('UTXO checks distinguish unspent and absent observations, retry failures, a
     return route.fulfill({ json: { result: attempt === 1 ? positive : null } });
   });
   await openFixture(page);
+  await page.clock.install();
+  const check = page.locator('.selection-top').getByRole('button', {
+    name: 'Check current UTXO status',
+    exact: true,
+  });
+  const toast = page.locator('.toast');
   const status = page.getByRole('region', { name: 'Current UTXO status', exact: true });
+  const evidence = page.locator('.selection-evidence');
   await page
     .getByLabel('Node notes', { exact: true })
     .fill('Keep this annotation through status checks.');
-  await page.getByRole('button', { name: 'Check current UTXO status', exact: true }).click();
+  await check.click();
+  await expect(toast).toContainText('Unspent at check');
+  await expect(toast).toContainText('Mempool included');
+  await expect(toast).toHaveAttribute('role', 'status');
+  await expect(evidence).not.toHaveAttribute('open');
+  await page.clock.fastForward(8_100);
+  await expect(toast).toHaveCount(0);
+  await evidence.locator('summary').click();
+  await expect(status).toBeVisible();
   await expect(status).toContainText('Unspent at check');
-  await expect(status).toContainText('Mempool included');
+  await expect(status.getByRole('button')).toHaveCount(0);
   await expect(status.locator('time')).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}T/);
   await expect(page.locator('.spending-note')).toContainText('1 spending transaction is loaded');
   await expect(
     page.getByRole('button', { name: 'Find spending transactions', exact: true }),
   ).toBeEnabled();
-  await status.getByRole('button', { name: 'Check UTXO status again', exact: true }).click();
-  await expect(status.getByRole('alert')).toContainText('Could not verify this output');
+  await evidence.locator('summary').click();
+  await check.click();
+  await expect(toast).toContainText('UTXO status check failed. Try again.');
   await expect(page.locator('body')).not.toContainText('unsafe-detail-host');
-  await status.getByRole('button', { name: 'Retry UTXO status check', exact: true }).click();
+  await toast.getByRole('button', { name: 'Dismiss message', exact: true }).click();
+  await expect(toast).toHaveCount(0);
+  await check.click();
+  await expect(toast).toContainText('Not in current UTXO set');
+  await expect(toast).toContainText('does not identify a spending transaction');
+  await evidence.locator('summary').click();
   await expect(status).toContainText('Not in current UTXO set');
-  await expect(status).toContainText('does not identify a spending transaction');
   await expect(
     page.getByRole('button', { name: 'Find spending transactions', exact: true }),
   ).toBeEnabled();
@@ -95,9 +115,6 @@ test('UTXO checks distinguish unspent and absent observations, retry failures, a
     'Keep this annotation through status checks.',
   );
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
-  await expect(page.locator('.graph-canvas canvas')).toBeVisible();
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: test.info().outputPath('utxo-status-desktop.png') });
 });
 
 test('changing the selected output discards a delayed UTXO response', async ({ page }) => {
@@ -119,22 +136,28 @@ test('changing the selected output discards a delayed UTXO response', async ({ p
     return route.fulfill({ json: { result: null } });
   });
   await openFixture(page);
-  await page.getByRole('button', { name: 'Check current UTXO status', exact: true }).click();
+  const check = page.locator('.selection-top').getByRole('button', {
+    name: 'Check current UTXO status',
+    exact: true,
+  });
+  const toast = page.locator('.toast');
+  await check.click();
   await expect.poll(() => pending).toBe(true);
+  await expect(check).toBeDisabled();
+  await expect(check).toHaveAttribute('aria-busy', 'true');
   await page.locator(`.entity-row[title="out:${TX_SPENDING}:0"]`).click();
   const status = page.getByRole('region', { name: 'Current UTXO status', exact: true });
-  await expect(
-    status.getByRole('button', { name: 'Check current UTXO status', exact: true }),
-  ).toBeEnabled();
-  await status.getByRole('button', { name: 'Check current UTXO status', exact: true }).click();
-  await expect(status).toContainText('Not in current UTXO set');
+  await expect(check).toBeEnabled();
+  await check.click();
+  await expect(toast).toContainText('Not in current UTXO set');
+  const latestNotice = await toast.innerText();
   release();
   await page.waitForTimeout(150);
-  await expect(status).not.toContainText('Unspent at check');
+  await expect(toast).toHaveText(latestNotice);
+  await expect(toast).not.toContainText('Unspent at check');
+  await page.locator('.selection-evidence > summary').click();
   await expect(status).toContainText('Not in current UTXO set');
   await page.locator(`.entity-row[title="out:${TX_FUNDING}:0"]`).click();
-  await expect(status.getByRole('status')).toHaveCount(0);
-  await expect(
-    status.getByRole('button', { name: 'Check current UTXO status', exact: true }),
-  ).toBeEnabled();
+  await expect(status).toHaveCount(0);
+  await expect(check).toBeEnabled();
 });

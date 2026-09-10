@@ -21,7 +21,7 @@ import {
 import { formatSats, type Annotation, type GraphNode, type Transaction } from '../domain/types';
 import './entity-browser.css';
 import type { VisibilityProps } from './VisibilityActions';
-import { GraphFilterButton } from './GraphFilterControls';
+import { GraphConnectionsAction, GraphFilterButton } from './GraphFilterControls';
 import { SelectionCheckbox } from './SelectionToolbar';
 import type { EntitySelection } from '../lib/useEntitySelection';
 
@@ -45,6 +45,8 @@ interface Props extends VisibilityProps {
   onSelect: (id: string) => void;
   totalCount?: number;
   contextCount?: number;
+  contextNodeCount?: number;
+  contextPreviewPending?: boolean;
   wallets?: readonly { id: string; name: string }[];
   tags?: readonly { id: string; name: string }[];
   selection?: EntitySelection;
@@ -62,6 +64,8 @@ export default function EntityBrowser({
   onSelect,
   totalCount = nodes.length,
   contextCount = 0,
+  contextNodeCount,
+  contextPreviewPending,
   hiddenNodeIds = [],
   transactions = {},
   removableNodeIds = [],
@@ -103,7 +107,7 @@ export default function EntityBrowser({
   const scope = describeMatchScope(selectable);
   const excludedContext = nodes.length - selectable.length;
   return (
-    <div className="entity-browser">
+    <div className="entity-browser" aria-busy={contextPreviewPending}>
       <div className="entity-filters">
         <input
           aria-label="Filter graph entities"
@@ -195,12 +199,15 @@ export default function EntityBrowser({
               <button
                 type="button"
                 aria-label={`Select ${scope} in the entity list`}
+                disabled={contextPreviewPending}
                 title={
                   excludedContext > 0
                     ? `Replace the selection with these matches. ${excludedContext.toLocaleString()} connected context entities are excluded.`
                     : 'Replace the selection with the entities listed here.'
                 }
-                onClick={() => selection.replace(selectable.map((node) => node.id))}
+                onClick={() => {
+                  if (!contextPreviewPending) selection.replace(selectable.map((node) => node.id));
+                }}
               >
                 Select {scope}
               </button>
@@ -223,11 +230,20 @@ export default function EntityBrowser({
             {error}
           </p>
         )}
-        <div className="entity-result-count">
+        <div className="entity-result-count" tabIndex={-1}>
           <span role="status">
-            {nodes.length.toLocaleString()} {visibility === 'graph' ? 'on graph' : 'matches'} /{' '}
-            {totalCount.toLocaleString()} loaded
+            {contextPreviewPending
+              ? 'Filtering…'
+              : `${nodes.length.toLocaleString()} ${visibility === 'graph' ? 'on graph' : 'matches'} / ${totalCount.toLocaleString()} loaded`}
           </span>
+          {(visibility === 'visible' || visibility === 'graph') && (
+            <GraphConnectionsAction
+              filters={filters}
+              onChange={onFiltersChange}
+              extraNodeCount={contextNodeCount}
+              pending={contextPreviewPending}
+            />
+          )}
           {activeFilters && (
             <button
               type="button"

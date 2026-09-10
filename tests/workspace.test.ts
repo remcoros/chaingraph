@@ -139,7 +139,9 @@ describe('workspace graph and analysis', () => {
     expect(parsed.annotations).toEqual(w.annotations);
     expect(parsed.findings).toHaveLength(1);
     expect(parsed.findings[0].nodeIds).toHaveLength(2);
-    expect(parsed.findings[0].description).toContain('loaded history');
+    expect(parsed.findings[0].txids).toEqual([id(1)]);
+    expect(parsed.findings[0].description).toContain('within this transaction');
+    expect(parsed.findings[0].details).toContain('loaded history');
   });
 
   it('rejects malformed workspace versions, network names and mismatched transaction keys', () => {
