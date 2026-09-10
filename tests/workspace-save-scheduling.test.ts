@@ -118,7 +118,7 @@ describe('encrypted save scheduling around graph interaction', () => {
   });
 });
 
-describe('latest scan results across graph Undo', () => {
+describe('retained scan results across graph Undo', () => {
   const txid = (n: number) => n.toString(16).padStart(64, '0');
   const node = (n: number) => `tx:${txid(n)}`;
   const output = (n: number) => `out:${txid(n)}:0`;
@@ -237,13 +237,13 @@ describe('latest scan results across graph Undo', () => {
     expect(() => parseWorkspace(restored)).not.toThrow();
   });
 
-  it('keeps replacement and clear current through older user-edit Undo', () => {
+  it('keeps accumulated results and clear current through older user-edit Undo', () => {
     const { store, id, run } = scanFixture();
     store.update(id, (w) => ({ ...w, description: 'Public annotation' }));
     const latest = { ...run, id: 'latest-run', results: [] };
     store.update(id, (w) => replaceScanRun(w, latest), false);
     store.undo(id);
-    expect(store.getSession(id)!.data.connectionScans!.runs).toEqual([latest]);
+    expect(store.getSession(id)!.data.connectionScans!.runs).toEqual([run, latest]);
     store.update(id, (w) => ({ ...w, description: 'Another public annotation' }));
     store.update(id, clearScanRuns, false);
     store.undo(id);

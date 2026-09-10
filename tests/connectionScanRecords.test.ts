@@ -70,7 +70,7 @@ describe('compact connection scan records', () => {
     expect(restored.transactions).toEqual(workspace.transactions);
   });
 
-  it('replaces the latest results and prunes all evidence from the previous scan', () => {
+  it('keeps prior results and their proof when starting a new scan', () => {
     const { workspace, run, evidence } = fixture();
     const saved = replaceScanRun(workspace, run, { ...evidence, [id(8)]: transaction(8) });
     const latest: ScanRun = {
@@ -91,8 +91,8 @@ describe('compact connection scan records', () => {
       ],
     };
     const replaced = replaceScanRun(saved, latest, { [id(8)]: transaction(8) });
-    expect(replaced.connectionScans!.runs).toEqual([latest]);
-    expect(Object.keys(replaced.connectionScans!.evidence)).toEqual([id(8)]);
+    expect(replaced.connectionScans!.runs).toEqual([run, latest]);
+    expect(Object.keys(replaced.connectionScans!.evidence)).toEqual([id(2), id(3), id(8)]);
     expect(saved.connectionScans!.runs).toEqual([run]);
     expect(replaced.transactions).toBe(workspace.transactions);
     const started = replaceScanRun(replaced, {
@@ -101,11 +101,97 @@ describe('compact connection scan records', () => {
       status: 'running',
       results: [],
     });
-    expect(started.connectionScans!.runs).toHaveLength(1);
-    expect(started.connectionScans!.evidence).toEqual({});
+    expect(started.connectionScans!.runs.map((item) => item.id)).toEqual([
+      run.id,
+      latest.id,
+      'next',
+    ]);
+    expect(started.connectionScans!.evidence).toEqual(replaced.connectionScans!.evidence);
+    expect(clearScanRuns(started).connectionScans).toBeUndefined();
   });
 
-  it('validates all legacy runs before keeping the final result and encrypts that normalization', async () => {
+  it('updates streaming results once and prunes only empty older scans', () => {
+    const { workspace, run, result, evidence } = fixture();
+    const started = replaceScanRun(workspace, { ...run, status: 'running', results: [] });
+    const streaming = replaceScanRun(started, { ...run, status: 'running' }, evidence);
+    const completed = replaceScanRun(streaming, run);
+    expect(completed.connectionScans!.runs).toEqual([run]);
+    expect(completed.connectionScans!.evidence).toEqual(evidence);
+    const next = replaceScanRun(completed, { ...run, id: 'next', results: [] });
+    const afterEmpty = replaceScanRun(next, { ...run, id: 'after-empty', results: [] });
+    expect(afterEmpty.connectionScans!.runs.map((item) => item.id)).toEqual([
+      run.id,
+      'after-empty',
+    ]);
+    const dismissed = dismissScanResult(afterEmpty, run.id, result.id);
+    expect(dismissed.connectionScans!.runs[0].results[0].dismissed).toBe(true);
+    expect(dismissed.connectionScans!.runs.at(-1)!.id).toBe('after-empty');
+    expect(dismissed.connectionScans!.evidence).toEqual(evidence);
+    expect(dismissScanResult(dismissed, run.id, result.id)).toBe(dismissed);
+  });
+
+  it('rejects an additional scan at the run limit without dropping earlier findings', () => {
+    const { workspace, run, evidence } = fixture();
+    let saved = workspace;
+    for (let index = 0; index < 20; index++)
+      saved = replaceScanRun(saved, { ...run, id: `run-${index}` }, evidence);
+    const before = saved.connectionScans;
+    expect(() => replaceScanRun(saved, { ...run, id: 'overflow', results: [] })).toThrow(
+      'Clear results before starting another scan',
+    );
+    expect(saved.connectionScans).toBe(before);
+    expect(saved.connectionScans!.runs).toHaveLength(20);
+    expect(
+      replaceScanRun(saved, { ...run, id: 'run-0', examined: 4 }).connectionScans!.runs,
+    ).toHaveLength(20);
+    expect(replaceScanRun(clearScanRuns(saved), run, evidence).connectionScans!.runs).toEqual([
+      run,
+    ]);
+  });
+
+  it('enforces proof and byte limits across accumulated scans without evicting prior results', () => {
+    const { workspace, run } = fixture();
+    const batch = (start: number, count: number): ScanRun => ({
+      ...run,
+      id: `batch-${start}`,
+      targetIds: Array.from({ length: count }, (_, index) => tn(start + index)),
+      results: Array.from({ length: count }, (_, index) => ({
+        id: `result-${start + index}`,
+        kind: 'connection',
+        relationship: 'direct',
+        endpoint: tn(start + index),
+        path: [tn(1), out(1), tn(start + index)],
+        directions: ['downstream', 'downstream'],
+        hops: 1,
+      })),
+    });
+    let saved = workspace;
+    for (let start = 2; start < 202; start += 50)
+      saved = replaceScanRun(
+        saved,
+        batch(start, 50),
+        Object.fromEntries(
+          Array.from({ length: 50 }, (_, index) => [
+            id(start + index),
+            transaction(start + index, 1),
+          ]),
+        ),
+      );
+    expect(Object.keys(saved.connectionScans!.evidence)).toHaveLength(200);
+    expect(() => replaceScanRun(saved, batch(202, 1), { [id(202)]: transaction(202, 1) })).toThrow(
+      '200 path transactions',
+    );
+    expect(saved.connectionScans!.runs).toHaveLength(4);
+    const large = (index: number) => ({
+      ...transaction(index, 1),
+      vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51'.repeat(550_000) } }],
+    });
+    const first = replaceScanRun(workspace, batch(2, 1), { [id(2)]: large(2) });
+    expect(() => replaceScanRun(first, batch(3, 1), { [id(3)]: large(3) })).toThrow('2 MiB');
+    expect(first.connectionScans!.runs.map((item) => item.id)).toEqual(['batch-2']);
+  });
+
+  it('validates and restores every retained scan with its compact encrypted evidence', async () => {
     const { workspace, run, evidence } = fixture();
     const latest: ScanRun = {
       ...run,
@@ -130,12 +216,12 @@ describe('compact connection scan records', () => {
       connectionScans: { runs: [run, latest], evidence: { ...evidence, [id(8)]: transaction(8) } },
     };
     const parsed = parseWorkspace(legacy);
-    expect(parsed.connectionScans!.runs).toEqual([{ ...latest, status: 'interrupted' }]);
-    expect(Object.keys(parsed.connectionScans!.evidence)).toEqual([id(8)]);
+    expect(parsed.connectionScans!.runs).toEqual([run, { ...latest, status: 'interrupted' }]);
+    expect(Object.keys(parsed.connectionScans!.evidence)).toEqual([id(2), id(3), id(8)]);
     const encrypted = await validateAndEncryptWorkspace(legacy, 'public fixture password');
     const serialized = (await decryptWorkspace(encrypted, 'public fixture password')) as Workspace;
-    expect(serialized.connectionScans!.runs).toEqual([latest]);
-    expect(Object.keys(serialized.connectionScans!.evidence)).toEqual([id(8)]);
+    expect(serialized.connectionScans!.runs).toEqual([run, latest]);
+    expect(Object.keys(serialized.connectionScans!.evidence)).toEqual([id(2), id(3), id(8)]);
     const restored = await decryptAndValidateWorkspace(encrypted, 'public fixture password');
     expect(restored).toEqual(parsed);
     expect(legacy.connectionScans.runs).toHaveLength(2);
@@ -255,6 +341,7 @@ describe('compact connection scan records', () => {
     );
     store.undo(saved.id);
     expect(store.getSession(saved.id)!.data.connectionScans?.runs.map((item) => item.id)).toEqual([
+      run.id,
       'latest',
     ]);
     edit('Second annotation');
@@ -368,7 +455,7 @@ describe('compact connection scan records', () => {
         runs: Array.from({ length: 21 }, (_, n) => ({ ...run, id: `run${n}` })),
         evidence: {},
       }),
-    ).toThrow('20-run import limit');
+    ).toThrow('Clear results before starting another scan');
     expect(() =>
       assertConnectionScanBudget({
         runs: [],

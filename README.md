@@ -16,9 +16,9 @@ verified unspent, coinbase and unspendable endings live under **Endpoints**.
 Scan-wide resource limits appear only in the completion status.
 Review exact paths, add a path or an explicit prefix in one undoable action,
 and continue from a stopping point.
-Only the latest results and path evidence stay encrypted; a new scan replaces
-them and **Clear all results** clears them without removing added paths. The
-explored search space is discarded. Results are bounded observations, not
+New scans keep earlier results, with clickable source and target rows in each
+card. Results and path evidence stay encrypted; **Clear all results** clears the
+collection without removing added paths. The explored search space is discarded. Results are bounded observations, not
 exhaustive paths or ownership claims. See [connection scan instructions](instructions.md#connection-scans).
 
 ![Compact main workbench with public testnet4 transaction tracing and floating navigation](docs/screenshots/compact-main-desktop.png)

@@ -74,6 +74,7 @@
   gap: 6px;
   font-size: var(--text-sm);
   line-height: 1.5;
+  margin-top: 12px;
 }
 .connection-scan-status > svg {
   flex-shrink: 0;
@@ -101,23 +102,6 @@
 .connection-scan-clear {
   flex-shrink: 0;
   min-height: 32px;
-}
-.connection-scan-results-source {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 10px;
-  font-size: var(--text-sm);
-}
-.connection-scan-results-source button {
-  justify-self: start;
-  text-align: left;
-}
-.connection-scan-results-source button span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.connection-scan-results-source button svg {
-  flex-shrink: 0;
 }
 .connection-scan-run-details {
   margin-top: 4px;
@@ -176,20 +160,35 @@
   height: 28px;
   padding: 4px;
 }
-.connection-scan-result-endpoint {
+.connection-scan-result-nodes {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+.connection-scan-result-node {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  margin-top: 2px;
+  min-width: 0;
   font-size: var(--text-sm);
 }
-.connection-scan-result-endpoint > span {
+.connection-scan-result-node button {
+  justify-content: flex-start;
+  text-align: left;
+  min-height: 28px;
+  padding: 3px 0;
+}
+.connection-scan-result-node button svg {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.connection-scan-result-node button span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.connection-scan-result-endpoint > small {
+.connection-scan-result-node small {
   flex-shrink: 0;
+  margin-left: auto;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -238,9 +237,16 @@
   padding: 4px 0;
   font-size: var(--text-xs);
 }
-.connection-scan-path li > span:nth-child(2) {
+.connection-scan-path li > :nth-child(2) {
   overflow-wrap: anywhere;
   min-width: 0;
+}
+.connection-scan-path li button {
+  justify-self: start;
+  padding: 2px 0;
+  min-height: 24px;
+  text-align: left;
+  font-size: inherit;
 }
 .connection-scan-path small {
   color: var(--color-muted);

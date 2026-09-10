@@ -10,7 +10,7 @@ import { clearContextProvenance } from './workspace';
 export const MAX_SCAN_EVIDENCE_TRANSACTIONS = 200;
 export const MAX_SCAN_RECORD_BYTES = 2 * 1024 * 1024;
 export interface ConnectionScanRecords {
-  /** One latest run. Arrays remain readable for compatibility with earlier workspaces. */
+  /** Bounded results from retained scans, ordered by when each scan started. */
   runs: ScanRun[];
   evidence: Record<string, Transaction>;
 }
@@ -117,7 +117,7 @@ export function assertConnectionScanBudget(data: unknown, checkBytes = true): vo
   if (!data || typeof data !== 'object') return;
   const raw = data as { runs?: unknown; evidence?: unknown };
   if (Array.isArray(raw.runs) && raw.runs.length > SCAN_LIMITS.maxRuns)
-    throw new Error('Legacy scan records exceed the 20-run import limit.');
+    throw new Error('Scan results span 20 scans. Clear results before starting another scan.');
   if (Array.isArray(raw.runs)) {
     for (const run of raw.runs) {
       if (!run || typeof run !== 'object') continue;
@@ -416,7 +416,7 @@ function compactRecords(
   runs: ScanRun[],
   supplied: Record<string, Transaction> = {},
 ): ConnectionScanRecords {
-  runs = runs.slice(-1);
+  runs = runs.filter((run, index) => run.results.length > 0 || index === runs.length - 1);
   const available = { ...workspace.connectionScans?.evidence, ...supplied };
   const needed = new Set(
     runs.flatMap((run) => run.results.flatMap((result) => [...scanResultEvidenceIds(result)])),
@@ -431,24 +431,31 @@ function compactRecords(
   return records;
 }
 
-/** Every new scan replaces the latest results; only its supporting evidence survives. */
+/** Update one scan without removing findings or proof from other scans. */
 export function replaceScanRun(
   workspace: Workspace,
   run: ScanRun,
   evidence: Record<string, Transaction> = {},
 ): Workspace {
   scanRunSchema.parse(run);
-  const records = compactRecords(workspace, [run], evidence);
+  const runs = workspace.connectionScans?.runs ?? [];
+  const records = compactRecords(
+    workspace,
+    runs.some((retained) => retained.id === run.id)
+      ? runs.map((retained) => (retained.id === run.id ? run : retained))
+      : [...runs, run],
+    evidence,
+  );
   validateConnectionScanRecords(records, workspace, false);
   return { ...workspace, connectionScans: records };
 }
 
-/** Call after validating all imported records, including those being discarded. */
+/** Normalize validated imports while preserving all retained results and their proof. */
 export function latestConnectionScanRecords(
   workspace: Workspace,
 ): ConnectionScanRecords | undefined {
-  const latest = workspace.connectionScans?.runs.at(-1);
-  return latest ? compactRecords(workspace, [latest]) : undefined;
+  const runs = workspace.connectionScans?.runs;
+  return runs?.length ? compactRecords(workspace, runs) : undefined;
 }
 export function clearScanRuns(workspace: Workspace): Workspace {
   return workspace.connectionScans ? { ...workspace, connectionScans: undefined } : workspace;
@@ -458,15 +465,14 @@ export function dismissScanResult(
   runId: string,
   resultId: string,
 ): Workspace {
-  const latest = workspace.connectionScans?.runs.at(-1);
-  if (!latest || latest.id !== runId) return workspace;
-  const run = {
-    ...latest,
-    results: latest.results.map((result) =>
+  const run = workspace.connectionScans?.runs.find((item) => item.id === runId);
+  if (!run?.results.some((result) => result.id === resultId && !result.dismissed)) return workspace;
+  return replaceScanRun(workspace, {
+    ...run,
+    results: run.results.map((result) =>
       result.id === resultId ? { ...result, dismissed: true } : result,
     ),
-  };
-  return { ...workspace, connectionScans: compactRecords(workspace, [run]) };
+  });
 }
 
 const membershipCache = new WeakMap<string[], Set<string>>();

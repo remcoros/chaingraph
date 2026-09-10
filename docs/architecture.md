@@ -230,8 +230,11 @@ The entity list remains the alternative interaction path for keyboard access and
 ## Bounded graph connection scans
 
 The right inspector's Scan form follows the current selection. Its primary action
-starts a new run from that selection; existing results retain a separately labeled
-source. Each run owns its frozen source, target snapshot and settings. `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
+starts a new run from that selection without clearing earlier results. Each card
+provides clickable source and target rows; the latest status and checked count
+stay with the scan controls above the results divider. Known nodes in expanded
+paths are also selectable. Each run owns its frozen source, target snapshot and
+settings. `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
 deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
 same-direction walks at a meeting point and retain per-edge directions; no
@@ -294,11 +297,13 @@ membership without reseeding it; worker validation restores running markers as
 interrupted, never as jobs.
 The existing encrypted envelope format remains unchanged.
 
-`domain/connectionScanRecords.ts` retains only the latest run, bounded to 50
-results, 200 extra path transactions and 2 MiB. A new scan replaces the previous
-results and releases their evidence. Legacy arrays of up to 20 runs validate
-before normalization to the final run; encrypted saves write that normalized
-state. There is no history picker, manual save/restore or rerun archive. Run fields are
+`domain/connectionScanRecords.ts` upserts runs by ID in stable order, retaining
+findings from earlier scans. Streaming, dismissal and rechecks update their own
+run without changing the latest scan's status. Only empty non-latest runs are
+pruned. The encrypted collection is bounded to 20 runs, 50 results per run,
+200 extra path transactions and 2 MiB total; reaching a bound rejects the write
+without evicting older findings. Restoring retains all validated records. There
+is no history picker, manual save/restore or rerun archive. Run fields are
 strictly validated. Path direction, observed edges, network addresses and prevout
 consistency are validated at the existing encryption-worker boundary. Shared
 evidence is retained only for saved result paths and reused from normal workspace
@@ -306,10 +311,10 @@ observations where present. Frontier queues, visited maps and transport state
 cannot enter the record schema. UI-time edits check compact limits; full workspace
 validation remains off the UI thread. Missing evidence is explicit at Add path.
 There is no automatic scan resumption. Clear all results cancels active work and
-clears the retained result set. Replacement, dismissal and clearing carry through
+clears the retained result set. Accumulation, dismissal and clearing carry through
 undo snapshots so an unrelated edit undo cannot restore an older scan. Each
 snapshot retains path proof absent from its own observations within the same
-record caps; undoing Add therefore keeps the latest results usable when that
+record caps; undoing Add therefore keeps retained results usable when that
 evidence fits. Missing proof remains explicit if a snapshot reaches those caps.
 
 Accepting a complete path or explicit prefix merges only supporting transactions

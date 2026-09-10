@@ -62,7 +62,8 @@ outpoint identity. Addresses and the entire workspace are outside this scan scop
 **Scan selection** searches from the selected node for directed connections and
 shared ancestors or descendants. Selecting another node prepares the next scan;
 it never changes or restarts the active run. Existing results keep their original
-source under **Results from**; select that source there to scan it again.
+source and target as clickable rows in each card. Select either to prepare a new
+scan from that node; starting it keeps the earlier cards.
 Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
 transactions, 60 seconds and a 200-branch boundary. Cached transactions and
@@ -86,11 +87,13 @@ separate filter for natural path endings.
 | Lookup failed | A request timed out, failed or returned invalid data. |
 | Conflicting evidence | Observations contradict the proposed path. Only a verified prefix can be added. |
 
-Expand **Path** to inspect directed steps and new nodes. Alternative paths to the
-same finding share one card; choose an alternative inside it. **Select** selects
-the endpoint. **Add (+N)** adds the displayed path with N new nodes in one Undo
-action, without siblings. Both actions sit at the bottom right. **Path length**
-lets you choose a shorter prefix when needed. Adding reveals the path and resets
+Expand **Path** to inspect directed steps and new nodes. Known nodes in the path
+are clickable to select; new nodes stay marked **New**. Alternative paths to the
+same finding within a scan share one card; choose an alternative inside it. Click
+the source or target row to select that node. A target whose evidence is not yet
+loaded becomes selectable after adding its path. **Add (+N)** adds the displayed
+path with N new nodes in one Undo action, without siblings, from the bottom right.
+**Path length** lets you choose a shorter prefix when needed. Adding reveals the path and resets
 graph filters, preserving annotations and the camera. Select a branch after adding
 its transaction, then use **Scan selection** to continue.
 
@@ -104,20 +107,23 @@ or explicitly outdated observations cannot be added. Missing proof must be reloa
 Dismiss removes the finding and all of its alternative paths, including while scanning.
 
 Time, transaction, result and hop limits never create cards. Completion and
-coverage appear globally. Backend outages and rate limits stop the scan with one
-global reason. Offline scans follow loaded evidence only. Expand the checked count
+coverage for the latest scan appear above the results divider. Backend outages
+and rate limits stop the scan with one global reason. Offline scans follow loaded evidence only. Expand the checked count
 for settings and omitted-result counts. Each scan admits at most 10 natural
 endpoints and 10 evidence problems, reserving room in the 50-path allowance for
 connections and branch choices. Explicit rechecks may recategorize retained paths
 within that overall allowance.
 
-Only the latest scan's results are retained. Starting another scan replaces them;
-there is no scan history to manage. **Clear all results** clears the set, cancels
-an active scan, and leaves added graph nodes and annotations intact. The latest
-results stay encrypted with the workspace, bounded to 50 results, 200 additional
-path transactions and 2 MiB. If path evidence cannot be retained, it remains
-available to add during the current session. Explored transactions and frontiers
-are not saved. Results, path steps and actions stack within the sidebar width.
+Starting another scan keeps earlier results in the same list. There is no scan
+history picker. **Clear all results** clears the collection, cancels an active
+scan, and leaves added graph nodes and annotations intact. Results stay encrypted
+with the workspace, bounded to 20 scans with findings, 50 results per scan,
+200 additional path transactions and 2 MiB total. Empty older scans are discarded.
+At the scan-count limit, clear results before starting another scan. Existing
+findings are never silently evicted to make room. If new path evidence cannot be
+retained, it remains available to add during the current session. Explored
+transactions and frontiers are not saved. Results, path steps and actions stack
+within the sidebar width.
 
 Cancel, closing the Scan tab, changing workbenches, switching workspaces or locking
 stops active work. Interrupted records restore as interrupted; reopening never
