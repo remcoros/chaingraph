@@ -691,7 +691,7 @@ test('hover dwell ignores passing nodes and the compact card stays usable at a n
   await edit.hover();
   await emit({ type: 'node', id: `tx:${'b'.repeat(64)}` });
   await page.waitForTimeout(700);
-  await expect(card).toContainText('Fixture output');
+  await expect(card.getByTitle(outputId.slice(4), { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('narrow-node-card.png') });
   await edit.click();
   await expect(page.getByLabel('Notes editor')).toBeFocused();

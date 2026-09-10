@@ -187,7 +187,9 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   });
   await page.getByRole('button', { name: 'Show new activity (2)', exact: true }).click();
   await expect(page.getByLabel('Filter graph entities')).toHaveValue('');
-  await expect(page.locator('.entity-list')).toContainText(TX_SPENDING.slice(0, 8));
+  await expect(
+    page.locator('.entity-list').getByTitle(`tx:${TX_SPENDING}`, { exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await selectFunding(page);
   await expect(page.getByLabel('Node notes')).toHaveValue('Edited note remains during refresh.');

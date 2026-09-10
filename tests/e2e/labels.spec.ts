@@ -49,7 +49,8 @@ test('BIP329 import preserves omitted labels and notes, honors clearing, and rej
   await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Entity type').selectOption('transaction');
-  await page.locator('.entity-row').click();
+  await expect(page.locator('.entity-row')).toHaveCount(1);
+  await page.locator('.entity-list').getByTitle(id, { exact: true }).click();
   await importFile(page, [{ type: 'tx', ref: TX_SPENDING }]);
   await expect(page.getByRole('status').filter({ hasText: 'Imported 0 labels.' })).toBeVisible();
   await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('Original label');

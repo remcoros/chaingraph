@@ -211,6 +211,16 @@ async function waitForUtxoCheck(page: Page) {
   await expect(page.locator('.wallet-coverage')).toContainText('2 unspent', { timeout: 15000 });
 }
 
+async function expectReviewGuidance(page: Page, text: string) {
+  const help = detail(page).getByRole('img', { name: 'Review guidance', exact: true });
+  await help.focus();
+  await expect(help).toHaveAttribute('aria-describedby', /.+/);
+  const tooltip = page.locator(`[id="${await help.getAttribute('aria-describedby')}"]`);
+  await expect(tooltip).toContainText(text);
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toBeHidden();
+}
+
 async function screenshot(page: Page, name: string) {
   await mkdir('artifacts/wallet-six-tabs', { recursive: true });
   await page.screenshot({ path: `artifacts/wallet-six-tabs/${name}.png`, fullPage: true });
@@ -235,13 +245,15 @@ test('derives a resumable review queue from current coins and their sources', as
   await screenshot(page, 'review-queue-desktop');
 
   await rows.first().click();
-  await expect(detail(page)).toContainText('This current UTXO has no label or tags');
+  await expectReviewGuidance(page, 'This current UTXO has no label or tags');
   await expect(detail(page).getByRole('button', { name: /Reviewed, source unknown/ })).toHaveCount(
     0,
   );
   await detail(page).getByRole('button', { name: 'Mark reviewed', exact: true }).click();
   // The queue advances to the next open item and confirms the decision in place.
-  await expect(page.locator('.wallet-review-status-line')).toContainText('Reviewed');
+  await expect(page.getByRole('status').filter({ hasText: 'Reviewed 1 review item.' })).toHaveText(
+    'Reviewed 1 review item.',
+  );
   await expect(reviewList(page)).not.toContainText('60,000,000 sats');
   await page.getByLabel('Review filter').selectOption('decided');
   await expect(reviewList(page)).toContainText('Reviewed');
@@ -293,7 +305,7 @@ test('saved source-unknown decisions remain completed in Review and UTXOs after 
   await page.getByLabel('Review filter').selectOption('decided');
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(1);
   await expect(reviewList(page)).toContainText('Source unknown');
-  await expect(detail(page)).toContainText('Previously reviewed with the source unknown');
+  await expectReviewGuidance(page, 'Previously reviewed with the source unknown');
   await expect(detail(page).getByRole('button', { name: 'Reopen', exact: true })).toBeVisible();
   await expect(
     detail(page).getByRole('button', { name: /Mark reviewed|Reviewed, source unknown/ }),
@@ -638,7 +650,9 @@ test('carries a record into Graph and Analysis and offers a way back', async ({ 
   await detail(page).getByRole('button', { name: 'Show in Graph' }).click();
   await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Back to Wallet' })).toBeVisible();
-  await expect(page.locator('.right-panel')).toContainText(`${TX_MID.slice(0, 8)}`);
+  await expect(
+    page.locator('.right-panel .selection-heading').getByTitle(`${TX_MID}:0`, { exact: true }),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'Back to Wallet' }).click();
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
@@ -652,7 +666,7 @@ test('carries a record into Graph and Analysis and offers a way back', async ({ 
   await page.getByRole('button', { name: 'Back to Wallet' }).click();
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
   // Returning keeps the queue and the previously selected item.
-  await expect(detail(page)).toContainText('This current UTXO has no label or tags');
+  await expectReviewGuidance(page, 'This current UTXO has no label or tags');
 });
 
 test('a refresh keeps decisions, flags new activity and stays inside one wallet', async ({
@@ -665,7 +679,9 @@ test('a refresh keeps decisions, flags new activity and stays inside one wallet'
   const rows = reviewList(page).getByRole('listitem');
   await rows.first().click();
   await detail(page).getByRole('button', { name: 'Mark reviewed' }).click();
-  await expect(page.locator('.wallet-review-status-line')).toContainText('Reviewed');
+  await expect(page.getByRole('status').filter({ hasText: 'Reviewed 1 review item.' })).toHaveText(
+    'Reviewed 1 review item.',
+  );
 
   const chain = await mockChain(page);
   chain.newActivity = true;
@@ -682,7 +698,9 @@ test('a refresh keeps decisions, flags new activity and stays inside one wallet'
   await page.getByLabel('Selected wallet').selectOption({ label: 'Second public wallet' });
   await expect(page.locator('.wallet-coverage')).toContainText('1 used of 1 discovered');
   await walletTab(page, 'UTXOs').click();
-  await expect(page.locator('.wallet-review-records')).not.toContainText(TX_MID.slice(0, 12));
+  await expect(
+    page.locator(`.wallet-review-records .wallet-item-title[title^="${TX_MID}:"]`),
+  ).toHaveCount(0);
 });
 
 test('stays usable on a phone viewport', async ({ page }) => {
@@ -811,7 +829,7 @@ test('Review later keeps refreshed activity discoverable across views and a relo
   await page.getByRole('button', { name: 'Refresh wallet' }).click();
   await expect(page.locator('.wallet-coverage')).toContainText('3 unspent', { timeout: 20000 });
   await reviewList(page).getByRole('listitem').filter({ hasText: 'New activity' }).click();
-  await expect(detail(page)).toContainText('Found during a wallet refresh');
+  await expectReviewGuidance(page, 'Found during a wallet refresh');
   await detail(page).getByRole('button', { name: 'Review later' }).click();
 
   // Deferred work moves out of To review into its own view, without completion.
@@ -830,11 +848,17 @@ test('Review later keeps refreshed activity discoverable across views and a relo
   // Records agrees: deferred work has its own filter and is not completed.
   await walletTab(page, 'Transactions').click();
   await page.getByLabel('Review state filter').selectOption('open');
-  await expect(page.locator('.wallet-review-records')).not.toContainText(TX_NEW.slice(0, 12));
+  await expect(
+    page.locator(`.wallet-review-records .wallet-item-title[title="${TX_NEW}"]`),
+  ).toHaveCount(0);
   await page.getByLabel('Review state filter').selectOption('later');
-  await expect(page.locator('.wallet-review-records')).toContainText(TX_NEW.slice(0, 12));
+  await expect(
+    page.locator(`.wallet-review-records .wallet-item-title[title="${TX_NEW}"]`),
+  ).toBeVisible();
   await page.getByLabel('Review state filter').selectOption('decided');
-  await expect(page.locator('.wallet-review-records')).not.toContainText(TX_NEW.slice(0, 12));
+  await expect(
+    page.locator(`.wallet-review-records .wallet-item-title[title="${TX_NEW}"]`),
+  ).toHaveCount(0);
 
   // Locking flushes the encrypted save, so persistence is checked on real storage.
   await page.getByRole('button', { name: 'Workspace menu' }).click();
@@ -893,26 +917,53 @@ test('keyboard Show on a phone focuses the revealed graph', async ({ page }) => 
   await seed(page);
   await waitForUtxoCheck(page);
   await reviewList(page).getByRole('listitem').first().click();
+  const canvas = page.locator('.graph-canvas canvas');
+  await expect(canvas).toHaveCount(1);
   const invoker = detail(page).getByRole('button', { name: 'Show in Graph', exact: true });
   await invoker.focus();
   await page.keyboard.press('Enter');
   await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.graph-stage')).toBeVisible();
-  const landed = await page.evaluate(() => {
-    const active = document.activeElement as HTMLElement | null;
-    return {
-      tag: active?.tagName ?? 'NONE',
-      inGraph:
-        !!active && !!document.querySelector('[aria-label="Graph workspace"]')?.contains(active),
-    };
-  });
-  expect(landed.tag).not.toBe('BODY');
-  expect(landed.inGraph).toBe(true);
+  await expect(canvas).toBeFocused();
   // The accepted return contract still restores the exact invoker.
   const back = page.getByRole('button', { name: 'Back to Wallet' });
   await back.focus();
   await page.keyboard.press('Enter');
   await expect(invoker).toBeFocused();
+});
+
+test('keyboard Show keeps focus in Graph while its renderer loads', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let releaseRenderer!: () => void;
+  const rendererGate = new Promise<void>((resolve) => {
+    releaseRenderer = resolve;
+  });
+  await page.route('**/src/components/GraphView.tsx*', async (route) => {
+    await rendererGate;
+    await route.continue();
+  });
+  try {
+    await seed(page);
+    await waitForUtxoCheck(page);
+    const invoker = detail(page).getByRole('button', { name: 'Show in Graph', exact: true });
+    await invoker.focus();
+    await page.keyboard.press('Enter');
+    const graph = page.getByRole('region', { name: 'Graph workspace', exact: true });
+    await expect(workbench(page, 'Graph')).toHaveAttribute('aria-pressed', 'true');
+    await expect(graph.getByText('Loading graph renderer…', { exact: true })).toBeVisible();
+    await expect(graph.locator('canvas')).toHaveCount(0);
+    await expect(graph).toBeFocused();
+
+    releaseRenderer();
+    await expect(graph.locator('.graph-canvas canvas')).toBeVisible();
+    // Finishing the renderer must not move focus away from the stable region.
+    await expect(graph).toBeFocused();
+    await page.getByRole('button', { name: 'Back to Wallet', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(invoker).toBeFocused();
+  } finally {
+    releaseRenderer();
+  }
 });
 
 // RUX-P02: queue rows keep real button semantics inside their list items.
@@ -1298,12 +1349,13 @@ test('one-hop Sources and Destinations keep missing evidence and creating-transa
   const rows = list.getByRole('listitem');
   await expect(rows).toHaveCount(1);
   await expect(page.locator('.wallet-input-status')).toContainText('2 input lookups failed');
-  await expect(list).not.toContainText(historyOnlyId.slice(0, 12));
+
   const source = rows.filter({ has: page.locator(`.wallet-item-title[title="${EXTERNAL}"]`) });
   await source.locator('.wallet-row-button').click();
   await expect(walletDetail(page)).toContainText('Source address');
   await expect(walletDetail(page)).toContainText('10,000,000 sats');
-  await expect(walletDetail(page)).toContainText(fundingId.slice(0, 12));
+  await expect(walletDetail(page).getByTitle(`${fundingId}:0`, { exact: true })).toBeVisible();
+  await expect(walletDetail(page).getByTitle(`${historyOnlyId}:0`, { exact: true })).toHaveCount(0);
   // Only missing direct parents are requested; neither this known source's
   // ancestry nor a transaction associated only by address history is expanded.
   expect(
@@ -1332,7 +1384,7 @@ test('one-hop Sources and Destinations keep missing evidence and creating-transa
   await walletTab(page, 'Destinations').click();
   await expect(batchDetail(page)).toHaveCount(0);
   await expect(rows).toHaveCount(1);
-  await expect(rows).toContainText(EXTERNAL.slice(0, 12));
+  await expect(rows.locator(`.wallet-item-title[title="${EXTERNAL}"]`)).toBeVisible();
   await rows.locator('.wallet-row-button').click();
   await expect(walletDetail(page).locator('.wallet-match-value')).toHaveText(
     'No match in this wallet',
@@ -1381,7 +1433,7 @@ test('queue selection batches metadata, defers to untouched work and reopens int
   const initialCount = await rows.count();
   await batchDetail(page).getByRole('button', { name: 'Review later', exact: true }).click();
   await expect(rows).toHaveCount(initialCount - 2);
-  await expect(detail(page)).toContainText('This wallet address has no label or tags');
+  await expectReviewGuidance(page, 'This wallet address has no label or tags');
   await expect(reviewList(page)).not.toContainText('Wallet savings');
   await page.getByLabel('Review filter').selectOption('later');
   await expect(rows).toHaveCount(2);
@@ -1457,8 +1509,10 @@ for (const phone of [false, true]) {
     const flowBox = (await flow.boundingBox())!;
     const panelBox = (await detail(page).boundingBox())!;
     const headingBox = (await detail(page).getByRole('heading', { level: 2 }).boundingBox())!;
+    const actionsBox = (await detail(page).locator('.wallet-detail-toolbar').boundingBox())!;
     expect(flowBox.width).toBeGreaterThan(panelBox.width * 0.8);
-    expect(flowBox.y + flowBox.height).toBeLessThanOrEqual(headingBox.y);
+    expect(actionsBox.y).toBeGreaterThanOrEqual(headingBox.y + headingBox.height);
+    expect(flowBox.y).toBeGreaterThanOrEqual(actionsBox.y + actionsBox.height);
     await reviewList(page)
       .getByRole('listitem')
       .first()

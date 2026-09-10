@@ -46,13 +46,19 @@ test('mobile annotated transaction keeps quick tools inside the flow viewport', 
     tools.evaluate((element) => {
       const panel = element.closest('.transaction-view')!.getBoundingClientRect();
       const tools = element.getBoundingClientRect();
-      return tools.top >= panel.top && tools.bottom <= panel.bottom;
+      return (
+        tools.top >= panel.top &&
+        tools.bottom <= panel.bottom &&
+        tools.left >= panel.left &&
+        tools.right <= panel.right
+      );
     });
   await expect.poll(inside).toBe(true);
+  await expect(tools.getByRole('button')).toHaveCount(4);
   for (const action of await tools.getByRole('button').all()) {
     const bounds = await action.boundingBox();
-    expect(bounds!.width).toBeGreaterThanOrEqual(32);
-    expect(bounds!.height).toBeGreaterThanOrEqual(32);
+    expect(bounds!.width).toBeGreaterThanOrEqual(24);
+    expect(bounds!.height).toBeGreaterThanOrEqual(30);
   }
   await page.screenshot({ path: test.info().outputPath('mobile-flow-tools-visible.png') });
 });

@@ -264,7 +264,11 @@ export default function App() {
           ? (rightPanelRef.current ?? graphWorkspaceRef.current)
           : (graphWorkspaceRef.current?.querySelector<HTMLElement>(
               '.graph-canvas:not([aria-hidden="true"]) canvas',
-            ) ?? graphWorkspaceRef.current);
+            ) ??
+            // The lazy renderer may still be loading. Land within Graph without
+            // moving focus again when its canvas eventually becomes available.
+            graphWorkspaceRef.current?.querySelector<HTMLElement>('.graph-stage') ??
+            graphWorkspaceRef.current);
       destination?.focus({ preventScroll: true });
     } else {
       const section = workbenchSection(workbench);
@@ -2294,7 +2298,12 @@ export default function App() {
               entityBatchNodes={entityBatchNodes}
               bookmarks={bookmarks}
             />
-            <section className="graph-stage" data-tour="graph-stage" aria-label="Graph workspace">
+            <section
+              className="graph-stage"
+              data-tour="graph-stage"
+              aria-label="Graph workspace"
+              tabIndex={-1}
+            >
               <div className="graph-stage-content">
                 {viewOwner === w.id && (
                   <TransactionView

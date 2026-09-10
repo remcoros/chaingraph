@@ -179,7 +179,9 @@ test('locks, rejects the wrong password, and restores a saved workspace after re
   const dialog = page.getByRole('dialog', { name: 'Unlock workspace' });
   await dialog.getByLabel('Password', { exact: true }).fill('definitely-wrong');
   await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('Could not unlock');
+  await expect(dialog.getByRole('alert')).toHaveText(
+    'Unable to unlock workspace. The password is incorrect or the file was changed.',
+  );
   await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await dialog.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -266,6 +268,8 @@ test('renders a saved 150-input fixture and scans, excludes, restores and refres
   await expect(page.locator('.statusbar')).toContainText('543 transactions');
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await expect(page.locator('.entity-row')).toHaveCount(1);
+  await expect(page.locator('.entity-row')).toContainText('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
   await expect(page.locator('.details')).toContainText('150 / 150');
   await page.getByRole('button', { name: 'Flat', exact: true }).click();
@@ -277,7 +281,9 @@ test('renders a saved 150-input fixture and scans, excludes, restores and refres
   const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
   await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
   const analysis = page.locator('.analysis-workbench');
-  await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
+  await analysis
+    .getByRole('combobox', { name: 'Scan scope', exact: true })
+    .selectOption('workspace');
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   const results = analysis.locator('.scan-result-list > button');
   const equal = results.filter({ hasText: 'equal outputs' });
@@ -319,7 +325,9 @@ test('CIOH and address-reuse findings operate on loaded wallet history', async (
     .getByRole('button', { name: 'Analysis', exact: true })
     .click();
   const analysis = page.locator('.analysis-workbench');
-  await analysis.getByLabel('Scan scope', { exact: true }).selectOption('workspace');
+  await analysis
+    .getByRole('combobox', { name: 'Scan scope', exact: true })
+    .selectOption('workspace');
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   const results = analysis.locator('.scan-result-list > button');
   await expect(results.filter({ hasText: 'hypothesis' })).toHaveCount(1);

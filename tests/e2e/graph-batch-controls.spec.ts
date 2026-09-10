@@ -165,11 +165,10 @@ test('selection is explicit, scoped per workspace and pruned only by removal', a
 
   // Single click still inspects and opens the transaction flow.
   const rows = page.locator('.entity-list .entity-list-entry');
-  await rows
-    .filter({ hasText: TX_SPENDING.slice(0, 8) })
-    .first()
-    .locator('.entity-row')
-    .click();
+  const spendingRow = rows.filter({
+    has: page.getByTitle(`tx:${TX_SPENDING}`, { exact: true }),
+  });
+  await spendingRow.locator('.entity-row').click();
   await expect(page.getByLabel('Node label')).toBeVisible();
 
   // Flow checkboxes share the same selection without changing the inspected entity.
@@ -195,17 +194,13 @@ test('selection is explicit, scoped per workspace and pruned only by removal', a
   // Removing a transaction prunes exactly its entities from the selection.
   await page.getByLabel('Filter graph entities').fill('');
   await page.getByLabel('Entity type', { exact: true }).selectOption('transaction');
-  await page
-    .locator('.entity-list-entry')
-    .filter({ hasText: TX_SPENDING.slice(0, 8) })
-    .getByRole('button', { name: /^Remove/ })
-    .click();
-  const dialog = page.getByRole('dialog');
-  if (await dialog.isVisible())
-    await dialog
-      .getByRole('button', { name: /Remove|Confirm/ })
-      .first()
-      .click();
+  await expect(rows).toHaveCount(2);
+  await spendingRow.getByRole('button', { name: /^Remove/ }).click();
+  // This transaction has no annotations or tags, so removal is immediate.
+  await expect(spendingRow).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Remove transaction?', exact: true })).toHaveCount(
+    0,
+  );
   await expect(toolbar.getByRole('status')).toContainText('1 selected');
 });
 

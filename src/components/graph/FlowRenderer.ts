@@ -521,6 +521,8 @@ export class FlowRenderer implements GraphAdapter {
     this.positions = new Map(result.positions);
     this.displayedDimensions = this.dimensions;
     this.snapshotNodes = undefined;
+    // A pending checkpoint may have saved old geometry with this request's revision.
+    this.snapshotSignature = '';
     for (const [id, p] of result.positions) {
       this.cache.delete(id);
       this.cache.set(id, p);

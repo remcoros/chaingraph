@@ -268,6 +268,48 @@ describe('default renderer responsiveness and snapshots', () => {
     expect(events.activity).toHaveBeenLastCalledWith(false);
   });
 
+  it('publishes newly settled geometry after a pending checkpoint without a camera change, then deduplicates unchanged flushes', () => {
+    const { renderer, events } = setup();
+    renderer.update(frame());
+    WorkerMock.instances[0].reply();
+    renderer.flushSnapshot();
+    const initial = vi.mocked(events.snapshot!).mock.calls.at(-1)![0];
+    vi.mocked(events.snapshot!).mockClear();
+
+    renderer.update(frame(7));
+    renderer.flushSnapshot();
+    expect(events.snapshot).toHaveBeenCalledTimes(1);
+    const pending = vi.mocked(events.snapshot!).mock.calls[0][0];
+    expect(pending.nodes).toBe(initial.nodes);
+    expect(pending.nodes).toHaveLength(3);
+    expect(pending.camera).toEqual(initial.camera);
+    expect(renderer.canvas.getAttribute('aria-busy')).toBe('true');
+
+    // A pending checkpoint already used this request's revision. Accepting its
+    // result must publish the changed geometry even if the camera has not moved.
+    WorkerMock.instances[0].reply();
+    expect(events.layout).toHaveBeenLastCalledWith({ busy: false, nodeCount: 7 });
+    renderer.flushSnapshot();
+    expect(events.snapshot).toHaveBeenCalledTimes(2);
+    const settled = vi.mocked(events.snapshot!).mock.calls[1][0];
+    expect(settled.camera).toEqual(pending.camera);
+    expect(settled.nodes.map((node) => node.id)).toEqual([
+      'n0',
+      'n1',
+      'n2',
+      'n3',
+      'n4',
+      'n5',
+      'n6',
+    ]);
+    expect(settled.nodes.slice(0, 3)).toEqual(pending.nodes);
+    expect(settled.nodes).not.toBe(pending.nodes);
+
+    renderer.flushSnapshot();
+    expect(events.snapshot).toHaveBeenCalledTimes(2);
+    renderer.dispose();
+  });
+
   it('captures the camera before the first layout completes without inventing positions', () => {
     const { renderer, events } = setup();
     renderer.update(frame(10_000));

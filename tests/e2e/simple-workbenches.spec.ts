@@ -81,8 +81,11 @@ test('selected output scans every applicable tool, explains coverage and returns
   });
   await workbench(page, 'Analysis').click();
   const analysis = page.locator('.analysis-workbench');
-  await expect(analysis).toContainText(/output/i);
-  await expect(analysis).toContainText(/loaded data/i);
+  const scope = analysis.getByRole('combobox', { name: 'Scan scope', exact: true });
+  await scope.selectOption('context');
+  await expect(scope).toHaveValue('context');
+  await expect(analysis.locator('.scan-scope')).toContainText('Output');
+  await expect(analysis.locator('.scan-scope')).toContainText('2 loaded transactions');
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   for (const tool of analysisTools) await expect(analysis).toContainText(tool.name);
   await expect(analysis).toContainText(/wallet/i);
@@ -219,9 +222,11 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   });
   await workbench(page, 'Analysis').click();
   const analysis = page.locator('.analysis-workbench');
+  const scope = analysis.getByRole('combobox', { name: 'Scan scope', exact: true });
   await expect(
-    analysis.getByRole('option', { name: 'Current selection', exact: true }),
+    scope.getByRole('option', { name: 'Selection (Transaction)', exact: true }),
   ).toHaveCount(1);
+  await scope.selectOption('context');
   await expect(analysis.getByRole('button', { name: 'Trace', exact: true })).toHaveCount(0);
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   await analysis
@@ -231,10 +236,20 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   const evidence = analysis.getByRole('list', { name: 'Related transactions and outputs' });
   await expect(evidence.getByRole('button', { name: /^Show output/ })).toHaveCount(6);
   await expect(evidence).toContainText('2,000,000,000');
-  const supporting = analysis.getByRole('list', { name: 'Supporting transactions' });
+  const supporting = evidence.getByRole('listitem').filter({
+    has: page.getByRole('button', {
+      name: `Show transaction ${TX_SPENDING} on graph`,
+      exact: true,
+    }),
+  });
+  await expect(supporting).toHaveCount(1);
   await expect(supporting).toContainText('#800124');
   await expect(supporting.locator('time')).toHaveAttribute('title', /2023-07-24 03:27:09 GMT/);
-  await expect(evidence.locator('time')).toHaveCount(0);
+  const outputEvidence = evidence.getByRole('listitem').filter({
+    has: page.getByRole('button', { name: /^Show output/ }),
+  });
+  await expect(outputEvidence).toHaveCount(6);
+  await expect(outputEvidence.locator('time')).toHaveCount(0);
   await supporting.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'artifacts/wallet-polish/analysis-metadata-desktop.png' });
   await screenshot(page, 'six-outputs-evidence-desktop');
@@ -287,6 +302,9 @@ for (const phone of [false, true]) {
     if (phone) await page.setViewportSize({ width: 390, height: 844 });
     await workbench(page, 'Analysis').click();
     const analysis = page.locator('.analysis-workbench');
+    await analysis
+      .getByRole('combobox', { name: 'Scan scope', exact: true })
+      .selectOption('context');
     await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
     const canvas = page.locator('.graph-canvas canvas');
     const invokers = [
@@ -311,7 +329,9 @@ for (const phone of [false, true]) {
       await page.getByRole('button', { name: 'Back to Analysis', exact: true }).focus();
       await page.keyboard.press('Enter');
       await expect(invoker).toBeFocused();
-      await expect(analysis.getByLabel('Scan scope')).toHaveValue('context');
+      await expect(analysis.getByRole('combobox', { name: 'Scan scope', exact: true })).toHaveValue(
+        'context',
+      );
     }
     await screenshot(page, `keyboard-analysis-return-${phone ? 'phone' : 'desktop'}`);
     expect(calls).toEqual([]);
@@ -334,7 +354,7 @@ test('keyboard workbench return falls back when the originating finding is repla
     await workbench(page, 'Analysis').focus();
     await page.keyboard.press('Enter');
     await expect(workbench(page, 'Analysis')).toBeFocused();
-    if (remove) await analysis.getByRole('button', { name: 'Clear all', exact: true }).click();
+    if (remove) await analysis.getByRole('button', { name: 'Clear findings', exact: true }).click();
     else await analysis.locator('.scan-result-list button').nth(1).click();
     expect(await original!.evaluate((element) => element.isConnected)).toBe(false);
     await workbench(page, 'Graph').focus();
@@ -345,6 +365,10 @@ test('keyboard workbench return falls back when the originating finding is repla
     await expect(
       page.getByRole('region', { name: 'Analysis workspace', exact: true }),
     ).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(analysis.getByRole('combobox', { name: 'Scan scope', exact: true })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(analysis.getByRole('img', { name: 'Scan scope', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(analysis.getByRole('button', { name: 'Scan', exact: true })).toBeFocused();
   }

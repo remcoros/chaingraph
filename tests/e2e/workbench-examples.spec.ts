@@ -62,6 +62,13 @@ for (const id of [
     const navigation = page.getByRole('navigation', { name: 'Workbench', exact: true });
     await navigation.getByRole('button', { name: 'Analysis', exact: true }).click();
     const analysis = page.locator('.analysis-workbench');
+    const scope = analysis.getByRole('combobox', { name: 'Scan scope', exact: true });
+    await scope.selectOption('context');
+    await expect(scope).toHaveValue('context');
+    // This journey verifies the bundled observations without requesting missing input data.
+    await analysis
+      .getByRole('checkbox', { name: 'Load missing input data before scanning', exact: true })
+      .uncheck();
     if (id === 'mainnet-public-wallet')
       await expect(analysis.locator('.scan-scope')).toContainText('Wallet');
     else await expect(analysis.locator('.scan-scope')).toContainText('Output');

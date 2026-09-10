@@ -53,7 +53,7 @@ test('legacy Analysis view opens the full workbench and controls survive ordinar
   );
   const analysis = page.locator('.analysis-workbench');
   await analysis
-    .getByLabel('Scan scope', { exact: true })
+    .getByRole('combobox', { name: 'Scan scope', exact: true })
     .selectOption({ label: 'Loaded workspace' });
   await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
   await expect(analysis.locator('.scan-result-list button').first()).toBeVisible();
@@ -63,7 +63,9 @@ test('legacy Analysis view opens the full workbench and controls survive ordinar
     page.locator('.right-panel .panel-tabs').getByRole('button', { name: /^Analysis/ }),
   ).toHaveCount(0);
   await nav(page).getByRole('button', { name: 'Analysis', exact: true }).click();
-  await expect(analysis.getByLabel('Scan scope', { exact: true })).toHaveValue('workspace');
+  await expect(analysis.getByRole('combobox', { name: 'Scan scope', exact: true })).toHaveValue(
+    'workspace',
+  );
   await expect(analysis.locator('.scan-result-list button').first()).toBeVisible();
   expect(calls).toHaveLength(0);
 });
@@ -73,18 +75,24 @@ test('each unlocked workspace keeps its scope and locking clears temporary analy
 }) => {
   await prepare(page);
   await unlock(page, 'Analysis A');
-  await page.getByLabel('Scan scope', { exact: true }).selectOption('context');
+  await page.getByRole('combobox', { name: 'Scan scope', exact: true }).selectOption('context');
   await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
   await unlock(page, 'Analysis B');
-  await expect(page.getByLabel('Scan scope', { exact: true })).toHaveValue('workspace');
+  await expect(page.getByRole('combobox', { name: 'Scan scope', exact: true })).toHaveValue(
+    'workspace',
+  );
   await page.locator('.workspace-tab[title="Analysis A"]').click();
-  await expect(page.getByLabel('Scan scope', { exact: true })).toHaveValue('context');
+  await expect(page.getByRole('combobox', { name: 'Scan scope', exact: true })).toHaveValue(
+    'context',
+  );
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await expect(page.locator('.workspace-tab[title="Analysis A"]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
   await unlock(page, 'Analysis A');
-  await expect(page.getByLabel('Scan scope', { exact: true })).toHaveValue('workspace');
+  await expect(page.getByRole('combobox', { name: 'Scan scope', exact: true })).toHaveValue(
+    'workspace',
+  );
 });
 
 test('an empty loaded workspace gives a clear no-findings explanation without requests', async ({

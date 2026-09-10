@@ -311,8 +311,8 @@ test('standard script bytes improve comparisons without fetching omitted type la
     .click();
   await expect(page.locator('.scan-detail')).toContainText('Known input types: P2WPKH');
   await expect(page.locator('.scan-detail')).toContainText('Known output types: P2WPKH, Taproot');
-  await expect(page.locator('.scan-detail')).toContainText(
-    '0 input and 0 output types are unavailable',
+  await expect(page.locator('.scan-detail')).not.toContainText(
+    'types are unavailable or unrecognized',
   );
   await expect(
     page.getByRole('button', { name: 'Load scope data and rerun', exact: true }),

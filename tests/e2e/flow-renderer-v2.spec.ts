@@ -1,4 +1,5 @@
 import type { RenderNode } from '../../src/components/graph/adapter';
+import type { LayoutRequest, LayoutResult } from '../../src/components/graph/flowLayout';
 import { test, expect, type Page } from '@playwright/test';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -25,13 +26,13 @@ import {FlowRenderer} from '/@fs'+'';
 const host=document.getElementById('host');
 const node=(id,shape,x,y,z,radius=5)=>({id,shape,x,y,z,radius,color:shape==='box'?'#e3a54f':shape==='sphere'?'#84c2ae':'#919fd1',highlight:false,text:id});
 const initial={dimensions:3,background:'#111a20',nodes:[node('creating','box',-80,0,-24),node('output','sphere',0,0,0),node('spending','box',80,0,24),node('address','octahedron',0,65,0)],links:[{id:'create',source:'creating',target:'output',color:'#74818b',width:0,arrowLength:3.6},{id:'spend',source:'output',target:'spending',color:'#74818b',width:0,arrowLength:3.6},{id:'association',source:'output',target:'address',color:'#74818b',width:0,arrowLength:0}]};
-let frame=structuredClone(initial);const snapshots=[],activity=[],selects=[],hovers=[];let errors=0,recovered=0;
-let graph;const make=()=>new FlowRenderer(host,{snapshot:s=>snapshots.push(s),activity:a=>activity.push(a),hover:e=>hovers.push(e),select:e=>selects.push(e),dismiss:()=>{},error:()=>errors++,recovered:()=>recovered++});
+let frame=structuredClone(initial);const snapshots=[],activity=[],selects=[],hovers=[],layouts=[];let errors=0,recovered=0;
+let graph;const make=()=>new FlowRenderer(host,{snapshot:s=>snapshots.push(s),layout:s=>layouts.push(s),activity:a=>activity.push(a),hover:e=>hovers.push(e),select:e=>selects.push(e),dismiss:()=>{},error:()=>errors++,recovered:()=>recovered++});
 graph=make();const resize=()=>{const r=host.getBoundingClientRect();graph.resize(r.width,r.height,30)};resize();
 new ResizeObserver(resize).observe(host);
 const freeze=f=>{f.nodes.forEach(Object.freeze);f.links.forEach(Object.freeze);Object.freeze(f.nodes);Object.freeze(f.links);return Object.freeze(f)};
 graph.update(freeze(frame));
-window.fixture={get graph(){return graph},snapshots,activity,selects,hovers,get errors(){return errors},get recovered(){return recovered},get frame(){return frame},update:f=>{frame=f;graph.update(freeze(f))},reset:()=>{graph.dispose();graph=make();resize();graph.update(freeze(frame))},project:id=>{const p=graph.positions.get(id);const n=graph.nodes.find(n=>n.id===id);const v=graph.project(p);const r=graph.canvas.getBoundingClientRect();return{x:r.x+(v.x+1)*r.width/2,y:r.y+(1-v.y)*r.height/2}},render:()=>graph.renderer.render(graph.scene,graph.camera)};
+window.fixture={get graph(){return graph},snapshots,activity,selects,hovers,layouts,get errors(){return errors},get recovered(){return recovered},get frame(){return frame},update:f=>{frame=f;graph.update(freeze(f))},reset:()=>{graph.dispose();graph=make();resize();graph.update(freeze(frame))},project:id=>{const p=graph.positions.get(id);const n=graph.nodes.find(n=>n.id===id);const v=graph.project(p);const r=graph.canvas.getBoundingClientRect();return{x:r.x+(v.x+1)*r.width/2,y:r.y+(1-v.y)*r.height/2}},render:()=>graph.renderer.render(graph.scene,graph.camera)};
 `,
   );
   server = await createServer({
@@ -69,7 +70,55 @@ const camera = (page: Page) =>
     f.graph.flushSnapshot();
     return f.snapshots.at(-1).camera;
   });
-const geometry = (page: Page) => page.evaluate(() => [...(window as any).fixture.graph.positions]);
+const geometry = (page: Page) =>
+  page.evaluate(() =>
+    [...(window as any).fixture.graph.positions].sort(([a], [b]) => a.localeCompare(b)),
+  );
+
+// Hold and replay worker messages at the browser boundary. This deliberately lets
+// tests deliver callbacks after termination to verify the renderer rejects them.
+async function controlLayoutWorkers(page: Page) {
+  await page.addInitScript(() => {
+    (window as any).layoutWorkers = [];
+    class ControlledWorker {
+      requests: LayoutRequest[] = [];
+      terminateCount = 0;
+      onmessage: ((event: MessageEvent<LayoutResult>) => void) | null = null;
+      onerror: ((event: ErrorEvent) => void) | null = null;
+      constructor() {
+        (window as any).layoutWorkers.push(this);
+      }
+      postMessage(request: LayoutRequest) {
+        this.requests.push(structuredClone(request));
+      }
+      terminate() {
+        this.terminateCount++;
+      }
+      reply(positions?: LayoutResult['positions']) {
+        const request = this.requests.at(-1)!;
+        const previous = new Map(request.previous);
+        this.onmessage?.(
+          new MessageEvent<LayoutResult>('message', {
+            data: {
+              revision: request.revision,
+              positions:
+                positions ??
+                request.nodes.map((node, i) => [
+                  node.id,
+                  previous.get(node.id) ?? {
+                    x: node.fx ?? node.x ?? 200 + i * 20,
+                    y: node.fy ?? node.y ?? 30,
+                    z: node.fz ?? node.z ?? 0,
+                  },
+                ]),
+            },
+          }),
+        );
+      }
+    }
+    (window as any).Worker = ControlledWorker;
+  });
+}
 async function drag(page: Page, button: 'left' | 'right' = 'left') {
   const b = (await page.locator('canvas').boundingBox())!;
   await page.mouse.move(b.x + b.width * 0.75, b.y + b.height * 0.8);
@@ -401,7 +450,7 @@ test('context recovery, repeated disposal and stale worker results cannot revive
   expect(errors).toEqual([]);
 });
 
-test('hidden empty mount defers fit and unavailable workers retain the same fallback layout', async ({
+test('hidden empty mount defers fit and known coordinates render without a worker', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -415,7 +464,7 @@ test('hidden empty mount defers fit and unavailable workers retain the same fall
   await page.evaluate(() => {
     const f = (window as any).fixture;
     f.graph.dispose();
-    f.frame = { ...f.frame, nodes: [], links: [] };
+    f.update({ ...f.frame, nodes: [], links: [] });
     f.reset();
     f.graph.resize(0, 0);
     f.update({
@@ -449,17 +498,16 @@ test('hidden empty mount defers fit and unavailable workers retain the same fall
   expect(errors).toEqual([]);
 });
 
-test('an immediate checkpoint completes pending layout and rejects its later worker reply', async ({
+test('an immediate checkpoint preserves the visible graph without completing a pending layout, and disposal rejects its reply', async ({
   page,
 }) => {
+  await controlLayoutWorkers(page);
   const errors = await open(page);
   await drag(page);
   const before = await camera(page);
+  const visible = await geometry(page);
   const saved = await page.evaluate(() => {
     const f = (window as any).fixture;
-    f.graph.worker.terminate();
-    // Leave a real adapter request pending as if the worker were busy at Lock.
-    f.graph.worker = { postMessage() {}, terminate() {} };
     f.update({
       ...f.frame,
       nodes: [
@@ -478,16 +526,40 @@ test('an immediate checkpoint completes pending layout and rejects its later wor
         },
       ],
     });
-    const pending = Boolean(f.graph.pending);
+    const worker = (window as any).layoutWorkers[0];
+    const pendingBefore = Boolean(f.graph.pending);
     f.graph.flushSnapshot();
     const snapshot = f.snapshots.at(-1);
-    f.graph.accept({ revision: f.graph.revision, positions: [['late', { x: 0, y: 0, z: 0 }]] });
-    return { pending, snapshot, late: f.graph.positions.has('late') };
+    const pendingAfter = Boolean(f.graph.pending);
+    const busy = f.graph.canvas.getAttribute('aria-busy');
+    const positions = [...f.graph.positions].sort(([a], [b]) => a.localeCompare(b));
+    f.graph.dispose();
+    const snapshotCount = f.snapshots.length;
+    worker.reply([['late', { x: 0, y: 0, z: 0 }]]);
+    return {
+      pendingBefore,
+      pendingAfter,
+      busy,
+      snapshot,
+      positions,
+      terminated: worker.terminateCount,
+      late: f.graph.positions.has('late'),
+      afterDispose: f.graph.positions.size,
+      snapshotCount,
+      afterLateSnapshotCount: f.snapshots.length,
+    };
   });
-  expect(saved.pending).toBe(true);
-  expect(saved.snapshot.nodes).toHaveLength(5);
+  expect(saved.pendingBefore && saved.pendingAfter).toBe(true);
+  expect(saved.busy).toBe('true');
+  expect(saved.positions).toEqual(visible);
+  expect(saved.snapshot.nodes).toHaveLength(4);
+  expect(saved.snapshot.nodes.some((node: { id: string }) => node.id === 'arriving')).toBe(false);
   expect(saved.snapshot.camera).toEqual(before);
+  expect(saved.terminated).toBe(1);
   expect(saved.late).toBe(false);
+  expect(saved.afterDispose).toBe(0);
+  expect(saved.afterLateSnapshotCount).toBe(saved.snapshotCount);
+  await expect(page.locator('canvas')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -540,17 +612,15 @@ test('repack removes old arrangements explicitly while dimensions and snapshots 
   expect(errors).toEqual([]);
 });
 
-test('rapid expansions coalesce worker jobs, checkpoint the latest graph and retain GPU capacity', async ({
+test('rapid expansions cancel obsolete workers, checkpoint the visible graph and retain GPU capacity when the latest result arrives', async ({
   page,
 }) => {
+  await controlLayoutWorkers(page);
   const errors = await open(page);
+  const before = await camera(page);
   const result = await page.evaluate(() => {
     const f = (window as any).fixture;
     const g = f.graph;
-    g.worker.terminate();
-    const receive = g.worker.onmessage;
-    const requests: any[] = [];
-    g.worker = { postMessage: (r: any) => requests.push(r), terminate() {} };
     const buffers = g.batches.map((b: any) => b.mesh);
     const edges = g.edges.mesh.geometry.getAttribute('start');
     for (let i = 0; i < 3; i++)
@@ -572,34 +642,55 @@ test('rapid expansions coalesce worker jobs, checkpoint the latest graph and ret
           },
         ],
       });
-    const started = requests.length;
-    receive({
-      data: { revision: requests[0].revision, positions: [['obsolete', { x: 0, y: 0, z: 0 }]] },
-    });
-    const replacements = requests.length;
-    const latest = requests.at(-1).nodes.length;
+    const workers = (window as any).layoutWorkers;
+    for (const worker of workers.slice(0, -1)) worker.reply([['obsolete', { x: 0, y: 0, z: 0 }]]);
     g.flushSnapshot();
-    const snapshot = f.snapshots.at(-1);
-    receive({
-      data: { revision: requests.at(-1).revision, positions: [['late', { x: 0, y: 0, z: 0 }]] },
-    });
+    const pendingSnapshot = f.snapshots.at(-1);
+    const pending = Boolean(g.pending);
+    const latest = workers.at(-1);
+    latest.reply();
+    g.flushSnapshot();
+    const settledSnapshot = f.snapshots.at(-1);
+    const positions = [...g.positions];
+    // Both a duplicate current reply and terminated-worker replies must be inert.
+    latest.reply([['late', { x: 0, y: 0, z: 0 }]]);
+    workers[0].reply([['obsolete', { x: 0, y: 0, z: 0 }]]);
     return {
-      started,
-      replacements,
-      latest,
-      snapshot,
-      positions: [...g.positions],
+      requestedSizes: workers.map((worker: any) =>
+        worker.requests.map((r: LayoutRequest) => r.nodes.length),
+      ),
+      terminated: workers.map((worker: any) => worker.terminateCount),
+      pending,
+      pendingSnapshot,
+      settledSnapshot,
+      positions,
+      afterLatePositions: [...g.positions],
+      busy: g.canvas.getAttribute('aria-busy'),
+      status: f.layouts.at(-1),
       stableNodes: buffers.every((b: any, i: number) => g.batches[i].mesh === b),
-      // This fixture crosses the 4 -> 8 connection capacity once.
       edgeCapacity: g.edges.mesh.geometry.getAttribute('start').count,
       oldEdgeCapacity: edges.count,
     };
   });
-  expect(result.started).toBe(1);
-  expect(result.replacements).toBe(2);
-  expect(result.latest).toBe(7);
-  expect(result.snapshot.nodes).toHaveLength(7);
-  expect(result.positions.some(([id]: [string]) => id === 'late' || id === 'obsolete')).toBe(false);
+  expect(result.requestedSizes).toEqual([[5], [6], [7]]);
+  expect(result.terminated).toEqual([1, 1, 0]);
+  expect(result.pending).toBe(true);
+  expect(result.pendingSnapshot.nodes).toHaveLength(4);
+  expect(result.pendingSnapshot.camera).toEqual(before);
+  expect(result.settledSnapshot.nodes).toHaveLength(7);
+  expect(result.settledSnapshot.camera).toEqual(before);
+  expect(result.positions.map(([id]: [string]) => id).sort()).toEqual([
+    'address',
+    'creating',
+    'new-0',
+    'new-1',
+    'new-2',
+    'output',
+    'spending',
+  ]);
+  expect(result.afterLatePositions).toEqual(result.positions);
+  expect(result.busy).toBe('false');
+  expect(result.status).toEqual({ busy: false, nodeCount: 7 });
   expect(result.stableNodes).toBe(true);
   expect(result.oldEdgeCapacity).toBe(4);
   expect(result.edgeCapacity).toBe(8);
@@ -700,14 +791,13 @@ for (const manual of [false, true])
   test(`isolated address focus waits for its frame and final layout, manual gesture=${manual}`, async ({
     page,
   }) => {
+    await controlLayoutWorkers(page);
     const errors = await open(page);
     const originalCamera = await camera(page);
     await page.evaluate(() => {
       const f = (window as any).fixture,
         g = f.graph;
-      // Hold the reply until after focus, frame arrival, and optional manual input.
-      g.worker.terminate();
-      g.worker = { postMessage() {}, terminate() {} };
+      // The controlled worker holds its reply through frame arrival and manual input.
       g.focus('isolated');
       f.update({
         ...f.frame,
@@ -724,18 +814,21 @@ for (const manual of [false, true])
         ],
       });
     });
+    await expect(page.locator('canvas')).toHaveAttribute('aria-busy', 'true');
+    expect(await geometry(page)).toHaveLength(4);
+    expect(await camera(page)).toEqual(originalCamera);
     if (manual) await drag(page);
     const pose = await page.evaluate(() => {
       const f = (window as any).fixture,
         g = f.graph;
       const cameraBefore = g.cameraRecord();
-      g.accept({
-        revision: g.pending.revision,
-        positions: [...g.positions, ['isolated', { x: 5000, y: 2000, z: -500 }]],
-      });
+      const worker = (window as any).layoutWorkers[0];
+      worker.reply([...g.positions, ['isolated', { x: 5000, y: 2000, z: -500 }]]);
       g.flushSnapshot();
       return { before: cameraBefore, after: f.snapshots.at(-1).camera };
     });
+    await expect(page.locator('canvas')).toHaveAttribute('aria-busy', 'false');
+    expect(await geometry(page)).toHaveLength(5);
     if (manual) expect(pose.after).toEqual(pose.before);
     else {
       expect(pose.after).not.toEqual(originalCamera);

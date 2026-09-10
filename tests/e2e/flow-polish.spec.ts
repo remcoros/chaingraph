@@ -14,6 +14,8 @@ test('transaction card and its annotation toolbar have separate keyboard actions
   await openFlowFixture(page);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await expect(page.locator('.entity-row')).toHaveCount(1);
+  await expect(page.locator('.entity-row')).toContainText('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
   const view = page.locator('.transaction-view');
   await view.getByRole('button', { name: /^Output 0:/ }).click();
@@ -47,6 +49,8 @@ test('expanded output controls remain at the top while browsing a large transact
   await page.getByRole('button', { name: 'Browse', exact: true }).click();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await expect(page.locator('.entity-row')).toHaveCount(1);
+  await expect(page.locator('.entity-row')).toContainText('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
   await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
   const view = page.locator('.transaction-view');
@@ -74,6 +78,8 @@ test('long transaction labels stay inside the junction card on desktop and phone
   await openFlowFixture(page);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Filter graph entities').fill('Synthetic CoinJoin 1');
+  await expect(page.locator('.entity-row')).toHaveCount(1);
+  await expect(page.locator('.entity-row')).toContainText('Synthetic CoinJoin 1');
   await page.locator('.entity-row').click();
   const flow = page.locator('.transaction-view');
   await flow

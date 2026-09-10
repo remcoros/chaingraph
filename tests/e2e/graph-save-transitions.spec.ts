@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { encryptWorkspace, decryptWorkspace } from '../../src/lib/crypto';
 import { newWorkspace } from '../../src/domain/workspace';
@@ -15,7 +16,8 @@ async function seed(page: Page, migrate = false) {
     for (let index = 0; index < 125; index++)
       first.annotations[`tx:${(index + 1).toString(16).padStart(64, '0')}`] = {
         label: '',
-        note: 'Public migration fixture '.repeat(360),
+        // Synthetic noise keeps the migration fixture above the inline limit after gzip.
+        note: 'Public migration fixture ' + randomBytes(6750).toString('base64'),
         icon: '',
         bookmarked: false,
       };
