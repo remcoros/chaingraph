@@ -142,6 +142,10 @@ describe('workspace graph and analysis', () => {
     expect(parsed.findings[0].txids).toEqual([id(1)]);
     expect(parsed.findings[0].description).toContain('within this transaction');
     expect(parsed.findings[0].details).toContain('loaded history');
+    expect(parsed.findings).toEqual(w.findings);
+    expect(parsed.findings[0].description).toContain(
+      'not evidence of repeated receiving activity across separate transactions',
+    );
   });
 
   it('rejects malformed workspace versions, network names and mismatched transaction keys', () => {
