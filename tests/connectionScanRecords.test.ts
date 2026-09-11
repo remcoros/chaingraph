@@ -55,6 +55,23 @@ function fixture() {
 }
 
 describe('compact connection scan records', () => {
+  it('encrypts neighbour scope and frozen IDs without retaining its adjacency index', async () => {
+    const { workspace, run, evidence } = fixture();
+    run.settings.targetScope = 'neighbours';
+    const next = replaceScanRun(workspace, run, evidence);
+    const encrypted = await validateAndEncryptWorkspace(next, 'public fixture password');
+    expect(JSON.stringify(encrypted)).not.toContain(run.source);
+    const restored = await decryptAndValidateWorkspace(encrypted, 'public fixture password');
+    expect(restored.connectionScans?.runs[0]).toEqual(run);
+    expect(Object.keys(restored.connectionScans!)).toEqual(['runs', 'evidence']);
+    expect(() =>
+      parseWorkspace({
+        ...next,
+        connectionScans: { ...next.connectionScans, neighbours: { [run.source]: run.targetIds } },
+      }),
+    ).toThrow();
+  });
+
   it('encrypts custom scope and expanded targets using the existing compact run record', async () => {
     const { workspace, run, evidence } = fixture();
     run.settings.targetScope = 'custom';

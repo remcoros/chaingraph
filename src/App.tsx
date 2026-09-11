@@ -2,6 +2,7 @@ import { TransactionFetchShell } from './lib/useTransactionFetch';
 import { ConnectionScanPanel } from './components/ConnectionScanPanel';
 import { ScanTargetToolbar } from './components/ScanTargetToolbar';
 import { prepareCustomScanTargets } from './domain/connectionScanTargets';
+import { indexScanNeighbours } from './domain/connectionScanNeighbours';
 import { isScanNodeId } from './domain/connectionScan';
 import { addScanPath } from './domain/connectionScanRecords';
 import { spendingNotice } from './lib/spendingNotice';
@@ -506,6 +507,7 @@ export default function App() {
     ],
   );
   const flowIndex = useMemo(() => indexGraphFlow(graph), [graph]);
+  const scanNeighbours = useMemo(() => indexScanNeighbours(graph), [graph]);
   const graphFlowContext = useMemo(
     () => flowIndex.resolve(selectedId, w?.view.transactionFlow?.transactionId),
     [flowIndex, selectedId, w?.view.transactionFlow?.transactionId],
@@ -2984,6 +2986,7 @@ export default function App() {
                     visibleNodeIds={visibleGraph.nodes.map((node) => node.id)}
                     addedNodeIds={[...connectionMembers]}
                     loadedSpenders={flowIndex.spenders}
+                    neighbours={scanNeighbours}
                     active={
                       shownRightTab === 'scan' && shownWorkbench === 'graph' && !lockingWorkspace
                     }

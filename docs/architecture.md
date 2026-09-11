@@ -244,6 +244,18 @@ freezes only explicitly picked transaction/outpoint IDs without inspecting or
 expanding transaction evidence. It deduplicates, excludes the source and rejects
 more than 1,000 targets. Only the custom scope and frozen target IDs enter the
 existing encrypted run record; picks and picker state reset on workspace changes.
+
+`domain/connectionScanNeighbours.ts` indexes the existing full loaded graph before
+membership, visibility and canvas filters. It admits only transaction/outpoint
+nodes and observed creates/spends links, treating those links as undirected for
+target selection. A breadth-first walk freezes up to 1,000 nearest nodes, excluding
+the source and disconnected components. Sorted adjacency gives deterministic ties;
+the queue admits at most 1,001 nodes including the source. A further candidate marks
+the preview as capped without adding it. No RPC, search-direction bias or scan-limit
+pruning enters target preparation. The index is transient, rebuilt with loaded
+graph changes, and only the frozen IDs enter the existing run record. Neighbours
+is the default scope for new settings; saved scopes retain their prior choice.
+
 `domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`:
 deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join

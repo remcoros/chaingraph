@@ -55,9 +55,18 @@ The graph represents transaction creation and consumption of outputs. An output 
 ## Connection scans
 
 Select a transaction or output and open **Scan** in Graph's right inspector.
-Choose **Both**, **Sources** or **Destinations**, then **Visible graph**, **All added nodes**
-(including hidden and filtered nodes), or **Custom targets**. Inputs use their previous
-outpoint identity. Addresses and the entire workspace are outside this scan scope.
+Choose **Both**, **Sources** or **Destinations**, then **Neighbours**, **Visible graph**,
+**All added nodes** (including hidden and filtered nodes), or **Custom targets**.
+Inputs use their previous outpoint identity. Addresses are outside this scan scope.
+
+**Neighbours** is the default when there are no previous scan settings. It follows
+loaded transaction/output links in both directions, taking nearby nodes first, up
+to 1,000 targets. Hidden, filtered and not-yet-added nodes are eligible; disconnected
+nodes and the source are excluded. Equal-distance choices use a stable order.
+No transactions are fetched to choose these targets. Loading more evidence can
+change the neighbourhood, but the target list is frozen when you start scanning.
+The count reads **Nearest 1,000 loaded nodes** when capped. Sources/Destinations
+and scan limits govern the subsequent search, not neighbour selection.
 
 For custom targets, choose **Pick target(s)**. Click transactions or outputs in the
 graph to add or remove them; the source stays fixed while picking. The floating
@@ -78,8 +87,8 @@ Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
 transactions, 60 seconds and a 200-branch boundary. Cached transactions and
 spending-history candidates share the same allowance with target-side searches.
-Scopes above 1,000 targets require custom picks or a smaller visible graph or filter
-scope. Custom picks must also fit that limit; oversized target sets are rejected
+Visible/added scopes above 1,000 targets require **Neighbours**, custom picks or a
+smaller visible graph or filter scope. Custom picks must also fit that limit; oversized target sets are rejected
 without silently dropping nodes.
 
 Results stream into compact cards. The default **Findings** filter shows

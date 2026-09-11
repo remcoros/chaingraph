@@ -7,8 +7,9 @@ Version 0.2.0 includes multiple encrypted workspaces and watch-only wallets, bro
 Filter the graph by entity type, labels, tags, wallet membership, notes, bookmarks, value and loaded funding/spending evidence. The floating **Filters** popover collects those controls, and removable chips show every active filter beside a **Reset filters** action. Follow a selection's neighborhood, navigate selection history, isolate findings, or use a paginated entity list. Select several entities and apply a label, tag or icon to exactly that set. Wallet and Graph share quick editors with searchable tags, explicit color choices, and responsive rows for long names. Batch labels and icons preserve existing values unless replacement is enabled. Nine example workspaces offer real transactions across six mainnet and three testnet4 cases with starter labels, tags, icons and bookmarks. Only examples for networks configured on your backend are shown.
 
 The Graph inspector's **Scan** tab searches from a transaction or outpoint for
-direct connections and shared ancestors or descendants among visible, added or
-custom-picked graph nodes. **Pick target(s)** uses a floating multi-target picker
+direct connections and shared ancestors or descendants among nearby loaded,
+visible, added or custom-picked nodes. **Neighbours** defaults to the nearest
+1,000 connected loaded nodes without direction bias. **Pick target(s)** uses a floating multi-target picker
 and targets exactly the picked transactions or outputs. Searches
 default to 3 transaction hops, 200 examined transactions,
 30 seconds and a 50-branch stopping point. Findings appear during the scan and

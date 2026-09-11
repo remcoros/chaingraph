@@ -35,7 +35,7 @@ export const SCAN_STATUS_ONLY_REASONS: readonly ScanStopReason[] = [
 ];
 export interface ScanSettings {
   direction: ScanDirection | 'both';
-  targetScope: 'visible' | 'added' | 'custom';
+  targetScope: 'neighbours' | 'visible' | 'added' | 'custom';
   maxHops: number;
   maxTransactions: number;
   maxMilliseconds: number;
@@ -90,7 +90,7 @@ export const SCAN_LIMITS = {
 } as const;
 export const DEFAULT_SCAN_SETTINGS: ScanSettings = {
   direction: 'both',
-  targetScope: 'visible',
+  targetScope: 'neighbours',
   maxHops: 3,
   maxTransactions: 200,
   maxMilliseconds: 30_000,
@@ -106,7 +106,7 @@ export function validateScanSettings(settings: ScanSettings): ScanSettings {
   if (
     !settings ||
     !['upstream', 'downstream', 'both'].includes(settings.direction) ||
-    !['visible', 'added', 'custom'].includes(settings.targetScope)
+    !['neighbours', 'visible', 'added', 'custom'].includes(settings.targetScope)
   )
     throw new Error('Invalid scan settings.');
   for (const key of ['maxHops', 'maxTransactions', 'maxMilliseconds', 'fanOut'] as const) {

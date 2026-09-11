@@ -43,6 +43,7 @@ import {
 import { retryConnectionScanResult, applyScanRecheck } from '../lib/connectionScanRetry';
 import { transactionStatus } from '../domain/transactionStatus';
 import { prepareCustomScanTargets } from '../domain/connectionScanTargets';
+import { prepareNeighbourScanTargets } from '../domain/connectionScanNeighbours';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
@@ -74,6 +75,7 @@ type Props = {
   visibleNodeIds: string[];
   addedNodeIds: string[];
   loadedSpenders: ReadonlyMap<string, readonly string[]>;
+  neighbours: ReadonlyMap<string, readonly string[]>;
   active: boolean;
   canQuery: boolean;
   scope: TransactionFetchScope;
@@ -131,6 +133,22 @@ export function ConnectionScanPanel(props: Props) {
       };
     }
   }, [props.customTargetIds, source, settings.targetScope]);
+  const neighbourTargetPlan = useMemo(() => {
+    if (!active || settings.targetScope !== 'neighbours' || !eligible(source))
+      return { ids: [], capped: false, error: '' };
+    try {
+      return {
+        ...prepareNeighbourScanTargets({ source, neighbours: props.neighbours }),
+        error: '',
+      };
+    } catch (cause) {
+      return {
+        ids: [],
+        capped: false,
+        error: cause instanceof Error ? cause.message : 'Neighbours could not be prepared.',
+      };
+    }
+  }, [active, source, settings.targetScope, props.neighbours]);
   const savedSpenders = useMemo(
     () => indexLoadedSpends(workspace.connectionScans?.evidence ?? {}),
     [workspace.connectionScans?.evidence],
@@ -237,26 +255,28 @@ export function ConnectionScanPanel(props: Props) {
     let targetIds: string[];
     try {
       targetIds =
-        frozenSettings.targetScope === 'custom'
-          ? prepareCustomScanTargets({
-              pickedNodeIds: props.customTargetIds,
-              source: startSource,
-            })
-          : [
-              ...new Set(
-                (frozenSettings.targetScope === 'visible'
-                  ? props.visibleNodeIds
-                  : props.addedNodeIds
-                ).filter((id) => eligible(id) && id !== startSource),
-              ),
-            ];
+        frozenSettings.targetScope === 'neighbours'
+          ? prepareNeighbourScanTargets({ source: startSource, neighbours: props.neighbours }).ids
+          : frozenSettings.targetScope === 'custom'
+            ? prepareCustomScanTargets({
+                pickedNodeIds: props.customTargetIds,
+                source: startSource,
+              })
+            : [
+                ...new Set(
+                  (frozenSettings.targetScope === 'visible'
+                    ? props.visibleNodeIds
+                    : props.addedNodeIds
+                  ).filter((id) => eligible(id) && id !== startSource),
+                ),
+              ];
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Targets could not be prepared.');
       return;
     }
     if (targetIds.length > SCAN_LIMITS.maxTargets) {
       setError(
-        `Pick custom targets or choose a smaller graph scope: at most ${SCAN_LIMITS.maxTargets} targets per scan.`,
+        `Choose Neighbours, pick custom targets or choose a smaller graph scope: at most ${SCAN_LIMITS.maxTargets} targets per scan.`,
       );
       return;
     }
@@ -264,7 +284,9 @@ export function ConnectionScanPanel(props: Props) {
       setError(
         frozenSettings.targetScope === 'custom'
           ? 'Pick another transaction or output as a target.'
-          : 'Add another transaction or output to the target scope first.',
+          : frozenSettings.targetScope === 'neighbours'
+            ? 'No loaded neighbours. Load a connected transaction or pick custom targets.'
+            : 'Add another transaction or output to the target scope first.',
       );
       return;
     }
@@ -483,11 +505,30 @@ export function ConnectionScanPanel(props: Props) {
                   });
                 }}
               >
+                <option value="neighbours">Neighbours</option>
                 <option value="visible">Visible graph</option>
                 <option value="added">All added nodes</option>
                 <option value="custom">Custom targets</option>
               </select>
             </label>
+            {settings.targetScope === 'neighbours' &&
+              eligible(source) &&
+              (neighbourTargetPlan.error ? (
+                <p className="connection-scan-error" role="alert">
+                  {neighbourTargetPlan.error}
+                </p>
+              ) : (
+                <span
+                  className="small muted"
+                  title="Nearest nodes connected by loaded transaction links, including hidden and filtered nodes."
+                >
+                  {neighbourTargetPlan.capped
+                    ? `Nearest ${neighbourTargetPlan.ids.length.toLocaleString()} loaded nodes`
+                    : neighbourTargetPlan.ids.length
+                      ? `${neighbourTargetPlan.ids.length.toLocaleString()} nearby loaded nodes`
+                      : 'No loaded neighbours'}
+                </span>
+              ))}
             {settings.targetScope === 'custom' && (
               <div className="connection-scan-custom-targets">
                 <button
@@ -601,6 +642,7 @@ export function ConnectionScanPanel(props: Props) {
                 disabled={
                   !eligible(source) ||
                   props.pickingTargets ||
+                  (settings.targetScope === 'neighbours' && !neighbourTargetPlan.ids.length) ||
                   (settings.targetScope === 'custom' &&
                     (!customTargetPlan.ids.length || !!customTargetPlan.error))
                 }
@@ -641,7 +683,9 @@ export function ConnectionScanPanel(props: Props) {
                   {run.targetIds.length}{' '}
                   {run.settings.targetScope === 'custom'
                     ? 'custom targets'
-                    : `${run.settings.targetScope === 'visible' ? 'visible' : 'added'} graph nodes`}
+                    : run.settings.targetScope === 'neighbours'
+                      ? 'nearby loaded nodes'
+                      : `${run.settings.targetScope === 'visible' ? 'visible' : 'added'} graph nodes`}
                 </dd>
                 <dt>Direction</dt>
                 <dd>
