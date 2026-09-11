@@ -155,6 +155,9 @@ export function presentGraph(
             .filter(Boolean)
             .join('\n') || undefined,
         shape: shapes[node.kind],
+        captionPriority:
+          (input.showTags !== false && !!override?.tags?.length) ||
+          (input.showLabels !== false && !!override?.label),
         marker: role
           ? {
               shape: role === 'input' ? ('brackets' as const) : ('ring' as const),

@@ -4,6 +4,8 @@ export interface RenderNode {
   id: string;
   /** Display text for engines that draw labels; has no entity semantics. */
   text?: string;
+  /** Keep explicit captions per node, ahead of automatic text and independent of glow. */
+  captionPriority?: boolean;
   shape: 'box' | 'sphere' | 'octahedron';
   color: string;
   radius: number;

@@ -182,6 +182,13 @@ describe('shared graph semantics and presentation', () => {
     const render = (flags = {}) =>
       presentGraph({ ...input, nodePresentation, ...flags }, palette).nodes;
     expect(render()[0].text).toBe('🏦 Exchange deposit\n#Exchange · #Savings');
+    expect(render({ glow: false })[1]).toMatchObject({
+      captionPriority: true,
+      highlight: false,
+    });
+    expect(render({ showLabels: false, showTags: false })[0].captionPriority).toBe(false);
+    expect(render({ showTags: false })[0].captionPriority).toBe(true);
+    expect(render({ showTags: false })[1].captionPriority).toBe(false);
     expect(render({ showLabels: false })[0].text).toBe('🏦\n#Exchange · #Savings');
     expect(render({ showTags: false })[0].text).toBe('🏦 Exchange deposit');
     expect(render({ showIcons: false })[0].text).toBe('Exchange deposit\n#Exchange · #Savings');

@@ -39,6 +39,7 @@ import { makeFlowEdges } from './flowEdges';
 import { makeFlowParticles } from './flowParticles';
 import { chooseFlowLinks, indexFlowLinks } from './flowSelection';
 import { makeEdgePickIndex } from './flowEdgePicking';
+import { placeFlowCaptions } from './flowCaptions';
 import { createNodePickMesh, intersectNodes, syncNodePickMesh } from './nodePicking';
 import './flowRenderer.css';
 
@@ -121,6 +122,7 @@ export class FlowRenderer implements GraphAdapter {
   private raycaster = new Raycaster();
   private labels: HTMLDivElement;
   private labelPool: HTMLSpanElement[] = [];
+  private visibleCaptionIds = new Set<string>();
   private cleanups: (() => void)[] = [];
   private settingCamera = false;
   private recovery?: ReturnType<typeof setTimeout>;
@@ -894,17 +896,8 @@ export class FlowRenderer implements GraphAdapter {
       .filter(
         (v): v is NonNullable<typeof v> =>
           Boolean(v) && Math.abs(v!.p.z) <= 1 && Math.abs(v!.p.x) <= 1.1 && Math.abs(v!.p.y) <= 1.1,
-      )
-      .sort(
-        (a, b) =>
-          Number(b.n.selected) - Number(a.n.selected) ||
-          Number(b.n.id === this.hovered) - Number(a.n.id === this.hovered) ||
-          Number(b.n.highlight) - Number(a.n.highlight) ||
-          Number(b.n.shape === 'box') - Number(a.n.shape === 'box') ||
-          b.radius - a.radius,
       );
     let count = 0;
-    const boxes: { x: number; y: number; w: number; h: number }[] = [];
     const append = (
       text: string,
       x: number,
@@ -956,41 +949,28 @@ export class FlowRenderer implements GraphAdapter {
         n.color,
       );
     }
-    let captions = 0;
-    const repeats = new Set<string>();
-    for (const { n, p, radius } of candidates) {
-      if (captions >= 48) break;
-      if (!n.text) continue;
-      if (!n.selected && n.id !== this.hovered && repeats.has(n.text)) continue;
-      const priority = n.selected || n.id === this.hovered || n.highlight;
-      if (!priority && radius < 2.2 && n.shape !== 'box') continue;
-      const lines = n.text
-        .split('\n')
-        .slice(0, 2)
-        .map((t) => ([...t].length > 36 ? [...t].slice(0, 35).join('') + '…' : t));
-      const text = lines.join('\n'),
-        w = Math.min(238, Math.max(...lines.map((t) => t.length)) * 6.3 + 14),
-        h = lines.length * 16 + 6;
-      let x = ((p.x + 1) * this.width) / 2 + Math.max(8, radius * 1.5 + 4),
-        y = ((1 - p.y) * this.height) / 2 - h / 2;
-      if (x + w > this.width - 8)
-        x = ((p.x + 1) * this.width) / 2 - Math.max(8, radius * 1.5 + 4) - w;
-      if (priority) {
-        x = Math.max(8, Math.min(x, this.width - w - 8));
-        y = Math.max(this.inset + 4, Math.min(y, this.height - h - 8));
-      }
-      if (x < 4 || x + w > this.width - 4 || y < this.inset + 4 || y + h > this.height - 8)
-        continue;
-      if (
-        boxes.some(
-          (b) => x < b.x + b.w + 6 && x + w + 6 > b.x && y < b.y + b.h + 4 && y + h + 4 > b.y,
-        )
-      )
-        continue;
-      boxes.push({ x, y, w, h });
-      append(text, x, y, w, h, `flow-node-caption${n.selected ? ' selected' : ''}`, n.color);
-      repeats.add(n.text);
-      captions++;
+    const captions = placeFlowCaptions(
+      candidates.map(({ n, p, radius }) => ({
+        node: n,
+        x: ((p.x + 1) * this.width) / 2,
+        y: ((1 - p.y) * this.height) / 2,
+        radius,
+      })),
+      { width: this.width, height: this.height, topInset: this.inset },
+      this.visibleCaptionIds,
+      this.hovered,
+    );
+    this.visibleCaptionIds = new Set(captions.map(({ node }) => node.id));
+    for (const { node, text, x, y, width, height } of captions) {
+      append(
+        text,
+        x,
+        y,
+        width,
+        height,
+        `flow-node-caption${node.selected ? ' selected' : ''}`,
+        node.color,
+      );
     }
     for (let i = count; i < this.labelPool.length; i++) this.labelPool[i].hidden = true;
   }
@@ -1023,6 +1003,7 @@ export class FlowRenderer implements GraphAdapter {
     this.renderer.forceContextLoss();
     this.canvas.remove();
     this.labels.remove();
+    this.visibleCaptionIds.clear();
     this.modes.clear();
     this.cache.clear();
     this.positions.clear();
