@@ -8,10 +8,9 @@ fractional BTC digits from the right. It presents alternatives, not a universal
 formatting standard. BTC denotes 100 million satoshis; an eight-place decimal
 amount must carry the BTC unit.
 
-For this application the user selected automatic sats/BTC display with right-grouped
-BTC fractions. The implementation uses sats below one BTC and exact BTC above,
-without adding unit preferences. Narrow non-breaking spaces prevent group breaks.
-The choice of threshold is application policy. The guide's locale controls, fiat
+For this application the user selected BTC display for every amount with
+right-grouped fractions, including small values, without adding unit preferences. Narrow non-breaking spaces prevent group breaks.
+The fixed denomination is application policy. The guide's locale controls, fiat
 conversion, hidden balances and alternate symbol proposals are outside this change.
 Only the design principles are applied; no guide images or implementation code are
 redistributed. See the amount presentation decision in [architecture](../architecture.md#amount-presentation).

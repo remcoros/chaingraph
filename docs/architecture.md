@@ -16,9 +16,9 @@ flowchart LR
 
 `src/domain/amountFormat.ts` is the shared monetary display boundary for Graph,
 Wallet, Analysis, filter summaries and generated template text. It accepts integer
-satoshis as safe numbers or bigint. Below an absolute value of 100,000,000 sats it
-uses sat/sats; at or above that boundary it uses BTC with exactly eight decimal
-places grouped 2/3/3 from the right. Integer groups use narrow non-breaking spaces,
+satoshis as safe numbers or bigint. Every amount uses BTC with exactly eight
+decimal places grouped 2/3/3 from the right, including zero and amounts below one
+BTC. Integer groups use narrow non-breaking spaces,
 and a non-breaking space separates the amount from its unit. Bigint arithmetic
 preserves every satoshi; missing, non-finite, fractional or unsafe numeric inputs
 remain unknown. Dedicated amount elements use tabular digits and do not wrap.

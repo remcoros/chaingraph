@@ -226,7 +226,7 @@ test('floating navigation preserves distinct silhouettes, actual picking, card a
   expect(meshes.output.taper).toBeGreaterThan(meshes.address.taper + 0.1);
   await hover(page, meshes.output);
   const card = page.getByRole('dialog', { name: 'Graph item details' });
-  await expect(card).toContainText('10 000 sats');
+  await expect(card).toContainText('0.00 010 000 BTC');
   await expect(card).toContainText('Saved confirmations');
   const toolbar = card.getByRole('group', { name: 'Graph item actions' });
   const toolbarBounds = (await toolbar.boundingBox())!;

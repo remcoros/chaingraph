@@ -4,12 +4,12 @@ import { activeFilterChips } from '../src/domain/graphFilters';
 
 describe('exact Bitcoin amount display', () => {
   it.each([
-    [0, '0\u00a0sats'],
-    [1, '1\u00a0sat'],
-    [-1, '-1\u00a0sat'],
-    [999, '999\u00a0sats'],
-    [25_000, '25\u202f000\u00a0sats'],
-    [99_999_999, '99\u202f999\u202f999\u00a0sats'],
+    [0, '0.00\u202f000\u202f000\u00a0BTC'],
+    [1, '0.00\u202f000\u202f001\u00a0BTC'],
+    [-1, '-0.00\u202f000\u202f001\u00a0BTC'],
+    [999, '0.00\u202f000\u202f999\u00a0BTC'],
+    [25_000, '0.00\u202f025\u202f000\u00a0BTC'],
+    [99_999_999, '0.99\u202f999\u202f999\u00a0BTC'],
     [100_000_000, '1.00\u202f000\u202f000\u00a0BTC'],
     [100_000_001, '1.00\u202f000\u202f001\u00a0BTC'],
     [123_456_789, '1.23\u202f456\u202f789\u00a0BTC'],
@@ -38,8 +38,8 @@ describe('exact Bitcoin amount display', () => {
     expect(formatSats(100_000_000)).toBe('100\u202f000\u202f000\u00a0sats');
   });
 
-  it('labels both ends of filter ranges that cross the unit boundary', () => {
+  it('uses BTC at both ends of a filter range', () => {
     const [chip] = activeFilterChips({ minSats: 25_000, maxSats: 123_456_789 });
-    expect(chip.label).toBe('25\u202f000\u00a0sats – 1.23\u202f456\u202f789\u00a0BTC');
+    expect(chip.label).toBe('0.00\u202f025\u202f000\u00a0BTC – 1.23\u202f456\u202f789\u00a0BTC');
   });
 });

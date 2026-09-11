@@ -620,7 +620,7 @@ for (const surface of ['chips', 'popover', 'entities'] as const) {
       workspace.view.filters = { kind: 'output' };
     });
     const filters = page.getByLabel('Active graph filters');
-    await expect(filters).toContainText('Above 1 000 sats');
+    await expect(filters).toContainText('Above 0.00 001 000 BTC');
     if (surface === 'popover') {
       await page
         .locator('.graph-navigation')

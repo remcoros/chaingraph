@@ -2,8 +2,8 @@
 
 Chaingraph helps you investigate Bitcoin activity and keep your own observations alongside the graph. It is watch-only: you can import public wallet information, inspect transactions, and organize hypotheses without supplying a seed phrase or private key.
 
-Amounts below 1 BTC display as integer sats; larger amounts display BTC with eight
-decimal places grouped from the right: `25 000 sats`, `1.00 000 000 BTC`,
+All amounts display as BTC with eight decimal places grouped from the right:
+`0.00 025 000 BTC`, `1.00 000 000 BTC`,
 `1.23 456 789 BTC`. Thin non-breaking spaces keep digit groups together. No amount
 is rounded or abbreviated. Amount-entry fields still accept integer sats as
 labelled, and fee rates remain in sat/vB. Missing values stay unknown. Previously

@@ -73,7 +73,7 @@ test('independent amount filters retain selections and unknown inputs, collapse 
   await expect(input(2)).toBeVisible(); // Missing amount is unknown, not small.
   await expect(output(0)).toHaveCount(0);
   await expect(output(1)).toHaveCount(0); // Greater than excludes the exact boundary.
-  await expect(graphFilter.locator('option:checked')).toHaveText('> 1 000 sats');
+  await expect(graphFilter.locator('option:checked')).toHaveText('> 0.00 001 000 BTC');
   await expect(
     flow.getByRole('button', { name: 'Show 1 amount-filtered inputs', exact: true }),
   ).toBeVisible();

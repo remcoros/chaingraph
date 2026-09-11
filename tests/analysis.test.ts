@@ -168,7 +168,7 @@ describe('scoped analysis and honest evidence', () => {
     const report = tool('value-flow').analyze(workspace(a, b, spend), [spend.txid]);
     expect(report.findings).toHaveLength(1);
     expect(report.emptyReason).toBeUndefined();
-    expect(report.findings[0].title).toBe('Network fee: 1 sat');
+    expect(report.findings[0].title).toBe('Network fee: 0.00 000 001 BTC');
     expect(report.findings[0].details).toContain('0.01 sat/vB');
     expect(report.findings[0].scopeTxids).toEqual([spend.txid]);
     expect(report.findings[0].txids).toEqual([spend.txid, a.txid, b.txid]);
@@ -188,7 +188,10 @@ describe('scoped analysis and honest evidence', () => {
       },
     ];
     const report = tool('value-flow').analyze(workspace(spend), [spend.txid]);
-    expect(report.findings[0]).toMatchObject({ title: 'Network fee: 1 sat', kind: 'observation' });
+    expect(report.findings[0]).toMatchObject({
+      title: 'Network fee: 0.00 000 001 BTC',
+      kind: 'observation',
+    });
     expect(report.findings[0].details).toContain('Known inputs total');
   });
   it('never calculates a fee from partial input history, even when known inputs exceed outputs', () => {
@@ -216,7 +219,7 @@ describe('scoped analysis and honest evidence', () => {
     const result = tool('value-flow').run(workspace(parent, spend), [spend.txid], {
       feeMode: 'attention',
     })[0];
-    expect(result.title).toBe('Network fee: 100 000 sats');
+    expect(result.title).toBe('Network fee: 0.00 100 000 BTC');
     expect(result.details).toContain('Fee rate is unknown');
   });
   it('filters fee reviews by a configurable threshold with inclusive equality', () => {

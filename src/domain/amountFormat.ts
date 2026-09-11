@@ -18,12 +18,11 @@ export function formatSats(value?: number | bigint): string {
   return `${grouped(amount.toString())}${UNIT_SPACE}${magnitude === 1n ? 'sat' : 'sats'}`;
 }
 
-/** Exact automatic display: sats below one BTC; BTC with right-grouped eight decimals above. */
+/** Exact BTC display with eight decimal places grouped from the right. */
 export function formatBitcoinAmount(value?: number | bigint): string {
   const amount = integerSats(value);
   if (amount === undefined) return 'Unknown value';
   const magnitude = amount < 0n ? -amount : amount;
-  if (magnitude < SATS_PER_BTC) return formatSats(amount);
   const whole = grouped((magnitude / SATS_PER_BTC).toString());
   const fraction = grouped((magnitude % SATS_PER_BTC).toString().padStart(8, '0'));
   return `${amount < 0n ? '-' : ''}${whole}.${fraction}${UNIT_SPACE}BTC`;
