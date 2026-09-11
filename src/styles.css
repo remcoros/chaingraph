@@ -993,8 +993,7 @@ small,
 }
 .inspector-scroll > .panel-section:not(.selection-evidence),
 .inspector-scroll > .connection-scan > .panel-section {
-  padding-top: 11px;
-  padding-bottom: 11px;
+  padding: 11px 17px;
 }
 .panel-section > .eyebrow {
   margin-bottom: 10px;
@@ -1021,7 +1020,7 @@ small,
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .selection-top .eyebrow {
   margin-top: 5px;
@@ -1030,7 +1029,9 @@ small,
   margin: -4px -6px 0 0;
 }
 .selection-heading h2 {
-  margin-bottom: 8px;
+  font-size: 15px;
+  margin: 4px 0;
+  overflow-wrap: anywhere;
 }
 .selection-value {
   font-size: 21px;

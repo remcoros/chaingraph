@@ -11,7 +11,7 @@
   min-width: 0;
 }
 .connection-scan-source {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .connection-scan-source h2 {
   flex: 1;
@@ -37,9 +37,9 @@
 .connection-scan-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px 8px;
+  gap: 8px;
   padding: 0;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   border: 0;
   min-width: 0;
 }
