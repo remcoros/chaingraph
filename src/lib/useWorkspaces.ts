@@ -79,6 +79,7 @@ export interface Session {
   revision: number;
   savedRevision: number;
   history: UndoEntry[];
+  redoHistory: UndoEntry[];
   /** Increments whenever the undo head changes, so a caller can tell whether its
    * own edit is still the step that Undo would restore. Presentation-only writes
    * leave it untouched. */
@@ -322,6 +323,7 @@ export class WorkspaceSessionStore {
           revision: 0,
           savedRevision: alreadySaved ? 0 : -1,
           history: [],
+          redoHistory: [],
           undoRevision: 0,
         },
       ],
@@ -406,7 +408,27 @@ export class WorkspaceSessionStore {
     const coalesce = undo && group && previousGroup?.key === group && now - previousGroup.at < 1500;
     if (undo && group) this.editGroups.set(id, { key: group, at: now });
     else if (undo || evidenceChanged) this.editGroups.delete(id);
-    // Chain refreshes are not undoable. Older snapshots are invalidated only when
+    const carryPresentation = (entry: UndoEntry): UndoEntry => {
+      const snapshot = entry.workspace;
+      return {
+        ...entry,
+        workspace: {
+          ...carryObservationContext(carryScanMetadata(snapshot, data), current.data, data),
+          // Latest scan results are not an undoable archive. Preserve
+          // pre-path evidence on camera writes, but carry explicit
+          // result replacement/clearing through both history stacks.
+          ...(data.connectionScans !== current.data.connectionScans
+            ? { connectionScans: scanRecordsForUndo(snapshot, data) }
+            : {}),
+          view: {
+            ...data.view,
+            hiddenNodeIds: snapshot.view.hiddenNodeIds,
+            graphNodeIds: snapshot.view.graphNodeIds,
+          },
+        },
+      };
+    };
+    // Chain refreshes are not undoable. Both history stacks are invalidated only when
     // evidence changed; a quiet check retains them, with the latest scan-owned
     // metadata carried in so undo restores user edits, never stale check state.
     this.patch({
@@ -439,30 +461,8 @@ export class WorkspaceSessionStore {
                     ]
                 : evidenceChanged
                   ? []
-                  : s.history.map((entry) => {
-                      const snapshot = entry.workspace;
-                      return {
-                        ...entry,
-                        workspace: {
-                          ...carryObservationContext(
-                            carryScanMetadata(snapshot, data),
-                            current.data,
-                            data,
-                          ),
-                          // Latest scan results are not an undoable archive. Preserve
-                          // pre-path evidence on camera writes, but carry explicit
-                          // result replacement/clearing through older edit snapshots.
-                          ...(data.connectionScans !== current.data.connectionScans
-                            ? { connectionScans: scanRecordsForUndo(snapshot, data) }
-                            : {}),
-                          view: {
-                            ...data.view,
-                            hiddenNodeIds: snapshot.view.hiddenNodeIds,
-                            graphNodeIds: snapshot.view.graphNodeIds,
-                          },
-                        },
-                      };
-                    }),
+                  : s.history.map(carryPresentation),
+              redoHistory: undo || evidenceChanged ? [] : s.redoHistory.map(carryPresentation),
             },
       ),
     });
@@ -477,6 +477,35 @@ export class WorkspaceSessionStore {
               ...s,
               data: s.history[s.history.length - 1].workspace,
               history: s.history.slice(0, -1),
+              redoHistory: [
+                ...s.redoHistory,
+                { workspace: s.data, description: s.history[s.history.length - 1].description },
+              ],
+              revision: s.revision + 1,
+              undoRevision: s.undoRevision + 1,
+            }
+          : s,
+      ),
+    });
+  };
+
+  redo = (id: string) => {
+    if (this.locking.has(id)) return;
+    this.editGroups.delete(id);
+    this.patch({
+      sessions: this.state.sessions.map((s) =>
+        s.data.id === id && s.redoHistory.length
+          ? {
+              ...s,
+              data: s.redoHistory[s.redoHistory.length - 1].workspace,
+              history: [
+                ...s.history,
+                {
+                  workspace: s.data,
+                  description: s.redoHistory[s.redoHistory.length - 1].description,
+                },
+              ],
+              redoHistory: s.redoHistory.slice(0, -1),
               revision: s.revision + 1,
               undoRevision: s.undoRevision + 1,
             }
@@ -681,6 +710,7 @@ export function useWorkspaces() {
     unlock: store.unlock,
     update: store.update,
     undo: store.undo,
+    redo: store.redo,
     lock: store.lock,
     persist: store.persist,
     getSession: store.getSession,

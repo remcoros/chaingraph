@@ -75,6 +75,7 @@ import {
   Wallet as WalletIcon,
   X,
   Undo2,
+  Redo2,
 } from 'lucide-react';
 const GraphView = lazy(() => import('./components/GraphView'));
 
@@ -1786,6 +1787,8 @@ export default function App() {
   const undoToken = ws.getSession(w?.id ?? '')?.undoRevision ?? 0;
   const undoDescription = ws.active?.history.at(-1)?.description;
   const undoLabel = undoDescription ? `Undo: ${undoDescription}` : 'Nothing to undo';
+  const redoDescription = ws.active?.redoHistory.at(-1)?.description;
+  const redoLabel = redoDescription ? `Redo: ${redoDescription}` : 'Nothing to redo';
   const applyBatch = (summary: string, update: (data: Workspace) => Workspace) => {
     if (!w) return undefined;
     const before = ws.getSession(w.id)?.undoRevision;
@@ -2490,6 +2493,15 @@ export default function App() {
                 <Undo2 size={17} />
               </button>
               <button
+                className="icon-button workspace-redo"
+                aria-label={redoLabel}
+                title={redoLabel}
+                disabled={!ws.active?.redoHistory.length || !!operation}
+                onClick={() => ws.redo(w.id)}
+              >
+                <Redo2 size={17} />
+              </button>
+              <button
                 className="export-button"
                 title="Export encrypted workspace backup"
                 aria-label="Export encrypted workspace backup"
@@ -2534,6 +2546,18 @@ export default function App() {
                       }}
                     >
                       <Undo2 size={15} /> Undo
+                    </button>
+                    <button
+                      className="mobile-workspace-redo"
+                      aria-label={redoLabel}
+                      title={redoLabel}
+                      disabled={!ws.active?.redoHistory.length || !!operation}
+                      onClick={() => {
+                        setMenu(false);
+                        ws.redo(w.id);
+                      }}
+                    >
+                      <Redo2 size={15} /> Redo
                     </button>
                     <button
                       onClick={() => {

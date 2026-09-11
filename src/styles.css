@@ -1490,7 +1490,8 @@ small,
   .workspace-actions {
     gap: 0;
   }
-  .workspace-actions > .icon-button:first-child {
+  .workspace-actions > .workspace-undo,
+  .workspace-actions > .workspace-redo {
     display: none;
   }
   .export-button {
@@ -1658,7 +1659,8 @@ small,
     gap: 2px;
   }
 }
-.workspace-actions .dropdown > .mobile-workspace-undo {
+.workspace-actions .dropdown > .mobile-workspace-undo,
+.workspace-actions .dropdown > .mobile-workspace-redo {
   display: none;
 }
 @media (max-width: 560px) {
@@ -1675,10 +1677,12 @@ small,
     width: 80px;
   }
   .workbench-toolbar .workspace-actions > .workspace-undo,
+  .workbench-toolbar .workspace-actions > .workspace-redo,
   .workbench-toolbar .workspace-actions > .export-button {
     display: none;
   }
-  .workspace-actions .dropdown > .mobile-workspace-undo {
+  .workspace-actions .dropdown > .mobile-workspace-undo,
+  .workspace-actions .dropdown > .mobile-workspace-redo {
     display: flex;
   }
 }
@@ -2073,7 +2077,8 @@ small,
 .workspace-menu .dropdown {
   top: calc(100% + 8px);
 }
-.workspace-menu .dropdown > .mobile-workspace-undo {
+.workspace-menu .dropdown > .mobile-workspace-undo,
+.workspace-menu .dropdown > .mobile-workspace-redo {
   display: none;
 }
 .lookup-error {
@@ -2109,7 +2114,8 @@ small,
   }
 }
 @media (max-width: 560px) {
-  .workspace-menu .dropdown > .mobile-workspace-undo {
+  .workspace-menu .dropdown > .mobile-workspace-undo,
+  .workspace-menu .dropdown > .mobile-workspace-redo {
     display: flex;
   }
   .lookup-prefetch select {
