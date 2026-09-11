@@ -251,47 +251,14 @@ async function loadSnapshot(id: string): Promise<Snapshot> {
 }
 
 /** A starting canvas, independent of loaded evidence and later manual expansion. */
-function initialTemplateGraph(
-  workspace: Workspace,
-  roots: string[],
-  selected: string,
-  limit: number,
-): string[] {
+function initialTemplateGraph(workspace: Workspace, roots: string[], selected: string): string[] {
   const nodes = new Set([...roots.map(txNodeId), selected]);
-  const rootIds = new Set(roots);
-  const bridges = new Set(
-    roots.flatMap((id) =>
-      workspace.transactions[id].vin.flatMap((input) =>
-        input.txid && input.vout !== undefined && rootIds.has(input.txid)
-          ? [outputNodeId(input.txid, input.vout)]
-          : [],
-      ),
-    ),
-  );
-  for (const id of roots) {
-    const transaction = workspace.transactions[id];
-    for (const side of ['inputs', 'outputs'] as const) {
-      const candidates = transactionNodeIds(transaction, side);
-      const available = new Set(candidates);
-      // Keep the example's selected/annotated outpoints and exact spending paths.
-      const priority = [selected, ...bridges, ...Object.keys(workspace.annotations)].filter(
-        (node) => available.has(node),
-      );
-      if (side === 'outputs') {
-        const scripts = new Set<string | undefined>();
-        for (const output of transaction.vout) {
-          if (scripts.has(output.scriptPubKey.type)) continue;
-          scripts.add(output.scriptPubKey.type);
-          priority.push(outputNodeId(id, output.n));
-        }
-        // Two members make repeated-amount groups visible in the CoinJoin example.
-        for (const tag of workspace.tags ?? [])
-          priority.push(...tag.nodeIds.filter((node) => available.has(node)).slice(0, 2));
-      }
-      for (const node of [...new Set([...priority, ...candidates])].slice(0, limit))
-        nodes.add(node);
-    }
-  }
+  // Every example opens on the complete input and output set of its root
+  // transactions. Each one is curated around comparing that whole width, so a
+  // partial opening would hide the point rather than tidy the canvas.
+  for (const id of roots)
+    for (const side of ['inputs', 'outputs'] as const)
+      for (const node of transactionNodeIds(workspace.transactions[id], side)) nodes.add(node);
   // The wallet example also annotates a context parent's additional sibling. Show
   // its creator to connect that sibling to the already visible funding outpoint.
   for (const node of Object.keys(workspace.annotations)) {
@@ -775,15 +742,7 @@ export async function createTemplateWorkspace(
     showTags: true,
     showIcons: true,
     selectionId: selected,
-    graphNodeIds: initialTemplateGraph(
-      workspace,
-      snapshot.roots,
-      selected,
-      // Comparing every repeated amount across one CoinJoin is what this example
-      // teaches, so it opens with the complete input and output set. The others
-      // open on a representative sample and expand on demand.
-      id === 'mainnet-wabisabi' ? Infinity : 20,
-    ),
+    graphNodeIds: initialTemplateGraph(workspace, snapshot.roots, selected),
     leftTab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks',
     rightTab: 'inspect',
     prefetchDepth: 0,

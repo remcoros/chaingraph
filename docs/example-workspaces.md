@@ -20,11 +20,11 @@ and exact spending links; none of them is an ownership or participant claim.
 | Explore 53 outputs            | testnet4 | [fan-out](https://mempool.space/testnet4/tx/cc159432ffb7a166abeccc79800e9616a09ea9ac6937080c2ca37b38671970e5)                                                                                                                        |            2 |            56 |
 | From mixed scripts to a spend | testnet4 | [mixed scripts](https://mempool.space/testnet4/tx/b92eb2d8abf81a25197bacde9845eea3d711bd6edf25e1e8975d731271dd83eb), [successor](https://mempool.space/testnet4/tx/e0d797ca417b3c39e64677da7be5591f7c5e5d945743e9046efdbb10fd8ba76f) |            4 |            10 |
 
-Initial nodes counts the loaded evidence. Examples with a wide transaction open
-on a bounded sample of it, chosen to keep every script form and the annotated
-outpoints visible, and reveal the rest on demand. The WabiSabi example is the
-exception: comparing repeated amounts across one CoinJoin is what it teaches, so
-all 327 inputs and 279 outputs are on the canvas from the start.
+Initial nodes counts the loaded evidence. Every example opens on the complete
+input and output set of its root transactions, because each one is curated
+around comparing that whole width. Where the count is higher than the opening
+canvas, the difference is context: a parent transaction kept for its values but
+not placed on the canvas itself.
 
 ## Discovery credits
 

@@ -111,9 +111,8 @@ describe('real annotated workspace templates', () => {
         for (const side of ['inputs', 'outputs'] as const) {
           const candidates = transactionNodeIds(transaction, side);
           const shown = candidates.filter((id) => nodes.has(id));
-          // The CoinJoin example opens complete; the rest open on a bounded sample.
-          const cap = template.id === 'mainnet-wabisabi' ? Infinity : 20;
-          expect(shown.length).toBe(Math.min(candidates.length, cap));
+          // Examples open on the complete width of their root transactions.
+          expect(shown.length).toBe(candidates.length);
         }
       }
       // Selection and save/load preserve this initial canvas without expanding it.
@@ -126,17 +125,21 @@ describe('real annotated workspace templates', () => {
     },
   );
 
-  it('keeps large opening graphs bounded while showing script variety', async () => {
-    for (const id of ['mainnet-batch-outputs', 'testnet4-fan-out']) {
+  it('opens wide fan-outs on their complete output set', async () => {
+    for (const [id, expected] of [
+      ['mainnet-batch-outputs', 143],
+      ['testnet4-fan-out', 53],
+    ] as const) {
       const workspace = await createTemplateWorkspace(id);
       const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
       const visible = new Set(workspace.view.graphNodeIds);
-      const outputs = root.vout.filter((output) => visible.has(outputNodeId(root.txid, output.n)));
-      expect(visible.size).toBeLessThanOrEqual(41);
-      expect(outputs.length).toBeLessThan(root.vout.length);
-      expect(new Set(outputs.map((output) => output.scriptPubKey.type))).toEqual(
-        new Set(root.vout.map((output) => output.scriptPubKey.type)),
-      );
+      expect(root.vout).toHaveLength(expected);
+      for (const output of root.vout)
+        expect(visible.has(outputNodeId(root.txid, output.n)), `${id} output ${output.n}`).toBe(
+          true,
+        );
+      for (const node of transactionNodeIds(root, 'inputs')) expect(visible.has(node)).toBe(true);
+      expect(visible.has(txNodeId(root.txid))).toBe(true);
     }
   });
 
