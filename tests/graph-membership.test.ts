@@ -372,7 +372,10 @@ describe('explicit canvas membership', () => {
       expect(graph.links.some((link) => link.kind === 'creates' && link.source === root)).toBe(
         true,
       );
-      expect(visible.size).toBeLessThan(buildGraph(w).nodes.length);
+      // The CoinJoin example opens on its complete transaction; the other keeps a
+      // curated subset of the loaded evidence.
+      if (template === 'mainnet-wabisabi') expect(visible.size).toBe(buildGraph(w).nodes.length);
+      else expect(visible.size).toBeLessThan(buildGraph(w).nodes.length);
       expect(parseWorkspace(w)).toEqual(w);
     },
   );

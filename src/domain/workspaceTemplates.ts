@@ -251,7 +251,12 @@ async function loadSnapshot(id: string): Promise<Snapshot> {
 }
 
 /** A starting canvas, independent of loaded evidence and later manual expansion. */
-function initialTemplateGraph(workspace: Workspace, roots: string[], selected: string): string[] {
+function initialTemplateGraph(
+  workspace: Workspace,
+  roots: string[],
+  selected: string,
+  limit: number,
+): string[] {
   const nodes = new Set([...roots.map(txNodeId), selected]);
   const rootIds = new Set(roots);
   const bridges = new Set(
@@ -263,7 +268,6 @@ function initialTemplateGraph(workspace: Workspace, roots: string[], selected: s
       ),
     ),
   );
-  const limit = 20;
   for (const id of roots) {
     const transaction = workspace.transactions[id];
     for (const side of ['inputs', 'outputs'] as const) {
@@ -771,7 +775,15 @@ export async function createTemplateWorkspace(
     showTags: true,
     showIcons: true,
     selectionId: selected,
-    graphNodeIds: initialTemplateGraph(workspace, snapshot.roots, selected),
+    graphNodeIds: initialTemplateGraph(
+      workspace,
+      snapshot.roots,
+      selected,
+      // Comparing every repeated amount across one CoinJoin is what this example
+      // teaches, so it opens with the complete input and output set. The others
+      // open on a representative sample and expand on demand.
+      id === 'mainnet-wabisabi' ? Infinity : 20,
+    ),
     leftTab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks',
     rightTab: 'inspect',
     prefetchDepth: 0,

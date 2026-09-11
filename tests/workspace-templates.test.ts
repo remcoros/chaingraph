@@ -111,7 +111,9 @@ describe('real annotated workspace templates', () => {
         for (const side of ['inputs', 'outputs'] as const) {
           const candidates = transactionNodeIds(transaction, side);
           const shown = candidates.filter((id) => nodes.has(id));
-          expect(shown.length).toBe(Math.min(candidates.length, 20));
+          // The CoinJoin example opens complete; the rest open on a bounded sample.
+          const cap = template.id === 'mainnet-wabisabi' ? Infinity : 20;
+          expect(shown.length).toBe(Math.min(candidates.length, cap));
         }
       }
       // Selection and save/load preserve this initial canvas without expanding it.
@@ -124,8 +126,8 @@ describe('real annotated workspace templates', () => {
     },
   );
 
-  it('keeps large opening graphs bounded while showing script variety and repeated amounts', async () => {
-    for (const id of ['mainnet-batch-outputs', 'testnet4-fan-out', 'mainnet-wabisabi']) {
+  it('keeps large opening graphs bounded while showing script variety', async () => {
+    for (const id of ['mainnet-batch-outputs', 'testnet4-fan-out']) {
       const workspace = await createTemplateWorkspace(id);
       const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
       const visible = new Set(workspace.view.graphNodeIds);
@@ -135,9 +137,6 @@ describe('real annotated workspace templates', () => {
       expect(new Set(outputs.map((output) => output.scriptPubKey.type))).toEqual(
         new Set(root.vout.map((output) => output.scriptPubKey.type)),
       );
-      if (id === 'mainnet-wabisabi')
-        for (const tag of workspace.tags!)
-          expect(tag.nodeIds.filter((node) => visible.has(node)).length).toBeGreaterThanOrEqual(2);
     }
   });
 
@@ -309,6 +308,17 @@ describe('real annotated workspace templates', () => {
     );
     expect(workspace.findings).toEqual([]);
     expect(buildGraph(workspace).nodes.length).toBe(607);
+    // The canvas opens on the complete transaction: every input outpoint, every
+    // output, and the CoinJoin itself, with nothing left to reveal by hand.
+    const visible = new Set(workspace.view.graphNodeIds);
+    expect(visible.size).toBe(607);
+    for (const input of root.vin)
+      expect(visible.has(outputNodeId(input.txid!, input.vout!))).toBe(true);
+    for (const output of root.vout)
+      expect(visible.has(outputNodeId(root.txid, output.n))).toBe(true);
+    expect(visible.has(txNodeId(root.txid))).toBe(true);
+    for (const tag of workspace.tags!)
+      expect(tag.nodeIds.every((node) => visible.has(node))).toBe(true);
   });
 
   it('includes a derived public watch-only wallet with honest partial scan state', async () => {
