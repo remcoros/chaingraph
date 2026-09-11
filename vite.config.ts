@@ -46,5 +46,24 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
-  build: { chunkSizeWarningLimit: 1500 },
+  build: {
+    chunkSizeWarningLimit: 1500,
+    // Template snapshots are fetched and JSON.parsed at runtime. Small ones
+    // would otherwise be inlined as base64 data URLs, which both bloats the
+    // chunk that holds them and gives two of the nine templates a different
+    // loading path from the rest. Keep every snapshot an emitted file.
+    assetsInlineLimit: (filePath: string) =>
+      /templateData\/.*\.json$/.test(filePath) ? false : undefined,
+  },
+  // `vite preview` does not inherit `server.proxy`. Mirror it so a production
+  // build, which is the only build React Compiler runs on, can be exercised
+  // against a local backend the same way the dev server is.
+  preview: {
+    proxy: {
+      '/api': {
+        target: process.env.CHAINGRAPH_PROXY_TARGET ?? 'http://127.0.0.1:3000',
+        changeOrigin: false,
+      },
+    },
+  },
 }));

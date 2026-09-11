@@ -1,6 +1,7 @@
 import { formatBitcoinAmount } from './domain/amountFormat';
 import { Amount } from './components/Amount';
 import { TransactionFetchShell } from './lib/useTransactionFetch';
+import { ConnectionScanPanel } from './components/ConnectionScanPanel';
 import { ScanTargetToolbar } from './components/ScanTargetToolbar';
 import { prepareCustomScanTargets } from './domain/connectionScanTargets';
 import { indexScanNeighbours } from './domain/connectionScanNeighbours';
@@ -18,6 +19,7 @@ import {
 } from './domain/walletRecords';
 import { listWalletRelationships } from './domain/walletRelationships';
 import { useFlowInputs } from './lib/useFlowInputs';
+import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
 import { GraphLegend } from './components/GraphLegend';
 import { indexGraphFlow } from './components/graph/flowContext';
@@ -49,8 +51,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentType,
-  type ReactNode,
 } from 'react';
 import {
   ChevronRight,
@@ -77,72 +77,12 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
-// Route-level code splitting. None of this is reachable from the workspace list
-// or unlock screen, which is the true first-paint path, so keeping it out of the
-// entry chunk is pure win. `prefetchWorkbenches` warms them during unlock so the
-// split is invisible once a workspace actually opens.
+// The graph renderer is the one genuinely optional chunk: it pulls in three.js
+// and is not needed until a workspace is open. The other workbenches and dialogs
+// are deliberately NOT split: their stylesheets would then load as separate
+// chunks, and this project uses global, unscoped CSS whose cascade depends on
+// source order.
 const GraphView = lazy(() => import('./components/GraphView'));
-
-/**
- * Wraps a lazy component in its own Suspense boundary so one pending chunk never
- * blanks unrelated UI. Declared at module scope: defining it per render would
- * remount the subtree on every parent render.
- */
-function withSuspense<P extends object>(Component: ComponentType<P>, fallback: ReactNode = null) {
-  return function Suspended(props: P) {
-    return (
-      <Suspense fallback={fallback}>
-        <Component {...props} />
-      </Suspense>
-    );
-  };
-}
-
-const panelFallback = (
-  <div className="lazy-panel-fallback" role="status" aria-live="polite">
-    <LoaderCircle className="spin" size={16} />
-    <span>Loading…</span>
-  </div>
-);
-
-const ConnectionScanPanel = withSuspense(
-  lazy(() =>
-    import('./components/ConnectionScanPanel').then((m) => ({ default: m.ConnectionScanPanel })),
-  ),
-  panelFallback,
-);
-const TransactionView = withSuspense(
-  lazy(() => import('./components/TransactionView').then((m) => ({ default: m.TransactionView }))),
-);
-const AnalysisWorkbench = withSuspense(
-  lazy(() =>
-    import('./components/AnalysisWorkbench').then((m) => ({ default: m.AnalysisWorkbench })),
-  ),
-  panelFallback,
-);
-const WalletWorkbench = withSuspense(
-  lazy(() => import('./components/WalletWorkbench').then((m) => ({ default: m.WalletWorkbench }))),
-  panelFallback,
-);
-const ExamplesDialog = withSuspense(
-  lazy(() => import('./components/ExamplesDialog').then((m) => ({ default: m.ExamplesDialog }))),
-);
-const AboutDialog = withSuspense(
-  lazy(() => import('./components/AboutDialog').then((m) => ({ default: m.AboutDialog }))),
-);
-const GuidedTour = withSuspense(
-  lazy(() => import('./components/GuidedTour').then((m) => ({ default: m.GuidedTour }))),
-);
-type AnalysisWorkbenchSession = import('./components/AnalysisWorkbench').AnalysisWorkbenchSession;
-
-/** Warm the workbench chunks before a workspace opens, so the split never shows. */
-function prefetchWorkbenches() {
-  void import('./components/GraphView');
-  void import('./components/AnalysisWorkbench');
-  void import('./components/WalletWorkbench');
-  void import('./components/ConnectionScanPanel');
-  void import('./components/TransactionView');
-}
 
 import {
   CreateDialog,
@@ -153,8 +93,10 @@ import {
   WorkspaceDetailsDialog,
   Modal,
 } from './components/Dialogs';
+import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { HelpMenu } from './components/HelpMenu';
+import { AboutDialog } from './components/AboutDialog';
 import {
   describeMatchScope,
   filterGraph,
@@ -177,10 +119,13 @@ import { GraphWalletFilter } from './components/GraphWalletFilter';
 import { setNodesHidden, showAllNodes, transactionNodeIds } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
+import { AnalysisWorkbench, type AnalysisWorkbenchSession } from './components/AnalysisWorkbench';
+import { WalletWorkbench } from './components/WalletWorkbench';
 import { pruneWalletReviews } from './domain/walletReview';
 import './components/workbenches.css';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
+import { GuidedTour } from './components/GuidedTour';
 import {
   buildGraph,
   clearContextProvenance,
@@ -245,17 +190,6 @@ export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
   const fetchScope = ws.active?.fetchScope;
-  // Warm the split workbench chunks once the first paint is done, so opening a
-  // workspace never waits on a network round trip for them.
-  useEffect(() => {
-    const idle = globalThis.requestIdleCallback;
-    if (idle) {
-      const handle = idle(prefetchWorkbenches, { timeout: 3000 });
-      return () => globalThis.cancelIdleCallback?.(handle);
-    }
-    const handle = setTimeout(prefetchWorkbenches, 1500);
-    return () => clearTimeout(handle);
-  }, []);
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
@@ -2155,7 +2089,14 @@ export default function App() {
       inputs: countSide(contextSideIds.inputs),
       outputs: countSide(contextSideIds.outputs),
     };
-  }, [contextSideIds, canvasIds, admittedIds, hiddenIds, unconnectedForHide, unconnectedForRemoval]);
+  }, [
+    contextSideIds,
+    canvasIds,
+    admittedIds,
+    hiddenIds,
+    unconnectedForHide,
+    unconnectedForRemoval,
+  ]);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
   // Single pass over every graph link, memoized: this ran filter+map across the
   // whole link set on each render, including on every keystroke in the lookup field.

@@ -34,15 +34,18 @@ import type { EntitySelection } from '../lib/useEntitySelection';
 
 /** Icons mirror the transaction flow block (Box), output side toolbar (ArrowRightFromLine)
  * and the graph's address-node toggle (Layers), so entities read the same way everywhere. */
-const TYPE_FILTERS: { value: GraphNode['kind']; label: string; Icon: ComponentType<{ size?: number; className?: string }> }[] = [
+const TYPE_FILTERS: {
+  value: GraphNode['kind'];
+  label: string;
+  Icon: ComponentType<{ size?: number; className?: string }>;
+}[] = [
   { value: 'transaction', label: 'Transactions', Icon: Box },
   { value: 'output', label: 'Outputs', Icon: ArrowRightFromLine },
   { value: 'address', label: 'Addresses', Icon: Layers },
 ];
-const TYPE_ICON = Object.fromEntries(TYPE_FILTERS.map(({ value, Icon }) => [value, Icon])) as Record<
-  GraphNode['kind'],
-  ComponentType<{ size?: number; className?: string }>
->;
+const TYPE_ICON = Object.fromEntries(
+  TYPE_FILTERS.map(({ value, Icon }) => [value, Icon]),
+) as Record<GraphNode['kind'], ComponentType<{ size?: number; className?: string }>>;
 
 const SORT_OPTIONS: { value: EntitySort; label: string }[] = [
   { value: 'graph', label: 'Graph order' },
@@ -249,7 +252,11 @@ export default function EntityBrowser({
                   className={`entity-icon-toggle entity-type-${value} ${active ? 'active' : ''}`}
                   aria-pressed={active}
                   aria-label={label}
-                  title={active ? `Showing ${label.toLowerCase()} only. Click to show all types.` : `Show ${label.toLowerCase()} only`}
+                  title={
+                    active
+                      ? `Showing ${label.toLowerCase()} only. Click to show all types.`
+                      : `Show ${label.toLowerCase()} only`
+                  }
                   onClick={() => patch({ kind: active ? 'all' : value })}
                 >
                   <Icon size={13} />
@@ -391,112 +398,120 @@ export default function EntityBrowser({
           </p>
         )}
       </div>
-      <div ref={listRef} className="entity-list" data-testid="entity-list" aria-label="Matching graph entities">
+      <div
+        ref={listRef}
+        className="entity-list"
+        data-testid="entity-list"
+        aria-label="Matching graph entities"
+      >
         {sorted.slice(first, first + pageSize).map((node) => {
           const KindIcon = TYPE_ICON[node.kind];
           return (
-          <div
-            key={node.id}
-            className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${selection?.has(node.id) ? 'is-batch-selected' : ''}`}
-          >
-            {selection?.mode && (
-              <SelectionCheckbox
-                id={node.id}
-                label={node.label}
-                checked={selection.has(node.id)}
-                onToggle={selection.toggle}
-              />
-            )}
             <div
-              className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
-              data-testid="entity-row"
-              role="button"
-              tabIndex={0}
-              aria-pressed={selectedId === node.id}
-              onClick={(event) => {
-                if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
-                else onSelect(node.id);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
-                else onSelect(node.id);
-              }}
-              title={node.id}
+              key={node.id}
+              className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${selection?.has(node.id) ? 'is-batch-selected' : ''}`}
             >
-              <span className="entity-row-header">
-                <KindIcon size={12} className={`entity-row-icon ${node.kind}`} />
-                <span className="entity-row-title">
-                  <strong>{short(node.id)}</strong>
-                  {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
-                    <small className="entity-row-io">
-                      ({transactions[node.txid!].vin.length} / {transactions[node.txid!].vout.length})
-                    </small>
-                  )}
+              {selection?.mode && (
+                <SelectionCheckbox
+                  id={node.id}
+                  label={node.label}
+                  checked={selection.has(node.id)}
+                  onToggle={selection.toggle}
+                />
+              )}
+              <div
+                className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
+                data-testid="entity-row"
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedId === node.id}
+                onClick={(event) => {
+                  if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
+                  else onSelect(node.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
+                  else onSelect(node.id);
+                }}
+                title={node.id}
+              >
+                <span className="entity-row-header">
+                  <KindIcon size={12} className={`entity-row-icon ${node.kind}`} />
+                  <span className="entity-row-title">
+                    <strong>{short(node.id)}</strong>
+                    {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
+                      <small className="entity-row-io">
+                        ({transactions[node.txid!].vin.length} /{' '}
+                        {transactions[node.txid!].vout.length})
+                      </small>
+                    )}
+                  </span>
                 </span>
-              </span>
-              <span className="entity-row-lower">
-                <span className="entity-row-body">
-                  {annotations[node.id]?.label && (
-                    <small className="entity-row-label">
-                      {annotations[node.id]!.icon ? `${annotations[node.id]!.icon} ` : ''}
-                      {annotations[node.id]!.label}
-                    </small>
-                  )}
-                  {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
-                    <span className="entity-chain-status">
-                      <TransactionBlockTime transaction={transactions[node.txid!]} />
-                    </span>
-                  )}
-                  <Amount as="small" value={node.value} />
+                <span className="entity-row-lower">
+                  <span className="entity-row-body">
+                    {annotations[node.id]?.label && (
+                      <small className="entity-row-label">
+                        {annotations[node.id]!.icon ? `${annotations[node.id]!.icon} ` : ''}
+                        {annotations[node.id]!.label}
+                      </small>
+                    )}
+                    {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
+                      <span className="entity-chain-status">
+                        <TransactionBlockTime transaction={transactions[node.txid!]} />
+                      </span>
+                    )}
+                    <Amount as="small" value={node.value} />
+                  </span>
+                  <span className="entity-row-status">
+                    {annotations[node.id]?.bookmarked && (
+                      <Bookmark size={12} aria-label="Bookmarked" />
+                    )}
+                  </span>
+                  <span className="entity-row-actions">
+                    {onSetHidden && (
+                      <button
+                        type="button"
+                        className="icon-button entity-row-restore"
+                        aria-label={`${hidden.has(node.id) ? 'Show' : 'Hide'} ${node.label} ${hidden.has(node.id) ? 'in' : 'from'} graph`}
+                        title={
+                          hidden.has(node.id) ? 'Show entity in graph' : 'Hide entity from graph'
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSetHidden([node.id], !hidden.has(node.id));
+                        }}
+                      >
+                        {hidden.has(node.id) ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                    )}
+                    {removable.has(node.id) && onRemoveNode && (
+                      <button
+                        type="button"
+                        className="icon-button danger entity-row-remove"
+                        aria-label={
+                          node.kind === 'address'
+                            ? `Stop watching ${node.label}`
+                            : `Remove ${node.label} from workspace`
+                        }
+                        title={
+                          node.kind === 'address'
+                            ? 'Stop watching address'
+                            : 'Remove transaction from workspace'
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemoveNode(node.id);
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </span>
                 </span>
-                <span className="entity-row-status">
-                  {annotations[node.id]?.bookmarked && (
-                    <Bookmark size={12} aria-label="Bookmarked" />
-                  )}
-                </span>
-                <span className="entity-row-actions">
-                  {onSetHidden && (
-                    <button
-                      type="button"
-                      className="icon-button entity-row-restore"
-                      aria-label={`${hidden.has(node.id) ? 'Show' : 'Hide'} ${node.label} ${hidden.has(node.id) ? 'in' : 'from'} graph`}
-                      title={hidden.has(node.id) ? 'Show entity in graph' : 'Hide entity from graph'}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSetHidden([node.id], !hidden.has(node.id));
-                      }}
-                    >
-                      {hidden.has(node.id) ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
-                  )}
-                  {removable.has(node.id) && onRemoveNode && (
-                    <button
-                      type="button"
-                      className="icon-button danger entity-row-remove"
-                      aria-label={
-                        node.kind === 'address'
-                          ? `Stop watching ${node.label}`
-                          : `Remove ${node.label} from workspace`
-                      }
-                      title={
-                        node.kind === 'address'
-                          ? 'Stop watching address'
-                          : 'Remove transaction from workspace'
-                      }
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onRemoveNode(node.id);
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </span>
-              </span>
+              </div>
             </div>
-          </div>
           );
         })}
         {!nodes.length && (

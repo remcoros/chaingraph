@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node --use-system-ca --import tsx scripts/dev.ts",
     "dev:live": "node --use-system-ca --import tsx scripts/dev.ts",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/precompress.mjs",
     "start": "node --use-system-ca --import tsx server/index.ts",
     "start:live": "node --use-system-ca --import tsx server/index.ts",
     "test": "vitest run",

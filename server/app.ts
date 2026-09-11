@@ -1,5 +1,6 @@
 import express, { type ErrorRequestHandler } from 'express';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import type { ServerConfig } from './config';
 import { NetworkRegistry } from './networks';
 import { errorMessage, SafeError } from './errors';
@@ -178,6 +179,30 @@ export function createApp(
       ? undefined
       : (options.staticDirectory ?? path.resolve('dist'));
   if (directory) {
+    // Serve build-time pre-compressed variants when the client accepts them.
+    // Assets are immutable and hashed, so this costs no runtime CPU. Falls
+    // through untouched when a `.br`/`.gz` sibling is absent.
+    app.get('/{*path}', (req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      const accept = req.headers['accept-encoding'];
+      if (typeof accept !== 'string') return next();
+      const requested = path.posix.normalize(req.path);
+      // Reject traversal before touching the filesystem.
+      if (requested.includes('..')) return next();
+      const target = path.join(directory, requested);
+      if (!target.startsWith(directory + path.sep)) return next();
+      const encoding = /\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : undefined;
+      if (!encoding) return next();
+      const file = `${target}.${encoding === 'br' ? 'br' : 'gz'}`;
+      if (!existsSync(file)) return next();
+      // Content-Type must describe the decoded asset, not the container.
+      res.type(path.extname(requested) || '.html');
+      res.setHeader('Content-Encoding', encoding);
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.sendFile(file, (error) => {
+        if (error) next(error);
+      });
+    });
     app.use(express.static(directory));
     app.get('/{*path}', (_req, res, next) => {
       res.sendFile(path.join(directory, 'index.html'), (error) => {

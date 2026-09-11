@@ -1272,10 +1272,6 @@
   text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
-  content-visibility: auto;
-  /* Measured: rendered review rows are 92px. An inaccurate estimate makes the
-     scrollbar jump while scrolling an unrendered list. */
-  contain-intrinsic-size: auto 92px;
 }
 .wallet-review-item:has(.wallet-row-button.active) {
   background: var(--color-raised);
