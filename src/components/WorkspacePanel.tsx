@@ -118,18 +118,21 @@ export function WorkspacePanel({
     <aside className="left-panel" data-tour="wallet-panel">
       <div className="panel-tabs">
         <button
+          data-testid="panel-tab-wallets"
           className={leftTab === 'wallets' ? 'active' : ''}
           onClick={() => setLeftTab('wallets')}
         >
           Wallets <span>{w.wallets.length}</span>
         </button>
         <button
+          data-testid="panel-tab-entities"
           className={leftTab === 'entities' ? 'active' : ''}
           onClick={() => setLeftTab('entities')}
         >
           Entities
         </button>
         <button
+          data-testid="panel-tab-bookmarks"
           className={leftTab === 'bookmarks' ? 'active icon-button' : 'icon-button'}
           aria-label="Bookmarks"
           onClick={() => setLeftTab('bookmarks')}
@@ -137,6 +140,7 @@ export function WorkspacePanel({
           <Bookmark size={15} />
         </button>
         <button
+          data-testid="panel-tab-tags"
           className={leftTab === 'tags' ? 'active icon-button' : 'icon-button'}
           aria-label="Tags"
           title="Tags"

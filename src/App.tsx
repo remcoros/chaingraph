@@ -2371,6 +2371,7 @@ export default function App() {
           ))}
           <button
             className="icon-button"
+            data-testid="new-workspace-button"
             aria-label="New workspace"
             title="New workspace"
             onClick={() => setCreate('empty')}

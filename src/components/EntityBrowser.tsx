@@ -230,6 +230,7 @@ export default function EntityBrowser({
     <div className="entity-browser" aria-busy={contextPreviewPending}>
       <div className="entity-filters">
         <input
+          data-testid="entity-filter-query"
           aria-label="Filter graph entities"
           type="search"
           placeholder="Search labels, IDs, notes…"
@@ -244,6 +245,7 @@ export default function EntityBrowser({
                 <button
                   key={value}
                   type="button"
+                  data-testid={`entity-type-filter-${value}`}
                   className={`entity-icon-toggle entity-type-${value} ${active ? 'active' : ''}`}
                   aria-pressed={active}
                   aria-label={label}
@@ -261,6 +263,7 @@ export default function EntityBrowser({
               return (
                 <button
                   type="button"
+                  data-testid="entity-visibility-toggle"
                   className={`entity-icon-toggle entity-visibility-toggle ${visibility !== 'graph' && visibility !== 'visible' ? 'active' : ''}`}
                   title={`${meta.hint} Click to cycle visibility.`}
                   aria-label={`Entity visibility: ${meta.label}. Click to cycle.`}
@@ -388,7 +391,7 @@ export default function EntityBrowser({
           </p>
         )}
       </div>
-      <div ref={listRef} className="entity-list" aria-label="Matching graph entities">
+      <div ref={listRef} className="entity-list" data-testid="entity-list" aria-label="Matching graph entities">
         {sorted.slice(first, first + pageSize).map((node) => {
           const KindIcon = TYPE_ICON[node.kind];
           return (
@@ -406,6 +409,7 @@ export default function EntityBrowser({
             )}
             <div
               className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
+              data-testid="entity-row"
               role="button"
               tabIndex={0}
               aria-pressed={selectedId === node.id}
