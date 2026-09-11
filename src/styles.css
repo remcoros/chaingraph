@@ -1888,7 +1888,7 @@ small,
   font-size: 11px;
 }
 .transaction-view > summary {
-  min-height: 38px;
+  min-height: 32px;
   padding-top: 3px;
   padding-bottom: 3px;
 }
@@ -1897,7 +1897,7 @@ small,
   align-items: center;
   justify-content: space-between;
   gap: 5px;
-  width: calc(100% - 14px);
+  width: 100%;
   vertical-align: middle;
 }
 .transaction-summary-content > small {

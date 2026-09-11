@@ -27,6 +27,8 @@ import {
   EyeOff,
   ArrowDown,
   ArrowUp,
+  ChevronsDown,
+  ChevronsUp,
 } from 'lucide-react';
 import {
   type GraphNode,
@@ -599,6 +601,14 @@ export function TransactionView(props: Props) {
   );
   const [choice, setChoice] = useState('');
   const [fullHeight, setFullHeight] = useState(false);
+  const [localOpen, setLocalOpen] = useState(true);
+  const open = state?.open ?? localOpen;
+  const setPanelHeight = (height: 'collapsed' | 'expanded' | 'full') => {
+    const nextOpen = height !== 'collapsed';
+    setFullHeight(height === 'full');
+    setLocalOpen(nextOpen);
+    if (nextOpen !== open) onStateChange?.({ ...state, open: nextOpen });
+  };
   const current =
     related.find(({ tx }) => tx.txid === (state?.transactionId ?? choice)) ?? related[0];
   const choose = (transactionId: string) => {
@@ -606,7 +616,7 @@ export function TransactionView(props: Props) {
     if (transactionId === state?.transactionId) return;
     onStateChange?.({ ...state, transactionId, expandedInputs: false, expandedOutputs: false });
   };
-  if (!selected || (selected.kind === 'address' && !related.length)) return null;
+  const hasFlowSelection = !!selected && (selected.kind !== 'address' || related.length > 0);
   const currentNotOnGraph =
     !!current &&
     props.graphNodeIds !== undefined &&
@@ -617,12 +627,12 @@ export function TransactionView(props: Props) {
     onSelect(outputId);
   };
   const leg = current
-    ? selectedFlowLeg(current.tx, selected.kind === 'output' ? selected.id : undefined)
+    ? selectedFlowLeg(current.tx, selected?.kind === 'output' ? selected.id : undefined)
     : undefined;
   const missingCreating =
-    selected.kind === 'output' && !workspace.transactions[selected.txid ?? ''];
+    selected?.kind === 'output' && !workspace.transactions[selected.txid ?? ''];
   const selectedResolution =
-    selected.kind === 'output' && selected.txid !== undefined && selected.vout !== undefined
+    selected?.kind === 'output' && selected.txid !== undefined && selected.vout !== undefined
       ? resolvePreviousOutput(workspace, selected, previousOutputs)
       : undefined;
   const selectedOutput =
@@ -630,9 +640,9 @@ export function TransactionView(props: Props) {
       ? selectedResolution.output
       : undefined;
   const selectedUnspendable = isOpReturn(selectedOutput?.scriptPubKey.hex);
-  const loadedSpenders = selected.kind === 'output' ? (spends.get(selected.id) ?? []) : [];
+  const loadedSpenders = selected?.kind === 'output' ? (spends.get(selected.id) ?? []) : [];
   const walletObservation =
-    selected.kind === 'output'
+    selected?.kind === 'output'
       ? matchingWalletUtxoObservation(
           walletUtxoObservation,
           workspace,
@@ -641,6 +651,7 @@ export function TransactionView(props: Props) {
         )
       : undefined;
   const preview = (direction: 'previous' | 'next') => {
+    if (!selected) return null;
     const active =
       direction === 'previous' ? leg?.direction === 'previous' : leg?.direction === 'next';
     if (!active)
@@ -732,236 +743,256 @@ export function TransactionView(props: Props) {
   return (
     <div className="transaction-view-slot">
       <div className={`transaction-view-surface${fullHeight ? ' is-full-height' : ''}`}>
-        <details
-          className="transaction-view"
-          data-tour="transaction-flow"
-          open={state?.open ?? true}
-          onToggle={(event) => {
-            const open = event.currentTarget.open;
-            if (!open) setFullHeight(false);
-            if (open !== (state?.open ?? true)) onStateChange?.({ ...state, open });
-          }}
-        >
-          <summary>
+        <details className="transaction-view" data-tour="transaction-flow" open={open}>
+          <summary
+            aria-disabled={!hasFlowSelection}
+            onClick={(event) => {
+              event.preventDefault();
+              if (hasFlowSelection) setPanelHeight(open ? 'collapsed' : 'expanded');
+            }}
+          >
             <span className="transaction-summary-content">
-              <span>Transaction flow</span>
-              <small title={current ? transactionStatus(current.tx).title : undefined}>
-                {current ? transactionStatus(current.tx).label : 'Not loaded'}
-              </small>
+              <span className="transaction-summary-title">
+                <span>Transaction flow</span>
+                {hasFlowSelection && selected && (
+                  <code title={selected.id.replace(/^(?:tx|out|addr):/, '')}>
+                    {short(selected.id)}
+                  </code>
+                )}
+                {selected?.kind === 'transaction' && current && (
+                  <span
+                    className="transaction-summary-counts"
+                    title={`${current.tx.vin.length} inputs / ${current.tx.vout.length} outputs`}
+                    aria-label={`${current.tx.vin.length} inputs / ${current.tx.vout.length} outputs`}
+                  >
+                    ({current.tx.vin.length}/{current.tx.vout.length})
+                  </span>
+                )}
+              </span>
+              {hasFlowSelection && (
+                <small title={current ? transactionStatus(current.tx).title : undefined}>
+                  {current ? transactionStatus(current.tx).label : 'Not loaded'}
+                </small>
+              )}
             </span>
           </summary>
-          <div className="transaction-view-body">
-            <div className="transaction-view-actions">
-              {!!props.missingInputCount && props.onLoadAllInputs && (
-                <button
-                  type="button"
-                  className="text-button"
-                  disabled={!!disabledReason || inputLoading}
-                  title={
-                    disabledReason ||
-                    `Fetch up to ${props.missingInputCount} parent transactions for missing input details. Up to 500 per action; other branches are not followed.`
-                  }
-                  onClick={props.onLoadAllInputs}
-                >
-                  Load missing input details ({props.missingInputCount})
-                </button>
-              )}
-            </div>
-            {current ? (
-              <TransactionRows
-                {...props}
-                tx={current.tx}
-                key={current.tx.txid}
-                spends={spends}
-                previousOutputs={previousOutputs}
-                onNavigate={navigate}
-                onSelect={(id) => {
-                  choose(current.tx.txid);
-                  onSelect(id);
-                }}
-                onEdit={(id, target) => {
-                  choose(current.tx.txid);
-                  props.onEdit(id, target);
-                }}
-                previous={preview('previous')}
-                next={preview('next')}
-                identity={
-                  <div className="transaction-flow-center">
-                    {props.onSmallAmountThresholdChange && (
-                      <div className="transaction-flow-amounts">
-                        <SmallAmountControl
-                          context="flow"
-                          threshold={workspace.view.flowAmountThreshold}
-                          onChange={props.onSmallAmountThresholdChange}
-                        />
-                      </div>
-                    )}
-                    <div
-                      className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className="transaction-identity-select"
-                        aria-label={`Select displayed transaction ${current.tx.txid}`}
-                        aria-pressed={selected.id === txNodeId(current.tx.txid)}
-                        title={current.tx.txid}
-                        onClick={() => onSelect(txNodeId(current.tx.txid))}
-                      >
-                        <Box size={25} aria-hidden="true" />
-                        {workspace.annotations[txNodeId(current.tx.txid)]?.icon && (
-                          <span
-                            className="transaction-annotation-icon"
-                            role="img"
-                            aria-label={`Annotation icon: ${workspace.annotations[txNodeId(current.tx.txid)].icon}`}
-                          >
-                            {workspace.annotations[txNodeId(current.tx.txid)].icon}
-                          </span>
-                        )}
-                        <span className="transaction-identity-caption" title="Inputs / outputs">
-                          {current.role === 'Selected'
-                            ? 'Transaction'
-                            : `${current.role} transaction`}{' '}
-                          ({current.tx.vin.length} / {current.tx.vout.length})
-                        </span>
-                        <strong className="mono">{short(current.tx.txid)}</strong>
-                        {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
-                          <strong
-                            className="transaction-identity-label"
-                            title={workspace.annotations[txNodeId(current.tx.txid)].label}
-                          >
-                            {workspace.annotations[txNodeId(current.tx.txid)].label}
-                          </strong>
-                        )}
-                        {props.renderMetadata?.(txNodeId(current.tx.txid))}
-                      </button>
-                      <TransactionBlockTime transaction={current.tx} />
-                      <div
-                        className="transaction-identity-tools"
-                        role="group"
-                        aria-label="Transaction annotation tools"
-                      >
-                        <button
-                          type="button"
-                          className="icon-button"
-                          aria-label="Edit displayed transaction annotation"
-                          title="Edit transaction label"
-                          onClick={() => props.onEdit(txNodeId(current.tx.txid), 'label')}
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button"
-                          aria-label="Edit displayed transaction tags"
-                          title="Choose transaction tags"
-                          onClick={() => props.onEdit(txNodeId(current.tx.txid), 'tags')}
-                        >
-                          <Tags size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button"
-                          aria-label="Edit displayed transaction icon"
-                          title="Choose transaction icon"
-                          onClick={() => props.onEdit(txNodeId(current.tx.txid), 'icon')}
-                        >
-                          <Smile size={13} />
-                        </button>
-                        <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
-                      </div>
-                      {(currentNotOnGraph ||
-                        props.hiddenNodeIds?.includes(txNodeId(current.tx.txid))) && (
-                        <div className="transaction-hidden-state">
-                          <span className="entity-hidden-badge">
-                            <EyeOff size={10} /> {currentNotOnGraph ? 'Not on graph' : 'Hidden'}
-                          </span>
-                          {props.onSetHidden && (
-                            <button
-                              type="button"
-                              className="text-button"
-                              aria-label={
-                                currentNotOnGraph
-                                  ? 'Add displayed transaction to graph'
-                                  : 'Show displayed transaction in graph'
-                              }
-                              onClick={() =>
-                                props.onSetHidden?.([txNodeId(current.tx.txid)], false)
-                              }
-                            >
-                              {currentNotOnGraph ? 'Add to graph' : 'Show'}
-                            </button>
-                          )}
+          {hasFlowSelection && selected && (
+            <div className="transaction-view-body">
+              <div className="transaction-view-actions">
+                {!!props.missingInputCount && props.onLoadAllInputs && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={!!disabledReason || inputLoading}
+                    title={
+                      disabledReason ||
+                      `Fetch up to ${props.missingInputCount} parent transactions for missing input details. Up to 500 per action; other branches are not followed.`
+                    }
+                    onClick={props.onLoadAllInputs}
+                  >
+                    Load missing input details ({props.missingInputCount})
+                  </button>
+                )}
+              </div>
+              {current ? (
+                <TransactionRows
+                  {...props}
+                  tx={current.tx}
+                  key={current.tx.txid}
+                  spends={spends}
+                  previousOutputs={previousOutputs}
+                  onNavigate={navigate}
+                  onSelect={(id) => {
+                    choose(current.tx.txid);
+                    onSelect(id);
+                  }}
+                  onEdit={(id, target) => {
+                    choose(current.tx.txid);
+                    props.onEdit(id, target);
+                  }}
+                  previous={preview('previous')}
+                  next={preview('next')}
+                  identity={
+                    <div className="transaction-flow-center">
+                      {props.onSmallAmountThresholdChange && (
+                        <div className="transaction-flow-amounts">
+                          <SmallAmountControl
+                            context="flow"
+                            threshold={workspace.view.flowAmountThreshold}
+                            onChange={props.onSmallAmountThresholdChange}
+                          />
                         </div>
                       )}
-                      {related.length > 1 && (
-                        <select
-                          className="transaction-choice"
-                          aria-label="Displayed transaction"
-                          value={current.tx.txid}
-                          onChange={(e) => navigate(e.target.value, selected.id)}
-                        >
-                          {related.map(({ tx, role }) => (
-                            <option key={tx.txid} value={tx.txid}>
-                              {role}:{' '}
-                              {workspace.annotations[txNodeId(tx.txid)]?.label
-                                ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
-                                : ''}
-                              {short(tx.txid)}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </div>
-                }
-              />
-            ) : (
-              <p className="small" role="status">
-                {inputLoading
-                  ? 'Loading creating transaction…'
-                  : 'Creating transaction unavailable.'}
-              </p>
-            )}
-            <div className="transaction-view-actions">
-              {selected.kind === 'output' &&
-                !missingCreating &&
-                !selectedUnspendable &&
-                !!(loadedSpenders.length || walletObservation) && (
-                  <small
-                    className="transaction-coverage"
-                    title="Missing loaded spends do not establish that an output is unspent."
-                  >
-                    {loadedSpenders.length
-                      ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
-                      : 'No spending transaction loaded'}
-                    {walletObservation && (
-                      <span>
-                        {' · Unspent at wallet check · '}
-                        <time dateTime={walletObservation.checkedAt}>
-                          {new Date(walletObservation.checkedAt).toLocaleString()}
-                        </time>
-                      </span>
-                    )}
-                    {loadedSpenders.length > 0 && (
-                      <button
-                        type="button"
-                        className="text-button"
-                        aria-label="Check this output for spends"
-                        disabled={!!disabledReason}
-                        title={
-                          disabledReason ||
-                          'Check this exact output for additional spending transactions'
-                        }
-                        onClick={() => onTrace('spending', selected.id)}
+                      <div
+                        className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
                       >
-                        Check again
-                      </button>
-                    )}
-                  </small>
-                )}
+                        <button
+                          type="button"
+                          className="transaction-identity-select"
+                          aria-label={`Select displayed transaction ${current.tx.txid}`}
+                          aria-pressed={selected.id === txNodeId(current.tx.txid)}
+                          title={current.tx.txid}
+                          onClick={() => onSelect(txNodeId(current.tx.txid))}
+                        >
+                          <Box size={25} aria-hidden="true" />
+                          {workspace.annotations[txNodeId(current.tx.txid)]?.icon && (
+                            <span
+                              className="transaction-annotation-icon"
+                              role="img"
+                              aria-label={`Annotation icon: ${workspace.annotations[txNodeId(current.tx.txid)].icon}`}
+                            >
+                              {workspace.annotations[txNodeId(current.tx.txid)].icon}
+                            </span>
+                          )}
+                          <span className="transaction-identity-caption" title="Inputs / outputs">
+                            {current.role === 'Selected'
+                              ? 'Transaction'
+                              : `${current.role} transaction`}{' '}
+                            ({current.tx.vin.length} / {current.tx.vout.length})
+                          </span>
+                          <strong className="mono">{short(current.tx.txid)}</strong>
+                          {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
+                            <strong
+                              className="transaction-identity-label"
+                              title={workspace.annotations[txNodeId(current.tx.txid)].label}
+                            >
+                              {workspace.annotations[txNodeId(current.tx.txid)].label}
+                            </strong>
+                          )}
+                          {props.renderMetadata?.(txNodeId(current.tx.txid))}
+                        </button>
+                        <TransactionBlockTime transaction={current.tx} />
+                        <div
+                          className="transaction-identity-tools"
+                          role="group"
+                          aria-label="Transaction annotation tools"
+                        >
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label="Edit displayed transaction annotation"
+                            title="Edit transaction label"
+                            onClick={() => props.onEdit(txNodeId(current.tx.txid), 'label')}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label="Edit displayed transaction tags"
+                            title="Choose transaction tags"
+                            onClick={() => props.onEdit(txNodeId(current.tx.txid), 'tags')}
+                          >
+                            <Tags size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label="Edit displayed transaction icon"
+                            title="Choose transaction icon"
+                            onClick={() => props.onEdit(txNodeId(current.tx.txid), 'icon')}
+                          >
+                            <Smile size={13} />
+                          </button>
+                          <CopyButton
+                            value={current.tx.txid}
+                            label="Copy displayed transaction ID"
+                          />
+                        </div>
+                        {(currentNotOnGraph ||
+                          props.hiddenNodeIds?.includes(txNodeId(current.tx.txid))) && (
+                          <div className="transaction-hidden-state">
+                            <span className="entity-hidden-badge">
+                              <EyeOff size={10} /> {currentNotOnGraph ? 'Not on graph' : 'Hidden'}
+                            </span>
+                            {props.onSetHidden && (
+                              <button
+                                type="button"
+                                className="text-button"
+                                aria-label={
+                                  currentNotOnGraph
+                                    ? 'Add displayed transaction to graph'
+                                    : 'Show displayed transaction in graph'
+                                }
+                                onClick={() =>
+                                  props.onSetHidden?.([txNodeId(current.tx.txid)], false)
+                                }
+                              >
+                                {currentNotOnGraph ? 'Add to graph' : 'Show'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {related.length > 1 && (
+                          <select
+                            className="transaction-choice"
+                            aria-label="Displayed transaction"
+                            value={current.tx.txid}
+                            onChange={(e) => navigate(e.target.value, selected.id)}
+                          >
+                            {related.map(({ tx, role }) => (
+                              <option key={tx.txid} value={tx.txid}>
+                                {role}:{' '}
+                                {workspace.annotations[txNodeId(tx.txid)]?.label
+                                  ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
+                                  : ''}
+                                {short(tx.txid)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  }
+                />
+              ) : (
+                <p className="small" role="status">
+                  {inputLoading
+                    ? 'Loading creating transaction…'
+                    : 'Creating transaction unavailable.'}
+                </p>
+              )}
+              <div className="transaction-view-actions">
+                {selected.kind === 'output' &&
+                  !missingCreating &&
+                  !selectedUnspendable &&
+                  !!(loadedSpenders.length || walletObservation) && (
+                    <small
+                      className="transaction-coverage"
+                      title="Missing loaded spends do not establish that an output is unspent."
+                    >
+                      {loadedSpenders.length
+                        ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
+                        : 'No spending transaction loaded'}
+                      {walletObservation && (
+                        <span>
+                          {' · Unspent at wallet check · '}
+                          <time dateTime={walletObservation.checkedAt}>
+                            {new Date(walletObservation.checkedAt).toLocaleString()}
+                          </time>
+                        </span>
+                      )}
+                      {loadedSpenders.length > 0 && (
+                        <button
+                          type="button"
+                          className="text-button"
+                          aria-label="Check this output for spends"
+                          disabled={!!disabledReason}
+                          title={
+                            disabledReason ||
+                            'Check this exact output for additional spending transactions'
+                          }
+                          onClick={() => onTrace('spending', selected.id)}
+                        >
+                          Check again
+                        </button>
+                      )}
+                    </small>
+                  )}
+              </div>
             </div>
-          </div>
-          {(inputLoading || inputError) && (
+          )}
+          {hasFlowSelection && (inputLoading || inputError) && (
             <div className="transaction-input-feedback">
               {inputLoading && (
                 <small className="transaction-input-status" role="status">
@@ -991,17 +1022,38 @@ export function TransactionView(props: Props) {
           <button
             type="button"
             className="icon-button transaction-height-toggle"
-            aria-label={
-              fullHeight ? 'Restore flow panel height' : 'Expand flow panel to full height'
-            }
-            title={fullHeight ? 'Restore flow panel height' : 'Expand flow panel to full height'}
-            aria-pressed={fullHeight}
-            onClick={() => setFullHeight((expanded) => !expanded)}
+            aria-label={open ? 'Collapse flow panel' : 'Expand flow panel'}
+            title={open ? 'Collapse flow panel' : 'Expand flow panel'}
+            aria-expanded={open}
+            disabled={!hasFlowSelection}
+            onClick={() => setPanelHeight(open ? 'collapsed' : 'expanded')}
           >
-            {fullHeight ? (
+            {open && fullHeight ? (
+              <ChevronsUp size={14} aria-hidden="true" />
+            ) : open ? (
               <ArrowUp size={14} aria-hidden="true" />
             ) : (
               <ArrowDown size={14} aria-hidden="true" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="icon-button transaction-height-toggle"
+            aria-label={
+              open && fullHeight ? 'Restore flow panel height' : 'Expand flow panel to full height'
+            }
+            title={
+              open && fullHeight ? 'Restore flow panel height' : 'Expand flow panel to full height'
+            }
+            onClick={() => setPanelHeight(open && fullHeight ? 'expanded' : 'full')}
+            disabled={!hasFlowSelection}
+          >
+            {open && fullHeight ? (
+              <ArrowUp size={14} aria-hidden="true" />
+            ) : open ? (
+              <ArrowDown size={14} aria-hidden="true" />
+            ) : (
+              <ChevronsDown size={14} aria-hidden="true" />
             )}
           </button>
         </div>

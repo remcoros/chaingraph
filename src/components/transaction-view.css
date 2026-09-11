@@ -19,7 +19,6 @@
 }
 .transaction-view-slot {
   flex: 0 1 auto;
-  margin: 6px 8px 0;
   min-height: 0;
 }
 .transaction-view-slot:has(.transaction-view[open]) {
@@ -33,12 +32,11 @@
   height: 100%;
   overflow: hidden;
   background: var(--color-paper);
-  border: 1px solid var(--color-rule);
-  border-radius: 7px;
+  border-bottom: 1px solid var(--color-rule);
 }
 .transaction-view-surface.is-full-height:has(.transaction-view[open]) {
   position: absolute;
-  inset: 6px 8px 8px;
+  inset: 0;
   height: auto;
   z-index: 10;
 }
@@ -59,10 +57,11 @@
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
+  gap: 4px;
   pointer-events: none;
 }
 .transaction-view:not([open]) + .transaction-view-footer {
-  display: none;
+  bottom: 3px;
 }
 .transaction-height-toggle {
   pointer-events: auto;
@@ -74,6 +73,9 @@
   color: var(--color-muted);
 }
 .transaction-view > summary {
+  display: flex;
+  align-items: center;
+  list-style: none;
   padding: 7px 10px;
   cursor: pointer;
   position: sticky;
@@ -81,6 +83,38 @@
   z-index: 2;
   background: var(--color-paper);
   font-weight: 600;
+}
+.transaction-view > summary::-webkit-details-marker {
+  display: none;
+}
+.transaction-view > summary[aria-disabled='true'] {
+  color: var(--color-muted);
+  cursor: default;
+}
+.transaction-summary-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.transaction-summary-title > code {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.transaction-summary-counts {
+  color: var(--color-muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.transaction-view:not([open]) .transaction-summary-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+}
+.transaction-view:not([open]) .transaction-summary-content > small {
+  grid-column: 3;
 }
 .transaction-view > summary small {
   float: right;
@@ -548,14 +582,8 @@
   padding: 1px 4px;
 }
 @media (max-width: 700px) {
-  .transaction-view-slot {
-    margin: 5px 5px 0;
-  }
   .transaction-view-slot:has(.transaction-view[open]) {
     height: min(calc(46% - 20px), 320px);
-  }
-  .transaction-view-surface.is-full-height:has(.transaction-view[open]) {
-    inset: 5px;
   }
   .transaction-view-body {
     padding: 0 5px 7px;
