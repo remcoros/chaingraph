@@ -12,8 +12,10 @@
   --color-muted: #a1adb0;
   --color-faint: #859298;
   --color-rule: #303a3e;
-  --color-accent: #b5e879;
-  --color-accent-ink: #17230c;
+  --color-accent: #f7931a;
+  --color-accent-hover: #ffa33a;
+  --color-accent-pressed: #dc7c0c;
+  --color-accent-ink: #17120c;
   --color-tx: #e3b477;
   --color-output: #79b5bd;
   --color-flow-input: #83baff;
@@ -48,4 +50,32 @@
   --rule-hair: 1px;
   --ease-ui: cubic-bezier(0.2, 0.65, 0.3, 1);
   --dur-ui: 140ms;
+}
+
+:root[data-accent-theme='red'] {
+  --color-accent: #e05245;
+  --color-accent-hover: #ea675b;
+  --color-accent-pressed: #d95045;
+  --color-accent-ink: #170d0b;
+}
+
+:root[data-accent-theme='green'] {
+  --color-accent: #b5e879;
+  --color-accent-hover: #c2ee8d;
+  --color-accent-pressed: #9fd162;
+  --color-accent-ink: #17230c;
+}
+
+:root[data-accent-theme='blue'] {
+  --color-accent: #4da3ff;
+  --color-accent-hover: #69b2ff;
+  --color-accent-pressed: #3188e6;
+  --color-accent-ink: #091827;
+}
+
+:root[data-accent-theme='purple'] {
+  --color-accent: #9b7bff;
+  --color-accent-hover: #ae93ff;
+  --color-accent-pressed: #8261e6;
+  --color-accent-ink: #160f29;
 }

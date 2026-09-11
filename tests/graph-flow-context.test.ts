@@ -24,7 +24,7 @@ const palette: GraphPalette = {
   transaction: '#e3b477',
   output: '#79b5bd',
   address: '#b0a0e0',
-  accent: '#b5e879',
+  accent: '#f7931a',
   muted: '#a1adb0',
   background: '#14191b',
   input: '#83baff',

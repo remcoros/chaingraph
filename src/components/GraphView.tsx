@@ -370,10 +370,18 @@ export default function GraphView(props: GraphViewProps) {
     [props.nodes, props.links],
   );
   useEffect(() => {
-    if (containerRef.current)
-      graphRef.current?.update(
-        presentGraph(props, readGraphPalette(containerRef.current), presentationIndex),
-      );
+    const element = containerRef.current;
+    if (!element) return;
+    const update = () =>
+      graphRef.current?.update(presentGraph(props, readGraphPalette(element), presentationIndex));
+    update();
+    // Accent changes affect canvas colors as well as CSS, without replacing the renderer.
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-accent-theme'],
+    });
+    return () => observer.disconnect();
   }, [
     adapterFactory,
     presentationIndex,

@@ -262,6 +262,10 @@ colors, widths, arrows and a `directed`/`flowSide` hint. Callers supply
 color wins, then tag color, then wallet color. Value sizing uses
 `1.6 + 0.9 * log10(1 + sats / 10000)`.
 
+The browser remembers its accent preference separately from encrypted workspaces.
+`accentTheme.ts` applies it before mounting the app; `GraphView.tsx` observes the
+root accent attribute and refreshes presentation colors on the existing renderer.
+
 `graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`,
 optional `flushSnapshot`, `zoom`, `repack`, `setMotion`, and events for
 hover/select (`{ type, id }` plus pointer coordinates and modifiers), activity

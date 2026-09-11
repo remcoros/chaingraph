@@ -6,6 +6,9 @@ private key. Amounts are shown in BTC with eight decimals grouped for reading,
 for example `0.00 025 000 BTC`; hover an amount for its exact satoshi value.
 Amount inputs take whole satoshis and fee rates use sat/vB.
 
+Choose an accent color using the swatches in **Help and samples**. Bitcoin orange
+is the default; your choice is remembered in this browser while the app stays dark.
+
 ## Workspaces
 
 A workspace holds transactions, wallets, annotations, analysis results and your
