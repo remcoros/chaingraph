@@ -27,6 +27,7 @@
   height: min(calc(50% - 28px), 312px);
 }
 .transaction-view-surface {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -52,19 +53,24 @@
   font-size: 11px;
 }
 .transaction-view-footer {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
   display: flex;
-  flex-shrink: 0;
-  padding: 1px 4px;
+  pointer-events: none;
 }
 .transaction-view:not([open]) + .transaction-view-footer {
   display: none;
 }
 .transaction-height-toggle {
+  pointer-events: auto;
   min-width: 26px;
   min-height: 26px;
   padding: 4px;
-  background: transparent;
-  border-color: transparent;
+  background: var(--color-paper);
+  border-color: var(--color-rule);
   color: var(--color-muted);
 }
 .transaction-view > summary {
@@ -238,7 +244,7 @@
   gap: 6px;
   width: 100%;
   min-width: 0;
-  min-height: 110px;
+  min-height: 79px;
   border: 0;
   border-radius: 8px 8px 0 0;
   padding: 12px 8px;
@@ -247,7 +253,15 @@
   text-align: center;
 }
 .transaction-identity-select > svg {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 16px;
+  height: 16px;
   color: var(--color-accent);
+}
+.transaction-identity-caption {
+  max-width: calc(100% - 36px);
 }
 .transaction-identity-select > span {
   font-size: 10px;
@@ -558,10 +572,6 @@
     min-height: 0;
     padding: 6px 3px;
     gap: 2px;
-  }
-  .transaction-identity-select > svg {
-    width: 20px;
-    height: 20px;
   }
   .transaction-identity-tools .icon-button {
     min-width: 24px;

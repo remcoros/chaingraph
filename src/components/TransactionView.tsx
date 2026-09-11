@@ -25,8 +25,8 @@ import {
   Smile,
   Eye,
   EyeOff,
-  Maximize2,
-  Minimize2,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
 import {
   type GraphNode,
@@ -817,7 +817,7 @@ export function TransactionView(props: Props) {
                             {workspace.annotations[txNodeId(current.tx.txid)].icon}
                           </span>
                         )}
-                        <span title="Inputs / outputs">
+                        <span className="transaction-identity-caption" title="Inputs / outputs">
                           {current.role === 'Selected'
                             ? 'Transaction'
                             : `${current.role} transaction`}{' '}
@@ -999,9 +999,9 @@ export function TransactionView(props: Props) {
             onClick={() => setFullHeight((expanded) => !expanded)}
           >
             {fullHeight ? (
-              <Minimize2 size={14} aria-hidden="true" />
+              <ArrowUp size={14} aria-hidden="true" />
             ) : (
-              <Maximize2 size={14} aria-hidden="true" />
+              <ArrowDown size={14} aria-hidden="true" />
             )}
           </button>
         </div>
