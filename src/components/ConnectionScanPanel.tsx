@@ -1149,15 +1149,15 @@ function ScanResultRow({
             {error}
           </p>
         )}
-        <section className="connection-scan-path-section" aria-label="Path">
-          <div className="connection-scan-path-heading">
+        <details className="connection-scan-path-section">
+          <summary className="connection-scan-path-heading">
             <strong>Path</strong>{' '}
             <span>
               {prefixLength + (creatorId ? 1 : 0)}{' '}
               {prefixLength + (creatorId ? 1 : 0) === 1 ? 'node' : 'nodes'}
               {alternatives.length > 1 ? ` · ${alternatives.length} alternatives` : ''}
             </span>
-          </div>
+          </summary>
           {alternatives.length > 1 && (
             <label>
               Alternative path
@@ -1216,7 +1216,7 @@ function ScanResultRow({
               {plan.newNodeIds.includes(creatorId) && <small>New</small>}
             </div>
           )}
-        </section>
+        </details>
       </div>
       <footer className="connection-scan-result-actions">
         {(category === 'issue' || finding === 'unspent') && (
