@@ -119,15 +119,7 @@ for (const phone of [false, true]) {
     await expect(flow).toBeVisible();
     const output = flow.locator('.wallet-flow-column').nth(1);
     await expect(output.locator('.is-selected')).toContainText('Editing address');
-    await mkdir('artifacts/wallet-polish', { recursive: true });
-    const phase = process.env.WALLET_POLISH_BASELINE ? 'before' : 'after';
     await flow.scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: `artifacts/wallet-polish/${phase}-${phone ? 'phone' : 'desktop'}.png`,
-    });
-    await flow.screenshot({
-      path: `artifacts/wallet-polish/${phase}-flow-${phone ? 'phone' : 'desktop'}.png`,
-    });
     if (!process.env.WALLET_POLISH_BASELINE) {
       await expect(output).toContainText('My withdrawal');
       await expect(output).toContainText('Withdrawal');
@@ -172,9 +164,6 @@ for (const phone of [false, true]) {
     await page.waitForTimeout(700);
     if (phone)
       await expect(graphFlow.locator('.transaction-identity-select')).toBeInViewport({ ratio: 1 });
-    await page.screenshot({
-      path: `artifacts/wallet-polish/${phase}-graph-${phone ? 'phone' : 'desktop'}.png`,
-    });
     await page.getByRole('button', { name: 'Back to Wallet', exact: true }).click();
     await expect(show).toBeFocused();
     if (!process.env.WALLET_POLISH_BASELINE) {
@@ -249,9 +238,6 @@ test('bundled public wallet snapshot keeps transaction metadata and editable con
   for (const phone of [false, true]) {
     await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1440, height: 900 });
     await flow.scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: `artifacts/wallet-polish/public-snapshot-${phone ? 'phone' : 'desktop'}.png`,
-    });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

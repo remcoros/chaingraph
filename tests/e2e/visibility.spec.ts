@@ -289,9 +289,6 @@ for (const width of [1440, 390])
       ).toBe(true);
     };
     await assertOrder();
-    await page.screenshot({
-      path: `artifacts/flow-renderer-v2/compact/hidden-by-filters-${width}.png`,
-    });
     await status.getByRole('button', { name: 'Reset filters', exact: true }).click();
     await expect(status).toHaveCount(0);
     if (width === 390)
@@ -310,7 +307,4 @@ for (const width of [1440, 390])
         .click();
     await expect(status).toContainText('selection hidden from graph');
     await assertOrder();
-    await page.screenshot({
-      path: `artifacts/flow-renderer-v2/compact/hidden-from-graph-${width}.png`,
-    });
   });

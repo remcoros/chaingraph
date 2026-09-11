@@ -53,7 +53,6 @@ for (const width of [1440, 390]) {
     expect(await page.locator('main.welcome').evaluate((el) => el.scrollTop)).toBe(
       backgroundScroll,
     );
-    await page.screenshot({ path: testInfo.outputPath(`password-validation-${width}.png`) });
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await expect(
@@ -96,7 +95,6 @@ test('created workspaces lock on reload and unlock with accessible password cont
   await unlock.getByRole('button', { name: 'Show password', exact: true }).click();
   await expect(password).toHaveAttribute('type', 'text');
   await unlock.getByRole('button', { name: 'Hide password', exact: true }).click();
-  await page.screenshot({ path: testInfo.outputPath('unlock-password-controls.png') });
   await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
   await expect(unlock).toHaveCount(0);
   await expect(page.getByLabel('Transaction, output, or address')).toBeVisible();

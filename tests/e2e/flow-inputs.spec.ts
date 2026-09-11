@@ -234,7 +234,6 @@ for (const action of ['row', 'arrow'] as const) {
     await expect(flow.getByRole('alert')).toContainText('timed out');
     expect(olderCalls.length).toBeGreaterThan(0);
     await expect(page.locator('.statusbar')).toContainText('2 transactions');
-    await page.screenshot({ path: testInfo.outputPath(`compact-input-${action}-failure.png`) });
     available = true;
     await flow.getByRole('button', { name: 'Retry previous outputs', exact: true }).click();
     await expect(page.locator('.statusbar')).toContainText('3 transactions');

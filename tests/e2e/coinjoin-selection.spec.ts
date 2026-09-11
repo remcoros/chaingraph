@@ -65,7 +65,6 @@ test('a real WabiSabi input opens its creating CoinJoin without downloading its 
   expect(calls).toEqual([]);
   expect(errors).toEqual([]);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.screenshot({ path: testInfo.outputPath('wabisabi-parent-navigation.png') });
 });
 
 test('a second input hop inside the real WabiSabi example survives an unavailable creator', async ({
@@ -139,5 +138,4 @@ test('a second input hop inside the real WabiSabi example survives an unavailabl
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   expect([...new Set(requested)]).toEqual([input.txid]);
   expect(errors).toEqual([]);
-  await page.screenshot({ path: testInfo.outputPath('wabisabi-second-input-load-failure.png') });
 });

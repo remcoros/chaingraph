@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Transaction, Wallet, Workspace } from '../../src/domain/types';
@@ -221,11 +220,6 @@ async function expectReviewGuidance(page: Page, text: string) {
   await expect(tooltip).toBeHidden();
 }
 
-async function screenshot(page: Page, name: string) {
-  await mkdir('artifacts/wallet-six-tabs', { recursive: true });
-  await page.screenshot({ path: `artifacts/wallet-six-tabs/${name}.png`, fullPage: true });
-}
-
 test('derives a resumable review queue from current coins and their sources', async ({ page }) => {
   await seed(page);
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
@@ -242,7 +236,6 @@ test('derives a resumable review queue from current coins and their sources', as
   await expect(reviewList(page)).toContainText('Destination address');
   // A labelled UTXO is still reviewable but never jumps ahead of unlabelled coins.
   await expect(rows.nth(1)).toContainText('Exchange A withdrawal');
-  await screenshot(page, 'review-queue-desktop');
 
   await rows.first().click();
   await expectReviewGuidance(page, 'This current UTXO has no label or tags');
@@ -368,9 +361,7 @@ test('finding types expose zero counts, match by OR and keep counts independent 
     ).toContainText('No scan results are available for this type yet.');
     if (tool.id === 'transaction-shapes') {
       await expect(page.getByRole('tooltip')).toHaveCount(1);
-      await page.screenshot({ path: 'artifacts/wallet-finding-type-help.png' });
       await page.setViewportSize({ width: 900, height: 900 });
-      await page.screenshot({ path: 'artifacts/wallet-finding-type-help-narrow.png' });
       await page.setViewportSize({ width: 1440, height: 1000 });
     }
   }
@@ -431,7 +422,6 @@ test('finding types expose zero counts, match by OR and keep counts independent 
       },
     ]).flat(),
   );
-  await screenshot(page, 'finding-types-zero-counts');
 });
 
 for (const [tab, firstId, secondId] of [
@@ -564,7 +554,6 @@ for (const [tab, firstId, secondId] of [
       .click();
     await expect(first).toContainText('❄️');
     await expect(second).toContainText('❄️');
-    await screenshot(page, `${tab.toLowerCase().replaceAll(' ', '-')}-batch`);
     await first.locator('.wallet-row-button').click();
     await expect(batch).toHaveCount(0);
     await expect(selected.getByRole('heading', { level: 2 })).toContainText(`${tab} batch label`);
@@ -639,7 +628,6 @@ test('batch labels, tags and icons apply to the explicit selection in one undoab
     .getByRole('dialog', { name: 'Choose node icon' })
     .getByRole('button', { name: 'Savings' })
     .click();
-  await screenshot(page, 'records-batch-desktop');
 
   await page.locator('.workspace-undo').first().click();
   await expect(page.locator('.wallet-review-records')).not.toContainText('🏦');
@@ -699,7 +687,6 @@ test('a refresh keeps decisions, flags new activity and stays inside one wallet'
   await page.getByLabel('Review filter').selectOption('decided');
   await expect(reviewList(page)).toContainText('Reviewed');
   await page.getByLabel('Review filter').selectOption('open');
-  await screenshot(page, 'review-refresh-desktop');
 
   // A second wallet has its own queue; decisions never leak across wallets.
   await page.getByLabel('Selected wallet').selectOption({ label: 'Second public wallet' });
@@ -716,7 +703,6 @@ test('stays usable on a phone viewport', async ({ page }) => {
   await waitForUtxoCheck(page);
   await reviewList(page).getByRole('listitem').first().click();
   await expect(detail(page).getByRole('button', { name: 'Mark reviewed' })).toBeVisible();
-  await screenshot(page, 'review-queue-phone');
   await walletTab(page, 'UTXOs').click();
   await page.getByRole('button', { name: 'Select all (2)', exact: true }).click();
   const bar = page.getByRole('group', { name: 'Batch metadata editing' });
@@ -726,7 +712,6 @@ test('stays usable on a phone viewport', async ({ page }) => {
   // The editor must be inside the visible viewport, not clipped by its panel.
   const box = await editor.boundingBox();
   expect(box!.y + box!.height).toBeLessThanOrEqual(844);
-  await screenshot(page, 'records-batch-phone');
   await page.keyboard.press('Escape');
   await expect(editor).toBeHidden();
 });
@@ -1068,7 +1053,6 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await seed(page);
     await waitForUtxoCheck(page);
-    await screenshot(page, `polish-${viewport.name}-initial`);
     await reviewList(page).getByRole('listitem').nth(1).locator('button.wallet-row-button').click();
     const initialCount = await reviewList(page).getByRole('listitem').count();
     const bar = detail(page).getByRole('group', { name: 'Edit entity metadata' });
@@ -1086,7 +1070,6 @@ for (const viewport of [
         return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2));
       }),
     ).toBe(true);
-    await screenshot(page, `polish-${viewport.name}-label-editor`);
     await apply.click();
     await expect(detail(page).getByRole('heading', { level: 2 })).toHaveText('Cold storage');
     await expect(reviewList(page)).toContainText('Cold storage');
@@ -1120,7 +1103,6 @@ for (const viewport of [
       const panel = await page.locator('.wallet-workbench').boundingBox();
       expect(actions!.y + actions!.height).toBeLessThanOrEqual(panel!.y + panel!.height);
     }
-    await screenshot(page, `polish-${viewport.name}-metadata`);
     if (viewport.name === 'phone')
       await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
     await expect(
@@ -1183,7 +1165,6 @@ test('wallet records support range selection, additive toggles and an explicit h
   await checks.nth(1).focus();
   await page.keyboard.press('Space');
   await expect(checks.nth(1)).not.toBeChecked();
-  await screenshot(page, 'polish-records-range-selection');
   await page.getByRole('button', { name: 'Addresses', exact: true }).click();
   await expect(bar).toBeHidden();
 });
@@ -1221,9 +1202,6 @@ test('address details open the latest verified transaction context and transacti
   await expect(walletFlow(page).locator('.ownership-external')).toHaveCount(1);
   await expect(chooser).toHaveValue(TX_MID);
   await expect(walletDetail(page).getByLabel('Identifiers and tags')).toBeVisible();
-  await mkdir('artifacts/ui-review/feedback', { recursive: true });
-  await page.screenshot({ path: 'artifacts/ui-review/feedback/address-transaction-context.png' });
-
   await walletTab(page, 'Transactions').click();
   await rows
     .filter({ has: page.locator(`.wallet-item-title[title="${TX_MID}"]`) })
@@ -1415,7 +1393,6 @@ test('one-hop Sources and Destinations keep missing evidence and creating-transa
     new RegExp(TX_MID),
   );
   expect(chain.calls).toHaveLength(callsAfterSources);
-  await screenshot(page, 'one-hop-destination-evidence');
 });
 
 test('queue selection batches metadata, defers to untouched work and reopens into To review', async ({
@@ -1527,7 +1504,6 @@ for (const phone of [false, true]) {
       .first()
       .locator('button.wallet-row-button')
       .click();
-    await screenshot(page, `wallet-context-${phone ? 'phone' : 'desktop'}`);
     const input = flow.getByRole('button', {
       name: `Show input ${TX_OLD}:0 on graph`,
       exact: true,
@@ -1545,7 +1521,6 @@ for (const phone of [false, true]) {
     await expect(detail(page).locator('.wallet-match-value')).toHaveText('No match in this wallet');
     await expect(flow.locator('.is-selected')).toHaveClass(/ownership-external/);
     await expect(flow.locator('.is-selected')).toContainText('No wallet match');
-    await screenshot(page, `wallet-counterparty-${phone ? 'phone' : 'desktop'}`);
     await page.getByRole('img', { name: 'Wallet relationship', exact: true }).focus();
     await expect(page.getByRole('tooltip')).toContainText('or identify its owner');
     await page.keyboard.press('Escape');
@@ -1593,7 +1568,6 @@ test('related selection uses exact addresses and transactions within the current
   await expect(rows.filter({ hasText: 'Destination address' })).not.toContainText('Wallet purpose');
   await page.getByRole('button', { name: 'Select all (7)', exact: true }).click();
   await expect(bar.locator('.batch-scope')).toHaveText('7 selected');
-  await screenshot(page, 'wallet-related-selection');
 });
 
 test('compact wallet flow keeps a late selected output visible and expands a bounded list', async ({
@@ -1697,8 +1671,6 @@ for (const width of [1440, 390, 320]) {
       'true',
     );
     await assertFits();
-    await mkdir('artifacts/quick-edit-review', { recursive: true });
-    await page.screenshot({ path: `artifacts/quick-edit-review/wallet-create-${width}.png` });
     await tags.getByRole('button', { name: 'Create and assign', exact: true }).click();
     await expect(tags).toBeHidden();
     await expect(trigger).toBeFocused();
@@ -1722,7 +1694,6 @@ for (const width of [1440, 390, 320]) {
       tags.locator('.metadata-tag-option').filter({ hasText: existingName }),
     ).toContainText('0 of 1 selected');
     await assertFits();
-    await page.screenshot({ path: `artifacts/quick-edit-review/wallet-tags-${width}.png` });
     await page.keyboard.press('Escape');
     await expect(trigger).toBeFocused();
 

@@ -24,7 +24,6 @@ for (const phone of [false, true]) {
     await page.getByText('Wallet', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Notes', exact: true })).toBeVisible();
     const suffix = phone ? 'phone' : 'desktop';
-    await page.screenshot({ path: path.join(artifact, `screenshots/fix-after-${suffix}.png`) });
 
     await page.getByRole('button', { name: 'Transactions', exact: true }).click();
     await page.getByLabel('Filter wallet records').fill('Demo wallet spending hop 1');
@@ -42,9 +41,6 @@ for (const phone of [false, true]) {
       .filter({ hasText: 'Demo wallet spending hop 1' })
       .click();
     await expect(page.getByRole('button', { name: 'Mark reviewed', exact: true })).toHaveCount(0);
-    await page.screenshot({
-      path: path.join(artifact, `screenshots/fix-transactions-${suffix}.png`),
-    });
 
     await page.getByRole('button', { name: 'Notes', exact: true }).click();
     const editor = page.getByRole('dialog', { name: 'Edit notes', exact: true });
@@ -57,7 +53,6 @@ for (const phone of [false, true]) {
     await expect(editor.getByRole('button', { name: 'Done', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(editor.getByRole('button', { name: 'Close notes editor' })).toBeFocused();
-    await page.screenshot({ path: path.join(artifact, `screenshots/fix-notes-${suffix}.png`) });
     await page.keyboard.press('Escape');
     await expect(editor).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Notes', exact: true })).toBeFocused();
@@ -101,7 +96,6 @@ for (const phone of [false, true]) {
     await page.locator('.wallet-row-button').first().click();
     await expect(page.locator('.wallet-match-value')).toContainText('No match in this wallet');
     await expect(page.getByText('Unresolved script', { exact: true })).toHaveCount(0);
-    await page.screenshot({ path: path.join(artifact, `screenshots/fix-source-${suffix}.png`) });
     await page.getByRole('button', { name: 'Notes', exact: true }).click();
     await note.fill(`WQF source ${suffix}`);
     // Clicking another section closes the portal and cannot transfer the draft.

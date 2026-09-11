@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import type { Workspace } from '../../src/domain/types';
 import { outputNodeId } from '../../src/domain/types';
 import { mockBitcoin } from '../fixtures/bitcoin';
@@ -75,11 +74,6 @@ for (const id of [
     await analysis.getByRole('button', { name: 'Scan', exact: true }).click();
     await expect(analysis.locator('.scan-result-list button').first()).toBeVisible();
     await expect(analysis.locator('.scan-detail')).toContainText('Interpretation and limits');
-    await mkdir('artifacts/simple-workbenches', { recursive: true });
-    await page.screenshot({
-      path: `artifacts/simple-workbenches/${id}-analysis-desktop.png`,
-      fullPage: true,
-    });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(analysis.getByRole('button', { name: 'Scan', exact: true })).toBeInViewport({
       ratio: 1,
@@ -87,10 +81,6 @@ for (const id of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await page.screenshot({
-      path: `artifacts/simple-workbenches/${id}-analysis-mobile.png`,
-      fullPage: true,
-    });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await analysis.getByRole('button', { name: 'Isolate', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Reset filters', exact: true })).toBeVisible();

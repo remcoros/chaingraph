@@ -235,7 +235,6 @@ test('floating navigation preserves distinct silhouettes, actual picking, card a
   expect(
     (await toolbar.getByRole('button', { name: 'Edit label and notes' }).boundingBox())!.height,
   ).toBeLessThanOrEqual(30);
-  await page.screenshot({ path: test.info().outputPath('compact-node-card.png') });
   await card.getByRole('button', { name: /Load previous level|Open creating transaction/ }).hover();
   await page.waitForTimeout(800);
   await expect(card).toBeVisible();
@@ -420,7 +419,6 @@ test('fits first data after an empty mount, pans in 2D, focuses and fits, then o
   await page.getByRole('button', { name: 'Fixture fit graph' }).click();
   await page.waitForTimeout(800);
   expect(Object.keys(await visibleMeshes(page))).toHaveLength(4);
-  await page.screenshot({ path: test.info().outputPath('desktop-force.png') });
   expect(errors).toEqual([]);
 });
 
@@ -495,7 +493,6 @@ test('mobile touch taps select without hover and touch drags pan without selecti
   const cardBounds = (await card.boundingBox())!;
   expect(cardBounds.x).toBeGreaterThanOrEqual(0);
   expect(cardBounds.x + cardBounds.width).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: test.info().outputPath('mobile-force.png') });
   await card.getByRole('button', { name: 'Edit label and notes' }).tap();
   await expect(page.getByLabel('Notes editor')).toBeFocused();
   expect(errors).toEqual([]);
@@ -585,11 +582,9 @@ test('fit protects an upper label from floating navigation and reframes a resize
   };
   await page.getByRole('button', { name: 'Fixture fit graph', exact: true }).click();
   await assertCaptionClear();
-  await page.screenshot({ path: test.info().outputPath('fit-upper-caption.png') });
   await page.locator('#fixture-graph').evaluate((element) => (element.style.height = '280px'));
   await expect.poll(async () => (await canvas.boundingBox())?.height).toBe(280);
   await assertCaptionClear();
-  await page.screenshot({ path: test.info().outputPath('fit-upper-caption-short-flow.png') });
   // Fit uses the current annotation dimensions after an edit, without remounting.
   await page.evaluate(() =>
     (window as any).fixture.setCaption('Followed output with a longer annotation'),
@@ -640,7 +635,6 @@ test('annotation captions render over the graph and all three display toggles re
   };
   await expect.poll(captionPixels).toBeGreaterThan(40);
   const visibleCaptionPixels = await captionPixels();
-  await page.screenshot({ path: test.info().outputPath('graph-annotation-captions.png') });
   await page.evaluate(() => {
     const fixture = (window as any).fixture;
     fixture.setLabels(false);
@@ -692,7 +686,6 @@ test('hover dwell ignores passing nodes and the compact card stays usable at a n
   await emit({ type: 'node', id: `tx:${'b'.repeat(64)}` });
   await page.waitForTimeout(700);
   await expect(card.getByTitle(outputId.slice(4), { exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('narrow-node-card.png') });
   await edit.click();
   await expect(page.getByLabel('Notes editor')).toBeFocused();
   await expect(card).toBeHidden();

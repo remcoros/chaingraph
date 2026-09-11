@@ -181,10 +181,6 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
     page.getByText('Last check: 0 new to workspace · 1 transaction refreshed', { exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
-  await page.screenshot({
-    path: testInfo.outputPath('wallet-refreshed-desktop.png'),
-    fullPage: true,
-  });
   await page.getByRole('button', { name: 'Show new activity (2)', exact: true }).click();
   await expect(page.getByLabel('Filter graph entities')).toHaveValue('');
   await expect(
@@ -201,10 +197,6 @@ test('reopens a wallet days later, refreshes new receives and spends, and keeps 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeInViewport({
     ratio: 1,
-  });
-  await page.screenshot({
-    path: testInfo.outputPath('wallet-refreshed-mobile.png'),
-    fullPage: true,
   });
   expect(errors).toEqual([]);
   const storage = await page.evaluate(() =>

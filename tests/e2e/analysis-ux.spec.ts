@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { encryptWorkspace, decryptWorkspace } from '../../src/lib/crypto';
 import { newWorkspace } from '../../src/domain/workspace';
 import type { Transaction, Workspace } from '../../src/domain/types';
@@ -12,7 +12,6 @@ import {
   type MockCall,
 } from '../fixtures/bitcoin';
 const password = 'public-analysis-recovery-fixture';
-const shots = 'artifacts/ui-review/improvements/analysis';
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Workbench', exact: true });
 
 async function prepare(page: Page, attached = false, rawScripts = false, automatic = false) {
@@ -105,7 +104,6 @@ async function prepare(page: Page, attached = false, rawScripts = false, automat
     ).toBeVisible();
     await page.getByLabel('Load missing input data before scanning', { exact: true }).uncheck();
   }
-  await mkdir(shots + '/followup', { recursive: true });
   return { w, calls, state };
 }
 async function scan(page: Page) {
@@ -154,7 +152,6 @@ test('keyboard multiselect, zero counts, help, priority chips and reset filter r
   await dialog.getByRole('button', { name: 'Clear types', exact: true }).click();
   await dialog.getByRole('checkbox', { name: 'Value flow and fees', exact: true }).check();
   await dialog.getByRole('checkbox', { name: 'Co-spent inputs', exact: true }).check();
-  await page.screenshot({ path: `${shots}/after-desktop-types.png` });
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
   await expect(page.locator('.scan-result-list > button')).toHaveCount(2);
@@ -175,7 +172,6 @@ test('attached-data recovery preserves camera, annotations and Undo across cache
   const { w, calls } = await prepare(page);
   await scan(page);
   await page.locator('.scan-result-list > button').filter({ hasText: 'Fee unknown' }).click();
-  await page.screenshot({ path: `${shots}/after-desktop-missing.png` });
   const before = await exportData(page);
   await page
     .getByRole('article', { name: 'Selected finding' })
@@ -192,7 +188,6 @@ test('attached-data recovery preserves camera, annotations and Undo across cache
   expect(after.view.selectionId).toBe(before.view.selectionId);
   expect(after.view.graphSnapshot?.camera).toEqual(before.view.graphSnapshot?.camera);
   expect(after.findings.every((finding) => !finding.stale)).toBe(true);
-  await page.screenshot({ path: `${shots}/after-desktop-resolved.png` });
   const invoker = page.getByRole('button', { name: 'Show on graph', exact: true });
   await invoker.focus();
   await page.keyboard.press('Enter');
@@ -218,7 +213,6 @@ test('partial success, cancellation and retry stay scoped and never add parent b
   await recover.click();
   await expect(page.locator('.scan-notice').first()).toContainText('1 still unavailable');
   await expect(page.locator('.scan-detail')).toContainText('1/2 input values available');
-  await page.screenshot({ path: `${shots}/after-desktop-partial.png` });
   state.mode = 'wait';
   await recover.click();
   await expect.poll(() => !!state.release).toBe(true);
@@ -242,12 +236,10 @@ test.describe('phone touch walkthrough', () => {
     const { calls } = await prepare(page);
     await scan(page);
     await page.locator('.scan-result-list > button').filter({ hasText: 'Fee unknown' }).tap();
-    await page.screenshot({ path: `${shots}/after-phone-missing.png` });
     await page.getByRole('button', { name: /Finding types/ }).tap();
     const dialog = page.getByRole('dialog', { name: 'Analysis finding types' });
     await dialog.getByRole('img', { name: 'Value flow and fees', exact: true }).tap();
     await expect(page.getByRole('tooltip')).toContainText('Reconcile');
-    await page.screenshot({ path: `${shots}/after-phone-types-help.png` });
     await dialog.getByRole('button', { name: 'Clear types', exact: true }).tap();
     await dialog.getByRole('button', { name: 'Close analysis finding types', exact: true }).tap();
     await page.getByRole('button', { name: 'Reset filters', exact: true }).tap();
@@ -257,7 +249,6 @@ test.describe('phone touch walkthrough', () => {
       .getByRole('button', { name: 'Load missing data and rerun', exact: true })
       .tap();
     await expect(page.locator('.scan-detail h2')).toContainText('Network fee:');
-    await page.screenshot({ path: `${shots}/after-phone-resolved.png` });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
@@ -318,7 +309,6 @@ test('standard script bytes improve comparisons without fetching omitted type la
     page.getByRole('button', { name: 'Load scope data and rerun', exact: true }),
   ).toHaveCount(0);
   expect(calls).toHaveLength(0);
-  await page.screenshot({ path: `${shots}/after-desktop-script-evidence.png` });
 });
 
 test('Scan automatically resolves missing inputs and keeps the compact toolbar and navigation cache', async ({
@@ -341,7 +331,6 @@ test('Scan automatically resolves missing inputs and keeps the compact toolbar a
   await expect(page.getByRole('dialog', { name: 'Analysis finding types' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
-  await page.screenshot({ path: `${shots}/followup/after-desktop.png` });
   const after = await exportData(page);
   expect(after.view.graphSnapshot?.camera).toEqual(before.view.graphSnapshot?.camera);
   expect(after.view.selectionId).toEqual(before.view.selectionId);
@@ -366,7 +355,6 @@ test('automatic loading times out with partial evidence and leaves manual recove
   ).toBeEnabled();
   expect(calls).toHaveLength(2);
   state.release!();
-  await page.screenshot({ path: `${shots}/followup/after-partial.png` });
 });
 
 test('cancelling automatic loading does not replace saved findings or start parent lookups', async ({
@@ -411,7 +399,6 @@ test.describe('automatic phone scan', () => {
     await page.getByRole('button', { name: 'Close analysis finding types', exact: true }).tap();
     await page.getByRole('button', { name: 'Reset filters', exact: true }).tap();
     await expect(page.locator('.scan-result-list')).not.toContainText('Fee unknown');
-    await page.screenshot({ path: `${shots}/followup/after-phone.png` });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
@@ -456,7 +443,6 @@ test('scan opens higher review priority first and keeps guidance prominent above
     expect(evidenceBounds).not.toBeNull();
     expect(guidanceBounds!.y + guidanceBounds!.height).toBeLessThan(evidenceBounds!.y);
     await guidance.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${shots}/guidance-${width}.png` });
   }
   await detail.getByText('Interpretation and limits', { exact: true }).click();
   await expect(guidance).toBeVisible();

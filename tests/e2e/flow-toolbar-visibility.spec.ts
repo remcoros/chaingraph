@@ -60,5 +60,4 @@ test('mobile annotated transaction keeps quick tools inside the flow viewport', 
     expect(bounds!.width).toBeGreaterThanOrEqual(24);
     expect(bounds!.height).toBeGreaterThanOrEqual(30);
   }
-  await page.screenshot({ path: test.info().outputPath('mobile-flow-tools-visible.png') });
 });

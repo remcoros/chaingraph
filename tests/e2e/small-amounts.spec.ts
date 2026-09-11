@@ -120,7 +120,6 @@ test('amount controls and entity metadata stay readable on a phone', async ({ pa
   expect(box?.height).toBeGreaterThanOrEqual(32);
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   await page.waitForTimeout(300);
-  await page.screenshot({ path: test.info().outputPath('small-amount-flow-phone.png') });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Browse', exact: true }).click();
   const row = page.locator(`.entity-row[title="tx:${TX_SPENDING}"]`);
   await row.scrollIntoViewIfNeeded();
@@ -129,7 +128,6 @@ test('amount controls and entity metadata stay readable on a phone', async ({ pa
     .first()
     .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
   expect(font).toBeGreaterThanOrEqual(11);
-  await page.screenshot({ path: test.info().outputPath('small-amount-entities-phone.png') });
 });
 
 test('Entities can match the canvas while filtered observations remain recoverable', async ({

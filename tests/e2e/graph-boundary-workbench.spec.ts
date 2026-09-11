@@ -29,7 +29,6 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   await page.waitForTimeout(7000);
   await expect(page.locator('.graph-legend')).toContainText('Drag to pan');
   await expect(page.getByLabel('Size nodes by')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('desktop-workbench.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Browse', exact: true }).click();
   await expect(page.locator('canvas')).toBeHidden();
@@ -42,6 +41,5 @@ test('shared graph boundary preserves reviewed workbench controls on desktop and
   await expect(page.getByRole('button', { name: 'Hide panels', exact: true })).toBeHidden();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: test.info().outputPath('mobile-workbench.png') });
   expect(errors).toEqual([]);
 });

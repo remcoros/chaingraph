@@ -172,7 +172,6 @@ test('keeps entity filters, pagination and selection usable on a narrow screen w
     expect(bounds).not.toBeNull();
     expect(bounds!.y + bounds!.height).toBeLessThan(844);
   }
-  await page.screenshot({ path: '/tmp/chaingraph-entity-browser-mobile.png', fullPage: true });
   await page.locator('.entity-browser .entity-row').focus();
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('Pinned output');

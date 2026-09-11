@@ -70,12 +70,10 @@ test('entity row actions hide and remove their own target without changing the s
   await expect(spending).toContainText('(2 in / 2 out)');
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   await page.waitForTimeout(500);
-  await page.screenshot({ path: test.info().outputPath('entity-row-actions-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Browse', exact: true }).click();
   await spending.locator('.entity-row').scrollIntoViewIfNeeded();
   await expect(spending.locator('.entity-row-actions')).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: test.info().outputPath('entity-row-actions-phone.png') });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await expect(spending.locator('.entity-row button')).toHaveCount(0);
   await spending

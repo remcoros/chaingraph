@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import {
   mockBitcoin,
   transactions,
@@ -119,8 +118,6 @@ test('explicit flow lookup finds an exact confirmed spend and navigation reuses 
     .click();
   await expect(view.getByLabel('Displayed transaction', { exact: true })).toHaveValue(TX_FUNDING);
   expect(calls).toHaveLength(beforeNavigation);
-  await mkdir('artifacts', { recursive: true });
-  await page.screenshot({ path: 'artifacts/core31-spender-confirmed.png', fullPage: true });
 });
 
 test('Inspector batches transaction outputs and downloads a shared mempool spender once', async ({

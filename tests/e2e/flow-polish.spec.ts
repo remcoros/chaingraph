@@ -38,7 +38,6 @@ test('transaction card and its annotation toolbar have separate keyboard actions
   await expect(
     page.getByRole('searchbox', { name: 'Find or create tag', exact: true }),
   ).toBeFocused();
-  await page.screenshot({ path: 'test-results/flow-toolbar-desktop.png' });
 });
 
 test('expanded output controls remain at the top while browsing a large transaction', async ({
@@ -68,7 +67,6 @@ test('expanded output controls remain at the top while browsing a large transact
   );
   await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeInViewport({ ratio: 1 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: 'test-results/flow-controls-mobile.png' });
 });
 
 test('long transaction labels stay inside the junction card on desktop and phone', async ({
@@ -110,5 +108,4 @@ test('long transaction labels stay inside the junction card on desktop and phone
   const actionBounds = await rowAction.boundingBox();
   expect(actionBounds!.width).toBeGreaterThanOrEqual(32);
   expect(actionBounds!.height).toBeGreaterThanOrEqual(32);
-  await page.screenshot({ path: 'test-results/flow-long-label-mobile.png' });
 });

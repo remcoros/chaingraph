@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import { newWorkspace } from '../../src/domain/workspace';
 import { outputNodeId, type Workspace } from '../../src/domain/types';
 import { deriveAddresses } from '../../src/lib/wallet';
@@ -13,7 +12,6 @@ import {
 } from '../fixtures/bitcoin';
 
 const password = 'public-usability-fixture';
-const shots = 'artifacts/ui-review/improvements';
 const nav = (page: Page, mode: string) =>
   page
     .getByRole('navigation', { name: 'Workbench', exact: true })
@@ -64,7 +62,6 @@ async function prepareWallet(page: Page, w: Workspace) {
     return route.fulfill({ status: 400, json: { error: 'Unsupported public fixture request' } });
   });
   await openFixtureWorkspace(page, w, password);
-  await mkdir(shots, { recursive: true });
   await expect(page.getByLabel('Wallet coverage')).toContainText('1 unspent');
   return calls;
 }
@@ -80,7 +77,6 @@ test('wallet checks survive Graph handoff, remain exact, and clear on wallet swi
     .getByLabel('Batch label')
     .fill('Household reserve: repairs and replacement fund from September withdrawal');
   await page.getByRole('button', { name: 'Apply label', exact: true }).click();
-  await page.screenshot({ path: `${shots}/wallet-laptop.png` });
   await page.getByRole('button', { name: 'Show in Graph', exact: true }).click();
   const inspector = page.locator('.inspector-scroll');
   await expect(inspector).toContainText('Unspent at wallet check');
@@ -103,7 +99,6 @@ test('wallet checks survive Graph handoff, remain exact, and clear on wallet swi
   await expect(page.getByLabel('Wallet coverage')).toContainText('1 unspent');
   await page.getByRole('button', { name: 'Show in Graph', exact: true }).click();
   await expect(inspector).toContainText('Unspent at wallet check');
-  await page.screenshot({ path: `${shots}/graph-wallet-evidence.png` });
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await page.locator('.saved-row').filter({ hasText: w.name }).click();
@@ -124,13 +119,11 @@ test('script-only wallet receipts and constrained metadata remain usable', async
   await expect(count.locator('dd')).toHaveText('3');
   await nav(page, 'Wallet').click();
   await page.setViewportSize({ width: 800, height: 800 });
-  await page.screenshot({ path: `${shots}/wallet-800.png` });
   await page.setViewportSize({ width: 640, height: 800 });
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   await page.getByLabel('Entity notes').fill('Public note kept when navigating away immediately.');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Notes', exact: true })).toBeFocused();
-  await page.screenshot({ path: `${shots}/wallet-640.png` });
   await page.getByRole('button', { name: 'Show in Graph', exact: true }).click();
   await page.getByRole('button', { name: 'Inspector', exact: true }).click();
   await expect(page.getByLabel('Node notes')).toHaveValue(
@@ -188,8 +181,6 @@ test('Analysis opens compact supporting evidence without inventing an amount or 
   await expect(page.locator('.inspector-scroll')).toContainText('aaaaaaa...aaaaaaa');
   await expect(page.getByRole('button', { name: 'Reset filters', exact: true })).toBeVisible();
   expect(calls).toEqual([]);
-  await mkdir(shots, { recursive: true });
-  await page.screenshot({ path: `${shots}/analysis-input-handoff.png` });
 });
 
 test('compact Inspector keeps creating and spending links inside the panel', async ({ page }) => {
@@ -214,7 +205,6 @@ test('compact Inspector keeps creating and spending links inside the panel', asy
   await expect(
     inspector.locator('.selection-facts').getByText('Block', { exact: true }),
   ).toBeVisible();
-  await mkdir('artifacts/ui-review/feedback', { recursive: true });
   for (const width of [1366, 800]) {
     await page.setViewportSize({ width, height: 768 });
     if (width === 800) await page.getByRole('button', { name: 'Inspector', exact: true }).click();
@@ -225,7 +215,6 @@ test('compact Inspector keeps creating and spending links inside the panel', asy
         buttons.some((button) => button.scrollWidth > button.clientWidth + 1),
       );
     expect(clipped).toBe(false);
-    await page.screenshot({ path: `artifacts/ui-review/feedback/inspector-${width}.png` });
   }
   await spending.click();
   await expect(inspector.locator('.selection-facts code[title]')).toHaveAttribute(
@@ -267,8 +256,6 @@ test('wallet context defaults to latest, preserves a choice, and explains an emp
   await expect(empty).toContainText('Some wallet history is not loaded.');
   await expect(empty.locator('svg')).toBeVisible();
   await expect(page.locator('.wallet-review-flow')).toHaveCount(0);
-  await mkdir('artifacts/ui-review/feedback', { recursive: true });
-  await page.screenshot({ path: 'artifacts/ui-review/feedback/wallet-no-related.png' });
   await addressRow(w.wallets[0].addresses[0].address).click();
   await expect(chooser).toHaveValue(TX_SPENDING);
   await expect(page.locator('.wallet-review-flow')).toBeVisible();

@@ -105,7 +105,6 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   });
   expect((await assignmentGeometry()).height).toBeLessThan(60);
   await expectNoHorizontalOverflow();
-  await page.screenshot({ path: 'artifacts/quick-edit-review/inline-tags-desktop.png' });
 
   await picker.getByRole('button', { name: 'Address + outputs', exact: true }).click();
   await picker.getByLabel('Find or create tag').fill('Shop');
@@ -170,7 +169,6 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await expect(page.getByRole('button', { name: 'Save tag', exact: true })).toHaveCount(0);
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.locator('.graph-stage canvas')).toBeVisible();
-  await page.screenshot({ path: 'artifacts/quick-edit-review/tags-manager-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'Browse' }).click();
   await expect(page.getByRole('button', { name: 'New tag', exact: true })).toBeInViewport({
@@ -217,6 +215,5 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await expect(addShop).toBeDisabled();
   await expect(removeShop).toBeEnabled();
   await expectNoHorizontalOverflow();
-  await page.screenshot({ path: 'artifacts/quick-edit-review/inline-tags-mobile.png' });
   await page.keyboard.press('Escape');
 });

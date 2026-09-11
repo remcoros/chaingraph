@@ -105,7 +105,6 @@ for (const phone of [false, true]) {
     const outputs = flow.locator('.wallet-flow-column').nth(1);
     await flow.scrollIntoViewIfNeeded();
     await mkdir('artifacts/wallet-polish', { recursive: true });
-    const phase = process.env.WALLET_POLISH_BASELINE ? 'before' : 'after';
     if (!phone && !process.env.WALLET_POLISH_BASELINE) {
       await writeFile(
         'artifacts/wallet-polish/synthetic-script-outputs.chaingraph',
@@ -117,9 +116,6 @@ for (const phone of [false, true]) {
         }),
       );
     }
-    await page.screenshot({
-      path: `artifacts/wallet-polish/scripts-${phase}-${phone ? 'phone' : 'desktop'}.png`,
-    });
     if (process.env.WALLET_POLISH_BASELINE) return;
     const memo = outputs.locator('.wallet-flow-node').first();
     await expect(memo).toContainText('Unspendable');
@@ -137,9 +133,6 @@ for (const phone of [false, true]) {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(message);
     await memo.getByRole('button', { name: 'Copy outpoint', exact: true }).click();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`${txid}:0`);
-    await page.screenshot({
-      path: `artifacts/wallet-polish/scripts-expanded-${phone ? 'phone' : 'desktop'}.png`,
-    });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -166,9 +159,6 @@ for (const phone of [false, true]) {
     await graphData.locator('summary').click();
     await expect(graphData.locator('pre')).toHaveText(message);
     await expect(page.locator('.selection-heading')).toContainText('Unspendable output');
-    await page.screenshot({
-      path: `artifacts/wallet-polish/scripts-graph-${phone ? 'phone' : 'desktop'}.png`,
-    });
     await page.getByRole('button', { name: 'Back to Wallet', exact: true }).click();
     await expect(memo).toContainText('OP_RETURN');
     expect(calls).toEqual([]);

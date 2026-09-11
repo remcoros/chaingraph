@@ -65,7 +65,6 @@ test('transaction cards contain long references, annotations and every action at
         await expect(card.locator('.graph-card-identifier').first()).toHaveText(short(txid));
         await expect(card.locator('.graph-card-identifier').first()).toHaveAttribute('title', txid);
         if (x === 5 && [1440, 390].includes(width) && ['unlabeled', 'long'].includes(scenario)) {
-          await page.screenshot({ path: test.info().outputPath(`${width}-${scenario}.png`) });
         }
         await card.getByRole('button', { name: 'Close graph details' }).click();
         await expect(card).toBeHidden();

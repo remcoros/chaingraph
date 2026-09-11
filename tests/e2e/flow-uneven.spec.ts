@@ -81,9 +81,6 @@ test('both flow collapse controls remain reachable through uneven expanded lanes
     const top = (await flow.boundingBox())!.y;
     expect((await inputs.boundingBox())!.y).toBeLessThan(top + 90);
     expect((await outputs.boundingBox())!.y).toBeLessThan(top + 90);
-    await page.screenshot({
-      path: test.info().outputPath(`uneven-flow-${width}.png`),
-    });
   }
   await outputs.click();
   await expect(

@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import { newWorkspace, parseWorkspace } from '../../src/domain/workspace';
 import type { Workspace } from '../../src/domain/types';
 import { decryptWorkspace, encryptWorkspace } from '../../src/lib/crypto';
@@ -80,8 +79,6 @@ for (const viewport of [
     await expect(dialog.getByRole('alert')).toContainText('The previous name is kept');
     await expect(walletPage.getByLabel('Selected wallet')).toContainText('Original wallet');
     await name.fill('Renamed wallet');
-    await mkdir('artifacts/wallet-name', { recursive: true });
-    await page.screenshot({ path: `artifacts/wallet-name/dialog-${viewport.width}.png` });
     await name.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(edit).toBeFocused();

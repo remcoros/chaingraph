@@ -1,7 +1,7 @@
 import { WORKSPACE_TEMPLATES } from '../../src/domain/workspaceTemplates';
 import { openLaboratoryFixture } from '../fixtures/open-workspace';
 import { expect, test, type Page, type Locator } from '@playwright/test';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import {
   mockBitcoin,
   PUBLIC_ZPUB,
@@ -608,8 +608,6 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   await page.keyboard.press('Tab');
   await expect(notes).toBeFocused();
   await expectHitTarget(notes);
-  await mkdir('artifacts/shared-test-triage', { recursive: true });
-  await page.screenshot({ path: 'artifacts/shared-test-triage/inspector-desktop.png' });
 
   // Editing survives toggling the collapsible chain evidence.
   await notes.fill('Draft that must survive evidence toggles.');
@@ -650,7 +648,6 @@ test('inspector keeps trace actions and label editing reachable on a 150-output 
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.type(' Phone edit.');
   await expect(notes).toHaveValue('Draft that must survive evidence toggles. Phone edit.');
-  await page.screenshot({ path: 'artifacts/shared-test-triage/inspector-phone.png' });
 });
 
 test('compact header keeps workspace tabs and lookup controls reachable with keyboard-accessible help and samples', async ({
@@ -696,8 +693,6 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
       await expectHitTarget(control);
   }
   await expectGraphHeaderReachable();
-  await mkdir('artifacts/shared-test-triage', { recursive: true });
-  await page.screenshot({ path: 'artifacts/shared-test-triage/header-desktop.png' });
 
   const help = page.getByRole('button', { name: 'Help and samples', exact: true });
   await help.focus();
@@ -733,7 +728,6 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   await expect(help).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
   await expectGraphHeaderReachable();
-  await page.screenshot({ path: 'artifacts/shared-test-triage/header-phone.png' });
   await expect(tabs.getByRole('button', { name: /Compact public study/ })).toBeInViewport();
   await expect(lookup.getByLabel('Prefetch previous levels')).toBeInViewport({ ratio: 1 });
   await expect(lookup.getByRole('button', { name: 'Add to graph', exact: true })).toBeInViewport({

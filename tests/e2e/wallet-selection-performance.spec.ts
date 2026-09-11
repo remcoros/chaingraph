@@ -89,7 +89,6 @@ test('loaded large-wallet row selection stays responsive without upstream reques
     `${output}/timings.json`,
     JSON.stringify({ addresses: 600, transactions: 1800, measurements }, null, 2),
   );
-  await page.screenshot({ path: `${output}/addresses.png` });
   expect(rpcCalls).toEqual([]);
   for (const samples of Object.values(measurements)) {
     const median = [...samples].sort((a, b) => a - b)[Math.floor(samples.length / 2)];

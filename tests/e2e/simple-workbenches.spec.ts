@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import { analysisTools } from '../../src/domain/analysis';
 import type { Workspace } from '../../src/domain/types';
 import { newWorkspace, parseWorkspace } from '../../src/domain/workspace';
@@ -67,11 +66,6 @@ async function saved(page: Page): Promise<Workspace> {
   return (await decryptWorkspace(envelope, password)) as Workspace;
 }
 
-async function screenshot(page: Page, name: string) {
-  await mkdir('artifacts/simple-workbenches', { recursive: true });
-  await page.screenshot({ path: `artifacts/simple-workbenches/${name}.png`, fullPage: true });
-}
-
 // One click must account for every registered tool, even tools without enough context.
 test('selected output scans every applicable tool, explains coverage and returns to an unfiltered graph', async ({
   page,
@@ -91,7 +85,6 @@ test('selected output scans every applicable tool, explains coverage and returns
   await expect(analysis).toContainText(/wallet/i);
   await expect(analysis).toContainText(/skip|unavailable/i);
   expect(calls).toHaveLength(0);
-  await screenshot(page, 'analysis-desktop');
   await analysis.getByRole('button', { name: 'Show on graph', exact: true }).click();
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   await expect.poll(async () => (await saved(page)).view.filters?.includeIds).toBeUndefined();
@@ -100,7 +93,6 @@ test('selected output scans every applicable tool, explains coverage and returns
   await expect(analysis.getByRole('button', { name: 'Show on graph', exact: true })).toBeVisible();
   await analysis.getByRole('button', { name: /isolate/i }).click();
   await expect(page.getByRole('button', { name: 'Reset filters', exact: true })).toBeVisible();
-  await screenshot(page, 'graph-isolated-desktop');
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await expect.poll(async () => (await saved(page)).view.filters?.includeIds).toBeUndefined();
   expect((await saved(page)).view.hiddenNodeIds).toEqual([siblingOutput]);
@@ -110,7 +102,6 @@ test('selected output scans every applicable tool, explains coverage and returns
     ratio: 1,
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await screenshot(page, 'analysis-mobile');
 });
 
 test('restored include and focus filters have an effective reset independent of manual hiding', async ({
@@ -187,7 +178,6 @@ test('saved Trace mode opens Graph and selection isolation toggles with keyboard
     .toEqual({ id: originOutput, hops: 1 });
   await page.getByLabel('Focus graph paths').selectOption('2');
   await expect.poll(async () => (await saved(page)).view.filters?.focus?.hops).toBe(2);
-  await screenshot(page, 'graph-selection-isolated-desktop');
   await page.locator(`.entity-row[title="tx:${TX_FUNDING}"]`).click();
   await expect
     .poll(async () => (await saved(page)).view.filters?.focus?.id)
@@ -201,7 +191,6 @@ test('saved Trace mode opens Graph and selection isolation toggles with keyboard
   await isolate.click();
   await expect(isolate).toBeInViewport({ ratio: 1 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await screenshot(page, 'graph-selection-isolated-mobile');
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await expect(isolate).toHaveAttribute('aria-pressed', 'false');
 });
@@ -251,8 +240,6 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   await expect(outputEvidence).toHaveCount(6);
   await expect(outputEvidence.locator('time')).toHaveCount(0);
   await supporting.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'artifacts/wallet-polish/analysis-metadata-desktop.png' });
-  await screenshot(page, 'six-outputs-evidence-desktop');
   await evidence
     .getByRole('button', { name: `Show address ${CHANGE_ADDRESS} on graph`, exact: true })
     .click();
@@ -287,9 +274,7 @@ test('equal-output evidence links all six outputs, their addresses and the suppo
   await page.getByRole('button', { name: 'Back to Analysis', exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await evidence.scrollIntoViewIfNeeded();
-  await screenshot(page, 'six-outputs-evidence-mobile');
   await supporting.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'artifacts/wallet-polish/analysis-metadata-phone.png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(calls).toEqual([]);
 });
@@ -333,7 +318,6 @@ for (const phone of [false, true]) {
         'context',
       );
     }
-    await screenshot(page, `keyboard-analysis-return-${phone ? 'phone' : 'desktop'}`);
     expect(calls).toEqual([]);
   });
 }
@@ -398,7 +382,6 @@ test.skip('Trace requires an output choice, follows one explicit branch and shar
   await expect(
     trace.getByRole('button', { name: 'Follow selected branch', exact: true }),
   ).toBeDisabled();
-  await screenshot(page, 'trace-ambiguity-desktop');
   const nextOutput = `out:${'b'.repeat(64)}:1`;
   await trace.getByLabel('Trace branch', { exact: true }).selectOption(nextOutput);
   await trace.getByRole('button', { name: 'Follow selected branch', exact: true }).click();
@@ -444,7 +427,6 @@ test.skip('Trace requires an output choice, follows one explicit branch and shar
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(trace.getByRole('button', { name: 'Scan backward', exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await screenshot(page, 'trace-mobile');
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
   await unlock(page, workspace.name);

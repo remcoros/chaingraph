@@ -234,7 +234,6 @@ test('mobile annotation showcase reveals its editor without covering it and rest
       );
     })
     .toBe(true);
-  await page.screenshot({ path: test.info().outputPath('mobile-tour-annotations-visible.png') });
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
   await expect.poll(() => inspector.evaluate((element) => element.scrollTop)).toBe(originalScroll);

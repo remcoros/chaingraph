@@ -69,7 +69,6 @@ test('transaction rows retain spending context while automatically loading prevo
   );
   await page.locator('.script-inspector > summary').click();
   await expect(page.locator('.script-inspector')).toContainText('OP_0');
-  await page.screenshot({ path: 'test-results/transaction-inspection-desktop.png' });
   await view.locator(':scope > summary').getByText('Transaction flow', { exact: true }).click();
   await expect(view.locator('.transaction-columns')).not.toBeVisible();
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
@@ -111,7 +110,6 @@ test('large transaction lists collapse and remain usable on a phone', async ({ p
   await view.getByRole('button', { name: 'Collapse outputs', exact: true }).click();
   await expect(view.locator('.transaction-row[data-selected="true"]')).toBeAttached();
   await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: 'test-results/transaction-inspection-mobile.png' });
   await view.getByRole('button', { name: 'Show all 150 outputs', exact: true }).click();
   await expect(view.getByRole('button', { name: /^Output 149:/ })).toBeInViewport({ ratio: 1 });
   await view.hover();
@@ -307,7 +305,6 @@ test('keeps selected rows visible through tag wrapping and resize, and shows tra
   }));
   expect(badgeGeometry.height).toBeGreaterThan(35);
   expect(badgeGeometry.overflow).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: test.info().outputPath('selected-tag-after-resize.png') });
   await page.setViewportSize({ width: 420, height: 800 });
   await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);

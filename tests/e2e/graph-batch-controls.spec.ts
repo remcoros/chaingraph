@@ -217,7 +217,6 @@ test('batch controls stay reachable and tappable on a phone screen', async ({ pa
   const box = await toolbar.getByRole('button', { name: 'Label' }).boundingBox();
   expect(box!.height).toBeGreaterThanOrEqual(36);
   await expect(toolbar).toBeInViewport();
-  await page.screenshot({ path: testInfo.outputPath('batch-controls-phone.png') });
   await toolbar.getByRole('button', { name: 'Label' }).click();
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
   await expect(editor).toBeInViewport();
@@ -374,10 +373,6 @@ for (const width of [1440, 390, 320]) {
     await input.fill('searchable');
     await expect(row).toHaveCount(1);
     await input.fill('');
-    await page.screenshot({
-      path: `artifacts/quick-edit-review/graph-tags-${width}.png`,
-      fullPage: true,
-    });
     for (const name of ['S', 'x'.repeat(100)]) {
       await input.fill(name);
       await expect(editor.getByRole('button', { name: 'Create and assign' })).toBeVisible();
@@ -385,10 +380,6 @@ for (const width of [1440, 390, 320]) {
     }
     await input.fill('Scoped savings');
     await editor.getByRole('button', { name: 'Color 4', exact: true }).click();
-    await page.screenshot({
-      path: `artifacts/quick-edit-review/graph-create-${width}.png`,
-      fullPage: true,
-    });
     await input.press('Enter');
     await expect(editor).toBeHidden();
     await expect(trigger).toBeFocused();

@@ -153,7 +153,6 @@ test('wallet addresses show loaded output counts and remain selectable without l
   await assertAddressVisible();
   await page.waitForTimeout(1800);
   await assertAddressVisible();
-  await page.screenshot({ path: testInfo.outputPath('wallet-addresses-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page
     .locator('.mobile-switch')
@@ -161,7 +160,6 @@ test('wallet addresses show loaded output counts and remain selectable without l
     .click();
   await expectWalletTabsReachable(page);
   await expect(panel.locator('.wallet-record-row').first()).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: testInfo.outputPath('wallet-addresses-mobile.png') });
   await rightTab(page, 'Transactions').click();
   await rightTab(page, 'Addresses').click();
   await expect(panel).toBeVisible();
@@ -252,7 +250,6 @@ test('UTXO records come from current address checks and refresh removes spent re
   ).toHaveCount(0);
   await panel.getByRole('button', { name: `Select wallet UTXO ${TX_FUNDING}:0` }).click();
   await expect(panel.locator('.wallet-record-row')).toHaveAttribute('aria-pressed', 'true');
-  await page.screenshot({ path: testInfo.outputPath('wallet-utxos-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.mobile-switch').getByRole('button', { name: 'UTXOs', exact: true }).click();
   await expectWalletTabsReachable(page);
@@ -260,7 +257,6 @@ test('UTXO records come from current address checks and refresh removes spent re
   await expect(panel.getByRole('button', { name: 'Refresh wallet UTXOs' })).toBeInViewport({
     ratio: 1,
   });
-  await page.screenshot({ path: testInfo.outputPath('wallet-utxos-mobile.png') });
   spent = true;
   await panel.getByRole('button', { name: 'Refresh wallet UTXOs' }).click();
   await expect(panel).toContainText('No UTXOs found for the checked addresses.');

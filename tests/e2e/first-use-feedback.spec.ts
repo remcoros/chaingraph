@@ -74,7 +74,6 @@ test('mobile keeps network and previous-level context visible and exports are ex
     exact: true,
   });
   await expect(exported).toHaveAttribute('title', 'Export encrypted workspace backup');
-  await page.screenshot({ path: testInfo.outputPath('feedback-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.connection-network')).toHaveText('mainnet');
   await expect(page.locator('.connection-network')).toBeVisible();
@@ -89,5 +88,4 @@ test('mobile keeps network and previous-level context visible and exports are ex
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Workspace actions', exact: true })).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('feedback-mobile.png') });
 });

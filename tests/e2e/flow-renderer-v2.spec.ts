@@ -223,7 +223,6 @@ test('real node and line picking, pointer coordinates, silhouettes, directional 
   await page.waitForTimeout(1600);
   expect(await page.evaluate(() => (window as any).fixture.graph.raf)).toBe(0);
   expect(errors).toEqual([]);
-  await page.screenshot({ path: 'artifacts/flow-renderer-v2/controlled-shapes.png' });
 });
 
 test('orbit, pan, cursor zoom, Flat mode, focus and manual resize preserve geometry without drag selection', async ({
@@ -403,7 +402,6 @@ test('touch taps select, orbit and pinch never hover or accidentally select', as
   expect(await page.evaluate(() => (window as any).fixture.selects.length)).toBe(1);
   expect(await page.evaluate(() => (window as any).fixture.hovers.length)).toBe(0);
   expect(errors).toEqual([]);
-  await page.screenshot({ path: 'artifacts/flow-renderer-v2/mobile-gesture.png' });
   await context.close();
 });
 

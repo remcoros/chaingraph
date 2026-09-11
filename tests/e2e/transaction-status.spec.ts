@@ -75,5 +75,4 @@ test('saved block heights and explicit mempool observations are distinct from un
   await expect(page.locator('.selection-heading')).not.toContainText('Unconfirmed');
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   await page.waitForTimeout(500);
-  await page.screenshot({ path: test.info().outputPath('transaction-status-desktop.png') });
 });

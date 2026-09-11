@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
 import { newWorkspace } from '../../src/domain/workspace';
 import { deriveAddresses } from '../../src/lib/wallet';
 import { decryptWorkspace } from '../../src/lib/crypto';
@@ -85,12 +84,10 @@ for (const width of [1440, 390]) {
     expect(iconBox.height).toBeGreaterThanOrEqual(24);
     expect(iconBox.height).toBeLessThanOrEqual(30);
     expect(Math.abs(iconBox.y - bookmarkBox.y)).toBeLessThanOrEqual(1);
-    await mkdir('artifacts/inspector-metadata', { recursive: true });
     await association.evaluate((element) => element.scrollIntoView({ block: 'end' }));
     await page.locator('.inspector-scroll').evaluate((element) => {
       element.scrollTop += 64;
     });
-    await page.screenshot({ path: `artifacts/inspector-metadata/empty-${width}.png` });
 
     const label = annotations.getByLabel('Node label', { exact: true });
     const notes = annotations.getByLabel('Node notes', { exact: true });
@@ -138,7 +135,6 @@ for (const width of [1440, 390]) {
     await page.locator('.inspector-scroll').evaluate((element) => {
       element.scrollTop += 64;
     });
-    await page.screenshot({ path: `artifacts/inspector-metadata/populated-${width}.png` });
 
     // Lock without waiting for the debounced save: flush must include the last edit.
     await notes.fill('Final edit survives immediate lock');

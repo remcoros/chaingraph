@@ -103,10 +103,8 @@ for (const template of WORKSPACE_TEMPLATES) {
       })
       .toBe(canvas.nodes.length);
     expect(copy.view.graphSnapshot!.camera.position).not.toEqual({ x: 260, y: 140, z: 1000 });
-    await page.screenshot({ path: `artifacts/example-${template.id}-opening.png` });
     if (template.id === 'mainnet-op-return') {
       await page.setViewportSize({ width: 900, height: 900 });
-      await page.screenshot({ path: 'artifacts/example-message-opening-narrow.png' });
     }
     const storage = await page.evaluate((key) => localStorage.getItem(key), STORAGE);
     expect(storage).not.toContain(template.description);
@@ -121,14 +119,11 @@ for (const template of WORKSPACE_TEMPLATES) {
       await page.locator('.wallet-row').filter({ hasText: wallet.name }).click();
       await expect(page.getByRole('button', { name: 'Refresh wallet', exact: true })).toBeVisible();
       await expect(page.locator('.scan-result')).toContainText(`Gap limit ${wallet.scanGap}`);
-      await page.screenshot({ path: 'artifacts/example-public-wallet.png' });
     } else {
       expect(copy.wallets).toEqual([]);
     }
     expect(calls).toEqual([]);
     expect(errors).toEqual([]);
-    if (template.id === 'mainnet-wabisabi')
-      await page.screenshot({ path: 'artifacts/example-wabisabi.png' });
   });
 }
 
@@ -316,7 +311,6 @@ test('desktop examples form two mainnet rows and one testnet4 row in Home and He
   await page.keyboard.press('Tab');
   await expect(first).toBeFocused();
   await expect(first).toHaveCSS('outline-offset', '-3px');
-  await page.screenshot({ path: 'artifacts/examples-desktop.png' });
   // Narrow layouts retain all cases and the network boundary without horizontal scrolling.
   await page.setViewportSize({ width: 390, height: 844 });
   const last = dialog.getByRole('button', {
@@ -327,7 +321,6 @@ test('desktop examples form two mainnet rows and one testnet4 row in Home and He
   await expect(last).toBeInViewport();
   await expect(dialog.getByRole('button', { name: 'Close dialog', exact: true })).toBeInViewport();
   expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  await page.screenshot({ path: 'artifacts/examples-mobile.png' });
 });
 
 test('mainnet-only galleries have six examples and no network separator', async ({ page }) => {
