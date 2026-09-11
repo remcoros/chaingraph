@@ -258,6 +258,14 @@ a {
   min-width: 0;
   user-select: text;
 }
+.selection-facts .text-button {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 20px;
+  padding: 0;
+  text-align: left;
+}
 .selection-facts .copy-control {
   flex-shrink: 0;
   margin-left: auto;

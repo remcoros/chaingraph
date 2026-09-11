@@ -188,6 +188,14 @@ Selecting one input still loads only its creating transaction when missing. Expl
 
 The graph is derived from workspace transactions and annotations. Only active, non-stale analysis findings contribute separate cluster presentation; they do not rewrite the observed transaction graph. When multiple findings reference one node, the current projection uses the last active finding for its display color. The inspector remains the place to review actual findings and evidence.
 
+The output inspector lists outpoint, creating transaction, address, value and block
+in that order. Identifiers can be copied; creating transactions open from the table,
+and an address click admits and reveals just that address through the existing
+graph membership action. Enabling address display also projects validated attached
+prevout addresses when their creating transaction is absent, without fetching it
+or adding a watched address. Loaded spending transactions remain below the trace
+controls; the creator is not repeated there.
+
 ## Shared filtering, selection and batch actions
 
 Filtering, multiple selection and batch metadata form one small layer over explicit

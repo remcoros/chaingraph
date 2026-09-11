@@ -23,6 +23,7 @@ import {
 import {
   short,
   txNodeId,
+  addressNodeId,
   type Annotation,
   type Wallet,
   type Workspace,
@@ -377,6 +378,7 @@ export function NodeInspector({
         : undefined);
   const selectedOutput =
     selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
+  const address = selected.address ?? (selectedOutput ? outputAddress(selectedOutput) : undefined);
   const utxo = useUtxoStatus(
     w.id,
     w.network,
@@ -419,7 +421,7 @@ export function NodeInspector({
     const equal = equalOutputCount(tx);
     if (equal >= 3) cautions.push(`${equal} equal outputs, inspect carefully`);
   }
-  const relatedNav = !!onSelectNode && (spendingCount > 0 || (selected.kind === 'output' && !!tx));
+  const relatedNav = !!onSelectNode && spendingCount > 0;
   const hasEvidence = selected.kind === 'output' || !!tx || !!selected.address;
   const showRefresh = !!selected.txid && !!tx && !w.demo;
   const showRemove =
@@ -507,15 +509,6 @@ export function NodeInspector({
         )}
         {w.annotations[selected.id]?.label && <h2>{w.annotations[selected.id].label}</h2>}
         <dl className="selection-facts">
-          {selected.address && selected.kind !== 'address' && (
-            <div>
-              <dt>Address</dt>
-              <dd>
-                <code title={selected.address}>{short(selected.address)}</code>
-                <CopyButton value={selected.address} label="Copy address" />
-              </dd>
-            </div>
-          )}
           <div>
             <dt>
               {selected.kind === 'output'
@@ -550,11 +543,56 @@ export function NodeInspector({
               />
             </dd>
           </div>
+          {selected.kind === 'output' && selected.txid && (
+            <div>
+              <dt>Transaction</dt>
+              <dd>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!!previousReason}
+                  title={previousReason || `Open creating transaction: ${selected.txid}`}
+                  aria-label={`Open creating transaction: ${selected.txid}`}
+                  onClick={() => {
+                    if (tx && onSelectNode) onSelectNode(txNodeId(tx.txid));
+                    else onExpand('funding');
+                  }}
+                >
+                  <code>{short(selected.txid)}</code>
+                </button>
+                <CopyButton value={selected.txid} label="Copy transaction ID" />
+              </dd>
+            </div>
+          )}
+          {selected.kind !== 'address' && (selected.kind === 'output' || address) && (
+            <div>
+              <dt>Address</dt>
+              <dd>
+                {address ? (
+                  <>
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={!onSelectNode}
+                      title={`Add and select address: ${address}`}
+                      aria-label={`Add and select address: ${address}`}
+                      onClick={() => onSelectNode?.(addressNodeId(address))}
+                    >
+                      <code>{short(address)}</code>
+                    </button>
+                    <CopyButton value={address} label="Copy address" />
+                  </>
+                ) : (
+                  <span className="muted">{selectedOutput ? 'None' : 'Unknown'}</span>
+                )}
+              </dd>
+            </div>
+          )}
           <div>
             <dt>Value</dt>
             <Amount as="dd" value={selected.value} />
           </div>
-          {tx && (
+          {(tx || selected.kind === 'output') && (
             <div>
               <dt>Block</dt>
               <dd>
@@ -568,17 +606,6 @@ export function NodeInspector({
           <p className="selection-caution">
             <TriangleAlert size={13} />
             {cautions.join(' · ')}
-          </p>
-        )}
-        {selected.kind !== 'address' && (
-          <p className="small muted spending-note">
-            {opReturn
-              ? 'OP_RETURN · Unspendable output'
-              : spendingCount
-                ? `${spendingCount} spending transaction${spendingCount === 1 ? ' is' : 's are'} loaded ${selected.kind === 'output' ? 'for this output' : 'across these outputs'}. Current chain status may differ.`
-                : walletObservation || utxo.observation
-                  ? 'No spending transaction loaded.'
-                  : 'Spend status unknown. No spending transaction loaded.'}
           </p>
         )}
         <div className="selection-trace">
@@ -606,16 +633,6 @@ export function NodeInspector({
         ))}
         {relatedNav && (
           <div className="related-transactions">
-            {selected.kind === 'output' && tx && (
-              <button
-                type="button"
-                className="text-button"
-                title={tx.txid}
-                onClick={() => onSelectNode?.(txNodeId(tx.txid))}
-              >
-                <span>Creating tx:</span> <code>{short(tx.txid)}</code>
-              </button>
-            )}
             {spendingNodes.slice(0, 5).map((id) => (
               <button
                 key={id}

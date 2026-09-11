@@ -1048,9 +1048,6 @@ small,
 .selection-caution svg {
   flex-shrink: 0;
 }
-.spending-note {
-  margin-bottom: 10px;
-}
 .selection-trace {
   display: flex;
   flex-wrap: wrap;

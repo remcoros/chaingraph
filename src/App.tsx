@@ -3171,7 +3171,10 @@ export default function App() {
                     editToken={editTarget === 'tags' ? undefined : editToken}
                     editTarget={editTarget === 'icon' ? 'icon' : 'label'}
                     onEditHandled={() => setEditToken(0)}
-                    onSelectNode={select}
+                    onSelectNode={(id) => {
+                      if (id.startsWith('addr:')) revealGraphNodes([id]);
+                      select(id);
+                    }}
                     onCenter={() => centerNode()}
                     onShowAndCenter={() => centerNode(selected.id, undefined, true)}
                     hiddenNodeIds={w.view.hiddenNodeIds}

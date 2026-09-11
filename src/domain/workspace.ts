@@ -720,6 +720,7 @@ export function buildGraph(workspace: Workspace): GraphData {
           resolution?.status === 'loaded' || resolution?.status === 'attached'
             ? resolution.output
             : undefined;
+        const address = output ? outputAddress(output) : undefined;
         add({
           id,
           kind: 'output',
@@ -727,8 +728,13 @@ export function buildGraph(workspace: Workspace): GraphData {
           vout: input.vout,
           label: `${short(input.txid)}:${input.vout}`,
           value: output ? sats(output.value) : undefined,
-          address: output ? outputAddress(output) : undefined,
+          address,
         });
+        if (address && workspace.view.showAddresses) {
+          const aid = addressNodeId(address);
+          add({ id: aid, kind: 'address', label: short(address), address });
+          link(id, aid, 'address');
+        }
       }
       link(id, txNodeId(tx.txid), 'spends');
     }
