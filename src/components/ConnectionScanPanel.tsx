@@ -924,6 +924,30 @@ function ScanResultGroup({
   );
 }
 
+function ScanPathNodeLabel({ workspace, id }: { workspace: Workspace; id: string }) {
+  const transaction = id.startsWith('tx:')
+    ? (workspace.transactions[id.slice(3)] ?? workspace.connectionScans?.evidence[id.slice(3)])
+    : undefined;
+  return (
+    <>
+      <span className="connection-scan-path-name">{nameFor(workspace, id)}</span>
+      {id.startsWith('tx:') && (
+        <span
+          className="connection-scan-path-counts"
+          title={
+            transaction
+              ? `${transaction.vin.length} inputs / ${transaction.vout.length} outputs`
+              : 'Input/output counts unavailable'
+          }
+        >
+          {' '}
+          ({transaction?.vin.length ?? '?'}/{transaction?.vout.length ?? '?'})
+        </span>
+      )}
+    </>
+  );
+}
+
 function ScanResultRow({
   workspace,
   result,
@@ -943,23 +967,18 @@ function ScanResultRow({
   const category = resultCategory(result);
   const hasDirection = !!(result.scanDirection ?? result.directions[0]);
   const conflict = finding === 'conflicting-evidence';
-  const [prefixLength, setPrefixLength] = useState(
-    conflict ? Math.max(1, result.path.length - 1) : result.path.length,
-  );
+  const prefixLength = conflict ? Math.max(1, result.path.length - 1) : result.path.length;
   const [error, setError] = useState('');
-  const fullPlan = useMemo(
-    () => prepareScanPathAddition(workspace, result),
+  const plan = useMemo(
+    () => prepareScanPathAddition(workspace, result, prefixLength),
     [
       workspace.transactions,
       workspace.connectionScans?.evidence,
       workspace.view.graphNodeIds,
       result,
+      prefixLength,
     ],
   );
-  const plan =
-    prefixLength === result.path.length
-      ? fullPlan
-      : prepareScanPathAddition(workspace, result, prefixLength);
   const creatorId = plan.creatorId;
   const openNode = (id: string) => {
     setError('');
@@ -1098,34 +1117,6 @@ function ScanResultRow({
             </button>
           </div>
         )}
-        {result.context && (
-          <div className="connection-scan-existing-route">
-            <strong>Existing route</strong>
-            <ol className="connection-scan-path">
-              {result.context.path.map((id, index) => (
-                <li key={id} title={id}>
-                  <span aria-label={index ? result.context!.directions[index - 1] : 'Source'}>
-                    {index
-                      ? result.context!.directions[index - 1] === 'upstream'
-                        ? '↑'
-                        : '↓'
-                      : '●'}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={actionBusy}
-                    aria-label={`Select existing route node: ${nameFor(workspace, id)}`}
-                    onClick={() => openNode(id)}
-                  >
-                    {nameFor(workspace, id)}
-                  </button>
-                  {plan.newNodeIds.includes(id) && <small>New</small>}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
         {(outsideChain || unconfirmed) && (
           <p className="small connection-scan-evidence-status">
             {outsideChain
@@ -1147,7 +1138,7 @@ function ScanResultRow({
         )}
         {plan.blockedByConflict && (
           <p className="small connection-scan-error">
-            Choose an earlier verified step or refresh the conflicting evidence.
+            Refresh the conflicting evidence before adding.
           </p>
         )}
         {obscured && (
@@ -1179,25 +1170,6 @@ function ScanResultRow({
               </select>
             </label>
           )}
-          {((!connection && result.path.length > 5) ||
-            fullPlan.missingTxids.length > 0 ||
-            conflict ||
-            fullPlan.blockedByConflict) &&
-            result.path.length > 1 && (
-              <label>
-                Path length
-                <select
-                  value={prefixLength}
-                  onChange={(event) => setPrefixLength(Number(event.target.value))}
-                >
-                  {result.path.map((id, index) => (
-                    <option key={`${id}:${index}`} value={index + 1}>
-                      {index + 1} / {result.path.length}: {short(id)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
           <ol className="connection-scan-path">
             {result.path.slice(0, prefixLength).map((id, index) => (
               <li key={`${id}:${index}`} title={id}>
@@ -1212,7 +1184,7 @@ function ScanResultRow({
                   title={id}
                   onClick={() => openNode(id)}
                 >
-                  {nameFor(workspace, id)}
+                  <ScanPathNodeLabel workspace={workspace} id={id} />
                 </button>
                 {plan.newNodeIds.includes(id) && <small>New</small>}
               </li>
@@ -1239,7 +1211,7 @@ function ScanResultRow({
                 title={creatorId}
                 onClick={() => openNode(creatorId)}
               >
-                {nameFor(workspace, creatorId)}
+                <ScanPathNodeLabel workspace={workspace} id={creatorId} />
               </button>
               {plan.newNodeIds.includes(creatorId) && <small>New</small>}
             </div>

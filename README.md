@@ -17,8 +17,7 @@ default to 3 transaction hops, 200 examined transactions,
 30 seconds and a 50-branch stopping point. Findings appear during the scan and
 can be dismissed individually. Connection and branch-choice cards identify exact
 paths and shared meeting points. Automatic scopes compare observed links with the
-loaded graph regardless of canvas visibility. Reconnection cards show both the
-found route and the existing route that closes the loop; Add reveals both.
+loaded graph regardless of canvas visibility. Reconnection cards show the path; Add includes the links needed to reveal the complete loop.
 Ordinary ancestry and merely loading an identifiable creator are omitted.
 Targets in separate loaded components can still yield useful connecting paths. Evidence problems offer a bounded endpoint recheck;
 verified unspent, coinbase and unspendable endings live under **Endpoints**.

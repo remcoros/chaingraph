@@ -124,21 +124,21 @@ separate filter for natural path endings.
 
 Automatic scopes compare with loaded links, independently of canvas visibility.
 Ordinary ancestry and loading the already identifiable creator of known outputs
-are omitted. A reconnection shows the existing route that closes its loop; targets
+are omitted. Adding a reconnection reveals its complete loop; targets
 in separate loaded components can instead produce a connecting path. Existing
 routes are bounded to 8 transaction hops. Connections requiring a longer existing
 route are omitted. Custom targets can return directed paths without a loop.
 
-**Path** shows directed steps and new nodes. Click a source, target, branch or
+**Path** shows directed steps and new nodes. Transactions include input/output
+counts as `(inputs/outputs)`. Click a source, target, branch or
 path node to add it if needed and select it. Clicking adds only that node,
 without the other steps or siblings. Missing transaction evidence loads on demand.
 Paths ending at an output include its creating transaction, shown with a small
 origin icon if it is not already in the path.
 
 Alternative paths to the same finding within a scan share one card; choose an
-alternative inside it. **Add (+N)** adds the found route and any displayed existing
-route, including the terminal creating transaction, with N new nodes in one Undo
-action. This reveals the whole reconnection. **Path length** offers a shorter prefix for stopping points or missing/conflicting proof; its **Add prefix** action omits the existing route. Adding reveals the path and resets graph filters, preserving
+alternative inside it. **Add (+N)** adds the found route and its connecting links, including the terminal creating transaction, with N new nodes in one Undo
+action. This reveals the whole reconnection. Conflicting observations only allow **Add prefix** for the preceding verified steps. Adding reveals the path and resets graph filters, preserving
 annotations and the camera. Select a branch after adding its transaction, then
 use **Scan selection** to continue. Missing evidence is fetched only for the
 requested action; conflicting evidence must be resolved before adding.

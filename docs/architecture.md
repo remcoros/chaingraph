@@ -401,7 +401,8 @@ validation remains off the UI thread. `domain/connectionScanAddition.ts` plans
 and adds both routes of a reconnection plus its terminal creating transaction without changing
 the saved result or search hop count. A creator already in the path is not repeated.
 Its union of graph nodes drives Add, and the whole addition is one Undo step.
-An explicit shorter prefix omits the existing route and is labeled Add prefix.
+Conflicting observations use the preceding verified prefix, labeled Add prefix.
+Cards have no path-length selector.
 Single-node clicks add only the requested node. Both actions validate required
 proof and conflicts before admission, preserving unrelated graph membership.
 `lib/connectionScanActionEvidence.ts` reuses available evidence and fetches only
@@ -425,7 +426,9 @@ Cards group alternative paths to the same finding using their type, endpoint,
 direction and meeting node. Alternative paths remain flat bounded records;
 there is no persisted grouping index. Connections precede branch decisions and
 evidence problems; natural endpoints have a separate filter. Each card groups
-its existing route and always-visible Path section in the body, with actions at the bottom right.
+an always-visible Path section in the body, with actions at the bottom right.
+Each transaction step includes its input/output counts, including the terminal
+creator. The stored closing route is used for Add without a separate card section.
 Distinct root input/output branches get a reconnection title and clickable branch
 identifiers. Other cycles use Reconnection; direct bridges use Funding/Spending
 path. Old automatic direct cards lacking context or a bridge marker are hidden. Clearing the latest

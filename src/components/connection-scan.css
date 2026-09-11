@@ -328,13 +328,7 @@
   padding: 2px 0;
   text-align: left;
 }
-.connection-scan-existing-route {
-  margin-top: 10px;
-  font-size: var(--text-sm);
-}
-.connection-scan-existing-route > strong {
-  font-weight: 600;
-}
+
 .connection-scan-evidence-status {
   color: var(--color-warning);
 }
@@ -344,4 +338,21 @@
 }
 .connection-scan-result-body p {
   overflow-wrap: anywhere;
+}
+
+.connection-scan-path .text-button,
+.connection-scan-path-creator .text-button {
+  display: flex;
+  align-items: baseline;
+}
+.connection-scan-path-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connection-scan-path-counts {
+  flex-shrink: 0;
+  white-space: pre;
+  color: var(--color-muted);
 }
