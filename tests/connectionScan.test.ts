@@ -51,6 +51,7 @@ describe('bounded connection traversal', () => {
     expect(run.examined).toBeLessThanOrEqual(3);
     expect(run.status).toBe('complete');
     expect(Object.keys(run).sort()).toEqual([
+      'deepestHop',
       'examined',
       'id',
       'results',
@@ -305,7 +306,13 @@ describe('bounded connection traversal', () => {
     'keeps earlier findings when the %s frontier times out without adding time rows',
     async (side) => {
       let now = 0;
-      const progress = vi.fn();
+      let releaseTimeout!: () => void;
+      const earlierFinding = new Promise<void>((resolve) => {
+        releaseTimeout = resolve;
+      });
+      const progress = vi.fn((run) => {
+        if (run.results.length) releaseTimeout();
+      });
       const input = options(pathEdges, {
         targetIds: side === 'source' ? [] : [tx(2), tx(9)],
         settings: { ...DEFAULT_SCAN_SETTINGS, direction: 'downstream' },
@@ -318,11 +325,13 @@ describe('bounded connection traversal', () => {
         if (side === 'source') {
           if (id === tx(1)) return { nodeIds: [out(1), out(1, 1)] };
           if (id === out(1)) return { nodeIds: [], stopReason: 'fan-out' };
+          await earlierFinding;
           now = DEFAULT_SCAN_SETTINGS.maxMilliseconds + 1;
           return { nodeIds: [] };
         }
         // The target-side outpoint follows the direct source->tx(2) finding.
         if (id === out(2)) {
+          await earlierFinding;
           now = DEFAULT_SCAN_SETTINGS.maxMilliseconds + 1;
           return { nodeIds: [] };
         }
@@ -460,9 +469,15 @@ describe('bounded connection traversal', () => {
     'backend-unavailable',
     'rate-limited',
   ] as const)('stops all fronts for %s without resource or lifecycle cards', async (stopReason) => {
-    const resolveNeighbors = vi.fn(async () => ({ nodeIds: [out(1)], stopReason }));
+    const resolveNeighbors = vi.fn<ConnectionScanOptions['resolveNeighbors']>(async () => ({
+      nodeIds: [out(1)],
+      stopReason,
+    }));
     const run = await runConnectionScan(options([], { resolveNeighbors }));
-    expect(resolveNeighbors).toHaveBeenCalledTimes(1);
+    // Up to one window may already be in flight when a stop response arrives.
+    expect(resolveNeighbors.mock.calls.length).toBeGreaterThan(0);
+    expect(resolveNeighbors.mock.calls.length).toBeLessThanOrEqual(4);
+    expect(resolveNeighbors.mock.calls.every((call) => call[3].aborted)).toBe(true);
     expect(run.stopReasons).toContain(stopReason);
     expect(run.results).toEqual([]);
     expect(run.status).toBe(stopReason === 'cancelled' ? 'cancelled' : 'complete');

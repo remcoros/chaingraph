@@ -53,6 +53,8 @@ export function runConnectionScanInWorker(
     let lastProgress = 0;
     let lastResultCount = 0;
     let examinedCount = 0;
+    // Every in-flight resolver reserves from the same run-wide transaction allowance.
+    const examined = new Set<string>();
     const pathEvidence = (run: ScanRun): Record<string, Transaction> => {
       const ids = new Set(
         run.results.flatMap((result) =>
@@ -133,9 +135,7 @@ export function runConnectionScanInWorker(
       }
       if (!Number.isSafeInteger(message.id) || message.id <= lastRequest) return;
       lastRequest = message.id;
-      const examined = new Set(message.examinedTxids);
-      examinedCount = Math.max(examinedCount, examined.size);
-      const initial = new Set(examined);
+      const initial = new Set(message.examinedTxids);
       const budget: ScanBudget = {
         get examined() {
           return examined.size;
@@ -158,7 +158,12 @@ export function runConnectionScanInWorker(
         },
       };
       const examinedTxids = () => [...examined].filter((id) => !initial.has(id));
-      void adapter.resolveNeighbors(message.nodeId, message.direction, budget).then(
+      const resolveNeighbors = async () => {
+        for (const txid of initial) budget.examine(txid);
+        budget.examine(message.nodeId.split(':')[1]!);
+        return adapter.resolveNeighbors(message.nodeId, message.direction, budget);
+      };
+      void resolveNeighbors().then(
         (neighbors) => {
           if (current())
             send({ type: 'neighbors', id: message.id, neighbors, examinedTxids: examinedTxids() });

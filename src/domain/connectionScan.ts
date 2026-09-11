@@ -83,6 +83,8 @@ export interface ScanRun {
   startedAt: string;
   status: 'running' | 'complete' | 'cancelled' | 'interrupted' | 'failed';
   examined: number;
+  /** Deepest transaction-hop distance reached from a source or target root. */
+  deepestHop?: number;
   stopReasons: ScanStopReason[];
   results: ScanResult[];
   omittedResults?: { endpoints: number; issues: number };
@@ -164,6 +166,8 @@ export interface ConnectionScanOptions {
   knownLinks?: readonly (readonly [string, string])[];
   settings: ScanSettings;
   signal?: AbortSignal;
+  /** Worker bridges reserve transactions centrally and return their admitted IDs. */
+  resolverOwnsTransactionBudget?: boolean;
   resolveNeighbors: (
     nodeId: string,
     direction: ScanDirection,
@@ -244,6 +248,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     startedAt: new Date(start).toISOString(),
     status: 'running',
     examined: 0,
+    deepestHop: 0,
     stopReasons: [],
     results: [],
   };
@@ -544,17 +549,39 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         known,
         reconstructionCheckpoint,
       );
-    // Alternate source/target and directions, with FIFO order inside each front.
-    scan: while (fronts.some((front) => front.cursor < front.queue.length)) {
-      for (const front of fronts) {
-        if (reasons.has('results')) break scan;
-        if (front.cursor >= front.queue.length) continue;
-        const visit = front.queue[front.cursor++]!;
+    // Resolve a small window concurrently, but mutate traversal state serially.
+    // Each front admits one breadth level at a time, so a fast deeper path cannot
+    // claim a node before a still-pending shorter path from the same roots.
+    type Task = { front: Front; visit: Visit; nodeId: string };
+    type Completion = Task & ({ neighbors: ScanNeighbors } | { error: unknown });
+    const pending = new Set<Task>();
+    const ready: Completion[] = [];
+    let wake: (() => void) | undefined;
+    const notify = () => {
+      wake?.();
+      wake = undefined;
+    };
+    controller.signal.addEventListener('abort', notify);
+    let nextFront = 0;
+    const admit = async (): Promise<boolean> => {
+      for (let offset = 0; offset < fronts.length; offset++) {
+        const index = (nextFront + offset) % fronts.length;
+        const front = fronts[index]!;
+        const visit = front.queue[front.cursor];
+        if (
+          !visit ||
+          [...pending].some(
+            (task) => task.front === front && task.visit.path.length < visit.path.length,
+          )
+        )
+          continue;
+        nextFront = (index + 1) % fronts.length;
+        front.cursor++;
         current = { front, visit };
         budget.checkpoint();
         const nodeId = visit.path.at(-1)!;
         await meeting(front, visit);
-        if (reasons.has('results')) break scan;
+        if (reasons.has('results')) return true;
         if (front.side === 'source' && targets.has(nodeId)) {
           // A fully known prefix is existing graph context, not a new
           // connection. Keep tracing through it so a selected transaction's
@@ -564,115 +591,160 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
               ? acceptedDirectTargets.has(nodeId) && contextIndex!.isNovel(visit.path)
               : visit.path.some((id) => !known.has(id))
           )
-            continue;
+            return true;
         }
-        if (front.side === 'target' && nodeId === options.source) continue;
+        if (front.side === 'target' && nodeId === options.source) return true;
         // Entering the next transaction would exceed the hop limit. Do not
         // resolve a spender (including its history fallback) just to reject it.
         if (nodeId.startsWith('out:') && visit.hops >= settings.maxHops) {
           boundary(front, visit, 'depth');
+          return true;
+        }
+        if (!options.resolverOwnsTransactionBudget) budget.examine(nodeId.split(':')[1]!);
+        run.deepestHop = Math.max(run.deepestHop ?? 0, visit.hops);
+        const task = { front, visit, nodeId };
+        pending.add(task);
+        // Attach rejection handling immediately, including for synchronous adapters.
+        void Promise.resolve()
+          .then(() => options.resolveNeighbors(nodeId, front.direction, budget, controller.signal))
+          .then(
+            (neighbors) => {
+              ready.push({ ...task, neighbors });
+              notify();
+            },
+            (error: unknown) => {
+              ready.push({ ...task, error });
+              notify();
+            },
+          );
+        return true;
+      }
+      return false;
+    };
+    scan: while (true) {
+      while (
+        pending.size < 4 &&
+        !ready.length &&
+        !reasons.has('results') &&
+        !reasons.has('transactions')
+      ) {
+        try {
+          if (!(await admit())) break;
+        } catch (error) {
+          if (!(error instanceof ScanBudgetExceeded) || error.reason !== 'transactions')
+            throw error;
+          reasons.add('transactions');
+          if (current) boundary(current.front, current.visit, 'transactions');
+        }
+      }
+      if (reasons.has('results') || !pending.size) break;
+      while (!ready.length) {
+        budget.checkpoint();
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+          if (controller.signal.aborted) notify();
+        });
+      }
+      budget.checkpoint();
+      const completed = ready.shift()!;
+      const { front, visit, nodeId } = completed;
+      const task = [...pending].find((entry) => entry.front === front && entry.visit === visit)!;
+      pending.delete(task);
+      current = { front, visit };
+      if ('error' in completed) {
+        // Keep useful results from already-admitted lookups when the shared
+        // transaction budget fills. Time limits and cancellation still stop now.
+        if (
+          completed.error instanceof ScanBudgetExceeded &&
+          completed.error.reason === 'transactions'
+        ) {
+          boundary(front, visit, 'transactions');
           continue;
         }
-        budget.examine(nodeId.split(':')[1]!);
-        let neighbors: ScanNeighbors;
-        try {
-          neighbors = await options.resolveNeighbors(
-            nodeId,
-            front.direction,
-            budget,
-            controller.signal,
-          );
-          budget.checkpoint();
-        } catch (error) {
-          budget.checkpoint();
-          if (error instanceof ScanBudgetExceeded) throw error;
+        if (completed.error instanceof ScanBudgetExceeded) throw completed.error;
+        boundary(front, visit, 'failure');
+        continue;
+      }
+      const neighbors = completed.neighbors;
+      const ids = [...new Set(neighbors.nodeIds)].sort();
+      if (neighbors.stopReason || neighbors.observation) {
+        const observation =
+          neighbors.observation ??
+          (neighbors.stopReason === 'fan-out' && ids.length >= settings.fanOut
+            ? {
+                finding:
+                  front.direction === 'upstream'
+                    ? ('many-inputs' as const)
+                    : ('many-outputs' as const),
+                ...(ids.length > 0 ? { branchCount: ids.length } : {}),
+              }
+            : undefined);
+        boundary(front, visit, neighbors.stopReason, observation);
+        if (neighbors.stopReason === 'transactions') continue;
+        if (
+          neighbors.stopReason &&
+          ['time', 'results', 'cancelled', 'backend-unavailable', 'rate-limited'].includes(
+            neighbors.stopReason,
+          )
+        ) {
+          if (neighbors.stopReason === 'cancelled') run.status = 'cancelled';
+          break scan;
+        }
+        if (
+          neighbors.stopReason === 'depth' ||
+          neighbors.stopReason === 'fan-out' ||
+          (observation &&
+            ['many-inputs', 'many-outputs', 'unspent', 'coinbase', 'unspendable'].includes(
+              observation.finding,
+            ))
+        )
+          continue;
+      }
+      if (ids.length >= settings.fanOut) {
+        boundary(front, visit, 'fan-out', {
+          finding: front.direction === 'upstream' ? 'many-inputs' : 'many-outputs',
+          branchCount: ids.length,
+        });
+        continue;
+      }
+      for (const id of ids) {
+        if (reasons.has('results')) break scan;
+        if (!isScanNodeId(id)) {
           boundary(front, visit, 'failure');
           continue;
         }
-        const ids = [...new Set(neighbors.nodeIds)].sort();
-        if (neighbors.stopReason || neighbors.observation) {
-          const observation =
-            neighbors.observation ??
-            (neighbors.stopReason === 'fan-out' && ids.length >= settings.fanOut
-              ? {
-                  finding:
-                    front.direction === 'upstream'
-                      ? ('many-inputs' as const)
-                      : ('many-outputs' as const),
-                  ...(ids.length > 0 ? { branchCount: ids.length } : {}),
-                }
-              : undefined);
-          boundary(front, visit, neighbors.stopReason, observation);
-          if (
-            neighbors.stopReason &&
-            [
-              'time',
-              'transactions',
-              'results',
-              'cancelled',
-              'backend-unavailable',
-              'rate-limited',
-            ].includes(neighbors.stopReason)
-          ) {
-            if (neighbors.stopReason === 'cancelled') run.status = 'cancelled';
-            break scan;
-          }
-          if (
-            neighbors.stopReason === 'depth' ||
-            neighbors.stopReason === 'fan-out' ||
-            (observation &&
-              ['many-inputs', 'many-outputs', 'unspent', 'coinbase', 'unspendable'].includes(
-                observation.finding,
-              ))
-          )
-            continue;
-        }
-        if (ids.length >= settings.fanOut) {
-          boundary(front, visit, 'fan-out', {
-            finding: front.direction === 'upstream' ? 'many-inputs' : 'many-outputs',
-            branchCount: ids.length,
-          });
+        if (visit.path.includes(id)) continue;
+        const hops = visit.hops + (id.startsWith('tx:') ? 1 : 0);
+        if (hops > settings.maxHops) {
+          boundary(front, visit, 'depth');
           continue;
         }
-        for (const id of ids) {
-          if (reasons.has('results')) break scan;
-          if (!isScanNodeId(id)) {
-            boundary(front, visit, 'failure');
-            continue;
+        const predecessors = front.predecessors.get(id) ?? new Set<string>();
+        predecessors.add(nodeId);
+        front.predecessors.set(id, predecessors);
+        const successors = front.successors.get(nodeId) ?? new Set<string>();
+        successors.add(id);
+        front.successors.set(nodeId, successors);
+        const next = { path: [...visit.path, id], hops };
+        run.deepestHop = Math.max(run.deepestHop ?? 0, hops);
+        if (front.visited.has(id)) {
+          await refreshMeetings(front, id);
+          if (
+            front.side === 'source' &&
+            !front.contextVisits.has(id) &&
+            next.path.every((node) => known.has(node))
+          ) {
+            front.contextVisits.add(id);
+            front.queue.push(next);
           }
-          if (visit.path.includes(id)) continue;
-          const hops = visit.hops + (id.startsWith('tx:') ? 1 : 0);
-          if (hops > settings.maxHops) {
-            boundary(front, visit, 'depth');
-            continue;
-          }
-          const predecessors = front.predecessors.get(id) ?? new Set<string>();
-          predecessors.add(nodeId);
-          front.predecessors.set(id, predecessors);
-          const successors = front.successors.get(nodeId) ?? new Set<string>();
-          successors.add(id);
-          front.successors.set(nodeId, successors);
-          const next = { path: [...visit.path, id], hops };
-          if (front.visited.has(id)) {
-            await refreshMeetings(front, id);
-            if (
-              front.side === 'source' &&
-              !front.contextVisits.has(id) &&
-              next.path.every((node) => known.has(node))
-            ) {
-              front.contextVisits.add(id);
-              front.queue.push(next);
-            }
-            continue;
-          }
-          if (next.path.every((node) => known.has(node))) front.contextVisits.add(id);
-          front.visited.set(id, next);
-          front.queue.push(next);
-          await meeting(front, next);
+          continue;
         }
-        progress();
-        if (reasons.has('results')) break;
+        if (next.path.every((node) => known.has(node))) front.contextVisits.add(id);
+        front.visited.set(id, next);
+        front.queue.push(next);
+        await meeting(front, next);
       }
+      progress();
       if (reasons.has('results')) break;
     }
     if (run.status === 'running') run.status = 'complete';
@@ -683,6 +755,8 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     run.status =
       reason === 'cancelled' ? 'cancelled' : reason === 'failure' ? 'failed' : 'complete';
   } finally {
+    // No speculative lookup may outlive completion, a result cap or cancellation.
+    controller.abort();
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', abort);
   }

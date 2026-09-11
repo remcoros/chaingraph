@@ -29,6 +29,7 @@ self.onmessage = (event: MessageEvent<ScanWorkerInput>) => {
   started = true;
   void runConnectionScan({
     ...message.request,
+    resolverOwnsTransactionBudget: true,
     signal: controller.signal,
     onProgress: (run) => send({ type: 'progress', run }),
     resolveNeighbors: async (nodeId, direction, budget, signal): Promise<ScanNeighbors> => {

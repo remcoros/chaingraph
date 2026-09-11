@@ -394,8 +394,15 @@ scopes (`connectionScanNeighbours.ts`: breadth-first over loaded
 creates/spends links, up to 1,000 nearest nodes; visible; all added) and custom
 picks (`connectionScanTargets.ts`: exactly the picked transaction/outpoint IDs,
 deduplicated, source excluded, at most 1,000) freeze their targets and the
-loaded-link baseline before the run. Deterministic FIFO fronts alternate source
-and target work per requested direction; shared ancestors/descendants join
+loaded-link baseline before the run. FIFO fronts alternate source and target
+admission per requested direction, with up to four neighbour lookups in flight.
+Ready responses are applied serially; a front finishes its current breadth level
+before advancing deeper, while other fronts remain free to progress. The worker
+bridge reserves transactions against one shared run budget, including overlapping
+requests and failed lookups. Pending transaction and UTXO lookups are deduplicated
+within the run and aborted on completion. Exhausting the transaction budget stops
+admission while allowing already-admitted lookups to finish within the deadline.
+Shared ancestors/descendants join
 same-direction walks at a meeting point. Automatic connections must add an
 observed edge and, for targets in the source's component, retain a distinct
 existing route (bounded to 8 transactions) so Add closes a loop; merely loading a
@@ -405,6 +412,8 @@ Defaults are 3 hops, 200 transactions, 30 seconds and a 50-branch boundary;
 hard limits are 8 hops, 1,000 transactions, 60 seconds, 200 branches, 1,000
 targets and 50 results, with at most 10 endpoint and 10 evidence-problem paths
 per run. Time and depth limits produce a run-level reason, never cards.
+Run details show grouped connections found and optional deepest transaction-hop
+distance reached from either search side; older saved runs omit unknown depth.
 `connectionScanFetch.ts` reuses loaded evidence and the scheduler's background
 priority; an unspent endpoint needs a validated `gettxout` observation with
 creator proof; coinbase and OP_RETURN endings need the actual script bytes.

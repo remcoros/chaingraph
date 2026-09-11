@@ -305,6 +305,10 @@ a direction (**Both**, **Sources**, **Destinations**) and a target scope:
 - **Custom targets**: **Pick target(s)** and click transactions or outputs in
   the graph; **Done** applies, **Esc** cancels.
 
+The scan summary shows transactions checked and the deepest hop reached from
+either search side. Open its details for the number of connections found in that
+run and its limits. Older saved scans may not have a recorded depth.
+
 Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 50-branch stopping point; advanced controls allow up to 8 hops, 1,000
 transactions, 60 seconds and 200 branches.

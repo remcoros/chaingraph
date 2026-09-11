@@ -67,7 +67,8 @@ export function createConnectionScanFetch(
   const evidence = { ...options.transactions };
   const spenders = new Map<string, Set<string>>();
   const refreshed = new Set<string>();
-  const utxoChecks = new Map<string, ScanObservation | undefined>();
+  const transactionLoads = new Map<string, Promise<Transaction>>();
+  const utxoChecks = new Map<string, Promise<ScanObservation | undefined>>();
   let indexedInputs = 0;
   const index = async (tx: Transaction, budget: ScanBudget) => {
     for (const input of tx.vin) {
@@ -99,15 +100,26 @@ export function createConnectionScanFetch(
   const load = async (txid: string, budget: ScanBudget, height?: number) => {
     checkpoint(budget);
     budget.examine(txid);
+    const pending = transactionLoads.get(txid);
+    if (pending) return pending;
     if (evidence[txid] && (!options.refresh || refreshed.has(txid))) return evidence[txid];
     if (options.allowNetwork === false) return undefined;
-    const value = await transport.fetchTransaction(options.network, txid, signal, height, hints);
-    checkpoint(budget);
-    const tx = validateScanTransaction(value, txid, options.network);
-    evidence[txid] = tx;
-    refreshed.add(txid);
-    await index(tx, budget);
-    return tx;
+    const loading = (async () => {
+      const value = await transport.fetchTransaction(options.network, txid, signal, height, hints);
+      checkpoint(budget);
+      const tx = validateScanTransaction(value, txid, options.network);
+      await index(tx, budget);
+      checkpoint(budget);
+      evidence[txid] = tx;
+      refreshed.add(txid);
+      return tx;
+    })();
+    transactionLoads.set(txid, loading);
+    try {
+      return await loading;
+    } finally {
+      transactionLoads.delete(txid);
+    }
   };
   const unavailable = (): ScanNeighbors =>
     options.allowNetwork === false
@@ -206,17 +218,14 @@ export function createConnectionScanFetch(
         if (!transport.fetchUtxo) return undefined;
         if (!utxoChecks.has(nodeId)) {
           checkpoint(budget);
-          const observation = await transport.fetchUtxo(
-            options.network,
-            point.txid,
-            point.vout,
-            expected,
-            signal,
+          utxoChecks.set(
+            nodeId,
+            transport.fetchUtxo(options.network, point.txid, point.vout, expected, signal),
           );
-          checkpoint(budget);
-          utxoChecks.set(nodeId, observation);
         }
-        return utxoChecks.get(nodeId);
+        const observation = await utxoChecks.get(nodeId);
+        checkpoint(budget);
+        return observation;
       };
       if (output) {
         const observation = await currentUtxo(output);

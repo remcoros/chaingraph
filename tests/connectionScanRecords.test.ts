@@ -87,12 +87,14 @@ describe('compact connection scan records', () => {
   it('encrypts a compact round trip and restores running records without altering a save input', async () => {
     const { workspace, run, evidence } = fixture();
     run.status = 'running';
+    run.deepestHop = 3;
     const next = replaceScanRun(workspace, run, evidence);
     next.view.rightTab = 'scan';
     const encrypted = await validateAndEncryptWorkspace(next, 'public fixture password');
     expect(JSON.stringify(encrypted)).not.toContain(run.source);
     const restored = await decryptAndValidateWorkspace(encrypted, 'public fixture password');
     expect(restored.connectionScans?.runs[0].status).toBe('interrupted');
+    expect(restored.connectionScans?.runs[0].deepestHop).toBe(3);
     expect(restored.view.rightTab).toBe('scan');
     expect(next.connectionScans?.runs[0].status).toBe('running');
     expect(restored.connectionScans?.evidence).toEqual(evidence);
@@ -408,6 +410,21 @@ describe('compact connection scan records', () => {
     expect(() => parseWorkspace(saved)).not.toThrow();
     expect(prepareScanPath(saved, result).missingTxids).toEqual([id(2), id(3)]);
     expect(() => addScanPath(saved, result)).toThrow('evidence is missing');
+  });
+
+  it('preserves unrecorded scan depth and rejects depth outside the run limits', () => {
+    const { workspace, run, evidence } = fixture();
+    const saved = replaceScanRun(workspace, run, evidence);
+    expect(parseWorkspace(saved).connectionScans?.runs[0]).not.toHaveProperty('deepestHop');
+    for (const deepestHop of [-1, 0.5, run.settings.maxHops + 1, 9]) {
+      expect(() => replaceScanRun(workspace, { ...run, deepestHop }, evidence)).toThrow();
+      expect(() =>
+        parseWorkspace({
+          ...saved,
+          connectionScans: { ...saved.connectionScans, runs: [{ ...run, deepestHop }] },
+        }),
+      ).toThrow();
+    }
   });
 
   it.each([{ frontier: [] }, { visited: {} }, { transport: { url: 'private fixture' } }])(

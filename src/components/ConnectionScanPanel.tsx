@@ -365,6 +365,7 @@ export function ConnectionScanPanel(props: Props) {
       startedAt: new Date().toISOString(),
       status: 'running',
       examined: 0,
+      deepestHop: 0,
       stopReasons: [],
       results: [],
     };
@@ -523,6 +524,9 @@ export function ConnectionScanPanel(props: Props) {
 
   const groups = groupScanRuns(scanRuns);
   const status = run ? scanStatus(run, busy) : undefined;
+  const connectionsFound = new Set(
+    run?.results.filter((result) => result.kind === 'connection').map(scanResultGroupKey),
+  ).size;
   const shownGroups = groups.filter((group) =>
     filter === 'findings' ? group.category !== 'endpoint' : group.category === filter,
   );
@@ -758,11 +762,14 @@ export function ConnectionScanPanel(props: Props) {
             <details className="connection-scan-run-details">
               <summary
                 title="Scan details"
-                aria-label={`Scan details: ${run.examined} of ${run.settings.maxTransactions} transactions checked`}
+                aria-label={`Scan details: ${run.examined} of ${run.settings.maxTransactions} transactions checked${run.deepestHop === undefined ? '' : `, deepest hop ${run.deepestHop}`}`}
               >
                 <Info size={13} /> {run.examined} / {run.settings.maxTransactions} checked
+                {run.deepestHop !== undefined && <> · deepest hop {run.deepestHop}</>}
               </summary>
               <dl>
+                <dt>Connections found</dt>
+                <dd>{connectionsFound}</dd>
                 <dt>Targets</dt>
                 <dd>
                   {run.targetIds.length}{' '}

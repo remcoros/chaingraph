@@ -72,6 +72,24 @@ function setup(
 }
 
 describe('connection scan fetch adapter', () => {
+  it('shares an overlapping transaction refresh across transaction and output walks', async () => {
+    const s = setup([tx(1)], true, undefined, { refresh: true });
+    let finish!: (value: Transaction) => void;
+    s.transport.fetchTransaction.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const b = budget();
+    const transaction = s.resolveNeighbors(`tx:${id(1)}`, 'downstream', b);
+    const output = s.resolveNeighbors(`out:${id(1)}:0`, 'upstream', b);
+    expect(s.transport.fetchTransaction).toHaveBeenCalledOnce();
+    finish(tx(1));
+    expect(await transaction).toEqual({ nodeIds: [`out:${id(1)}:0`] });
+    expect(await output).toEqual({ nodeIds: [`tx:${id(1)}`] });
+    expect(b.examinedTxids).toEqual([id(1)]);
+  });
   it('does not describe a coinbase input as an upstream branch boundary', async () => {
     const adapter = createConnectionScanFetch({
       network: 'testnet4',
@@ -228,7 +246,10 @@ describe('connection scan fetch adapter', () => {
   });
 });
 
-import { runConnectionScanInWorker } from '../src/lib/connectionScanRunner';
+import {
+  runConnectionScanInWorker,
+  type ConnectionScanRunnerOptions,
+} from '../src/lib/connectionScanRunner';
 import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/domain/connectionScan';
 import type {
   ConnectionScanRequest,
@@ -277,7 +298,10 @@ const completed = (status: ScanRun['status'] = 'complete'): ScanRun => ({
     },
   ],
 });
-function runnerSetup(scanRequest: ConnectionScanRequest = request()) {
+function runnerSetup(
+  scanRequest: ConnectionScanRequest = request(),
+  extra: Partial<ConnectionScanRunnerOptions> = {},
+) {
   const worker = new FakeScanWorker();
   const scope = new TransactionFetchScope('testnet4');
   const controller = new AbortController();
@@ -294,6 +318,7 @@ function runnerSetup(scanRequest: ConnectionScanRequest = request()) {
     onProgress: progress,
     isCurrent: () => active,
     workerFactory: () => worker as unknown as Worker,
+    ...extra,
   });
   return {
     worker,
@@ -307,6 +332,60 @@ function runnerSetup(scanRequest: ConnectionScanRequest = request()) {
   };
 }
 describe('connection scan worker ownership', () => {
+  it('shares the transaction allowance across overlapping requests and counts failed fetches', async () => {
+    const finish = new Map<string, (value: Transaction) => void>();
+    const fail = new Map<string, (error: Error) => void>();
+    const fetch = vi.spyOn(connectionScanTransport, 'fetchTransaction').mockImplementation(
+      (_network, txid) =>
+        new Promise((resolve, reject) => {
+          finish.set(txid, resolve);
+          fail.set(txid, reject);
+        }),
+    );
+    try {
+      const s = runnerSetup(
+        { ...request(), settings: { ...request().settings, maxTransactions: 2 } },
+        { allowNetwork: true, transactions: {} },
+      );
+      for (const n of [1, 2, 3])
+        s.worker.reply({
+          type: 'resolve',
+          id: n,
+          nodeId: `tx:${id(n)}`,
+          direction: 'upstream',
+          examinedTxids: [],
+        });
+      await vi.waitFor(() =>
+        expect(s.worker.messages.at(-1)).toMatchObject({
+          type: 'neighbors',
+          id: 3,
+          error: 'transactions',
+          examinedTxids: [id(1), id(2)],
+        }),
+      );
+      expect(fetch).toHaveBeenCalledTimes(2);
+      finish.get(id(2))!(tx(2));
+      await vi.waitFor(() =>
+        expect(s.worker.messages.at(-1)).toMatchObject({
+          type: 'neighbors',
+          id: 2,
+          examinedTxids: [id(1), id(2)],
+        }),
+      );
+      fail.get(id(1))!(new Error('Synthetic unavailable transaction'));
+      await vi.waitFor(() =>
+        expect(s.worker.messages.at(-1)).toMatchObject({
+          type: 'neighbors',
+          id: 1,
+          examinedTxids: [id(1), id(2)],
+        }),
+      );
+      s.worker.reply({ type: 'complete', run: { ...completed('interrupted'), examined: 0 } });
+      expect((await s.pending).run.examined).toBe(2);
+    } finally {
+      fetch.mockRestore();
+    }
+  });
   it('freezes loaded scan context independently from displayed nodes across the worker boundary', async () => {
     const initial = {
       ...request(),
@@ -410,6 +489,28 @@ describe('connection scan worker ownership', () => {
 });
 
 describe('scan stopping-point evidence', () => {
+  it('shares pending UTXO checks and rejects both consumers when their session closes', async () => {
+    const s = setup([tx(1)]);
+    let finish!: (value: undefined) => void;
+    s.transport.fetchUtxo.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const b = budget();
+    const first = s.resolveNeighbors(`out:${id(1)}:0`, 'downstream', b);
+    const second = s.resolveNeighbors(`out:${id(1)}:0`, 'downstream', b);
+    expect(s.transport.fetchUtxo).toHaveBeenCalledOnce();
+    s.scope.close();
+    finish(undefined);
+    const results = await Promise.allSettled([first, second]);
+    expect(results).toEqual([
+      { status: 'rejected', reason: expect.objectContaining({ name: 'AbortError' }) },
+      { status: 'rejected', reason: expect.objectContaining({ name: 'AbortError' }) },
+    ]);
+    expect(s.transport.fetchIndexedSpenders).not.toHaveBeenCalled();
+  });
   it('reports exact many-input and many-output counts without truncating at the threshold', async () => {
     const many = tx(1);
     many.vin = Array.from({ length: 67 }, (_, n) => ({ txid: id(n + 2), vout: 0 }));

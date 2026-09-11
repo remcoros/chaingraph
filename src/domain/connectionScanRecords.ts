@@ -103,6 +103,7 @@ export const scanRunSchema = z
     startedAt: z.iso.datetime({ offset: true }),
     status: z.enum(['running', 'complete', 'cancelled', 'interrupted', 'failed']),
     examined: z.number().int().min(0).max(SCAN_LIMITS.maxTransactions),
+    deepestHop: z.number().int().min(0).max(SCAN_LIMITS.maxHops).optional(),
     stopReasons: z
       .array(reason)
       .max(11)
@@ -116,7 +117,11 @@ export const scanRunSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine((run) => run.deepestHop === undefined || run.deepestHop <= run.settings.maxHops, {
+    path: ['deepestHop'],
+    message: 'Scan depth exceeds its hop limit.',
+  });
 
 /** Reject unknown scan fields instead of ever serializing a frontier or transport state. */
 export function connectionScansSchema(transaction: z.ZodType<Transaction>) {
