@@ -7,7 +7,7 @@ description: Review Chaingraph interaction changes for accessible, accurate Bitc
 
 Use for substantive graph, panel, navigation or workspace interactions. Match existing styling for incremental edits; when the user asks for a redesign or isolated experiment, compare alternative hierarchies and interactions instead of treating the current layout as a constraint.
 
-Browser and screenshot validation require explicit user request or an agreed QA scope. Otherwise, run appropriate non-browser checks and state that visual validation was not performed. This applies to targeted browser checks as well as full suites. UI work or skill selection alone does not authorize these checks; do not pause to request them merely to satisfy a checklist.
+Browser and screenshot validation happen only on explicit request or within an agreed QA scope (see `AGENTS.md`). Selecting this skill does not authorize them.
 
 Review the criteria below through source inspection and appropriate non-browser checks by default. Perform browser exercises and screenshot inspection only when authorized, in a fresh browser context and within the agreed scope.
 

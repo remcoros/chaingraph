@@ -419,7 +419,7 @@ Specifically attempt to remove 30 to 50 percent of explanatory UI copy from the 
 
 Passing type checks and tests does not prove UI quality.
 
-Browser and screenshot validation require explicit user request or an agreed QA scope. Otherwise, run appropriate non-browser checks and state that visual validation was not performed. This applies to targeted browser checks as well as full suites. UI work or skill selection alone does not authorize these checks; do not pause to request them merely to satisfy a checklist.
+Browser and screenshot validation happen only on explicit request or within an agreed QA scope (see `AGENTS.md`). Selecting this skill does not authorize them.
 
 When browser and screenshot validation is authorized, apply the following within the agreed scope:
 

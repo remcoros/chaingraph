@@ -1,103 +1,66 @@
 # Chaingraph agent guide
 
-Chaingraph is a standalone MIT-licensed Bitcoin application. This repository owns
-the application, tests and deployment configuration. Unrelated parent-folder
-packaging workflows do not apply here.
+Chaingraph is an MIT-licensed, self-hosted, watch-only Bitcoin workbench for
+personal wallets and on-chain investigation. Read `README.md`,
+`docs/architecture.md` and the module you are changing before editing it.
+`CONTRIBUTING.md` has the commands, worktree conventions and review expectations.
 
-## Product and boundaries
+## Product boundaries
 
-- Read `README.md`, `docs/architecture.md`, and the relevant module before changing it.
-- Build a self-hosted personal wallet, UTXO and label-management tool with on-chain
-  analysis for individuals and hobbyists. Wallet, Graph and Analysis workbenches
-  share evidence, selection and metadata; keep their workflows coherent and compact.
-- Workspaces own multiple watch-only wallets. The browser owns derivation, discovery,
-  loaded chain data, annotations, analysis, and encrypted persistence.
-- The backend only provides bounded read-only Core/Electrum access. No server database,
-  wallet storage, scan jobs, indexes, or workspace cache. Each configured network has
-  an isolated Core/Electrum pair; mainnet and testnet4 may run simultaneously.
-- Support mainnet and testnet4; validate the network at all import and RPC boundaries.
-- Keep observations, human annotations, and heuristic hypotheses distinct. Never call
-  a cluster proof of common ownership; preserve evidence and allow removal.
-- Use subagents for independent modules/reviews with explicit file ownership.
-- Explicitly requested clean reviews must not inherit skills, memory or this guide;
-  supply the essential product/privacy constraints in their standalone task.
-- Keep experiments in their requested worktrees with separate preview ports. Treat
-  scope and test budgets as task instructions that the user can revise, not fixed
-  restrictions in an agent's startup configuration. Merge only when requested.
+- The browser owns derivation, scanning, loaded chain data, annotations,
+  analysis and encrypted persistence. The backend is a bounded read-only
+  Core/Electrum proxy with no database, wallet storage, jobs, index or cache.
+- Mainnet and testnet4 are supported, each through an isolated Core/Electrum
+  pair, possibly at the same time. Validate the network at every import and RPC
+  boundary.
+- Keep observations, human annotations and heuristic hypotheses distinct. Never
+  present a cluster or a wallet match as proof of ownership. Missing evidence is
+  unknown, not zero or unspent. Preserve evidence and allow removal.
+- No private keys, seed import, signing, spending or wallet-mutating RPC.
+- Workspace names are public in the saved index; everything else belongs inside
+  the encrypted envelope. Passwords and decrypted state live only in memory and
+  are never logged.
+- Wallet, Graph and Analysis share evidence, selection and metadata. Keep
+  renderer mechanics separate from selection, metadata and workspace logic.
 
 ## Working safely
 
-- Keep committed code, documentation and screenshots free of personal account names,
-  absolute user-home paths, private hostnames and machine-specific handoff locations.
-  Use repository-relative references, runtime home-directory discovery or explicit
-  placeholders. Preserve required upstream attribution and documented public fixtures.
-  Run `npm run check:portability` before committing; this narrow check does not replace
-  a credential review. Keep local recordings and browser artifacts under `artifacts/`.
+- Never open, display, copy or commit real `.env.mainnet` or `.env.testnet4`
+  files. Tests may load them without logging credentials, URLs, headers or raw
+  upstream error text. Public synthetic fixtures are fine.
+- Keep committed content free of personal account names, absolute home paths,
+  private hostnames and machine-specific paths. `npm run check:portability`
+  catches the common cases; it is not a credential scan. Local recordings and
+  browser output go under the ignored `artifacts/`.
+- Prefer vetted Bitcoin primitives and WebCrypto over custom cryptography. Test
+  vectors, tampering, network mismatch, cancellation and storage failures.
+- Keep workspace validation and encryption off the UI thread. Camera gestures
+  defer snapshots and autosave; lock, export and switch capture the latest view.
+- MIT-compatible code only. Research references never authorize copying an
+  incompatible implementation. Regenerate `THIRD_PARTY_NOTICES.md` after
+  dependency changes.
+- Credit external sources in `docs/references.md` and record decisions and their
+  reasoning in `docs/architecture.md` or the topic notes under `docs/`. The
+  ignored `docs/research/`, `docs/reviews/` and `docs/experiments/` folders are
+  personal working notes and are not part of the published repository.
 
-- Never open, display, copy, or commit real `.env.live`, `.env.mainnet`, or `.env.testnet4` files.
-  Test processes may load them directly without logging credentials, URLs, headers,
-  or raw upstream exception messages. Public synthetic fixtures are allowed.
-- No private keys, seed import, signing, spending, or wallet-mutating RPC methods.
-- Workspace names are intentionally public in the saved index. Descriptions, xpubs,
-  graph data and notes belong inside the encrypted envelope.
-  Passwords and decrypted state live only in memory. Do not log them.
-- Keep workspace validation/encryption off the browser UI thread. Camera gestures
-  must defer snapshots and autosaves; lock/export/switch must capture the latest view.
-  Renderer changes need relevant gesture, flush and save-failure regression checks;
-  prefer non-browser coverage of those contracts and keep browser checks explicitly scoped.
-- Prefer vetted Bitcoin primitives and WebCrypto to custom cryptography. Test vectors,
-  tampering, network mismatch, cancellations, and storage failure paths matter.
-- MIT application code only. Check dependency and source licenses before reuse.
-  Research references are not authorization to copy incompatible implementations.
-- Keep external research in `docs/research/` with direct primary-source links, date,
-  applicability, and limits. Record decisions in architecture docs, not TODO files.
+## Validation
 
-## Development
+- `npm run check` (portability, build, domain and integration tests) is the
+  routine gate. Engine or data changes need relevant behavioral tests; UI polish
+  does not need new E2E coverage. Documentation-only edits need no test run.
+- Browser and screenshot validation happen only on explicit request or within an
+  agreed QA scope. Otherwise run non-browser checks and say that visual
+  validation was not performed. Do not pause merely to ask for it.
+- State exactly what was validated. A build or mocked RPC test is not live
+  validation, and passing non-browser checks does not establish visual usability.
+- Keep `README.md` and `docs/user-guide.md` in sync with behavior changes.
 
-- Node 24+, TypeScript, React/Vite, a Three.js graph renderer, and a Node HTTP proxy.
-- `npm run dev` starts the app and proxy; `npm run dev:live` uses the same isolated per-network file discovery as `dev`;
-  `.env.live` is not a runtime fallback. Production: `npm run build && npm start`.
-- `npm run build` checks types and builds; `npm test` runs domain/backend tests;
-  `npm run check` combines portability, build and domain/integration tests. Routine
-  push/PR CI launches no browser. Match checks to the change and current user
-  instructions. Documentation-only edits do not need an application test suite.
-- Prioritize engine correctness and data integrity. Engine or data changes require
-  relevant behavioral checks; UI polish does not require new E2E tests or routine
-  browser runs. Existing `npm run test:e2e` journeys are optional diagnostics, not
-  a maintenance requirement for every evolving workflow. Assess the value of a
-  broken historical test before updating it.
-- Browser QA is available through the manual Browser QA workflow with runtime,
-  selected-spec or explicitly chosen full-suite scope. Release verification uses
-  `npm run test:production` for HTTP checks and a narrow production browser runtime
-  check of the real encryption worker and encrypted persistence. It does not run
-  the full E2E suite. `npm run test:production:http` performs only non-browser checks.
-- Browser and screenshot validation require explicit user request or an agreed QA
-  scope. Otherwise, run appropriate non-browser checks and state that visual
-  validation was not performed. This applies to targeted browser checks as well as
-  full suites. UI work or skill selection alone does not authorize these checks;
-  do not pause to request them merely to satisfy a checklist.
-- Test complex domain/security logic with meaningful behavioral regressions; avoid
-  tests that merely repeat implementation. Plan exploratory browser review with an
-  explicit scope when preparing releases or investigating UI behavior. Exercise real
-  services read-only when available.
-- State exactly what was validated. A build or mocked RPC test is not live validation.
-- Keep README and user instructions in sync with changes. Preserve unrelated files.
-- Do not assume that passing non-browser checks establishes visual usability.
-  When browser and screenshot validation is authorized, inspect screenshots and
-  trace real editing/navigation tasks. Explicit redesign requests may change the layout
-  and renderer; preserve data contracts and compare isolated working proposals.
-- Keep renderer mechanics separate from selection, metadata and workspace logic.
-  Prefer loaded or attached prevout evidence before fetching parents; distinguish
-  missing evidence from zero values, unspent outputs or ownership conclusions.
+## Conventions
+
 - Do not use em dashes in authored copy.
-- For UI design and implementation, use `.agents/skills/product-ui-design/SKILL.md` to 
-  establish task hierarchy, information density, copy, interaction and visual structure 
-  before coding.
-- For substantial UI work, when browser and screenshot validation is explicitly
-  requested or included in an agreed QA scope, also use
-  `.agents/skills/chaingraph-ui-review/SKILL.md`. Run authorized browser checks
-  serially within a checkout and stay within the agreed validation scope.
-
-See `CONTRIBUTING.md` for separate
-worktree dependencies and preview/test ports. Release commands and validation are
-documented in `docs/deployment.md`; do not assume a publication destination.
+- Use `.agents/skills/product-ui-design/SKILL.md` before UI work, and
+  `.agents/skills/chaingraph-ui-review/SKILL.md` when browser validation is in
+  scope.
+- Independent reviews requested without skills, memory or this guide must
+  receive the product and privacy constraints above in their task.

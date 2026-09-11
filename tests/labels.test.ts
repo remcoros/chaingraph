@@ -6,7 +6,7 @@ import { isExtendedPublicKey } from '../src/lib/wallet';
 import { newWorkspace } from '../src/domain/workspace';
 
 // Public BIP32/BIP86 vectors (BSD-2-Clause) and BIP84 vectors (CC0).
-// Sources and attribution: docs/research/wallet-security.md.
+// Sources and attribution: docs/references.md.
 const parentXpub =
   'xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5';
 const taprootXpub =

@@ -6,7 +6,7 @@ Chaingraph is a single-user analysis workbench with a stateless proxy. It has no
 
 The backend discovers `.env.mainnet` and `.env.testnet4` in its working directory, or in the directory named by `CHAINGRAPH_NETWORK_CONFIG_DIR`. Configure one or both files using the public [.env.example](../.env.example) template. At least one valid network file is required at startup. Each file has its own Bitcoin RPC authentication, Fulcrum endpoint, connection/request timeouts and concurrency limits. The filename selects its network; an optional `BITCOIN_NETWORK` value must agree with it.
 
-These files use dotenv syntax: quote values containing `#`, and keep any intentional quotes inside the chosen quoting style. Dollar signs are not expanded. Files are parsed independently, never sourced by a shell, merged into `process.env`, or supplied to Compose `env_file`. `.env` and `.env.live` are not runtime fallbacks. Do not load two network files with Node's `--env-file` options; that would merge their identically named settings before the application starts.
+These files use dotenv syntax: quote values containing `#`, and keep any intentional quotes inside the chosen quoting style. Dollar signs are not expanded. Files are parsed independently, never sourced by a shell, merged into `process.env`, or supplied to Compose `env_file`. A plain `.env` file is not a runtime fallback. Do not load two network files with Node's `--env-file` options; that would merge their identically named settings before the application starts.
 
 Core and Fulcrum must both serve the file's network. Their reported chain/genesis is checked before relevant requests. `GET /api/networks` reports configured networks; `GET /api/status?network=mainnet` checks one pair. The frontend uses the workspace network on every request and shows each pair's health independently. Newly created workspaces can select only configured networks. Importing or unlocking a workspace for an unconfigured network opens its saved data for offline inspection and editing, with a clear backend-network error and disabled live queries.
 
@@ -36,8 +36,7 @@ and timeout settings still apply. Browser expansion uses at most 500 candidate
 transactions per action, reserving history-fallback capacity. Partial work needs
 explicit continuation. Graph expansion remains explicit, saved conflicting spends
 are retained, and a missing spender is never proof of an unspent output. Electrum
-is still required for wallet/address discovery and fallback. See [verified
-protocol research](research/core-31-spender-index.md) for reorg and coverage limits.
+is still required for wallet/address discovery and fallback. See [spender-index.md](spender-index.md) for reorg and coverage limits.
 
 ## Local production container
 
@@ -92,16 +91,16 @@ For example, `SERVER_PORT=4300 CHAINGRAPH_NETWORK_CONFIG_DIR=./config npm start`
 
 ## Release process
 
-`package.json` is the version authority; keep both package-lock version fields and the changelog in sync. Version 0.2.0 is the initial release candidate. Check locally before creating a tag:
+`package.json` is the version authority; keep both package-lock version fields and the changelog in sync. Check locally before creating a tag (replace the version):
 
 ```sh
-node scripts/release-check.mjs --tag v0.2.0
+node scripts/release-check.mjs --tag v0.1.0
 npm ci
 npm run check
-docker build --load -t chaingraph:0.2.0 .
+docker build --load -t chaingraph:0.1.0 .
 ```
 
-The repository has no assumed GitHub owner or published image. When an owner intentionally pushes a matching `vX.Y.Z` tag to GitHub, `.github/workflows/release.yml` validates the version, runs non-browser checks and the narrow production runtime check against the container, then publishes `ghcr.io/<actual-owner>/<actual-repository>` for linux/amd64 and linux/arm64. Stable releases receive full version, minor and latest tags; prereleases receive their prerelease version. The workflow attaches OCI metadata, provenance and an SBOM. After publication, a separate job creates a GitHub Release with the matching changelog entry and immutable image digest. Reruns preserve an existing Release and any edited notes. Only that final job receives repository contents write permission. Check package visibility in GitHub before expecting unauthenticated pulls.
+When a matching `vX.Y.Z` tag is pushed to GitHub, `.github/workflows/release.yml` validates the version, runs non-browser checks and the narrow production runtime check against the container, then publishes `ghcr.io/remcoros/chaingraph` for linux/amd64 and linux/arm64. Stable releases receive full version, minor and latest tags; prereleases receive their prerelease version. The workflow attaches OCI metadata, provenance and an SBOM. After publication, a separate job creates a GitHub Release with the matching changelog entry and immutable image digest. Reruns preserve an existing Release and any edited notes. Only that final job receives repository contents write permission. Check package visibility in GitHub before expecting unauthenticated pulls.
 
 Routine push/PR checks launch no browser. The release workflow installs Chromium only for `npm run test:production`; it does not run the full E2E suite. That command first runs `npm run test:production:http` for built assets, production CSP/security headers and configured-network discovery, then checks real bundled encryption-worker execution under CSP, WebGL context initialization, and encrypted workspace save, reload/unlock and export. The container check uses public synthetic network configuration and mocked browser upstream responses. It does not establish live upstream health, full worker coverage, panel usability or mobile behavior.
 
@@ -120,7 +119,7 @@ CHAINGRAPH_SMOKE_URL=http://127.0.0.1:3000 npm run test:production
 
 Use the manual **Browser QA** workflow for a production runtime check (default) or the small E2E smoke suite. It has no push, PR or scheduled trigger and cannot publish a release. Broader navigation, copy, layout and responsive review belongs in separately scoped exploratory QA. The E2E suite is a minimal smoke check, not a full-suite release gate. Run browser checks serially within each checkout. Failure diagnostics stay under `artifacts/` and are retained by the browser/release workflows for seven days. Passing non-browser checks does not establish visual usability.
 
-Supply `CHAINGRAPH_SOURCE_URL=https://github.com/<owner>/<repository>` as a public build argument to include the project's GitHub link in the UI; the release workflow supplies the actual repository automatically. `VCS_REF` records the source commit in image metadata. Credentials must only be provided at runtime, never as build arguments, because build provenance may expose build arguments.
+Supply `CHAINGRAPH_SOURCE_URL=https://github.com/remcoros/chaingraph` as a public build argument to include the project's GitHub link in the UI; the release workflow supplies the repository automatically. `VCS_REF` records the source commit in image metadata. Credentials must only be provided at runtime, never as build arguments, because build provenance may expose build arguments.
 
 After a release exists, set `CHAINGRAPH_IMAGE` to its GHCR tag or preferably its verified digest. Keep the same `CHAINGRAPH_CONFIG_DIR`, then pull and start it:
 

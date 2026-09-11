@@ -16,7 +16,7 @@ import { deriveAddresses } from '../src/lib/wallet';
 import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
 
 const txid = (n: number) => n.toString(16).padStart(64, '0');
-// Public BIP84 vector, CC0; existing source attribution: docs/research/wallet-security.md.
+// Public BIP84 vector, CC0; existing source attribution: docs/references.md.
 const account =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
 const address = deriveAddresses(account, 'mainnet', 'p2wpkh', 0, 0, 1)[0];

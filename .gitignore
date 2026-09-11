@@ -15,3 +15,12 @@ coverage/
 
 # Local recordings and browser artifacts are not release assets.
 artifacts/
+
+# Local design-skill logs.
+.hallmark/
+
+# Development-time notes: reviews, branch experiments and research.
+docs/reviews/
+docs/experiments/
+docs/research/
+docs/validation.md

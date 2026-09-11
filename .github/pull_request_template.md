@@ -1,5 +1,5 @@
-Describe the problem and the resulting behavior. Include a concrete before/after example when useful.
+Describe the problem and the resulting behavior, with a before/after example when useful.
 
-Validation: list the relevant checks actually run, plus any unverified behavior. If browser/screenshot validation was explicitly requested or in an agreed QA scope for this change, note what was reviewed (synthetic or public data only); otherwise state that visual validation was not performed.
+Validation: list the checks actually run and any unverified behavior. Note whether browser/screenshot validation was performed (synthetic or public data only) or not.
 
-Explain changes to workspace compatibility, trust boundaries or analysis assumptions when applicable. Link research sources or their entry in `docs/research/`.
+Call out changes to workspace compatibility, trust boundaries or analysis assumptions. Add new external sources to `docs/references.md`.

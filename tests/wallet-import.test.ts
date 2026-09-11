@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HDKey } from '@scure/bip32';
 import { addressToScriptHash, deriveAddresses, verifyWalletAddresses } from '../src/lib/wallet';
 
-// Published BIP84 account vector (CC0); references in docs/research/wallet-security.md.
+// Published BIP84 account vector (CC0); references in docs/references.md.
 const zpub =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
 const otherAccount =

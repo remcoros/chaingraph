@@ -10,7 +10,7 @@ import {
 } from './wallet';
 
 // Public mathematical test fixtures from BIP84 (CC0), BIP86/BIP32 (BSD-2-Clause),
-// BIP49 (public domain), and SLIP132 (CC-BY-SA-4.0). Sources: docs/research/wallet-security.md.
+// BIP49 (public domain), and SLIP132 (CC-BY-SA-4.0). Sources: docs/references.md.
 const zpub =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
 const taprootXpub =
