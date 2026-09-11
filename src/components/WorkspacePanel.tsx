@@ -206,24 +206,27 @@ export function WorkspacePanel({
                 <p>Add multiple wallets to trace how their histories connect.</p>
               </div>
             )}
-            <button className="add-wallet" onClick={onAddWallet} disabled={w.demo}>
-              <Plus size={16} />
-              Add wallet
-            </button>
+            <div className="compact-controls">
+              <button className="add-wallet" onClick={onAddWallet} disabled={w.demo}>
+                <Plus size={13} />
+                Add wallet
+              </button>
+            </div>
           </div>
           <div className="scan-settings">
             {!!w.wallets.length && (
-              <button
-                className="refresh-wallets"
-                disabled={busy || !canQuery}
-                onClick={onRefreshAll}
-              >
-                <RefreshCw size={15} /> Refresh all wallets
-              </button>
+              <div className="compact-controls">
+                <button
+                  className="refresh-wallets"
+                  disabled={busy || !canQuery}
+                  onClick={onRefreshAll}
+                >
+                  <RefreshCw size={13} /> Refresh all wallets
+                </button>
+              </div>
             )}
             <div className="section-title">
               <h3>Discovery</h3>
-              <span className="eyebrow">CLIENT-SIDE</span>
             </div>
             <label>
               Gap limit

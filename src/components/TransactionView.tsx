@@ -84,6 +84,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   pinned,
   belowThreshold,
   label,
+  icon,
   loaded,
   spendCount,
   spendId,
@@ -103,6 +104,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   pinned: boolean;
   belowThreshold: boolean;
   label?: string;
+  icon?: string;
   loaded: boolean;
   spendCount: number;
   spendId?: string;
@@ -144,7 +146,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   return (
     <div
       key={row.index}
-      className={`transaction-row ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
+      className={`transaction-row ${icon ? 'has-annotation-icon' : ''} ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
       data-selected={selected}
     >
       {batchMode && row.id && (
@@ -205,6 +207,15 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
             )}
             {row.id && renderMetadata?.(row.id)}
           </span>
+          {icon && (
+            <span
+              className="transaction-row-annotation-icon"
+              role="img"
+              aria-label={`Annotation icon: ${icon}`}
+            >
+              {icon}
+            </span>
+          )}
         </button>
         {opReturn && <OpReturnData hex={row.output!.scriptPubKey.hex} />}
       </div>
@@ -519,6 +530,7 @@ function TransactionRows({
                   pinned={row.id === selected?.id}
                   belowThreshold={belowThreshold(row)}
                   label={row.id ? workspace.annotations[row.id]?.label : undefined}
+                  icon={row.id ? workspace.annotations[row.id]?.icon : undefined}
                   loaded={
                     inputs
                       ? !!workspace.transactions[row.previousTxid ?? '']
@@ -762,6 +774,15 @@ export function TransactionView(props: Props) {
                     onClick={() => onSelect(txNodeId(current.tx.txid))}
                   >
                     <Box size={25} aria-hidden="true" />
+                    {workspace.annotations[txNodeId(current.tx.txid)]?.icon && (
+                      <span
+                        className="transaction-annotation-icon"
+                        role="img"
+                        aria-label={`Annotation icon: ${workspace.annotations[txNodeId(current.tx.txid)].icon}`}
+                      >
+                        {workspace.annotations[txNodeId(current.tx.txid)].icon}
+                      </span>
+                    )}
                     <span title="Inputs / outputs">
                       {current.role === 'Selected' ? 'Transaction' : `${current.role} transaction`}{' '}
                       ({current.tx.vin.length} / {current.tx.vout.length})

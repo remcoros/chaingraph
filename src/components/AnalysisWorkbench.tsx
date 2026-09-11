@@ -10,6 +10,7 @@ import {
   ChevronsUp,
   ChevronUp,
   Minus,
+  Plus,
   Lightbulb,
   TriangleAlert,
   Info,
@@ -916,7 +917,7 @@ export function AnalysisWorkbench({
                     Loaded data changed after this finding. Scan again to refresh its evidence.
                   </p>
                 )}
-                <div className="button-row">
+                <div className="button-row compact-controls">
                   <button
                     disabled={!detail.nodeIds.length && !detail.txids.length}
                     onClick={() => showGraph(detail.nodeIds)}
@@ -942,6 +943,7 @@ export function AnalysisWorkbench({
                       )
                     }
                   >
+                    {detail.excluded ? <Plus size={14} /> : <Minus size={14} />}
                     {detail.excluded ? 'Restore finding' : 'Exclude finding'}
                   </button>
                 </div>

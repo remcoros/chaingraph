@@ -199,7 +199,6 @@ function IconPalette({
           <X size={16} />
         </button>
       </div>
-      <p className="small muted">Choose a symbol, or clear the current icon.</p>
       <div className="icon-palette-grid" role="group" aria-label="Icon choices">
         {options.map(([symbol, label], index) => (
           <button

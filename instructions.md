@@ -61,7 +61,9 @@ The graph represents transaction creation and consumption of outputs. An output 
 
 In transaction-flow input/output rows, the shortened address and BTC amount share
 the top line. A saved label appears beneath the address. The navigation arrow is
-at the top right and the annotation pencil is at the bottom right. Outputs without
+at the top right and the annotation pencil is at the bottom right. Saved annotation
+icons appear at the bottom left of input/output rows and the top right of the
+central transaction. Outputs without
 an address retain their script or loading description.
 
 ## Connection scans

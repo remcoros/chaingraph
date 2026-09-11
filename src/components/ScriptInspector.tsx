@@ -1,4 +1,5 @@
 import { TransactionBlockTime } from './TransactionBlockTime';
+import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { short } from '../domain/types';
@@ -163,19 +164,22 @@ function ScriptInspectorBody({
       <OpReturnData hex={outputHex} />
       {!raw && (
         <>
-          <button
-            type="button"
-            disabled={loading || !canQuery || workspace.demo}
-            onClick={() => void load()}
-          >
-            {loading ? 'Loading raw transaction…' : 'Load raw transaction'}
-          </button>
+          <div className="compact-controls">
+            <button
+              type="button"
+              disabled={loading || !canQuery || workspace.demo}
+              onClick={() => void load()}
+            >
+              <Download size={14} />
+              {loading ? 'Loading raw transaction…' : 'Load raw transaction'}
+            </button>
+          </div>
           <p className="small muted">
             {workspace.demo
               ? 'Legacy synthetic data: raw transaction and witness data are unavailable.'
               : !canQuery
                 ? 'Connect to this workspace network to load raw data.'
-                : 'Loads scriptSig, witness, version, locktime and raw hex from your node. Held only while inspecting this selection.'}
+                : 'Loads scriptSig, witness, version, locktime and raw hex.'}
           </p>
         </>
       )}

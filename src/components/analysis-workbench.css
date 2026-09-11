@@ -32,7 +32,7 @@
 .analysis-workbench p {
   margin: 6px 0;
 }
-.analysis-workbench button {
+.analysis-workbench button:not(:where(.compact-controls button)) {
   padding: 6px 10px;
   font-size: 12px;
 }
@@ -454,7 +454,7 @@
   font-size: 11px;
 }
 @media (pointer: coarse) {
-  .analysis-workbench button,
+  .analysis-workbench button:not(:where(.compact-controls button)),
   .wallet-category-option label,
   .wallet-category-option .wallet-help {
     min-height: 32px;

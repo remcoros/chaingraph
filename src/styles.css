@@ -718,7 +718,6 @@ small,
   line-height: 1.85;
 }
 .add-wallet {
-  width: 100%;
   background: transparent;
   border-style: dashed;
   color: var(--color-muted);
@@ -1587,14 +1586,10 @@ small,
   color: var(--color-accent);
 }
 .refresh-wallets {
-  width: 100%;
   margin-bottom: 14px;
 }
 .wallet-refresh-summary {
   margin: 12px 0 16px;
-}
-.wallet-refresh-summary > .primary {
-  width: 100%;
 }
 .wallet-refresh-summary small {
   display: block;

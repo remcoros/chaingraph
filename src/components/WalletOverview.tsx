@@ -1,5 +1,13 @@
 import { Amount } from './Amount';
-import { Pencil, Plus, RefreshCw, ScanSearch, Wallet as WalletIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  Download,
+  Pencil,
+  Plus,
+  RefreshCw,
+  ScanSearch,
+  Wallet as WalletIcon,
+} from 'lucide-react';
 import { walletCheckAge } from '../domain/walletActivity';
 import type { WalletReviewCoverage } from '../domain/walletReview';
 import type { WalletUtxoView } from '../lib/useWalletUtxos';
@@ -171,16 +179,21 @@ export function WalletOverview({
           </span>
         )}
         {(missingHistory > 0 || coverage.pendingTransactions > 0) && (
-          <button disabled={!canQuery || busy} onClick={onRefresh}>
-            {missingHistory
-              ? `Load history (${missingHistory})`
-              : `Continue refresh (${coverage.pendingTransactions})`}
-          </button>
+          <span className="compact-controls">
+            <button disabled={!canQuery || busy} onClick={onRefresh}>
+              {missingHistory ? <Download size={13} /> : <RefreshCw size={13} />}
+              {missingHistory
+                ? `Load history (${missingHistory})`
+                : `Continue refresh (${coverage.pendingTransactions})`}
+            </button>
+          </span>
         )}
         {utxos?.nextCursor !== undefined && (
-          <button disabled={!canQuery || utxoLoading} onClick={() => onCheck(utxos.nextCursor)}>
-            Check next addresses
-          </button>
+          <span className="compact-controls">
+            <button disabled={!canQuery || utxoLoading} onClick={() => onCheck(utxos.nextCursor)}>
+              <ArrowRight size={13} /> Check next addresses
+            </button>
+          </span>
         )}
         {utxos && (
           <span className="small muted" title={utxos.checkedAt}>
@@ -190,9 +203,11 @@ export function WalletOverview({
           </span>
         )}
         {!!utxos?.failed && (
-          <button disabled={!canQuery || utxoLoading} onClick={() => onCheck()}>
-            Retry address checks ({utxos.failed})
-          </button>
+          <span className="compact-controls">
+            <button disabled={!canQuery || utxoLoading} onClick={() => onCheck()}>
+              <RefreshCw size={13} /> Retry address checks ({utxos.failed})
+            </button>
+          </span>
         )}
         {!canQuery && <span className="small muted">{queryDisabledReason}</span>}
       </div>

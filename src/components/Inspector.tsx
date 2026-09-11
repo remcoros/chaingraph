@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Crosshair,
   EyeOff,
+  Eye,
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
@@ -161,9 +162,9 @@ export function WalletInspector({
     <div className="panel-section">
       <span className="eyebrow">WATCH-ONLY WALLET</span>
       <h2>{wallet.name}</h2>
-      <div className="wallet-refresh-summary">
+      <div className="wallet-refresh-summary compact-controls">
         <button className="primary" disabled={busy || !canQuery} onClick={onScan}>
-          <RefreshCw size={15} />
+          <RefreshCw size={13} />
           {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
         </button>
         <p
@@ -180,7 +181,7 @@ export function WalletInspector({
         )}
         {!!wallet.unreviewedTransactionIds?.length && (
           <button onClick={onShowActivity} title="Transactions loaded since your last review">
-            Show new activity ({wallet.unreviewedTransactionIds.length})
+            <Eye size={13} /> Show new activity ({wallet.unreviewedTransactionIds.length})
           </button>
         )}
         {wallet.activityOverflow && (

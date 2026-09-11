@@ -77,6 +77,11 @@
   gap: 8px 12px;
   padding: 10px 0 6px;
 }
+.wallet-coverage-actions .compact-controls > button {
+  min-height: var(--control-height-compact);
+  padding: var(--control-padding-compact);
+  font-size: var(--text-xs);
+}
 .wallet-review-messages:empty {
   display: none;
 }

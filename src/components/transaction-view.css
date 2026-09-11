@@ -196,6 +196,7 @@
   left: 100%;
 }
 .transaction-identity-select {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -217,6 +218,13 @@
   font-size: 10px;
   white-space: normal;
   color: var(--color-muted);
+}
+.transaction-identity-select > .transaction-annotation-icon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 16px;
+  line-height: 1;
 }
 .transaction-identity-label {
   display: -webkit-box;
@@ -345,8 +353,25 @@
   height: 2px;
 }
 .transaction-row-content {
+  position: relative;
   flex: 1;
   min-width: 0;
+}
+.transaction-row.has-annotation-icon .transaction-row-content {
+  min-height: 44px;
+}
+.transaction-row.has-annotation-icon .transaction-row-index {
+  min-width: 18px;
+}
+.transaction-row-annotation-icon {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  font-size: 14px;
+  line-height: 1;
+}
+.transaction-row.has-annotation-icon .op-return-data {
+  margin-left: 28px;
 }
 .transaction-row-select {
   width: 100%;
