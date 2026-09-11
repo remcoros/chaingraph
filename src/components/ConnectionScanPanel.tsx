@@ -529,7 +529,13 @@ export function ConnectionScanPanel(props: Props) {
     <div className="connection-scan" hidden={!active}>
       <section className="panel-section">
         <div className="connection-scan-source">
-          <span className="muted">Selected node</span>
+          <span className="muted">
+            {source?.startsWith('tx:')
+              ? 'TRANSACTION'
+              : source?.startsWith('out:')
+                ? 'TRANSACTION OUTPUT'
+                : 'SELECTION'}
+          </span>
           <strong title={source}>
             {source && eligible(source)
               ? nameFor(workspace, source)
