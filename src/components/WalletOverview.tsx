@@ -101,7 +101,7 @@ export function WalletOverview({
             title="Scan this wallet's loaded transactions for supported observations and hypotheses. No network requests"
             onClick={onScan}
           >
-            <ScanSearch size={14} /> {scanLoading ? 'Analysing...' : 'Analyse loaded'}
+            <ScanSearch size={14} /> {scanLoading ? 'Analyzing…' : 'Analyze'}
           </button>
           <button
             aria-label="Refresh wallet"

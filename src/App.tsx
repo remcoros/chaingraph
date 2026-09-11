@@ -3275,6 +3275,7 @@ export default function App() {
           >
             <WalletWorkbench
               walletUtxos={walletUtxos}
+              preparationCache={ws.getSession(w.id)?.walletPreparation}
               tourPreview={
                 tourStep?.view?.workbench === 'wallet'
                   ? { tab: tourStep.view.walletTab ?? 'review', example: tourExample }
@@ -3693,6 +3694,7 @@ export default function App() {
             setSelectedId(undefined);
             setRightTab('inspect');
             setMobilePanel('right');
+            switchWorkbench('wallet', true);
           }}
           onClose={() => setWalletDialog(false)}
         />

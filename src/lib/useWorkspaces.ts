@@ -1,4 +1,5 @@
 import { TransactionFetchScope, transactionScheduler } from './transactionScheduler';
+import { WalletPreparationCache } from './walletPreparation';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Transaction, Workspace } from '../domain/types';
 import { describeWorkspaceChange } from '../domain/undoDescription';
@@ -74,6 +75,7 @@ export interface UndoEntry {
 }
 export interface Session {
   fetchScope: TransactionFetchScope;
+  walletPreparation: WalletPreparationCache;
   data: Workspace;
   password: string;
   revision: number;
@@ -319,6 +321,7 @@ export class WorkspaceSessionStore {
         {
           data,
           fetchScope: new TransactionFetchScope(data.network),
+          walletPreparation: new WalletPreparationCache(),
           password,
           revision: 0,
           savedRevision: alreadySaved ? 0 : -1,
@@ -665,7 +668,10 @@ export class WorkspaceSessionStore {
         if (current && current.revision !== current.savedRevision)
           throw new Error('Workspace changed while locking; keep it open and save again.');
         this.editGroups.delete(id);
-        if (current) transactionScheduler.dispose(current.fetchScope);
+        if (current) {
+          transactionScheduler.dispose(current.fetchScope);
+          current.walletPreparation.dispose();
+        }
         this.patch({
           sessions: this.state.sessions.filter((s) => s.data.id !== id),
           activeId: this.state.activeId === id ? undefined : this.state.activeId,

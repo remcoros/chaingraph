@@ -1,3 +1,7 @@
+import {
+  createWalletOutputEvidenceResolver,
+  type WalletOutputEvidenceResolver,
+} from './walletOutputEvidence';
 import { formatBitcoinAmount } from './amountFormat';
 import { z } from 'zod';
 import { stableKey } from './analysis/shared';
@@ -7,15 +11,12 @@ import {
   outputNodeId,
   short,
   txNodeId,
-  type TxOutput,
   type AnalysisFinding,
   type Transaction,
   type Wallet,
   type Workspace,
 } from './types';
-import { hexToBytes } from '@noble/hashes/utils.js';
 import { addressToScriptHash } from '../lib/wallet';
-import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import {
   canonicalTransactionId,
   groupWalletRelationships,
@@ -25,12 +26,7 @@ import {
   type WalletRelationship,
   type WalletRelationshipContext,
 } from './walletRelationships';
-import {
-  indexPreviousOutputs,
-  outputScriptHash,
-  resolvePreviousOutput,
-  type PreviousOutputIndex,
-} from './prevouts';
+import { indexPreviousOutputs, resolvePreviousOutput, type PreviousOutputIndex } from './prevouts';
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const REVIEW_REASONS = [
@@ -186,28 +182,6 @@ function fingerprint(value: string): string {
   return stableKey(value).slice(0, 16);
 }
 
-/** Raw scripts are authoritative, including when imported address text conflicts.
- * Address-only observations must encode a valid script on this workspace network. */
-function outputAddress(output: TxOutput, network: Workspace['network']): string | undefined {
-  try {
-    const bitcoinNetwork = network === 'mainnet' ? networks.bitcoin : networks.testnet;
-    if (output.scriptPubKey.hex !== undefined)
-      return bitcoinAddress.fromOutputScript(hexToBytes(output.scriptPubKey.hex), bitcoinNetwork);
-    const address =
-      output.scriptPubKey.address ??
-      (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined);
-    if (!address) return undefined;
-    addressToScriptHash(address, network);
-    return bitcoinAddress.fromOutputScript(
-      bitcoinAddress.toOutputScript(address, bitcoinNetwork),
-      bitcoinNetwork,
-    );
-  } catch {
-    // A non-address or malformed raw script never falls back to claimed metadata.
-    return undefined;
-  }
-}
-
 interface OwnedOutput {
   nodeId: string;
   txid: string;
@@ -223,6 +197,7 @@ export function walletOwnedOutputs(
   workspace: Workspace,
   wallet: Wallet,
   prevouts?: PreviousOutputIndex,
+  evidence: WalletOutputEvidenceResolver = createWalletOutputEvidenceResolver(workspace.network),
 ): Map<string, OwnedOutput> {
   const hashes = new Set(
     verifiedWalletAddresses(wallet, workspace.network).map((address) => address.scripthash),
@@ -231,7 +206,7 @@ export function walletOwnedOutputs(
   if (!hashes.size) return owned;
   for (const [nodeId, resolution] of prevouts ?? indexPreviousOutputs(workspace)) {
     if (resolution.status !== 'loaded' && resolution.status !== 'attached') continue;
-    if (!hashes.has(outputScriptHash(resolution.output, workspace.network) ?? '')) continue;
+    if (!hashes.has(evidence(resolution.output).scripthash ?? '')) continue;
     const match = /^out:([0-9a-f]{64}):(\d+)$/.exec(nodeId);
     const vout = match ? Number(match[2]) : undefined;
     if (!match || !validOutputIndex(vout)) continue;
@@ -240,7 +215,7 @@ export function walletOwnedOutputs(
       txid: match[1],
       vout,
       valueSats: Math.round(resolution.output.value * 100_000_000),
-      address: outputAddress(resolution.output, workspace.network),
+      address: evidence(resolution.output).address,
     });
   }
   return owned;
@@ -298,12 +273,15 @@ export function buildWalletReview(
     /** Reuse projections of the same wallet, transactions and network. */
     relationships?: WalletAddressRelationships;
     prevouts?: PreviousOutputIndex;
+    evidence?: WalletOutputEvidenceResolver;
   } = {},
 ): WalletReview {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
   const prevouts = options.prevouts ?? indexPreviousOutputs(workspace);
-  const owned = walletOwnedOutputs(workspace, wallet, prevouts);
-  const groups = options.relationships ?? groupWalletRelationships(workspace, wallet, prevouts);
+  const evidence = options.evidence ?? createWalletOutputEvidenceResolver(workspace.network);
+  const owned = walletOwnedOutputs(workspace, wallet, prevouts, evidence);
+  const groups =
+    options.relationships ?? groupWalletRelationships(workspace, wallet, prevouts, evidence);
   const relationships = {
     sources: [...groups.sources.flatMap((group) => group.outpoints), ...groups.sourceExceptions],
     destinations: [
@@ -538,7 +516,7 @@ export function buildWalletReview(
           source.amountSats,
           source.missing,
           source.ownership,
-          output ? outputScriptHash(output, workspace.network) : undefined,
+          evidence(output).scripthash,
           source.contexts,
         ]),
       ),
@@ -578,7 +556,7 @@ export function buildWalletReview(
         nodeId,
         txid,
         valueSats: Math.round(output.value * 100_000_000),
-        address: outputAddress(output, workspace.network),
+        address: evidence(output).address,
       });
     }
   }

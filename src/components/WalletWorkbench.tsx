@@ -13,10 +13,9 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { short, type Wallet, type Workspace } from '../domain/types';
-import { verifyWalletUtxo, type WalletUtxoRecord } from '../domain/walletRecords';
+import type { WalletUtxoRecord } from '../domain/walletRecords';
 import {
   applyReviewDecisions,
-  buildWalletReview,
   isCompletedReview,
   REASON_LABELS,
   spendGuidance,
@@ -34,7 +33,6 @@ import {
   type WalletStatusFilter,
   type WalletTab,
 } from '../domain/walletWorkbenchRows';
-import { groupWalletRelationships } from '../domain/walletRelationships';
 import {
   walletReviewCategories,
   matchesReviewCategories,
@@ -63,10 +61,7 @@ import { TransactionBlockTime } from './TransactionBlockTime';
 import { walletRecordBlockObservation } from '../domain/transactionTime';
 import { CopyButton } from './CopyButton';
 import { buildTagIndex } from '../domain/tags';
-import {
-  buildWalletSelectionIndex,
-  buildWalletSelectionAddresses,
-} from '../domain/walletSelectionIndex';
+import { WalletPreparationCache } from '../lib/walletPreparation';
 import './wallet-workbench.css';
 
 export interface WalletWorkbenchProps {
@@ -76,6 +71,7 @@ export interface WalletWorkbenchProps {
   workspace: Workspace;
   wallet?: Wallet;
   walletUtxos: WalletUtxoController;
+  preparationCache?: WalletPreparationCache;
   canQuery: boolean;
   busy: boolean;
   queryDisabledReason?: string;
@@ -134,9 +130,13 @@ export const WalletWorkbench = memo(
     const previewWallet = props.tourPreview?.example?.wallets[0] ?? props.wallet;
     const walletIdentity = props.wallet ? `${props.workspace.id}:${props.wallet.id}` : undefined;
     const [mountedWallet, setMountedWallet] = useState<string>();
-    if (mountedWallet !== undefined && mountedWallet !== walletIdentity)
-      setMountedWallet(undefined);
-    const retainWallet = walletIdentity !== undefined && mountedWallet === walletIdentity;
+    const prepared =
+      props.wallet &&
+      props.preparationCache?.peek(props.workspace, props.wallet, props.walletUtxos.utxos);
+    const nextMountedWallet =
+      prepared || mountedWallet === walletIdentity ? walletIdentity : undefined;
+    if (mountedWallet !== nextMountedWallet) setMountedWallet(nextMountedWallet);
+    const retainWallet = nextMountedWallet !== undefined;
     useEffect(() => {
       if (!props.active || props.tourPreview || !walletIdentity || retainWallet) return;
       // Let the active tab and preparation message paint before building the review.
@@ -188,6 +188,7 @@ export const WalletWorkbench = memo(
             key={`tour:${previewWorkspace.id}:${previewWallet.id}:${props.tourPreview.tab}`}
             {...props}
             {...PREVIEW_ACTIONS}
+            preparationCache={undefined}
             active={false}
             workspace={previewWorkspace}
             wallet={previewWallet}
@@ -213,15 +214,8 @@ export const WalletWorkbench = memo(
 
 function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: boolean }) {
   const { workspace, wallet, active, busy, canQuery, onChange } = props;
-  // Keep loaded-data indexes above the keyed detail panel so row navigation reuses them.
-  const selectionIndex = useMemo(
-    () => buildWalletSelectionIndex(workspace),
-    [workspace.transactions, workspace.network],
-  );
-  const walletAddresses = useMemo(
-    () => buildWalletSelectionAddresses(wallet, workspace.network),
-    [wallet.addresses, workspace.network],
-  );
+  const [localPreparation] = useState(() => new WalletPreparationCache());
+  const preparation = props.preparationCache ?? localPreparation;
   const walletScan = useWalletScan({
     workspace,
     wallet,
@@ -258,61 +252,8 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     ]);
   const filterScope = filterScopeFor(status);
   const { utxos, loading: utxoLoading, error: utxoError, check } = props.walletUtxos;
-  const currentUtxos = useMemo(
-    () =>
-      (utxos?.records ?? [])
-        .filter(
-          (record) =>
-            !workspace.transactions[record.txid] ||
-            verifyWalletUtxo(record, workspace.transactions[record.txid], workspace.network),
-        )
-        .sort(
-          (a, b) => b.valueSats - a.valueSats || a.txid.localeCompare(b.txid) || a.vout - b.vout,
-        ),
-    [utxos, workspace.transactions, workspace.network],
-  );
-  const invalidCount = (utxos?.records.length ?? 0) - currentUtxos.length;
-  const relationships = useMemo(
-    () => groupWalletRelationships(workspace, wallet, selectionIndex.prevouts),
-    [
-      workspace.network,
-      workspace.transactions,
-      wallet.id,
-      wallet.addresses,
-      wallet.pendingTransactionIds,
-      wallet.scanComplete,
-      wallet.scannedAt,
-      selectionIndex,
-    ],
-  );
-  const review = useMemo(
-    () =>
-      buildWalletReview(workspace, wallet, {
-        utxos: utxos ? currentUtxos : undefined,
-        utxoCheckedAt: utxos?.checkedAt,
-        utxoCheckedAddresses: utxos?.checkedAddresses,
-        utxoTotalAddresses: utxos?.totalAddresses,
-        utxoPartial: utxos?.nextCursor !== undefined || (utxos?.failed ?? 0) > 0,
-        page: itemPage,
-        relationships,
-        prevouts: selectionIndex.prevouts,
-      }),
-    [
-      workspace.id,
-      workspace.network,
-      workspace.transactions,
-      workspace.annotations,
-      workspace.tags,
-      workspace.walletReviews,
-      workspace.findings,
-      wallet,
-      utxos,
-      currentUtxos,
-      itemPage,
-      relationships,
-      selectionIndex,
-    ],
-  );
+  const { selectionIndex, walletAddresses, relationships, review, currentUtxos, invalidCount } =
+    preparation.prepare(workspace, wallet, utxos, itemPage);
   const fetchTransaction = useTransactionFetch('background');
   const counterparties = useWalletCounterparties({
     workspace,
@@ -434,7 +375,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                   : tool?.status === 'skipped'
                     ? 'The last scan skipped this check.'
                     : tool?.status === 'error'
-                      ? 'The last scan could not finish this check. Choose Analyse loaded to try again.'
+                      ? 'The last scan could not finish this check. Choose Analyze to try again.'
                       : `Last scan: ${currentScan?.scope.label ?? 'selection unavailable'}.`;
             return { ...category, note };
           }),
@@ -474,6 +415,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
   const initialReviewLoading =
     !props.tourPreview &&
     tab === 'review' &&
+    filteredRows.length === 0 &&
     !selectedKey &&
     !previousRow.current &&
     canQuery &&

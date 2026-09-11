@@ -17,7 +17,7 @@ export function WalletCategoryFilter({
   selected,
   onChange,
   title = 'Wallet finding types',
-  countHelp = 'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyse loaded to look for new findings.',
+  countHelp = 'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyze to look for new findings.',
 }: {
   active: boolean;
   title?: string;

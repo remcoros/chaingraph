@@ -212,6 +212,9 @@ native SegWit or Taproot. `ypub`/`upub` and `zpub`/`vpub` constrain the choice;
 wallet before scanning. Master keys, descriptors, multisig and custom derivation
 paths are not supported.
 
+Adding a wallet opens it in the Wallet workbench. Choose **Refresh** to discover
+its addresses and history; importing the key does not start analysis.
+
 Scanning queries receive and change histories through your backend in bounded
 batches, using a gap limit, a maximum index and a transaction budget. Your key
 never leaves the browser, but the backend and upstreams see the queried script
@@ -255,7 +258,7 @@ whole filtered list. Batch edits appear in the same detail panel and are one
 Undo step each.
 
 **Refresh** checks the wallet for new activity and keeps your selection, labels
-and camera; new transactions are flagged until you review them. **Scan** runs
+and camera; new transactions are flagged until you review them. **Analyze** runs
 the analysis tools on the wallet's loaded data. **Check activity every 30s**
 polls wallets and watched addresses while the workspace is unlocked.
 

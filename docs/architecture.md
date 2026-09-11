@@ -351,8 +351,19 @@ bounded batches with explicit continuation. `walletSelectionIndex.ts` builds
 per-snapshot indexes of scripts, outputs, spends and prevouts so row selection
 does not rescan; `walletWorkbenchRows.ts` is the shared row contract for all six
 tabs, and `walletReviewCategories.ts` defines finding categories with OR
-semantics and pre-filter counts. Wallet **Scan** reuses the Analysis registry
+semantics and pre-filter counts. Wallet **Analyze** reuses the Analysis registry
 and merge path; it is distinct from history refresh.
+
+Each unlocked session owns a `WalletPreparationCache` in
+`src/lib/walletPreparation.ts`. It shares one transaction index and script decoder
+per current network/transaction snapshot and retains relationships and prepared
+review items per wallet. Immutable source references invalidate only dependent
+results; camera and workbench changes do not. Initial review and latest UTXO-check
+variants are retained separately so returning to a wallet never presents an old
+UTXO check as current. Warm returns bypass the preparation placeholder. These
+results are not serialized, and successful locking disposes them; save failure
+leaves the unlocked session and its preparation intact. The cache does not keep
+separate wallet components mounted for every workspace or run analysis in the background.
 
 ## Analysis
 

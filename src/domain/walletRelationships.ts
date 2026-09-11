@@ -1,6 +1,8 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
+import {
+  createWalletOutputEvidenceResolver,
+  type WalletOutputEvidenceResolver,
+} from './walletOutputEvidence';
+export { walletOutputEvidence } from './walletOutputEvidence';
 import { addressToScriptHash } from '../lib/wallet';
 import { canonicalEntityNodeId } from './entityReferences';
 import { indexPreviousOutputs, resolvePreviousOutput, type PreviousOutputIndex } from './prevouts';
@@ -8,7 +10,6 @@ import { verifiedWalletAddresses } from './walletRecords';
 import {
   outputNodeId,
   sats,
-  type Network,
   type Transaction,
   type TxOutput,
   type Wallet,
@@ -104,41 +105,6 @@ export function validOutputIndex(value: number | undefined): value is number {
   return Number.isSafeInteger(value) && value! >= 0 && value! <= 0xffffffff;
 }
 
-/** Raw script bytes win over address text. Non-address scripts and malformed
- * claims cannot establish an external address or identify a controller. */
-export function walletOutputEvidence(
-  output: TxOutput | undefined,
-  network: Network,
-): { address?: string; scripthash?: string } {
-  if (!output) return {};
-  try {
-    const bitcoinNetwork = network === 'mainnet' ? networks.bitcoin : networks.testnet;
-    if (output.scriptPubKey.hex !== undefined) {
-      const script = hexToBytes(output.scriptPubKey.hex);
-      const scripthash = bytesToHex(sha256(script).reverse());
-      try {
-        return { scripthash, address: bitcoinAddress.fromOutputScript(script, bitcoinNetwork) };
-      } catch {
-        return { scripthash };
-      }
-    }
-    const reported =
-      output.scriptPubKey.address ??
-      (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined);
-    if (!reported) return {};
-    const scripthash = addressToScriptHash(reported, network);
-    return {
-      scripthash,
-      address: bitcoinAddress.fromOutputScript(
-        bitcoinAddress.toOutputScript(reported, bitcoinNetwork),
-        bitcoinNetwork,
-      ),
-    };
-  } catch {
-    return {};
-  }
-}
-
 /** Ignore inconsistent map keys rather than borrowing another transaction's outputs. */
 export function loadedWalletTransactions(workspace: Workspace): Map<string, Transaction> {
   const transactions = new Map<string, Transaction>();
@@ -155,6 +121,9 @@ export function listWalletRelationships(
   workspace: Workspace,
   wallet: Wallet,
   prevouts: PreviousOutputIndex = indexPreviousOutputs(workspace),
+  resolveEvidence: WalletOutputEvidenceResolver = createWalletOutputEvidenceResolver(
+    workspace.network,
+  ),
 ): WalletRelationships {
   const transactions = loadedWalletTransactions(workspace);
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
@@ -181,7 +150,7 @@ export function listWalletRelationships(
     if (txid && addresses.length) known.add(txid);
   }
   const subject = (txid: string, vout: number, output?: TxOutput): WalletRelationship => {
-    const evidence = walletOutputEvidence(output, workspace.network);
+    const evidence = resolveEvidence(output);
     const amount = output ? sats(output.value) : undefined;
     return {
       id: outputNodeId(txid, vout),
@@ -341,8 +310,9 @@ export function groupWalletRelationships(
   workspace: Workspace,
   wallet: Wallet,
   prevouts?: PreviousOutputIndex,
+  evidence?: WalletOutputEvidenceResolver,
 ): WalletAddressRelationships {
-  const relationships = listWalletRelationships(workspace, wallet, prevouts);
+  const relationships = listWalletRelationships(workspace, wallet, prevouts, evidence);
   const group = (entries: WalletRelationship[]) => {
     const grouped = new Map<
       string,
@@ -421,12 +391,10 @@ export function listLoadedAddressTransactionIds(workspace: Workspace, address: s
   const transactions = loadedWalletTransactions(workspace);
   const prevouts = indexPreviousOutputs(workspace);
   const contexts = new Set<string>();
+  const evidence = createWalletOutputEvidenceResolver(workspace.network);
   for (const [txid, transaction] of transactions) {
     for (const output of transaction.vout) {
-      if (
-        validOutputIndex(output.n) &&
-        walletOutputEvidence(output, workspace.network).scripthash === scripthash
-      ) {
+      if (validOutputIndex(output.n) && evidence(output).scripthash === scripthash) {
         contexts.add(txid);
       }
     }
@@ -443,7 +411,7 @@ export function listLoadedAddressTransactionIds(workspace: Workspace, address: s
         );
         return (
           (resolution.status === 'loaded' || resolution.status === 'attached') &&
-          walletOutputEvidence(resolution.output, workspace.network).scripthash === scripthash
+          evidence(resolution.output).scripthash === scripthash
         );
       })
     )

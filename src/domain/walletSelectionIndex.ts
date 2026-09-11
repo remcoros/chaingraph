@@ -1,21 +1,17 @@
+import {
+  createWalletOutputEvidenceResolver,
+  type WalletOutputEvidenceResolver,
+} from './walletOutputEvidence';
 import { indexPreviousOutputs, type PreviousOutputIndex } from './prevouts';
 import { verifiedWalletAddresses } from './walletRecords';
 import {
   canonicalTransactionId,
   loadedWalletTransactions,
   validOutputIndex,
-  walletOutputEvidence,
 } from './walletRelationships';
-import {
-  outputNodeId,
-  type Network,
-  type Transaction,
-  type TxOutput,
-  type Wallet,
-  type Workspace,
-} from './types';
+import { outputNodeId, type Network, type Transaction, type Wallet, type Workspace } from './types';
 
-/** Component-owned projection of one immutable chain snapshot. Never persisted. */
+/** Session-owned projection of one immutable chain snapshot. Never persisted. */
 export interface WalletSelectionIndex {
   transactions: ReadonlyMap<string, Transaction>;
   prevouts: PreviousOutputIndex;
@@ -42,26 +38,15 @@ export function buildWalletSelectionAddresses(
 }
 
 /** Rebuild when transactions or network changes, independently of row selection. */
-export function buildWalletSelectionIndex(workspace: Workspace): WalletSelectionIndex {
+export function buildWalletSelectionIndex(
+  workspace: Workspace,
+  inspect: WalletOutputEvidenceResolver = createWalletOutputEvidenceResolver(workspace.network),
+): WalletSelectionIndex {
   const transactions = loadedWalletTransactions(workspace);
   const prevouts = indexPreviousOutputs(workspace);
   const contexts = new Map<string, Set<string>>();
   const addressOutputs = new Map<string, string[]>();
   const spenders = new Map<string, Set<string>>();
-  const evidence = new Map<TxOutput, ReturnType<typeof walletOutputEvidence>>();
-  const scripts = new Map<string, ReturnType<typeof walletOutputEvidence>>();
-  const inspect = (output: TxOutput) => {
-    let result = evidence.get(output);
-    if (!result) {
-      const hex = output.scriptPubKey.hex?.toLowerCase();
-      result =
-        (hex === undefined ? undefined : scripts.get(hex)) ??
-        walletOutputEvidence(output, workspace.network);
-      if (hex !== undefined) scripts.set(hex, result);
-      evidence.set(output, result);
-    }
-    return result;
-  };
   const addContext = (hash: string | undefined, txid: string) => {
     if (!hash) return;
     const ids = contexts.get(hash) ?? new Set<string>();

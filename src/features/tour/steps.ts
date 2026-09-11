@@ -66,7 +66,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'review' },
-    text: 'Open "Wallet", then pick one or use "Add wallet". "Refresh" pulls in its history, "Check UTXOs" confirms what is still unspent, and "Analyse loaded" runs the local analysis.',
+    text: 'Open "Wallet", then pick one or use "Add wallet". "Refresh" pulls in its history, "Check UTXOs" confirms what is still unspent, and "Analyze" runs the local analysis.',
     missingTargetText:
       'No wallet yet. Add a watch-only public key once the tour is done. For now, a temporary public example shows the three activity views.',
     tip: 'This is a preview only. The tour will not refresh, check UTXOs, run analysis or save anything.',
