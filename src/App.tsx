@@ -3122,7 +3122,7 @@ export default function App() {
                 {wallet && (
                   <WalletRecordsPanel
                     walletUtxos={walletUtxos}
-                    key={`${w.id}:${wallet.id}`}
+                    key={`wallet-records:${w.id}:${wallet.id}`}
                     workspace={w}
                     wallet={wallet}
                     active={
@@ -3145,7 +3145,7 @@ export default function App() {
                   !selected &&
                   tourStep?.view?.rightTab !== 'inspect' ? (
                   <WalletInspector
-                    key={`${w.id}:${wallet.id}`}
+                    key={`wallet-inspector:${w.id}:${wallet.id}`}
                     wallet={wallet}
                     workspace={w}
                     busy={!!operation}
