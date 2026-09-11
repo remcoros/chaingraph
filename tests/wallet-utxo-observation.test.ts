@@ -119,9 +119,10 @@ describe('shared wallet observations', () => {
         canQuery: false,
         onScan() {},
         onShowActivity() {},
+        onEdit() {},
         onRemove() {},
       }),
     );
-    expect(html).toContain('<dt>Loaded received outputs</dt><dd>1</dd>');
+    expect(html.match(/Loaded received outputs[\s\S]*?<\/dt><dd>(\d+)<\/dd>/)?.[1]).toBe('1');
   });
 });
