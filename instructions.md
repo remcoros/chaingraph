@@ -59,6 +59,11 @@ Older saved synthetic laboratory workspaces remain readable. Live lookups stay d
 
 The graph represents transaction creation and consumption of outputs. An output can already be spent; the presence of an output node does not mean it is an available UTXO. Unknown funding outputs may appear before their parent transaction has been loaded. Address nodes are an optional additional view of script destinations, not proof of a common owner.
 
+In transaction-flow input/output rows, the shortened address and BTC amount share
+the top line. A saved label appears beneath the address. The navigation arrow is
+at the top right and the annotation pencil is at the bottom right. Outputs without
+an address retain their script or loading description.
+
 ## Connection scans
 
 Select a transaction or output and open **Scan** in Graph's right inspector.

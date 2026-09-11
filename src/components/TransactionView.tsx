@@ -172,11 +172,11 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
         >
           <span className="transaction-row-index">#{row.index}</span>
           <span className="transaction-row-main">
-            <strong>
-              {row.coinbase
-                ? 'Coinbase'
-                : label ||
-                  (opReturn
+            <span className="transaction-row-heading">
+              <strong>
+                {row.coinbase
+                  ? 'Coinbase'
+                  : opReturn
                     ? 'OP_RETURN'
                     : address
                       ? short(address)
@@ -184,13 +184,16 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
                         ? inputLoading && selected
                           ? 'Loading previous output…'
                           : 'Select to load previous output'
-                        : 'Script output')}
-            </strong>
-            <span className={row.coinbase ? undefined : 'bitcoin-amount'}>
-              {row.coinbase
-                ? 'Newly created coins'
-                : formatBitcoinAmount(row.output ? sats(row.output.value) : undefined)}
+                        : 'Script output'}
+              </strong>
+              {!row.coinbase && (
+                <span className="bitcoin-amount">
+                  {formatBitcoinAmount(row.output ? sats(row.output.value) : undefined)}
+                </span>
+              )}
             </span>
+            {label && <span className="transaction-row-label">{label}</span>}
+            {row.coinbase && <span>Newly created coins</span>}
             {selected && belowThreshold && (
               <span
                 className="amount-selection-badge"
@@ -211,6 +214,18 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
       </div>
       {row.id && (
         <div className="transaction-row-tools">
+          {!opReturn && (
+            <button
+              type="button"
+              className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
+              aria-label={navigationLabel}
+              title={!loaded && disabledReason ? disabledReason : navigationLabel}
+              disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
+              onClick={navigate}
+            >
+              {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
+            </button>
+          )}
           {offGraph && canShowHidden && (
             <button
               type="button"
@@ -226,22 +241,11 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
             type="button"
             className="icon-button transaction-row-edit"
             aria-label={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
+            title={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
             onClick={() => actions.current.onEdit(row.id!)}
           >
             <Pencil size={12} />
           </button>
-          {!opReturn && (
-            <button
-              type="button"
-              className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
-              aria-label={navigationLabel}
-              title={!loaded && disabledReason ? disabledReason : navigationLabel}
-              disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
-              onClick={navigate}
-            >
-              {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
-            </button>
-          )}
         </div>
       )}
     </div>

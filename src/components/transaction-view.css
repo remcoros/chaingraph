@@ -371,8 +371,22 @@
 }
 .transaction-row-main {
   display: grid;
+  flex: 1;
   gap: 2px;
   min-width: 0;
+}
+.transaction-row-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px;
+}
+.transaction-row-heading .bitcoin-amount {
+  text-align: right;
+}
+.transaction-row-label {
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .transaction-row-main strong {
   overflow: hidden;
@@ -386,8 +400,11 @@
 .transaction-row-tools {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   flex-shrink: 0;
+}
+.transaction-row-tools .transaction-row-edit {
+  margin-top: auto;
 }
 .transaction-row-tools .icon-button {
   padding: 3px;
@@ -481,32 +498,18 @@
   .transaction-identity-select strong {
     font-size: 9px;
   }
-  .transaction-row {
-    flex-direction: column;
-    --transaction-row-tools-space: 34px;
-  }
   .transaction-row-select {
     padding: 7px 4px;
     gap: 3px;
     min-height: 48px;
-  }
-  .transaction-row-tools {
-    flex-direction: row;
-    justify-content: flex-end;
-    border-top: 1px solid var(--color-rule);
   }
   .transaction-row-main strong,
   .transaction-row-main > span {
     font-size: 10px;
   }
   .transaction-row-tools .icon-button {
-    flex: 1;
     min-width: 32px;
     min-height: 32px;
-  }
-  .transaction-row-tools .icon-button + .icon-button {
-    border-left: 1px solid var(--color-rule);
-    border-radius: 0;
   }
   .transaction-row::after {
     width: 6px;
@@ -647,12 +650,6 @@
 .transaction-row-main .entity-hidden-badge {
   font-size: 9px;
 }
-@media (max-width: 700px) {
-  .transaction-row-tools {
-    flex-wrap: wrap;
-  }
-}
-
 .transaction-row-main > span,
 .transaction-row-main strong,
 .transaction-view {
