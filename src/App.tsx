@@ -906,10 +906,14 @@ export default function App() {
     ws.update(
       w.id,
       (current) => {
-        const nextView = { ...current.view, ...presentation };
-        return JSON.stringify(current.view) === JSON.stringify(nextView)
-          ? current
-          : { ...current, view: nextView };
+        // Compare only these UI settings, never the saved graph geometry or membership.
+        const unchanged = (Object.keys(presentation) as (keyof typeof presentation)[]).every(
+          (key) =>
+            current.view[key] === presentation[key] ||
+            (key === 'filters' &&
+              JSON.stringify(current.view.filters) === JSON.stringify(presentation.filters)),
+        );
+        return unchanged ? current : { ...current, view: { ...current.view, ...presentation } };
       },
       false,
     );
@@ -3252,7 +3256,9 @@ export default function App() {
                   ? { tab: tourStep.view.walletTab ?? 'review', example: tourExample }
                   : undefined
               }
-              active={workbench === 'wallet' && !lockingWorkspace && !tourStep}
+              active={
+                viewOwner === w.id && workbench === 'wallet' && !lockingWorkspace && !tourStep
+              }
               workspace={w}
               analysisScan={analysisSessions.current.get(w.id)?.scan}
               updateEvidence={ws.update}

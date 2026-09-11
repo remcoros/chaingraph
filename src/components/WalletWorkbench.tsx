@@ -1,5 +1,5 @@
 import { Amount } from './Amount';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeftRight,
   Coins,
@@ -10,6 +10,7 @@ import {
   Filter,
   Network,
   Wallet as WalletIcon,
+  LoaderCircle,
 } from 'lucide-react';
 import { short, type Wallet, type Workspace } from '../domain/types';
 import { verifyWalletUtxo, type WalletUtxoRecord } from '../domain/walletRecords';
@@ -131,6 +132,22 @@ export const WalletWorkbench = memo(
   function WalletWorkbench(props: WalletWorkbenchProps) {
     const previewWorkspace = props.tourPreview?.example ?? props.workspace;
     const previewWallet = props.tourPreview?.example?.wallets[0] ?? props.wallet;
+    const walletIdentity = props.wallet ? `${props.workspace.id}:${props.wallet.id}` : undefined;
+    const [mountedWallet, setMountedWallet] = useState<string>();
+    if (mountedWallet !== undefined && mountedWallet !== walletIdentity)
+      setMountedWallet(undefined);
+    const retainWallet = walletIdentity !== undefined && mountedWallet === walletIdentity;
+    useEffect(() => {
+      if (!props.active || props.tourPreview || !walletIdentity || retainWallet) return;
+      // Let the active tab and preparation message paint before building the review.
+      // Keep the mounted review when leaving this workbench; cancel unopened reviews.
+      let frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          startTransition(() => setMountedWallet(walletIdentity));
+        });
+      });
+      return () => cancelAnimationFrame(frame);
+    }, [props.active, props.tourPreview, walletIdentity, retainWallet]);
     if (!props.wallet && !previewWallet)
       return (
         <section className="wallet-workbench" aria-label="Wallet review workbench">
@@ -149,9 +166,17 @@ export const WalletWorkbench = memo(
       );
     return (
       <>
-        {props.wallet && (
+        {!retainWallet && props.active && !props.tourPreview && props.wallet && (
+          <section className="wallet-workbench is-preparing" aria-label="Wallet review workbench">
+            <div className="wallet-preparing" role="status">
+              <LoaderCircle size={16} className="spin" aria-hidden="true" />
+              <span>Preparing wallet…</span>
+            </div>
+          </section>
+        )}
+        {retainWallet && props.wallet && (
           <WalletReview
-            key={`${props.workspace.id}:${props.wallet.id}`}
+            key={walletIdentity}
             {...props}
             tourPreview={undefined}
             hidden={!!props.tourPreview}
@@ -247,6 +272,19 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     [utxos, workspace.transactions, workspace.network],
   );
   const invalidCount = (utxos?.records.length ?? 0) - currentUtxos.length;
+  const relationships = useMemo(
+    () => groupWalletRelationships(workspace, wallet, selectionIndex.prevouts),
+    [
+      workspace.network,
+      workspace.transactions,
+      wallet.id,
+      wallet.addresses,
+      wallet.pendingTransactionIds,
+      wallet.scanComplete,
+      wallet.scannedAt,
+      selectionIndex,
+    ],
+  );
   const review = useMemo(
     () =>
       buildWalletReview(workspace, wallet, {
@@ -256,6 +294,8 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
         utxoTotalAddresses: utxos?.totalAddresses,
         utxoPartial: utxos?.nextCursor !== undefined || (utxos?.failed ?? 0) > 0,
         page: itemPage,
+        relationships,
+        prevouts: selectionIndex.prevouts,
       }),
     [
       workspace.id,
@@ -269,18 +309,8 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
       utxos,
       currentUtxos,
       itemPage,
-    ],
-  );
-  const relationships = useMemo(
-    () => groupWalletRelationships(workspace, wallet),
-    [
-      workspace.network,
-      workspace.transactions,
-      wallet.id,
-      wallet.addresses,
-      wallet.pendingTransactionIds,
-      wallet.scanComplete,
-      wallet.scannedAt,
+      relationships,
+      selectionIndex,
     ],
   );
   const fetchTransaction = useTransactionFetch('background');
@@ -314,7 +344,9 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
         return row;
       }),
       ...records,
-      ...buildWalletRelationshipRows(workspace, relationships, review.items),
+      ...(tab === 'sources' || tab === 'destinations'
+        ? buildWalletRelationshipRows(workspace, relationships, review.items)
+        : { sources: [], destinations: [] }),
     };
   }, [
     workspace.network,

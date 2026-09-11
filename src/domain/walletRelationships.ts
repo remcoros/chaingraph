@@ -3,7 +3,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { addressToScriptHash } from '../lib/wallet';
 import { canonicalEntityNodeId } from './entityReferences';
-import { indexPreviousOutputs, resolvePreviousOutput } from './prevouts';
+import { indexPreviousOutputs, resolvePreviousOutput, type PreviousOutputIndex } from './prevouts';
 import { verifiedWalletAddresses } from './walletRecords';
 import {
   outputNodeId,
@@ -151,9 +151,12 @@ export function loadedWalletTransactions(workspace: Workspace): Map<string, Tran
 
 /** One-hop local relationships. Histories qualify coverage only; every direction
  * requires actual loaded wallet-script matches and exact outpoint references. */
-export function listWalletRelationships(workspace: Workspace, wallet: Wallet): WalletRelationships {
+export function listWalletRelationships(
+  workspace: Workspace,
+  wallet: Wallet,
+  prevouts: PreviousOutputIndex = indexPreviousOutputs(workspace),
+): WalletRelationships {
   const transactions = loadedWalletTransactions(workspace);
-  const prevouts = indexPreviousOutputs(workspace);
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
   const hashes = new Set(addresses.map((entry) => entry.scripthash));
   const outputs = new Map<string, WalletRelationship>();
@@ -337,8 +340,9 @@ export function listWalletRelationships(workspace: Workspace, wallet: Wallet): W
 export function groupWalletRelationships(
   workspace: Workspace,
   wallet: Wallet,
+  prevouts?: PreviousOutputIndex,
 ): WalletAddressRelationships {
-  const relationships = listWalletRelationships(workspace, wallet);
+  const relationships = listWalletRelationships(workspace, wallet, prevouts);
   const group = (entries: WalletRelationship[]) => {
     const grouped = new Map<
       string,

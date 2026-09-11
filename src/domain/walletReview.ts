@@ -21,10 +21,16 @@ import {
   groupWalletRelationships,
   loadedWalletTransactions,
   validOutputIndex,
+  type WalletAddressRelationships,
   type WalletRelationship,
   type WalletRelationshipContext,
 } from './walletRelationships';
-import { indexPreviousOutputs, outputScriptHash, resolvePreviousOutput } from './prevouts';
+import {
+  indexPreviousOutputs,
+  outputScriptHash,
+  resolvePreviousOutput,
+  type PreviousOutputIndex,
+} from './prevouts';
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const REVIEW_REASONS = [
@@ -213,13 +219,17 @@ interface OwnedOutput {
 /** Verified wallet outputs in loaded data. Membership is derivation evidence,
  * never a claim that an output is publicly linked to the other wallet outputs.
  */
-export function walletOwnedOutputs(workspace: Workspace, wallet: Wallet): Map<string, OwnedOutput> {
+export function walletOwnedOutputs(
+  workspace: Workspace,
+  wallet: Wallet,
+  prevouts?: PreviousOutputIndex,
+): Map<string, OwnedOutput> {
   const hashes = new Set(
     verifiedWalletAddresses(wallet, workspace.network).map((address) => address.scripthash),
   );
   const owned = new Map<string, OwnedOutput>();
   if (!hashes.size) return owned;
-  for (const [nodeId, resolution] of indexPreviousOutputs(workspace)) {
+  for (const [nodeId, resolution] of prevouts ?? indexPreviousOutputs(workspace)) {
     if (resolution.status !== 'loaded' && resolution.status !== 'attached') continue;
     if (!hashes.has(outputScriptHash(resolution.output, workspace.network) ?? '')) continue;
     const match = /^out:([0-9a-f]{64}):(\d+)$/.exec(nodeId);
@@ -285,11 +295,15 @@ export function buildWalletReview(
     utxoPartial?: boolean;
     /** Multiplies the per-reason bound for an explicit continuation. */
     page?: number;
+    /** Reuse projections of the same wallet, transactions and network. */
+    relationships?: WalletAddressRelationships;
+    prevouts?: PreviousOutputIndex;
   } = {},
 ): WalletReview {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
-  const owned = walletOwnedOutputs(workspace, wallet);
-  const groups = groupWalletRelationships(workspace, wallet);
+  const prevouts = options.prevouts ?? indexPreviousOutputs(workspace);
+  const owned = walletOwnedOutputs(workspace, wallet, prevouts);
+  const groups = options.relationships ?? groupWalletRelationships(workspace, wallet, prevouts);
   const relationships = {
     sources: [...groups.sources.flatMap((group) => group.outpoints), ...groups.sourceExceptions],
     destinations: [
@@ -298,7 +312,6 @@ export function buildWalletReview(
     ],
   };
   const loaded = loadedWalletTransactions(workspace);
-  const prevouts = indexPreviousOutputs(workspace);
   const directSources = new Map(relationships.sources.map((entry) => [entry.id, entry]));
   const directDestinations = new Map(relationships.destinations.map((entry) => [entry.id, entry]));
   const history = new Set<string>();

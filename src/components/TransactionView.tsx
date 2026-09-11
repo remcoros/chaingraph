@@ -289,6 +289,7 @@ function TransactionRows({
   onStateChange,
   selection,
   spends,
+  previousOutputs,
   onNavigate,
   identity,
   previous,
@@ -296,6 +297,7 @@ function TransactionRows({
 }: Props & {
   tx: Transaction;
   spends: ReturnType<typeof indexLoadedSpends>;
+  previousOutputs: ReturnType<typeof indexPreviousOutputs>;
   onNavigate: (txid: string, outputId: string) => void;
   identity: ReactNode;
   previous: ReactNode;
@@ -306,7 +308,6 @@ function TransactionRows({
     () => (graphNodeIds === undefined ? undefined : new Set(graphNodeIds)),
     [graphNodeIds],
   );
-  const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
   const flow = useRef<HTMLDivElement>(null);
   const actions = useRef<FlowRowActions>({
     onSelect,
@@ -592,7 +593,10 @@ export function TransactionView(props: Props) {
     () => (selected ? relatedTransactions(workspace.transactions, selected, spends) : []),
     [workspace.transactions, selected?.id, spends],
   );
-  const previousOutputs = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
+  const previousOutputs = useMemo(
+    () => indexPreviousOutputs(workspace),
+    [workspace.transactions, workspace.network],
+  );
   const [choice, setChoice] = useState('');
   const [fullHeight, setFullHeight] = useState(false);
   const current =
@@ -769,6 +773,7 @@ export function TransactionView(props: Props) {
                 tx={current.tx}
                 key={current.tx.txid}
                 spends={spends}
+                previousOutputs={previousOutputs}
                 onNavigate={navigate}
                 onSelect={(id) => {
                   choose(current.tx.txid);
