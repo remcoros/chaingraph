@@ -887,6 +887,8 @@ function ScanResultRow({
     prefixLength === result.path.length
       ? fullPlan
       : prepareScanPath(workspace, result, prefixLength);
+  const lastNode = plan.nodeIds.at(-1);
+  const creatorId = lastNode?.startsWith('out:') ? `tx:${lastNode.split(':')[1]}` : undefined;
   const connection = category === 'connection';
   const title = titles[finding];
   const visible = new Set(visibleNodeIds);
@@ -1095,6 +1097,24 @@ function ScanResultRow({
               </li>
             ))}
           </ol>
+          {creatorId && (
+            <div className="connection-scan-path-creator">
+              <span className="muted">Created by</span>
+              {traceSourceExists(workspace, creatorId) ? (
+                <button
+                  type="button"
+                  className="text-button"
+                  aria-label={`Select creating transaction: ${nameFor(workspace, creatorId)}`}
+                  title={creatorId}
+                  onClick={() => onSelect(creatorId)}
+                >
+                  {nameFor(workspace, creatorId)}
+                </button>
+              ) : (
+                <span title={creatorId}>{nameFor(workspace, creatorId)}</span>
+              )}
+            </div>
+          )}
         </details>
       </div>
       <footer className="connection-scan-result-actions">

@@ -273,6 +273,26 @@
 .connection-scan-path small {
   color: var(--color-muted);
 }
+.connection-scan-path-creator {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 4px 0 0 20px;
+  font-size: var(--text-xs);
+}
+.connection-scan-path-creator > :first-child {
+  flex-shrink: 0;
+}
+.connection-scan-path-creator > :last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.connection-scan-path-creator button {
+  min-height: 24px;
+  padding: 2px 0;
+  text-align: left;
+  font-size: inherit;
+}
 .connection-scan-error {
   font-size: var(--text-sm);
   overflow-wrap: anywhere;

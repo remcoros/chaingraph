@@ -109,8 +109,11 @@ separate filter for natural path endings.
 | Conflicting evidence | Observations contradict the proposed path. Only a verified prefix can be added. |
 
 Expand **Path** to inspect directed steps and new nodes. Known nodes in the path
-are clickable to select; new nodes stay marked **New**. Alternative paths to the
-same finding within a scan share one card; choose an alternative inside it. Click
+are clickable to select; new nodes stay marked **New**. Paths ending at an output
+show its creating transaction beneath the steps, selectable when already loaded.
+This **Created by** context does not change the path count or the nodes added.
+Alternative paths to the same finding within a scan share one card; choose an
+alternative inside it. Click
 the source or target row to select that node. A target whose evidence is not yet
 loaded becomes selectable after adding its path. **Add (+N)** adds the displayed
 path with N new nodes in one Undo action, without siblings, from the bottom right.
