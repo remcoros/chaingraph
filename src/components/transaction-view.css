@@ -61,7 +61,7 @@
 }
 @media (min-width: 1000px) {
   .transaction-flow {
-    grid-template-columns: minmax(220px, 1fr) clamp(156px, calc(19% + 20px), 204px) minmax(
+    grid-template-columns: minmax(220px, 1fr) clamp(176px, calc(19% + 40px), 224px) minmax(
         220px,
         1fr
       );
