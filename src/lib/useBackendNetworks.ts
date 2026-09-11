@@ -38,33 +38,31 @@ export function useBackendNetworks(refreshToken: number) {
     const discover = async () => {
       if (discovering) return;
       discovering = true;
-      try {
-        const available = await backendNetworks(
-          AbortSignal.any([lifetime.signal, AbortSignal.timeout(10000)]),
-        );
-        if (lifetime.signal.aborted) return;
-        supported = new Set(available);
-        for (const [network, controller] of pending)
-          if (!supported.has(network)) {
-            controller.abort();
-            pending.delete(network);
-          }
-        setNetworks((current) =>
-          JSON.stringify(current) === JSON.stringify(available) ? current : available,
-        );
-        setStatuses((current) =>
-          Object.fromEntries(
-            Object.entries(current).filter(([network]) => supported.has(network as Network)),
-          ),
-        );
-        setDiscoveryError('');
-        for (const network of available) pollNetwork(network);
-      } catch {
-        if (!lifetime.signal.aborted)
-          setDiscoveryError('Cannot discover supported networks. Check the backend connection.');
-      } finally {
-        discovering = false;
-      }
+      await backendNetworks(AbortSignal.any([lifetime.signal, AbortSignal.timeout(10000)]))
+        .then((available) => {
+          if (lifetime.signal.aborted) return;
+          supported = new Set(available);
+          for (const [network, controller] of pending)
+            if (!supported.has(network)) {
+              controller.abort();
+              pending.delete(network);
+            }
+          setNetworks((current) =>
+            JSON.stringify(current) === JSON.stringify(available) ? current : available,
+          );
+          setStatuses((current) =>
+            Object.fromEntries(
+              Object.entries(current).filter(([network]) => supported.has(network as Network)),
+            ),
+          );
+          setDiscoveryError('');
+          for (const network of available) pollNetwork(network);
+        })
+        .catch(() => {
+          if (!lifetime.signal.aborted)
+            setDiscoveryError('Cannot discover supported networks. Check the backend connection.');
+        });
+      discovering = false;
     };
     void discover();
     const timer = setInterval(() => {

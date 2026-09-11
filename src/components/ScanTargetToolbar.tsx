@@ -18,12 +18,13 @@ export function ScanTargetToolbar({
   onRemove,
   onDone,
   onCancel,
-  targetCount = ids.length,
+  targetCount,
   error,
 }: ScanTargetToolbarProps) {
   const toolbar = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const errorId = useId();
+  const displayedTargetCount = targetCount ?? ids.length;
 
   useEffect(() => toolbar.current?.focus({ preventScroll: true }), []);
   useEffect(() => {
@@ -56,7 +57,8 @@ export function ScanTargetToolbar({
             role="status"
             title="Only picked nodes are scan targets."
           >
-            {targetCount.toLocaleString('en-US')} {targetCount === 1 ? 'target' : 'targets'}
+            {displayedTargetCount.toLocaleString('en-US')}{' '}
+            {displayedTargetCount === 1 ? 'target' : 'targets'}
           </span>
         )}
         <div className="scan-target-toolbar-actions">

@@ -19,9 +19,11 @@ export function useUtxoStatus(
 ) {
   const key = `${workspaceId}:${network}:${txid}:${vout}:${expected?.value}:${expected?.scriptPubKey.hex}`;
   const activeKey = useRef(key);
-  activeKey.current = key;
   const request = useRef<AbortController | undefined>(undefined);
   const [state, setState] = useState<CheckState>({ key });
+  useEffect(() => {
+    activeKey.current = key;
+  });
   useEffect(() => {
     request.current?.abort();
     request.current = undefined;

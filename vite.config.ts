@@ -5,8 +5,24 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 const source = process.env.CHAINGRAPH_SOURCE_URL ?? '';
 if (source && !/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/.test(source))
   throw new Error('CHAINGRAPH_SOURCE_URL must be an HTTPS GitHub repository URL.');
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ command }) => ({
+  plugins: [
+    react({
+      // React Compiler memoizes components and hooks automatically, which is the
+      // safety net for a UI written with almost no hand-rolled useCallback/memo.
+      //
+      // Build-only on purpose. With @vitejs/plugin-react 6.1.1, enabling the
+      // compiler also changes the Fast Refresh hook-signature instrumentation it
+      // emits ($RefreshSig$ registrations that are absent otherwise). In the dev
+      // server that remounts the workspace store and drops the unlocked session,
+      // so unlocking a workspace silently returns to the home screen. Verified by
+      // A/B on unmodified sources: dev + compiler fails the e2e smoke test, dev
+      // without it passes, and a production build with it passes. The breakage is
+      // not memoization: it reproduces with 'use no memo' on every source file.
+      // Revisit once the plugin's dev-mode refresh handling is fixed.
+      compiler: command === 'build' ? { logDiagnostics: true } : false,
+    }),
+  ],
   envDir: false,
   worker: { format: 'es' },
   define: {
@@ -31,4 +47,4 @@ export default defineConfig({
     },
   },
   build: { chunkSizeWarningLimit: 1500 },
-});
+}));

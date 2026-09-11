@@ -43,11 +43,9 @@ export function WalletReviewFlow({
   onVisibleInputsChange?: (inputs: readonly WalletReviewFlowEntry[]) => void;
   active?: boolean;
 }) {
-  const reportInputs = useRef(onVisibleInputsChange);
-  reportInputs.current = onVisibleInputsChange;
   useEffect(() => {
-    if (context.status !== 'loaded') reportInputs.current?.([]);
-  }, [context.status]);
+    if (context.status !== 'loaded') onVisibleInputsChange?.([]);
+  }, [context.status, onVisibleInputsChange]);
   const editingId =
     editedNodeId ??
     context.selectedNodeId ??
@@ -234,14 +232,10 @@ function FlowColumn({
   const visibleKey = JSON.stringify(visible, (key, value) =>
     key === 'scriptPubKey' ? undefined : value,
   );
-  const reportVisible = useRef(onVisibleEntriesChange);
-  reportVisible.current = onVisibleEntriesChange;
-  const latestVisible = useRef(visible);
-  latestVisible.current = visible;
   const reportsVisible = !!onVisibleEntriesChange;
   useEffect(() => {
-    reportVisible.current?.(latestVisible.current);
-  }, [visibleKey, reportsVisible]);
+    onVisibleEntriesChange?.(visible);
+  }, [visibleKey, reportsVisible, onVisibleEntriesChange]);
   useLayoutEffect(() => {
     const container = list.current;
     const selected = container?.querySelector<HTMLElement>('.is-selected');

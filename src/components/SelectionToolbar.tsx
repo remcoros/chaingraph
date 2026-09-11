@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { CheckSquare, Eye, EyeOff, Focus, Plus, Tag, Type, Undo2, X } from 'lucide-react';
 import type { Workspace } from '../domain/types';
 import { labelBatchPlan } from '../domain/batchEdits';
@@ -51,8 +51,8 @@ export function SelectionToolbar({
     token: number;
     workspaceId: string;
   }>();
-  const labelButton = useRef<HTMLButtonElement>(null);
-  const tagButton = useRef<HTMLButtonElement>(null);
+  const [labelButton, setLabelButton] = useState<HTMLButtonElement | null>(null);
+  const [tagButton, setTagButton] = useState<HTMLButtonElement | null>(null);
   const labelId = useId();
   const tagId = useId();
   const ids = selection.ids;
@@ -118,7 +118,7 @@ export function SelectionToolbar({
       {count > 0 && (
         <>
           <button
-            ref={labelButton}
+            ref={setLabelButton}
             type="button"
             aria-haspopup="dialog"
             aria-expanded={editor === 'label'}
@@ -128,7 +128,7 @@ export function SelectionToolbar({
             <Type size={13} /> Label
           </button>
           <button
-            ref={tagButton}
+            ref={setTagButton}
             type="button"
             aria-haspopup="dialog"
             aria-expanded={editor === 'tag'}
@@ -211,8 +211,8 @@ export function SelectionToolbar({
           <Undo2 size={13} /> Undo
         </button>
       )}
-      {editor === 'label' && labelButton.current && (
-        <MetadataPopover anchor={labelButton.current} onClose={() => setEditor(undefined)}>
+      {editor === 'label' && labelButton && (
+        <MetadataPopover anchor={labelButton} onClose={() => setEditor(undefined)}>
           <BatchLabelEditor
             id={labelId}
             workspace={workspace}
@@ -222,8 +222,8 @@ export function SelectionToolbar({
           />
         </MetadataPopover>
       )}
-      {editor === 'tag' && tagButton.current && (
-        <MetadataPopover anchor={tagButton.current} onClose={() => setEditor(undefined)}>
+      {editor === 'tag' && tagButton && (
+        <MetadataPopover anchor={tagButton} onClose={() => setEditor(undefined)}>
           <BatchTagEditor
             id={tagId}
             workspace={workspace}

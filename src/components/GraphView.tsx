@@ -83,7 +83,16 @@ export default function GraphView(props: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<GraphAdapter | null>(null);
   const current = useRef(props);
-  current.current = props;
+  // Every reader of `current.current` is an event handler or an imperative
+  // renderer callback, so it always runs after commit. Publishing the latest
+  // props from an effect instead of during render keeps the component safe
+  // under concurrent rendering (a discarded render must not mutate a ref) and
+  // lets React Compiler memoize this component instead of skipping it.
+  // Declared before every other effect so same-commit effects still read the
+  // current props.
+  useEffect(() => {
+    current.current = props;
+  });
   const cardRef = useRef<HTMLElement>(null);
   const navigationRef = useRef<HTMLDivElement>(null);
   const contextToolbarRef = useRef<HTMLDivElement>(null);
@@ -121,12 +130,17 @@ export default function GraphView(props: GraphViewProps) {
   const lastFitToken = useRef(props.fitToken);
   const immutableNodeSource = useRef<GraphSnapshot['nodes'] | undefined>(undefined);
   const snapshotSignatures = useRef<{ camera: string; nodes: string } | undefined>(undefined);
-  snapshotSignatures.current ??= {
-    camera: props.snapshot
-      ? JSON.stringify([props.snapshot.dimensions, props.snapshot.camera])
-      : '',
-    nodes: props.snapshot ? JSON.stringify(props.snapshot.nodes) : '',
-  };
+  // Lazy one-time ref initialisation. Written with an explicit guard rather than
+  // `??=`, which React Compiler does not yet support and which made it skip this
+  // whole component.
+  if (snapshotSignatures.current === undefined) {
+    snapshotSignatures.current = {
+      camera: props.snapshot
+        ? JSON.stringify([props.snapshot.dimensions, props.snapshot.camera])
+        : '',
+      nodes: props.snapshot ? JSON.stringify(props.snapshot.nodes) : '',
+    };
+  }
 
   function keepCardOpen() {
     clearTimeout(closeTimer.current);

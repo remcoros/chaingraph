@@ -138,7 +138,15 @@ export class TransactionScheduler {
     this.drain();
   }
   private promote(job: Job) {
-    const first = [...job.consumers].sort((a, b) => rank[a.priority] - rank[b.priority])[0];
+    let first: Consumer | undefined;
+    let firstRank = Infinity;
+    for (const consumer of job.consumers) {
+      const consumerRank = rank[consumer.priority];
+      if (consumerRank < firstRank) {
+        first = consumer;
+        firstRank = consumerRank;
+      }
+    }
     if (first) {
       job.priority = first.priority;
     }
@@ -148,27 +156,52 @@ export class TransactionScheduler {
     this.draining = true;
     try {
       for (;;) {
-        const active = [...this.jobs].filter((j) => j.state === 'active');
-        if (active.length >= MAX_ACTIVE_TRANSACTIONS) break;
-        const candidates = [...this.jobs]
-          .filter((j) => {
-            if (j.state !== 'queued') return false;
-            const sameNetwork = active.filter((a) => a.network === j.network);
-            if (sameNetwork.length >= MAX_ACTIVE_PER_NETWORK) return false;
-            return (
-              j.priority === 'navigation' ||
-              (active.filter((a) => a.priority !== 'navigation').length <
-                MAX_NON_NAVIGATION_TRANSACTIONS &&
-                sameNetwork.filter((a) => a.priority !== 'navigation').length <
-                  MAX_NON_NAVIGATION_PER_NETWORK)
-            );
-          })
-          .sort(
-            (a, b) =>
-              rank[a.priority] - rank[b.priority] ||
-              Number(a.network === this.lastNetwork) - Number(b.network === this.lastNetwork),
-          );
-        const job = candidates[0];
+        let active = 0;
+        let activeNonNavigation = 0;
+        const activeByNetwork = new Map<Network, { total: number; nonNavigation: number }>();
+        for (const existing of this.jobs) {
+          if (existing.state !== 'active') continue;
+          active++;
+          const network = existing.network;
+          const counts = activeByNetwork.get(network) ?? { total: 0, nonNavigation: 0 };
+          counts.total++;
+          if (existing.priority !== 'navigation') {
+            activeNonNavigation++;
+            counts.nonNavigation++;
+          }
+          activeByNetwork.set(network, counts);
+        }
+        if (active >= MAX_ACTIVE_TRANSACTIONS) break;
+
+        let job: Job | undefined;
+        let jobRank = Infinity;
+        let jobLastNetwork = 0;
+        const lastNetwork = this.lastNetwork;
+        for (const queued of this.jobs) {
+          if (queued.state !== 'queued') continue;
+          const network = queued.network;
+          const counts = activeByNetwork.get(network);
+          if ((counts?.total ?? 0) >= MAX_ACTIVE_PER_NETWORK) continue;
+          const priority = queued.priority;
+          if (
+            priority !== 'navigation' &&
+            (activeNonNavigation >= MAX_NON_NAVIGATION_TRANSACTIONS ||
+              (counts?.nonNavigation ?? 0) >= MAX_NON_NAVIGATION_PER_NETWORK)
+          )
+            continue;
+
+          const queuedRank = rank[priority];
+          const queuedLastNetwork = Number(network === lastNetwork);
+          if (
+            !job ||
+            queuedRank < jobRank ||
+            (queuedRank === jobRank && queuedLastNetwork < jobLastNetwork)
+          ) {
+            job = queued;
+            jobRank = queuedRank;
+            jobLastNetwork = queuedLastNetwork;
+          }
+        }
         if (!job) break;
         job.state = 'active';
         this.lastNetwork = job.network;

@@ -440,6 +440,50 @@ export async function mapLimit<T, R>(
   );
   return out;
 }
+function createAsyncLimiter(limit: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const pump = () => {
+    while (active < limit) {
+      const run = queue.shift();
+      if (!run) return;
+      run();
+    }
+  };
+  return function runLimited<R>(fn: () => Promise<R>, signal?: AbortSignal): Promise<R> {
+    signal?.throwIfAborted();
+    return new Promise<R>((resolve, reject) => {
+      let queued = true;
+      const run = () => {
+        queued = false;
+        signal?.removeEventListener('abort', abortQueued);
+        active++;
+        Promise.resolve()
+          .then(() => {
+            signal?.throwIfAborted();
+            return fn();
+          })
+          .then(resolve, reject)
+          .finally(() => {
+            active--;
+            pump();
+          });
+      };
+      const abortQueued = () => {
+        if (!queued) return;
+        queued = false;
+        const index = queue.indexOf(run);
+        if (index >= 0) queue.splice(index, 1);
+        reject(signal?.reason ?? new DOMException('Request cancelled.', 'AbortError'));
+      };
+      if (active < limit) run();
+      else {
+        queue.push(run);
+        signal?.addEventListener('abort', abortQueued, { once: true });
+      }
+    });
+  };
+}
 export interface ScanProgress {
   done: number;
   message: string;
@@ -477,12 +521,17 @@ export async function scanWallet(
     priority: 'background',
     observation: {},
   };
-  const addresses: Wallet['addresses'] = [];
-  const historyIds = new Set<string>();
-  const heights = new Map<string, number>();
+  const scanController = new AbortController();
+  const scanSignal = options.signal
+    ? AbortSignal.any([options.signal, scanController.signal])
+    : scanController.signal;
+  const limitHistoryFetch = createAsyncLimiter(4);
+  const progressHistoryIds = new Set<string>();
   let checked = 0;
-  let complete = true;
-  for (const branch of [0, 1] as const) {
+  const scanBranch = async (
+    branch: 0 | 1,
+  ): Promise<{ addresses: Wallet['addresses']; complete: boolean }> => {
+    const branchAddresses: Wallet['addresses'] = [];
     let gap = 0;
     let index = 0;
     const knownUsed = Math.max(
@@ -492,29 +541,57 @@ export async function scanWallet(
         .map((a) => a.index),
     );
     while (index < options.maxIndex && (gap < options.gap || index <= knownUsed)) {
-      options.signal?.throwIfAborted();
+      scanSignal.throwIfAborted();
       const size = Math.min(10, options.maxIndex - index);
       const derived = deriveAddresses(wallet.key, network, wallet.scriptType, branch, index, size);
-      const histories = await mapLimit(derived, 4, (d) =>
-        fetchHistory(network, d.scripthash, options.signal),
+      const histories = await Promise.all(
+        derived.map((d) =>
+          limitHistoryFetch(() => fetchHistory(network, d.scripthash, scanSignal), scanSignal),
+        ),
       );
       for (let i = 0; i < derived.length; i++) {
         const history = histories[i];
-        addresses.push({ ...derived[i], history });
+        branchAddresses.push({ ...derived[i], history });
         gap = history.length ? 0 : gap + 1;
         for (const h of history) {
-          historyIds.add(h.tx_hash);
-          heights.set(h.tx_hash, h.height);
+          progressHistoryIds.add(h.tx_hash);
         }
         checked++;
       }
       index += size;
       options.onProgress?.({
         done: checked,
-        message: `${wallet.name}: checked ${checked} addresses · ${historyIds.size} transactions`,
+        message: `${wallet.name}: checked ${checked} addresses · ${progressHistoryIds.size} transactions`,
       });
     }
-    if (gap < options.gap || index <= knownUsed) complete = false;
+    return {
+      addresses: branchAddresses,
+      complete: !(gap < options.gap || index <= knownUsed),
+    };
+  };
+  const branchPromises = ([0, 1] as const).map((branch) =>
+    scanBranch(branch).catch((error: unknown) => {
+      scanController.abort();
+      throw error;
+    }),
+  );
+  let branchResults: Awaited<ReturnType<typeof scanBranch>>[];
+  try {
+    branchResults = await Promise.all(branchPromises);
+  } catch (error) {
+    scanController.abort();
+    await Promise.allSettled(branchPromises);
+    throw error;
+  }
+  const addresses = branchResults.flatMap((result) => result.addresses);
+  const complete = branchResults.every((result) => result.complete);
+  const historyIds = new Set<string>();
+  const heights = new Map<string, number>();
+  for (const address of addresses) {
+    for (const h of address.history ?? []) {
+      historyIds.add(h.tx_hash);
+      heights.set(h.tx_hash, h.height);
+    }
   }
   const oldHeights = new Map(
     wallet.addresses.flatMap((a) => (a.history ?? []).map((h) => [h.tx_hash, h.height] as const)),
@@ -945,12 +1022,15 @@ export async function loadSpending(
   const wanted = new Set(outputs.map((o) => o.n));
   const budget = Math.max(0, 500 - (indexed?.inspected ?? 0));
   const nextOffset = offset + budget < ids.length ? offset + budget : undefined;
+  const indexedTransactions = indexed
+    ? new Map(indexed.transactions.map((transaction) => [transaction.txid, transaction]))
+    : undefined;
   const candidates = await mapLimit(
     ids.slice(offset, offset + budget),
     TRANSACTION_BATCH_CONCURRENCY,
     async (id) => {
       try {
-        const cached = indexed?.transactions.find((t) => t.txid === id) ?? w.transactions[id];
+        const cached = indexedTransactions?.get(id) ?? w.transactions[id];
         return cached
           ? withHistoryHeight(cached, heights.get(id)!)
           : await fetchTransaction(w.network, id, signal, heights.get(id), fetchHints);

@@ -7,6 +7,7 @@ const port = Number(process.env.CHAINGRAPH_E2E_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error('CHAINGRAPH_E2E_PORT must be an integer between 1024 and 65535.');
 const origin = `http://127.0.0.1:${port}`;
+const preview = process.env.CHAINGRAPH_E2E_PREVIEW === '1';
 const cache = path.join(os.homedir(), '.cache/ms-playwright');
 const cachedChromium = existsSync(cache)
   ? readdirSync(cache)
@@ -36,9 +37,15 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: `npm exec vite -- --host 127.0.0.1 --port ${port} --strictPort`,
+    // React Compiler runs on `build` only (see vite.config.ts), so the dev
+    // server never exercises compiled output. CHAINGRAPH_E2E_PREVIEW=1 builds
+    // and serves the production bundle instead, which is how the compiled code
+    // gets end-to-end coverage.
+    command: preview
+      ? `npm exec vite -- build && npm exec vite -- preview --host 127.0.0.1 --port ${port} --strictPort`
+      : `npm exec vite -- --host 127.0.0.1 --port ${port} --strictPort`,
     url: origin,
     reuseExistingServer: false,
-    timeout: 60000,
+    timeout: 120000,
   },
 });

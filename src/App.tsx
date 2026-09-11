@@ -1,7 +1,6 @@
 import { formatBitcoinAmount } from './domain/amountFormat';
 import { Amount } from './components/Amount';
 import { TransactionFetchShell } from './lib/useTransactionFetch';
-import { ConnectionScanPanel } from './components/ConnectionScanPanel';
 import { ScanTargetToolbar } from './components/ScanTargetToolbar';
 import { prepareCustomScanTargets } from './domain/connectionScanTargets';
 import { indexScanNeighbours } from './domain/connectionScanNeighbours';
@@ -12,7 +11,6 @@ import { WalletRecordsPanel } from './components/WalletRecordsPanel';
 import { resolveGraphHandoff } from './domain/graphHandoff';
 import { resolveWalletUtxoObservation } from './domain/walletUtxoObservation';
 import { useWalletUtxos } from './lib/useWalletUtxos';
-import { addressToScriptHash } from './lib/wallet';
 import {
   verifiedWalletAddresses,
   verifyWalletUtxo,
@@ -20,7 +18,6 @@ import {
 } from './domain/walletRecords';
 import { listWalletRelationships } from './domain/walletRelationships';
 import { useFlowInputs } from './lib/useFlowInputs';
-import { ExamplesDialog } from './components/ExamplesDialog';
 import type { NodePresentation } from './components/graph/presentation';
 import { GraphLegend } from './components/GraphLegend';
 import { indexGraphFlow } from './components/graph/flowContext';
@@ -37,6 +34,7 @@ import {
   showAllGraphOutputs,
 } from './domain/graphMembership';
 import { GraphControls } from './components/GraphControls';
+import { LookupForm } from './components/LookupForm';
 import { EntityBadges } from './components/EntityBadges';
 import { CopyButton } from './components/CopyButton';
 import TagsPanel, { SelectedTags } from './components/TagsPanel';
@@ -51,7 +49,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
+  type ComponentType,
+  type ReactNode,
 } from 'react';
 import {
   ChevronRight,
@@ -78,7 +77,72 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
+// Route-level code splitting. None of this is reachable from the workspace list
+// or unlock screen, which is the true first-paint path, so keeping it out of the
+// entry chunk is pure win. `prefetchWorkbenches` warms them during unlock so the
+// split is invisible once a workspace actually opens.
 const GraphView = lazy(() => import('./components/GraphView'));
+
+/**
+ * Wraps a lazy component in its own Suspense boundary so one pending chunk never
+ * blanks unrelated UI. Declared at module scope: defining it per render would
+ * remount the subtree on every parent render.
+ */
+function withSuspense<P extends object>(Component: ComponentType<P>, fallback: ReactNode = null) {
+  return function Suspended(props: P) {
+    return (
+      <Suspense fallback={fallback}>
+        <Component {...props} />
+      </Suspense>
+    );
+  };
+}
+
+const panelFallback = (
+  <div className="lazy-panel-fallback" role="status" aria-live="polite">
+    <LoaderCircle className="spin" size={16} />
+    <span>Loading…</span>
+  </div>
+);
+
+const ConnectionScanPanel = withSuspense(
+  lazy(() =>
+    import('./components/ConnectionScanPanel').then((m) => ({ default: m.ConnectionScanPanel })),
+  ),
+  panelFallback,
+);
+const TransactionView = withSuspense(
+  lazy(() => import('./components/TransactionView').then((m) => ({ default: m.TransactionView }))),
+);
+const AnalysisWorkbench = withSuspense(
+  lazy(() =>
+    import('./components/AnalysisWorkbench').then((m) => ({ default: m.AnalysisWorkbench })),
+  ),
+  panelFallback,
+);
+const WalletWorkbench = withSuspense(
+  lazy(() => import('./components/WalletWorkbench').then((m) => ({ default: m.WalletWorkbench }))),
+  panelFallback,
+);
+const ExamplesDialog = withSuspense(
+  lazy(() => import('./components/ExamplesDialog').then((m) => ({ default: m.ExamplesDialog }))),
+);
+const AboutDialog = withSuspense(
+  lazy(() => import('./components/AboutDialog').then((m) => ({ default: m.AboutDialog }))),
+);
+const GuidedTour = withSuspense(
+  lazy(() => import('./components/GuidedTour').then((m) => ({ default: m.GuidedTour }))),
+);
+type AnalysisWorkbenchSession = import('./components/AnalysisWorkbench').AnalysisWorkbenchSession;
+
+/** Warm the workbench chunks before a workspace opens, so the split never shows. */
+function prefetchWorkbenches() {
+  void import('./components/GraphView');
+  void import('./components/AnalysisWorkbench');
+  void import('./components/WalletWorkbench');
+  void import('./components/ConnectionScanPanel');
+  void import('./components/TransactionView');
+}
 
 import {
   CreateDialog,
@@ -89,10 +153,8 @@ import {
   WorkspaceDetailsDialog,
   Modal,
 } from './components/Dialogs';
-import { TransactionView } from './components/TransactionView';
 import { emptyAnnotation, NodeInspector, WalletInspector } from './components/Inspector';
 import { HelpMenu } from './components/HelpMenu';
-import { AboutDialog } from './components/AboutDialog';
 import {
   describeMatchScope,
   filterGraph,
@@ -115,13 +177,10 @@ import { GraphWalletFilter } from './components/GraphWalletFilter';
 import { setNodesHidden, showAllNodes, transactionNodeIds } from './domain/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from './domain/entityRemoval';
 import { applyWalletScan, walletActivitySummary } from './domain/walletActivity';
-import { AnalysisWorkbench, type AnalysisWorkbenchSession } from './components/AnalysisWorkbench';
-import { WalletWorkbench } from './components/WalletWorkbench';
 import { pruneWalletReviews } from './domain/walletReview';
 import './components/workbenches.css';
 import { WorkspaceHome } from './components/WorkspaceHome';
 import { WorkspacePanel } from './components/WorkspacePanel';
-import { GuidedTour } from './components/GuidedTour';
 import {
   buildGraph,
   clearContextProvenance,
@@ -186,6 +245,17 @@ export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
   const fetchScope = ws.active?.fetchScope;
+  // Warm the split workbench chunks once the first paint is done, so opening a
+  // workspace never waits on a network round trip for them.
+  useEffect(() => {
+    const idle = globalThis.requestIdleCallback;
+    if (idle) {
+      const handle = idle(prefetchWorkbenches, { timeout: 3000 });
+      return () => globalThis.cancelIdleCallback?.(handle);
+    }
+    const handle = setTimeout(prefetchWorkbenches, 1500);
+    return () => clearTimeout(handle);
+  }, []);
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
@@ -357,7 +427,10 @@ export default function App() {
   const [editTarget, setEditTarget] = useState<'label' | 'tags' | 'icon'>('label');
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  // Only the reset signal stays lifted; the lookup text itself lives in
+  // LookupForm so typing does not re-render the whole workbench.
+  const [queryReset, setQueryReset] = useState(0);
+  const clearQuery = () => setQueryReset((token) => token + 1);
   const [queryError, setQueryError] = useState('');
   const [notice, setNotice] = useState('');
   const [noticeSequence, setNoticeSequence] = useState(0);
@@ -485,7 +558,16 @@ export default function App() {
     return () => observer.disconnect();
   }, [w?.id, ws.sessions.length]);
   const wRef = useRef(w);
-  wRef.current = w;
+  // Latest-workspace ref for callbacks (guards of the form "is this still the
+  // same workspace?"). Published from a layout effect rather than during render:
+  // mutating a ref during render is unsafe under concurrent rendering because
+  // React may discard the render, and it also made React Compiler skip this
+  // component. useLayoutEffect (not useEffect) keeps the value fresh before
+  // paint, so event handlers observe the same value they did before. Declared
+  // ahead of every other effect that reads it.
+  useLayoutEffect(() => {
+    wRef.current = w;
+  });
   const graphFlush = useRef<{ workspaceId: string; flush: () => void } | undefined>(undefined);
   const flushActiveGraph = useCallback(() => {
     const id = wRef.current?.id;
@@ -884,7 +966,7 @@ export default function App() {
     setExamplesOpen(false);
     setEntityRemoval(undefined);
     setEditToken(0);
-    setQuery('');
+    clearQuery();
     setQueryError('');
     setMenu(false);
     setFocusRequest(undefined);
@@ -1368,24 +1450,6 @@ export default function App() {
     }
     switchWorkbench('analysis', true);
   }
-  async function search(e: FormEvent) {
-    e.preventDefault();
-    const text = query.trim();
-    if (!w || !text) return;
-    if (!/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
-      try {
-        addressToScriptHash(text, w.network);
-      } catch {
-        setQueryError(
-          `Enter a 64-character transaction ID, txid:vout, or a valid ${w.network} Bitcoin address.`,
-        );
-        searchInput.current?.focus({ preventScroll: true });
-        return;
-      }
-    }
-    setQueryError('');
-    await addQuery(text);
-  }
   function revealLookup(id: string) {
     if (!w) return;
     const address = id.startsWith('addr:') ? id.slice(5) : undefined;
@@ -1420,7 +1484,7 @@ export default function App() {
       // Cached navigation needs no backend. Explicit ancestry and address-history
       // loading can still continue after the selected entity is already in view.
       if (!canQuery || (!existing.startsWith('addr:') && !prefetchDepth)) {
-        setQuery('');
+        clearQuery();
         return;
       }
     }
@@ -1500,7 +1564,7 @@ export default function App() {
             : '',
         );
       }
-      setQuery('');
+      clearQuery();
     });
   }
   async function refreshWallets(targets: Wallet[], initial: Workspace, signal: AbortSignal) {
@@ -1528,7 +1592,7 @@ export default function App() {
       added += result.wallet.lastActivity?.newTransactionIds.length ?? 0;
       refreshed += result.wallet.lastActivity?.refreshedTransactionCount ?? 0;
       missing += result.wallet.lastActivity?.missingTransactionCount ?? 0;
-      partial ||= !result.wallet.scanComplete;
+      partial = partial || !result.wallet.scanComplete;
     }
     return { snapshot, added, refreshed, partial, missing };
   }
@@ -1800,7 +1864,7 @@ export default function App() {
               ),
             },
           };
-          partial ||= result.truncated;
+          partial = partial || result.truncated;
         }
         setNotice(
           `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
@@ -2063,37 +2127,45 @@ export default function App() {
     () => [...allGraphOutputIds].filter((id) => !canvasIds.has(id)).length,
     [allGraphOutputIds, canvasIds],
   );
-  const contextSides =
-    contextSideIds &&
-    (Object.fromEntries(
-      (['inputs', 'outputs'] as const).map((side) => [
-        side,
-        {
-          total: contextSideIds[side].length,
-          shown: contextSideIds[side].filter((id) => canvasIds.has(id)).length,
-          hidden: contextSideIds[side].filter((id) => admittedIds.has(id) && hiddenIds.has(id))
-            .length,
-          added: contextSideIds[side].filter((id) => admittedIds.has(id)).length,
-          unconnectedShown: contextSideIds[side].filter(
-            (id) => canvasIds.has(id) && unconnectedForHide.has(id),
-          ).length,
-          unconnectedAdded: contextSideIds[side].filter((id) => unconnectedForRemoval.has(id))
-            .length,
-        },
-      ]),
-    ) as
-      | {
-          inputs: GraphContextSideCounts;
-          outputs: GraphContextSideCounts;
+  // One pass per side instead of five `.filter().length` scans each. These
+  // recompute on every render of a very large component, over the full
+  // input/output id lists of the focused transaction.
+  const contextSides = useMemo(() => {
+    if (!contextSideIds) return undefined;
+    const countSide = (ids: readonly string[]): GraphContextSideCounts => {
+      let shown = 0;
+      let hidden = 0;
+      let added = 0;
+      let unconnectedShown = 0;
+      let unconnectedAdded = 0;
+      for (const id of ids) {
+        const onCanvas = canvasIds.has(id);
+        const admitted = admittedIds.has(id);
+        if (onCanvas) shown++;
+        if (admitted) {
+          added++;
+          if (hiddenIds.has(id)) hidden++;
         }
-      | undefined);
+        if (onCanvas && unconnectedForHide.has(id)) unconnectedShown++;
+        if (unconnectedForRemoval.has(id)) unconnectedAdded++;
+      }
+      return { total: ids.length, shown, hidden, added, unconnectedShown, unconnectedAdded };
+    };
+    return {
+      inputs: countSide(contextSideIds.inputs),
+      outputs: countSide(contextSideIds.outputs),
+    };
+  }, [contextSideIds, canvasIds, admittedIds, hiddenIds, unconnectedForHide, unconnectedForRemoval]);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
-  const selectedSpenders =
-    selected?.kind === 'output'
-      ? graph.links
-          .filter((link) => link.kind === 'spends' && link.source === selected.id)
-          .map((link) => link.target)
-      : [];
+  // Single pass over every graph link, memoized: this ran filter+map across the
+  // whole link set on each render, including on every keystroke in the lookup field.
+  const selectedSpenders = useMemo(() => {
+    if (selected?.kind !== 'output') return [];
+    const spenders: string[] = [];
+    for (const link of graph.links)
+      if (link.kind === 'spends' && link.source === selected.id) spenders.push(link.target);
+    return spenders;
+  }, [selected?.kind, selected?.id, graph.links]);
   const openSpendingFromToolbar = () => {
     if (!selectedId) return;
     if (selectedSpenders.length === 1) select(selectedSpenders[0], { preserveCamera: true });
@@ -2489,32 +2561,17 @@ export default function App() {
               )}
             </nav>
             <div className="lookup-controls" data-tour="chain-lookup">
-              <form className="search-form" onSubmit={search}>
-                <Search size={17} />
-                <input
-                  ref={searchInput}
-                  aria-label="Transaction, output, or address"
-                  placeholder="Transaction ID, txid:vout, or Bitcoin address"
-                  value={query}
-                  aria-invalid={!!queryError}
-                  aria-describedby={queryError ? 'lookup-error' : undefined}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setQueryError('');
-                  }}
-                  spellCheck={false}
-                />
-                <button
-                  type="submit"
-                  className="search-go"
-                  aria-label="Add to graph"
-                  disabled={
-                    (!canQuery && !loadedLookupId(query.trim())) || !!operation || !query.trim()
-                  }
-                >
-                  <span>Add to graph</span> <Plus size={14} />
-                </button>
-              </form>
+              <LookupForm
+                inputRef={searchInput}
+                network={w.network}
+                canQuery={canQuery}
+                busy={!!operation}
+                resetToken={queryReset}
+                queryError={queryError}
+                onQueryError={setQueryError}
+                resolveLoaded={loadedLookupId}
+                onSubmit={addQuery}
+              />
               {!w.demo && (
                 <label
                   className="lookup-prefetch"

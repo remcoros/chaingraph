@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "react-perf", "typescript", "unicorn", "oxc"],
+  "env": { "browser": true, "es2024": true },
+  "categories": {},
+  "rules": {
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/jsx-key": "error",
+    "react/no-array-index-key": "off",
+    "react/no-danger": "error",
+    "react-perf/jsx-no-new-object-as-prop": "off",
+    "react-perf/jsx-no-new-array-as-prop": "off",
+    "react-perf/jsx-no-new-function-as-prop": "off",
+    "oxc/no-async-await": "off",
+    "unicorn/no-array-for-each": "off"
+  },
+  "ignorePatterns": ["dist/**", "node_modules/**", "artifacts/**", "test-results/**", "public/**"]
+}

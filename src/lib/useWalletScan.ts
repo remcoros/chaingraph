@@ -39,15 +39,79 @@ export function walletScanSummary(scan: AnalysisScan): string {
   return `${scan.findings.length} findings${failed ? ` · ${failed} tool${failed === 1 ? '' : 's'} failed` : ''}`;
 }
 
-export function useWalletScan(options: {
+interface WalletScanOptions {
   workspace: Workspace;
   wallet: Wallet;
   active: boolean;
   onChange: (update: (current: Workspace) => Workspace) => void;
   onComplete?: (scan: AnalysisScan) => void;
-}) {
+}
+
+async function runWalletScanRequest(
+  row: WalletRow | undefined,
+  latest: { current: WalletScanOptions },
+  pending: { current: AbortController | undefined },
+  setScan: (scan: AnalysisScan) => void,
+  setLoading: (loading: boolean) => void,
+  setMessage: (message: string) => void,
+  setError: (error: string) => void,
+) {
+  if (!latest.current.active) return;
+  pending.current?.abort();
+  pending.current = undefined;
+  setLoading(false);
+  const snapshot = latest.current;
+  const scope = walletScanScope(snapshot.workspace, snapshot.wallet, row);
+  setError('');
+  if (!scope.txids.length) {
+    setError('No loaded transactions in this scope. Load its context first.');
+    return;
+  }
+  const controller = new AbortController();
+  pending.current = controller;
+  setLoading(true);
+  setMessage('Scanning loaded data');
+  try {
+    const result = await scanAnalysis(snapshot.workspace, scope, scanDefaults(), controller.signal);
+    if (
+      controller.signal.aborted ||
+      !latest.current.active ||
+      latest.current.workspace.id !== snapshot.workspace.id ||
+      latest.current.wallet.id !== snapshot.wallet.id ||
+      latest.current.workspace.network !== snapshot.workspace.network ||
+      latest.current.workspace.transactions !== snapshot.workspace.transactions ||
+      walletEvidenceChanged(snapshot.workspace.wallets, latest.current.workspace.wallets)
+    )
+      return;
+    latest.current.onChange((current) => ({
+      ...current,
+      findings: mergeScanFindings(current.findings, result),
+    }));
+    setScan(result);
+    setMessage(walletScanSummary(result));
+    latest.current.onComplete?.(result);
+  } catch (cause) {
+    if (!controller.signal.aborted) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Scan could not finish. Existing findings were kept.',
+      );
+      setMessage('Scan failed');
+    }
+  } finally {
+    if (pending.current === controller) {
+      pending.current = undefined;
+      setLoading(false);
+    }
+  }
+}
+
+export function useWalletScan(options: WalletScanOptions) {
   const latest = useRef(options);
-  latest.current = options;
+  useEffect(() => {
+    latest.current = options;
+  });
   const pending = useRef<AbortController | undefined>(undefined);
   const [scan, setScan] = useState<AnalysisScan>();
   const [loading, setLoading] = useState(false);
@@ -74,60 +138,7 @@ export function useWalletScan(options: {
   useEffect(() => () => pending.current?.abort(), []);
 
   async function run(row?: WalletRow) {
-    if (!latest.current.active) return;
-    pending.current?.abort();
-    pending.current = undefined;
-    setLoading(false);
-    const snapshot = latest.current;
-    const scope = walletScanScope(snapshot.workspace, snapshot.wallet, row);
-    setError('');
-    if (!scope.txids.length) {
-      setError('No loaded transactions in this scope. Load its context first.');
-      return;
-    }
-    const controller = new AbortController();
-    pending.current = controller;
-    setLoading(true);
-    setMessage('Scanning loaded data');
-    try {
-      const result = await scanAnalysis(
-        snapshot.workspace,
-        scope,
-        scanDefaults(),
-        controller.signal,
-      );
-      if (
-        controller.signal.aborted ||
-        !latest.current.active ||
-        latest.current.workspace.id !== snapshot.workspace.id ||
-        latest.current.wallet.id !== snapshot.wallet.id ||
-        latest.current.workspace.network !== snapshot.workspace.network ||
-        latest.current.workspace.transactions !== snapshot.workspace.transactions ||
-        walletEvidenceChanged(snapshot.workspace.wallets, latest.current.workspace.wallets)
-      )
-        return;
-      latest.current.onChange((current) => ({
-        ...current,
-        findings: mergeScanFindings(current.findings, result),
-      }));
-      setScan(result);
-      setMessage(walletScanSummary(result));
-      latest.current.onComplete?.(result);
-    } catch (cause) {
-      if (!controller.signal.aborted) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : 'Scan could not finish. Existing findings were kept.',
-        );
-        setMessage('Scan failed');
-      }
-    } finally {
-      if (pending.current === controller) {
-        pending.current = undefined;
-        setLoading(false);
-      }
-    }
+    await runWalletScanRequest(row, latest, pending, setScan, setLoading, setMessage, setError);
   }
   return { run, scan, loading, message, error };
 }

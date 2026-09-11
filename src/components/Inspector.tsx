@@ -859,12 +859,12 @@ export function NodeInspector({
                       : transactionStatus(tx).label}
                   </dd>
                 </div>
-                {tx.vsize && (
+                {typeof tx.vsize === 'number' ? (
                   <div>
                     <dt>Virtual size</dt>
                     <dd>{tx.vsize.toLocaleString()} vB</dd>
                   </div>
-                )}
+                ) : null}
                 {equalOutputCount(tx) >= 3 && (
                   <div>
                     <dt>Equal outputs</dt>

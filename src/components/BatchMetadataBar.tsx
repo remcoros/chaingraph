@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Tag, TextCursorInput } from 'lucide-react';
 import { IconPicker } from './IconPicker';
 import {
@@ -41,16 +41,20 @@ export function BatchMetadataBar({
   onNotice,
   onClear,
 }: BatchMetadataBarProps) {
-  const [open, setOpen] = useState<'label' | 'tags' | 'notes' | undefined>();
+  const [openState, setOpen] = useState<'label' | 'tags' | 'notes' | undefined>();
   const [replaceIcons, setReplaceIcons] = useState(false);
   const labelTrigger = useRef<HTMLButtonElement>(null);
   const noteTrigger = useRef<HTMLButtonElement>(null);
   const tagTrigger = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!active) setOpen(undefined);
-  }, [active]);
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
-  useEffect(() => setOpen(undefined), [scopeKey]);
+  const [previousScopeKey, setPreviousScopeKey] = useState(scopeKey);
+  const open = active && previousScopeKey === scopeKey ? openState : undefined;
+  if (previousScopeKey !== scopeKey) {
+    setPreviousScopeKey(scopeKey);
+    if (openState !== undefined) setOpen(undefined);
+  } else if (!active && openState !== undefined) {
+    setOpen(undefined);
+  }
   if (!active || !ids.length) return null;
   const firstIcon = workspace.annotations[ids[0]]?.icon ?? '';
   const mixedIcons = ids.some((id) => (workspace.annotations[id]?.icon ?? '') !== firstIcon);

@@ -1,5 +1,5 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
 import {
@@ -103,41 +103,24 @@ export function useFlowInputs(options: {
   update: (id: string, change: (current: Workspace) => Workspace, undo?: boolean) => void;
 }) {
   const latest = useRef(options);
-  latest.current = options;
+  useEffect(() => {
+    latest.current = options;
+  });
   const workspace = options.workspace;
   // Selection and view changes reuse chain-evidence indexes. Rebuilding these
   // during every render can dominate click latency in a large loaded wallet.
-  const spends = useMemo(
-    () => (workspace ? indexLoadedSpends(workspace.transactions) : undefined),
-    [workspace?.transactions],
-  );
-  const related = useMemo(
-    () =>
-      workspace && options.selected
-        ? relatedTransactions(workspace.transactions, options.selected, spends)
-        : [],
-    [workspace?.transactions, options.selected?.id, spends],
-  );
-  const prevouts = useMemo(
-    () => (workspace ? indexPreviousOutputs(workspace) : new Map()),
-    [workspace?.transactions, workspace?.network],
-  );
-  const plans = useMemo(
-    () =>
-      workspace
-        ? {
-            selected: flowInputPlan(workspace, options.selected, false, { related, prevouts }),
-            all: flowInputPlan(workspace, options.selected, true, { related, prevouts }),
-          }
-        : undefined,
-    [
-      workspace?.transactions,
-      workspace?.view.transactionFlow?.transactionId,
-      options.selected?.id,
-      related,
-      prevouts,
-    ],
-  );
+  const spends = workspace ? indexLoadedSpends(workspace.transactions) : undefined;
+  const related =
+    workspace && options.selected
+      ? relatedTransactions(workspace.transactions, options.selected, spends)
+      : [];
+  const prevouts = workspace ? indexPreviousOutputs(workspace) : new Map();
+  const plans = workspace
+    ? {
+        selected: flowInputPlan(workspace, options.selected, false, { related, prevouts }),
+        all: flowInputPlan(workspace, options.selected, true, { related, prevouts }),
+      }
+    : undefined;
   const plan = plans?.selected;
   const target =
     options.workspace && options.selected
@@ -191,7 +174,7 @@ export function useFlowInputs(options: {
           loaded.push(tx);
         } catch (error) {
           if (controller.signal.aborted) throw error;
-          failed++;
+          failed = failed + 1;
           // Categorize known backend failures without echoing arbitrary exception text.
           const message = error instanceof Error ? error.message.toLowerCase() : '';
           if (message.includes('timed out')) reasons.add('The backend request timed out.');

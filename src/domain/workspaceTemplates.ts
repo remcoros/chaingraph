@@ -1,4 +1,13 @@
 import { formatBitcoinAmount } from './amountFormat';
+import mainnetBatchOutputsUrl from './templateData/mainnet-batch-outputs.json?url';
+import mainnetEqualOutputsUrl from './templateData/mainnet-equal-outputs.json?url';
+import mainnetLargeValuePathUrl from './templateData/mainnet-large-value-path.json?url';
+import mainnetOpReturnUrl from './templateData/mainnet-op-return.json?url';
+import mainnetPublicWalletUrl from './templateData/mainnet-public-wallet.json?url';
+import mainnetWabisabiUrl from './templateData/mainnet-wabisabi.json?url';
+import testnet4FanOutUrl from './templateData/testnet4-fan-out.json?url';
+import testnet4MixedPathUrl from './templateData/testnet4-mixed-path.json?url';
+import testnet4SpentOutputUrl from './templateData/testnet4-spent-output.json?url';
 import { TAG_COLOR, type TagColor } from './tagColors';
 import type { Annotation, Network, Transaction, Wallet, Workspace, WorkspaceTag } from './types';
 import { outputNodeId, sats, txNodeId } from './types';
@@ -32,7 +41,7 @@ const chainSource = (network: Network, txid: string, title = 'Transaction on mem
   url: `https://mempool.space/${network === 'testnet4' ? 'testnet4/' : ''}tx/${txid}`,
 });
 
-/** Lightweight catalog. Chain snapshots are imported only when creating a copy. */
+/** Lightweight catalog. Chain snapshots are loaded only when creating a copy. */
 export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
   {
     id: 'mainnet-equal-outputs',
@@ -163,29 +172,82 @@ interface Snapshot {
   wallet?: Omit<Wallet, 'id'>;
 }
 
+interface SnapshotSource {
+  readonly assetUrl: string;
+  readonly filePath: string;
+}
+
+const SNAPSHOT_SOURCES: Record<string, SnapshotSource> = {
+  'mainnet-equal-outputs': {
+    assetUrl: mainnetEqualOutputsUrl,
+    filePath: './templateData/mainnet-equal-outputs.json',
+  },
+  'mainnet-op-return': {
+    assetUrl: mainnetOpReturnUrl,
+    filePath: './templateData/mainnet-op-return.json',
+  },
+  'testnet4-spent-output': {
+    assetUrl: testnet4SpentOutputUrl,
+    filePath: './templateData/testnet4-spent-output.json',
+  },
+  'testnet4-fan-out': {
+    assetUrl: testnet4FanOutUrl,
+    filePath: './templateData/testnet4-fan-out.json',
+  },
+  'mainnet-large-value-path': {
+    assetUrl: mainnetLargeValuePathUrl,
+    filePath: './templateData/mainnet-large-value-path.json',
+  },
+  'mainnet-batch-outputs': {
+    assetUrl: mainnetBatchOutputsUrl,
+    filePath: './templateData/mainnet-batch-outputs.json',
+  },
+  'mainnet-wabisabi': {
+    assetUrl: mainnetWabisabiUrl,
+    filePath: './templateData/mainnet-wabisabi.json',
+  },
+  'mainnet-public-wallet': {
+    assetUrl: mainnetPublicWalletUrl,
+    filePath: './templateData/mainnet-public-wallet.json',
+  },
+  'testnet4-mixed-path': {
+    assetUrl: testnet4MixedPathUrl,
+    filePath: './templateData/testnet4-mixed-path.json',
+  },
+};
+
+const snapshotCache = new Map<string, Promise<Snapshot>>();
+
+function parseSnapshot(text: string): Snapshot {
+  return JSON.parse(text) as Snapshot;
+}
+
+async function fetchSnapshot(assetUrl: string): Promise<Snapshot> {
+  const response = await fetch(assetUrl);
+  if (!response.ok)
+    throw new Error(`Unable to load workspace template snapshot (${response.status}).`);
+  return parseSnapshot(await response.text());
+}
+
+async function readSnapshotFile(filePath: string): Promise<Snapshot> {
+  const { readFile } = await import('node:fs/promises');
+  return parseSnapshot(await readFile(new URL(filePath, import.meta.url), 'utf8'));
+}
+
 async function loadSnapshot(id: string): Promise<Snapshot> {
-  switch (id) {
-    case 'mainnet-equal-outputs':
-      return (await import('./templateData/mainnet-equal-outputs.json')).default;
-    case 'mainnet-op-return':
-      return (await import('./templateData/mainnet-op-return.json')).default;
-    case 'testnet4-spent-output':
-      return (await import('./templateData/testnet4-spent-output.json')).default;
-    case 'testnet4-fan-out':
-      return (await import('./templateData/testnet4-fan-out.json')).default;
-    case 'mainnet-large-value-path':
-      return (await import('./templateData/mainnet-large-value-path.json')).default;
-    case 'mainnet-batch-outputs':
-      return (await import('./templateData/mainnet-batch-outputs.json')).default;
-    case 'mainnet-wabisabi':
-      return (await import('./templateData/mainnet-wabisabi.json')).default;
-    case 'mainnet-public-wallet':
-      return (await import('./templateData/mainnet-public-wallet.json')).default as Snapshot;
-    case 'testnet4-mixed-path':
-      return (await import('./templateData/testnet4-mixed-path.json')).default;
-    default:
-      throw new Error('Unknown workspace template.');
-  }
+  const source = SNAPSHOT_SOURCES[id];
+  if (!source) throw new Error('Unknown workspace template.');
+  const cacheKey = import.meta.env.SSR ? source.filePath : source.assetUrl;
+  const cached = snapshotCache.get(cacheKey);
+  if (cached) return cached;
+  const snapshot = (
+    import.meta.env.SSR ? readSnapshotFile(source.filePath) : fetchSnapshot(source.assetUrl)
+  ).catch((error: unknown) => {
+    snapshotCache.delete(cacheKey);
+    throw error;
+  });
+  snapshotCache.set(cacheKey, snapshot);
+  return snapshot;
 }
 
 /** A starting canvas, independent of loaded evidence and later manual expansion. */

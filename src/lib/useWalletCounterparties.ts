@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   createWalletCounterpartyLoader,
   type WalletCounterpartyOptions,
@@ -7,11 +7,7 @@ import {
 export type { WalletCounterpartyOptions, WalletCounterpartyState } from './walletCounterparties';
 
 export function useWalletCounterparties(options: WalletCounterpartyOptions) {
-  const latest = useRef(options);
-  latest.current = options;
-  const loader = useRef<ReturnType<typeof createWalletCounterpartyLoader> | undefined>(undefined);
-  if (!loader.current) loader.current = createWalletCounterpartyLoader(() => latest.current);
-  const current = loader.current;
+  const [current] = useState(() => createWalletCounterpartyLoader());
   const state = useSyncExternalStore(current.subscribe, current.getSnapshot, current.getSnapshot);
   useEffect(() => {
     current.configure(options);

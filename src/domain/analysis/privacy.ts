@@ -217,10 +217,16 @@ export const ciohTool = defineTool({
       groups.set(leader, group);
     }
     const findings = [...groups.values()]
-      .sort((a, b) => [...a.nodes].sort()[0].localeCompare([...b.nodes].sort()[0]))
       .map((group) => {
-        const nodeIds = [...group.nodes].sort(),
-          txids = [...group.txids].sort();
+        const nodeIds = [...group.nodes].sort();
+        return {
+          nodeIds,
+          txids: [...group.txids].sort(),
+          firstNodeId: nodeIds[0]!,
+        };
+      })
+      .sort((a, b) => a.firstNodeId.localeCompare(b.firstNodeId))
+      .map(({ nodeIds, txids }) => {
         const unavailable = nodeIds.filter((id) => unavailableNodes.has(id)).length;
         return finding(
           context,

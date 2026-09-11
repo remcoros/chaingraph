@@ -328,6 +328,7 @@ export function MetadataPopover({
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = ref.current!;
+    let frame = 0;
     const position = () => {
       const viewport = window.visualViewport;
       const left = viewport?.offsetLeft ?? 0;
@@ -345,13 +346,17 @@ export function MetadataPopover({
           : trigger.bottom + 6;
       element.style.top = `${Math.max(top + 12, Math.min(preferredTop, top + height - box.height - 12))}px`;
     };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(position);
+    };
     position();
-    const observer = new ResizeObserver(position);
+    const observer = new ResizeObserver(schedule);
     observer.observe(element);
-    window.addEventListener('resize', position);
-    document.addEventListener('scroll', position, true);
-    window.visualViewport?.addEventListener('scroll', position);
-    window.visualViewport?.addEventListener('resize', position);
+    window.addEventListener('resize', schedule);
+    document.addEventListener('scroll', schedule, { capture: true, passive: true });
+    window.visualViewport?.addEventListener('scroll', schedule, { passive: true });
+    window.visualViewport?.addEventListener('resize', schedule);
     const outside = (event: PointerEvent) => {
       if (
         event.target instanceof Node &&
@@ -362,11 +367,12 @@ export function MetadataPopover({
     };
     document.addEventListener('pointerdown', outside);
     return () => {
+      cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener('resize', position);
-      document.removeEventListener('scroll', position, true);
-      window.visualViewport?.removeEventListener('scroll', position);
-      window.visualViewport?.removeEventListener('resize', position);
+      window.removeEventListener('resize', schedule);
+      document.removeEventListener('scroll', schedule, { capture: true });
+      window.visualViewport?.removeEventListener('scroll', schedule);
+      window.visualViewport?.removeEventListener('resize', schedule);
       document.removeEventListener('pointerdown', outside);
     };
   }, [anchor, onClose]);

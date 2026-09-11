@@ -269,6 +269,17 @@ small,
 .spin {
   animation: spin 1s linear infinite;
 }
+/* Placeholder shown while a code-split panel chunk resolves. Prefetching on idle
+   means this is normally never painted. */
+.lazy-panel-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 12px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);

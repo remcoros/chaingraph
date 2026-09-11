@@ -83,6 +83,7 @@ export function IconPicker({
 }: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const [triggerElement, setTriggerElement] = useState<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!openToken || disabled) return;
     trigger.current?.focus();
@@ -106,7 +107,10 @@ export function IconPicker({
     <div className={`icon-picker${compact ? ' icon-picker-compact' : ''}`}>
       {!compact && <span className="icon-picker-label">{caption ?? field}</span>}
       <button
-        ref={trigger}
+        ref={(element) => {
+          trigger.current = element;
+          setTriggerElement(element);
+        }}
         type="button"
         className="icon-picker-trigger"
         aria-label={accessibleLabel}
@@ -122,8 +126,8 @@ export function IconPicker({
         </span>
         {compact && <span>{caption ?? 'Icon'}</span>}
       </button>
-      {open && (
-        <MetadataPopover anchor={trigger.current!} onClose={() => setOpen(false)}>
+      {open && triggerElement && (
+        <MetadataPopover anchor={triggerElement} onClose={() => setOpen(false)}>
           <IconPalette
             id={id}
             value={mixed ? '' : value}

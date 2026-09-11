@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Filter, RotateCcw, X } from 'lucide-react';
 import {
   activeFilterChips,
@@ -358,7 +358,7 @@ export function GraphFilterButton({
   extraFiltersActive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   const count =
     activeFilterKeys(props.filters).filter((key) => key !== 'preserveContext').length +
@@ -366,7 +366,7 @@ export function GraphFilterButton({
   return (
     <>
       <button
-        ref={trigger}
+        ref={setTrigger}
         type="button"
         className={`graph-filter-trigger ${count ? 'active' : ''} ${className ?? ''}`}
         aria-label={count ? `${triggerLabel}, ${count} active` : triggerLabel}
@@ -380,10 +380,10 @@ export function GraphFilterButton({
         <span className="graph-nav-caption">{triggerLabel}</span>
         {count > 0 && <span className="graph-filter-count">{count}</span>}
       </button>
-      {open && trigger.current && (
+      {open && trigger && (
         <AnchoredPopover
           id={id}
-          anchor={trigger.current}
+          anchor={trigger}
           title={triggerLabel === 'Filters' ? 'Graph filters' : triggerLabel}
           width={318}
           className="graph-filter-popover"

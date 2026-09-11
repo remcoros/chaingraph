@@ -138,12 +138,12 @@ export function GuidedTour({
       schedule();
     };
     window.addEventListener('resize', resize);
-    window.addEventListener('scroll', schedule, true);
+    window.addEventListener('scroll', schedule, { capture: true, passive: true });
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
       window.removeEventListener('resize', resize);
-      window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('scroll', schedule, { capture: true });
       for (const { element, top, left } of scrollPositions) {
         if (element.isConnected) element.scrollTo({ top, left, behavior: 'instant' });
       }

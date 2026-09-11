@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { ChevronDown, Wallet } from 'lucide-react';
 import { selectedWalletFilterIds, type GraphFilters } from '../domain/graphFilters';
 import { AnchoredPopover } from './AnchoredPopover';
@@ -89,13 +89,12 @@ export function GraphWalletFilter({
   active = true,
   ...props
 }: WalletFilterProps & { active?: boolean }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
   const count = selectedWalletFilterIds(props.filters).length;
-  useEffect(() => {
-    if (!active) setOpen(false);
-  }, [active]);
+  if (!active && openState) setOpen(false);
+  const open = active && openState;
   return (
     <>
       <button

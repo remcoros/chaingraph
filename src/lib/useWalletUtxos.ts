@@ -19,6 +19,82 @@ export interface WalletUtxoController {
   check: (cursor?: number) => Promise<void>;
 }
 
+async function runWalletUtxoRequest({
+  workspace,
+  wallet,
+  scope,
+  cursor,
+  controller,
+  previous,
+  request,
+  isCurrent,
+  setState,
+}: {
+  workspace: Workspace;
+  wallet: Wallet;
+  scope: object;
+  cursor: number;
+  controller: AbortController;
+  previous?: WalletUtxoView;
+  request: { current: AbortController | undefined };
+  isCurrent: () => boolean;
+  setState: (state: {
+    scope: object;
+    utxos?: WalletUtxoView;
+    loading: boolean;
+    error: string;
+  }) => void;
+}) {
+  try {
+    const batch = await fetchWalletUtxos(workspace.network, wallet, {
+      cursor,
+      signal: controller.signal,
+    });
+    if (!isCurrent()) return;
+    const records = new Map(
+      (previous?.records ?? []).map((record) => [`${record.txid}:${record.vout}`, record]),
+    );
+    for (const record of batch.records) {
+      const key = `${record.txid}:${record.vout}`;
+      const existing = records.get(key);
+      if (
+        existing &&
+        (existing.scripthash !== record.scripthash ||
+          existing.valueSats !== record.valueSats ||
+          existing.height !== record.height)
+      )
+        throw new Error('Conflicting UTXO observations. Refresh to restart the check.');
+      records.set(key, record);
+    }
+    if (records.size > 50_000)
+      throw new Error('The UTXO result limit was reached. Previous results remain available.');
+    setState({
+      scope,
+      loading: false,
+      error: '',
+      utxos: {
+        records: [...records.values()],
+        // Continuations must not make earlier observations appear more recent.
+        checkedAt: previous?.checkedAt ?? batch.checkedAt,
+        checkedAddresses: batch.checkedAddresses,
+        totalAddresses: batch.totalAddresses,
+        nextCursor: batch.nextCursor,
+        failed: (previous?.failed ?? 0) + batch.errors.length,
+      },
+    });
+  } catch (cause) {
+    if (isCurrent())
+      setState({
+        scope,
+        utxos: previous,
+        loading: false,
+        error: cause instanceof Error ? cause.message : 'Could not check wallet UTXOs.',
+      });
+  } finally {
+    if (request.current === controller) request.current = undefined;
+  }
+}
+
 /** Transient observations shared by workbenches, scoped to one unlocked wallet.
  * Completed checks survive navigation, but never a wallet, workspace or scan change.
  */
@@ -36,7 +112,6 @@ export function useWalletUtxos({
     [workspace?.id, workspace?.network, wallet?.id, wallet?.addresses, wallet?.scannedAt],
   );
   const activeScope = useRef(scope);
-  activeScope.current = scope;
   const [state, setState] = useState<{
     scope: object;
     utxos?: WalletUtxoView;
@@ -49,7 +124,10 @@ export function useWalletUtxos({
   const request = useRef<AbortController | undefined>(undefined);
   const attempted = useRef(false);
   const view = useRef<WalletUtxoView | undefined>(undefined);
-  view.current = current.utxos;
+  useEffect(() => {
+    activeScope.current = scope;
+    view.current = current.utxos;
+  });
 
   async function check(cursor = 0) {
     if (!workspace || !wallet || !enabled) return;
@@ -61,54 +139,17 @@ export function useWalletUtxos({
     setState({ scope, utxos: previous, loading: true, error: '' });
     const isCurrent = () =>
       !controller.signal.aborted && activeScope.current === scope && request.current === controller;
-    try {
-      const batch = await fetchWalletUtxos(workspace.network, wallet, {
-        cursor,
-        signal: controller.signal,
-      });
-      if (!isCurrent()) return;
-      const records = new Map(
-        (previous?.records ?? []).map((record) => [`${record.txid}:${record.vout}`, record]),
-      );
-      for (const record of batch.records) {
-        const key = `${record.txid}:${record.vout}`;
-        const existing = records.get(key);
-        if (
-          existing &&
-          (existing.scripthash !== record.scripthash ||
-            existing.valueSats !== record.valueSats ||
-            existing.height !== record.height)
-        )
-          throw new Error('Conflicting UTXO observations. Refresh to restart the check.');
-        records.set(key, record);
-      }
-      if (records.size > 50_000)
-        throw new Error('The UTXO result limit was reached. Previous results remain available.');
-      setState({
-        scope,
-        loading: false,
-        error: '',
-        utxos: {
-          records: [...records.values()],
-          // Continuations must not make earlier observations appear more recent.
-          checkedAt: previous?.checkedAt ?? batch.checkedAt,
-          checkedAddresses: batch.checkedAddresses,
-          totalAddresses: batch.totalAddresses,
-          nextCursor: batch.nextCursor,
-          failed: (previous?.failed ?? 0) + batch.errors.length,
-        },
-      });
-    } catch (cause) {
-      if (isCurrent())
-        setState({
-          scope,
-          utxos: previous,
-          loading: false,
-          error: cause instanceof Error ? cause.message : 'Could not check wallet UTXOs.',
-        });
-    } finally {
-      if (request.current === controller) request.current = undefined;
-    }
+    await runWalletUtxoRequest({
+      workspace,
+      wallet,
+      scope,
+      cursor,
+      controller,
+      previous,
+      request,
+      isCurrent,
+      setState,
+    });
   }
 
   useEffect(() => {

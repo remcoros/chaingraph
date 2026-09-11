@@ -1,6 +1,6 @@
 import { TransactionFetchScope, transactionScheduler } from './transactionScheduler';
 import { WalletPreparationCache } from './walletPreparation';
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Transaction, Workspace } from '../domain/types';
 import { describeWorkspaceChange } from '../domain/undoDescription';
 import {
@@ -686,9 +686,7 @@ export class WorkspaceSessionStore {
 }
 
 export function useWorkspaces() {
-  const storeRef = useRef<WorkspaceSessionStore | null>(null);
-  if (!storeRef.current) storeRef.current = new WorkspaceSessionStore();
-  const store = storeRef.current;
+  const [store] = useState(() => new WorkspaceSessionStore());
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   useEffect(() => {
     const ids = state.sessions.filter((s) => s.revision !== s.savedRevision).map((s) => s.data.id);

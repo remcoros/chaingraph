@@ -267,9 +267,7 @@ export function CreateDialog({
   const suggestedName = useRef(true);
   const [description, setDescription] = useState(template?.description ?? '');
   const [net, setNet] = useState<Network | undefined>(template?.network ?? networks?.[0]);
-  useEffect(() => {
-    if (!template && (!net || !networks?.includes(net))) setNet(networks?.[0]);
-  }, [networks, net, template]);
+  const selectedNet = template?.network ?? (net && networks?.includes(net) ? net : networks?.[0]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const nameInput = useRef<HTMLInputElement>(null);
@@ -319,7 +317,7 @@ export function CreateDialog({
       setError('Encryption needs a secure browser context. Use localhost or HTTPS.');
       return;
     }
-    if (!net || !networks?.includes(net)) {
+    if (!selectedNet || !networks?.includes(selectedNet)) {
       setError('Cannot discover supported networks. Check the backend connection.');
       return;
     }
@@ -335,7 +333,7 @@ export function CreateDialog({
             description.trim(),
             controller.signal,
           )
-        : { ...newWorkspace(name.trim(), net), description: description.trim() };
+        : { ...newWorkspace(name.trim(), selectedNet), description: description.trim() };
       controller.signal.throwIfAborted();
       if (!supported.current?.includes(w.network))
         throw new Error(`Backend does not support ${w.network}. Check the backend connection.`);
@@ -365,7 +363,7 @@ export function CreateDialog({
       <PasswordControls
         label="Create workspace encryption"
         onConfirm={submit}
-        disabled={busy || !net || !networks?.includes(net)}
+        disabled={busy || !selectedNet || !networks?.includes(selectedNet)}
         action={
           <>
             {busy ? 'Preparing workspace…' : 'Create workspace'} <ArrowRight size={16} />
@@ -418,11 +416,11 @@ export function CreateDialog({
         <label>
           Bitcoin network
           {template || networks?.length === 1 ? (
-            <input disabled={busy} readOnly value={template?.network ?? networks?.[0]} />
+            <input disabled={busy} readOnly value={template?.network ?? selectedNet} />
           ) : networks?.length ? (
             <select
               disabled={busy}
-              value={net ?? ''}
+              value={selectedNet ?? ''}
               onChange={(e) => setNet(e.target.value as Network)}
             >
               {networks.map((network) => (

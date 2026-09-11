@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, EyeOff, Layers, X } from 'lucide-react';
 import type { Transaction } from '../domain/types';
@@ -25,7 +25,7 @@ export function VisibilityActions({
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const anchor = useRef<HTMLButtonElement>(null);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   const notOnGraph = graphNodeIds !== undefined && !graphNodeIds.includes(nodeId);
   const hidden = hiddenNodeIds.includes(nodeId);
@@ -57,7 +57,7 @@ export function VisibilityActions({
       </button>
       {transaction && (
         <button
-          ref={anchor}
+          ref={setAnchor}
           type="button"
           className="icon-button"
           aria-label="Input and output visibility"
@@ -72,11 +72,11 @@ export function VisibilityActions({
       )}
       {open &&
         transaction &&
-        anchor.current &&
+        anchor &&
         createPortal(
           <GroupVisibility
             id={id}
-            anchor={anchor.current}
+            anchor={anchor}
             transaction={transaction}
             graphNodeIds={graphNodeIds}
             hiddenNodeIds={hiddenNodeIds}

@@ -34,42 +34,62 @@ function targetKey(options: Options) {
   ]);
 }
 
+interface FlowInputScope {
+  key: string;
+  attempt: number;
+  attempted: string[];
+  failed: string[];
+  missingOutputs: string[];
+}
+
+function freshFlowInputScope(key: string, attempt: number): FlowInputScope {
+  return { key, attempt, attempted: [], failed: [], missingOutputs: [] };
+}
+
+function currentFlowInputScope(scope: FlowInputScope, key: string, attempt: number) {
+  if (scope.key !== key) return freshFlowInputScope(key, attempt);
+  if (scope.attempt === attempt) return scope;
+  return {
+    key,
+    attempt,
+    attempted: [
+      ...new Set(scope.missingOutputs.map((id) => id.split(':')[1]).filter(Boolean)),
+    ].sort(),
+    failed: [],
+    missingOutputs: scope.missingOutputs,
+  };
+}
+
+function sortedIds(values: Iterable<string>) {
+  return [...new Set(values)].sort();
+}
+
 /** Visible direct prevouts only, cancelled when the Wallet context or visibility changes. */
 export function useWalletFlowInputs(options: Options) {
   const latest = useRef(options);
-  latest.current = options;
+  useEffect(() => {
+    latest.current = options;
+  });
   const target = targetKey(options);
   const source = walletFlowSourceKey(options.workspace, options.walletId, options.transactionId);
   const [attempt, setAttempt] = useState(0);
   const scopeKey = JSON.stringify([target, source, options.enabled]);
-  const scope = useRef({
-    key: scopeKey,
-    attempt,
-    attempted: new Set<string>(),
-    failed: new Set<string>(),
-    missingOutputs: new Set<string>(),
-  });
-  if (scope.current.key !== scopeKey)
-    scope.current = {
-      key: scopeKey,
-      attempt,
-      attempted: new Set(),
-      failed: new Set(),
-      missingOutputs: new Set(),
-    };
-  else if (scope.current.attempt !== attempt) {
-    scope.current.attempt = attempt;
-    scope.current.attempted = new Set(
-      [...scope.current.missingOutputs].map((id) => id.split(':')[1]),
-    );
-    scope.current.failed.clear();
-  }
+  const [scopeState, setScopeState] = useState<FlowInputScope>(() =>
+    freshFlowInputScope(scopeKey, attempt),
+  );
+  const scope = currentFlowInputScope(scopeState, scopeKey, attempt);
+  useEffect(() => {
+    if (scope !== scopeState) setScopeState(scope);
+  }, [scope, scopeState]);
+  const attempted = new Set(scope.attempted);
+  const failed = new Set(scope.failed);
+  const missingOutputs = new Set(scope.missingOutputs);
   const plan = walletFlowInputPlan(
     options.workspace,
     options.walletId,
     options.transactionId,
     options.inputs,
-    scope.current.attempted,
+    attempted,
     options.prevouts,
   );
   const visibleKey = JSON.stringify(plan.refs);
@@ -77,12 +97,13 @@ export function useWalletFlowInputs(options: Options) {
   const [state, setState] = useState({ key: '', loading: false, error: '' });
   useEffect(() => {
     if (!options.enabled || !source) return;
-    const owned = scope.current;
+    const ownedAttempted = new Set(attempted);
+    const ownedFailed = new Set(failed);
+    const ownedMissingOutputs = new Set(missingOutputs);
     const { workspace, walletId, transactionId, inputs, fetch, update } = latest.current;
     const controller = new AbortController();
     const active = () =>
       !controller.signal.aborted &&
-      scope.current === owned &&
       latest.current.enabled &&
       targetKey(latest.current) === target &&
       walletFlowSourceKey(latest.current.workspace, walletId, transactionId) === source &&
@@ -101,16 +122,16 @@ export function useWalletFlowInputs(options: Options) {
       walletId,
       transactionId,
       inputs,
-      owned.attempted,
+      ownedAttempted,
       latest.current.prevouts,
     );
     const message = () => {
       const absent =
         currentPlan.missingOutputCount > 0 ||
-        currentPlan.refs.some((ref) => owned.missingOutputs.has(ref.id))
+        currentPlan.refs.some((ref) => ownedMissingOutputs.has(ref.id))
           ? 'A loaded parent does not contain the requested output. Other outputs were not substituted.'
           : '';
-      const failedCount = currentPlan.missing.filter((id) => owned.failed.has(id)).length;
+      const failedCount = currentPlan.missing.filter((id) => ownedFailed.has(id)).length;
       const failed = failedCount
         ? `${failedCount} input transaction${failedCount === 1 ? '' : 's'} could not be loaded. Retry to try again.`
         : '';
@@ -121,8 +142,14 @@ export function useWalletFlowInputs(options: Options) {
       setState({ key: scopeKey, loading: false, error: message() });
       return () => controller.abort();
     }
-    ids.forEach((id) => owned.attempted.add(id));
+    ids.forEach((id) => ownedAttempted.add(id));
+    setScopeState((current) =>
+      current.key === scopeKey && current.attempt === attempt
+        ? { ...current, attempted: sortedIds([...current.attempted, ...ids]) }
+        : current,
+    );
     setState({ key: scopeKey, loading: true, error: message() });
+    let finished = false;
     void (async () => {
       const result = await loadWalletFlowInputWave(
         workspace.network,
@@ -131,14 +158,24 @@ export function useWalletFlowInputs(options: Options) {
         controller.signal,
       );
       if (!active()) return;
-      result.failed.forEach((id) => owned.failed.add(id));
+      result.failed.forEach((id) => ownedFailed.add(id));
       for (const transaction of result.loaded)
         for (const ref of currentPlan.refs)
           if (
             ref.txid === transaction.txid &&
             !transaction.vout.some((output) => output.n === ref.vout)
           )
-            owned.missingOutputs.add(ref.id);
+            ownedMissingOutputs.add(ref.id);
+      setScopeState((current) =>
+        current.key === scopeKey && current.attempt === attempt
+          ? {
+              ...current,
+              attempted: sortedIds([...current.attempted, ...ownedAttempted]),
+              failed: sortedIds(ownedFailed),
+              missingOutputs: sortedIds(ownedMissingOutputs),
+            }
+          : current,
+      );
       const additions = result.loaded.filter(
         (transaction) =>
           !latest.current.workspace.transactions[transaction.txid] &&
@@ -161,25 +198,48 @@ export function useWalletFlowInputs(options: Options) {
           false,
         );
       if (active()) setState({ key: scopeKey, loading: false, error: message() });
+      finished = true;
     })().catch(() => {
       if (!active()) return;
-      ids.forEach((id) => owned.failed.add(id));
+      ids.forEach((id) => ownedFailed.add(id));
+      setScopeState((current) =>
+        current.key === scopeKey && current.attempt === attempt
+          ? {
+              ...current,
+              attempted: sortedIds([...current.attempted, ...ownedAttempted]),
+              failed: sortedIds(ownedFailed),
+              missingOutputs: sortedIds(ownedMissingOutputs),
+            }
+          : current,
+      );
       setState({
         key: scopeKey,
         loading: false,
         error: 'Input details could not be added. Retry to try again.',
       });
+      finished = true;
     });
     return () => {
       controller.abort();
       // Unfinished requests can be tried again if a different visible range still needs them.
+      if (finished) return;
       ids.forEach((id) => {
         if (
-          !owned.failed.has(id) &&
-          !currentPlan.refs.some((ref) => ref.txid === id && owned.missingOutputs.has(ref.id))
+          !ownedFailed.has(id) &&
+          !currentPlan.refs.some((ref) => ref.txid === id && ownedMissingOutputs.has(ref.id))
         )
-          owned.attempted.delete(id);
+          ownedAttempted.delete(id);
       });
+      setScopeState((current) =>
+        current.key === scopeKey && current.attempt === attempt
+          ? {
+              ...current,
+              attempted: current.attempted.filter((id) => ownedAttempted.has(id)),
+              failed: sortedIds(ownedFailed),
+              missingOutputs: sortedIds(ownedMissingOutputs),
+            }
+          : current,
+      );
     };
   }, [scopeKey, target, source, visibleKey, cacheKey, attempt, options.enabled]);
   const cachedError = plan.missingOutputCount

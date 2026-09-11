@@ -31,6 +31,7 @@ export function WalletHelp({
   }, [active]);
   useLayoutEffect(() => {
     if (!open || !active) return;
+    let frame = 0;
     const place = () => {
       const anchor = trigger.current?.getBoundingClientRect();
       const box = tooltip.current?.getBoundingClientRect();
@@ -42,6 +43,10 @@ export function WalletHelp({
             ? anchor.bottom + 6
             : Math.max(12, anchor.top - box.height - 6),
       });
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(place);
     };
     const outside = (event: PointerEvent) => {
       if (
@@ -55,13 +60,14 @@ export function WalletHelp({
       if (event.key === 'Escape') setOpen(false);
     };
     place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', schedule);
+    window.addEventListener('scroll', schedule, { capture: true, passive: true });
     document.addEventListener('pointerdown', outside);
     document.addEventListener('keydown', escape);
     return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', schedule, { capture: true });
       document.removeEventListener('pointerdown', outside);
       document.removeEventListener('keydown', escape);
     };
