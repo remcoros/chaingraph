@@ -57,17 +57,95 @@ describe('contextual scan scope', () => {
       expect(choice.scope.txids).toEqual([1, 2, 3, 4].map(id));
     }
   });
-  it('defaults to Selection with a wallet and labels the actual entity when both coexist', () => {
+  it('defaults absent or invalid choices to Workspace while labeling the available selection', () => {
     const workspace = fixture();
     const selected = { id: `tx:${id(1)}`, kind: 'transaction' as const, txid: id(1), label: '' };
-    const walletScope = analysisScopeChoice(workspace, undefined, undefined, wallet());
-    expect(walletScope.mode).toBe('context');
+    for (const choice of [undefined, 'invalid-scope', 'wallet:']) {
+      const walletScope = analysisScopeChoice(workspace, choice, undefined, wallet());
+      expect(walletScope.mode).toBe('workspace');
+      expect(walletScope.selectionLabel).toBe('Selection (Wallet)');
+      expect(walletScope.scope).toMatchObject({
+        kind: 'workspace',
+        label: 'Workspace',
+        txids: [1, 2, 3, 4].map(id),
+      });
+      const entityScope = analysisScopeChoice(workspace, choice, selected, wallet());
+      expect(entityScope.mode).toBe('workspace');
+      expect(entityScope.selectionLabel).toBe('Selection (Transaction)');
+      expect(entityScope.scope.txids).toEqual([1, 2, 3, 4].map(id));
+    }
+  });
+  it('keeps explicit Selection graph-first with the current wallet as fallback', () => {
+    const workspace = fixture();
+    const selected = { id: `tx:${id(1)}`, kind: 'transaction' as const, txid: id(1), label: '' };
+    const walletScope = analysisScopeChoice(workspace, 'context', undefined, wallet());
     expect(walletScope.selectionLabel).toBe('Selection (Wallet)');
     expect(walletScope.scope.kind).toBe('wallet');
-    const entityScope = analysisScopeChoice(workspace, undefined, selected, wallet());
+    const entityScope = analysisScopeChoice(workspace, 'context', selected, wallet());
     expect(entityScope.mode).toBe('context');
     expect(entityScope.selectionLabel).toBe('Selection (Transaction)');
     expect(entityScope.scope.txids).toEqual([id(1)]);
+  });
+  it('isolates an explicit wallet from the active wallet and graph selection', () => {
+    const workspace = fixture();
+    const otherAddress = 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g';
+    const otherWallet: Wallet = {
+      ...wallet(),
+      id: 'other-public-fixture',
+      name: 'Other public fixture',
+      addresses: [
+        {
+          ...wallet().addresses[0],
+          address: otherAddress,
+          scripthash: addressToScriptHash(otherAddress, 'mainnet'),
+        },
+      ],
+    };
+    const received = tx(5);
+    received.vout[0].scriptPubKey.address = otherAddress;
+    const spent = tx(6, 5);
+    workspace.transactions[id(5)] = received;
+    workspace.transactions[id(6)] = spent;
+    workspace.wallets = [wallet(), otherWallet];
+    for (const selected of [
+      undefined,
+      { id: `tx:${id(1)}`, kind: 'transaction' as const, txid: id(1), label: '' },
+      { id: `out:${id(2)}:0`, kind: 'output' as const, txid: id(2), vout: 0, label: '' },
+    ]) {
+      const choice = analysisScopeChoice(
+        workspace,
+        `wallet:${otherWallet.id}`,
+        selected,
+        workspace.wallets[0],
+      );
+      expect(choice).toMatchObject({
+        mode: `wallet:${otherWallet.id}`,
+        walletUnavailable: false,
+        scope: { kind: 'wallet', label: `Wallet ${otherWallet.name}`, txids: [id(5), id(6)] },
+      });
+    }
+  });
+  it('keeps a removed explicit wallet empty even if a stale wallet and graph selection remain', async () => {
+    const workspace = fixture();
+    const imported = wallet();
+    workspace.wallets = [imported];
+    const mode = `wallet:${imported.id}`;
+    expect(analysisScopeChoice(workspace, mode).scope.txids).toEqual([1, 2, 3, 4].map(id));
+    workspace.wallets = [];
+    const choice = analysisScopeChoice(
+      workspace,
+      mode,
+      { id: `tx:${id(1)}`, kind: 'transaction', txid: id(1), label: '' },
+      imported,
+    );
+    expect(choice).toMatchObject({
+      mode,
+      walletUnavailable: true,
+      scope: { kind: 'wallet', label: 'Wallet unavailable', txids: [] },
+    });
+    const scan = await scanAnalysis(workspace, choice.scope);
+    expect(scan.findings).toEqual([]);
+    expect(scan.reports.every((report) => report.status === 'skipped')).toBe(true);
   });
   it('keeps explicit and legacy session choices through selection changes and scans', async () => {
     const workspace = fixture();
@@ -96,7 +174,11 @@ describe('contextual scan scope', () => {
       mode: 'context',
       hasSelection: false,
       selectionLabel: 'Selection (None)',
-      scope: { label: 'No current selection', txids: [] },
+      scope: {
+        label: 'No current selection',
+        explanation: 'Select a wallet or graph entity, or choose Workspace.',
+        txids: [],
+      },
     });
     const unavailable = analysisScopeChoice(workspace, 'context', {
       id: `tx:${id(99)}`,
@@ -107,7 +189,7 @@ describe('contextual scan scope', () => {
     expect(unavailable.hasSelection).toBe(true);
     expect(unavailable.scope.txids).toEqual([]);
     expect(analysisScopeChoice(workspace, undefined).mode).toBe('workspace');
-    expect(analysisScopeChoice(workspace, undefined, undefined, wallet()).mode).toBe('context');
+    expect(analysisScopeChoice(workspace, undefined, undefined, wallet()).mode).toBe('workspace');
   });
   it('scans all loaded records regardless of visibility or include filters', () => {
     const workspace = fixture();

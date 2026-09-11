@@ -310,14 +310,20 @@ describe('explicit canvas membership', () => {
   });
 
   it.each(['mainnet-wabisabi', 'testnet4-mixed-path'])(
-    'starts example %s at its chosen root and selection',
+    'projects only the curated starting canvas for example %s',
     async (template) => {
       const w = await createTemplateWorkspace(template);
-      expect(w.view.graphNodeIds).toEqual([
-        ...new Set([txNodeId(w.view.transactionFlow!.transactionId!), w.view.selectionId!]),
-      ]);
-      expect(ids(w).length).toBeLessThanOrEqual(2);
-      expect(Object.keys(w.transactions).length).toBeGreaterThan(1);
+      const root = txNodeId(w.view.transactionFlow!.transactionId!);
+      const graph = projectGraphMembership(buildGraph(w), w.view.graphNodeIds);
+      const visible = new Set(graph.nodes.map((node) => node.id));
+      expect(visible).toEqual(new Set(w.view.graphNodeIds));
+      expect(visible.has(root)).toBe(true);
+      expect(visible.has(w.view.selectionId!)).toBe(true);
+      expect(graph.links.some((link) => link.kind === 'spends' && link.target === root)).toBe(true);
+      expect(graph.links.some((link) => link.kind === 'creates' && link.source === root)).toBe(
+        true,
+      );
+      expect(visible.size).toBeLessThan(buildGraph(w).nodes.length);
       expect(parseWorkspace(w)).toEqual(w);
     },
   );
