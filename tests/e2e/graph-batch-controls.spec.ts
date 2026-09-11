@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { encryptWorkspace, decryptWorkspace } from '../../src/lib/crypto';
-import { newWorkspace } from '../../src/domain/workspace';
+import { buildGraph, newWorkspace } from '../../src/domain/workspace';
 import type { Workspace } from '../../src/domain/types';
 import { mockBitcoin, transactions, TX_FUNDING, TX_SPENDING } from '../fixtures/bitcoin';
 
@@ -29,6 +29,7 @@ async function seed(page: Page, customize?: (workspace: Workspace) => void) {
     transactionFlow: { open: true, transactionId: TX_SPENDING },
   };
   customize?.(workspace);
+  workspace.view.graphNodeIds = buildGraph(workspace).nodes.map((node) => node.id);
   const envelope = await encryptWorkspace(workspace, password);
   await page.addInitScript(
     ({ id, publicName, envelope }) => {
@@ -104,7 +105,7 @@ test('filters, batch selection and anchored batch editors keep other metadata in
   });
 
   // One Undo step restores the whole batch.
-  await toolbar.getByRole('button', { name: /^Undo: Labelled/ }).click();
+  await toolbar.getByRole('button', { name: /^Undo: Change (?:\d+ )?labels?/ }).click();
   workspace = await saved(page);
   expect(workspace.annotations[fundingSibling]?.label ?? '').toBe('');
   expect(workspace.annotations[fundingOutput].label).toBe('Keep this label');
@@ -178,7 +179,7 @@ test('selection is explicit, scoped per workspace and pruned only by removal', a
   await flowRow.getByRole('checkbox').check();
   await expect(toolbar.getByRole('status')).toContainText('1 selected');
   // The Inspector still shows the clicked transaction, not the checked output.
-  await expect(page.locator('.selection-heading .eyebrow')).toHaveText('TRANSACTION');
+  await expect(page.locator('.selection-heading .eyebrow:visible')).toHaveText('TRANSACTION');
 
   // Entity rows use the same shared selection.
   await rows.nth(1).getByRole('checkbox').check();
@@ -193,7 +194,7 @@ test('selection is explicit, scoped per workspace and pruned only by removal', a
 
   // Removing a transaction prunes exactly its entities from the selection.
   await page.getByLabel('Filter graph entities').fill('');
-  await page.getByLabel('Entity type', { exact: true }).selectOption('transaction');
+  await page.getByRole('button', { name: 'Transactions', exact: true }).click();
   await expect(rows).toHaveCount(2);
   await spendingRow.getByRole('button', { name: /^Remove/ }).click();
   // This transaction has no annotations or tags, so removal is immediate.
@@ -233,7 +234,6 @@ test('context entities shown to explain links never become batch targets', async
     .locator('.graph-navigation-status')
     .getByRole('button', { name: /^Show connections/ })
     .click();
-  await page.getByLabel('Entity visibility').selectOption('graph');
   await page.locator('.left-panel').getByRole('button', { name: 'Select', exact: true }).click();
 
   // The list shows canvas context, and the batch scope counts only real matches.
@@ -263,7 +263,7 @@ test('a batch Undo retires when a later edit owns the undo step, protecting that
   await tagEditor.getByLabel('Find or create tag').fill('Equal-value review');
   await tagEditor.getByRole('button', { name: 'Color 3', exact: true }).click();
   await tagEditor.getByRole('button', { name: 'Create and assign' }).click();
-  const batchUndo = toolbar.getByRole('button', { name: /^Undo: Created tag Equal-value review/ });
+  const batchUndo = toolbar.getByRole('button', { name: /^Undo: Add tag/ });
   await expect(batchUndo).toBeVisible();
 
   // A later unrelated annotation edit takes over the undo step.
@@ -308,6 +308,11 @@ test('combined workbench navigation retains batch Undo and isolation reveals amo
   });
   const toolbar = page.locator('.selection-toolbar');
   await page.locator('.graph-navigation').getByRole('button', { name: 'Selection mode' }).click();
+  // Amount-filtered entities are excluded from the default "on graph" list scope;
+  // widen to "all" so they can be selected and isolated back onto the canvas.
+  const visibilityToggle = page.getByLabel(/^Entity visibility:/);
+  await visibilityToggle.click();
+  await visibilityToggle.click();
   const rows = page.locator('.entity-list .entity-list-entry');
   await rows.nth(1).getByRole('checkbox').check();
   await rows.nth(2).getByRole('checkbox').check();
