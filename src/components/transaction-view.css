@@ -59,9 +59,20 @@
   column-gap: var(--transaction-flow-gap);
   align-items: start;
 }
+@media (min-width: 1000px) {
+  .transaction-flow {
+    grid-template-columns: minmax(220px, 1fr) clamp(156px, calc(19% + 20px), 204px) minmax(
+        220px,
+        1fr
+      );
+  }
+}
 @media (min-width: 1450px) {
   .transaction-flow {
-    grid-template-columns: minmax(220px, 1fr) clamp(176px, 22%, 224px) minmax(220px, 1fr);
+    grid-template-columns: minmax(220px, 1fr) clamp(216px, calc(22% + 40px), 264px) minmax(
+        220px,
+        1fr
+      );
   }
 }
 .transaction-flow-inputs {
