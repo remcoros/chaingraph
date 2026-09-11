@@ -496,27 +496,32 @@ function TransactionRows({
                   {rows.length}{' '}
                   {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
                 </h4>
-                {retained.length > 3 && (
-                  <button
-                    type="button"
-                    className="text-button transaction-expand"
-                    aria-expanded={expanded}
-                    onClick={() => toggle(!expanded)}
-                  >
-                    {expanded
-                      ? `Collapse ${name.toLowerCase()}`
-                      : `Show all ${retained.length} ${name.toLowerCase()}`}
-                  </button>
-                )}
-                {filteredCount > 0 && (
-                  <button
-                    type="button"
-                    className="text-button transaction-amount-recovery"
-                    aria-label={`Show ${filteredCount} amount-filtered ${name.toLowerCase()}`}
-                    onClick={() => onSmallAmountThresholdChange?.(0)}
-                  >
-                    {filteredCount} filtered · Show
-                  </button>
+                {(filteredCount > 0 || retained.length > 3) && (
+                  <div className="transaction-lane-actions">
+                    {filteredCount > 0 && (
+                      <button
+                        type="button"
+                        className="text-button transaction-amount-recovery"
+                        aria-label={`${filteredCount} amounts filtered from ${name.toLowerCase()}. Clear amount filter`}
+                        title="Clear amount filter"
+                        onClick={() => onSmallAmountThresholdChange?.(0)}
+                      >
+                        {filteredCount} amounts filtered
+                      </button>
+                    )}
+                    {retained.length > 3 && (
+                      <button
+                        type="button"
+                        className="text-button transaction-expand"
+                        aria-expanded={expanded}
+                        onClick={() => toggle(!expanded)}
+                      >
+                        {expanded
+                          ? `Collapse ${name.toLowerCase()}`
+                          : `Show all ${retained.length} ${name.toLowerCase()}`}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -892,40 +897,42 @@ export function TransactionView(props: Props) {
           </p>
         )}
         <div className="transaction-view-actions">
-          {selected.kind === 'output' && !missingCreating && !selectedUnspendable && (
-            <small
-              className="transaction-coverage"
-              title="Missing loaded spends do not establish that an output is unspent."
-            >
-              {loadedSpenders.length
-                ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
-                : walletObservation
-                  ? 'No spending transaction loaded'
-                  : 'Spend status unknown'}
-              {walletObservation && (
-                <span>
-                  {' · Unspent at wallet check · '}
-                  <time dateTime={walletObservation.checkedAt}>
-                    {new Date(walletObservation.checkedAt).toLocaleString()}
-                  </time>
-                </span>
-              )}
-              {loadedSpenders.length > 0 && (
-                <button
-                  type="button"
-                  className="text-button"
-                  aria-label="Check this output for spends"
-                  disabled={!!disabledReason}
-                  title={
-                    disabledReason || 'Check this exact output for additional spending transactions'
-                  }
-                  onClick={() => onTrace('spending', selected.id)}
-                >
-                  Check again
-                </button>
-              )}
-            </small>
-          )}
+          {selected.kind === 'output' &&
+            !missingCreating &&
+            !selectedUnspendable &&
+            !!(loadedSpenders.length || walletObservation) && (
+              <small
+                className="transaction-coverage"
+                title="Missing loaded spends do not establish that an output is unspent."
+              >
+                {loadedSpenders.length
+                  ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
+                  : 'No spending transaction loaded'}
+                {walletObservation && (
+                  <span>
+                    {' · Unspent at wallet check · '}
+                    <time dateTime={walletObservation.checkedAt}>
+                      {new Date(walletObservation.checkedAt).toLocaleString()}
+                    </time>
+                  </span>
+                )}
+                {loadedSpenders.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    aria-label="Check this output for spends"
+                    disabled={!!disabledReason}
+                    title={
+                      disabledReason ||
+                      'Check this exact output for additional spending transactions'
+                    }
+                    onClick={() => onTrace('spending', selected.id)}
+                  >
+                    Check again
+                  </button>
+                )}
+              </small>
+            )}
         </div>
       </div>
       {(inputLoading || inputError) && (

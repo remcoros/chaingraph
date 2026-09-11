@@ -30,7 +30,7 @@
 }
 .transaction-view[open] {
   /* Keep the graph stationary when the selected transaction has fewer rows. */
-  height: min(calc(50% - 38px), 302px);
+  height: min(calc(50% - 28px), 312px);
   min-height: 0;
 }
 .transaction-view > summary {
@@ -160,6 +160,7 @@
   display: flex;
   justify-content: center;
   min-width: 0;
+  padding-top: 6px;
 }
 .transaction-flow-amounts .small-amount-control {
   min-width: 0;
@@ -283,7 +284,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1px 6px;
-  min-height: 29px;
+  min-height: 33px;
   padding: 3px 0;
   background: var(--color-paper);
   border-bottom: 1px solid var(--color-rule);
@@ -293,6 +294,29 @@
   color: var(--color-muted);
   font-size: 10px;
   font-weight: 500;
+}
+.transaction-lane-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  margin-left: auto;
+  max-width: 100%;
+}
+.transaction-lane-actions .transaction-amount-recovery + .transaction-expand {
+  position: relative;
+  border-radius: 0;
+  padding-left: 8px;
+}
+.transaction-lane-actions .transaction-amount-recovery + .transaction-expand::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 12px;
+  border-left: 1px solid var(--color-rule);
+  transform: translateY(-50%);
 }
 .transaction-rows {
   position: sticky;
@@ -439,10 +463,12 @@
 .transaction-row-follow.is-loaded {
   color: var(--color-accent);
 }
+.transaction-lane-actions .text-button {
+  font-size: 10px;
+}
 .transaction-expand {
   margin: 0;
   padding: 2px 0;
-  font-size: 10px;
 }
 .transaction-view-actions {
   display: flex;
@@ -478,7 +504,7 @@
     margin: 5px 5px 0;
   }
   .transaction-view[open] {
-    height: min(calc(46% - 30px), 310px);
+    height: min(calc(46% - 20px), 320px);
   }
   .transaction-view-body {
     padding: 0 5px 7px;
@@ -513,7 +539,7 @@
     min-height: 43px;
     align-content: center;
   }
-  .transaction-expand {
+  .transaction-lane-actions .text-button {
     font-size: 9px;
   }
 

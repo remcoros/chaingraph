@@ -1911,11 +1911,10 @@ small,
   font-size: 11px;
 }
 .transaction-amount-recovery {
-  font-size: 11px;
-  min-height: 32px;
-  width: 100%;
-  white-space: normal;
-  padding: 3px 1px;
+  min-height: 26px;
+  width: auto;
+  white-space: nowrap;
+  padding: 2px 1px;
 }
 .amount-selection-badge {
   color: var(--color-accent);
