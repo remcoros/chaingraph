@@ -209,6 +209,9 @@ Select an item to add a label, note, icon, or bookmark in its inspector. The ico
 
 ## Filter and navigate
 
+Use the bottom-left expand icon in the transaction flow panel to extend it down
+over the graph. Use the restore icon to return to its previous height.
+
 Clicking a transaction, input or output adds only that chosen node to the graph.
 Its complete transaction record stays available in the flow panel. The icons-only
 right toolbar offers input/output Add, Hide and Remove actions, selection history,

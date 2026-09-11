@@ -1,4 +1,5 @@
 .graph-stage-content {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -16,22 +17,55 @@
 .graph-renderer-region .graph-controls {
   flex-wrap: wrap;
 }
-.transaction-view {
-  position: relative;
+.transaction-view-slot {
   flex: 0 1 auto;
   margin: 6px 8px 0;
+  min-height: 0;
+}
+.transaction-view-slot:has(.transaction-view[open]) {
+  /* Preserve the graph's space while the panel overlays it. */
+  height: min(calc(50% - 28px), 312px);
+}
+.transaction-view-surface {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: 7px;
+}
+.transaction-view-surface.is-full-height:has(.transaction-view[open]) {
+  position: absolute;
+  inset: 6px 8px 8px;
+  height: auto;
+  z-index: 10;
+}
+.transaction-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
   background: var(--color-paper);
-  border: 1px solid var(--color-rule);
-  border-radius: 7px;
   font-size: 11px;
 }
-.transaction-view[open] {
-  /* Keep the graph stationary when the selected transaction has fewer rows. */
-  height: min(calc(50% - 28px), 312px);
-  min-height: 0;
+.transaction-view-footer {
+  display: flex;
+  flex-shrink: 0;
+  padding: 1px 4px;
+}
+.transaction-view:not([open]) + .transaction-view-footer {
+  display: none;
+}
+.transaction-height-toggle {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 4px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-muted);
 }
 .transaction-view > summary {
   padding: 7px 10px;
@@ -500,11 +534,14 @@
   padding: 1px 4px;
 }
 @media (max-width: 700px) {
-  .transaction-view {
+  .transaction-view-slot {
     margin: 5px 5px 0;
   }
-  .transaction-view[open] {
+  .transaction-view-slot:has(.transaction-view[open]) {
     height: min(calc(46% - 20px), 320px);
+  }
+  .transaction-view-surface.is-full-height:has(.transaction-view[open]) {
+    inset: 5px;
   }
   .transaction-view-body {
     padding: 0 5px 7px;
