@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ChevronRight,
   FolderOpen,
   LockKeyhole,
   Plus,
@@ -128,7 +127,6 @@ export function WorkspaceHome({
                         <small>Unlock once to reveal and save its public name.</small>
                       )}
                   </span>
-                  <ChevronRight size={17} />
                 </button>
                 {onDelete && (
                   <button

@@ -133,15 +133,23 @@ kbd {
 .skip-link:focus {
   transform: translateY(0);
 }
+/* Opening and deleting are separate buttons because buttons cannot nest, so the
+   entry carries the rule and the hover that make them read as one item. */
 .saved-entry {
   position: relative;
   display: flex;
   align-items: stretch;
-  gap: 5px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.saved-entry:hover {
+  background: var(--color-hover);
 }
 .saved-entry .saved-row {
   flex: 1;
   min-width: 0;
+}
+.saved-entry .saved-row:hover {
+  background: none;
 }
 .saved-entry > .saved-delete {
   padding: 8px;

@@ -460,7 +460,6 @@ small,
   width: 100%;
   padding: 19px 8px;
   border: 0;
-  border-bottom: 1px solid var(--color-rule);
   border-radius: 0;
   text-align: left;
   justify-content: flex-start;
