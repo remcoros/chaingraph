@@ -787,7 +787,7 @@ export async function fetchIndexedSpenders(
   existing: Record<string, Transaction>,
   signal?: AbortSignal,
   hints: TransactionFetchHints = {},
-  beforeInspect?: (txid: string) => void,
+  beforeInspect?: (txid: string) => void | boolean,
 ): Promise<IndexedSpenders | undefined> {
   signal = spendingSignal(network, hints, signal);
   const fetchHints: TransactionFetchHints = {
@@ -868,12 +868,17 @@ export async function fetchIndexedSpenders(
     }
   const unresolved: SpendingOutpoint[] = [];
   const boundedGroups = [...groups].slice(0, 250);
+  let inspected = 0;
   for (const [, group] of [...groups].slice(250))
     unresolved.push(...group.map(({ txid, vout }) => ({ txid, vout })));
   await mapLimit(boundedGroups, TRANSACTION_BATCH_CONCURRENCY, async ([txid, group]) => {
     // Connection scans share this allowance with traversal and history fallback.
-    // Keep the gate outside the recoverable lookup catch so exhaustion propagates.
-    beforeInspect?.(txid);
+    // A declined candidate stays unresolved; thrown cancellation/deadline errors propagate.
+    if (beforeInspect?.(txid) === false) {
+      unresolved.push(...group.map(({ txid, vout }) => ({ txid, vout })));
+      return;
+    }
+    inspected++;
     try {
       const blockhash = group[0].blockhash;
       let tx = existing[txid];
@@ -940,7 +945,7 @@ export async function fetchIndexedSpenders(
   return {
     transactions: [...transactions.values()],
     unresolved,
-    inspected: boundedGroups.length,
+    inspected,
     unavailableTxids: [...groups]
       .filter(([, group]) => group.some((row) => unresolvedKeys.has(pointKey(row))))
       .map(([id]) => id),

@@ -200,14 +200,16 @@ describe('connection scan fetch adapter', () => {
   it('gates indexed candidates before downloading', async () => {
     const s = setup([tx(1)]);
     s.transport.fetchIndexedSpenders.mockImplementation(
-      async (_network, _points, _existing, _signal, _hints, examine) => {
-        examine?.(id(2));
+      async (_network, points, _existing, _signal, _hints, examine) => {
+        if (examine?.(id(2)) === false)
+          return { transactions: [], unresolved: points, inspected: 0, unavailableTxids: [id(2)] };
         throw new Error('must not reach this');
       },
     );
     await expect(
-      s.resolveNeighbors(`out:${id(1)}:0`, 'downstream', budget(0)),
+      s.resolveNeighbors(`out:${id(1)}:0`, 'downstream', budget(1)),
     ).rejects.toMatchObject({ reason: 'transactions' });
+    expect(s.transport.fetchIndexedSpenders).toHaveBeenCalledOnce();
     expect(s.transport.fetchHistory).not.toHaveBeenCalled();
   });
   it('rejects late transport evidence when the session closes', async () => {

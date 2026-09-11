@@ -415,7 +415,15 @@ per run. Time and depth limits produce a run-level reason, never cards.
 Run details show grouped connections found and optional deepest transaction-hop
 distance reached from either search side; older saved runs omit unknown depth.
 `connectionScanFetch.ts` reuses loaded evidence and the scheduler's background
-priority; an unspent endpoint needs a validated `gettxout` observation with
+priority. Downstream indexed spender requests collect up to four exact outpoints
+over a 2 ms window, validate the returned evidence against the requested points,
+and distribute each spender and unresolved point to the matching lookup.
+Candidates beyond the shared budget are skipped without discarding admitted
+spenders from the same batch. Script
+histories share pending and completed requests by script hash within this run;
+failed requests are evicted for retry. This transient lookup state stays in browser
+memory and is discarded with the run. An unspent endpoint needs a validated
+`gettxout` observation with
 creator proof; coinbase and OP_RETURN endings need the actual script bytes.
 Typed error codes separate outages from local failures and no upstream text
 enters a result.

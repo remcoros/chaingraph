@@ -10,7 +10,13 @@ import type {
 import { ScanBudgetExceeded, isScanNodeId } from '../domain/connectionScan';
 import { outputAddress } from '../domain/workspace';
 import { addressToScriptHash } from './wallet';
-import { fetchHistory, fetchIndexedSpenders, fetchTransaction } from './api';
+import {
+  fetchHistory,
+  fetchIndexedSpenders,
+  fetchTransaction,
+  type IndexedSpenders,
+  type SpendingOutpoint,
+} from './api';
 import type { TransactionFetchScope } from './transactionScheduler';
 import {
   fetchScanUtxo,
@@ -69,6 +75,7 @@ export function createConnectionScanFetch(
   const refreshed = new Set<string>();
   const transactionLoads = new Map<string, Promise<Transaction>>();
   const utxoChecks = new Map<string, Promise<ScanObservation | undefined>>();
+  const histories = new Map<string, ReturnType<typeof fetchHistory>>();
   let indexedInputs = 0;
   const index = async (tx: Transaction, budget: ScanBudget) => {
     for (const input of tx.vin) {
@@ -96,6 +103,113 @@ export function createConnectionScanFetch(
   const checkpoint = (budget: ScanBudget) => {
     signal.throwIfAborted();
     budget.checkpoint();
+  };
+  type IndexedLookup = Pick<IndexedSpenders, 'transactions' | 'unresolved'> | undefined;
+  type IndexedRequest = {
+    point: SpendingOutpoint;
+    budget: ScanBudget;
+    resolve: (value: IndexedLookup) => void;
+    reject: (error: unknown) => void;
+  };
+  let indexedQueue: IndexedRequest[] = [];
+  let indexedTimer: ReturnType<typeof setTimeout> | undefined;
+  const takeIndexedQueue = () => {
+    clearTimeout(indexedTimer);
+    indexedTimer = undefined;
+    signal.removeEventListener('abort', cancelIndexedQueue);
+    const requests = indexedQueue;
+    indexedQueue = [];
+    return requests;
+  };
+  const cancelIndexedQueue = () => {
+    for (const request of takeIndexedQueue()) request.reject(signal.reason);
+  };
+  const flushIndexedQueue = async () => {
+    const requests = takeIndexedQueue();
+    if (!requests.length) return;
+    try {
+      for (const request of requests) checkpoint(request.budget);
+      // Resolver budgets share the run-wide allowance, including concurrent downloads.
+      const budget = requests[0].budget;
+      const points = [
+        ...new Map(requests.map(({ point }) => [`${point.txid}:${point.vout}`, point])).values(),
+      ];
+      let transactionLimit = false;
+      const indexed = await transport.fetchIndexedSpenders(
+        options.network,
+        points,
+        {},
+        signal,
+        hints,
+        (id) => {
+          checkpoint(budget);
+          try {
+            budget.examine(id);
+          } catch (error) {
+            if (!(error instanceof ScanBudgetExceeded) || error.reason !== 'transactions')
+              throw error;
+            transactionLimit = true;
+            return false;
+          }
+        },
+      );
+      checkpoint(budget);
+      const transactions: Transaction[] = [];
+      for (const value of indexed?.transactions ?? []) {
+        budget.examine(value.txid);
+        const tx = validateScanTransaction(value, value.txid, options.network);
+        if (
+          !points.some((point) =>
+            tx.vin.some((input) => input.txid === point.txid && input.vout === point.vout),
+          )
+        )
+          throw new ScanEvidenceConflict();
+        transactions.push(tx);
+      }
+      // Validate the whole union before accepting any path; a spender may cover several points.
+      for (const { point, resolve, reject } of requests) {
+        const result = indexed
+          ? {
+              transactions: transactions.filter((tx) =>
+                tx.vin.some((input) => input.txid === point.txid && input.vout === point.vout),
+              ),
+              unresolved: indexed.unresolved.filter(
+                (item) => item.txid === point.txid && item.vout === point.vout,
+              ),
+            }
+          : undefined;
+        if (transactionLimit && !result?.transactions.length && result?.unresolved.length)
+          reject(new ScanBudgetExceeded('transactions'));
+        else resolve(result);
+      }
+    } catch (error) {
+      for (const request of requests) request.reject(error);
+    }
+  };
+  const indexedSpenders = (point: SpendingOutpoint, budget: ScanBudget) => {
+    checkpoint(budget);
+    return new Promise<IndexedLookup>((resolve, reject) => {
+      indexedQueue.push({ point, budget, resolve, reject });
+      if (indexedQueue.length >= 4) {
+        void flushIndexedQueue();
+      } else if (indexedTimer === undefined) {
+        // Worker messages arrive in separate tasks, so a microtask would rarely batch them.
+        indexedTimer = setTimeout(() => void flushIndexedQueue(), 2);
+        signal.addEventListener('abort', cancelIndexedQueue, { once: true });
+      }
+    });
+  };
+  const historyFor = (hash: string, budget: ScanBudget) => {
+    checkpoint(budget);
+    let history = histories.get(hash);
+    if (!history) {
+      history = transport.fetchHistory(options.network, hash, signal).catch((error: unknown) => {
+        histories.delete(hash);
+        throw error;
+      });
+      histories.set(hash, history);
+    }
+    return history;
   };
   const load = async (txid: string, budget: ScanBudget, height?: number) => {
     checkpoint(budget);
@@ -231,30 +345,15 @@ export function createConnectionScanFetch(
         const observation = await currentUtxo(output);
         if (observation) return { nodeIds: [], observation };
       }
-      const indexed = await transport.fetchIndexedSpenders(
-        options.network,
-        [point],
-        {},
-        signal,
-        hints,
-        (id) => {
-          checkpoint(budget);
-          budget.examine(id);
-        },
-      );
+      const indexed = await indexedSpenders(point, budget);
       checkpoint(budget);
-      const validIndexed: Transaction[] = [];
-      for (const value of indexed?.transactions ?? []) {
-        budget.examine(value.txid);
-        const tx = validateScanTransaction(value, value.txid, options.network);
-        if (!tx.vin.some((input) => input.txid === point.txid && input.vout === point.vout))
-          throw new ScanEvidenceConflict();
-        validIndexed.push(tx);
-      }
+      const validIndexed = indexed?.transactions ?? [];
       if (validIndexed.length > 1) return conflict();
       for (const tx of validIndexed) {
-        evidence[tx.txid] = tx;
+        budget.examine(tx.txid);
         await index(tx, budget);
+        checkpoint(budget);
+        evidence[tx.txid] = tx;
       }
       if (validIndexed.length) return { nodeIds: validIndexed.map((tx) => `tx:${tx.txid}`) };
       if (!output) {
@@ -282,7 +381,7 @@ export function createConnectionScanFetch(
             ? addressToScriptHash(address, options.network)
             : undefined;
       if (!hash) return unknownSpend();
-      const history = await transport.fetchHistory(options.network, hash, signal);
+      const history = await historyFor(hash, budget);
       checkpoint(budget);
       const candidates = new Map(history.map((row) => [row.tx_hash, row.height]));
       for (const id of [...candidates.keys()].sort()) {

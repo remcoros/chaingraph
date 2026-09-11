@@ -114,6 +114,28 @@ describe('optional exact output spending lookup', () => {
       [id(2), 1, id(9)],
     ]);
   });
+  it('keeps admitted batch results when the inspection gate declines another spender', async () => {
+    const other = { ...point, vout: 1 };
+    indexReply = [
+      { ...point, spendingtxid: spender.txid },
+      { ...other, spendingtxid: id(3) },
+    ];
+    const result = await fetchIndexedSpenders(
+      'testnet4',
+      [point, other],
+      {},
+      undefined,
+      {},
+      (txid) => txid === spender.txid,
+    );
+    expect(result?.transactions.map((tx) => tx.txid)).toEqual([spender.txid]);
+    expect(result?.unresolved).toEqual([other]);
+    expect(result?.unavailableTxids).toEqual([id(3)]);
+    expect(result?.inspected).toBe(1);
+    expect(
+      calls.filter((call) => call.method === 'getrawtransaction').map((call) => call.params[0]),
+    ).toEqual([spender.txid]);
+  });
   it('reuses a local exact mempool transaction without downloads and retains conflicting alternatives', async () => {
     const old = { ...spender, txid: id(3), confirmations: -1 };
     const result = await fetchIndexedSpenders('testnet4', [point], {
