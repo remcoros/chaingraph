@@ -991,7 +991,8 @@ small,
   padding: 20px 17px;
   border-bottom: 1px solid var(--color-rule);
 }
-.inspector-scroll > .panel-section:not(.selection-evidence) {
+.inspector-scroll > .panel-section:not(.selection-evidence),
+.inspector-scroll > .connection-scan > .panel-section {
   padding-top: 11px;
   padding-bottom: 11px;
 }

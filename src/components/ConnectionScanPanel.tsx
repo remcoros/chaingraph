@@ -528,21 +528,23 @@ export function ConnectionScanPanel(props: Props) {
   );
   return (
     <div className="connection-scan" hidden={!active}>
-      <section className="panel-section">
+      <section className="panel-section selection-heading">
         <div className="connection-scan-source">
-          <span className="muted">
-            {source?.startsWith('tx:')
-              ? 'TRANSACTION'
-              : source?.startsWith('out:')
-                ? 'TRANSACTION OUTPUT'
-                : 'SELECTION'}
-          </span>
+          <div className="selection-top">
+            <span className="eyebrow">
+              {source?.startsWith('tx:')
+                ? 'TRANSACTION'
+                : source?.startsWith('out:')
+                  ? 'TRANSACTION OUTPUT'
+                  : 'SELECTION'}
+            </span>
+          </div>
           <div className="connection-scan-source-identity">
-            <strong title={source}>
+            <h2 title={source}>
               {source && eligible(source)
                 ? nameFor(workspace, source)
                 : 'Select a transaction or output'}
-            </strong>
+            </h2>
             {source && eligible(source) && (
               <CopyButton
                 value={source.replace(/^(tx|out):/, '')}

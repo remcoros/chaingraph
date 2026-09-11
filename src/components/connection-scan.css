@@ -1,13 +1,9 @@
 .connection-scan[hidden] {
   display: none;
 }
-.connection-scan .panel-section {
-  padding: 12px;
-}
 .connection-scan p {
   margin: 8px 0 0;
 }
-.connection-scan-source,
 .connection-scan-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -15,14 +11,12 @@
   min-width: 0;
 }
 .connection-scan-source {
-  gap: 4px;
   margin-bottom: 12px;
 }
-.connection-scan-source strong {
+.connection-scan-source h2 {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
-  line-height: 1.4;
 }
 .connection-scan-source-identity {
   display: flex;
