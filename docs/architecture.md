@@ -782,7 +782,13 @@ The Inspector's tag adapter retains explicit output/address scope and inherited
 membership hints. All tag popups search names/descriptions and support explicit
 color selection, direct Add/Remove membership and create-and-assign in one update.
 Global tag management retains descriptions/member management and shares the color
-palette. The Inspector's always-visible label/note inputs still autosave per edit;
+palette. `domain/tagColors.ts` owns the 16 presets used by tag editors, label grouping
+and example workspace tags. The tag manager keeps an active editor visible while its name or description
+changes under search. Valid field edits retain immediate autosave; creation and
+membership changes check the existing budgets before updating. Member removal
+uses the shared batch mutation, and deletion uses the shared confirmation dialog
+with focus restoration. Panel styles are scoped locally; no view or tag fields
+are added. The Inspector's always-visible label/note inputs still autosave per edit;
 graph hover, flow and retained Trace actions lead to that editor. Analysis owns
 no separate quick editor.
 

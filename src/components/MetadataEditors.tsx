@@ -12,9 +12,8 @@ import {
 } from '../domain/batchMetadata';
 import { canonicalTagNodeId } from '../domain/tags';
 import type { Workspace, WorkspaceTag } from '../domain/types';
+import { DEFAULT_TAG_COLOR, TAG_COLORS } from '../domain/tagColors';
 import './metadata-editors.css';
-
-export const TAG_COLORS = ['#65cbbb', '#e4af67', '#9c9aed', '#e888a5', '#85bce8', '#a4c977'];
 
 export interface MetadataEditorProps {
   workspace: Workspace;
@@ -169,7 +168,7 @@ export function BatchTagEditor({
   const ref = useDialogFocus(onClose, undefined, false);
   const search = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
-  const [color, setColor] = useState(TAG_COLORS[0]);
+  const [color, setColor] = useState<string>(DEFAULT_TAG_COLOR);
   const [error, setError] = useState('');
   const tags = workspace.tags ?? [];
   const name = query.trim();

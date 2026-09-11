@@ -1,4 +1,5 @@
 import { formatBitcoinAmount } from './amountFormat';
+import { TAG_COLOR, type TagColor } from './tagColors';
 import type { Annotation, Network, Transaction, Wallet, Workspace, WorkspaceTag } from './types';
 import { outputNodeId, sats, txNodeId } from './types';
 import { newWorkspace, parseWorkspace } from './workspace';
@@ -271,7 +272,7 @@ export async function createTemplateWorkspace(
     const annotation: Annotation = { label, note, icon, bookmarked };
     workspace.annotations[nodeId] = annotation;
   };
-  const tag = (name: string, color: string, description: string, nodeIds: string[]) => {
+  const tag = (name: string, color: TagColor, description: string, nodeIds: string[]) => {
     const entry: WorkspaceTag = { id: crypto.randomUUID(), name, color, description, nodeIds };
     workspace.tags!.push(entry);
   };
@@ -312,19 +313,19 @@ export async function createTemplateWorkspace(
     );
     tag(
       'Equal-value observations',
-      '#38bdf8',
+      TAG_COLOR.cyan,
       'Five outputs with the same observed amount; no ownership grouping.',
       Array.from({ length: 5 }, (_, n) => outputNodeId(equalSeed, n)),
     );
     tag(
       'Verified spending hop',
-      '#a78bfa',
+      TAG_COLOR.lavender,
       'An exact outpoint relationship present in the loaded transaction inputs.',
       [outputNodeId(equalSeed, 2), txNodeId(equalSpender)],
     );
     tag(
       'Successor equal pair',
-      '#fbbf24',
+      TAG_COLOR.gold,
       `Two successor outputs of ${formatBitcoinAmount(9_136_520)}.`,
       [outputNodeId(equalSpender, 2), outputNodeId(equalSpender, 3)],
     );
@@ -350,12 +351,15 @@ export async function createTemplateWorkspace(
       `${formatBitcoinAmount(200_000)} sent to a P2PKH script. The template does not identify this output as payment or change.`,
       '◇',
     );
-    tag('Data output', '#a78bfa', 'Observed OP_RETURN script; no attribution of the message.', [
-      selected,
-    ]);
+    tag(
+      'Data output',
+      TAG_COLOR.lavender,
+      'Observed OP_RETURN script; no attribution of the message.',
+      [selected],
+    );
     tag(
       'Spendable script form',
-      '#38bdf8',
+      TAG_COLOR.cyan,
       'P2PKH script form. This tag does not claim current UTXO status.',
       [outputNodeId(messageSeed, 1)],
     );
@@ -390,7 +394,7 @@ export async function createTemplateWorkspace(
     );
     tag(
       'Observed path',
-      '#38bdf8',
+      TAG_COLOR.cyan,
       'Creating transaction, exact spent outpoint, and its known spender.',
       [txNodeId(spentSeed), selected, txNodeId(spentSpender)],
     );
@@ -426,14 +430,19 @@ export async function createTemplateWorkspace(
     );
     tag(
       'P2WSH outputs',
-      '#38bdf8',
+      TAG_COLOR.cyan,
       'Outputs 0 through 50 share a script type. This does not group their owners.',
       Array.from({ length: 51 }, (_, n) => outputNodeId(fanoutSeed, n)),
     );
-    tag('P2WPKH output', '#fbbf24', 'One observed P2WPKH script, with no inferred payment role.', [
-      outputNodeId(fanoutSeed, 51),
+    tag(
+      'P2WPKH output',
+      TAG_COLOR.gold,
+      'One observed P2WPKH script, with no inferred payment role.',
+      [outputNodeId(fanoutSeed, 51)],
+    );
+    tag('Data output', TAG_COLOR.lavender, 'One observed OP_RETURN output.', [
+      outputNodeId(fanoutSeed, 52),
     ]);
-    tag('Data output', '#a78bfa', 'One observed OP_RETURN output.', [outputNodeId(fanoutSeed, 52)]);
   }
   if (id === 'mainnet-large-value-path') {
     selected = outputNodeId(largeSeed, 1);
@@ -472,14 +481,18 @@ export async function createTemplateWorkspace(
       '🔗',
       true,
     );
-    tag('Dominant output', '#fbbf24', 'Largest observed output, with no ownership attribution.', [
-      selected,
-    ]);
-    tag('Verified funding hop', '#38bdf8', 'Exact parent outpoint and consuming transaction.', [
-      txNodeId(largeParent),
-      outputNodeId(largeParent, 1),
-      txNodeId(largeSeed),
-    ]);
+    tag(
+      'Dominant output',
+      TAG_COLOR.gold,
+      'Largest observed output, with no ownership attribution.',
+      [selected],
+    );
+    tag(
+      'Verified funding hop',
+      TAG_COLOR.cyan,
+      'Exact parent outpoint and consuming transaction.',
+      [txNodeId(largeParent), outputNodeId(largeParent, 1), txNodeId(largeSeed)],
+    );
   } else if (id === 'mainnet-batch-outputs') {
     const outputs = snapshot.transactions[batchSeed].vout;
     const ranked = [...outputs].sort((a, b) => sats(b.value) - sats(a.value));
@@ -506,15 +519,15 @@ export async function createTemplateWorkspace(
     const small = outputs.filter((output) => sats(output.value) < 10_000);
     tag(
       `Below ${formatBitcoinAmount(10_000)}`,
-      '#fbbf24',
+      TAG_COLOR.gold,
       'Amount comparison group, not a dust-attack attribution.',
       small.map((output) => outputNodeId(batchSeed, output.n)),
     );
     for (const [type, label, color] of [
-      ['witness_v0_keyhash', 'P2WPKH', '#38bdf8'],
-      ['witness_v0_scripthash', 'P2WSH', '#a78bfa'],
-      ['scripthash', 'P2SH', '#34d399'],
-      ['pubkeyhash', 'P2PKH', '#fb7185'],
+      ['witness_v0_keyhash', 'P2WPKH', TAG_COLOR.cyan],
+      ['witness_v0_scripthash', 'P2WSH', TAG_COLOR.lavender],
+      ['scripthash', 'P2SH', TAG_COLOR.forest],
+      ['pubkeyhash', 'P2PKH', TAG_COLOR.rose],
     ] as const) {
       tag(
         label,
@@ -544,7 +557,7 @@ export async function createTemplateWorkspace(
     const ranked = [...groups]
       .filter(([, indices]) => indices.length > 1)
       .sort((a, b) => b[1].length - a[1].length);
-    const colors = ['#38bdf8', '#a78bfa', '#fbbf24', '#34d399'];
+    const colors = [TAG_COLOR.cyan, TAG_COLOR.lavender, TAG_COLOR.gold, TAG_COLOR.forest];
     for (const [index, [amount, indices]] of ranked.slice(0, 4).entries()) {
       const amountText = formatBitcoinAmount(amount);
       tag(
@@ -607,7 +620,7 @@ export async function createTemplateWorkspace(
       if (nodes.length)
         tag(
           branch === 0 ? 'Demo wallet: receive branch' : 'Demo wallet: change branch',
-          branch === 0 ? '#38bdf8' : '#a78bfa',
+          branch === 0 ? TAG_COLOR.cyan : TAG_COLOR.lavender,
           'Outputs matching addresses derived from the published demo key. The bundled scan is bounded and incomplete.',
           nodes,
         );
@@ -672,17 +685,19 @@ export async function createTemplateWorkspace(
     );
     tag(
       'Verified spending path',
-      '#38bdf8',
+      TAG_COLOR.cyan,
       'Exact outpoint relationship and successor output, without owner attribution.',
       [selected, txNodeId(mixedSpender), outputNodeId(mixedSpender, 0)],
     );
     tag(
       'Compare sibling amounts',
-      '#fbbf24',
+      TAG_COLOR.gold,
       'The two nonzero outputs of the creating transaction.',
       [selected, outputNodeId(mixedSeed, 2)],
     );
-    tag('Data output', '#a78bfa', 'Observed OP_RETURN script.', [outputNodeId(mixedSeed, 1)]);
+    tag('Data output', TAG_COLOR.lavender, 'Observed OP_RETURN script.', [
+      outputNodeId(mixedSeed, 1),
+    ]);
   }
   workspace.view = {
     ...workspace.view,

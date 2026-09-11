@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Plus, Tag, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
 import {
   addressNodeId,
   short,
@@ -15,86 +15,125 @@ import {
   MAX_TAG_MEMBERS,
   MAX_WORKSPACE_TAGS,
 } from '../domain/tags';
-import {
-  BatchTagEditor,
-  ColorPicker,
-  MetadataPopover,
-  TAG_COLORS as colors,
-} from './MetadataEditors';
+import { BatchTagEditor, ColorPicker, MetadataPopover } from './MetadataEditors';
+import { DEFAULT_TAG_COLOR } from '../domain/tagColors';
 import './tags.css';
 import { applyBatchTag } from '../domain/batchMetadata';
 import { canonicalAddress } from '../domain/entityReferences';
-import { useDialogFocus } from './Dialogs';
+import { Modal, useDialogFocus } from './Dialogs';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
+type TagValue = { name: string; color: string; description: string };
+
 function TagForm({
   tag,
   onSave,
-  onCancel,
+  onClose,
+  onDelete,
 }: {
   tag?: WorkspaceTag;
-  onSave: (value: { name: string; color: string; description: string }) => void;
-  onCancel?: () => void;
+  onSave: (value: TagValue) => string | undefined;
+  onClose: () => void;
+  onDelete?: () => void;
 }) {
   const [name, setName] = useState(tag?.name ?? '');
-  const [color, setColor] = useState(tag?.color ?? colors[0]);
+  const [color, setColor] = useState(tag?.color ?? DEFAULT_TAG_COLOR);
   const [description, setDescription] = useState(tag?.description ?? '');
+  const [error, setError] = useState('');
+  const errorId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
+  const save = (value: TagValue) => {
+    const issue = onSave(value);
+    setError(issue ?? '');
+    return !issue;
+  };
   return (
     <form
-      className="tag-form compact-controls"
+      className="tag-form"
+      noValidate
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+      }}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!tag && name.trim())
-          onSave({ name: name.trim(), color, description: description.trim() });
+        if (save({ name: name.trim(), color, description: tag ? description : description.trim() }))
+          onClose();
+        else input.current?.focus();
       }}
     >
       <label>
         Tag name
         <input
+          ref={input}
           aria-label="Tag name"
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
           maxLength={100}
           required
           value={name}
           placeholder="Exchange, shop, savings…"
           onChange={(event) => {
             setName(event.target.value);
-            if (tag) onSave({ name: event.target.value.trim(), color, description });
+            if (tag) save({ name: event.target.value.trim(), color, description });
+            else setError('');
           }}
         />
       </label>
-      <ColorPicker
-        value={color}
-        onChange={(next) => {
-          setColor(next);
-          if (tag) onSave({ name: name.trim(), color: next, description });
-        }}
-      />
+      {error && (
+        <p id={errorId} role="alert" className="tag-error">
+          {error}
+        </p>
+      )}
+      <div className="tag-color-field">
+        <span>Color</span>
+        <ColorPicker
+          value={color}
+          onChange={(next) => {
+            setColor(next);
+            if (tag) save({ name: name.trim(), color: next, description });
+          }}
+        />
+      </div>
       <label>
-        Description
+        Description <span className="tag-optional">Optional</span>
         <textarea
           aria-label="Tag description"
-          rows={2}
+          rows={4}
           maxLength={2000}
           value={description}
           onChange={(event) => {
             setDescription(event.target.value);
-            if (tag) onSave({ name: name.trim(), color, description: event.target.value });
+            if (tag) save({ name: name.trim(), color, description: event.target.value });
           }}
         />
       </label>
+      {tag && <p className="small muted">Changes apply automatically.</p>}
       <div className="tag-form-actions">
+        {onDelete && (
+          <button
+            type="button"
+            className="text-button danger tag-delete-trigger"
+            onClick={onDelete}
+          >
+            <Trash2 size={13} aria-hidden="true" /> Delete tag…
+          </button>
+        )}
         {!tag && (
-          <button className="primary" disabled={!name.trim()}>
-            <Plus size={13} /> Create tag
+          <button type="button" onClick={onClose}>
+            Cancel
           </button>
         )}
-        {tag && <span className="small muted">Changes apply automatically</span>}
-        {onCancel && (
-          <button type="button" onClick={onCancel}>
-            {tag ? <Check size={13} /> : <X size={13} />}
-            {tag ? 'Done' : 'Cancel'}
-          </button>
-        )}
+        <button className={tag ? undefined : 'primary'} type="submit">
+          {tag ? <Check size={13} aria-hidden="true" /> : <Plus size={13} aria-hidden="true" />}
+          {tag ? 'Done' : 'Create tag'}
+        </button>
       </div>
     </form>
   );
@@ -328,6 +367,17 @@ function TagAssignmentPicker({
   );
 }
 
+function TagDescription({ description }: { description: string }) {
+  return (
+    <details className="tag-description">
+      <summary title="Expand or collapse description">
+        <span>{description}</span>
+        <ChevronDown size={13} aria-hidden="true" />
+      </summary>
+    </details>
+  );
+}
+
 function TagMembers({
   tag,
   workspace,
@@ -343,49 +393,76 @@ function TagMembers({
 }) {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
+  const summary = useRef<HTMLElement>(null);
   const pages = Math.max(1, Math.ceil(tag.nodeIds.length / 25));
   const activePage = Math.min(page, pages - 1);
   return (
-    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>Members</summary>
+    <details
+      className="tag-members-section"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary ref={summary}>
+        <span>
+          Members <span className="muted">({tag.nodeIds.length})</span>
+        </span>
+        <ChevronDown size={13} aria-hidden="true" />
+      </summary>
       {open && (
         <>
-          <div className="tag-members">
+          <ul className="tag-members" aria-label={`Members of ${tag.name}`}>
             {tag.nodeIds.slice(activePage * 25, (activePage + 1) * 25).map((id) => (
-              <div key={id}>
-                <button
-                  className="text-button"
-                  disabled={!loadedIds.has(id)}
-                  title={id}
-                  onClick={() => onSelect(id)}
-                >
-                  {workspace.annotations[id]?.label || short(id)}
-                </button>
+              <li key={id}>
+                <div className="tag-member-identity">
+                  <button
+                    className="text-button"
+                    disabled={!loadedIds.has(id)}
+                    title={id}
+                    aria-label={`Inspect ${workspace.annotations[id]?.label || id}`}
+                    onClick={() => onSelect(id)}
+                  >
+                    {workspace.annotations[id]?.label || <code>{short(id)}</code>}
+                  </button>
+                  <small>
+                    {workspace.annotations[id]?.label && (
+                      <>
+                        <code title={id}>{short(id)}</code> ·{' '}
+                      </>
+                    )}
+                    {id.startsWith('tx:')
+                      ? 'Transaction'
+                      : id.startsWith('out:')
+                        ? 'Output'
+                        : 'Address'}
+                    {!loadedIds.has(id) && ' · Unavailable in graph'}
+                  </small>
+                </div>
                 <button
                   className="icon-button"
+                  title={`Remove ${id} from ${tag.name}`}
                   aria-label={`Remove ${id} from ${tag.name}`}
-                  onClick={() =>
-                    onChange((current) => ({
-                      ...current,
-                      tags: (current.tags ?? []).map((item) =>
-                        item.id === tag.id
-                          ? {
-                              ...item,
-                              nodeIds: item.nodeIds.filter((member) => member !== id),
-                            }
-                          : item,
-                      ),
-                    }))
-                  }
+                  onClick={() => {
+                    onChange((current) => applyBatchTag(current, [id], tag.id, false));
+                    summary.current?.focus();
+                  }}
                 >
-                  <Trash2 size={12} />
+                  <Minus size={13} aria-hidden="true" />
                 </button>
-              </div>
+              </li>
             ))}
-          </div>
-          {!tag.nodeIds.length && <p className="small muted">No assigned entities yet.</p>}
+          </ul>
+          {!tag.nodeIds.length && (
+            <p className="small muted">
+              No members. Select an entity, then choose Add to selection.
+            </p>
+          )}
+          {tag.nodeIds.some((id) => id.startsWith('addr:')) && (
+            <p className="small muted">
+              Address members also tag their outputs. Removing an address removes that inherited
+              tag.
+            </p>
+          )}
           {pages > 1 && (
-            <div className="tag-form-actions">
+            <nav className="tag-pagination" aria-label={`Members of ${tag.name}`}>
               <button
                 aria-label={`Previous members of ${tag.name}`}
                 disabled={!activePage}
@@ -393,7 +470,7 @@ function TagMembers({
               >
                 Previous
               </button>
-              <span className="small">
+              <span role="status">
                 {activePage + 1} / {pages}
               </span>
               <button
@@ -403,17 +480,19 @@ function TagMembers({
               >
                 Next
               </button>
-            </div>
+            </nav>
           )}
         </>
       )}
     </details>
   );
 }
+
 export default function TagsPanel({
   workspace,
   graph,
   selected,
+  selectedIds,
   onChange,
   onShow,
   onSelect,
@@ -421,234 +500,342 @@ export default function TagsPanel({
   workspace: Workspace;
   graph: GraphData;
   selected?: GraphNode;
+  selectedIds?: readonly string[];
   onChange: Change;
   onShow: (tag: WorkspaceTag) => void;
   onSelect: (id: string) => void;
 }) {
   const loadedIds = useMemo(() => new Set(graph.nodes.map((node) => node.id)), [graph]);
+  const targetIds = useMemo(
+    () => [...new Set(selectedIds?.length ? selectedIds : selected ? [selected.id] : [])],
+    [selectedIds, selected?.id],
+  );
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string>();
   const [deleting, setDeleting] = useState<string>();
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState<{ id: string; message: string }>();
+  const [importStatus, setImportStatus] = useState('');
+  const newButton = useRef<HTMLButtonElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const editButtons = useRef(new Map<string, HTMLButtonElement>());
+  const returnFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (returnFocus.current) {
+      (returnFocus.current.isConnected ? returnFocus.current : search.current)?.focus();
+      returnFocus.current = null;
+    }
+  }, [editing, creating]);
   const tags = workspace.tags ?? [];
-  const save = (value: { name: string; color: string; description: string }, id?: string) => {
-    if (!value.name.trim()) {
-      setError('Tag name cannot be empty. The previous name is kept.');
-      return;
-    }
-    if (!id && tags.length >= MAX_WORKSPACE_TAGS) {
-      setError('Workspace supports at most 200 tags.');
-      return;
-    }
+  const visibleTags = tags.filter(
+    (tag) =>
+      tag.id === editing ||
+      `${tag.name} ${tag.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const deletion = tags.find((tag) => tag.id === deleting);
+  const closeEditor = () => {
+    returnFocus.current = editing
+      ? (editButtons.current.get(editing) ?? search.current)
+      : newButton.current;
+    setCreating(false);
+    setEditing(undefined);
+  };
+  const save = (value: TagValue, id?: string): string | undefined => {
+    if (!value.name.trim()) return 'Enter a tag name.';
+    if (!id && tags.length >= MAX_WORKSPACE_TAGS)
+      return 'Tag limit reached. Delete a tag before creating another.';
     if (
       !id &&
-      selected &&
-      tags.reduce((total, tag) => total + tag.nodeIds.length, 0) >= MAX_TAG_MEMBERS
-    ) {
-      setError('Workspace has reached the 50,000 tag membership limit.');
+      tags.reduce((total, tag) => total + tag.nodeIds.length, 0) + targetIds.length >
+        MAX_TAG_MEMBERS
+    )
+      return 'Member limit reached. Remove a tag assignment before adding another.';
+    if (tags.some((tag) => tag.id !== id && tag.name.toLowerCase() === value.name.toLowerCase()))
+      return 'A tag with this name already exists.';
+    const existing = tags.find((tag) => tag.id === id);
+    if (
+      existing &&
+      existing.name === value.name &&
+      existing.color === value.color &&
+      (existing.description ?? '') === value.description
+    )
       return;
-    }
-    if (tags.some((tag) => tag.id !== id && tag.name.toLowerCase() === value.name.toLowerCase())) {
-      setError('A tag with this name already exists.');
-      return;
-    }
     onChange((current) => ({
       ...current,
       tags: id
         ? (current.tags ?? []).map((tag) => (tag.id === id ? { ...tag, ...value } : tag))
-        : [
-            ...(current.tags ?? []),
-            { ...value, id: crypto.randomUUID(), nodeIds: selected ? [selected.id] : [] },
-          ],
+        : [...(current.tags ?? []), { ...value, id: crypto.randomUUID(), nodeIds: targetIds }],
     }));
-    if (!id) setCreating(false);
-    setError('');
+    if (!id) setQuery('');
   };
   return (
-    <div className="tags-panel">
-      <div className="tags-heading">
-        <h2 className="panel-title">Workspace tags</h2>
-        <button
-          className="icon-button"
-          aria-label="New tag"
-          disabled={tags.length >= 200}
-          onClick={() => {
-            setCreating(true);
-            setEditing(undefined);
-          }}
-        >
-          <Plus size={16} />
-        </button>
+    <div className="tags-panel compact-controls">
+      <div className="panel-section tags-toolbar">
+        <div className="tags-heading">
+          <h2 className="panel-title">Workspace tags</h2>
+          <button
+            ref={newButton}
+            aria-label="New tag"
+            aria-expanded={creating}
+            disabled={creating}
+            onClick={() => {
+              setCreating(true);
+              setEditing(undefined);
+              setActionError(undefined);
+            }}
+          >
+            <Plus size={13} aria-hidden="true" /> New tag
+          </button>
+        </div>
+        <div className="tags-search">
+          <input
+            ref={search}
+            type="search"
+            aria-label="Search tags"
+            placeholder="Search tags…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {query && (
+            <button
+              className="icon-button"
+              aria-label="Clear tag search"
+              title="Clear tag search"
+              onClick={() => {
+                setQuery('');
+                search.current?.focus();
+              }}
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <p className="tag-result-count" role="status">
+          {query.trim()
+            ? `${visibleTags.length} of ${tags.length} tags`
+            : `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}`}
+        </p>
       </div>
-      <p className="small muted">
-        Group related transactions, outputs and addresses. Labels and notes stay independent.
-      </p>
-      {error && (
-        <p role="alert" className="warning">
-          {error}
-        </p>
-      )}
       {creating && (
-        <>
-          <p className="small muted">
-            {selected
-              ? `Includes the selected ${selected.kind}.`
-              : 'Create a group, then add a graph selection.'}
-          </p>
-          <TagForm onSave={(value) => save(value)} onCancel={() => setCreating(false)} />
-        </>
+        <section className="panel-section tag-create" aria-label="New tag">
+          <h3>New tag</h3>
+          {targetIds.length > 0 && (
+            <p className="small muted">
+              Includes {targetIds.length} selected {targetIds.length === 1 ? 'entity' : 'entities'}.
+            </p>
+          )}
+          <TagForm onSave={(value) => save(value)} onClose={closeEditor} />
+        </section>
       )}
-      <input
-        type="search"
-        aria-label="Search tags"
-        placeholder="Find a tag…"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-      <details className="tags-label-import">
-        <summary>Group existing labels</summary>
+      <details className="panel-section tags-label-import">
+        <summary>
+          <span>Group existing labels</span>
+          <ChevronDown size={13} aria-hidden="true" />
+        </summary>
         <p className="small muted">
-          Create groups from matching nonempty labels, including imported BIP329 labels. Review them
-          here before treating them as known entities.
+          Create a tag for each distinct label. Existing tags, labels and notes stay unchanged.
         </p>
         <button
-          disabled={
-            tags.length >= 200 ||
-            !Object.values(workspace.annotations).some((annotation) => annotation.label.trim())
-          }
           onClick={() => {
             try {
               const proposals = tagsFromLabels(workspace);
               if (!proposals.length) {
-                setError('No new label groups to create.');
-                return;
-              }
-              if (tags.length + proposals.length > 200) {
-                setError('Too many label groups. Create selected tags individually.');
+                setImportStatus('No new tags to create from labels.');
+                setActionError(undefined);
                 return;
               }
               onChange((current) => ({
                 ...current,
                 tags: [...(current.tags ?? []), ...proposals],
               }));
-              setError('');
-            } catch (error) {
-              setError(error instanceof Error ? error.message : 'Could not group labels.');
+              setImportStatus(
+                `Created ${proposals.length} ${proposals.length === 1 ? 'tag' : 'tags'}.`,
+              );
+              setActionError(undefined);
+              setQuery('');
+            } catch {
+              setImportStatus('');
+              setActionError({
+                id: 'import',
+                message:
+                  'Tag or member limit reached. Create tags individually or remove unused assignments, then try again.',
+              });
             }
           }}
         >
           Create tags from labels
         </button>
+        {importStatus && (
+          <p role="status" className="small muted">
+            {importStatus}
+          </p>
+        )}
+        {actionError?.id === 'import' && (
+          <p role="alert" className="tag-error">
+            {actionError.message}
+          </p>
+        )}
       </details>
       <div className="tag-list">
-        {tags
-          .filter((tag) =>
-            `${tag.name} ${tag.description ?? ''}`.toLowerCase().includes(query.toLowerCase()),
-          )
-          .map((tag) => {
-            const ids = tagNodeIds(tag, graph);
-            return (
-              <article className="tag-card" key={tag.id}>
-                <div className="tags-heading">
-                  <h4>
-                    <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-                    {tag.name}
-                  </h4>
-                  <button
-                    className="text-button"
-                    aria-label={`Edit tag ${tag.name}`}
-                    onClick={() => {
-                      setEditing(editing === tag.id ? undefined : tag.id);
-                      setCreating(false);
-                    }}
-                  >
-                    Edit
-                  </button>
-                </div>
-                {editing === tag.id ? (
-                  <TagForm
-                    key={tag.id}
-                    tag={tag}
-                    onSave={(value) => save(value, tag.id)}
-                    onCancel={() => {
-                      setEditing(undefined);
-                      setError('');
-                    }}
+        {visibleTags.map((tag) => {
+          const ids = tagNodeIds(tag, graph);
+          const members = new Set(tag.nodeIds);
+          const assigned = targetIds.length > 0 && targetIds.every((id) => members.has(id));
+          return (
+            <article className="tag-card panel-section" key={tag.id}>
+              <div className="tags-heading">
+                <h3>
+                  <span
+                    className="tag-dot"
+                    style={{ backgroundColor: tag.color }}
+                    aria-hidden="true"
                   />
-                ) : (
-                  <>
-                    {tag.description && <p className="small">{tag.description}</p>}
-                    <p className="small muted">
-                      {ids.length} loaded {ids.length === 1 ? 'entity' : 'entities'} ·{' '}
-                      {tag.nodeIds.length} assigned{' '}
-                      {tag.nodeIds.length === 1 ? 'reference' : 'references'}
-                    </p>
-                    <div className="tag-form-actions tag-card-actions">
-                      <button disabled={!ids.length} onClick={() => onShow(tag)}>
-                        Show on graph
-                      </button>
+                  {tag.name}
+                </h3>
+                <button
+                  ref={(button) => {
+                    if (button) editButtons.current.set(tag.id, button);
+                    else editButtons.current.delete(tag.id);
+                  }}
+                  className="text-button"
+                  aria-label={`Edit tag ${tag.name}`}
+                  aria-expanded={editing === tag.id}
+                  disabled={creating}
+                  onClick={() => {
+                    if (editing === tag.id) closeEditor();
+                    else {
+                      setEditing(tag.id);
+                      setActionError(undefined);
+                    }
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+              {editing === tag.id ? (
+                <TagForm
+                  tag={tag}
+                  onSave={(value) => save(value, tag.id)}
+                  onClose={closeEditor}
+                  onDelete={() => setDeleting(tag.id)}
+                />
+              ) : (
+                <>
+                  {tag.description && <TagDescription description={tag.description} />}
+                  <p className="tag-count">
+                    {ids.length} loaded {ids.length === 1 ? 'entity' : 'entities'}
+                  </p>
+                  <div className="tag-card-actions">
+                    <button
+                      disabled={!ids.length}
+                      title="Show on graph"
+                      onClick={() => onShow(tag)}
+                    >
+                      <Network size={14} aria-hidden="true" /> Show
+                    </button>
+                    {targetIds.length > 0 && (
                       <button
-                        disabled={!selected || tag.nodeIds.includes(selected.id)}
-                        onClick={() =>
-                          selected &&
-                          onChange((current) => ({
-                            ...current,
-                            tags: (current.tags ?? []).map((item) =>
-                              item.id === tag.id
-                                ? { ...item, nodeIds: [...new Set([...item.nodeIds, selected.id])] }
-                                : item,
-                            ),
-                          }))
+                        disabled={assigned}
+                        title={
+                          assigned
+                            ? 'Already assigned to every selected entity'
+                            : `Add tag to ${targetIds.length} selected ${targetIds.length === 1 ? 'entity' : 'entities'}`
                         }
+                        onClick={() => {
+                          try {
+                            applyBatchTag(workspace, targetIds, tag.id, true);
+                            onChange((current) => applyBatchTag(current, targetIds, tag.id, true));
+                            setActionError(undefined);
+                          } catch {
+                            setActionError({
+                              id: tag.id,
+                              message:
+                                'Could not add selection. Check the tag member limit and try again.',
+                            });
+                          }
+                        }}
                       >
-                        Add selection
-                      </button>
-                    </div>
-                    <TagMembers
-                      tag={tag}
-                      workspace={workspace}
-                      loadedIds={loadedIds}
-                      onChange={onChange}
-                      onSelect={onSelect}
-                    />
-                    {deleting === tag.id ? (
-                      <div className="tag-form-actions">
-                        <button
-                          className="danger"
-                          onClick={() => {
-                            onChange((current) => ({
-                              ...current,
-                              tags: (current.tags ?? []).filter((item) => item.id !== tag.id),
-                            }));
-                            setDeleting(undefined);
-                          }}
-                        >
-                          Delete tag
-                        </button>
-                        <button onClick={() => setDeleting(undefined)}>Keep tag</button>
-                      </div>
-                    ) : (
-                      <button className="text-button" onClick={() => setDeleting(tag.id)}>
-                        Remove tag…
+                        {assigned ? (
+                          <>
+                            <Check size={13} aria-hidden="true" /> Assigned ({targetIds.length})
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={13} aria-hidden="true" /> Add to selection (
+                            {targetIds.length})
+                          </>
+                        )}
                       </button>
                     )}
-                  </>
-                )}
-              </article>
-            );
-          })}
+                  </div>
+                  {actionError?.id === tag.id && (
+                    <p role="alert" className="tag-error">
+                      {actionError.message}
+                    </p>
+                  )}
+                  <TagMembers
+                    tag={tag}
+                    workspace={workspace}
+                    loadedIds={loadedIds}
+                    onChange={onChange}
+                    onSelect={onSelect}
+                  />
+                </>
+              )}
+            </article>
+          );
+        })}
       </div>
       {!tags.length && !creating && (
-        <div className="empty-panel">
-          <Tag size={24} />
-          <h3>Keep track of counterparties</h3>
-          <p>
-            Create tags such as Exchange or Shop, then apply them from any selected transaction,
-            output or address.
-          </p>
-          <button onClick={() => setCreating(true)}>Create your first tag</button>
+        <div className="panel-section tag-empty">
+          <Tag size={20} aria-hidden="true" />
+          <h3>No tags yet</h3>
+          <p>Create a tag to group transactions, outputs or addresses.</p>
         </div>
+      )}
+      {!!tags.length && !visibleTags.length && (
+        <div className="panel-section tag-empty">
+          <h3>No matching tags</h3>
+          <p>Search by name or description.</p>
+          <button
+            onClick={() => {
+              setQuery('');
+              search.current?.focus();
+            }}
+          >
+            Clear search
+          </button>
+        </div>
+      )}
+      {deletion && (
+        <Modal
+          title={`Delete ${deletion.name}?`}
+          className="tag-delete-dialog compact-controls"
+          fallbackFocusSelector=".tags-panel input[type='search']"
+          onClose={() => setDeleting(undefined)}
+        >
+          <p>
+            All tag assignments will be removed. Entities, labels and notes stay in the workspace.
+          </p>
+          <div className="tag-form-actions">
+            <button data-autofocus onClick={() => setDeleting(undefined)}>
+              Cancel
+            </button>
+            <button
+              className="danger"
+              onClick={() => {
+                onChange((current) => ({
+                  ...current,
+                  tags: (current.tags ?? []).filter((tag) => tag.id !== deletion.id),
+                }));
+                setDeleting(undefined);
+                setEditing(undefined);
+              }}
+            >
+              <Trash2 size={13} aria-hidden="true" /> Delete tag
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

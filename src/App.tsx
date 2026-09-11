@@ -2690,6 +2690,7 @@ export default function App() {
                   workspace={w}
                   graph={graph}
                   selected={selected}
+                  selectedIds={pickingScanTargets ? undefined : selection.ids}
                   onChange={changeTags}
                   onSelect={(id) => {
                     select(id);
@@ -3116,12 +3117,14 @@ export default function App() {
                   !selected &&
                   tourStep?.view?.rightTab !== 'inspect' ? (
                   <WalletInspector
+                    key={`${w.id}:${wallet.id}`}
                     wallet={wallet}
                     workspace={w}
                     busy={!!operation}
                     canQuery={canQuery}
                     onScan={() => void scan(wallet)}
                     onShowActivity={() => showWalletActivity(wallet)}
+                    onEdit={() => setWalletNameDialog({ workspaceId: w.id, walletId: wallet.id })}
                     onShowWallet={() => {
                       updateFilters({ walletId: wallet.id, preserveContext: true });
                       setMobilePanel('graph');

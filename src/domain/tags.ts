@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TAG_COLORS } from './tagColors';
 import { addressToScriptHash } from '../lib/wallet';
 import { canonicalAddress, canonicalEntityNodeId } from './entityReferences';
 import type { GraphData, GraphNode, Network, Workspace, WorkspaceTag } from './types';
@@ -125,11 +126,10 @@ export function tagsFromLabels(workspace: Workspace): WorkspaceTag[] {
     group.nodeIds.add(canonical);
     grouped.set(key, group);
   }
-  const palette = ['#65cbbb', '#e4af67', '#9c9aed', '#e888a5', '#85bce8', '#a4c977'];
   const proposals = [...grouped.values()].map((group, index) => ({
     id: crypto.randomUUID(),
     name: group.name,
-    color: palette[index % palette.length],
+    color: TAG_COLORS[index % TAG_COLORS.length],
     nodeIds: [...group.nodeIds],
   }));
   assertTagBudget([...(workspace.tags ?? []), ...proposals]);

@@ -17,6 +17,7 @@ import {
   Crosshair,
   EyeOff,
   Eye,
+  Pencil,
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
@@ -33,7 +34,7 @@ import {
 } from '../domain/types';
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
-import { walletActivitySummary, walletCheckAge } from '../domain/walletActivity';
+import { walletCheckAge } from '../domain/walletActivity';
 import { CopyButton } from './CopyButton';
 import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
 import { ScriptInspector } from './ScriptInspector';
@@ -140,6 +141,7 @@ export function WalletInspector({
   onScan,
   onShowActivity,
   onShowWallet,
+  onEdit,
   onRemove,
 }: {
   wallet: Wallet;
@@ -149,9 +151,18 @@ export function WalletInspector({
   onScan: () => void;
   onShowActivity: () => void;
   onShowWallet?: () => void;
+  onEdit: () => void;
   onRemove: () => void;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const removeButton = useRef<HTMLButtonElement>(null);
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (confirmRemove) keepButton.current?.focus();
+    else if (wasConfirming.current) removeButton.current?.focus();
+    wasConfirming.current = confirmRemove;
+  }, [confirmRemove]);
   const receivedOutputCount = listWalletAddresses(workspace, wallet).reduce(
     (total, address) => total + address.loadedOutputCount,
     0,
@@ -159,112 +170,191 @@ export function WalletInspector({
   const histories = new Set(
     wallet.addresses.flatMap((a) => a.history?.map((h) => h.tx_hash) ?? []),
   );
+  const knownHistory = wallet.addresses.some((address) => address.history !== undefined);
+  const pendingCount = wallet.pendingTransactionIds?.length ?? 0;
+  const coverage =
+    wallet.scanComplete === true
+      ? 'Gap limit reached on both branches.'
+      : wallet.scanComplete === false
+        ? 'Partial scan. Refresh or increase Discovery limits.'
+        : 'Scan coverage not recorded.';
   return (
-    <div className="panel-section">
-      <span className="eyebrow">WATCH-ONLY WALLET</span>
-      <h2>{wallet.name}</h2>
-      <div className="wallet-refresh-summary compact-controls">
-        <button className="primary" disabled={busy || !canQuery} onClick={onScan}>
-          <RefreshCw size={13} />
-          {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
-        </button>
-        <p
-          className="small muted"
-          title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}
-        >
-          {walletCheckAge(wallet.scannedAt)}
-          {wallet.scannedAt && (
-            <small>Last checked {new Date(wallet.scannedAt).toLocaleString()}</small>
+    <div className="wallet-inspector">
+      <section className="panel-section">
+        <div className="wallet-inspector-heading compact-controls">
+          <h2>{wallet.name}</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Edit wallet name: ${wallet.name}`}
+            title="Edit wallet name"
+            onClick={onEdit}
+          >
+            <Pencil size={13} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="wallet-inspector-kind">Watch-only · {wallet.scriptType.toUpperCase()}</p>
+        <div className="wallet-refresh-summary compact-controls">
+          <button className="primary" disabled={busy || !canQuery} onClick={onScan}>
+            <RefreshCw size={13} aria-hidden="true" />
+            {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
+          </button>
+          <p
+            className="wallet-inspector-check-age"
+            title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}
+          >
+            {walletCheckAge(wallet.scannedAt)}
+          </p>
+          {!!wallet.unreviewedTransactionIds?.length && (
+            <button onClick={onShowActivity} title="Transactions loaded since your last review">
+              <Eye size={13} aria-hidden="true" /> Show new activity (
+              {wallet.unreviewedTransactionIds.length})
+            </button>
           )}
-        </p>
-        {wallet.lastActivity && (
-          <p className="small">Last check: {walletActivitySummary(wallet)}</p>
+          {wallet.activityOverflow && (
+            <p className="wallet-inspector-notice">
+              Showing the latest 10,000 unreviewed transactions. Earlier records remain in the
+              graph.
+            </p>
+          )}
+          {!!wallet.lastActivity?.missingTransactionCount && (
+            <p className="wallet-inspector-notice">
+              {wallet.lastActivity.missingTransactionCount} previously recorded transactions were
+              absent from the latest histories. Saved transactions and annotations are retained.
+            </p>
+          )}
+        </div>
+      </section>
+      <section className="panel-section" aria-label="Discovery">
+        <h3>Discovery</h3>
+        {wallet.scannedAt && (
+          <p
+            className={
+              wallet.scanComplete === false
+                ? 'wallet-inspector-notice'
+                : 'wallet-inspector-coverage'
+            }
+          >
+            {coverage}
+          </p>
         )}
-        {!!wallet.unreviewedTransactionIds?.length && (
-          <button onClick={onShowActivity} title="Transactions loaded since your last review">
-            <Eye size={13} /> Show new activity ({wallet.unreviewedTransactionIds.length})
+        {pendingCount > 0 && (
+          <p className="wallet-inspector-notice" role="status">
+            {pendingCount} {pendingCount === 1 ? 'transaction waiting' : 'transactions waiting'} to
+            load. Refresh to continue.
+          </p>
+        )}
+        <dl className="details">
+          <div>
+            <dt>Discovered addresses</dt>
+            <dd>{wallet.addresses.length}</dd>
+          </div>
+          <div>
+            <dt>Known transactions</dt>
+            <dd>
+              {knownHistory ? histories.size : wallet.scannedAt ? 'Not recorded' : 'Not checked'}
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Loaded received outputs{' '}
+              <WalletHelp title="About received outputs">
+                <p>
+                  Loaded outputs matching this wallet, including spent outputs. This count is not an
+                  unspent balance.
+                </p>
+              </WalletHelp>
+            </dt>
+            <dd>{receivedOutputCount}</dd>
+          </div>
+        </dl>
+        {onShowWallet && (
+          <button className="text-button wallet-inspector-show" onClick={onShowWallet}>
+            Show wallet matches
           </button>
         )}
-        {wallet.activityOverflow && (
-          <p className="small warning">
-            Showing the latest 10,000 unreviewed transactions. Earlier loaded transactions remain in
-            the full graph.
-          </p>
-        )}
-        {!!wallet.lastActivity?.missingTransactionCount && (
-          <p className="warning small">
-            {wallet.lastActivity.missingTransactionCount} previously observed transactions are
-            absent from checked histories. Saved transactions and annotations remain in the graph.
-            This can follow a replacement, removal or chain reorganization.
-          </p>
-        )}
-        {wallet.scannedAt && (
-          <p className={`scan-result ${wallet.scanComplete ? '' : 'warning'}`}>
-            {wallet.scanComplete
-              ? 'Gap limit reached on both branches.'
-              : 'Partial scan: increase limits or refresh to continue.'}
-            <small>
-              {wallet.scanGap ? `Gap limit ${wallet.scanGap} · ` : ''}
-              {wallet.scanLimit} addresses maximum per branch
-            </small>
-            {!!wallet.pendingTransactionIds?.length && (
-              <small>
-                {wallet.pendingTransactionIds.length} transaction downloads queued for the next
-                refresh.
-              </small>
+      </section>
+      {(wallet.scannedAt || wallet.lastActivity) && (
+        <section className="panel-section wallet-inspector-last-check" aria-label="Last check">
+          <h3>Last check</h3>
+          {wallet.scannedAt && (
+            <p className="wallet-inspector-timestamp">
+              Last checked{' '}
+              <time dateTime={wallet.scannedAt}>{new Date(wallet.scannedAt).toLocaleString()}</time>
+            </p>
+          )}
+          <dl className="details">
+            {wallet.lastActivity && (
+              <>
+                <div>
+                  <dt>New to workspace</dt>
+                  <dd>{wallet.lastActivity.newTransactionIds.length}</dd>
+                </div>
+                <div>
+                  <dt>Transactions refreshed</dt>
+                  <dd>{wallet.lastActivity.refreshedTransactionCount}</dd>
+                </div>
+              </>
             )}
-          </p>
-        )}
-      </div>
-      {onShowWallet && (
-        <button className="text-button" onClick={onShowWallet}>
-          Show wallet matches
-        </button>
+            {wallet.scanGap !== undefined && (
+              <div>
+                <dt>Gap limit</dt>
+                <dd>{wallet.scanGap}</dd>
+              </div>
+            )}
+            {wallet.scanLimit !== undefined && (
+              <div>
+                <dt>Addresses / branch</dt>
+                <dd>{wallet.scanLimit} max</dd>
+              </div>
+            )}
+          </dl>
+        </section>
       )}
-      <details className="wallet-key-details">
-        <summary>Extended public key</summary>
-        <p className="mono muted wrap small">{wallet.key}</p>
+      <details className="panel-section selection-evidence wallet-inspector-key">
+        <summary>
+          <span>Extended public key</span>
+          <ChevronDown size={15} aria-hidden="true" />
+        </summary>
+        <div className="evidence-body">
+          <p className="mono wrap">{wallet.key}</p>
+        </div>
       </details>
-      <dl className="details">
-        <div>
-          <dt>Address type</dt>
-          <dd>{wallet.scriptType}</dd>
-        </div>
-        <div>
-          <dt>Discovered addresses</dt>
-          <dd>{wallet.addresses.length}</dd>
-        </div>
-        <div>
-          <dt>History transactions</dt>
-          <dd>{histories.size}</dd>
-        </div>
-        <div>
-          <dt>Loaded received outputs</dt>
-          <dd>{receivedOutputCount}</dd>
-        </div>
-      </dl>
-      <p className="small muted">
-        Received outputs include spent outputs; this is not a wallet balance.
-      </p>
-      {confirmRemove ? (
-        <div className="stack">
-          <p className="small">
-            Remove this wallet? Loaded transactions and annotations stay in the workspace.
-          </p>
-          <button className="danger" onClick={onRemove}>
+      <div
+        className="panel-section wallet-inspector-removal compact-controls"
+        onKeyDown={(event) => {
+          if (confirmRemove && event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setConfirmRemove(false);
+          }
+        }}
+      >
+        {confirmRemove ? (
+          <>
+            <p className="small">
+              Remove {wallet.name}? Loaded transactions and annotations stay in the workspace.
+            </p>
+            <div className="wallet-inspector-remove-actions">
+              <button ref={keepButton} onClick={() => setConfirmRemove(false)}>
+                Keep wallet
+              </button>
+              <button className="danger" disabled={busy} onClick={onRemove}>
+                Remove wallet
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            ref={removeButton}
+            className="text-button danger"
+            disabled={busy}
+            onClick={() => setConfirmRemove(true)}
+          >
             Remove wallet
           </button>
-          <button onClick={() => setConfirmRemove(false)}>Keep wallet</button>
-        </div>
-      ) : (
-        <button
-          className="text-button danger"
-          disabled={busy}
-          onClick={() => setConfirmRemove(true)}
-        >
-          Remove wallet
-        </button>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -493,11 +493,20 @@ Graph selection toolbar, including color choices and name/description search. Ch
 The **Tags** tab beside Wallets and Entities manages groups, imports and graph filters. Address membership also applies to outputs loaded
 later. It does not assign the entire creating or spending transaction to that tag.
 
+In **Tags**, search names and descriptions, then use **Edit** to change a tag.
+Valid edits apply automatically; **Done** closes the editor. **Add to selection (N)**
+assigns the tag to every explicitly selected entity, including selections outside
+the current graph filters. **New tag** includes that same selection. Without a
+multi-selection, both use the currently inspected entity. Expand **Members** to inspect
+available references or remove an assignment with the minus button. Address members
+also tag their outputs. **Delete tag…** in the editor asks for confirmation before
+removing the tag and all its assignments.
+
 **Group existing labels** creates tags from matching nonempty labels, including
 BIP329 imports. It leaves labels, notes, and existing tag memberships alone. Labels
 longer than 100 characters and references outside transaction/output/address types
 are not grouped. Review these groups before treating them as known counterparties.
-Use **Show on graph** to isolate a tag with its connected transactions; **Clear** or
+Use **Show** to isolate a tag with its connected transactions; **Clear** or
 **All paths** restores the graph. Removing a tag keeps its members and annotations.
 
 The graph highlight selector can show wallet matches, manual tags, both, or neither.
@@ -508,6 +517,12 @@ precedence when both are shown. Analysis findings remain separate hypotheses or
 observations. Tags and highlight preferences are encrypted with the workspace.
 
 ## Returning to a wallet
+
+Select a wallet to inspect its discovery counts and refresh status. The title's
+pencil opens the wallet-name editor. **Last check** shows its timestamp,
+transaction counts and scan limits. Expand **Extended public key** to inspect the key.
+Pending downloads and incomplete scans stay visible. **Remove wallet** asks for
+confirmation and keeps loaded transactions and annotations.
 
 Unlock your saved workspace to resume its loaded snapshot. **Refresh wallet** checks
 receive and change histories with the configured bounds; **Refresh all wallets**
