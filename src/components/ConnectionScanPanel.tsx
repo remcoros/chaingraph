@@ -994,32 +994,6 @@ function ScanResultRow({
   const addLabel = isPrefix ? 'Add prefix' : result.context ? 'Add reconnection' : 'Add path';
   const visible = new Set(visibleNodeIds);
   const obscured = plan.nodeIds.some((id) => !visible.has(id) && !plan.newNodeIds.includes(id));
-  const tx =
-    workspace.transactions[result.endpoint.split(':')[1]] ??
-    workspace.connectionScans?.evidence[result.endpoint.split(':')[1]];
-  const count =
-    result.branchCount ??
-    (finding === 'many-inputs'
-      ? tx?.vin.filter((input) => input.txid && input.vout !== undefined).length
-      : finding === 'many-outputs'
-        ? tx?.vout.length
-        : undefined);
-  const descriptions: Partial<Record<ScanResultFinding, string>> = {
-    'many-inputs': `${count === undefined ? 'Many' : count} inputs. Choose an input to continue tracing.`,
-    'many-outputs': `${count === undefined ? 'Many' : count} outputs. Choose an output to continue tracing.`,
-    coinbase: 'Mining reward transaction; no earlier funding inputs.',
-    unspendable: 'This output cannot be spent.',
-    unspent: 'Unspent at the recorded check, including the mempool.',
-    'transaction-unavailable': 'The transaction needed to continue is unavailable.',
-    'spend-unknown': 'No verified spender or current unspent observation.',
-    'lookup-failed':
-      result.issueCode === 'timeout'
-        ? 'The next lookup timed out.'
-        : result.issueCode === 'invalid-response'
-          ? 'The backend returned an invalid response.'
-          : 'Could not load the next step.',
-    'conflicting-evidence': 'Observations disagree. Only the preceding verified path can be added.',
-  };
   const meeting = relation?.meeting ?? scanMeetingNode(result);
   const statuses = [...new Set([...result.path, ...(result.context?.path ?? [])])].map(
     (id) =>
@@ -1092,12 +1066,8 @@ function ScanResultRow({
         ))}
       </div>
       <div className="connection-scan-result-body">
-        {relation && <p className="connection-scan-result-description">{relation.description}</p>}
         {workspace.annotations[result.endpoint]?.label && (
           <p className="small">{workspace.annotations[result.endpoint].label}</p>
-        )}
-        {descriptions[finding] && (
-          <p className="connection-scan-result-description">{descriptions[finding]}</p>
         )}
         {category === 'issue' && !hasDirection && (
           <p className="small muted">Start a new scan to refresh this older result.</p>
