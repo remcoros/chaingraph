@@ -382,7 +382,13 @@ interrupted, never as jobs.
 The existing encrypted envelope format remains unchanged.
 
 `domain/connectionScanRecords.ts` upserts runs by ID in stable order, retaining
-findings from earlier scans. Streaming, dismissal and rechecks update their own
+distinct findings from earlier scans. Exact finding paths are deduplicated across
+runs by source, finding kind, endpoint, meeting point and directed path. Run IDs,
+settings and observation timestamps do not change identity. The latest copy
+supplies current observation metadata; an explicit dismissal stays attached to
+that identity until results are cleared. The same compaction runs for live
+snapshots, saved records and validated imports, before retained-record budgets
+and evidence pruning. Different paths retain their own original run context. Streaming, dismissal and rechecks update their own
 run without changing the latest scan's status. Only empty non-latest runs are
 pruned. The encrypted collection is bounded to 20 runs, 50 results per run,
 200 extra path transactions and 2 MiB total; reaching a bound rejects the write

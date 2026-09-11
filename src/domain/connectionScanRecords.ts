@@ -1,3 +1,4 @@
+import { deduplicateScanRuns } from './connectionScanGroups';
 import { z } from 'zod';
 import type { ScanResult, ScanRun } from './connectionScan';
 import { SCAN_LIMITS, scanPathHops, isScanNodeId } from './connectionScan';
@@ -416,7 +417,7 @@ function compactRecords(
   runs: ScanRun[],
   supplied: Record<string, Transaction> = {},
 ): ConnectionScanRecords {
-  runs = runs.filter((run, index) => run.results.length > 0 || index === runs.length - 1);
+  runs = deduplicateScanRuns(runs, workspace.connectionScans?.runs);
   const available = { ...workspace.connectionScans?.evidence, ...supplied };
   const needed = new Set(
     runs.flatMap((run) => run.results.flatMap((result) => [...scanResultEvidenceIds(result)])),
@@ -431,7 +432,7 @@ function compactRecords(
   return records;
 }
 
-/** Update one scan without removing findings or proof from other scans. */
+/** Update one scan, keeping the newest copy of repeated finding paths. */
 export function replaceScanRun(
   workspace: Workspace,
   run: ScanRun,
@@ -450,7 +451,7 @@ export function replaceScanRun(
   return { ...workspace, connectionScans: records };
 }
 
-/** Normalize validated imports while preserving all retained results and their proof. */
+/** Normalize validated imports and compact repeated finding paths with their proof. */
 export function latestConnectionScanRecords(
   workspace: Workspace,
 ): ConnectionScanRecords | undefined {

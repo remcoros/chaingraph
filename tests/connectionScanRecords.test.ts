@@ -162,8 +162,30 @@ describe('compact connection scan records', () => {
   it('rejects an additional scan at the run limit without dropping earlier findings', () => {
     const { workspace, run, evidence } = fixture();
     let saved = workspace;
-    for (let index = 0; index < 20; index++)
-      saved = replaceScanRun(saved, { ...run, id: `run-${index}` }, evidence);
+    for (let index = 0; index < 20; index++) {
+      const source = tn(100 + index);
+      saved = replaceScanRun(
+        saved,
+        {
+          ...run,
+          id: `run-${index}`,
+          source,
+          targetIds: [],
+          results: [
+            {
+              id: `result-${index}`,
+              kind: 'boundary',
+              endpoint: source,
+              path: [source],
+              directions: [],
+              hops: 0,
+              reason: 'unknown',
+            },
+          ],
+        },
+        { [id(100 + index)]: transaction(100 + index) },
+      );
+    }
     const before = saved.connectionScans;
     expect(() => replaceScanRun(saved, { ...run, id: 'overflow', results: [] })).toThrow(
       'Clear results before starting another scan',
@@ -171,7 +193,8 @@ describe('compact connection scan records', () => {
     expect(saved.connectionScans).toBe(before);
     expect(saved.connectionScans!.runs).toHaveLength(20);
     expect(
-      replaceScanRun(saved, { ...run, id: 'run-0', examined: 4 }).connectionScans!.runs,
+      replaceScanRun(saved, { ...saved.connectionScans!.runs[0], examined: 4 }).connectionScans!
+        .runs,
     ).toHaveLength(20);
     expect(replaceScanRun(clearScanRuns(saved), run, evidence).connectionScans!.runs).toEqual([
       run,
@@ -370,7 +393,6 @@ describe('compact connection scan records', () => {
     );
     store.undo(saved.id);
     expect(store.getSession(saved.id)!.data.connectionScans?.runs.map((item) => item.id)).toEqual([
-      run.id,
       'latest',
     ]);
     edit('Second annotation');
@@ -774,15 +796,27 @@ describe('scan finding evidence and metadata', () => {
 
   it('allows rechecks to recategorize an eleventh endpoint within the global result cap', () => {
     const { workspace, run, result } = findingFixture('unspent');
+    workspace.transactions[id(1)].vout = Array.from({ length: 51 }, (_, n) => ({
+      n,
+      value: 1,
+      scriptPubKey: { hex: '51' },
+    }));
+    const endpoints = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        ...result,
+        id: `endpoint:${i}`,
+        endpoint: out(1, i),
+        path: [tn(1), out(1, i)],
+      }));
     const rechecked = replaceScanRun(workspace, {
       ...run,
-      results: Array.from({ length: 11 }, (_, i) => ({ ...result, id: `endpoint:${i}` })),
+      results: endpoints(11),
     });
     expect(parseWorkspace(rechecked).connectionScans!.runs[0].results).toHaveLength(11);
     expect(() =>
       replaceScanRun(workspace, {
         ...run,
-        results: Array.from({ length: 51 }, (_, i) => ({ ...result, id: `endpoint:${i}` })),
+        results: endpoints(51),
       }),
     ).toThrow();
     const saved = replaceScanRun(workspace, {

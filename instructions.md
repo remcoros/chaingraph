@@ -161,8 +161,10 @@ endpoints and 10 evidence problems, reserving room in the 50-path allowance for
 connections and branch choices. Explicit rechecks may recategorize retained paths
 within that overall allowance.
 
-Starting another scan keeps earlier results in the same list. There is no scan
-history picker. **Clear all results** clears the collection, cancels an active
+Starting another scan keeps distinct earlier results in the same list. Repeated
+finding paths appear once, with the latest observation. Dismissed paths stay
+hidden when rediscovered. Different sources and alternative paths are retained.
+**Clear all results** clears the collection and dismissals, cancels an active
 scan, and leaves added graph nodes and annotations intact. Results stay encrypted
 with the workspace, bounded to 20 scans with findings, 50 results per scan,
 200 additional path transactions and 2 MiB total. Empty older scans are discarded.
