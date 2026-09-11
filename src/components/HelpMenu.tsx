@@ -1,5 +1,19 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { CircleHelp } from 'lucide-react';
+import {
+  ACCENT_THEMES,
+  applyAccentTheme,
+  readAccentTheme,
+  type AccentTheme,
+} from '../lib/accentTheme';
+
+const ACCENT_THEME_LABELS: Record<AccentTheme, string> = {
+  orange: 'Bitcoin orange',
+  red: 'Red',
+  green: 'Green',
+  blue: 'Blue',
+  purple: 'Purple',
+};
 
 export interface HelpAction {
   label: string;
@@ -9,6 +23,7 @@ export interface HelpAction {
 
 export function HelpMenu({ actions }: { actions: HelpAction[] }) {
   const [open, setOpen] = useState(false);
+  const [accentTheme, setAccentTheme] = useState(readAccentTheme);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -91,6 +106,24 @@ export function HelpMenu({ actions }: { actions: HelpAction[] }) {
             }
           }}
         >
+          <div className="help-theme-picker" role="group" aria-label="Accent theme">
+            {ACCENT_THEMES.map((theme) => (
+              <button
+                key={theme}
+                type="button"
+                role="menuitemradio"
+                tabIndex={-1}
+                className={`help-theme-choice help-theme-${theme}`}
+                aria-label={ACCENT_THEME_LABELS[theme]}
+                aria-checked={accentTheme === theme}
+                title={ACCENT_THEME_LABELS[theme]}
+                onClick={() => {
+                  setAccentTheme(theme);
+                  applyAccentTheme(theme);
+                }}
+              />
+            ))}
+          </div>
           {actions.map((action) => (
             <button
               key={action.label}

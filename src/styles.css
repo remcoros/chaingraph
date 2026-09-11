@@ -4,6 +4,10 @@
 * {
   box-sizing: border-box;
 }
+::selection {
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+}
 html,
 body {
   margin: 0;
@@ -81,7 +85,12 @@ button.primary {
   font-weight: 750;
 }
 button.primary:hover {
-  background: color-mix(in srgb, var(--color-accent) 87%, var(--color-ink));
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+button.primary:active {
+  background: var(--color-accent-pressed);
+  border-color: var(--color-accent-pressed);
 }
 button.primary:disabled {
   opacity: 0.4;
@@ -1746,6 +1755,49 @@ small,
   min-width: 220px;
   max-width: calc(100vw - 16px);
   z-index: 50;
+}
+.help-theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px 10px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.dropdown .help-theme-choice {
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--theme-swatch);
+  box-shadow: 0 0 0 1px var(--color-rule);
+}
+.dropdown .help-theme-choice:hover {
+  background: var(--theme-swatch);
+  border-color: color-mix(in srgb, var(--color-ink) 50%, transparent);
+}
+.dropdown .help-theme-choice[aria-checked='true'] {
+  border-color: var(--color-paper);
+  box-shadow:
+    0 0 0 2px var(--color-ink),
+    0 0 0 4px var(--color-paper);
+}
+.help-theme-orange {
+  --theme-swatch: #f7931a;
+}
+.help-theme-red {
+  --theme-swatch: #e05245;
+}
+.help-theme-green {
+  --theme-swatch: #b5e879;
+}
+.help-theme-blue {
+  --theme-swatch: #4da3ff;
+}
+.help-theme-purple {
+  --theme-swatch: #9b7bff;
 }
 .lookup-prefetch {
   display: flex;

@@ -621,7 +621,7 @@ export function WalletDialog({
               name: name.trim(),
               key: key.trim(),
               scriptType: script,
-              color: '#b5e879',
+              color: '#f7931a',
               addresses: [],
             });
             onClose();

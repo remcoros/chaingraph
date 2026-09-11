@@ -77,11 +77,11 @@
   justify-content: center;
 }
 .icon-palette-choice[aria-pressed='true'] {
-  border-color: var(--color-accent, #b5e879);
-  background: #b5e87920;
+  border-color: var(--color-accent, #f7931a);
+  background: color-mix(in srgb, var(--color-accent, #f7931a) 12%, var(--color-paper));
 }
 .icon-palette-choice:focus-visible {
-  outline: 2px solid var(--color-accent, #b5e879);
+  outline: 2px solid var(--color-accent, #f7931a);
   outline-offset: 1px;
 }
 .icon-palette-footer {

@@ -32,7 +32,7 @@ export function readGraphPalette(element: HTMLElement): GraphPalette {
     input: color('--color-flow-input', '#83baff'),
     flowOutput: color('--color-flow-output', '#82cfaa'),
     address: color('--color-address', '#919fd1'),
-    accent: color('--color-accent', '#eab66b'),
+    accent: color('--color-accent', '#f7931a'),
     muted: color('--color-muted', '#74818b'),
     background: color('--color-paper', '#111a20'),
   };
