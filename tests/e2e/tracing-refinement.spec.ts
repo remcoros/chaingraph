@@ -81,7 +81,7 @@ for (const depth of ['0', '1'])
     await row.getByRole('button', { name: /Remove .* from workspace/ }).click();
     await expect(page.locator('.statusbar')).toContainText('0 transactions');
     await expect(page.locator('.entity-row')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Undo workspace change', exact: true }).first().click();
+    await page.locator('.workspace-undo').first().click();
     await expect(page.locator('.statusbar')).toContainText('2 transactions');
   });
 
@@ -192,7 +192,7 @@ test('deleting a root while manual tracing is pending discards late results and 
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
   await expect(page.locator('.statusbar')).toContainText('0 transactions');
   expect(Object.keys((await saved(page))!.transactions)).toEqual([]);
-  await page.getByRole('button', { name: 'Undo workspace change', exact: true }).first().click();
+  await page.locator('.workspace-undo').first().click();
   await expect(page.locator('.statusbar')).toContainText('1 transaction');
 });
 
@@ -258,6 +258,6 @@ test('a retained output placeholder cannot admit a late trace after its loaded c
   await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
   const result = (await saved(page))!;
   expect(Object.keys(result.transactions)).toEqual([child]);
-  await page.getByRole('button', { name: 'Undo workspace change', exact: true }).first().click();
+  await page.locator('.workspace-undo').first().click();
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });

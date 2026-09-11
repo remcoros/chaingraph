@@ -28,7 +28,7 @@ in the workspace menu saves unencrypted labels.
 
 ## Find activity
 
-Use the quick input in the center of the workbench bar to load a transaction ID, an address, or an output reference written as `transaction-id:output-index`. Undo and export sit on the right. On narrow screens, the input wraps below the workbench tabs. Adding an existing entity selects, reveals and centers it immediately, including while offline. Any requested ancestry or address-history loading can continue once the entity is in view. Select an item in the graph or entity list to inspect its details and available actions.
+Use the quick input in the center of the workbench bar to load a transaction ID, an address, or an output reference written as `transaction-id:output-index`. Undo and export sit on the right. Hover Undo to see the next action, such as “Undo: Change label” or “Undo: Add path”. Undo descriptions follow the active workspace and grouped edits. On narrow screens, the input wraps below the workbench tabs. Adding an existing entity selects, reveals and centers it immediately, including while offline. Any requested ancestry or address-history loading can continue once the entity is in view. Select an item in the graph or entity list to inspect its details and available actions.
 
 **Load previous txs**, on a selected transaction, adds one earlier level. For an output, **Open creating tx** opens only the transaction that created that outpoint, loading it if needed. Use the transaction-level action to follow its inputs further. A coinbase transaction has no earlier inputs.
 

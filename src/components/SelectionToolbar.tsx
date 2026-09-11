@@ -23,6 +23,7 @@ export interface SelectionToolbarProps {
   onApply: (summary: string, update: (workspace: Workspace) => Workspace) => number | undefined;
   /** Current undo head of the workspace session. */
   undoToken: number;
+  undoDescription?: string;
   onSetHidden: (ids: string[], hidden: boolean) => void;
   onIsolate: (ids: string[]) => void;
   onUndo: () => void;
@@ -38,6 +39,7 @@ export function SelectionToolbar({
   matchingPending = false,
   onApply,
   undoToken,
+  undoDescription,
   onSetHidden,
   onIsolate,
   onUndo,
@@ -199,8 +201,8 @@ export function SelectionToolbar({
         <button
           type="button"
           className="selection-toolbar-undo"
-          aria-label={`Undo: ${owned.summary}`}
-          title={`Undo: ${owned.summary}`}
+          aria-label={`Undo: ${undoDescription ?? owned.summary}`}
+          title={`Undo: ${undoDescription ?? owned.summary}`}
           onClick={() => {
             onUndo();
             setUndoable(undefined);

@@ -1,6 +1,7 @@
 import { TransactionFetchScope, transactionScheduler } from './transactionScheduler';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Transaction, Workspace } from '../domain/types';
+import { describeWorkspaceChange } from '../domain/undoDescription';
 import {
   MAX_SCAN_EVIDENCE_TRANSACTIONS,
   MAX_SCAN_RECORD_BYTES,
@@ -67,13 +68,17 @@ export interface SavedWorkspace {
   envelope?: EncryptedEnvelope;
   envelopeRef?: string;
 }
+export interface UndoEntry {
+  workspace: Workspace;
+  description: string;
+}
 export interface Session {
   fetchScope: TransactionFetchScope;
   data: Workspace;
   password: string;
   revision: number;
   savedRevision: number;
-  history: Workspace[];
+  history: UndoEntry[];
   /** Increments whenever the undo head changes, so a caller can tell whether its
    * own edit is still the step that Undo would restore. Presentation-only writes
    * leave it untouched. */
@@ -371,7 +376,13 @@ export class WorkspaceSessionStore {
     // Legacy or stale index labels are migrated from the authenticated workspace on save.
     this.add(data, password, entry.publicName === data.name);
   };
-  update = (id: string, fn: (w: Workspace) => Workspace, undo = true, group?: string) => {
+  update = (
+    id: string,
+    fn: (w: Workspace) => Workspace,
+    undo = true,
+    group?: string,
+    description?: string,
+  ) => {
     if (this.locking.has(id)) return;
     const current = this.state.sessions.find((s) => s.data.id === id);
     if (!current) return;
@@ -410,28 +421,48 @@ export class WorkspaceSessionStore {
                 s.undoRevision + ((undo && !coalesce) || (!undo && evidenceChanged) ? 1 : 0),
               history: undo
                 ? coalesce
-                  ? s.history
-                  : [...s.history.slice(-14), s.data]
+                  ? s.history.map((entry, index) =>
+                      index === s.history.length - 1
+                        ? {
+                            ...entry,
+                            description:
+                              description ?? describeWorkspaceChange(entry.workspace, data),
+                          }
+                        : entry,
+                    )
+                  : [
+                      ...s.history.slice(-14),
+                      {
+                        workspace: s.data,
+                        description: description ?? describeWorkspaceChange(s.data, data),
+                      },
+                    ]
                 : evidenceChanged
                   ? []
-                  : s.history.map((snapshot) => ({
-                      ...carryObservationContext(
-                        carryScanMetadata(snapshot, data),
-                        current.data,
-                        data,
-                      ),
-                      // Latest scan results are not an undoable archive. Preserve
-                      // pre-path evidence on camera writes, but carry explicit
-                      // result replacement/clearing through older edit snapshots.
-                      ...(data.connectionScans !== current.data.connectionScans
-                        ? { connectionScans: scanRecordsForUndo(snapshot, data) }
-                        : {}),
-                      view: {
-                        ...data.view,
-                        hiddenNodeIds: snapshot.view.hiddenNodeIds,
-                        graphNodeIds: snapshot.view.graphNodeIds,
-                      },
-                    })),
+                  : s.history.map((entry) => {
+                      const snapshot = entry.workspace;
+                      return {
+                        ...entry,
+                        workspace: {
+                          ...carryObservationContext(
+                            carryScanMetadata(snapshot, data),
+                            current.data,
+                            data,
+                          ),
+                          // Latest scan results are not an undoable archive. Preserve
+                          // pre-path evidence on camera writes, but carry explicit
+                          // result replacement/clearing through older edit snapshots.
+                          ...(data.connectionScans !== current.data.connectionScans
+                            ? { connectionScans: scanRecordsForUndo(snapshot, data) }
+                            : {}),
+                          view: {
+                            ...data.view,
+                            hiddenNodeIds: snapshot.view.hiddenNodeIds,
+                            graphNodeIds: snapshot.view.graphNodeIds,
+                          },
+                        },
+                      };
+                    }),
             },
       ),
     });
@@ -444,7 +475,7 @@ export class WorkspaceSessionStore {
         s.data.id === id && s.history.length
           ? {
               ...s,
-              data: s.history[s.history.length - 1],
+              data: s.history[s.history.length - 1].workspace,
               history: s.history.slice(0, -1),
               revision: s.revision + 1,
               undoRevision: s.undoRevision + 1,

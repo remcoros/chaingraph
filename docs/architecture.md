@@ -61,6 +61,15 @@ See [the design reference](research/bitcoin-amount-display.md).
 
 ## State and privacy
 
+Undo history stores up to 15 session-only entries pairing a workspace snapshot
+with a short action description. `src/domain/undoDescription.ts` derives descriptions
+from changed fields; callers can supply an explicit action such as Add path.
+Coalesced edits retain their initial snapshot and update its description to cover
+the combined change. Non-undo presentation writes update snapshot context while
+retaining descriptions; evidence invalidation clears both together. Undo pops
+both together. Desktop, mobile and batch Undo share the current entry description.
+History is not part of workspace persistence or exports.
+
 An unlocked session holds its workspace and password in browser memory. Annotation fields update the workspace immediately, with continuous typing in one field grouped into an Undo step. Presentation writes preserve the latest view across Undo. Mutations increment a revision; autosave serializes an encrypted snapshot after a short debounce and records which revision reached storage. Saves are serialized to avoid races. Graph gestures pause automatic save dispatch and index publication until interaction settles. The adapter coalesces camera snapshots after 1.2 seconds of quiet and schedules publication during idle time, retaining immutable geometry across camera-only changes. Explicit lock/export/switch checkpoints flush the current camera synchronously. Full workspace validation, serialization, compression and encryption run in a single-job browser worker; saves return only the encrypted envelope. Unlock and file import use the same serialized worker queue for file JSON parsing, authenticated decryption, bounded decompression, schema migration and complete wallet derivation validation. Reads return validated workspace data only to browser memory. Workers terminate on completion, failure or timeout; closing a read dialog aborts queued work or terminates an active read and prevents late session opening. Error messages come from allowlisted codes, never raw platform or schema exception text. Transport still uses structured cloning, so dispatch waits for idle interaction; it is not zero-copy. Save failures retain unlocked edits. See [performance findings](research/graph-autosave-performance.md). Locking first flushes pending graph state, freezes edits, waits for a current encrypted save, then removes the unlocked session. Failed saves leave the session open. Evidence-changing chain-data refreshes clear snapshot undo history so an old undo cannot discard newly fetched transactions. Quiet checks and activity acknowledgments carry the latest scan metadata into retained snapshots, preserving unrelated user-edit undo without reviving an old activity queue. It is not a guarantee of secure erasure from JavaScript memory.
 
 Create, unlock and encrypted-import dialogs use local encryption action groups

@@ -420,7 +420,7 @@ test('automatic annotation edits survive view changes and undo restores the late
   await page.getByLabel('Size nodes by').selectOption('value');
   await expect(label).toHaveValue('Second context');
   await label.fill('Third context');
-  await page.getByRole('button', { name: 'Undo workspace change' }).click();
+  await page.locator('.workspace-undo').click();
   await expect(label).toHaveValue('Second context');
   await expect(notes).toHaveValue('Keep the latest note');
   await notes.fill('Note changed after undo');
@@ -751,8 +751,6 @@ test('compact header keeps workspace tabs and lookup controls reachable with key
   await expect(
     page.getByRole('button', { name: 'Export encrypted workspace', exact: true }),
   ).toBeInViewport({ ratio: 1 });
-  await expect(
-    page.getByRole('button', { name: 'Undo workspace change', exact: true }),
-  ).toBeVisible();
+  await expect(page.locator('.workspace-undo')).toBeVisible();
   expect(calls).toHaveLength(0);
 });

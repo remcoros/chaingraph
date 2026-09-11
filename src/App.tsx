@@ -867,8 +867,8 @@ export default function App() {
     }
   }, [w?.id]);
   const change = useCallback(
-    (fn: (data: Workspace) => Workspace, undo = true, group?: string) => {
-      if (w) ws.update(w.id, fn, undo, group);
+    (fn: (data: Workspace) => Workspace, undo = true, group?: string, description?: string) => {
+      if (w) ws.update(w.id, fn, undo, group, description);
     },
     [w, ws.update],
   );
@@ -1784,6 +1784,8 @@ export default function App() {
     [visibleGraph],
   );
   const undoToken = ws.getSession(w?.id ?? '')?.undoRevision ?? 0;
+  const undoDescription = ws.active?.history.at(-1)?.description;
+  const undoLabel = undoDescription ? `Undo: ${undoDescription}` : 'Nothing to undo';
   const applyBatch = (summary: string, update: (data: Workspace) => Workspace) => {
     if (!w) return undefined;
     const before = ws.getSession(w.id)?.undoRevision;
@@ -2480,8 +2482,8 @@ export default function App() {
             <div className="workspace-actions" data-tour="workspace-actions">
               <button
                 className="icon-button workspace-undo"
-                aria-label="Undo workspace change"
-                title="Undo label, analysis, or view change"
+                aria-label={undoLabel}
+                title={undoLabel}
                 disabled={!ws.active?.history.length || !!operation}
                 onClick={() => ws.undo(w.id)}
               >
@@ -2523,14 +2525,15 @@ export default function App() {
                   >
                     <button
                       className="mobile-workspace-undo"
-                      aria-label="Undo workspace change"
+                      aria-label={undoLabel}
+                      title={undoLabel}
                       disabled={!ws.active?.history.length || !!operation}
                       onClick={() => {
                         setMenu(false);
                         ws.undo(w.id);
                       }}
                     >
-                      <Undo2 size={15} /> Undo workspace change
+                      <Undo2 size={15} /> Undo
                     </button>
                     <button
                       onClick={() => {
@@ -3017,20 +3020,24 @@ export default function App() {
                       setRightTab('scan');
                     }}
                     onAdd={(result, prefixLength, evidence) => {
-                      change((current) =>
-                        addScanPath(
-                          evidence
-                            ? {
-                                ...current,
-                                connectionScans: {
-                                  runs: current.connectionScans?.runs ?? [],
-                                  evidence: { ...current.connectionScans?.evidence, ...evidence },
-                                },
-                              }
-                            : current,
-                          result,
-                          prefixLength,
-                        ),
+                      change(
+                        (current) =>
+                          addScanPath(
+                            evidence
+                              ? {
+                                  ...current,
+                                  connectionScans: {
+                                    runs: current.connectionScans?.runs ?? [],
+                                    evidence: { ...current.connectionScans?.evidence, ...evidence },
+                                  },
+                                }
+                              : current,
+                            result,
+                            prefixLength,
+                          ),
+                        true,
+                        undefined,
+                        'Add path',
                       );
                       setGraphFilters({});
                       setFocusRequest(undefined);
@@ -3279,6 +3286,7 @@ export default function App() {
             matchingPending={graphFiltering}
             onApply={applyBatch}
             undoToken={undoToken}
+            undoDescription={undoDescription}
             onSetHidden={setEntityHidden}
             onIsolate={(ids) => {
               prepareIsolation(ids);

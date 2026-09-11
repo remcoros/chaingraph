@@ -69,10 +69,7 @@ for (const phone of [false, true]) {
     );
     // Undo survives cached Graph navigation. Phone exposes it in workspace actions.
     if (phone) await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
-    await page
-      .getByRole('button', { name: 'Undo workspace change', exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.locator('.workspace-undo, .mobile-workspace-undo').filter({ visible: true }).click();
     await page.getByRole('button', { name: 'Notes', exact: true }).click();
     await expect(note).toHaveValue(prior);
     await note.fill(marker);
@@ -117,10 +114,7 @@ for (const phone of [false, true]) {
     await expect(note).toHaveValue('');
     await page.keyboard.press('Escape');
     if (phone) await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
-    await page
-      .getByRole('button', { name: 'Undo workspace change', exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.locator('.workspace-undo, .mobile-workspace-undo').filter({ visible: true }).click();
     await page.getByRole('button', { name: 'Notes', exact: true }).click();
     await expect(note).toHaveValue(marker);
     await page.keyboard.press('Escape');

@@ -641,11 +641,11 @@ test('batch labels, tags and icons apply to the explicit selection in one undoab
     .click();
   await screenshot(page, 'records-batch-desktop');
 
-  await page.getByRole('button', { name: 'Undo workspace change' }).first().click();
+  await page.locator('.workspace-undo').first().click();
   await expect(page.locator('.wallet-review-records')).not.toContainText('🏦');
-  await page.getByRole('button', { name: 'Undo workspace change' }).first().click();
+  await page.locator('.workspace-undo').first().click();
   await expect(page.locator('.wallet-review-records')).toContainText('Reviewed savings');
-  await page.getByRole('button', { name: 'Undo workspace change' }).first().click();
+  await page.locator('.workspace-undo').first().click();
   await expect(page.locator('.wallet-review-records')).not.toContainText('Reviewed savings');
   await expect(page.locator('.wallet-review-records')).toContainText('Exchange A withdrawal');
 });
@@ -1123,7 +1123,9 @@ for (const viewport of [
     await screenshot(page, `polish-${viewport.name}-metadata`);
     if (viewport.name === 'phone')
       await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Undo workspace change' }).first()).toBeEnabled();
+    await expect(
+      page.locator('.workspace-undo, .mobile-workspace-undo').filter({ visible: true }),
+    ).toBeEnabled();
   });
 }
 
@@ -1325,7 +1327,7 @@ test('batch review rows sharing one subject edit one canonical metadata target',
   await editor.getByRole('button', { name: 'Apply label', exact: true }).click();
   await expect(rows.filter({ hasText: 'One canonical output' })).toHaveCount(2);
   await expect(rows.filter({ hasText: 'Exchange A withdrawal' })).toHaveCount(1);
-  await page.getByRole('button', { name: 'Undo workspace change' }).first().click();
+  await page.locator('.workspace-undo').first().click();
   await expect(rows.filter({ hasText: 'One canonical output' })).toHaveCount(0);
   await expect(rows.filter({ hasText: 'Fixture relationship context' })).toHaveCount(1);
 });

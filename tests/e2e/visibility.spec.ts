@@ -61,7 +61,7 @@ async function undo(page: Page) {
   if (await button.isVisible()) await button.click();
   else {
     await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
-    await page.getByRole('button', { name: 'Undo workspace change', exact: true }).click();
+    await page.locator('.mobile-workspace-undo').click();
   }
 }
 

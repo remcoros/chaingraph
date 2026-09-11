@@ -290,7 +290,9 @@ test('a batch Undo retires when a later edit owns the undo step, protecting that
   await labelEditor.getByLabel('Batch label').fill('Repeated label');
   await labelEditor.getByLabel('Replace existing labels').check();
   await labelEditor.getByRole('button', { name: 'Apply label' }).click();
-  await expect(toolbar.getByRole('button', { name: /^Undo: Label/ })).toBeVisible();
+  await expect(
+    toolbar.getByRole('button', { name: /^Undo: Change (?:\d+ )?labels?/ }),
+  ).toBeVisible();
   await toolbar.getByRole('button', { name: 'Label', exact: true }).click();
   await labelEditor.getByLabel('Batch label').fill('Repeated label');
   await labelEditor.getByLabel('Replace existing labels').check();
@@ -316,7 +318,7 @@ test('combined workbench navigation retains batch Undo and isolation reveals amo
   const editor = page.getByRole('dialog', { name: 'Label selected records' });
   await editor.getByLabel('Batch label').fill('Combined review');
   await editor.getByRole('button', { name: 'Apply label' }).click();
-  const undo = toolbar.getByRole('button', { name: /^Undo: Label/ });
+  const undo = toolbar.getByRole('button', { name: /^Undo: Change (?:\d+ )?labels?/ });
   await expect(undo).toBeVisible();
   const modes = page.getByRole('navigation', { name: 'Workbench', exact: true });
   await modes.getByRole('button', { name: 'Analysis', exact: true }).click();
