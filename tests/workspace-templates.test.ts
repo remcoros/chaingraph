@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WORKSPACE_TEMPLATES, createTemplateWorkspace } from '../src/domain/workspaceTemplates';
 import { buildGraph, parseWorkspace } from '../src/domain/workspace';
+import { indexPreviousOutputs } from '../src/domain/prevouts';
 import { outputNodeId, sats, txNodeId } from '../src/domain/types';
 import { projectGraphMembership } from '../src/domain/graphMembership';
 import { transactionNodeIds } from '../src/domain/visibility';
@@ -9,6 +10,16 @@ import { formatBitcoinAmount } from '../src/domain/amountFormat';
 afterEach(() => vi.restoreAllMocks());
 
 describe('real annotated workspace templates', () => {
+  it('keeps every bundled snapshot small enough to ship uncompressed', async () => {
+    const { stat } = await import('node:fs/promises');
+    for (const template of WORKSPACE_TEMPLATES) {
+      const { size } = await stat(`src/domain/templateData/${template.id}.json`);
+      // Snapshots record the outputs an example displays. Shipping whole parent
+      // transactions for their inputs would reintroduce megabytes of unused data.
+      expect({ id: template.id, kb: size <= 400_000 }).toEqual({ id: template.id, kb: true });
+    }
+  });
+
   it('offers six mainnet examples followed by three testnet4 examples', () => {
     expect(new Set(WORKSPACE_TEMPLATES.map((entry) => entry.id)).size).toBe(
       WORKSPACE_TEMPLATES.length,
@@ -34,9 +45,7 @@ describe('real annotated workspace templates', () => {
       expect(workspace.demo).toBe(false);
       expect(workspace.wallets).toHaveLength(template.id === 'mainnet-public-wallet' ? 1 : 0);
       expect(workspace.findings).toEqual([]);
-      expect(Object.keys(workspace.transactions).length).toBeLessThanOrEqual(
-        template.id === 'mainnet-wabisabi' ? 120 : 30,
-      );
+      expect(Object.keys(workspace.transactions).length).toBeLessThanOrEqual(30);
       expect(
         Object.values(workspace.transactions).every(
           (tx) => tx.vin.length <= (template.id === 'mainnet-wabisabi' ? 350 : 326),
@@ -44,9 +53,13 @@ describe('real annotated workspace templates', () => {
       ).toBe(true);
       const selected = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
       expect(selected).toBeDefined();
+      // Every input resolves to known previous-output content, whether the parent is
+      // loaded in full or the output is attached to the spending input.
+      const previous = indexPreviousOutputs(workspace);
       for (const input of selected.vin) {
         if (input.txid === undefined) continue;
-        expect(workspace.transactions[input.txid]?.vout[input.vout!]?.n).toBe(input.vout);
+        const resolution = previous.get(outputNodeId(input.txid, input.vout!));
+        expect(resolution?.status === 'loaded' || resolution?.status === 'attached').toBe(true);
       }
       // Every cached spend references a real output of its cached parent.
       for (const tx of Object.values(workspace.transactions)) {
@@ -153,8 +166,9 @@ describe('real annotated workspace templates', () => {
         first.transactions[root].vout[0].scriptPubKey.hex = '6a';
         first.annotations[Object.keys(first.annotations)[0]].note = 'Edited';
         first.tags![0].nodeIds.length = 0;
-        first.inputContext![Object.keys(first.inputContext!)[0]].length = 0;
-        first.contextTransactionIds!.length = 0;
+        const contextId = Object.keys(first.inputContext ?? {})[0];
+        if (contextId) first.inputContext![contextId].length = 0;
+        if (first.contextTransactionIds) first.contextTransactionIds.length = 0;
         first.view.transactionFlow!.open = false;
         expect(second).toEqual(expected);
         const third = await createTemplateWorkspace(template.id);
@@ -276,9 +290,15 @@ describe('real annotated workspace templates', () => {
     const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
     expect(root.vin).toHaveLength(327);
     expect(root.vout).toHaveLength(279);
-    expect(Object.keys(workspace.transactions)).toHaveLength(114);
-    for (const input of root.vin)
-      expect(workspace.transactions[input.txid!].vout[input.vout!]).toBeDefined();
+    // The snapshot carries the CoinJoin alone; each spend records the exact output it
+    // consumed instead of the whole parent transaction.
+    expect(Object.keys(workspace.transactions)).toHaveLength(1);
+    expect(workspace.contextTransactionIds ?? []).toEqual([]);
+    const previous = indexPreviousOutputs(workspace);
+    for (const input of root.vin) {
+      expect(input.prevout?.scriptPubKey.hex).toMatch(/^(?:[0-9a-f]{2})+$/);
+      expect(previous.get(outputNodeId(input.txid!, input.vout!))?.status).toBe('attached');
+    }
     const group = workspace.tags!.find(
       (tag) => tag.name === `${formatBitcoinAmount(2_097_152)} × 20`,
     );
@@ -288,7 +308,7 @@ describe('real annotated workspace templates', () => {
         .map((output) => outputNodeId(root.txid, output.n)),
     );
     expect(workspace.findings).toEqual([]);
-    expect(buildGraph(workspace).nodes.length).toBeLessThan(800);
+    expect(buildGraph(workspace).nodes.length).toBe(607);
   });
 
   it('includes a derived public watch-only wallet with honest partial scan state', async () => {

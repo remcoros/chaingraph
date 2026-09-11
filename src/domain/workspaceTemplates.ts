@@ -312,12 +312,14 @@ export async function createTemplateWorkspace(
   workspace.description = description ?? template.description;
   workspace.transactions = snapshot.transactions;
 
-  // Retain complete parent observations while displaying only the referenced outputs.
+  // Scope the display of parents that the snapshot loads in full. Parents recorded
+  // only as attached input prevouts carry no further outputs to scope.
   const roots = new Set(snapshot.roots);
   workspace.inputContext = {};
   for (const root of snapshot.roots) {
     for (const input of snapshot.transactions[root].vin) {
       if (!input.txid || input.vout === undefined || roots.has(input.txid)) continue;
+      if (!snapshot.transactions[input.txid]) continue;
       const outputs = (workspace.inputContext[input.txid] ??= []);
       if (!outputs.includes(input.vout)) outputs.push(input.vout);
     }
