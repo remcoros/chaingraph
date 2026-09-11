@@ -693,102 +693,104 @@ export default function GraphView(props: GraphViewProps) {
             <span>No visible graph nodes</span>
           </div>
         )}
-        {(props.navigation || props.filtering || layout.busy || layout.error) && (
-          <div
-            ref={navigationRef}
-            className="graph-navigation-overlay"
-            onPointerEnter={() => dismissCard()}
-            onFocusCapture={() => dismissCard()}
-          >
-            <div className="graph-navigation-shell" role="toolbar" aria-label="Graph navigation">
-              <div className="graph-navigation-row">
-                {props.navigation}
-                <div
-                  className="graph-camera-controls"
-                  role="group"
-                  aria-label="Graph camera and layout"
-                >
-                  <button
-                    aria-label="Fit graph"
-                    title="Fit all visible nodes"
-                    onClick={() => graphRef.current?.fit()}
-                    disabled={!props.nodes.length}
+        <div className="graph-overlays">
+          {(props.navigation || props.filtering || layout.busy || layout.error) && (
+            <div
+              ref={navigationRef}
+              className="graph-navigation-overlay"
+              onPointerEnter={() => dismissCard()}
+              onFocusCapture={() => dismissCard()}
+            >
+              <div className="graph-navigation-shell" role="toolbar" aria-label="Graph navigation">
+                <div className="graph-navigation-row">
+                  {props.navigation}
+                  <div
+                    className="graph-camera-controls"
+                    role="group"
+                    aria-label="Graph camera and layout"
                   >
-                    <Expand size={14} />
-                    <span>Fit</span>
-                  </button>
-                  {rendererActions.zoom && (
-                    <>
-                      <button
-                        aria-label="Zoom out"
-                        title="Zoom out"
-                        onClick={() => graphRef.current?.zoom?.(1.25)}
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <button
-                        aria-label="Zoom in"
-                        title="Zoom in"
-                        onClick={() => graphRef.current?.zoom?.(0.8)}
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </>
-                  )}
-                  {rendererActions.repack && (
                     <button
-                      aria-label="Repack graph"
-                      title="Repack visible nodes into a compact layout. This moves nodes and fits the view."
+                      aria-label="Fit graph"
+                      title="Fit all visible nodes"
+                      onClick={() => graphRef.current?.fit()}
                       disabled={!props.nodes.length}
-                      onClick={() => graphRef.current?.repack?.()}
                     >
-                      <RotateCw size={14} />
+                      <Expand size={14} />
+                      <span>Fit</span>
                     </button>
-                  )}
-                </div>
-              </div>
-              {!error && (props.filtering || layout.busy || layout.error) && (
-                <div
-                  className="graph-layout-status"
-                  role={layout.error && !props.filtering ? 'alert' : 'status'}
-                >
-                  {props.filtering || layout.busy ? (
-                    <>
-                      <LoaderCircle size={15} className="spin" aria-hidden="true" />
-                      <span>
-                        {props.filtering
-                          ? 'Filtering graph…'
-                          : `Arranging ${layout.nodeCount.toLocaleString()} nodes…`}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Could not arrange the graph.</span>
-                      <button type="button" onClick={() => graphRef.current?.repack?.()}>
-                        Retry
+                    {rendererActions.zoom && (
+                      <>
+                        <button
+                          aria-label="Zoom out"
+                          title="Zoom out"
+                          onClick={() => graphRef.current?.zoom?.(1.25)}
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <button
+                          aria-label="Zoom in"
+                          title="Zoom in"
+                          onClick={() => graphRef.current?.zoom?.(0.8)}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </>
+                    )}
+                    {rendererActions.repack && (
+                      <button
+                        aria-label="Repack graph"
+                        title="Repack visible nodes into a compact layout. This moves nodes and fits the view."
+                        disabled={!props.nodes.length}
+                        onClick={() => graphRef.current?.repack?.()}
+                      >
+                        <RotateCw size={14} />
                       </button>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
-              )}
-              {props.navigationStatus && (
-                <div className="graph-navigation-status" role="status">
-                  {props.navigationStatus}
-                </div>
-              )}
+                {!error && (props.filtering || layout.busy || layout.error) && (
+                  <div
+                    className="graph-layout-status"
+                    role={layout.error && !props.filtering ? 'alert' : 'status'}
+                  >
+                    {props.filtering || layout.busy ? (
+                      <>
+                        <LoaderCircle size={15} className="spin" aria-hidden="true" />
+                        <span>
+                          {props.filtering
+                            ? 'Filtering graph…'
+                            : `Arranging ${layout.nodeCount.toLocaleString()} nodes…`}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Could not arrange the graph.</span>
+                        <button type="button" onClick={() => graphRef.current?.repack?.()}>
+                          Retry
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+                {props.navigationStatus && (
+                  <div className="graph-navigation-status" role="status">
+                    {props.navigationStatus}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-        {props.contextToolbar && (
-          <div
-            ref={contextToolbarRef}
-            className="graph-context-overlay"
-            onPointerEnter={() => dismissCard()}
-            onFocusCapture={() => dismissCard()}
-          >
-            {props.contextToolbar}
-          </div>
-        )}
+          )}
+          {props.contextToolbar && (
+            <div
+              ref={contextToolbarRef}
+              className="graph-context-overlay"
+              onPointerEnter={() => dismissCard()}
+              onFocusCapture={() => dismissCard()}
+            >
+              {props.contextToolbar}
+            </div>
+          )}
+        </div>
         {props.legend}
       </div>
     </div>

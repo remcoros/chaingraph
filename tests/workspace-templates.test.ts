@@ -4,6 +4,7 @@ import { buildGraph, parseWorkspace } from '../src/domain/workspace';
 import { outputNodeId, sats, txNodeId } from '../src/domain/types';
 import { projectGraphMembership } from '../src/domain/graphMembership';
 import { transactionNodeIds } from '../src/domain/visibility';
+import { formatBitcoinAmount } from '../src/domain/amountFormat';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -258,8 +259,10 @@ describe('real annotated workspace templates', () => {
     const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
     expect(root.vin).toHaveLength(1);
     expect(root.vout).toHaveLength(143);
-    const small = workspace.tags!.find((tag) => tag.name === 'Below 0.00 010 000 BTC')!;
-    expect(small.nodeIds).toEqual(
+    const small = workspace.tags!.find(
+      (tag) => tag.name === `Below ${formatBitcoinAmount(10_000)}`,
+    );
+    expect(small?.nodeIds).toEqual(
       root.vout
         .filter((output) => sats(output.value) < 10_000)
         .map((output) => outputNodeId(root.txid, output.n)),
@@ -276,8 +279,10 @@ describe('real annotated workspace templates', () => {
     expect(Object.keys(workspace.transactions)).toHaveLength(114);
     for (const input of root.vin)
       expect(workspace.transactions[input.txid!].vout[input.vout!]).toBeDefined();
-    const group = workspace.tags!.find((tag) => tag.name === '0.02 097 152 BTC × 20')!;
-    expect(group.nodeIds).toEqual(
+    const group = workspace.tags!.find(
+      (tag) => tag.name === `${formatBitcoinAmount(2_097_152)} × 20`,
+    );
+    expect(group?.nodeIds).toEqual(
       root.vout
         .filter((output) => sats(output.value) === 2_097_152)
         .map((output) => outputNodeId(root.txid, output.n)),

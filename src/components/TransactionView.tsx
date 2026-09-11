@@ -762,6 +762,15 @@ export function TransactionView(props: Props) {
             next={preview('next')}
             identity={
               <div className="transaction-flow-center">
+                {props.onSmallAmountThresholdChange && (
+                  <div className="transaction-flow-amounts">
+                    <SmallAmountControl
+                      context="flow"
+                      threshold={workspace.view.flowAmountThreshold}
+                      onChange={props.onSmallAmountThresholdChange}
+                    />
+                  </div>
+                )}
                 <div
                   className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
                 >
@@ -874,15 +883,6 @@ export function TransactionView(props: Props) {
                     </select>
                   )}
                 </div>
-                {props.onSmallAmountThresholdChange && (
-                  <div className="transaction-flow-amounts">
-                    <SmallAmountControl
-                      context="flow"
-                      threshold={workspace.view.flowAmountThreshold}
-                      onChange={props.onSmallAmountThresholdChange}
-                    />
-                  </div>
-                )}
               </div>
             }
           />

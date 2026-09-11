@@ -1,3 +1,4 @@
+import { formatSats } from '../src/domain/amountFormat';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -48,7 +49,7 @@ describe('Wallet transaction flow controls', () => {
     expect(html).toContain(`aria-label="Show input ${parentId}:0 on graph"`);
     expect(html).toContain(`aria-label="Show output ${txid}:0 on graph"`);
     expect(html).toContain('title="Show on graph"');
-    expect(html).toContain('title="123 456 789 sats"');
+    expect(html).toContain(`title="${formatSats(123_456_789)}"`);
     expect(html).toContain('Editing output');
     expect(html).toContain('Your wallet');
     expect(html).toContain('No wallet match');

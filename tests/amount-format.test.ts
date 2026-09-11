@@ -4,17 +4,17 @@ import { activeFilterChips } from '../src/domain/graphFilters';
 
 describe('exact Bitcoin amount display', () => {
   it.each([
-    [0, '0.00\u202f000\u202f000\u00a0BTC'],
-    [1, '0.00\u202f000\u202f001\u00a0BTC'],
-    [-1, '-0.00\u202f000\u202f001\u00a0BTC'],
-    [999, '0.00\u202f000\u202f999\u00a0BTC'],
-    [25_000, '0.00\u202f025\u202f000\u00a0BTC'],
-    [99_999_999, '0.99\u202f999\u202f999\u00a0BTC'],
-    [100_000_000, '1.00\u202f000\u202f000\u00a0BTC'],
-    [100_000_001, '1.00\u202f000\u202f001\u00a0BTC'],
-    [123_456_789, '1.23\u202f456\u202f789\u00a0BTC'],
-    [-123_456_789, '-1.23\u202f456\u202f789\u00a0BTC'],
-    [2_100_000_000_000_000, '21\u202f000\u202f000.00\u202f000\u202f000\u00a0BTC'],
+    [0, '0.00\u2009000\u2009000\u2009BTC'],
+    [1, '0.00\u2009000\u2009001\u2009BTC'],
+    [-1, '-0.00\u2009000\u2009001\u2009BTC'],
+    [999, '0.00\u2009000\u2009999\u2009BTC'],
+    [25_000, '0.00\u2009025\u2009000\u2009BTC'],
+    [99_999_999, '0.99\u2009999\u2009999\u2009BTC'],
+    [100_000_000, '1.00\u2009000\u2009000\u2009BTC'],
+    [100_000_001, '1.00\u2009000\u2009001\u2009BTC'],
+    [123_456_789, '1.23\u2009456\u2009789\u2009BTC'],
+    [-123_456_789, '-1.23\u2009456\u2009789\u2009BTC'],
+    [2_100_000_000_000_000, '21\u2009000\u2009000.00\u2009000\u2009000\u2009BTC'],
   ])('formats %s satoshis without rounding or dropping digits', (value, expected) => {
     expect(formatBitcoinAmount(value)).toBe(expected);
     expect(formatBitcoinAmount(BigInt(value))).toBe(expected);
@@ -22,7 +22,7 @@ describe('exact Bitcoin amount display', () => {
 
   it('preserves bigint aggregates beyond number precision', () => {
     expect(formatBitcoinAmount(9_007_199_254_740_993n)).toBe(
-      '90\u202f071\u202f992.54\u202f740\u202f993\u00a0BTC',
+      '90\u2009071\u2009992.54\u2009740\u2009993\u2009BTC',
     );
   });
 
@@ -35,11 +35,11 @@ describe('exact Bitcoin amount display', () => {
   );
 
   it('keeps explicitly requested sats in their declared denomination', () => {
-    expect(formatSats(100_000_000)).toBe('100\u202f000\u202f000\u00a0sats');
+    expect(formatSats(100_000_000)).toBe('100\u2009000\u2009000\u2009sats');
   });
 
   it('uses BTC at both ends of a filter range', () => {
     const [chip] = activeFilterChips({ minSats: 25_000, maxSats: 123_456_789 });
-    expect(chip.label).toBe('0.00\u202f025\u202f000\u00a0BTC – 1.23\u202f456\u202f789\u00a0BTC');
+    expect(chip.label).toBe('0.00\u2009025\u2009000\u2009BTC – 1.23\u2009456\u2009789\u2009BTC');
   });
 });

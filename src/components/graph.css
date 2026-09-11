@@ -16,12 +16,21 @@
   outline-offset: -3px;
   touch-action: none;
 }
-.graph-context-overlay {
+.graph-overlays {
   position: absolute;
-  z-index: 5;
-  right: 12px;
-  top: 8px;
-  max-height: calc(100% - 16px);
+  inset: 8px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.graph-context-overlay {
+  position: relative;
+  margin-right: 4px;
+  min-height: 0;
+  flex: 0 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -195,10 +204,9 @@
 }
 
 .graph-navigation-overlay {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: max(8px, var(--graph-context-right-inset, 8px));
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
   z-index: 7;
   pointer-events: none;
   display: flex;

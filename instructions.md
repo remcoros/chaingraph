@@ -3,8 +3,8 @@
 Chaingraph helps you investigate Bitcoin activity and keep your own observations alongside the graph. It is watch-only: you can import public wallet information, inspect transactions, and organize hypotheses without supplying a seed phrase or private key.
 
 All amounts display as BTC with eight decimal places grouped from the right:
-`0.00 025 000 BTC`, `1.00 000 000 BTC`,
-`1.23 456 789 BTC`. Thin non-breaking spaces keep digit groups together. Hover an amount to see its exact, grouped satoshi equivalent. No amount
+`0.00 025 000 BTC`, `1.00 000 000 BTC`,
+`1.23 456 789 BTC`. Thin spaces separate digit groups and the BTC unit. Hover an amount to see its exact, grouped satoshi equivalent. No amount
 is rounded or abbreviated. Amount-entry fields still accept integer sats as
 labelled, and fee rates remain in sat/vB. Missing values stay unknown. Previously
 saved notes and findings keep their original wording.
@@ -549,8 +549,9 @@ or loaded spending transaction. Expand OP_RETURN data to select or copy the deco
 
 ### Follow larger transfers with less noise
 
-Use **All amounts** in either the graph toolbar or the transaction flow to show
-outputs greater than 546, 1,000, 10,000 or 100,000 sats. An amount exactly equal to
+Use **All amounts** in either the graph toolbar or above the transaction in the flow
+panel to show outputs greater than 546, 10,000, 100,000, 1,000,000, 10,000,000 or
+100,000,000 sats. Both dropdowns display these thresholds in BTC. An amount exactly equal to
 the selected threshold is filtered out. Each control affects only its own view,
 and both settings are saved independently. Collapsing the transaction flow hides
 its filter; reopening restores it. These are display thresholds, not a classification of dust attacks or

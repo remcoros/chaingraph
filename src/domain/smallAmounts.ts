@@ -1,6 +1,8 @@
 import type { GraphData } from './types';
 
-export const SMALL_AMOUNT_PRESETS = [0, 546, 1_000, 10_000, 100_000] as const;
+export const SMALL_AMOUNT_PRESETS = [
+  0, 546, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000,
+] as const;
 
 /** A presentation preference, not a script-dependent relay policy or ownership signal. */
 export function isSmallAmount(value: number | undefined, threshold = 0): boolean {

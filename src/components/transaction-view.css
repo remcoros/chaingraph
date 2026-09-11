@@ -30,7 +30,7 @@
 }
 .transaction-view[open] {
   /* Keep the graph stationary when the selected transaction has fewer rows. */
-  height: min(50%, 340px);
+  height: min(calc(50% - 38px), 302px);
   min-height: 0;
 }
 .transaction-view > summary {
@@ -152,7 +152,7 @@
   top: var(--transaction-center-top, 76px);
   align-self: start;
   min-width: 0;
-  margin-top: 38px;
+  margin-top: 0;
   display: grid;
   gap: 8px;
 }
@@ -478,7 +478,7 @@
     margin: 5px 5px 0;
   }
   .transaction-view[open] {
-    height: min(46%, 340px);
+    height: min(calc(46% - 30px), 310px);
   }
   .transaction-view-body {
     padding: 0 5px 7px;
@@ -486,9 +486,6 @@
   .transaction-flow {
     --transaction-flow-gap: 7px;
     grid-template-columns: minmax(200px, 1fr) 110px minmax(200px, 1fr);
-  }
-  .transaction-flow-center {
-    margin-top: 30px;
   }
   .transaction-view-identity::before,
   .transaction-view-identity::after {

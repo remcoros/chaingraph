@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../src/domain/amountFormat';
 import { describe, expect, it } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
@@ -168,7 +169,7 @@ describe('scoped analysis and honest evidence', () => {
     const report = tool('value-flow').analyze(workspace(a, b, spend), [spend.txid]);
     expect(report.findings).toHaveLength(1);
     expect(report.emptyReason).toBeUndefined();
-    expect(report.findings[0].title).toBe('Network fee: 0.00 000 001 BTC');
+    expect(report.findings[0].title).toBe(`Network fee: ${formatBitcoinAmount(1)}`);
     expect(report.findings[0].details).toContain('0.01 sat/vB');
     expect(report.findings[0].scopeTxids).toEqual([spend.txid]);
     expect(report.findings[0].txids).toEqual([spend.txid, a.txid, b.txid]);
@@ -189,7 +190,7 @@ describe('scoped analysis and honest evidence', () => {
     ];
     const report = tool('value-flow').analyze(workspace(spend), [spend.txid]);
     expect(report.findings[0]).toMatchObject({
-      title: 'Network fee: 0.00 000 001 BTC',
+      title: `Network fee: ${formatBitcoinAmount(1)}`,
       kind: 'observation',
     });
     expect(report.findings[0].details).toContain('Known inputs total');
@@ -219,7 +220,7 @@ describe('scoped analysis and honest evidence', () => {
     const result = tool('value-flow').run(workspace(parent, spend), [spend.txid], {
       feeMode: 'attention',
     })[0];
-    expect(result.title).toBe('Network fee: 0.00 100 000 BTC');
+    expect(result.title).toBe(`Network fee: ${formatBitcoinAmount(100_000)}`);
     expect(result.details).toContain('Fee rate is unknown');
   });
   it('filters fee reviews by a configurable threshold with inclusive equality', () => {

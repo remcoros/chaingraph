@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../src/domain/amountFormat';
 import { describe, expect, it } from 'vitest';
 import {
   activeFilterChips,
@@ -367,7 +368,9 @@ describe('membership exclusions and active filter chips', () => {
       kind: 'scope',
       label: 'Isolated 2 entities',
     });
-    expect(chips.find((chip) => chip.key === 'value')!.label).toBe('Min 0.00 001 000 BTC');
+    expect(chips.find((chip) => chip.key === 'value')!.label).toBe(
+      `Min ${formatBitcoinAmount(1_000)}`,
+    );
     const withoutValue = clearFilterKey(filters, 'value');
     expect(withoutValue.minSats).toBeUndefined();
     expect(withoutValue.query).toBe('salary');

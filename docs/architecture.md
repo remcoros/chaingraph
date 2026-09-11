@@ -18,8 +18,7 @@ flowchart LR
 Wallet, Analysis, filter summaries and generated template text. It accepts integer
 satoshis as safe numbers or bigint. Every amount uses BTC with exactly eight
 decimal places grouped 2/3/3 from the right, including zero and amounts below one
-BTC. Integer groups use narrow non-breaking spaces,
-and a non-breaking space separates the amount from its unit. Bigint arithmetic
+BTC. Thin spaces (U+2009) separate digit groups and the amount from its unit. Bigint arithmetic
 preserves every satoshi; missing, non-finite, fractional or unsafe numeric inputs
 remain unknown. `src/components/Amount.tsx` owns dedicated amount markup, tabular digits,
 non-wrapping text and the formatted sats tooltip. Its limited element choices
@@ -609,6 +608,10 @@ Zero retains a selectable radius of 1.6; unknown amounts use the default 3.2.
 supply remains below radius 12. There is no high-value plateau. This is logarithmic
 visual emphasis, not proportional sphere volume or projected area. Selected flow arrows are larger.
 
+Both amount controls share presets from `domain/smallAmounts.ts`: All amounts,
+then thresholds of 546, 10,000, 100,000, 1,000,000, 10,000,000 and 100,000,000 sats,
+displayed in BTC. The flow control sits above the transaction card, using the
+previously empty space so the panel can be shorter.
 Amount presets use strict greater-than semantics. `filterSmallAmounts` compares
 reachability from independent transaction roots and the selection before/after
 filtering. This removes automatic branches detached by filtered outputs, including
