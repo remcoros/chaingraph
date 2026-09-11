@@ -310,6 +310,14 @@ prefix when needed to continue through graph context. Alternative paths are not
 exhaustive. Fully displayed connection paths are omitted but do not stop source
 traversal: a transaction's visible inputs and outputs must not fence off new paths.
 A newly discovered direct path to a target still stops that source branch.
+For shared-ancestor reconstruction, the meeting creator alone does not count as
+new information: the displayed outpoints already identify it. Both reconstruction
+legs use this meeting-local novelty rule so an immediate sibling route cannot
+mask a deeper alternative. Such paths never enter the result allowance or stream.
+A new branch outpoint, another undisplayed transaction, or an undisplayed target
+still makes the path useful. Hidden shared spenders and direct connections retain
+their existing semantics. Frontier expansion, evidence fetching and budgets are
+unchanged; older saved findings are retained until dismissed or cleared.
 Only result paths and their proof persist; these traversal edges are discarded.
 
 All fronts share one unique-transaction budget, a deadline, total path-hop and

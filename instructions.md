@@ -122,6 +122,10 @@ separate filter for natural path endings.
 | Lookup failed | A request timed out, failed or returned invalid data. |
 | Conflicting evidence | Observations contradict the proposed path. Only a verified prefix can be added. |
 
+Shared-ancestor results omit paths where the only new node is the transaction
+that created already displayed outputs. Their outpoint IDs already identify that
+shared creator. Deeper connections and newly discovered shared spenders still appear.
+
 Expand **Path** to inspect directed steps and new nodes. Known nodes in the path
 are clickable to select; new nodes stay marked **New**. Paths ending at an output
 show its creating transaction beneath the steps with a small origin icon, selectable

@@ -333,17 +333,21 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     forbidden: Set<string>,
     maxHops: number,
     needsNewNode: boolean,
+    contextualCreator?: string,
   ): Promise<Visit | undefined> => {
+    // An outpoint already identifies its creator. At an ancestry meeting, the
+    // missing creator alone cannot turn displayed sibling paths into discoveries.
+    const isNewNode = (id: string) => id !== contextualCreator && !displayed.has(id);
     const meetingNode = witness.path.at(-1)!;
     if (
       witness.hops <= maxHops &&
       !witness.path.some((id) => forbidden.has(id)) &&
-      (!needsNewNode || witness.path.some((id) => !displayed.has(id)))
+      (!needsNewNode || witness.path.some(isNewNode))
     )
       return witness;
     // A short displayed route, or one through the other leg, must not erase
     // a longer useful route. Each node has at most two reconstruction states.
-    const queue = [{ path: [options.source], hops: 0, novel: !displayed.has(options.source) }];
+    const queue = [{ path: [options.source], hops: 0, novel: isNewNode(options.source) }];
     const seen = new Set([`${options.source}:${queue[0]!.novel}`]);
     for (let cursor = 0; cursor < queue.length; cursor++) {
       await reconstructionCheckpoint();
@@ -356,7 +360,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         if (forbidden.has(next) || visit.path.includes(next)) continue;
         const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
         if (hops > maxHops) continue;
-        const novel = visit.novel || !displayed.has(next);
+        const novel = visit.novel || isNewNode(next);
         const key = `${next}:${novel}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -386,12 +390,17 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         });
     }
     if (!target.predecessors.has(meetingNode)) return;
+    // Scope this novelty rule to the shared creator, never to hidden spenders or
+    // transaction nodes elsewhere along a path. Those may reveal new links.
+    const contextualCreator =
+      direction === 'upstream' && meetingNode.startsWith('tx:') ? meetingNode : undefined;
+    const isNewNode = (id: string) => id !== contextualCreator && !displayed.has(id);
     // Prefer target legs disjoint from the known source witness. Otherwise a
     // shorter conflicting leg can hide a usable leg at the same target. A second
     // bounded pass can pair an unconstrained target leg with another source path.
     const targetLegExclusions = [new Set(sourceVisit.path.slice(0, -1)), new Set<string>()];
     for (const forbidden of targetLegExclusions) {
-      const queue = [{ path: [meetingNode], hops: 0, novel: !displayed.has(meetingNode) }];
+      const queue = [{ path: [meetingNode], hops: 0, novel: isNewNode(meetingNode) }];
       const visited = new Set([`${meetingNode}:${queue[0]!.novel}`]);
       for (let cursor = 0; cursor < queue.length; cursor++) {
         await reconstructionCheckpoint();
@@ -405,6 +414,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
             new Set(visit.path.slice(1)),
             settings.maxHops - visit.hops,
             !visit.novel,
+            contextualCreator,
           );
           if (!prefix) continue;
           addResult({
@@ -426,7 +436,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
           if (next === options.source || forbidden.has(next) || visit.path.includes(next)) continue;
           const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
           if (hops > settings.maxHops) continue;
-          const novel = visit.novel || !displayed.has(next);
+          const novel = visit.novel || isNewNode(next);
           const key = `${next}:${novel}`;
           if (visited.has(key)) continue;
           visited.add(key);

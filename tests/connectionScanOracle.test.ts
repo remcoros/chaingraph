@@ -59,7 +59,18 @@ function referenceConnections(
               ? 'shared-ancestor'
               : 'shared-descendant'
             : 'direct';
-          found.add(`${node}|${relationship}`);
+          const turn = directions.findIndex((value, i) => i > 0 && value !== directions[i - 1]);
+          const meeting = path[turn];
+          const creatorOnly =
+            relationship === 'shared-ancestor' &&
+            meeting?.startsWith('tx:') &&
+            [path[turn - 1], path[turn + 1]].every((id) =>
+              id?.startsWith(`out:${meeting.slice(3)}:`),
+            ) &&
+            path.every((id) => id === meeting || shown.has(id));
+          // Outpoint IDs already disclose this shared creator. A hidden spender
+          // or an undisplayed branch node still establishes a new connection.
+          if (!creatorOnly) found.add(`${node}|${relationship}`);
         }
         // Displayed paths are context, not discoveries: continue through them
         // to find a new route beyond the selected transaction's immediate I/O.
@@ -172,6 +183,7 @@ describe('connection search independent DAG oracle', () => {
       target: tx(4),
       hidden: tx(1),
       relationship: 'shared-ancestor',
+      creatorOnly: true,
     },
     {
       direction: 'upstream' as const,
@@ -180,6 +192,7 @@ describe('connection search independent DAG oracle', () => {
       target: out(3, 0),
       hidden: tx(2),
       relationship: 'shared-ancestor',
+      creatorOnly: false,
     },
     {
       direction: 'downstream' as const,
@@ -188,13 +201,14 @@ describe('connection search independent DAG oracle', () => {
       target: out(1, 0),
       hidden: tx(3),
       relationship: 'shared-descendant',
+      creatorOnly: false,
     },
   ])(
-    'keeps a novel $relationship target leg beyond shorter displayed context',
-    async ({ direction, mask, source, target, hidden, relationship }) => {
+    'distinguishes new $relationship evidence from creator-only context',
+    async ({ direction, mask, source, target, hidden, relationship, creatorOnly }) => {
       const edges = transactionDag(mask);
       const displayed = [...new Set(edges.flat())].filter((node) => node !== hidden);
-      const expected = [`${target}|${relationship}`];
+      const expected = creatorOnly ? [] : [`${target}|${relationship}`];
       expect(referenceConnections(edges, source, [target], displayed, direction, 4)).toEqual(
         expected,
       );
