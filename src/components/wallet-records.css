@@ -12,7 +12,7 @@
   grid-column: span 3;
 }
 .wallet-records {
-  padding: 14px;
+  padding: var(--panel-padding-block) var(--panel-padding-inline);
 }
 .wallet-records-heading {
   display: flex;
@@ -20,7 +20,7 @@
   gap: 8px;
   justify-content: space-between;
 }
-.wallet-records-heading > strong {
+.wallet-records-heading > h2 {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

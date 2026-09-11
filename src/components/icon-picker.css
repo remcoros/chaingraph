@@ -102,6 +102,7 @@
 }
 .related-transactions > button {
   display: inline-flex;
+  align-items: baseline;
   min-width: 0;
   max-width: 100%;
   text-align: left;

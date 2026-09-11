@@ -97,7 +97,7 @@
 }
 .entity-pagination {
   border-top: 1px solid var(--color-rule);
-  padding: 9px 12px;
+  padding: var(--panel-padding-block) var(--panel-padding-inline);
   font-size: 10px;
   color: var(--color-muted);
   flex-shrink: 0;

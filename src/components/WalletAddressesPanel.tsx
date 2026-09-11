@@ -42,7 +42,9 @@ export function WalletAddressesPanel({
   return (
     <section className="wallet-records" aria-label="Wallet addresses">
       <div className="wallet-records-heading">
-        <strong title={wallet.name}>{wallet.name}</strong>
+        <h2 className="panel-title" title={wallet.name}>
+          {wallet.name}
+        </h2>
       </div>
       <p className="small muted">{addresses.length} discovered addresses · receive then change</p>
       <p className="small muted">Output counts use loaded transactions, including spent outputs.</p>

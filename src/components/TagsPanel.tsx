@@ -468,7 +468,7 @@ export default function TagsPanel({
   return (
     <div className="tags-panel">
       <div className="tags-heading">
-        <h3>Workspace tags</h3>
+        <h2 className="panel-title">Workspace tags</h2>
         <button
           className="icon-button"
           aria-label="New tag"

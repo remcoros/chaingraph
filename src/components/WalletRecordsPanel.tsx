@@ -104,7 +104,9 @@ export function WalletRecordsPanel({
       aria-label={`Wallet ${active === 'transactions' ? 'transactions' : 'UTXOs'}`}
     >
       <div className="wallet-records-heading">
-        <strong title={wallet.name}>{wallet.name}</strong>
+        <h2 className="panel-title" title={wallet.name}>
+          {wallet.name}
+        </h2>
         {active === 'utxos' && (
           <button
             className="icon-button"
