@@ -55,7 +55,9 @@ export function runConnectionScanInWorker(
     let examinedCount = 0;
     const pathEvidence = (run: ScanRun): Record<string, Transaction> => {
       const ids = new Set(
-        run.results.flatMap((result) => result.path.map((id) => id.split(':')[1]!)),
+        run.results.flatMap((result) =>
+          [...result.path, ...(result.context?.path ?? [])].map((id) => id.split(':')[1]!),
+        ),
       );
       return Object.fromEntries(
         [...ids].flatMap((id) => (adapter.evidence[id] ? [[id, adapter.evidence[id]]] : [])),

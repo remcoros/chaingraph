@@ -52,6 +52,7 @@ function referenceConnections(
       const node = path.at(-1)!;
       const reachesTarget = path.length > 1 && targetSet.has(node);
       const hasNewNode = path.some((id) => !shown.has(id));
+      let accepted = false;
       if (reachesTarget) {
         if (hasNewNode) {
           const relationship = turned
@@ -70,15 +71,18 @@ function referenceConnections(
             path.every((id) => id === meeting || shown.has(id));
           // Outpoint IDs already disclose this shared creator. A hidden spender
           // or an undisplayed branch node still establishes a new connection.
-          if (!creatorOnly) found.add(`${node}|${relationship}`);
+          if (!creatorOnly) {
+            found.add(`${node}|${relationship}`);
+            accepted = true;
+          }
         }
         // Displayed paths are context, not discoveries: continue through them
         // to find a new route beyond the selected transaction's immediate I/O.
         // A newly discovered target can still be a direction-change point.
-        if (turned) return;
+        if (turned && accepted) return;
       }
       const current = directions.at(-1) ?? initial;
-      const nextDirections: ScanDirection[] = reachesTarget && hasNewNode ? [] : [current];
+      const nextDirections: ScanDirection[] = reachesTarget && accepted ? [] : [current];
       if (!turned && path.length > 1) {
         nextDirections.push(current === 'upstream' ? 'downstream' : 'upstream');
       }

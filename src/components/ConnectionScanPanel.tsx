@@ -34,6 +34,7 @@ import {
   scanStatus,
   resultFinding,
   resultCategory,
+  scanRelationPresentation,
   type ScanResultFinding,
 } from '../domain/connectionScanPresentation';
 import {
@@ -50,8 +51,8 @@ import { prepareNeighbourScanTargets } from '../domain/connectionScanNeighbours'
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
-  'upstream-connection': 'Source connection',
-  'downstream-connection': 'Destination connection',
+  'upstream-connection': 'Funding path',
+  'downstream-connection': 'Spending path',
   'shared-ancestor': 'Shared ancestor',
   'shared-descendant': 'Shared descendant',
   'many-inputs': 'Many inputs',
@@ -386,9 +387,14 @@ export function ConnectionScanPanel(props: Props) {
           targetIds,
           displayedNodeIds: [...props.visibleNodeIds],
           // Automatic targets already belong to loaded evidence, even when their
-          // nodes are not on the canvas. Explicit picks retain their reveal action.
-          knownNodeIds:
-            frozenSettings.targetScope === 'custom' ? undefined : [...props.neighbours.keys()],
+          // nodes are not on the canvas. This also applies to fixed custom picks.
+          knownNodeIds: [...props.neighbours.keys()],
+          knownLinks:
+            frozenSettings.targetScope === 'custom'
+              ? undefined
+              : [...props.neighbours].flatMap(([node, adjacent]) =>
+                  adjacent.filter((next) => node < next).map((next) => [node, next] as const),
+                ),
           settings: frozenSettings,
         },
         network: workspace.network,
@@ -963,7 +969,10 @@ function ScanResultRow({
     });
   };
   const connection = category === 'connection';
-  const title = titles[finding];
+  const relation = scanRelationPresentation(result);
+  const title = relation?.title ?? titles[finding];
+  const isPrefix = prefixLength < result.path.length;
+  const addLabel = isPrefix ? 'Add prefix' : result.context ? 'Add reconnection' : 'Add path';
   const visible = new Set(visibleNodeIds);
   const obscured = plan.nodeIds.some((id) => !visible.has(id) && !plan.newNodeIds.includes(id));
   const tx =
@@ -992,8 +1001,8 @@ function ScanResultRow({
           : 'Could not load the next step.',
     'conflicting-evidence': 'Observations disagree. Only the preceding verified path can be added.',
   };
-  const meeting = scanMeetingNode(result);
-  const statuses = result.path.map(
+  const meeting = relation?.meeting ?? scanMeetingNode(result);
+  const statuses = [...new Set([...result.path, ...(result.context?.path ?? [])])].map(
     (id) =>
       transactionStatus(
         workspace.transactions[id.split(':')[1]] ??
@@ -1028,9 +1037,17 @@ function ScanResultRow({
       </div>
       <div className="connection-scan-result-nodes">
         {[
-          { id: result.path[0], label: 'source', Icon: CircleDot },
-          { id: result.endpoint, label: 'target', Icon: Crosshair },
-        ].map(({ id, label, Icon }) => (
+          {
+            id: relation?.branches?.[0] ?? result.path[0],
+            label: relation?.branches ? `First ${relation.branchLabel}` : 'Source',
+            Icon: CircleDot,
+          },
+          {
+            id: relation?.branches?.[1] ?? result.endpoint,
+            label: relation?.branches ? `Second ${relation.branchLabel}` : 'Target',
+            Icon: Crosshair,
+          },
+        ].map(({ id, label, Icon }, index) => (
           <div className="connection-scan-result-node" key={label}>
             <button
               type="button"
@@ -1038,7 +1055,7 @@ function ScanResultRow({
               disabled={actionBusy}
               title={
                 traceSourceExists(workspace, id)
-                  ? `${label === 'source' ? 'Source' : 'Target'}: ${id}`
+                  ? `${label}: ${id}`
                   : `Add and select ${label}: ${id}`
               }
               aria-label={`Select scan ${label}: ${nameFor(workspace, id)}`}
@@ -1047,7 +1064,7 @@ function ScanResultRow({
               <Icon size={14} />
               <span>{short(id)}</span>
             </button>
-            {label === 'target' && (
+            {index === 1 && (
               <small>
                 {result.hops} {result.hops === 1 ? 'hop' : 'hops'}
               </small>
@@ -1056,6 +1073,7 @@ function ScanResultRow({
         ))}
       </div>
       <div className="connection-scan-result-body">
+        {relation && <p className="connection-scan-result-description">{relation.description}</p>}
         {workspace.annotations[result.endpoint]?.label && (
           <p className="small">{workspace.annotations[result.endpoint].label}</p>
         )}
@@ -1068,7 +1086,44 @@ function ScanResultRow({
         {meeting && (
           <div className="connection-scan-meeting">
             <span className="muted">Meeting point</span>
-            <span title={meeting}>{nameFor(workspace, meeting)}</span>
+            <button
+              type="button"
+              className="text-button"
+              disabled={actionBusy}
+              title={meeting}
+              aria-label={`Select meeting point: ${nameFor(workspace, meeting)}`}
+              onClick={() => openNode(meeting)}
+            >
+              {nameFor(workspace, meeting)}
+            </button>
+          </div>
+        )}
+        {result.context && (
+          <div className="connection-scan-existing-route">
+            <strong>Existing route</strong>
+            <ol className="connection-scan-path">
+              {result.context.path.map((id, index) => (
+                <li key={id} title={id}>
+                  <span aria-label={index ? result.context!.directions[index - 1] : 'Source'}>
+                    {index
+                      ? result.context!.directions[index - 1] === 'upstream'
+                        ? '↑'
+                        : '↓'
+                      : '●'}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={actionBusy}
+                    aria-label={`Select existing route node: ${nameFor(workspace, id)}`}
+                    onClick={() => openNode(id)}
+                  >
+                    {nameFor(workspace, id)}
+                  </button>
+                  {plan.newNodeIds.includes(id) && <small>New</small>}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
         {(outsideChain || unconfirmed) && (
@@ -1103,14 +1158,15 @@ function ScanResultRow({
             {error}
           </p>
         )}
-        <details className="connection-scan-path-section">
-          <summary>
-            Path{' '}
+        <section className="connection-scan-path-section" aria-label="Path">
+          <div className="connection-scan-path-heading">
+            <strong>Path</strong>{' '}
             <span>
-              {plan.nodeIds.length} {plan.nodeIds.length === 1 ? 'node' : 'nodes'}
+              {prefixLength + (creatorId ? 1 : 0)}{' '}
+              {prefixLength + (creatorId ? 1 : 0) === 1 ? 'node' : 'nodes'}
               {alternatives.length > 1 ? ` · ${alternatives.length} alternatives` : ''}
             </span>
-          </summary>
+          </div>
           {alternatives.length > 1 && (
             <label>
               Alternative path
@@ -1123,7 +1179,7 @@ function ScanResultRow({
               </select>
             </label>
           )}
-          {(result.path.length > 5 ||
+          {((!connection && result.path.length > 5) ||
             fullPlan.missingTxids.length > 0 ||
             conflict ||
             fullPlan.blockedByConflict) &&
@@ -1188,7 +1244,7 @@ function ScanResultRow({
               {plan.newNodeIds.includes(creatorId) && <small>New</small>}
             </div>
           )}
-        </details>
+        </section>
       </div>
       <footer className="connection-scan-result-actions">
         {(category === 'issue' || finding === 'unspent') && (
@@ -1210,8 +1266,8 @@ function ScanResultRow({
         <button
           type="button"
           disabled={actionBusy || plan.blockedByConflict}
-          title={`Add path: ${plan.newNodeIds.length} new nodes`}
-          aria-label={`Add path: ${plan.newNodeIds.length} new nodes`}
+          title={`${addLabel}: ${plan.newNodeIds.length} new nodes`}
+          aria-label={`${addLabel}: ${plan.newNodeIds.length} new nodes`}
           onClick={() => {
             setError('');
             void onAdd(result, prefixLength).catch((cause) => {
@@ -1221,7 +1277,7 @@ function ScanResultRow({
           }}
         >
           {activeAction === `path:${result.id}` ? <LoaderCircle size={13} /> : <Plus size={13} />}{' '}
-          Add (+
+          {isPrefix ? 'Add prefix' : 'Add'} (+
           {plan.newNodeIds.length})
         </button>
       </footer>

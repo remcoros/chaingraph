@@ -78,6 +78,20 @@ const resultSchema = z
     includesMempool: z.boolean().optional(),
     issueCode: z.enum(['timeout', 'invalid-response', 'lookup-failed']).optional(),
     meetingNode: nodeId.optional(),
+    bridge: z.literal(true).optional(),
+    context: z
+      .object({
+        path: z
+          .array(nodeId)
+          .min(2)
+          .max(2 * SCAN_LIMITS.maxHops + 3),
+        directions: z
+          .array(direction)
+          .min(1)
+          .max(2 * SCAN_LIMITS.maxHops + 2),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export const scanRunSchema = z
@@ -162,7 +176,45 @@ export function scanResultEvidenceIds(result: ScanResult): Set<string> {
   result.directions.forEach((direction, i) =>
     ids.add(edgeEvidence(result.path[i], result.path[i + 1], direction).txid),
   );
+  if (result.context) {
+    for (const id of scanResultEvidenceIds({ ...result, ...result.context, context: undefined }))
+      ids.add(id);
+  }
   return ids;
+}
+
+/** A bounded known route closes the found path into a cycle without becoming search state. */
+export function scanContextPath(result: ScanResult): ScanResult | undefined {
+  const context = result.context;
+  if (!context) return undefined;
+  const edges = (path: string[]) =>
+    new Set(path.slice(1).map((node, i) => [path[i], node].sort().join('|')));
+  const foundEdges = edges(result.path);
+  const contextEdges = edges(context.path);
+  if (
+    result.kind !== 'connection' ||
+    context.path.length < 2 ||
+    context.path.length > 2 * SCAN_LIMITS.maxHops + 3 ||
+    context.path[0] !== result.path[0] ||
+    context.path.at(-1) !== result.endpoint ||
+    new Set(context.path).size !== context.path.length ||
+    context.path.some((id) => !isScanNodeId(id)) ||
+    context.directions.length !== context.path.length - 1 ||
+    context.directions.some(
+      (direction) => direction !== 'upstream' && direction !== 'downstream',
+    ) ||
+    scanPathHops(context.path) > SCAN_LIMITS.maxHops ||
+    (foundEdges.size === contextEdges.size &&
+      [...foundEdges].every((edge) => contextEdges.has(edge)))
+  )
+    throw new Error('Scan context must be a distinct bounded route between the result endpoints.');
+  return {
+    ...result,
+    ...context,
+    context: undefined,
+    finding: undefined,
+    hops: scanPathHops(context.path),
+  };
 }
 
 function validateFindingMetadata(result: ScanResult, run: ScanRun): void {
@@ -363,6 +415,14 @@ export function validateConnectionScanRecords(
       )
         throw new Error('Scan result does not match the requested direction.');
       validateFindingMetadata(result, run);
+      if (
+        result.bridge !== undefined &&
+        (result.bridge !== true || result.kind !== 'connection' || result.context)
+      )
+        throw new Error(
+          'A scan bridge connects separate graph anchors without a known context route.',
+        );
+      const context = scanContextPath(result);
       if (result.meetingNode !== undefined) {
         const switchIndex = result.directions.findIndex(
           (item, i) => i > 0 && item !== result.directions[i - 1],
@@ -378,6 +438,15 @@ export function validateConnectionScanRecords(
       const observation = (id: string) => workspace.transactions[id] ?? records.evidence[id];
       if (findingEvidenceConflicts(result, observation))
         throw new Error('Scan finding is not supported by its transaction observations.');
+      if (context) {
+        if (
+          context.path.some((id) => (observation(transactionId(id))?.confirmations ?? 0) < 0) ||
+          context.directions.some((direction, i) =>
+            edgeConflicts(context.path[i], context.path[i + 1], direction, observation, workspace),
+          )
+        )
+          throw new Error('Scan context is not supported by its transaction observations.');
+      }
       for (const id of scanResultEvidenceIds(result)) retained.add(id);
       if (result.finding === 'conflicting-evidence') {
         const terminal = result.path.at(-1)!;
@@ -497,6 +566,7 @@ export function prepareScanPath(
   const nodeIds = result.path.slice(0, prefixLength);
   const prefix = {
     ...result,
+    context: undefined,
     path: nodeIds,
     endpoint: nodeIds.at(-1)!,
     finding: prefixLength === result.path.length ? result.finding : undefined,

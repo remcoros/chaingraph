@@ -292,39 +292,35 @@ deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
 same-direction walks at a meeting point and retain per-edge directions; no
 alternating-direction flood fill, ownership claim or value allocation is used.
-Automatic scopes freeze the full loaded graph's node IDs as known context,
-separately from the rendered node IDs. Hidden or unadded I/O already described by
-a loaded transaction is therefore context, not a discovery or a reason to stop
-at an automatic target. Explicit custom picks retain their existing reveal
-semantics. This context is passed to the worker once, is not extended by scan
-fetches, and is never persisted. Rendering and Add counts still use actual graph
-membership. Both fronts retain transient directed edges when other branches join a reached
-node. Meeting reconstruction follows target edges back to distinct frozen targets.
-When the first source witness overlaps that target leg or contains no new node,
-a bounded source reconstruction looks for an admissible alternative, excluding
-the other leg's nodes. Target reconstruction first excludes the initial source
-path, then allows alternate source witnesses in a second pass. Each pass tracks
-at most two states per node, distinguishing an already known path from one
-containing new nodes. This also preserves new paths through known non-target
-context in custom scopes. A late joining branch on either side refreshes previously
-reached intersections immediately; found paths
-stream before later cancellation or timeout.
-Reconstruction shares the deadline, combined hop cap and result limit, periodically
-yields for cancellation, and performs no additional fetching. Fronts keep the first
-expansion witness per reached node. A source node also admits a later fully known
-prefix when needed to continue through graph context. Alternative paths are not
-exhaustive. Fully known connection paths are omitted but do not stop source
-traversal: a transaction's loaded inputs and outputs must not fence off new paths.
-A newly discovered direct path to a target still stops that source branch.
-For shared-ancestor reconstruction, the meeting creator alone does not count as
-new information: the known outpoints already identify it. Both reconstruction
-legs use this meeting-local novelty rule so an immediate sibling route cannot
-mask a deeper alternative. Such paths never enter the result allowance or stream.
-A new branch outpoint, another undisplayed transaction, or an undisplayed target
-still makes the path useful. Hidden shared spenders and direct connections retain
-their existing semantics. Frontier expansion, evidence fetching and budgets are
-unchanged; older saved findings are retained until dismissed or cleared.
-Only result paths and their proof persist; these traversal edges are discarded.
+Automatic scopes freeze loaded node IDs and observed creates/spends links separately
+from canvas membership and visibility. With source, targets and loaded evidence
+fixed, showing or hiding I/O does not change findings. `connectionScanContext.ts`
+indexes that baseline once inside the worker, yielding and checking the same
+deadline. Newly fetched evidence never becomes baseline context.
+
+Automatic connections must add an observed edge. A known outpoint already
+identifies its creating transaction, so merely loading that creator is not a new
+relationship. For an endpoint in the source's loaded component, a result also
+retains a distinct existing source-to-target route. The union explains the
+reconnection and closes its loop when added. The existing witness is capped at
+8 entered transactions and 19 nodes independently of the found route's configured
+hop limit. A connected endpoint whose baseline exceeds this witness bound is
+omitted, never misclassified as a disconnected bridge. Targets in separate loaded
+components can produce funding/spending or shared-ancestor/descendant bridges.
+Custom picks retain directed-path query semantics without requiring a loop,
+using the same loaded node snapshot rather than canvas visibility for novelty.
+
+Both search fronts keep transient directed edges at reconvergences. Meeting
+reconstruction pairs disjoint source and target legs, retaining at most two
+novelty states per node. Automatic novelty uses edges; legacy standalone callers
+without a baseline and custom scans retain their node-based rule. Short known
+routes cannot erase a longer new route. Late branch arrivals refresh already
+reached intersections and stream findings before later timeouts. Rejected targets
+remain traversable; accepted novel direct routes stop at their target, while
+known arrivals can continue. Reconstruction shares the deadline, hop and result
+caps and performs no extra fetching. Alternatives are bounded, not exhaustive.
+Only the found path, its optional bounded existing route, and their proof persist;
+all baseline and exploration indexes are discarded.
 
 All fronts share one unique-transaction budget, a deadline, total path-hop and
 result bounds. Defaults are 3 hops, 200 transactions, 30 seconds and a 50-branch
@@ -383,7 +379,9 @@ The existing encrypted envelope format remains unchanged.
 
 `domain/connectionScanRecords.ts` upserts runs by ID in stable order, retaining
 distinct findings from earlier scans. Exact finding paths are deduplicated across
-runs by source, finding kind, endpoint, meeting point and directed path. Run IDs,
+runs by source, finding kind, endpoint, meeting point and directed path.
+Reconnections use the source and union of undirected route edges, so opposite
+presentations of the same loop do not consume another result or card. Run IDs,
 settings and observation timestamps do not change identity. The latest copy
 supplies current observation metadata; an explicit dismissal stays attached to
 that identity until results are cleared. The same compaction runs for live
@@ -400,14 +398,15 @@ evidence is retained only for saved result paths and reused from normal workspac
 observations where present. Frontier queues, visited maps and transport state
 cannot enter the record schema. UI-time edits check compact limits; full workspace
 validation remains off the UI thread. `domain/connectionScanAddition.ts` plans
-and adds a displayed path plus its terminal creating transaction without changing
+and adds both routes of a reconnection plus its terminal creating transaction without changing
 the saved result or search hop count. A creator already in the path is not repeated.
-Its graph-membership count drives Add, and the whole addition is one Undo step.
+Its union of graph nodes drives Add, and the whole addition is one Undo step.
+An explicit shorter prefix omits the existing route and is labeled Add prefix.
 Single-node clicks add only the requested node. Both actions validate required
 proof and conflicts before admission, preserving unrelated graph membership.
 `lib/connectionScanActionEvidence.ts` reuses available evidence and fetches only
 missing requested transactions through the network-scoped navigation scheduler,
-with at most 10 transactions and a 30-second action deadline. Selection changes,
+with at most 20 requested transactions across both routes and a 30-second action deadline. Selection changes,
 Clear, leaving Scan, workspace changes and scope closure cancel pending actions;
 stale replies cannot select or add nodes. Missing offline proof remains an
 explicit retryable action error. No ancestry expansion accompanies these loads.
@@ -419,15 +418,17 @@ record caps; undoing Add therefore keeps retained results usable when that
 evidence fits. Missing proof remains explicit if a snapshot reaches those caps.
 
 Accepting a complete path or explicit prefix merges only supporting transactions
-and calls existing graph membership APIs once, producing one Undo step. It reveals
+and uses existing graph membership APIs, producing one Undo step. It reveals
 those nodes, resets graph filters, and preserves annotations and camera geometry.
 Sidebar controls and result cards use their own CSS namespace and a vertical layout.
 Cards group alternative paths to the same finding using their type, endpoint,
 direction and meeting node. Alternative paths remain flat bounded records;
 there is no persisted grouping index. Connections precede branch decisions and
 evidence problems; natural endpoints have a separate filter. Each card groups
-its path in the body and actions at the bottom right,
-independent of the Analysis workbench's two-column results. Clearing the latest
+its existing route and always-visible Path section in the body, with actions at the bottom right.
+Distinct root input/output branches get a reconnection title and clickable branch
+identifiers. Other cycles use Reconnection; direct bridges use Funding/Spending
+path. Old automatic direct cards lacking context or a bridge marker are hidden. Clearing the latest
 results does not remove accepted nodes or annotations. Scan details
 never enter the public saved-workspace index.
 

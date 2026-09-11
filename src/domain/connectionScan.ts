@@ -1,3 +1,9 @@
+import {
+  prepareScanContext,
+  scanEdgeKey,
+  scanReconnectionKey,
+  type ScanContextIndex,
+} from './connectionScanContext';
 /** Bounded observed-edge search. Exploration and its budgets are deliberately transient. */
 export type ScanDirection = 'upstream' | 'downstream';
 export type ScanStopReason =
@@ -45,6 +51,10 @@ export interface ScanResult {
   id: string;
   kind: 'connection' | 'boundary' | 'endpoint';
   relationship?: 'direct' | 'shared-ancestor' | 'shared-descendant';
+  /** A bounded existing source-to-target route that explains the reconnection. */
+  context?: { path: string[]; directions: ScanDirection[] };
+  /** Connection between frozen targets in disconnected loaded components. */
+  bridge?: true;
   endpoint: string;
   path: string[];
   /** Direction followed on each observed edge, in path order from the source. */
@@ -150,6 +160,8 @@ export interface ConnectionScanOptions {
   displayedNodeIds: readonly string[];
   /** Loaded graph context at scan start, independent of canvas visibility. */
   knownNodeIds?: readonly string[];
+  /** Frozen loaded creates/spends links, never extended by fetched evidence. */
+  knownLinks?: readonly (readonly [string, string])[];
   settings: ScanSettings;
   signal?: AbortSignal;
   resolveNeighbors: (
@@ -189,7 +201,10 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
   const targets = new Set(options.targetIds.filter((id) => id !== options.source).sort());
   // Automatic scopes search for new relationships, not nodes hidden by the
   // canvas. Keep this initial context fixed as new scan evidence arrives.
-  const known = new Set([...options.displayedNodeIds, ...(options.knownNodeIds ?? [])]);
+  const known = new Set(options.knownNodeIds ?? options.displayedNodeIds);
+  const contextual = settings.targetScope !== 'custom' && options.knownLinks !== undefined;
+  let contextIndex: ScanContextIndex | undefined;
+  const acceptedDirectTargets = new Set<string>();
   const now = options.now ?? Date.now;
   const start = now();
   const controller = new AbortController();
@@ -254,16 +269,28 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     }),
   );
   const addResult = (result: Omit<ScanResult, 'id' | 'hops'>) => {
-    if (result.kind === 'connection' && result.path.every((id) => known.has(id))) return;
+    if (result.kind === 'connection') {
+      if (contextual) {
+        if (!contextIndex || !contextIndex.isNovel(result.path)) return false;
+        const context = contextIndex.route(result.endpoint);
+        if (context) result = { ...result, context };
+        else if (!contextIndex.connected.has(result.endpoint)) result = { ...result, bridge: true };
+        else return false;
+      } else if (result.path.every((id) => known.has(id))) return false;
+    }
     const hops = scanPathHops(result.path);
-    if (hops > settings.maxHops || new Set(result.path).size !== result.path.length) return;
-    const key = `${result.kind}:${result.finding ?? result.reason ?? ''}:${result.scanDirection ?? ''}:${result.path.join('|')}`;
-    if (resultKeys.has(key)) return;
+    if (hops > settings.maxHops || new Set(result.path).size !== result.path.length) return false;
+    const key =
+      scanReconnectionKey(result) ??
+      `${result.kind}:${result.finding ?? result.reason ?? ''}:${result.scanDirection ?? ''}:${result.path.join('|')}`;
+    if (resultKeys.has(key)) return true;
     if (run.results.length >= SCAN_LIMITS.maxResults) {
       reasons.add('results');
-      return;
+      return false;
     }
     resultKeys.add(key);
+    if (result.kind === 'connection' && result.relationship === 'direct')
+      acceptedDirectTargets.add(result.endpoint);
     const category =
       result.kind === 'endpoint'
         ? 'endpoints'
@@ -279,13 +306,14 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
       if (resultCounts[category] >= cap) {
         run.omittedResults ??= { endpoints: 0, issues: 0 };
         run.omittedResults[category] = Math.min(1_000_000, run.omittedResults[category] + 1);
-        return;
+        return false;
       }
       resultCounts[category]++;
     }
     run.results.push({ ...result, hops, id: `${run.id}:${run.results.length + 1}` });
     // Publish actionable results before another frontier can wait on evidence.
     progress();
+    return true;
   };
   const boundary = (
     front: Front,
@@ -346,12 +374,15 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     if (
       witness.hops <= maxHops &&
       !witness.path.some((id) => forbidden.has(id)) &&
-      (!needsNewNode || witness.path.some(isNewNode))
+      (!needsNewNode ||
+        (contextual ? contextIndex!.isNovel(witness.path) : witness.path.some(isNewNode)))
     )
       return witness;
     // A short known route, or one through the other leg, must not erase
     // a longer useful route. Each node has at most two reconstruction states.
-    const queue = [{ path: [options.source], hops: 0, novel: isNewNode(options.source) }];
+    const queue = [
+      { path: [options.source], hops: 0, novel: contextual ? false : isNewNode(options.source) },
+    ];
     const seen = new Set([`${options.source}:${queue[0]!.novel}`]);
     for (let cursor = 0; cursor < queue.length; cursor++) {
       await reconstructionCheckpoint();
@@ -359,12 +390,20 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
       const visit = queue[cursor]!;
       const node = visit.path.at(-1)!;
       if (node === meetingNode && (!needsNewNode || visit.novel)) return visit;
-      if (node !== options.source && targets.has(node) && visit.novel) continue;
+      if (
+        node !== options.source &&
+        targets.has(node) &&
+        visit.novel &&
+        (!contextual || acceptedDirectTargets.has(node))
+      )
+        continue;
       for (const next of front.successors.get(node) ?? []) {
         if (forbidden.has(next) || visit.path.includes(next)) continue;
         const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
         if (hops > maxHops) continue;
-        const novel = visit.novel || isNewNode(next);
+        const novel =
+          visit.novel ||
+          (contextual ? !contextIndex!.edges.has(scanEdgeKey(node, next)) : isNewNode(next));
         const key = `${next}:${novel}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -404,7 +443,9 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     // bounded pass can pair an unconstrained target leg with another source path.
     const targetLegExclusions = [new Set(sourceVisit.path.slice(0, -1)), new Set<string>()];
     for (const forbidden of targetLegExclusions) {
-      const queue = [{ path: [meetingNode], hops: 0, novel: isNewNode(meetingNode) }];
+      const queue = [
+        { path: [meetingNode], hops: 0, novel: contextual ? false : isNewNode(meetingNode) },
+      ];
       const visited = new Set([`${meetingNode}:${queue[0]!.novel}`]);
       for (let cursor = 0; cursor < queue.length; cursor++) {
         await reconstructionCheckpoint();
@@ -420,27 +461,32 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
             !visit.novel,
             contextualCreator,
           );
-          if (!prefix) continue;
-          addResult({
-            kind: 'connection',
-            relationship: direction === 'upstream' ? 'shared-ancestor' : 'shared-descendant',
-            endpoint: node,
-            meetingNode,
-            scanDirection: direction,
-            path: [...prefix.path, ...visit.path.slice(1)],
-            directions: [
-              ...Array<ScanDirection>(prefix.path.length - 1).fill(direction),
-              ...Array<ScanDirection>(visit.path.length - 1).fill(reverseDirection(direction)),
-            ],
-          });
-          continue;
+          if (
+            prefix &&
+            addResult({
+              kind: 'connection',
+              relationship: direction === 'upstream' ? 'shared-ancestor' : 'shared-descendant',
+              endpoint: node,
+              meetingNode,
+              scanDirection: direction,
+              path: [...prefix.path, ...visit.path.slice(1)],
+              directions: [
+                ...Array<ScanDirection>(prefix.path.length - 1).fill(direction),
+                ...Array<ScanDirection>(visit.path.length - 1).fill(reverseDirection(direction)),
+              ],
+            })
+          )
+            continue;
+          // An unhelpful nearer target must not conceal a useful farther leg.
         }
         for (const next of target.predecessors.get(node) ?? []) {
           budget.checkpoint();
           if (next === options.source || forbidden.has(next) || visit.path.includes(next)) continue;
           const hops = visit.hops + (next.startsWith('tx:') ? 1 : 0);
           if (hops > settings.maxHops) continue;
-          const novel = visit.novel || isNewNode(next);
+          const novel =
+            visit.novel ||
+            (contextual ? !contextIndex!.edges.has(scanEdgeKey(node, next)) : isNewNode(next));
           const key = `${next}:${novel}`;
           if (visited.has(key)) continue;
           visited.add(key);
@@ -491,6 +537,13 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
   };
   let current: { front: Front; visit: Visit } | undefined;
   try {
+    if (contextual)
+      contextIndex = await prepareScanContext(
+        options.source,
+        options.knownLinks!,
+        known,
+        reconstructionCheckpoint,
+      );
     // Alternate source/target and directions, with FIFO order inside each front.
     scan: while (fronts.some((front) => front.cursor < front.queue.length)) {
       for (const front of fronts) {
@@ -506,7 +559,12 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
           // A fully known prefix is existing graph context, not a new
           // connection. Keep tracing through it so a selected transaction's
           // loaded inputs/outputs cannot fence off all undiscovered paths.
-          if (visit.path.some((id) => !known.has(id))) continue;
+          if (
+            contextual
+              ? acceptedDirectTargets.has(nodeId) && contextIndex!.isNovel(visit.path)
+              : visit.path.some((id) => !known.has(id))
+          )
+            continue;
         }
         if (front.side === 'target' && nodeId === options.source) continue;
         // Entering the next transaction would exceed the hop limit. Do not

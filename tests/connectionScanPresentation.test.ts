@@ -124,6 +124,7 @@ describe('scan progress presentation', () => {
     const shown = presentScanRun(
       {
         ...run,
+        settings: { ...run.settings, targetScope: 'custom' },
         results: entries.map(([result], index) => ({ ...result, id: String(index) })).reverse(),
       },
       new Set(),

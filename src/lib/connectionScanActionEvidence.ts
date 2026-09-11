@@ -24,7 +24,7 @@ export async function loadScanActionEvidence(
   if (scope.network && scope.network !== workspace.network)
     throw new Error('Transactions belong to a different Bitcoin network.');
   const ids = [...new Set(options.missingTxids)];
-  if (ids.length > SCAN_LIMITS.maxHops + 2)
+  if (ids.length > 2 * (SCAN_LIMITS.maxHops + 2))
     throw new Error('Too many transactions. Load a shorter path.');
   if (ids.some((id) => !/^[0-9a-f]{64}$/.test(id)))
     throw new Error('Invalid transaction ID. Run the scan again.');

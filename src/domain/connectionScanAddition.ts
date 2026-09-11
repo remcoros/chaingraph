@@ -1,5 +1,5 @@
 import type { ScanResult } from './connectionScan';
-import { addScanPath, prepareScanPath } from './connectionScanRecords';
+import { addScanPath, prepareScanPath, scanContextPath } from './connectionScanRecords';
 import { ensureGraphMembership } from './graphMembership';
 import { indexPreviousOutputs, type PreviousOutputIndex } from './prevouts';
 import { outputNodeId, type Workspace } from './types';
@@ -60,7 +60,7 @@ function addedTransactionConflicts(workspace: Workspace, txid: string): boolean 
 }
 
 /** The terminal creator is display context, included in Add without changing saved search hops. */
-export function prepareScanPathAddition(
+function prepareScanPrimaryPath(
   workspace: Workspace,
   result: ScanResult,
   prefixLength = result.path.length,
@@ -78,6 +78,34 @@ export function prepareScanPathAddition(
   return { ...prepared, blockedByConflict, creatorId };
 }
 
+/** Full connection actions include both routes; a partial prefix stays explicitly bounded. */
+export function prepareScanPathAddition(
+  workspace: Workspace,
+  result: ScanResult,
+  prefixLength = result.path.length,
+) {
+  const primary = prepareScanPrimaryPath(workspace, result, prefixLength);
+  if (prefixLength !== result.path.length || !result.context) return primary;
+  try {
+    const context = scanContextPath(result)!;
+    const prepared = prepareScanPath(workspace, context);
+    const transactions = { ...primary.transactions, ...prepared.transactions };
+    return {
+      ...primary,
+      blockedByConflict:
+        primary.blockedByConflict ||
+        prepared.blockedByConflict ||
+        Object.keys(transactions).some((txid) => addedTransactionConflicts(workspace, txid)),
+      nodeIds: [...new Set([...primary.nodeIds, ...prepared.nodeIds])],
+      newNodeIds: [...new Set([...primary.newNodeIds, ...prepared.newNodeIds])],
+      missingTxids: [...new Set([...primary.missingTxids, ...prepared.missingTxids])],
+      transactions,
+    };
+  } catch {
+    return { ...primary, blockedByConflict: true };
+  }
+}
+
 /** Add exactly the verified path and its displayed terminal creator in one undoable mutation. */
 export function addScanPathAddition(
   workspace: Workspace,
@@ -91,12 +119,14 @@ export function addScanPathAddition(
     throw new Error('Path evidence is missing. Reload it before adding this path.');
   // Seed legacy membership before new transaction observations enter the workspace.
   const initialized = ensureGraphMembership(workspace);
-  return prepared.creatorId
+  const added = prepared.creatorId
     ? addScanPath(
         initialized,
         additionResult(result, result.path.slice(0, prefixLength), prepared.creatorId),
       )
     : addScanPath(initialized, result, prefixLength);
+  const context = prefixLength === result.path.length ? scanContextPath(result) : undefined;
+  return context ? addScanPath(added, context) : added;
 }
 
 function nodeResult(nodeId: string): ScanResult {

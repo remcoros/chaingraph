@@ -57,12 +57,23 @@ describe('explicit scan action evidence', () => {
     expect(options.workspace.connectionScans).toBeUndefined();
   });
 
+  it('allows the bounded union of both route proofs without fetching extra transactions', async () => {
+    const options = fixture();
+    options.missingTxids = Array.from({ length: 20 }, (_, i) => id(i + 1));
+    const fetch = vi
+      .fn<typeof fetchTransaction>()
+      .mockImplementation(async (_network, txid) => transaction(Number.parseInt(txid, 16)));
+    const evidence = await loadScanActionEvidence(options, fetch);
+    expect(Object.keys(evidence)).toEqual(options.missingTxids);
+    expect(fetch.mock.calls.map((call) => call[1])).toEqual(options.missingTxids);
+  });
+
   it('rejects an oversized request or invalid IDs before any lookup', async () => {
     const options = fixture();
     const fetch = vi.fn<typeof fetchTransaction>();
     await expect(
       loadScanActionEvidence(
-        { ...options, missingTxids: Array.from({ length: 11 }, (_, i) => id(i)) },
+        { ...options, missingTxids: Array.from({ length: 21 }, (_, i) => id(i)) },
         fetch,
       ),
     ).rejects.toThrow('shorter path');

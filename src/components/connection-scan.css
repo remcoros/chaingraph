@@ -231,6 +231,7 @@
   gap: 4px;
   padding: 4px 7px;
   font-size: 11px;
+  white-space: nowrap;
 }
 .connection-scan-path-section {
   margin-top: 10px;
@@ -238,10 +239,10 @@
   padding-top: 6px;
   font-size: var(--text-sm);
 }
-.connection-scan-path-section > summary {
+.connection-scan-path-heading {
   font-weight: 600;
 }
-.connection-scan-path-section > summary span {
+.connection-scan-path-heading > span {
   margin-left: 6px;
   font-weight: 400;
   color: var(--color-muted);
@@ -320,6 +321,19 @@
 .connection-scan-meeting > span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.connection-scan-meeting > button {
+  justify-self: start;
+  min-height: 24px;
+  padding: 2px 0;
+  text-align: left;
+}
+.connection-scan-existing-route {
+  margin-top: 10px;
+  font-size: var(--text-sm);
+}
+.connection-scan-existing-route > strong {
+  font-weight: 600;
 }
 .connection-scan-evidence-status {
   color: var(--color-warning);

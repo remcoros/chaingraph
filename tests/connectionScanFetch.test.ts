@@ -308,11 +308,17 @@ function runnerSetup(scanRequest: ConnectionScanRequest = request()) {
 }
 describe('connection scan worker ownership', () => {
   it('freezes loaded scan context independently from displayed nodes across the worker boundary', async () => {
-    const initial = { ...request(), knownNodeIds: [`tx:${id(1)}`, `out:${id(1)}:0`] };
+    const initial = {
+      ...request(),
+      knownNodeIds: [`tx:${id(1)}`, `out:${id(1)}:0`],
+      knownLinks: [[`tx:${id(1)}`, `out:${id(1)}:0`] as [string, string]],
+    };
     const expected = structuredClone(initial);
     const s = runnerSetup(initial);
     initial.knownNodeIds.push(`tx:${id(2)}`);
     initial.displayedNodeIds.length = 0;
+    initial.knownLinks[0][1] = `out:${id(2)}:0`;
+    initial.knownLinks.length = 0;
     expect(s.worker.messages[0]).toEqual({ type: 'start', request: expected });
     s.worker.reply({ type: 'complete', run: completed() });
     await s.pending;

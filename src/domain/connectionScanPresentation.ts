@@ -13,6 +13,65 @@ export type ScanResultFinding =
   | 'shared-descendant';
 export type ScanResultCategory = 'connection' | 'branch' | 'endpoint' | 'issue';
 
+/** Name the relation the user can reveal, rather than the search frontier that found it. */
+export function scanRelationPresentation(result: ScanResult):
+  | {
+      title: string;
+      description: string;
+      branches?: [string, string];
+      branchLabel?: 'input' | 'output';
+      meeting?: string;
+    }
+  | undefined {
+  if (result.kind !== 'connection') return;
+  const direction = result.scanDirection ?? result.directions[0];
+  let divergence = 0;
+  while (
+    divergence < result.path.length &&
+    result.path[divergence] === result.context?.path[divergence]
+  )
+    divergence++;
+  const meeting =
+    result.meetingNode ??
+    result.path.slice(divergence).find((id) => result.context?.path.slice(divergence).includes(id));
+  if (result.context) {
+    const first = result.path[1];
+    const second = result.context.path[1];
+    if (
+      result.path[0]?.startsWith('tx:') &&
+      first?.startsWith('out:') &&
+      second?.startsWith('out:') &&
+      first !== second &&
+      result.directions[0] === result.context.directions[0]
+    ) {
+      const branchLabel = result.directions[0] === 'upstream' ? 'input' : 'output';
+      return {
+        title: branchLabel === 'input' ? 'Input reconnection' : 'Output reconnection',
+        description: `These ${branchLabel} branches reconnect.`,
+        branches: [first, second],
+        branchLabel,
+        meeting,
+      };
+    }
+    return { title: 'Reconnection', description: 'A second route links these nodes.', meeting };
+  }
+  if (result.relationship === 'shared-ancestor')
+    return {
+      title: 'Shared ancestor',
+      description: 'Both nodes trace back to this meeting point.',
+      meeting: result.meetingNode,
+    };
+  if (result.relationship === 'shared-descendant')
+    return {
+      title: 'Shared descendant',
+      description: 'Both nodes lead to this meeting point.',
+      meeting: result.meetingNode,
+    };
+  return direction === 'upstream'
+    ? { title: 'Funding path', description: 'The target is upstream of the source.' }
+    : { title: 'Spending path', description: 'The target is downstream of the source.' };
+}
+
 /** Normalize legacy path records without promoting run limits into node findings. */
 export function resultFinding(result: ScanResult): ScanResultFinding | undefined {
   if (result.reason && SCAN_STATUS_ONLY_REASONS.includes(result.reason)) return undefined;
@@ -65,6 +124,15 @@ export function presentScanRun(run: ScanRun, dismissed: ReadonlySet<string>): Sc
     ...run,
     results: run.results
       .filter((result) => resultFinding(result) !== undefined)
+      .filter(
+        (result) =>
+          run.settings.targetScope === 'custom' ||
+          result.kind !== 'connection' ||
+          result.relationship === 'shared-ancestor' ||
+          result.relationship === 'shared-descendant' ||
+          !!result.context ||
+          result.bridge === true,
+      )
       .map((result) => (dismissed.has(result.id) ? { ...result, dismissed: true } : result))
       .sort((a, b) => rank[resultCategory(a)] - rank[resultCategory(b)]),
   };

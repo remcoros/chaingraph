@@ -7,7 +7,7 @@ import type {
 } from '../domain/connectionScan';
 export type ConnectionScanRequest = Pick<
   ConnectionScanOptions,
-  'id' | 'source' | 'targetIds' | 'displayedNodeIds' | 'knownNodeIds' | 'settings'
+  'id' | 'source' | 'targetIds' | 'displayedNodeIds' | 'knownNodeIds' | 'knownLinks' | 'settings'
 >;
 export type ScanWorkerInput =
   | { type: 'start'; request: ConnectionScanRequest }

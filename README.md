@@ -16,17 +16,18 @@ and targets exactly the picked transactions or outputs. Searches
 default to 3 transaction hops, 200 examined transactions,
 30 seconds and a 50-branch stopping point. Findings appear during the scan and
 can be dismissed individually. Connection and branch-choice cards identify exact
-paths and shared meeting points. Automatic scopes treat loaded transaction I/O as
-known context regardless of canvas visibility, continuing beyond it to find deeper
-connections. Shared-ancestor paths that only add the already identifiable creator
-of known outputs are omitted. Evidence problems offer a bounded endpoint recheck;
+paths and shared meeting points. Automatic scopes compare observed links with the
+loaded graph regardless of canvas visibility. Reconnection cards show both the
+found route and the existing route that closes the loop; Add reveals both.
+Ordinary ancestry and merely loading an identifiable creator are omitted.
+Targets in separate loaded components can still yield useful connecting paths. Evidence problems offer a bounded endpoint recheck;
 verified unspent, coinbase and unspendable endings live under **Endpoints**.
 Scan-wide resource limits appear only in the completion status.
 Review exact paths, add a path or an explicit prefix including its terminal creator
 in one undoable action, and continue from a stopping point. Clicking a path node
 loads it if needed, adds only that node, and selects it.
-New scans keep distinct earlier results, with clickable source and target rows in
-each card. Repeated finding paths update the existing observation; dismissed
+New scans keep distinct earlier results, with clickable endpoints or input/output
+branches in each card. Repeated finding paths, including opposite views of the same loop, update the existing observation; dismissed
 paths stay hidden until results are cleared. Results and path evidence stay encrypted; **Clear all results** clears the
 collection without removing added paths. The explored search space is discarded. Results are bounded observations, not
 exhaustive paths or ownership claims. See [connection scan instructions](instructions.md#connection-scans).

@@ -1,3 +1,4 @@
+import { scanReconnectionKey } from './connectionScanContext';
 import type { ScanResult, ScanRun } from './connectionScan';
 import { resultCategory, resultFinding } from './connectionScanPresentation';
 
@@ -20,6 +21,8 @@ export function scanResultGroupKey(result: ScanResult): string {
 
 /** Stable identity of one finding path, independent of run IDs and observation time. */
 export function scanResultIdentity(source: string, result: ScanResult): string {
+  const reconnection = scanReconnectionKey(result);
+  if (reconnection) return JSON.stringify([source, 'reconnection', reconnection]);
   return JSON.stringify([
     source,
     result.kind,

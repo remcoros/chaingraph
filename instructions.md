@@ -94,8 +94,7 @@ target IDs with the encrypted results.
 
 **Scan selection** searches from the selected node for directed connections and
 shared ancestors or descendants. Selecting another node prepares the next scan;
-it never changes or restarts the active run. Existing results keep their original
-source and target as clickable rows in each card. Select either to prepare a new
+it never changes or restarts the active run. Existing results keep their original relation, with clickable endpoints or input/output branches in each card. Select either to prepare a new
 scan from that node; starting it keeps the earlier cards.
 Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
 50-branch stopping point. Advanced controls allow at most 8 hops, 1,000 examined
@@ -109,38 +108,37 @@ Results stream into compact cards. The default **Findings** filter shows
 connections first, then branch choices and evidence problems. **Endpoints** is a
 separate filter for natural path endings.
 
-| Finding | Meaning |
-| --- | --- |
-| Upstream / downstream connection | An observed funding or spending path links the selection to a graph target. |
-| Shared ancestor / shared descendant | Two paths meet at an earlier or later transaction or output. The card identifies both the target and meeting point. |
-| Many inputs / many outputs | The transaction's input or output count reaches the branch threshold. Add its path, inspect the transaction, and select one branch to continue. |
-| Unspent output | A positive UTXO check, with its time and mempool scope. This is a recorded observation, not a live balance. |
-| Coinbase origin | An upstream path reaches a coinbase transaction. |
-| Unspendable output | A downstream path ends at a verified OP_RETURN script. |
-| Transaction unavailable | A transaction needed to continue could not be loaded. |
-| Spend status unknown | Neither a verified spender nor a positive current UTXO observation is available. |
-| Lookup failed | A request timed out, failed or returned invalid data. |
-| Conflicting evidence | Observations contradict the proposed path. Only a verified prefix can be added. |
+| Finding                             | Meaning                                                                                                                                         |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Funding / spending path             | An observed funding or spending path links the selection to a graph target.                                                                     |
+| Reconnection                        | The found path and a distinct existing route form a loop. Both are included in Add.                                                             |
+| Shared ancestor / shared descendant | Two paths meet at an earlier or later transaction or output. The card identifies both the target and meeting point.                             |
+| Many inputs / many outputs          | The transaction's input or output count reaches the branch threshold. Add its path, inspect the transaction, and select one branch to continue. |
+| Unspent output                      | A positive UTXO check, with its time and mempool scope. This is a recorded observation, not a live balance.                                     |
+| Coinbase origin                     | An upstream path reaches a coinbase transaction.                                                                                                |
+| Unspendable output                  | A downstream path ends at a verified OP_RETURN script.                                                                                          |
+| Transaction unavailable             | A transaction needed to continue could not be loaded.                                                                                           |
+| Spend status unknown                | Neither a verified spender nor a positive current UTXO observation is available.                                                                |
+| Lookup failed                       | A request timed out, failed or returned invalid data.                                                                                           |
+| Conflicting evidence                | Observations contradict the proposed path. Only a verified prefix can be added.                                                                 |
 
-Automatic target scopes search beyond the loaded transaction context, even when
-only the selected transaction is on the graph. Its immediate inputs and outputs
-are not connection findings. Showing or hiding that context does not block deeper
-searches. Explicit custom targets retain their reveal actions.
+Automatic scopes compare with loaded links, independently of canvas visibility.
+Ordinary ancestry and loading the already identifiable creator of known outputs
+are omitted. A reconnection shows the existing route that closes its loop; targets
+in separate loaded components can instead produce a connecting path. Existing
+routes are bounded to 8 transaction hops. Connections requiring a longer existing
+route are omitted. Custom targets can return directed paths without a loop.
 
-Shared-ancestor results omit paths where the only new node is the transaction
-that created already known outputs. Their outpoint IDs already identify that
-shared creator. Deeper connections and newly discovered shared spenders still appear.
-
-Expand **Path** to inspect directed steps and new nodes. Click a source, target
-or path node to add it if needed and select it. Clicking adds only that node,
+**Path** shows directed steps and new nodes. Click a source, target, branch or
+path node to add it if needed and select it. Clicking adds only that node,
 without the other steps or siblings. Missing transaction evidence loads on demand.
 Paths ending at an output include its creating transaction, shown with a small
 origin icon if it is not already in the path.
 
 Alternative paths to the same finding within a scan share one card; choose an
-alternative inside it. **Add (+N)** adds the displayed path, including its terminal
-creating transaction, with N new nodes in one Undo action. **Path length** chooses
-a shorter prefix. Adding reveals the path and resets graph filters, preserving
+alternative inside it. **Add (+N)** adds the found route and any displayed existing
+route, including the terminal creating transaction, with N new nodes in one Undo
+action. This reveals the whole reconnection. **Path length** offers a shorter prefix for stopping points or missing/conflicting proof; its **Add prefix** action omits the existing route. Adding reveals the path and resets graph filters, preserving
 annotations and the camera. Select a branch after adding its transaction, then
 use **Scan selection** to continue. Missing evidence is fetched only for the
 requested action; conflicting evidence must be resolved before adding.
@@ -163,7 +161,7 @@ connections and branch choices. Explicit rechecks may recategorize retained path
 within that overall allowance.
 
 Starting another scan keeps distinct earlier results in the same list. Repeated
-finding paths appear once, with the latest observation. Dismissed paths stay
+finding paths and opposite views of the same loop appear once, with the latest observation. Dismissed paths stay
 hidden when rediscovered. Different sources and alternative paths are retained.
 **Clear all results** clears the collection and dismissals, cancels an active
 scan, and leaves added graph nodes and annotations intact. Results stay encrypted
