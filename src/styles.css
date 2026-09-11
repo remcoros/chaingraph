@@ -62,7 +62,8 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
+select:focus-visible,
+[role='button']:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
@@ -798,13 +799,46 @@ small,
   border: 1px solid transparent;
   background: none;
   gap: 9px;
-  padding: 9px;
+  padding: 6px;
   text-align: left;
   justify-content: flex-start;
   border-radius: 4px;
+  cursor: pointer;
 }
 .entity-row > span:last-child {
   min-width: 0;
+}
+.entity-row-title {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.entity-row-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-row-io {
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.entity-row-label {
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-row-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  color: var(--color-muted);
+  padding-top: 1px;
 }
 .entity-dot {
   display: inline-block;

@@ -1,6 +1,6 @@
 /** Monetary displays take integer satoshis. Stored values and numeric inputs stay unchanged. */
-const GROUP = '\u202f';
-const UNIT_SPACE = '\u00a0';
+const GROUP = '\u2009';
+const UNIT_SPACE = '\u2009';
 const SATS_PER_BTC = 100_000_000n;
 
 function integerSats(value?: number | bigint): bigint | undefined {

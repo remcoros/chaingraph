@@ -10,10 +10,118 @@
   max-height: 60%;
   overflow: auto;
 }
-.entity-filter-pair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+.entity-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
+}
+.entity-type-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+}
+.entity-icon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 5px 8px;
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.entity-type-toggle .entity-icon-toggle {
+  padding: 5px 7px;
+  border-radius: 3px;
+  /* Compensate for the wrapper's own 1px border + 2px padding on each side,
+   * so the group's outer visual height still matches the standalone 34px button. */
+  min-height: 28px;
+}
+.entity-type-toggle .entity-icon-toggle.entity-type-transaction.active {
+  color: var(--color-tx);
+  background: color-mix(in srgb, var(--color-tx) 18%, var(--color-paper));
+}
+.entity-type-toggle .entity-icon-toggle.entity-type-output.active {
+  color: var(--color-output);
+  background: color-mix(in srgb, var(--color-output) 18%, var(--color-paper));
+}
+.entity-type-toggle .entity-icon-toggle.entity-type-address.active {
+  color: var(--color-address);
+  background: color-mix(in srgb, var(--color-address) 18%, var(--color-paper));
+}
+.entity-visibility-toggle {
+  border-color: var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+}
+.entity-visibility-toggle.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+}
+.entity-clear-filters {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 30px;
+  font-size: 10px;
+}
+.entity-visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: 9px;
+}
+.entity-result-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.entity-sort-trigger {
+  min-height: var(--control-height-compact);
+}
+.entity-sort-trigger.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+}
+.entity-sort-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.entity-sort-options button {
+  justify-content: flex-start;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+  font-size: 11px;
+}
+.entity-sort-options button.active {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+  border-color: var(--color-accent);
+}
+@media (max-width: 999px), (pointer: coarse) {
+  .entity-icon-toggle {
+    min-height: 36px;
+  }
 }
 .entity-browser input,
 .entity-browser select {
@@ -69,10 +177,13 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
   font-size: 10px;
   color: var(--color-muted);
+}
+.entity-result-count > span[role='status'] {
+  flex: 1;
+  min-width: 0;
 }
 .entity-result-count button {
   display: flex;
@@ -131,24 +242,6 @@
   display: flex;
 }
 
-.entity-visibility-filter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.entity-visibility-filter select {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 23px 5px 7px;
-  font-size: 10px;
-}
-.entity-visibility-filter button {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-}
 .entity-show-all {
   display: flex;
   align-items: center;
@@ -157,29 +250,76 @@
 }
 .entity-list-entry {
   position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid transparent;
+}
+.entity-list-entry + .entity-list-entry {
+  border-top-color: color-mix(in srgb, var(--color-rule) 55%, transparent);
+}
+.entity-list-entry:hover {
+  background: var(--color-hover);
+  border-color: var(--color-faint);
+  border-radius: 4px;
+}
+.entity-list-entry:has(> .entity-row.selected) {
+  background: var(--color-raised);
+  border-color: var(--color-rule);
+  border-radius: 4px;
+}
+.entity-list-entry > .entity-row:hover,
+.entity-list-entry > .entity-row.selected {
+  border-color: transparent;
 }
 .entity-list-entry > .entity-row {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
 }
-.entity-list-entry.has-visibility > .entity-row {
-  padding-right: 36px;
-}
-.entity-list-entry.has-removal > .entity-row {
-  padding-right: 68px;
-}
-.entity-row-actions {
-  position: absolute;
-  right: 3px;
-  top: 50%;
-  transform: translateY(-50%);
+.entity-row-header {
   display: flex;
   align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.entity-row-icon {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.entity-row-icon.transaction {
+  color: var(--color-tx);
+}
+.entity-row-icon.output {
+  color: var(--color-output);
+}
+.entity-row-icon.address {
+  color: var(--color-address);
+}
+.entity-row-lower {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.entity-row-body {
+  flex: 1;
+  min-width: 0;
+}
+.entity-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
   gap: 1px;
 }
 .entity-row-actions .icon-button {
-  padding: 5px;
-  min-width: 30px;
-  min-height: 32px;
+  padding: 4px;
+  min-width: 26px;
+  min-height: 26px;
 }
 .entity-row-actions:empty {
   display: none;
@@ -191,17 +331,10 @@
 }
 @media (max-width: 999px), (pointer: coarse) {
   .entity-row-actions {
-    gap: 6px;
+    gap: 4px;
   }
   .entity-row-actions .icon-button {
-    min-width: 40px;
-    min-height: 40px;
-  }
-  .entity-list-entry.has-visibility > .entity-row {
-    padding-right: 48px;
-    min-height: 48px;
-  }
-  .entity-list-entry.has-removal > .entity-row {
-    padding-right: 94px;
+    min-width: 34px;
+    min-height: 34px;
   }
 }

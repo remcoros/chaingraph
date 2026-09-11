@@ -1,12 +1,17 @@
 import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
+  ArrowRightFromLine,
+  ArrowUpDown,
+  Asterisk,
   Bookmark,
+  Box,
   ChevronLeft,
   ChevronRight,
   Eye,
   EyeOff,
+  Layers,
   CheckSquare,
   Trash2,
   X,
@@ -19,12 +24,126 @@ import {
   type EntitySort,
   type GraphFilters,
 } from '../domain/graphFilters';
-import type { Annotation, GraphNode, Transaction } from '../domain/types';
+import { short, type Annotation, type GraphNode, type Transaction } from '../domain/types';
 import './entity-browser.css';
 import type { VisibilityProps } from './VisibilityActions';
+import { AnchoredPopover } from './AnchoredPopover';
 import { GraphConnectionsAction, GraphFilterButton } from './GraphFilterControls';
 import { SelectionCheckbox } from './SelectionToolbar';
 import type { EntitySelection } from '../lib/useEntitySelection';
+
+/** Icons mirror the transaction flow block (Box), output side toolbar (ArrowRightFromLine)
+ * and the graph's address-node toggle (Layers), so entities read the same way everywhere. */
+const TYPE_FILTERS: { value: GraphNode['kind']; label: string; Icon: ComponentType<{ size?: number; className?: string }> }[] = [
+  { value: 'transaction', label: 'Transactions', Icon: Box },
+  { value: 'output', label: 'Outputs', Icon: ArrowRightFromLine },
+  { value: 'address', label: 'Addresses', Icon: Layers },
+];
+const TYPE_ICON = Object.fromEntries(TYPE_FILTERS.map(({ value, Icon }) => [value, Icon])) as Record<
+  GraphNode['kind'],
+  ComponentType<{ size?: number; className?: string }>
+>;
+
+const SORT_OPTIONS: { value: EntitySort; label: string }[] = [
+  { value: 'graph', label: 'Graph order' },
+  { value: 'label', label: 'Label A–Z' },
+  { value: 'value-desc', label: 'Value high first' },
+  { value: 'value-asc', label: 'Value low first' },
+  { value: 'type', label: 'Entity type' },
+];
+
+/** Popover-backed sort trigger, matching the graph filter button's disclosure pattern. */
+function EntitySortButton({
+  sort,
+  onChange,
+}: {
+  sort: EntitySort;
+  onChange: (sort: EntitySort) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  const current = SORT_OPTIONS.find((option) => option.value === sort);
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className={`entity-sort-trigger ${sort !== 'graph' ? 'active' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        title="Sort the entity list"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <ArrowUpDown size={12} />
+        <span>{current?.label ?? 'Sort'}</span>
+      </button>
+      {open && trigger.current && (
+        <AnchoredPopover
+          id={id}
+          anchor={trigger.current}
+          title="Sort entities"
+          width={200}
+          className="entity-sort-popover"
+          onClose={() => setOpen(false)}
+        >
+          <div role="menu" className="entity-sort-options">
+            {SORT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={option.value === sort}
+                className={option.value === sort ? 'active' : ''}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </AnchoredPopover>
+      )}
+    </>
+  );
+}
+
+type VisibilityMode = 'visible' | 'hidden' | 'all' | 'graph';
+/** Manual "Not hidden"/"Match graph" distinction collapses into one default state
+ * for the tri-state control; both still map through unchanged to onVisibilityChange. */
+const VISIBILITY_CYCLE: VisibilityMode[] = ['graph', 'hidden', 'all'];
+const VISIBILITY_META: Record<
+  VisibilityMode,
+  { Icon: ComponentType<{ size?: number; className?: string }>; label: string; hint: string }
+> = {
+  graph: {
+    Icon: Eye,
+    label: 'On graph',
+    hint: 'Listing entities currently drawn on the canvas.',
+  },
+  visible: {
+    Icon: Eye,
+    label: 'On graph',
+    hint: 'Listing entities currently drawn on the canvas.',
+  },
+  hidden: {
+    Icon: EyeOff,
+    label: 'Hidden',
+    hint: 'Listing only entities manually hidden from the graph.',
+  },
+  all: {
+    Icon: Asterisk,
+    label: 'All',
+    hint: 'Listing every loaded entity, hidden or shown.',
+  },
+};
+function nextVisibility(current: VisibilityMode): VisibilityMode {
+  const index = VISIBILITY_CYCLE.indexOf(current === 'visible' ? 'graph' : current);
+  return VISIBILITY_CYCLE[(index + 1) % VISIBILITY_CYCLE.length];
+}
 
 interface Props extends VisibilityProps {
   transactions?: Record<string, Transaction>;
@@ -72,7 +191,7 @@ export default function EntityBrowser({
   removableNodeIds = [],
   onRemoveNode,
   onSetHidden,
-  visibility = 'visible',
+  visibility = 'graph',
   onVisibilityChange,
   hiddenCount = 0,
   onShowAllHidden,
@@ -117,59 +236,45 @@ export default function EntityBrowser({
           value={filters.query ?? ''}
           onChange={(event) => patch({ query: event.target.value })}
         />
-        <div className="entity-filter-pair">
-          <select
-            aria-label="Entity type"
-            value={filters.kind ?? 'all'}
-            onChange={(event) => patch({ kind: event.target.value as GraphFilters['kind'] })}
-          >
-            <option value="all">All types</option>
-            <option value="transaction">Transactions</option>
-            <option value="output">Outputs</option>
-            <option value="address">Addresses</option>
-          </select>
-          <select
-            aria-label="Entity sort order"
-            value={sort}
-            onChange={(event) => setSort(event.target.value as EntitySort)}
-          >
-            <option value="graph">Graph order</option>
-            <option value="label">Label A–Z</option>
-            <option value="value-desc">Value high first</option>
-            <option value="value-asc">Value low first</option>
-            <option value="type">Entity type</option>
-          </select>
-        </div>
-        {onVisibilityChange && (
-          <div className="entity-visibility-filter">
-            <select
-              aria-label="Entity visibility"
-              title="Match graph lists the nodes currently on the canvas. Other modes keep amount-filtered outputs available for inspection."
-              value={visibility}
-              onChange={(event) =>
-                onVisibilityChange(event.target.value as 'visible' | 'hidden' | 'all' | 'graph')
-              }
-            >
-              <option value="graph">Match graph</option>
-              <option value="visible">Not hidden</option>
-              <option value="hidden">Hidden</option>
-              <option value="all">All entities</option>
-            </select>
-            {hiddenCount > 0 && (
-              <button
-                type="button"
-                className="text-button"
-                aria-label={`Browse ${hiddenCount} hidden entities`}
-                onClick={() => {
-                  onFiltersChange({});
-                  onVisibilityChange('hidden');
-                }}
-              >
-                <EyeOff size={12} /> {hiddenCount} hidden
-              </button>
-            )}
+        <div className="entity-icon-row">
+          <div className="entity-type-toggle" role="group" aria-label="Filter by entity type">
+            {TYPE_FILTERS.map(({ value, label, Icon }) => {
+              const active = filters.kind === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`entity-icon-toggle entity-type-${value} ${active ? 'active' : ''}`}
+                  aria-pressed={active}
+                  aria-label={label}
+                  title={active ? `Showing ${label.toLowerCase()} only. Click to show all types.` : `Show ${label.toLowerCase()} only`}
+                  onClick={() => patch({ kind: active ? 'all' : value })}
+                >
+                  <Icon size={13} />
+                </button>
+              );
+            })}
           </div>
-        )}
+          {onVisibilityChange &&
+            (() => {
+              const meta = VISIBILITY_META[visibility];
+              return (
+                <button
+                  type="button"
+                  className={`entity-icon-toggle entity-visibility-toggle ${visibility !== 'graph' && visibility !== 'visible' ? 'active' : ''}`}
+                  title={`${meta.hint} Click to cycle visibility.`}
+                  aria-label={`Entity visibility: ${meta.label}. Click to cycle.`}
+                  onClick={() => onVisibilityChange(nextVisibility(visibility))}
+                >
+                  <meta.Icon size={13} />
+                  <span>{meta.label}</span>
+                  {hiddenCount > 0 && visibility !== 'hidden' && (
+                    <span className="entity-visibility-badge">{hiddenCount}</span>
+                  )}
+                </button>
+              );
+            })()}
+        </div>
         <div className="entity-filter-actions">
           <GraphFilterButton
             triggerLabel="More filters"
@@ -193,12 +298,23 @@ export default function EntityBrowser({
             </button>
           )}
         </div>
+        {activeFilters && (
+          <button
+            type="button"
+            className="entity-clear-filters"
+            onClick={() => (onResetFilters ? onResetFilters() : onFiltersChange({}))}
+            aria-label="Clear entity and graph filters"
+          >
+            <X size={12} /> Clear filters
+          </button>
+        )}
         {selection?.mode && (
           <div className="entity-selection-bar">
             <span role="status">{selection.count.toLocaleString()} selected</span>
             {selectable.length > 0 && (
               <button
                 type="button"
+                className="entity-selection-primary"
                 aria-label={`Select ${scope} in the entity list`}
                 disabled={contextPreviewPending}
                 title={
@@ -231,29 +347,23 @@ export default function EntityBrowser({
             {error}
           </p>
         )}
+        {(visibility === 'visible' || visibility === 'graph') && (
+          <GraphConnectionsAction
+            filters={filters}
+            onChange={onFiltersChange}
+            extraNodeCount={contextNodeCount}
+            pending={contextPreviewPending}
+          />
+        )}
         <div className="entity-result-count" tabIndex={-1}>
           <span role="status">
             {contextPreviewPending
               ? 'Filtering…'
               : `${nodes.length.toLocaleString()} ${visibility === 'graph' ? 'on graph' : 'matches'} / ${totalCount.toLocaleString()} loaded`}
           </span>
-          {(visibility === 'visible' || visibility === 'graph') && (
-            <GraphConnectionsAction
-              filters={filters}
-              onChange={onFiltersChange}
-              extraNodeCount={contextNodeCount}
-              pending={contextPreviewPending}
-            />
-          )}
-          {activeFilters && (
-            <button
-              type="button"
-              onClick={() => (onResetFilters ? onResetFilters() : onFiltersChange({}))}
-              aria-label="Clear entity and graph filters"
-            >
-              <X size={12} /> Clear
-            </button>
-          )}
+          <div className="entity-result-actions">
+            <EntitySortButton sort={sort} onChange={setSort} />
+          </div>
         </div>
         {visibility === 'hidden' && hiddenCount > 0 && onShowAllHidden && (
           <button type="button" className="text-button entity-show-all" onClick={onShowAllHidden}>
@@ -279,7 +389,9 @@ export default function EntityBrowser({
         )}
       </div>
       <div ref={listRef} className="entity-list" aria-label="Matching graph entities">
-        {sorted.slice(first, first + pageSize).map((node) => (
+        {sorted.slice(first, first + pageSize).map((node) => {
+          const KindIcon = TYPE_ICON[node.kind];
+          return (
           <div
             key={node.id}
             className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${selection?.has(node.id) ? 'is-batch-selected' : ''}`}
@@ -292,69 +404,97 @@ export default function EntityBrowser({
                 onToggle={selection.toggle}
               />
             )}
-            <button
+            <div
               className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
+              role="button"
+              tabIndex={0}
               aria-pressed={selectedId === node.id}
               onClick={(event) => {
                 if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
                 else onSelect(node.id);
               }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
+                else onSelect(node.id);
+              }}
               title={node.id}
             >
-              <span className={`entity-dot ${node.kind}`} />
-              <span>
-                <strong>{node.label}</strong>
-                <small>
-                  {node.kind === 'transaction' && transactions[node.txid ?? '']
-                    ? `(${transactions[node.txid!].vin.length} / ${transactions[node.txid!].vout.length})`
-                    : node.kind}
+              <span className="entity-row-header">
+                <KindIcon size={12} className={`entity-row-icon ${node.kind}`} />
+                <span className="entity-row-title">
+                  <strong>{short(node.id)}</strong>
+                  {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
+                    <small className="entity-row-io">
+                      ({transactions[node.txid!].vin.length} / {transactions[node.txid!].vout.length})
+                    </small>
+                  )}
+                </span>
+              </span>
+              <span className="entity-row-lower">
+                <span className="entity-row-body">
+                  {annotations[node.id]?.label && (
+                    <small className="entity-row-label">
+                      {annotations[node.id]!.icon ? `${annotations[node.id]!.icon} ` : ''}
+                      {annotations[node.id]!.label}
+                    </small>
+                  )}
                   {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
                     <span className="entity-chain-status">
                       <TransactionBlockTime transaction={transactions[node.txid!]} />
                     </span>
                   )}
-                  {hidden.has(node.id) && <EyeOff size={11} aria-label="Hidden from graph" />}
+                  <Amount as="small" value={node.value} />
+                </span>
+                <span className="entity-row-status">
                   {annotations[node.id]?.bookmarked && (
-                    <Bookmark size={11} aria-label="Bookmarked" />
+                    <Bookmark size={12} aria-label="Bookmarked" />
                   )}
-                </small>
-                <Amount as="small" value={node.value} />
+                </span>
+                <span className="entity-row-actions">
+                  {onSetHidden && (
+                    <button
+                      type="button"
+                      className="icon-button entity-row-restore"
+                      aria-label={`${hidden.has(node.id) ? 'Show' : 'Hide'} ${node.label} ${hidden.has(node.id) ? 'in' : 'from'} graph`}
+                      title={hidden.has(node.id) ? 'Show entity in graph' : 'Hide entity from graph'}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSetHidden([node.id], !hidden.has(node.id));
+                      }}
+                    >
+                      {hidden.has(node.id) ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                  )}
+                  {removable.has(node.id) && onRemoveNode && (
+                    <button
+                      type="button"
+                      className="icon-button danger entity-row-remove"
+                      aria-label={
+                        node.kind === 'address'
+                          ? `Stop watching ${node.label}`
+                          : `Remove ${node.label} from workspace`
+                      }
+                      title={
+                        node.kind === 'address'
+                          ? 'Stop watching address'
+                          : 'Remove transaction from workspace'
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemoveNode(node.id);
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </span>
               </span>
-            </button>
-            <div className="entity-row-actions">
-              {onSetHidden && (
-                <button
-                  type="button"
-                  className="icon-button entity-row-restore"
-                  aria-label={`${hidden.has(node.id) ? 'Show' : 'Hide'} ${node.label} ${hidden.has(node.id) ? 'in' : 'from'} graph`}
-                  title={hidden.has(node.id) ? 'Show entity in graph' : 'Hide entity from graph'}
-                  onClick={() => onSetHidden([node.id], !hidden.has(node.id))}
-                >
-                  {hidden.has(node.id) ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-              )}
-              {removable.has(node.id) && onRemoveNode && (
-                <button
-                  type="button"
-                  className="icon-button danger entity-row-remove"
-                  aria-label={
-                    node.kind === 'address'
-                      ? `Stop watching ${node.label}`
-                      : `Remove ${node.label} from workspace`
-                  }
-                  title={
-                    node.kind === 'address'
-                      ? 'Stop watching address'
-                      : 'Remove transaction from workspace'
-                  }
-                  onClick={() => onRemoveNode(node.id)}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {!nodes.length && (
           <p className="empty-panel">
             {totalCount

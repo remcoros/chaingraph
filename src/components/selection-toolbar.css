@@ -87,13 +87,8 @@
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
 .entity-list-entry:has(> .selection-checkbox) {
-  display: flex;
   align-items: center;
   gap: 2px;
-}
-.entity-list-entry:has(> .selection-checkbox) > .entity-row {
-  flex: 1;
-  min-width: 0;
 }
 .entity-filter-actions {
   display: flex;
@@ -103,6 +98,9 @@
 .entity-filter-actions button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
   gap: 5px;
   min-height: 30px;
   padding: 4px 8px;
@@ -119,10 +117,18 @@
   font-size: 10px;
   color: var(--color-muted);
 }
+.entity-selection-bar > span[role='status'] {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .entity-selection-bar button {
   min-height: 28px;
   padding: 3px 7px;
   font-size: 10px;
+}
+.entity-selection-primary {
+  flex: 1;
+  min-width: 0;
 }
 @media (max-width: 999px) {
   .selection-toolbar {

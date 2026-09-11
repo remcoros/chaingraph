@@ -48,7 +48,7 @@ export function WorkspaceHome({
   return (
     <main id="main-workspace" tabIndex={-1} className="welcome">
       <div className="welcome-copy">
-        <span className="eyebrow">YOUR COINS. YOUR PERSPECTIVE</span>
+        <span className="eyebrow">YOUR COINS. YOUR PERSPECTIVE.</span>
         <h1>
           Follow the coins.
           <br />

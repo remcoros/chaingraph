@@ -32,19 +32,14 @@ export function WalletFilterOptions({
     onChange({ ...filters, walletId: undefined, walletIds: ids.length ? ids : undefined });
   return (
     <div className="wallet-filter-options">
-      <div className="wallet-filter-tools">
-        <span className="small muted">
-          {selected.length ? 'Matches any selected wallet' : 'No wallet filter'}
-        </span>
-        <button
-          type="button"
-          className="text-button"
-          disabled={!selected.length}
-          onClick={() => update([])}
-        >
-          Clear
-        </button>
-      </div>
+      {selected.length > 0 && (
+        <div className="wallet-filter-tools">
+          <span className="small muted">Matches any selected wallet</span>
+          <button type="button" className="text-button" onClick={() => update([])}>
+            Clear
+          </button>
+        </div>
+      )}
       {(options.length > 8 || query) && (
         <input
           type="search"

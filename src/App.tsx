@@ -708,7 +708,7 @@ export default function App() {
     () => admittedGraph.nodes.filter((node) => !hiddenIds.has(node.id)).length,
     [admittedGraph, hiddenIds],
   );
-  const entityVisibility = w?.view.entityVisibility ?? 'visible';
+  const entityVisibility = w?.view.entityVisibility ?? 'graph';
   const recoveryFilterIndex = useMemo(() => buildGraphFilterIndex(recoveryGraph), [recoveryGraph]);
   const entityGraph = useMemo(() => {
     if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
