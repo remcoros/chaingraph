@@ -36,6 +36,24 @@ export function projectGraphMembership(graph: GraphData, nodeIds?: Iterable<stri
   };
 }
 
+/** Display only admitted addresses; changing this preference never adds membership.
+ * Retained addresses keep temporary context visible when the general toggle is off. */
+export function projectGraphAddresses(
+  graph: GraphData,
+  showAddresses: boolean,
+  retainedAddressIds?: ReadonlySet<string>,
+): GraphData {
+  if (showAddresses) return graph;
+  const excluded = new Set<string>();
+  for (const node of graph.nodes)
+    if (node.kind === 'address' && !retainedAddressIds?.has(node.id)) excluded.add(node.id);
+  if (!excluded.size) return graph;
+  return {
+    nodes: graph.nodes.filter((node) => !excluded.has(node.id)),
+    links: graph.links.filter((link) => !excluded.has(link.source) && !excluded.has(link.target)),
+  };
+}
+
 function actionNodeIds(workspace: Workspace, nodeIds: Iterable<string>): Set<string> {
   const ids = new Set<string>();
   let supplied = 0;

@@ -13,7 +13,7 @@
 }
 .graph-canvas canvas {
   display: block;
-  outline-offset: -3px;
+  outline: none;
   touch-action: none;
 }
 .graph-overlays {
@@ -376,15 +376,32 @@
   padding: 4px 7px;
   font-size: 11px;
 }
+.graph-navigation-shell {
+  position: relative;
+}
 .graph-layout-status {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 7px;
   min-width: 0;
-  padding: 5px 3px 1px;
-  border-top: 1px solid var(--color-rule);
+  width: max-content;
+  max-width: calc(100% - var(--graph-context-right-inset, 0px));
+  padding: 5px 9px 6px;
+  border: 1px solid var(--color-rule);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: 0 3px 14px #0003;
+  overflow-wrap: anywhere;
   color: var(--color-ink);
   font-size: 12px;
+}
+.graph-layout-status > svg {
+  flex-shrink: 0;
 }
 .graph-layout-status button {
   min-height: 26px;

@@ -219,9 +219,14 @@ existing `preserveContext` field and removable scope chip. Expansion is nonrecur
 manual hiding, address visibility and the selected path scope. A graph-scoped lazy
 index reuses adjacency and spend/funding evidence; neighbor expansion scans links
 once. The ordinary entity list reuses the canvas filter result when their scopes
-agree. React defers graph-filter projection behind immediate control updates,
+agree. One complete address-inclusive graph owns wallet matches, tags and connection
+evidence. Address visibility projects that graph without rebuilding loaded evidence;
+explicit canvas membership still gates every address. With no admitted addresses,
+the toggle preserves the canvas graph references and skips renderer updates.
+Presentation reuses a topology index across label, icon, tag, glow and size changes.
+React defers graph filters and display settings behind immediate control updates,
 keeping each deferred request paired with its fit token and workspace identity.
-Pending result sets show a filtering status and cannot replace batch selection
+Pending result sets show an updating status and cannot replace batch selection
 until current. Explicit individual selection remains available.
 
 `useEntitySelection` holds selection mode and an ordered set of identifiers as shared

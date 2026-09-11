@@ -63,6 +63,35 @@ function valueRadius(satoshis: number | undefined): number {
   // Zero stays pickable; filtering and additions never change this scale.
   return 1.6 + 0.9 * Math.log10(1 + satoshis / 10_000);
 }
+
+/** Reusable topology for one immutable pair of graph node/link arrays. */
+export interface GraphPresentationIndex {
+  readonly nodes: readonly GraphNode[];
+  readonly sourceLinks: readonly GraphLink[];
+  readonly links: readonly GraphLink[];
+  readonly bridges: ReadonlySet<string>;
+  readonly degrees: ReadonlyMap<string, number>;
+}
+
+export function buildGraphPresentationIndex(
+  nodes: readonly GraphNode[],
+  sourceLinks: readonly GraphLink[],
+): GraphPresentationIndex {
+  const ids = new Set(nodes.map((node) => node.id));
+  const links = sourceLinks.filter((link) => ids.has(link.source) && ids.has(link.target));
+  const created = new Set<string>();
+  const degrees = new Map<string, number>();
+  for (const link of links) {
+    if (link.kind === 'creates') created.add(link.target);
+    degrees.set(link.source, (degrees.get(link.source) ?? 0) + 1);
+    degrees.set(link.target, (degrees.get(link.target) ?? 0) + 1);
+  }
+  const bridges = new Set<string>();
+  for (const link of links)
+    if (link.kind === 'spends' && created.has(link.source)) bridges.add(link.source);
+  return { nodes, sourceLinks, links, bridges, degrees };
+}
+
 export function presentGraph(
   input: {
     nodes: readonly GraphNode[];
@@ -79,22 +108,14 @@ export function presentGraph(
     flowContext?: GraphFlowContext;
   },
   palette: GraphPalette,
+  index?: GraphPresentationIndex,
 ): GraphFrame {
-  const ids = new Set(input.nodes.map((node) => node.id));
+  const { links, bridges, degrees } =
+    index?.nodes === input.nodes && index.sourceLinks === input.links
+      ? index
+      : buildGraphPresentationIndex(input.nodes, input.links);
   const activeIds = new Set(input.batchSelectedIds);
   if (input.selectedId) activeIds.add(input.selectedId);
-  const links = input.links.filter((link) => ids.has(link.source) && ids.has(link.target));
-  const created = new Set(
-    links.filter((link) => link.kind === 'creates').map((link) => link.target),
-  );
-  const bridges = new Set(
-    links
-      .filter((link) => link.kind === 'spends' && created.has(link.source))
-      .map((link) => link.source),
-  );
-  const degrees = new Map<string, number>();
-  for (const link of links)
-    for (const id of [link.source, link.target]) degrees.set(id, (degrees.get(id) || 0) + 1);
   const shapes = { transaction: 'box', output: 'sphere', address: 'octahedron' } as const;
   return {
     dimensions: input.dimensions,

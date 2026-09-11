@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildGraphPresentationIndex,
   presentGraph,
   resolveGraphHit,
   type GraphPalette,
@@ -26,6 +27,69 @@ const palette: GraphPalette = {
 };
 const input = { nodes, links, dimensions: 2 as const, sizeBy: 'uniform' as const, glow: true };
 describe('shared graph semantics and presentation', () => {
+  it('reuses topology across display and selection changes without retaining stale visuals', () => {
+    const index = buildGraphPresentationIndex(nodes, links);
+    const before = structuredClone(index);
+    const nodePresentation = new Map([
+      ['out', { label: 'Savings', icon: '🔒', tags: ['Wallet'], color: '#ff0000', scale: 1.5 }],
+    ]);
+    const variants: Partial<Parameters<typeof presentGraph>[0]>[] = [
+      { showLabels: false },
+      { showTags: false },
+      { showIcons: false },
+      { glow: false },
+      { sizeBy: 'value' },
+      { sizeBy: 'degree' },
+      { selectedId: 'out', batchSelectedIds: ['spend'] },
+      { dimensions: 3 },
+      {
+        flowContext: {
+          transactionId: 'spend',
+          nodes: new Map([['out', 'input']]),
+          links: new Map([['spending', 'input']]),
+        },
+      },
+      { nodePresentation: undefined },
+    ];
+    for (const variant of variants) {
+      const changed = { ...input, nodePresentation, ...variant };
+      expect(presentGraph(changed, palette, index)).toEqual(presentGraph(changed, palette));
+    }
+    const selected = presentGraph(
+      { ...input, nodePresentation, selectedId: 'out' },
+      palette,
+      index,
+    );
+    expect(selected.nodes[1]).toMatchObject({
+      color: palette.accent,
+      selected: true,
+      text: '🔒 Savings\n#Wallet',
+    });
+    expect(presentGraph(input, palette, index).nodes[1]).toMatchObject({
+      selected: false,
+      text: 'Output',
+      radius: 3.2,
+    });
+    expect(index).toEqual(before);
+    expect(index.nodes).toBe(nodes);
+    expect(index.links[0]).toBe(links[0]);
+  });
+
+  it('excludes dangling edges from reused topology and rebuilds when membership changes', () => {
+    const visibleNodes = nodes.slice(0, 2);
+    const index = buildGraphPresentationIndex(visibleNodes, links);
+    const frame = presentGraph({ ...input, nodes: visibleNodes, sizeBy: 'degree' }, palette, index);
+    expect(frame.links.map((link) => link.id)).toEqual(['create']);
+    expect(frame.links[0].width).toBe(0);
+    expect(frame.nodes[1].radius).toBeCloseTo(3.2 * Math.cbrt(2));
+    const restored = presentGraph({ ...input, sizeBy: 'degree' }, palette, index);
+    expect(restored.links[0].width).toBe(1);
+    expect(restored.nodes[1].radius).toBeCloseTo(3.2 * Math.cbrt(1 + Math.sqrt(3)));
+    const changedLinks = { ...input, nodes: visibleNodes, links: [] };
+    expect(presentGraph(changedLinks, palette, index).links).toEqual([]);
+    expect(index.links.map((link) => link.id)).toEqual(['create']);
+  });
+
   it('marks active and batch flow neighborhoods without changing focus or treating annotations as selection', () => {
     const frame = presentGraph(
       { ...input, selectedId: 'tx', batchSelectedIds: ['spend'] },

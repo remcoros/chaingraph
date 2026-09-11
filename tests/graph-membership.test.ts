@@ -7,6 +7,7 @@ import {
   MAX_GRAPH_ACTION_NODES,
   MAX_GRAPH_NODES,
   parseGraphNodeIds,
+  projectGraphAddresses,
   projectGraphMembership,
   removeGraphNodes,
   showAllGraphOutputs,
@@ -37,6 +38,54 @@ function workspace() {
 }
 const ids = (w: ReturnType<typeof workspace>) =>
   projectGraphMembership(buildGraph(w), w.view.graphNodeIds).nodes.map((node) => node.id);
+
+describe('address display projection', () => {
+  it('never adds an address outside explicit membership, including retained context', () => {
+    const w = addGraphNodes(workspace(), [txNodeId(a), outputNodeId(a, 0)]);
+    const evidence = fullGraphMembershipEvidence(w);
+    expect(evidence.nodes.some((node) => node.id === `addr:${address}`)).toBe(true);
+    const members = projectGraphMembership(evidence, w.view.graphNodeIds);
+    expect(projectGraphAddresses(members, true)).toBe(members);
+    expect(projectGraphAddresses(members, false, new Set([`addr:${address}`]))).toBe(members);
+    expect(members.nodes.map((node) => node.id)).toEqual([txNodeId(a), outputNodeId(a, 0)]);
+  });
+
+  it('retains requested address context and non-address connections without changing evidence', () => {
+    const otherAddress = '1BoatSLRHtKNngkdXEeobR76b53LETtpyT';
+    const w = workspace();
+    w.transactions[a].vout[1].scriptPubKey.address = otherAddress;
+    w.transactions[b] = structuredClone(spending);
+    const graph = fullGraphMembershipEvidence(w);
+    const before = structuredClone(graph);
+    const retained = new Set([`addr:${address}`]);
+    const projected = projectGraphAddresses(graph, false, retained);
+    expect(
+      projected.nodes.filter((node) => node.kind === 'address').map((node) => node.id),
+    ).toEqual([`addr:${address}`]);
+    expect(projected.links.filter((link) => link.kind === 'address')).toEqual(
+      graph.links.filter((link) => link.kind === 'address' && link.target === `addr:${address}`),
+    );
+    expect(projected.links.filter((link) => link.kind !== 'address')).toEqual(
+      graph.links.filter((link) => link.kind !== 'address'),
+    );
+    expect(projected.links.some((link) => link.kind === 'spends')).toBe(true);
+    for (const node of projected.nodes) expect(graph.nodes).toContain(node);
+    for (const link of projected.links) expect(graph.links).toContain(link);
+    expect(graph).toEqual(before);
+    expect(retained).toEqual(new Set([`addr:${address}`]));
+  });
+
+  it('reuses the graph when no address would be excluded and restores from unchanged evidence', () => {
+    const graph = fullGraphMembershipEvidence(workspace());
+    expect(projectGraphAddresses(graph, true)).toBe(graph);
+    expect(projectGraphAddresses(graph, false, new Set([`addr:${address}`]))).toBe(graph);
+    const hidden = projectGraphAddresses(graph, false);
+    expect(hidden.nodes.every((node) => node.kind !== 'address')).toBe(true);
+    expect(hidden.links.every((link) => link.kind !== 'address')).toBe(true);
+    expect(projectGraphAddresses(hidden, false)).toBe(hidden);
+    expect(projectGraphAddresses(graph, true)).toBe(graph);
+  });
+});
 
 describe('explicit canvas membership', () => {
   function connectedWorkspace() {

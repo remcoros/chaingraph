@@ -31,6 +31,7 @@ import {
   ensureGraphMembership,
   hideGraphNodes,
   projectGraphMembership,
+  projectGraphAddresses,
   removeGraphNodes,
   fullGraphMembershipEvidence,
   showAllGraphOutputs,
@@ -370,8 +371,34 @@ export default function App() {
   const [fitToken, setFitToken] = useState(0);
   // Controls commit first; expensive graph/list projection can yield to newer input.
   const graphRenderRequest = useMemo(
-    () => ({ workspaceId: w?.id, filters: graphFilters, fitToken }),
-    [w?.id, graphFilters, fitToken],
+    () => ({
+      workspaceId: w?.id,
+      filters: graphFilters,
+      fitToken,
+      showAddresses: w?.view.showAddresses ?? false,
+      smallAmountThreshold: w?.view.smallAmountThreshold,
+      dimensions: w?.view.dimensions ?? 3,
+      sizeBy: w?.view.sizeBy ?? 'uniform',
+      glow: w?.view.glow ?? true,
+      showLabels: w?.view.showLabels ?? true,
+      showTags: w?.view.showTags ?? true,
+      showIcons: w?.view.showIcons ?? true,
+      highlightMode: w?.view.highlightMode ?? 'all',
+    }),
+    [
+      w?.id,
+      graphFilters,
+      fitToken,
+      w?.view.showAddresses,
+      w?.view.smallAmountThreshold,
+      w?.view.dimensions,
+      w?.view.sizeBy,
+      w?.view.glow,
+      w?.view.showLabels,
+      w?.view.showTags,
+      w?.view.showIcons,
+      w?.view.highlightMode,
+    ],
   );
   const deferredGraphRequest = useDeferredValue(graphRenderRequest);
   const appliedGraphRequest =
@@ -513,36 +540,38 @@ export default function App() {
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   }, [ws.persist, flushActiveGraph]);
-  const graph = useMemo(
-    () => (w ? buildGraph({ ...w, inputContext: undefined }) : { nodes: [], links: [] }),
-    [
-      w?.id,
-      w?.transactions,
-      w?.annotations,
-      w?.findings,
-      w?.watchedAddresses,
-      w?.view.showAddresses,
-    ],
+  // Evidence and indexes outlive visibility toggles; only their projection changes.
+  const completeGraph = useMemo(
+    () => (w ? fullGraphMembershipEvidence(w) : { nodes: [], links: [] }),
+    [w?.id, w?.network, w?.transactions, w?.annotations, w?.findings, w?.watchedAddresses],
   );
-  const flowIndex = useMemo(() => indexGraphFlow(graph), [graph]);
-  const scanNeighbours = useMemo(() => indexScanNeighbours(graph), [graph]);
+  const graphWithoutAddresses = useMemo(
+    () => projectGraphAddresses(completeGraph, false),
+    [completeGraph],
+  );
+  const graph = appliedGraphRequest.showAddresses ? completeGraph : graphWithoutAddresses;
+  const flowIndex = useMemo(() => indexGraphFlow(graphWithoutAddresses), [graphWithoutAddresses]);
+  const scanNeighbours = useMemo(
+    () => indexScanNeighbours(graphWithoutAddresses),
+    [graphWithoutAddresses],
+  );
   const graphFlowContext = useMemo(
     () => flowIndex.resolve(selectedId, w?.view.transactionFlow?.transactionId),
     [flowIndex, selectedId, w?.view.transactionFlow?.transactionId],
   );
   const walletMatches = useMemo(
-    () => (w ? buildWalletMatches(w, graph) : new Map()),
-    [w?.network, w?.transactions, w?.wallets, graph],
+    () => (w ? buildWalletMatches(w, completeGraph) : new Map()),
+    [w?.network, w?.transactions, w?.wallets, completeGraph],
   );
   const tagIndex = useMemo(
-    () => (w ? buildTagIndex(w, graph) : new Map<string, WorkspaceTag[]>()),
-    [w?.tags, graph],
+    () => (w ? buildTagIndex(w, completeGraph) : new Map<string, WorkspaceTag[]>()),
+    [w?.tags, completeGraph],
   );
   const nodePresentation = useMemo(() => {
     const presentation = new Map<string, NodePresentation>();
     if (!w) return presentation;
-    const mode = w.view.highlightMode ?? 'all';
-    for (const node of graph.nodes) {
+    const mode = appliedGraphRequest.highlightMode;
+    for (const node of completeGraph.nodes) {
       const tags = mode === 'all' || mode === 'tags' ? (tagIndex.get(node.id) ?? []) : [];
       const match = mode === 'all' || mode === 'wallets' ? walletMatches.get(node.id) : undefined;
       const walletColor = match
@@ -557,7 +586,14 @@ export default function App() {
       });
     }
     return presentation;
-  }, [w?.annotations, w?.wallets, w?.view.highlightMode, graph, walletMatches, tagIndex]);
+  }, [
+    w?.annotations,
+    w?.wallets,
+    appliedGraphRequest.highlightMode,
+    completeGraph,
+    walletMatches,
+    tagIndex,
+  ]);
   // Batch selection is shared UI state projected onto the neutral display contract.
   const highlightedSelection = pickingScanTargets ? scanTargetDraft!.ids : selection.ids;
   const batchPresentation = useMemo(() => {
@@ -592,8 +628,8 @@ export default function App() {
       : appliedGraphFilters;
   };
   const effectiveFilters = useMemo(
-    () => membershipFilters(graph, walletMatches, tagIndex),
-    [appliedGraphFilters, w?.tags, graph, walletMatches, tagIndex],
+    () => membershipFilters(completeGraph, walletMatches, tagIndex),
+    [appliedGraphFilters, w?.tags, completeGraph, walletMatches, tagIndex],
   );
   const automaticContextIds = useMemo(
     () => [
@@ -601,31 +637,44 @@ export default function App() {
     ],
     [w?.contextTransactionIds, w?.inputContext],
   );
-  const admittedGraph = useMemo(
-    () => projectGraphMembership(graph, w?.view.graphNodeIds),
-    [graph, w?.view.graphNodeIds],
+  const completeAdmittedGraph = useMemo(
+    () => projectGraphMembership(completeGraph, w?.view.graphNodeIds),
+    [completeGraph, w?.view.graphNodeIds],
   );
+  const admittedWithoutAddresses = useMemo(
+    () => projectGraphAddresses(completeAdmittedGraph, false),
+    [completeAdmittedGraph],
+  );
+  // With no admitted addresses, toggling the control must not update the renderer.
+  const canvasShowAddresses =
+    completeAdmittedGraph !== admittedWithoutAddresses && appliedGraphRequest.showAddresses;
+  const admittedGraph = canvasShowAddresses ? completeAdmittedGraph : admittedWithoutAddresses;
   const admittedIds = useMemo(
     () => new Set(admittedGraph.nodes.map((node) => node.id)),
     [admittedGraph],
   );
-  const amountSelectionId = w?.view.smallAmountThreshold ? selectedId : undefined;
+  const amountSelectionId = appliedGraphRequest.smallAmountThreshold ? selectedId : undefined;
   const amountGraph = useMemo(
     () =>
       filterSmallAmounts(
         admittedGraph,
-        w?.view.smallAmountThreshold,
+        appliedGraphRequest.smallAmountThreshold,
         amountSelectionId,
         automaticContextIds,
       ),
-    [admittedGraph, w?.view.smallAmountThreshold, amountSelectionId, automaticContextIds],
+    [
+      admittedGraph,
+      appliedGraphRequest.smallAmountThreshold,
+      amountSelectionId,
+      automaticContextIds,
+    ],
   );
   const amountFilterIndex = useMemo(() => buildGraphFilterIndex(amountGraph), [amountGraph]);
   const canvasFilterResult = useMemo(
     () =>
       filterGraph(
         amountGraph,
-        { ...effectiveFilters, showAddresses: w?.view.showAddresses },
+        { ...effectiveFilters, showAddresses: canvasShowAddresses },
         w?.annotations,
         { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
         { index: amountFilterIndex, previewContext: true },
@@ -634,31 +683,20 @@ export default function App() {
       amountGraph,
       amountFilterIndex,
       effectiveFilters,
-      w?.view.showAddresses,
+      canvasShowAddresses,
       w?.view.hiddenNodeIds,
       w?.annotations,
     ],
   );
   const visibleGraph = useMemo(() => {
-    return w?.view.smallAmountThreshold ||
+    return appliedGraphRequest.smallAmountThreshold ||
       effectiveFilters.minSats !== undefined ||
       effectiveFilters.maxSats !== undefined
       ? omitAmountOrphans(canvasFilterResult, selectedId)
       : canvasFilterResult;
-  }, [
-    canvasFilterResult,
-    effectiveFilters,
-    w?.view.smallAmountThreshold,
-    w?.view.showAddresses,
-    w?.view.hiddenNodeIds,
-    w?.annotations,
-    selectedId,
-  ]);
+  }, [canvasFilterResult, effectiveFilters, appliedGraphRequest.smallAmountThreshold, selectedId]);
   const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
-  const connectionGraph = useMemo(
-    () => (w && !w.view.showAddresses ? fullGraphMembershipEvidence(w) : graph),
-    [graph],
-  );
+  const connectionGraph = completeGraph;
   const connectionMembers = useMemo(
     () => new Set(w?.view.graphNodeIds ?? connectionGraph.nodes.map((node) => node.id)),
     [w?.view.graphNodeIds, connectionGraph],
@@ -682,22 +720,10 @@ export default function App() {
   // Address visibility is a canvas preference. Manually hidden addresses must
   // remain recoverable without enabling every address node in the renderer.
   const recoveryGraph = useMemo(() => {
-    if (!w || w.view.showAddresses || !w.view.hiddenNodeIds?.some((id) => id.startsWith('addr:')))
-      return graph;
-    const expanded = buildGraph({
-      ...w,
-      inputContext: undefined,
-      view: { ...w.view, showAddresses: true },
-    });
-    const nodes = expanded.nodes.filter(
-      (node) => node.kind !== 'address' || hiddenIds.has(node.id),
-    );
-    const ids = new Set(nodes.map((node) => node.id));
-    return {
-      nodes,
-      links: expanded.links.filter((link) => ids.has(link.source) && ids.has(link.target)),
-    };
-  }, [graph, hiddenIds, w?.view.showAddresses]);
+    if (appliedGraphRequest.showAddresses) return completeGraph;
+    if (![...hiddenIds].some((id) => id.startsWith('addr:'))) return graphWithoutAddresses;
+    return projectGraphAddresses(completeGraph, false, hiddenIds);
+  }, [completeGraph, graphWithoutAddresses, hiddenIds, appliedGraphRequest.showAddresses]);
   const hiddenCount = useMemo(
     () =>
       recoveryGraph.nodes.filter((node) => admittedIds.has(node.id) && hiddenIds.has(node.id))
@@ -712,15 +738,15 @@ export default function App() {
   const recoveryFilterIndex = useMemo(() => buildGraphFilterIndex(recoveryGraph), [recoveryGraph]);
   const entityGraph = useMemo(() => {
     if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
-    if (entityVisibility === 'visible' && !w?.view.smallAmountThreshold) return canvasFilterResult;
+    if (entityVisibility === 'visible' && !appliedGraphRequest.smallAmountThreshold)
+      return canvasFilterResult;
     const source = entityVisibility === 'visible' ? admittedGraph : recoveryGraph;
-    const filters =
-      source === graph || !w
-        ? effectiveFilters
-        : membershipFilters(source, buildWalletMatches(w, source), buildTagIndex(w, source));
     return filterGraph(
       source,
-      { ...filters, showAddresses: entityVisibility === 'visible' ? w?.view.showAddresses : true },
+      {
+        ...effectiveFilters,
+        showAddresses: entityVisibility === 'visible' ? canvasShowAddresses : true,
+      },
       w?.annotations,
       { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
       { index: source === recoveryGraph ? recoveryFilterIndex : undefined },
@@ -733,11 +759,11 @@ export default function App() {
     appliedGraphFilters,
     recoveryFilterIndex,
     canvasFilterResult,
-    w?.view.smallAmountThreshold,
+    appliedGraphRequest.smallAmountThreshold,
     w?.wallets,
     w?.tags,
     w?.annotations,
-    w?.view.showAddresses,
+    canvasShowAddresses,
     w?.view.hiddenNodeIds,
     entityVisibility,
     visibleGraph,
@@ -888,6 +914,11 @@ export default function App() {
     },
     [w, ws.update],
   );
+  const changeGraphView = (update: (view: Workspace['view']) => Workspace['view']) =>
+    change((current) => {
+      const view = update(current.view);
+      return view === current.view ? current : { ...current, view };
+    }, false);
   // Hydration has its own owner so a workspace switch never writes the previous view
   // into the newly active workspace. Presentation does not consume annotation undo.
   useEffect(() => {
@@ -2831,9 +2862,7 @@ export default function App() {
                       view={w.view}
                       focusGraph={shownFocusGraph}
                       onToggleFocus={() => setFocusGraph((value) => !value)}
-                      onChange={(update) =>
-                        change((current) => ({ ...current, view: update(current.view) }), false)
-                      }
+                      onChange={changeGraphView}
                     />
                   )}
                   {graph.nodes.length && viewOwner === w.id ? (
@@ -2876,8 +2905,8 @@ export default function App() {
                         legend={
                           <GraphLegend
                             flowContext={graphFlowContext}
-                            dimensions={w.view.dimensions}
-                            showAddresses={w.view.showAddresses}
+                            dimensions={appliedGraphRequest.dimensions}
+                            showAddresses={appliedGraphRequest.showAddresses}
                             demo={w.demo}
                           />
                         }
@@ -2888,12 +2917,7 @@ export default function App() {
                             view={w.view}
                             focusGraph={shownFocusGraph}
                             onToggleFocus={() => setFocusGraph((value) => !value)}
-                            onChange={(update) =>
-                              change(
-                                (current) => ({ ...current, view: update(current.view) }),
-                                false,
-                              )
-                            }
+                            onChange={changeGraphView}
                           />
                         )}
                         nodePresentation={batchPresentation}
@@ -2911,12 +2935,12 @@ export default function App() {
                         hiddenNodeIds={w.view.hiddenNodeIds}
                         graphNodeIds={w.view.graphNodeIds}
                         onSetHidden={setEntityHidden}
-                        dimensions={w.view.dimensions}
-                        sizeBy={w.view.sizeBy}
-                        glow={w.view.glow}
-                        showLabels={w.view.showLabels ?? true}
-                        showTags={w.view.showTags ?? true}
-                        showIcons={w.view.showIcons ?? true}
+                        dimensions={appliedGraphRequest.dimensions}
+                        sizeBy={appliedGraphRequest.sizeBy}
+                        glow={appliedGraphRequest.glow}
+                        showLabels={appliedGraphRequest.showLabels}
+                        showTags={appliedGraphRequest.showTags}
+                        showIcons={appliedGraphRequest.showIcons}
                         fitToken={appliedGraphRequest.fitToken}
                         transactions={w.transactions}
                         onTrace={(id) => void expand('funding', id)}

@@ -22,13 +22,21 @@ export function GraphControls({
       <div className="view-toggle">
         <button
           className={view.dimensions === 3 ? 'active' : ''}
-          onClick={() => onChange((current) => ({ ...current, dimensions: 3 }))}
+          onClick={() =>
+            onChange((current) =>
+              current.dimensions === 3 ? current : { ...current, dimensions: 3 },
+            )
+          }
         >
           3D
         </button>
         <button
           className={view.dimensions === 2 ? 'active' : ''}
-          onClick={() => onChange((current) => ({ ...current, dimensions: 2 }))}
+          onClick={() =>
+            onChange((current) =>
+              current.dimensions === 2 ? current : { ...current, dimensions: 2 },
+            )
+          }
         >
           Flat
         </button>

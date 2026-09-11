@@ -26,6 +26,7 @@ import {
 import type { GraphAdapter, GraphAdapterFactory } from './graph/adapter';
 import { createDefaultAdapter } from './graph/defaultAdapter';
 import {
+  buildGraphPresentationIndex,
   presentGraph,
   readGraphPalette,
   resolveGraphHit,
@@ -100,6 +101,16 @@ export default function GraphView(props: GraphViewProps) {
     busy: false,
     nodeCount: 0,
   });
+  const graphBusy = !!props.filtering || layout.busy;
+  const [showBusyStatus, setShowBusyStatus] = useState(false);
+  useEffect(() => {
+    if (!graphBusy || error) {
+      setShowBusyStatus(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowBusyStatus(true), 200);
+    return () => clearTimeout(timer);
+  }, [graphBusy, error]);
   const [rendererActions, setRendererActions] = useState({
     zoom: false,
     repack: false,
@@ -340,11 +351,18 @@ export default function GraphView(props: GraphViewProps) {
     return () => observer.disconnect();
   }, [hasNavigation, hasContextToolbar, adapterFactory]);
 
+  const presentationIndex = useMemo(
+    () => buildGraphPresentationIndex(props.nodes, props.links),
+    [props.nodes, props.links],
+  );
   useEffect(() => {
     if (containerRef.current)
-      graphRef.current?.update(presentGraph(props, readGraphPalette(containerRef.current)));
+      graphRef.current?.update(
+        presentGraph(props, readGraphPalette(containerRef.current), presentationIndex),
+      );
   }, [
     adapterFactory,
+    presentationIndex,
     props.nodes,
     props.links,
     props.dimensions,
@@ -748,17 +766,19 @@ export default function GraphView(props: GraphViewProps) {
                     )}
                   </div>
                 </div>
-                {!error && (props.filtering || layout.busy || layout.error) && (
-                  <div
-                    className="graph-layout-status"
-                    role={layout.error && !props.filtering ? 'alert' : 'status'}
-                  >
+                {props.navigationStatus && (
+                  <div className="graph-navigation-status" role="status">
+                    {props.navigationStatus}
+                  </div>
+                )}
+                {!error && ((graphBusy && showBusyStatus) || (!graphBusy && layout.error)) && (
+                  <div className="graph-layout-status" role={graphBusy ? 'status' : 'alert'}>
                     {props.filtering || layout.busy ? (
                       <>
                         <LoaderCircle size={15} className="spin" aria-hidden="true" />
                         <span>
                           {props.filtering
-                            ? 'Filtering graph…'
+                            ? 'Updating graph…'
                             : `Arranging ${layout.nodeCount.toLocaleString()} nodes…`}
                         </span>
                       </>
@@ -770,11 +790,6 @@ export default function GraphView(props: GraphViewProps) {
                         </button>
                       </>
                     )}
-                  </div>
-                )}
-                {props.navigationStatus && (
-                  <div className="graph-navigation-status" role="status">
-                    {props.navigationStatus}
                   </div>
                 )}
               </div>
