@@ -331,6 +331,10 @@ export function ConnectionScanPanel(props: Props) {
           source: startSource,
           targetIds,
           displayedNodeIds: [...props.visibleNodeIds],
+          // Automatic targets already belong to loaded evidence, even when their
+          // nodes are not on the canvas. Explicit picks retain their reveal action.
+          knownNodeIds:
+            frozenSettings.targetScope === 'custom' ? undefined : [...props.neighbours.keys()],
           settings: frozenSettings,
         },
         network: workspace.network,
@@ -1098,7 +1102,7 @@ function ScanResultRow({
               </li>
             ))}
           </ol>
-          {creatorId && (
+          {creatorId && !plan.nodeIds.includes(creatorId) && (
             <div className="connection-scan-path-creator">
               <span
                 className="muted"

@@ -230,7 +230,11 @@ describe('connection scan fetch adapter', () => {
 
 import { runConnectionScanInWorker } from '../src/lib/connectionScanRunner';
 import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/domain/connectionScan';
-import type { ScanWorkerInput, ScanWorkerOutput } from '../src/lib/connectionScanProtocol';
+import type {
+  ConnectionScanRequest,
+  ScanWorkerInput,
+  ScanWorkerOutput,
+} from '../src/lib/connectionScanProtocol';
 
 class FakeScanWorker {
   onmessage: ((event: MessageEvent<ScanWorkerOutput>) => void) | null = null;
@@ -273,14 +277,14 @@ const completed = (status: ScanRun['status'] = 'complete'): ScanRun => ({
     },
   ],
 });
-function runnerSetup() {
+function runnerSetup(scanRequest: ConnectionScanRequest = request()) {
   const worker = new FakeScanWorker();
   const scope = new TransactionFetchScope('testnet4');
   const controller = new AbortController();
   let active = true;
   const progress = vi.fn();
   const pending = runConnectionScanInWorker({
-    request: request(),
+    request: scanRequest,
     network: 'testnet4',
     transactions: { [id(1)]: tx(1), [id(2)]: tx(2, 1), [id(3)]: tx(3) },
     scope,
@@ -303,6 +307,16 @@ function runnerSetup() {
   };
 }
 describe('connection scan worker ownership', () => {
+  it('freezes loaded scan context independently from displayed nodes across the worker boundary', async () => {
+    const initial = { ...request(), knownNodeIds: [`tx:${id(1)}`, `out:${id(1)}:0`] };
+    const expected = structuredClone(initial);
+    const s = runnerSetup(initial);
+    initial.knownNodeIds.push(`tx:${id(2)}`);
+    initial.displayedNodeIds.length = 0;
+    expect(s.worker.messages[0]).toEqual({ type: 'start', request: expected });
+    s.worker.reply({ type: 'complete', run: completed() });
+    await s.pending;
+  });
   it('retains only result path transaction evidence', async () => {
     const s = runnerSetup();
     s.worker.reply({ type: 'complete', run: completed() });

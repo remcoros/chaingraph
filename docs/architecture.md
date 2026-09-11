@@ -292,26 +292,32 @@ deterministic FIFO fronts alternate source/target work and requested directions.
 Each walk preserves its direction. Shared-ancestor/descendant results join
 same-direction walks at a meeting point and retain per-edge directions; no
 alternating-direction flood fill, ownership claim or value allocation is used.
-Both fronts retain transient directed edges when other branches join a reached
+Automatic scopes freeze the full loaded graph's node IDs as known context,
+separately from the rendered node IDs. Hidden or unadded I/O already described by
+a loaded transaction is therefore context, not a discovery or a reason to stop
+at an automatic target. Explicit custom picks retain their existing reveal
+semantics. This context is passed to the worker once, is not extended by scan
+fetches, and is never persisted. Rendering and Add counts still use actual graph
+membership. Both fronts retain transient directed edges when other branches join a reached
 node. Meeting reconstruction follows target edges back to distinct frozen targets.
 When the first source witness overlaps that target leg or contains no new node,
 a bounded source reconstruction looks for an admissible alternative, excluding
 the other leg's nodes. Target reconstruction first excludes the initial source
 path, then allows alternate source witnesses in a second pass. Each pass tracks
-at most two states per node, distinguishing an already displayed path from one
-containing new nodes. This also preserves new paths through visible non-target
+at most two states per node, distinguishing an already known path from one
+containing new nodes. This also preserves new paths through known non-target
 context in custom scopes. A late joining branch on either side refreshes previously
 reached intersections immediately; found paths
 stream before later cancellation or timeout.
 Reconstruction shares the deadline, combined hop cap and result limit, periodically
 yields for cancellation, and performs no additional fetching. Fronts keep the first
-expansion witness per reached node. A source node also admits a later fully displayed
+expansion witness per reached node. A source node also admits a later fully known
 prefix when needed to continue through graph context. Alternative paths are not
-exhaustive. Fully displayed connection paths are omitted but do not stop source
-traversal: a transaction's visible inputs and outputs must not fence off new paths.
+exhaustive. Fully known connection paths are omitted but do not stop source
+traversal: a transaction's loaded inputs and outputs must not fence off new paths.
 A newly discovered direct path to a target still stops that source branch.
 For shared-ancestor reconstruction, the meeting creator alone does not count as
-new information: the displayed outpoints already identify it. Both reconstruction
+new information: the known outpoints already identify it. Both reconstruction
 legs use this meeting-local novelty rule so an immediate sibling route cannot
 mask a deeper alternative. Such paths never enter the result allowance or stream.
 A new branch outpoint, another undisplayed transaction, or an undisplayed target

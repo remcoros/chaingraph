@@ -122,14 +122,19 @@ separate filter for natural path endings.
 | Lookup failed | A request timed out, failed or returned invalid data. |
 | Conflicting evidence | Observations contradict the proposed path. Only a verified prefix can be added. |
 
+Automatic target scopes search beyond the loaded transaction context, even when
+only the selected transaction is on the graph. Its immediate inputs and outputs
+are not connection findings. Showing or hiding that context does not block deeper
+searches. Explicit custom targets retain their reveal actions.
+
 Shared-ancestor results omit paths where the only new node is the transaction
-that created already displayed outputs. Their outpoint IDs already identify that
+that created already known outputs. Their outpoint IDs already identify that
 shared creator. Deeper connections and newly discovered shared spenders still appear.
 
 Expand **Path** to inspect directed steps and new nodes. Known nodes in the path
 are clickable to select; new nodes stay marked **New**. Paths ending at an output
-show its creating transaction beneath the steps with a small origin icon, selectable
-when already loaded. This context does not change the path count or the nodes added.
+show its creating transaction beneath the steps if it is not already in the path,
+with a small origin icon, selectable when already loaded. This context does not change the path count or the nodes added.
 Alternative paths to the same finding within a scan share one card; choose an
 alternative inside it. Click
 the source or target row to select that node. A target whose evidence is not yet

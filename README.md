@@ -16,8 +16,10 @@ and targets exactly the picked transactions or outputs. Searches
 default to 3 transaction hops, 200 examined transactions,
 30 seconds and a 50-branch stopping point. Findings appear during the scan and
 can be dismissed individually. Connection and branch-choice cards identify exact
-paths and shared meeting points. Shared-ancestor paths that only add the already
-identifiable creator of displayed outputs are omitted. Evidence problems offer a bounded endpoint recheck;
+paths and shared meeting points. Automatic scopes treat loaded transaction I/O as
+known context regardless of canvas visibility, continuing beyond it to find deeper
+connections. Shared-ancestor paths that only add the already identifiable creator
+of known outputs are omitted. Evidence problems offer a bounded endpoint recheck;
 verified unspent, coinbase and unspendable endings live under **Endpoints**.
 Scan-wide resource limits appear only in the completion status.
 Review exact paths, add a path or an explicit prefix in one undoable action,

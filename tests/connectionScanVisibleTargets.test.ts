@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, runConnectionScan } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  runConnectionScan,
+  type ScanResult,
+} from '../src/domain/connectionScan';
+import {
+  indexScanNeighbours,
+  prepareNeighbourScanTargets,
+} from '../src/domain/connectionScanNeighbours';
 import { addScanPath, replaceScanRun } from '../src/domain/connectionScanRecords';
 import type { Transaction } from '../src/domain/types';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
@@ -131,5 +139,80 @@ describe('scanning beyond already displayed input paths', () => {
       expect.objectContaining({ path: [tx(3), ...hiddenPath], hops: 2 }),
     );
     expect(enough.run.results.some((r) => r.finding === 'many-outputs')).toBe(false);
+  });
+});
+
+describe('default neighbour scan from a transaction-only graph', () => {
+  it.each([
+    ['only the selected transaction', tx(3), [tx(3)]],
+    ['the selected transaction and its inputs and outputs', tx(3), displayed],
+    ['only the selected input', out(8, 150), [out(8, 150)]],
+    ['the selected input and its spending transaction context', out(8, 150), displayed],
+  ] as const)('streams the deeper loop with %s displayed', async (_label, source, graphNodeIds) => {
+    const workspace = newWorkspace('Synthetic transaction-only regression', 'mainnet');
+    workspace.transactions = { [selected.txid]: selected };
+    workspace.view.graphNodeIds = [...graphNodeIds];
+    const graph = buildGraph(workspace);
+    const neighbours = indexScanNeighbours(graph);
+    const targetIds = prepareNeighbourScanTargets({
+      source,
+      neighbours,
+    }).ids;
+    expect(targetIds).toHaveLength(10);
+    expect(new Set(targetIds)).toEqual(new Set(displayed.filter((node) => node !== source)));
+    const pool = Object.fromEntries([selected, creator, intermediate].map((t) => [t.txid, t]));
+    const transport: ConnectionScanTransport = {
+      fetchTransaction: vi.fn(async (_network, id) => {
+        if (pool[id]) return pool[id];
+        throw new Error('Synthetic branch unavailable.');
+      }),
+      fetchIndexedSpenders: vi.fn(async () => undefined),
+      fetchHistory: vi.fn(async () => []),
+      fetchUtxo: vi.fn(async () => undefined),
+    };
+    const adapter = createConnectionScanFetch(
+      {
+        network: 'mainnet',
+        transactions: workspace.transactions,
+        scope: new TransactionFetchScope('mainnet'),
+        signal: new AbortController().signal,
+        fanOut: DEFAULT_SCAN_SETTINGS.fanOut,
+        loadedSpenders: (node) =>
+          selected.vin.some((v) => node === `out:${v.txid}:${v.vout}`) ? [selected.txid] : [],
+      },
+      transport,
+    );
+    const streamed: ScanResult[] = [];
+    const run = await runConnectionScan({
+      id: 'transaction-only-regression',
+      source,
+      targetIds,
+      displayedNodeIds: workspace.view.graphNodeIds,
+      knownNodeIds: [...neighbours.keys()],
+      settings: { ...DEFAULT_SCAN_SETTINGS },
+      resolveNeighbors: adapter.resolveNeighbors,
+      onProgress: (progress) => streamed.push(...progress.results),
+    });
+    expect(
+      streamed.some((result) => result.kind === 'connection' && result.path.length === 2),
+    ).toBe(false);
+    const result = run.results.find(
+      (item) =>
+        item.kind === 'connection' &&
+        item.endpoint === out(5, 1) &&
+        item.path.includes(out(8, 150)),
+    );
+    expect(result).toMatchObject({
+      path: source === tx(3) ? [tx(3), ...hiddenPath] : hiddenPath,
+      hops: 2,
+      meetingNode: tx(8),
+      relationship: 'shared-ancestor',
+    });
+    expect(streamed).toContainEqual(result);
+    const saved = parseWorkspace(replaceScanRun(workspace, run, adapter.evidence));
+    const accepted = parseWorkspace(addScanPath(saved, result!));
+    expect(new Set(accepted.view.graphNodeIds)).toEqual(new Set([...graphNodeIds, ...hiddenPath]));
+    expect(accepted.transactions[creator.txid]).toBeDefined();
+    expect(accepted.transactions[intermediate.txid]).toBeDefined();
   });
 });

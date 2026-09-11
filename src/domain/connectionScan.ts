@@ -148,6 +148,8 @@ export interface ConnectionScanOptions {
   source: string;
   targetIds: readonly string[];
   displayedNodeIds: readonly string[];
+  /** Loaded graph context at scan start, independent of canvas visibility. */
+  knownNodeIds?: readonly string[];
   settings: ScanSettings;
   signal?: AbortSignal;
   resolveNeighbors: (
@@ -169,8 +171,8 @@ interface Front {
   queue: Visit[];
   cursor: number;
   visited: Map<string, Visit>;
-  /** A displayed-only arrival can continue where a novel target arrival stopped. */
-  displayedVisits: Set<string>;
+  /** An existing-context arrival can continue where a novel target arrival stopped. */
+  contextVisits: Set<string>;
   /** Retain reconverging branches without fetching every possible path. */
   predecessors: Map<string, Set<string>>;
   successors: Map<string, Set<string>>;
@@ -185,7 +187,9 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
   }
   if (options.targetIds.length > SCAN_LIMITS.maxTargets) throw new Error('Too many scan targets.');
   const targets = new Set(options.targetIds.filter((id) => id !== options.source).sort());
-  const displayed = new Set(options.displayedNodeIds);
+  // Automatic scopes search for new relationships, not nodes hidden by the
+  // canvas. Keep this initial context fixed as new scan evidence arrives.
+  const known = new Set([...options.displayedNodeIds, ...(options.knownNodeIds ?? [])]);
   const now = options.now ?? Date.now;
   const start = now();
   const controller = new AbortController();
@@ -243,14 +247,14 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         queue: visits,
         cursor: 0,
         visited: new Map(ids.map((id, i) => [id, visits[i]!])),
-        displayedVisits: new Set(ids.filter((id) => displayed.has(id))),
+        contextVisits: new Set(ids.filter((id) => known.has(id))),
         predecessors: new Map<string, Set<string>>(),
         successors: new Map<string, Set<string>>(),
       };
     }),
   );
   const addResult = (result: Omit<ScanResult, 'id' | 'hops'>) => {
-    if (result.kind === 'connection' && result.path.every((id) => displayed.has(id))) return;
+    if (result.kind === 'connection' && result.path.every((id) => known.has(id))) return;
     const hops = scanPathHops(result.path);
     if (hops > settings.maxHops || new Set(result.path).size !== result.path.length) return;
     const key = `${result.kind}:${result.finding ?? result.reason ?? ''}:${result.scanDirection ?? ''}:${result.path.join('|')}`;
@@ -336,8 +340,8 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     contextualCreator?: string,
   ): Promise<Visit | undefined> => {
     // An outpoint already identifies its creator. At an ancestry meeting, the
-    // missing creator alone cannot turn displayed sibling paths into discoveries.
-    const isNewNode = (id: string) => id !== contextualCreator && !displayed.has(id);
+    // missing creator alone cannot turn known sibling paths into discoveries.
+    const isNewNode = (id: string) => id !== contextualCreator && !known.has(id);
     const meetingNode = witness.path.at(-1)!;
     if (
       witness.hops <= maxHops &&
@@ -345,7 +349,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
       (!needsNewNode || witness.path.some(isNewNode))
     )
       return witness;
-    // A short displayed route, or one through the other leg, must not erase
+    // A short known route, or one through the other leg, must not erase
     // a longer useful route. Each node has at most two reconstruction states.
     const queue = [{ path: [options.source], hops: 0, novel: isNewNode(options.source) }];
     const seen = new Set([`${options.source}:${queue[0]!.novel}`]);
@@ -394,7 +398,7 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
     // transaction nodes elsewhere along a path. Those may reveal new links.
     const contextualCreator =
       direction === 'upstream' && meetingNode.startsWith('tx:') ? meetingNode : undefined;
-    const isNewNode = (id: string) => id !== contextualCreator && !displayed.has(id);
+    const isNewNode = (id: string) => id !== contextualCreator && !known.has(id);
     // Prefer target legs disjoint from the known source witness. Otherwise a
     // shorter conflicting leg can hide a usable leg at the same target. A second
     // bounded pass can pair an unconstrained target leg with another source path.
@@ -499,10 +503,10 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
         await meeting(front, visit);
         if (reasons.has('results')) break scan;
         if (front.side === 'source' && targets.has(nodeId)) {
-          // A fully displayed prefix is existing graph context, not a new
+          // A fully known prefix is existing graph context, not a new
           // connection. Keep tracing through it so a selected transaction's
-          // visible inputs/outputs cannot fence off all undiscovered paths.
-          if (visit.path.some((id) => !displayed.has(id))) continue;
+          // loaded inputs/outputs cannot fence off all undiscovered paths.
+          if (visit.path.some((id) => !known.has(id))) continue;
         }
         if (front.side === 'target' && nodeId === options.source) continue;
         // Entering the next transaction would exceed the hop limit. Do not
@@ -595,15 +599,15 @@ export async function runConnectionScan(options: ConnectionScanOptions): Promise
             await refreshMeetings(front, id);
             if (
               front.side === 'source' &&
-              !front.displayedVisits.has(id) &&
-              next.path.every((node) => displayed.has(node))
+              !front.contextVisits.has(id) &&
+              next.path.every((node) => known.has(node))
             ) {
-              front.displayedVisits.add(id);
+              front.contextVisits.add(id);
               front.queue.push(next);
             }
             continue;
           }
-          if (next.path.every((node) => displayed.has(node))) front.displayedVisits.add(id);
+          if (next.path.every((node) => known.has(node))) front.contextVisits.add(id);
           front.visited.set(id, next);
           front.queue.push(next);
           await meeting(front, next);
