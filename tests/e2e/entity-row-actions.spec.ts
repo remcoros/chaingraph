@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { encryptWorkspace } from '../../src/lib/crypto';
-import { newWorkspace } from '../../src/domain/workspace';
+import { buildGraph, newWorkspace } from '../../src/domain/workspace';
 import {
   mockBitcoin,
   transactions,
@@ -22,6 +22,7 @@ test('entity row actions hide and remove their own target without changing the s
     selectionId: `tx:${TX_FUNDING}`,
     leftTab: 'entities',
     transactionFlow: { open: false },
+    graphNodeIds: buildGraph(workspace).nodes.map((node) => node.id),
   };
   workspace.annotations[`tx:${TX_FUNDING}`] = {
     label: 'Selected funding',
@@ -67,7 +68,7 @@ test('entity row actions hide and remove their own target without changing the s
   const spending = page
     .locator('.entity-list-entry')
     .filter({ has: page.locator(`.entity-row[title="tx:${TX_SPENDING}"]`) });
-  await expect(spending).toContainText('(2 in / 2 out)');
+  await expect(spending).toContainText('(2 / 2)');
   await expect(page.locator('.graph-canvas canvas')).toBeVisible();
   await page.waitForTimeout(500);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -75,13 +76,15 @@ test('entity row actions hide and remove their own target without changing the s
   await spending.locator('.entity-row').scrollIntoViewIfNeeded();
   await expect(spending.locator('.entity-row-actions')).toBeInViewport({ ratio: 1 });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await expect(spending.locator('.entity-row button')).toHaveCount(0);
   await spending
     .getByRole('button', { name: 'Hide Spending review from graph', exact: true })
     .click();
   await expect(spending).toHaveCount(0);
   await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('Selected funding');
-  await page.getByLabel('Entity visibility').selectOption('all');
+  const visibilityToggle = page.getByLabel(/^Entity visibility:/);
+  await visibilityToggle.click();
+  await visibilityToggle.click();
+  await expect(visibilityToggle).toHaveAttribute('aria-label', /^Entity visibility: All\./);
   await spending
     .getByRole('button', { name: 'Show Spending review in graph', exact: true })
     .click();

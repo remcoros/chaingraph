@@ -2744,7 +2744,11 @@ export default function App() {
                     ? visibleEntityCount
                     : recoveryGraph.nodes.length
               }
-              contextCount={entityVisibility === 'visible' ? visibleGraph.contextNodeIds.length : 0}
+              contextCount={
+                entityVisibility === 'visible' || entityVisibility === 'graph'
+                  ? visibleGraph.contextNodeIds.length
+                  : 0
+              }
               contextNodeCount={canvasFilterResult.availableContextNodeCount}
               contextPreviewPending={graphFiltering}
               hiddenNodeIds={w.view.hiddenNodeIds}

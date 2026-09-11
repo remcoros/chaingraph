@@ -36,15 +36,16 @@ async function openEntities(page: Page) {
   await openFixtureWorkspace(page, workspace, password);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await expect(page.locator('.entity-result-count')).toContainText(
-    `${total.toLocaleString()} matches`,
+    `${total.toLocaleString()} on graph`,
   );
   return { total, transactionCount: Object.keys(workspace.transactions).length };
 }
 
 test('browses all records beyond 200, sorts and selects across pages', async ({ page }) => {
   const { transactionCount } = await openEntities(page);
-  await page.getByLabel('Entity type', { exact: true }).selectOption('transaction');
-  await page.getByLabel('Entity sort order').selectOption('label');
+  await page.getByRole('button', { name: 'Transactions', exact: true }).click();
+  await page.locator('.entity-sort-trigger').click();
+  await page.getByRole('menuitemradio', { name: 'Label A–Z' }).click();
   await page.getByLabel('Entities per page').selectOption('100');
   const rows = page.locator('.entity-browser .entity-row');
   await expect(rows).toHaveCount(100);
@@ -92,7 +93,7 @@ test('combines note, label and bookmark filters and reports invalid amount bound
   await more.getByRole('button', { name: 'Reset filters' }).click();
   await expect(page.locator('.entity-filter-error')).toHaveCount(0);
   await expect(page.locator('.entity-result-count')).toContainText(
-    `${total.toLocaleString()} matches`,
+    `${total.toLocaleString()} on graph`,
   );
   await expect(more.getByLabel('Minimum entity value in sats')).toHaveValue('');
   await more.getByLabel('Output spend evidence').selectOption('unknown');
@@ -117,7 +118,7 @@ test('shows nonmatching canvas context explicitly and clears it with the shared 
   const more = page.getByRole('dialog', { name: 'More filters' });
   await expect(more.getByLabel('Include neighboring nodes')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  const results = page.locator('.entity-result-count');
+  const results = page.locator('.entity-filters');
   await results.getByRole('button', { name: 'Show connections (+2)', exact: true }).click();
   await expect(page.locator('.entity-browser .entity-row')).toHaveCount(1);
   await expect(page.locator('.entity-context-note')).toContainText('2 connected context entities');
@@ -137,7 +138,7 @@ test('shows nonmatching canvas context explicitly and clears it with the shared 
   await expect(page.locator('.entity-context-note')).toHaveCount(0);
   await expect(page.locator('.filter-chip')).toHaveCount(0);
   await expect(page.locator('.entity-result-count')).toContainText(
-    `${total.toLocaleString()} matches`,
+    `${total.toLocaleString()} on graph`,
   );
 });
 
