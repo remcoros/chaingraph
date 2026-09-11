@@ -586,18 +586,16 @@ export function NodeInspector({
             title={previousReason || previousHint}
             onClick={() => onExpand('funding')}
           >
-            <ArrowDownLeft size={14} />
-            {selected.kind === 'output'
-              ? 'Open creating transaction'
-              : 'Load previous transactions'}
+            <ArrowDownLeft size={13} />
+            {selected.kind === 'output' ? 'Open creating tx' : 'Load previous txs'}
           </button>
           <button
             disabled={!!spendingReason}
             title={spendingReason || spendingHint}
             onClick={() => onExpand('spending')}
           >
-            <ArrowUpRight size={14} />
-            Find spending transactions
+            <ArrowUpRight size={13} />
+            Find spending txs
           </button>
         </div>
         {traceReasons.map((reason) => (

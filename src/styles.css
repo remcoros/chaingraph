@@ -1021,19 +1021,18 @@ small,
 }
 .selection-trace {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 7px;
   margin-top: 2px;
 }
 .selection-trace > button {
-  flex: 1 1 0;
-  min-width: 0;
-  gap: 5px;
-  padding: 7px 8px;
-  min-height: 38px;
+  flex: 1 0 auto;
+  gap: 4px;
+  padding: 4px 7px;
+  min-height: 30px;
   font-size: 11px;
   line-height: 1.25;
-  white-space: normal;
+  white-space: nowrap;
 }
 .trace-reason {
   margin-top: 8px;
