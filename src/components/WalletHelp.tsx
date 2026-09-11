@@ -6,10 +6,12 @@ import { CircleHelp } from 'lucide-react';
 export function WalletHelp({
   title,
   active = true,
+  icon,
   children,
 }: {
   title: string;
   active?: boolean;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -97,7 +99,7 @@ export function WalletHelp({
           if (event.key === 'Escape') setOpen(false);
         }}
       >
-        <CircleHelp size={14} aria-hidden="true" />
+        {icon ?? <CircleHelp size={14} aria-hidden="true" />}
       </span>
       {open &&
         active &&

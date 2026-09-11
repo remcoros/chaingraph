@@ -35,6 +35,7 @@ import {
   resultFinding,
   resultCategory,
   scanRelationPresentation,
+  scanResultTooltip,
   type ScanResultFinding,
 } from '../domain/connectionScanPresentation';
 import {
@@ -48,6 +49,7 @@ import { retryConnectionScanResult, applyScanRecheck } from '../lib/connectionSc
 import { transactionStatus } from '../domain/transactionStatus';
 import { prepareCustomScanTargets } from '../domain/connectionScanTargets';
 import { prepareNeighbourScanTargets } from '../domain/connectionScanNeighbours';
+import { WalletHelp } from './WalletHelp';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
@@ -852,6 +854,7 @@ export function ConnectionScanPanel(props: Props) {
                   : workspace
               }
               group={group}
+              active={active}
               retrying={retrying?.runId === group.run.id ? retrying.resultId : undefined}
               retryDisabled={busy || !!adding || !!retrying}
               actionBusy={!!adding}
@@ -890,6 +893,7 @@ export function ConnectionScanPanel(props: Props) {
 }
 
 type ResultRowProps = {
+  active: boolean;
   workspace: Workspace;
   result: ScanResult;
   alternatives: ScanResult[];
@@ -949,6 +953,7 @@ function ScanPathNodeLabel({ workspace, id }: { workspace: Workspace; id: string
 }
 
 function ScanResultRow({
+  active,
   workspace,
   result,
   alternatives,
@@ -1010,13 +1015,21 @@ function ScanResultRow({
       aria-label={`${title}: ${nameFor(workspace, result.endpoint)}`}
     >
       <div className="connection-scan-result-heading">
-        {connection ? (
-          <Check size={15} />
-        ) : category === 'endpoint' ? (
-          <Info size={15} />
-        ) : (
-          <TriangleAlert size={15} />
-        )}
+        <WalletHelp
+          title={title}
+          active={active}
+          icon={
+            connection ? (
+              <Check size={15} aria-hidden="true" />
+            ) : category === 'endpoint' ? (
+              <Info size={15} aria-hidden="true" />
+            ) : (
+              <TriangleAlert size={15} aria-hidden="true" />
+            )
+          }
+        >
+          {scanResultTooltip(result)}
+        </WalletHelp>
         <strong>{title}</strong>
         <button
           type="button"

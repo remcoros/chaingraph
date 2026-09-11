@@ -168,13 +168,13 @@
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
-.connection-scan-result.is-connection .connection-scan-result-heading > svg {
+.connection-scan-result.is-connection .connection-scan-result-heading > .wallet-help {
   color: var(--color-flow-output);
 }
-.connection-scan-result.is-boundary .connection-scan-result-heading > svg {
+.connection-scan-result.is-boundary .connection-scan-result-heading > .wallet-help {
   color: var(--color-warning);
 }
-.connection-scan-result.is-failure .connection-scan-result-heading > svg {
+.connection-scan-result.is-failure .connection-scan-result-heading > .wallet-help {
   color: var(--color-error);
 }
 .connection-scan-dismiss {
@@ -305,7 +305,7 @@
   min-width: 0;
 }
 
-.connection-scan-result.is-endpoint .connection-scan-result-heading > svg {
+.connection-scan-result.is-endpoint .connection-scan-result-heading > .wallet-help {
   color: var(--color-muted);
 }
 .connection-scan-meeting {
@@ -351,4 +351,9 @@
   flex-shrink: 0;
   white-space: pre;
   color: var(--color-muted);
+}
+
+.connection-scan-result-heading > .wallet-help {
+  min-width: 15px;
+  justify-self: start;
 }

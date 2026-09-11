@@ -72,6 +72,50 @@ export function scanRelationPresentation(result: ScanResult):
     : { title: 'Spending path', description: 'The target is downstream of the source.' };
 }
 
+/** Secondary explanation for the finding icon, kept out of the card's reading flow. */
+export function scanResultTooltip(result: ScanResult): string {
+  const relation = scanRelationPresentation(result);
+  if (result.context) {
+    if (relation?.branchLabel)
+      return `Two ${relation.branchLabel} branches of this transaction connect through another observed path. Add reveals the complete loop.`;
+    return 'A newly found path and existing transaction links form a loop between these nodes. Add reveals the complete connection.';
+  }
+  switch (resultFinding(result)) {
+    case 'upstream-connection':
+      return 'Following transaction inputs from the source reaches this target. Each step is supported by an observed transaction.';
+    case 'downstream-connection':
+      return 'Following outputs and their spending transactions from the source reaches this target. Each step is supported by an observed transaction.';
+    case 'shared-ancestor':
+      return 'The source and target trace back to a shared transaction or output. The path shows both branches and where they meet.';
+    case 'shared-descendant':
+      return 'The source and target lead to a shared spending transaction or output. The path shows both branches and where they meet.';
+    case 'many-inputs':
+      return "This transaction reached the scan's limit on the number of inputs to follow. This branch was not expanded; add the path to inspect its inputs.";
+    case 'many-outputs':
+      return "This transaction reached the scan's limit on the number of outputs to follow. This branch was not expanded; add the path to inspect its outputs.";
+    case 'coinbase':
+      return 'This branch ends at a coinbase transaction, which creates the block reward. It has no earlier transaction inputs to follow.';
+    case 'unspendable':
+      return 'This output uses OP_RETURN, which cannot be spent. There is no spending transaction to follow.';
+    case 'unspent':
+      return `This output was verified as unspent at the recorded check${result.includesMempool ? ', including the mempool' : ''}. It may have been spent since then.`;
+    case 'transaction-unavailable':
+      return 'The transaction needed for the next step could not be loaded, so this branch could not continue. Recheck to try that lookup again.';
+    case 'spend-unknown':
+      return 'The scan could not verify a spending transaction or confirm that this output was unspent. Recheck to try again.';
+    case 'lookup-failed':
+      return result.issueCode === 'timeout'
+        ? 'The lookup for the next step timed out. Recheck to try again.'
+        : result.issueCode === 'invalid-response'
+          ? 'The next lookup returned data that could not be verified. Recheck to try again.'
+          : 'The lookup for the next step failed. Recheck to try again.';
+    case 'conflicting-evidence':
+      return 'Transaction observations disagree, so this path cannot be accepted in full. Only the verified steps before the conflict can be added.';
+    default:
+      return 'A stopping point reached while following transaction links from the source.';
+  }
+}
+
 /** Normalize legacy path records without promoting run limits into node findings. */
 export function resultFinding(result: ScanResult): ScanResultFinding | undefined {
   if (result.reason && SCAN_STATUS_ONLY_REASONS.includes(result.reason)) return undefined;
