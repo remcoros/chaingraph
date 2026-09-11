@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { useCallback, useId, useMemo, useState, type ReactNode } from 'react';
 import {
   ChevronRight,
@@ -428,7 +428,7 @@ export function WalletItemDetail({
                   ? `Observed total (${outpoints.length} output${outpoints.length === 1 ? '' : 's'})`
                   : 'Amount'}
               </dt>
-              <dd className="bitcoin-amount">{formatBitcoinAmount(row.amountSats)}</dd>
+              <Amount as="dd" value={row.amountSats} />
             </div>
           )}
           <div>

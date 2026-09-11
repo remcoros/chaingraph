@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -318,9 +318,7 @@ export default function EntityBrowser({
                     <Bookmark size={11} aria-label="Bookmarked" />
                   )}
                 </small>
-                <small className="bitcoin-amount" title={formatBitcoinAmount(node.value)}>
-                  {formatBitcoinAmount(node.value)}
-                </small>
+                <Amount as="small" value={node.value} />
               </span>
             </button>
             <div className="entity-row-actions">

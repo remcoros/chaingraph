@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import {
   ArrowLeftFromLine,
@@ -548,7 +548,7 @@ export default function GraphView(props: GraphViewProps) {
               {hoveredNode.value !== undefined && (
                 <div>
                   <dt>{hoveredNode.kind === 'transaction' ? 'Total outputs' : 'Output value'}</dt>
-                  <dd className="bitcoin-amount">{formatBitcoinAmount(hoveredNode.value)}</dd>
+                  <Amount as="dd" value={hoveredNode.value} />
                 </div>
               )}
               {hoveredNode.address && hoveredNode.kind !== 'address' && (

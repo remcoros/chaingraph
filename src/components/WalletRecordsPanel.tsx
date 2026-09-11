@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { formatGmtTimestamp, walletRecordBlockObservation } from '../domain/transactionTime';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
@@ -204,16 +204,15 @@ export function WalletRecordsPanel({
                     row.mempool,
                   )}
                 />
-                <span
-                  className={row.utxo ? 'bitcoin-amount' : undefined}
-                  title={!row.utxo && row.transaction ? 'Inputs / outputs' : undefined}
-                >
-                  {row.utxo
-                    ? formatBitcoinAmount(row.utxo.valueSats)
-                    : row.transaction
+                {row.utxo ? (
+                  <Amount value={row.utxo.valueSats} />
+                ) : (
+                  <span title={row.transaction ? 'Inputs / outputs' : undefined}>
+                    {row.transaction
                       ? `(${row.transaction.vin.length} / ${row.transaction.vout.length})`
                       : 'Load transaction'}
-                </span>
+                  </span>
+                )}
               </span>
               {row.utxo && (
                 <span className="mono muted" title={row.utxo.address}>

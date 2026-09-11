@@ -1,4 +1,5 @@
 import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Network, Pencil, Tag, Smile, X } from 'lucide-react';
 import { fetchTransaction } from '../lib/api';
@@ -356,9 +357,7 @@ export function TraceWorkbench({
                   {point.txid}:{point.vout}
                 </code>
               </details>
-              <strong className="bitcoin-amount">
-                {formatBitcoinAmount(output ? sats(output.value) : selected?.value)}
-              </strong>
+              <Amount as="strong" value={output ? sats(output.value) : selected?.value} />
               <small>
                 {output
                   ? output.scriptPubKey.type || 'Script type unknown'

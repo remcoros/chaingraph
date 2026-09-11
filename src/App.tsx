@@ -1,4 +1,5 @@
 import { formatBitcoinAmount } from './domain/amountFormat';
+import { Amount } from './components/Amount';
 import { TransactionFetchShell } from './lib/useTransactionFetch';
 import { ConnectionScanPanel } from './components/ConnectionScanPanel';
 import { ScanTargetToolbar } from './components/ScanTargetToolbar';
@@ -2258,10 +2259,7 @@ export default function App() {
           {!!w.view.smallAmountThreshold && (
             <span className="filter-chip">
               <span title={`Above ${formatBitcoinAmount(w.view.smallAmountThreshold)}`}>
-                Above{' '}
-                <span className="bitcoin-amount">
-                  {formatBitcoinAmount(w.view.smallAmountThreshold)}
-                </span>
+                Above <Amount value={w.view.smallAmountThreshold} />
               </span>
               <button
                 aria-label="Remove graph amount filter"

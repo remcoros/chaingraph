@@ -1,4 +1,5 @@
 import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -411,12 +412,7 @@ function FlowColumn({
                   label: '',
                 }}
               />
-              <span
-                className={entry.valueSats === undefined ? undefined : 'bitcoin-amount'}
-                title={value}
-              >
-                {value}
-              </span>
+              <Amount value={entry.valueSats} unknown="Value not loaded" />
             </div>
           );
         })}

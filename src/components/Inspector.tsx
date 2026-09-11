@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { listWalletAddresses } from '../domain/walletRecords';
 import {
   matchingWalletUtxoObservation,
@@ -551,7 +551,7 @@ export function NodeInspector({
           </div>
           <div>
             <dt>Value</dt>
-            <dd className="bitcoin-amount">{formatBitcoinAmount(selected.value)}</dd>
+            <Amount as="dd" value={selected.value} />
           </div>
           {tx && (
             <div>

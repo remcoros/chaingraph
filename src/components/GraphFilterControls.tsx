@@ -10,6 +10,7 @@ import {
   type GraphFilters,
 } from '../domain/graphFilters';
 import { AnchoredPopover } from './AnchoredPopover';
+import { Amount } from './Amount';
 import { WalletFilterOptions } from './GraphWalletFilter';
 import './graph-filters.css';
 
@@ -288,7 +289,23 @@ export function FilterChips({
     <div className="filter-chips" aria-label="Active graph filters" tabIndex={-1}>
       {chips.map((chip) => (
         <span key={chip.key} className={`filter-chip filter-chip-${chip.kind}`}>
-          <span title={chip.key === 'value' ? chip.label : undefined}>{chip.label}</span>
+          <span title={chip.key === 'value' ? chip.label : undefined}>
+            {chip.key !== 'value' ? (
+              chip.label
+            ) : filters.minSats !== undefined && filters.maxSats !== undefined ? (
+              <>
+                <Amount value={filters.minSats} /> – <Amount value={filters.maxSats} />
+              </>
+            ) : filters.minSats !== undefined ? (
+              <>
+                Min <Amount value={filters.minSats} />
+              </>
+            ) : (
+              <>
+                Max <Amount value={filters.maxSats} />
+              </>
+            )}
+          </span>
           <button
             type="button"
             aria-label={`Remove filter: ${chip.label}`}

@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeftRight,
@@ -960,11 +960,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                             }
                           />
                         )}
-                        {row.amountSats !== undefined && (
-                          <span className="bitcoin-amount">
-                            {formatBitcoinAmount(row.amountSats)}
-                          </span>
-                        )}
+                        {row.amountSats !== undefined && <Amount value={row.amountSats} />}
                         {row.address && row.kind !== 'address' && (
                           <WalletReference value={row.address} kind="address" />
                         )}

@@ -4,7 +4,7 @@ Chaingraph helps you investigate Bitcoin activity and keep your own observations
 
 All amounts display as BTC with eight decimal places grouped from the right:
 `0.00 025 000 BTC`, `1.00 000 000 BTC`,
-`1.23 456 789 BTC`. Thin non-breaking spaces keep digit groups together. No amount
+`1.23 456 789 BTC`. Thin non-breaking spaces keep digit groups together. Hover an amount to see its exact, grouped satoshi equivalent. No amount
 is rounded or abbreviated. Amount-entry fields still accept integer sats as
 labelled, and fee rates remain in sat/vB. Missing values stay unknown. Previously
 saved notes and findings keep their original wording.

@@ -21,7 +21,10 @@ decimal places grouped 2/3/3 from the right, including zero and amounts below on
 BTC. Integer groups use narrow non-breaking spaces,
 and a non-breaking space separates the amount from its unit. Bigint arithmetic
 preserves every satoshi; missing, non-finite, fractional or unsafe numeric inputs
-remain unknown. Dedicated amount elements use tabular digits and do not wrap.
+remain unknown. `src/components/Amount.tsx` owns dedicated amount markup, tabular digits,
+non-wrapping text and the formatted sats tooltip. Its limited element choices
+preserve semantic table/list/detail markup. Plain-text findings and native
+select options use the same formatting helpers without React markup.
 
 This presentation does not alter RPC values, calculations, numeric sats inputs,
 exports or saved user annotations. Existing saved prose is not migrated; newly

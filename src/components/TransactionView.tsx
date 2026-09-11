@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
@@ -186,11 +186,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
                           : 'Select to load previous output'
                         : 'Script output'}
               </strong>
-              {!row.coinbase && (
-                <span className="bitcoin-amount">
-                  {formatBitcoinAmount(row.output ? sats(row.output.value) : undefined)}
-                </span>
-              )}
+              {!row.coinbase && <Amount value={row.output ? sats(row.output.value) : undefined} />}
             </span>
             {label && <span className="transaction-row-label">{label}</span>}
             {row.coinbase && <span>Newly created coins</span>}

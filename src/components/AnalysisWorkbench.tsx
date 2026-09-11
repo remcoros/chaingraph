@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../domain/amountFormat';
+import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
@@ -144,9 +144,7 @@ function EvidenceReference({
           </span>
         </button>
         {prefix === 'out' && (
-          <span className="scan-evidence-value bitcoin-amount">
-            {formatBitcoinAmount(output ? sats(output.value) : undefined)}
-          </span>
+          <Amount className="scan-evidence-value" value={output ? sats(output.value) : undefined} />
         )}
       </div>
       {prefix === 'tx' && <TransactionBlockTime transaction={workspace.transactions[txid]} />}
