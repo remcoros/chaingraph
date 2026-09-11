@@ -367,7 +367,7 @@ describe('membership exclusions and active filter chips', () => {
       kind: 'scope',
       label: 'Isolated 2 entities',
     });
-    expect(chips.find((chip) => chip.key === 'value')!.label).toBe('Min 1,000 sats');
+    expect(chips.find((chip) => chip.key === 'value')!.label).toBe('Min 1 000 sats');
     const withoutValue = clearFilterKey(filters, 'value');
     expect(withoutValue.minSats).toBeUndefined();
     expect(withoutValue.query).toBe('salary');

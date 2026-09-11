@@ -195,5 +195,4 @@ export const short = (value: string) => {
   return `${abbreviated}${outpoint ? `:${outpoint[2]}` : ''}`;
 };
 export const sats = (btc: number) => Math.round(btc * 100_000_000);
-export const formatSats = (value?: number) =>
-  value === undefined ? 'Unknown value' : `${value.toLocaleString()} sats`;
+export { formatSats } from './amountFormat';

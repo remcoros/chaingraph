@@ -69,6 +69,10 @@ select:focus-visible {
 button svg {
   flex-shrink: 0;
 }
+.bitcoin-amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 button.primary {
   color: var(--color-accent-ink);
   background: var(--color-accent);

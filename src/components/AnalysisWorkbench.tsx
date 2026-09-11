@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
@@ -24,7 +25,6 @@ import {
 import {
   short,
   addressNodeId,
-  formatSats,
   sats,
   txNodeId,
   type AnalysisFinding,
@@ -144,8 +144,8 @@ function EvidenceReference({
           </span>
         </button>
         {prefix === 'out' && (
-          <span className="scan-evidence-value">
-            {formatSats(output ? sats(output.value) : undefined)}
+          <span className="scan-evidence-value bitcoin-amount">
+            {formatBitcoinAmount(output ? sats(output.value) : undefined)}
           </span>
         )}
       </div>

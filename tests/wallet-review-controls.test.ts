@@ -48,7 +48,7 @@ describe('Wallet transaction flow controls', () => {
     expect(html).toContain(`aria-label="Show input ${parentId}:0 on graph"`);
     expect(html).toContain(`aria-label="Show output ${txid}:0 on graph"`);
     expect(html).toContain('title="Show on graph"');
-    expect(html).toContain('title="123,456,789 sats"');
+    expect(html).toContain('title="1.23 456 789 BTC"');
     expect(html).toContain('Editing output');
     expect(html).toContain('Your wallet');
     expect(html).toContain('No wallet match');

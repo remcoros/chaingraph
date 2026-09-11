@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeftRight,
@@ -10,7 +11,7 @@ import {
   Network,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import { formatSats, short, type Wallet, type Workspace } from '../domain/types';
+import { short, type Wallet, type Workspace } from '../domain/types';
 import { verifyWalletUtxo, type WalletUtxoRecord } from '../domain/walletRecords';
 import {
   applyReviewDecisions,
@@ -959,7 +960,11 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                             }
                           />
                         )}
-                        {row.amountSats !== undefined && <span>{formatSats(row.amountSats)}</span>}
+                        {row.amountSats !== undefined && (
+                          <span className="bitcoin-amount">
+                            {formatBitcoinAmount(row.amountSats)}
+                          </span>
+                        )}
                         {row.address && row.kind !== 'address' && (
                           <WalletReference value={row.address} kind="address" />
                         )}

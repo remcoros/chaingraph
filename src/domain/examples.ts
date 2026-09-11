@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from './amountFormat';
 import type { Network } from './types';
 
 export interface CuratedExample {
@@ -130,8 +131,7 @@ export const MAINNET_EXAMPLES: readonly CuratedExample[] = [
     id: 'five-equal-outputs',
     network: 'mainnet',
     title: 'Compare five equal outputs',
-    description:
-      'Five inputs and five 0.05 BTC outputs. Explore an equal-output CoinJoin pattern and the limits of common-input ownership heuristics.',
+    description: `Five inputs and five outputs of ${formatBitcoinAmount(5_000_000)}. Explore an equal-output CoinJoin pattern and the limits of common-input ownership heuristics.`,
     txid: '323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2',
     verifiedAt: '2026-09-08',
     sources: [

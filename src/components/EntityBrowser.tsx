@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -18,7 +19,7 @@ import {
   type EntitySort,
   type GraphFilters,
 } from '../domain/graphFilters';
-import { formatSats, type Annotation, type GraphNode, type Transaction } from '../domain/types';
+import type { Annotation, GraphNode, Transaction } from '../domain/types';
 import './entity-browser.css';
 import type { VisibilityProps } from './VisibilityActions';
 import { GraphConnectionsAction, GraphFilterButton } from './GraphFilterControls';
@@ -317,7 +318,9 @@ export default function EntityBrowser({
                     <Bookmark size={11} aria-label="Bookmarked" />
                   )}
                 </small>
-                <small>{formatSats(node.value)}</small>
+                <small className="bitcoin-amount" title={formatBitcoinAmount(node.value)}>
+                  {formatBitcoinAmount(node.value)}
+                </small>
               </span>
             </button>
             <div className="entity-row-actions">

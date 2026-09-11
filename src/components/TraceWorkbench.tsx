@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Network, Pencil, Tag, Smile, X } from 'lucide-react';
 import { fetchTransaction } from '../lib/api';
@@ -5,7 +6,6 @@ import { traceSourceExists } from '../lib/tracing';
 import { outputAddress } from '../domain/workspace';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
 import {
-  formatSats,
   outputNodeId,
   sats,
   short,
@@ -256,7 +256,7 @@ export function TraceWorkbench({
         )
       : tx.vout.map((item) => ({
           point: { txid: tx.txid, vout: item.n },
-          label: `${short(tx.txid)}:${item.n} · ${formatSats(sats(item.value))}${item.scriptPubKey.type === 'nulldata' ? ' · Unspendable data' : ''}`,
+          label: `${short(tx.txid)}:${item.n} · ${formatBitcoinAmount(sats(item.value))}${item.scriptPubKey.type === 'nulldata' ? ' · Unspendable data' : ''}`,
           via: `Forward branch through ${short(tx.txid)}; chosen output, no satoshi mapping`,
         })),
   );
@@ -307,7 +307,7 @@ export function TraceWorkbench({
                 <option value="">Choose an outpoint…</option>
                 {entryOutputs.map(({ txid, output: item }) => (
                   <option key={outputNodeId(txid, item.n)} value={outputNodeId(txid, item.n)}>
-                    {short(txid)}:{item.n} · {formatSats(sats(item.value))}
+                    {short(txid)}:{item.n} · {formatBitcoinAmount(sats(item.value))}
                   </option>
                 ))}
               </select>
@@ -356,7 +356,9 @@ export function TraceWorkbench({
                   {point.txid}:{point.vout}
                 </code>
               </details>
-              <strong>{formatSats(output ? sats(output.value) : selected?.value)}</strong>
+              <strong className="bitcoin-amount">
+                {formatBitcoinAmount(output ? sats(output.value) : selected?.value)}
+              </strong>
               <small>
                 {output
                   ? output.scriptPubKey.type || 'Script type unknown'

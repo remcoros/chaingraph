@@ -42,7 +42,7 @@ test('transaction rows retain spending context while automatically loading prevo
   await view.getByRole('button', { name: /^Input 0:/ }).click();
   await expect(view.locator('.transaction-view-identity')).toContainText('Spending transaction');
   await expect(view.locator('.transaction-row[data-selected="true"]')).toHaveCount(1);
-  await expect(view.getByRole('button', { name: /^Input 0:/ })).toContainText('100,000,000 sats');
+  await expect(view.getByRole('button', { name: /^Input 0:/ })).toContainText('1.00 000 000 BTC');
   await expect(view.getByLabel('Displayed transaction', { exact: true })).toBeVisible();
   await view
     .getByRole('button', { name: `Go to previous transaction ${TX_FUNDING}`, exact: true })
@@ -60,7 +60,7 @@ test('transaction rows retain spending context while automatically loading prevo
     .getByRole('button', { name: `Go to previous transaction ${TX_FUNDING}`, exact: true })
     .click();
   await expect(view.locator('.transaction-row[data-selected="true"]')).toContainText(
-    '100,000,000 sats',
+    '1.00 000 000 BTC',
   );
   await view.getByRole('button', { name: 'Edit output 0 annotation', exact: true }).click();
   await page.getByLabel('Node label').fill('Exchange withdrawal');

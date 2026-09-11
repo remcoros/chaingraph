@@ -53,7 +53,8 @@
 .transaction-flow {
   --transaction-flow-gap: 20px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(136px, 19%, 184px) minmax(0, 1fr);
+  /* Keep complete amounts inside their lane; the view already scrolls on narrow screens. */
+  grid-template-columns: minmax(220px, 1fr) clamp(136px, 19%, 184px) minmax(220px, 1fr);
   grid-template-areas: 'inputs identity outputs';
   column-gap: var(--transaction-flow-gap);
   align-items: start;
@@ -426,7 +427,7 @@
   }
   .transaction-flow {
     --transaction-flow-gap: 7px;
-    grid-template-columns: minmax(0, 1fr) 110px minmax(0, 1fr);
+    grid-template-columns: minmax(220px, 1fr) 110px minmax(220px, 1fr);
   }
   .transaction-flow-center {
     margin-top: 30px;

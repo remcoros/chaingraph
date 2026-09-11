@@ -258,7 +258,7 @@ describe('real annotated workspace templates', () => {
     const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
     expect(root.vin).toHaveLength(1);
     expect(root.vout).toHaveLength(143);
-    const small = workspace.tags!.find((tag) => tag.name === 'Below 10,000 sats')!;
+    const small = workspace.tags!.find((tag) => tag.name === 'Below 10 000 sats')!;
     expect(small.nodeIds).toEqual(
       root.vout
         .filter((output) => sats(output.value) < 10_000)
@@ -276,7 +276,7 @@ describe('real annotated workspace templates', () => {
     expect(Object.keys(workspace.transactions)).toHaveLength(114);
     for (const input of root.vin)
       expect(workspace.transactions[input.txid!].vout[input.vout!]).toBeDefined();
-    const group = workspace.tags!.find((tag) => tag.name === '2,097,152 sats × 20')!;
+    const group = workspace.tags!.find((tag) => tag.name === '2 097 152 sats × 20')!;
     expect(group.nodeIds).toEqual(
       root.vout
         .filter((output) => sats(output.value) === 2_097_152)

@@ -12,6 +12,23 @@ flowchart LR
   API --> Fulcrum[Fulcrum Electrum protocol]
 ```
 
+## Amount presentation
+
+`src/domain/amountFormat.ts` is the shared monetary display boundary for Graph,
+Wallet, Analysis, filter summaries and generated template text. It accepts integer
+satoshis as safe numbers or bigint. Below an absolute value of 100,000,000 sats it
+uses sat/sats; at or above that boundary it uses BTC with exactly eight decimal
+places grouped 2/3/3 from the right. Integer groups use narrow non-breaking spaces,
+and a non-breaking space separates the amount from its unit. Bigint arithmetic
+preserves every satoshi; missing, non-finite, fractional or unsafe numeric inputs
+remain unknown. Dedicated amount elements use tabular digits and do not wrap.
+
+This presentation does not alter RPC values, calculations, numeric sats inputs,
+exports or saved user annotations. Existing saved prose is not migrated; newly
+generated findings and examples use the formatter. Fee rates remain decimal
+sat/vB. There is no unit setting, fiat conversion or alternate-symbol preference.
+See [the design reference](research/bitcoin-amount-display.md).
+
 ## Module boundaries
 
 | Location                                                 | Responsibility                                                                                                    |

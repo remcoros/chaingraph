@@ -54,7 +54,7 @@ test('selecting an input hydrates its previous output with prefetch off and foll
       .locator('.selection-facts > div')
       .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
       .locator('dd'),
-  ).toHaveText('100,000,000 sats');
+  ).toHaveText('1.00 000 000 BTC');
   await page.getByRole('button', { name: 'Find spending transactions', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Find spending transactions', exact: true }),
@@ -84,7 +84,7 @@ test('explicit previous-level prefetch exposes input output values without anoth
       .locator('.selection-facts > div')
       .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
       .locator('dd'),
-  ).toHaveText('100,000,000 sats');
+  ).toHaveText('1.00 000 000 BTC');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params[0])).toEqual([
     TX_SPENDING,
@@ -117,7 +117,7 @@ test('explicit input detail loading deduplicates parents and exposes output valu
       .locator('.selection-facts > div')
       .filter({ has: page.locator('dt', { hasText: /^Value$/ }) })
       .locator('dd'),
-  ).toHaveText('100,000,000 sats');
+  ).toHaveText('1.00 000 000 BTC');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });
 test('saved incoming and outgoing paths remain navigable offline and survive locking', async ({

@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
@@ -26,7 +27,6 @@ import {
   txNodeId,
   short,
   sats,
-  formatSats,
 } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
 import { indexLoadedSpends, selectedFlowLeg } from '../domain/transactionFlow';
@@ -186,10 +186,10 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
                           : 'Select to load previous output'
                         : 'Script output')}
             </strong>
-            <span>
+            <span className={row.coinbase ? undefined : 'bitcoin-amount'}>
               {row.coinbase
                 ? 'Newly created coins'
-                : formatSats(row.output ? sats(row.output.value) : undefined)}
+                : formatBitcoinAmount(row.output ? sats(row.output.value) : undefined)}
             </span>
             {selected && belowThreshold && (
               <span

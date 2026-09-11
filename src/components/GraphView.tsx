@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import {
   ArrowLeftFromLine,
@@ -13,13 +14,7 @@ import {
   Play,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  short,
-  formatSats,
-  type GraphLink,
-  type GraphNode,
-  type Transaction,
-} from '../domain/types';
+import { short, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
 import './graph.css';
 import type { GraphFlowContext } from './graph/flowContext';
 import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
@@ -553,7 +548,7 @@ export default function GraphView(props: GraphViewProps) {
               {hoveredNode.value !== undefined && (
                 <div>
                   <dt>{hoveredNode.kind === 'transaction' ? 'Total outputs' : 'Output value'}</dt>
-                  <dd>{formatSats(hoveredNode.value)}</dd>
+                  <dd className="bitcoin-amount">{formatBitcoinAmount(hoveredNode.value)}</dd>
                 </div>
               )}
               {hoveredNode.address && hoveredNode.kind !== 'address' && (

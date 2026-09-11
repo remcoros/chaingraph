@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from './amountFormat';
 import { z } from 'zod';
 import { stableKey } from './analysis/shared';
 import { verifiedWalletAddresses, verifyWalletUtxo, type WalletUtxoRecord } from './walletRecords';
@@ -437,7 +438,7 @@ export function buildWalletReview(
     push({
       key: reviewKey(wallet.id, 'source', `${output.txid}:${output.vout}`),
       reason: 'source',
-      title: `Receipt of ${output.valueSats.toLocaleString('en-US')} sats`,
+      title: `Receipt of ${formatBitcoinAmount(output.valueSats)}`,
       detail: `This wallet output was spent into ${utxos.length} current UTXO${
         utxos.length === 1 ? '' : 's'
       }. Recording where it came from explains today's balance.`,

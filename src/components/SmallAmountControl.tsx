@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { SMALL_AMOUNT_PRESETS } from '../domain/smallAmounts';
 
 export function SmallAmountControl({
@@ -24,7 +25,7 @@ export function SmallAmountControl({
       >
         {presets.map((value) => (
           <option key={value} value={value}>
-            {value ? `> ${value.toLocaleString('en-US')} sats` : 'All amounts'}
+            {value ? `> ${formatBitcoinAmount(value)}` : 'All amounts'}
           </option>
         ))}
       </select>

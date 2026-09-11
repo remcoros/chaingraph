@@ -2,6 +2,13 @@
 
 Chaingraph helps you investigate Bitcoin activity and keep your own observations alongside the graph. It is watch-only: you can import public wallet information, inspect transactions, and organize hypotheses without supplying a seed phrase or private key.
 
+Amounts below 1 BTC display as integer sats; larger amounts display BTC with eight
+decimal places grouped from the right: `25 000 sats`, `1.00 000 000 BTC`,
+`1.23 456 789 BTC`. Thin non-breaking spaces keep digit groups together. No amount
+is rounded or abbreviated. Amount-entry fields still accept integer sats as
+labelled, and fee rates remain in sat/vB. Missing values stay unknown. Previously
+saved notes and findings keep their original wording.
+
 ## Start a workspace
 
 Create a workspace and give it a **Name (public)** and password. The suggested name is selected automatically, including when clicked, so typing replaces it. Once edited, the name behaves like a normal text field. Its network is shown automatically when the backend supports one network; choose mainnet or testnet4 when both are configured. The name remains visible while locked. An optional description stays encrypted and appears only while unlocked. Use **Workspace menu → Workspace details** to edit either field. Existing saved workspaces show their public name after being unlocked and saved once. Use a long, unique passphrase. Your password cannot be recovered. One backend can connect to both networks at once. Every lookup uses the selected workspace's matching Core/Fulcrum pair, so switching workspaces never redirects an in-flight request to another chain. Creation lists configured networks even when their upstreams are temporarily offline; a connection is needed for live lookups.

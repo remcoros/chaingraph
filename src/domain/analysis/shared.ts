@@ -8,6 +8,7 @@ import {
   type Workspace,
 } from '../types';
 import { indexPreviousOutputs, resolvePreviousOutput, type PreviousOutputIndex } from '../prevouts';
+import { formatBitcoinAmount } from '../amountFormat';
 
 export type AnalysisScope = 'graph' | 'selection';
 export type AnalysisKind = 'observation' | 'hypothesis' | 'incomplete';
@@ -144,8 +145,7 @@ export function satoshiValue(value: number): bigint | undefined {
     ? BigInt(rounded)
     : undefined;
 }
-export const formatAmount = (value: bigint) =>
-  `${value.toLocaleString('en-US')} sat${value === 1n ? '' : 's'}`;
+export const formatAmount = formatBitcoinAmount;
 export function stableKey(value: string): string {
   return bytesToHex(sha256(new TextEncoder().encode(value)));
 }

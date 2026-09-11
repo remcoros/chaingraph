@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { listWalletAddresses } from '../domain/walletRecords';
 import {
   matchingWalletUtxoObservation,
@@ -19,7 +20,6 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import {
-  formatSats,
   short,
   txNodeId,
   type Annotation,
@@ -551,7 +551,7 @@ export function NodeInspector({
           </div>
           <div>
             <dt>Value</dt>
-            <dd>{formatSats(selected.value)}</dd>
+            <dd className="bitcoin-amount">{formatBitcoinAmount(selected.value)}</dd>
           </div>
           {tx && (
             <div>

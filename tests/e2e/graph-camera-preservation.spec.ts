@@ -182,7 +182,7 @@ test('selected input hydration preserves the manually positioned camera when dat
   releaseParents();
   await expect(
     page.locator('.transaction-view').getByRole('button', { name: /^Input 0:/ }),
-  ).toContainText('100,000,000 sats');
+  ).toContainText('1.00 000 000 BTC');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await page.waitForTimeout(7000);
   await expect(canvas).toHaveAttribute('data-camera-instance', 'pending-canvas');

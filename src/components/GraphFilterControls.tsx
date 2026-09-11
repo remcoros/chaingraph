@@ -288,7 +288,7 @@ export function FilterChips({
     <div className="filter-chips" aria-label="Active graph filters" tabIndex={-1}>
       {chips.map((chip) => (
         <span key={chip.key} className={`filter-chip filter-chip-${chip.kind}`}>
-          <span>{chip.label}</span>
+          <span title={chip.key === 'value' ? chip.label : undefined}>{chip.label}</span>
           <button
             type="button"
             aria-label={`Remove filter: ${chip.label}`}

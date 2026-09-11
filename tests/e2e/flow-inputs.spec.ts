@@ -67,7 +67,7 @@ test('input selection and backward navigation follow one outpoint; bulk details 
   await settleRendering(page);
   expect(fetched).toEqual([TX_SPENDING]);
   await flow.getByRole('button', { name: /^Input 0:/ }).click();
-  await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText('100,000,000 sats');
+  await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText('1.00 000 000 BTC');
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
   await settleRendering(page);
   expect(fetched).toEqual([TX_SPENDING, TX_FUNDING]);
@@ -118,7 +118,7 @@ test('unavailable previous outputs show a retry and recover without adding the t
   expect(failed).toBeGreaterThan(0);
   available = true;
   await flow.getByRole('button', { name: 'Retry previous outputs', exact: true }).click();
-  await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText('100,000,000 sats');
+  await expect(flow.getByRole('button', { name: /^Input 0:/ })).toContainText('1.00 000 000 BTC');
   await expect(flow.getByRole('alert')).toHaveCount(0);
   await expect(page.locator('.statusbar')).toContainText('2 transactions');
 });

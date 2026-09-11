@@ -30,9 +30,9 @@ function feeExample() {
 it('explains the small-transfer fee example and saves guidance with the finding', () => {
   const w = feeExample();
   expect(w.findings[0]).toMatchObject({
-    title: 'Network fee: 3,140 sats',
+    title: 'Network fee: 3 140 sats',
     kind: 'observation',
-    description: expect.stringContaining('larger than the 2,000 sats left after the fee'),
+    description: expect.stringContaining('larger than the 2 000 sats left after the fee'),
     details: expect.stringContaining('28.55 sat/vB'),
     guidance: { kind: 'tip', text: expect.stringContaining('Before sending a small amount') },
   });

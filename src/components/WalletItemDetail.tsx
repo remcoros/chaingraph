@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { useCallback, useId, useMemo, useState, type ReactNode } from 'react';
 import {
   ChevronRight,
@@ -10,7 +11,7 @@ import {
   TriangleAlert,
   Undo2,
 } from 'lucide-react';
-import { formatSats, short, type Wallet, type Workspace, type WorkspaceTag } from '../domain/types';
+import { short, type Wallet, type Workspace, type WorkspaceTag } from '../domain/types';
 import { isCompletedReview, type WalletReviewItem } from '../domain/walletReview';
 import {
   buildWalletReviewContext,
@@ -427,7 +428,7 @@ export function WalletItemDetail({
                   ? `Observed total (${outpoints.length} output${outpoints.length === 1 ? '' : 's'})`
                   : 'Amount'}
               </dt>
-              <dd>{formatSats(row.amountSats)}</dd>
+              <dd className="bitcoin-amount">{formatBitcoinAmount(row.amountSats)}</dd>
             </div>
           )}
           <div>

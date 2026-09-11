@@ -230,13 +230,13 @@ test('derives a resumable review queue from current coins and their sources', as
   await seed(page);
   await expect(workbench(page, 'Wallet')).toHaveAttribute('aria-pressed', 'true');
   await waitForUtxoCheck(page);
-  await expect(page.locator('.wallet-coverage')).toContainText('85,000,000 sats');
+  await expect(page.locator('.wallet-coverage')).toContainText('85 000 000 sats');
   await expect(page.locator('.wallet-coverage')).toContainText('3 used of 4 discovered');
 
   // Unlabeled current coins come first, then the receipt that funded them.
   const rows = reviewList(page).getByRole('listitem');
   await expect(rows.first()).toContainText('Current UTXO');
-  await expect(rows.first()).toContainText('60,000,000 sats');
+  await expect(rows.first()).toContainText('60 000 000 sats');
   await expect(reviewList(page)).toContainText('Earlier wallet receipt');
   await expect(reviewList(page)).toContainText('Wallet address');
   await expect(reviewList(page)).toContainText('Destination address');
@@ -254,7 +254,7 @@ test('derives a resumable review queue from current coins and their sources', as
   await expect(page.getByRole('status').filter({ hasText: 'Reviewed 1 review item.' })).toHaveText(
     'Reviewed 1 review item.',
   );
-  await expect(reviewList(page)).not.toContainText('60,000,000 sats');
+  await expect(reviewList(page)).not.toContainText('60 000 000 sats');
   await page.getByLabel('Review filter').selectOption('decided');
   await expect(reviewList(page)).toContainText('Reviewed');
   await page.getByLabel('Review filter').selectOption('open');
@@ -301,7 +301,7 @@ test('saved source-unknown decisions remain completed in Review and UTXOs after 
     };
   });
   await waitForUtxoCheck(page);
-  await expect(reviewList(page)).not.toContainText('60,000,000 sats');
+  await expect(reviewList(page)).not.toContainText('60 000 000 sats');
   await page.getByLabel('Review filter').selectOption('decided');
   await expect(reviewList(page).getByRole('listitem')).toHaveCount(1);
   await expect(reviewList(page)).toContainText('Source unknown');
@@ -313,7 +313,7 @@ test('saved source-unknown decisions remain completed in Review and UTXOs after 
   await walletTab(page, 'UTXOs').click();
   await page.getByLabel('Review state filter').selectOption('decided');
   await expect(page.locator('.wallet-review-records').getByRole('listitem')).toHaveCount(1);
-  await expect(page.locator('.wallet-review-records')).toContainText('60,000,000 sats');
+  await expect(page.locator('.wallet-review-records')).toContainText('60 000 000 sats');
   await expect(page.locator('.wallet-review-records')).toContainText('Source unknown');
   await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
   await page.getByRole('button', { name: 'Lock workspace', exact: true }).click();
@@ -326,7 +326,7 @@ test('saved source-unknown decisions remain completed in Review and UTXOs after 
   await expect(reviewList(page)).toContainText('Source unknown');
   await detail(page).getByRole('button', { name: 'Reopen', exact: true }).click();
   await expect(page.getByLabel('Review filter')).toHaveValue('open');
-  await expect(detail(page)).toContainText('60,000,000 sats');
+  await expect(detail(page)).toContainText('60 000 000 sats');
 });
 
 test('finding types expose zero counts, match by OR and keep counts independent of their own filter', async ({
@@ -1360,7 +1360,7 @@ test('one-hop Sources and Destinations keep missing evidence and creating-transa
   const source = rows.filter({ has: page.locator(`.wallet-item-title[title="${EXTERNAL}"]`) });
   await source.locator('.wallet-row-button').click();
   await expect(walletDetail(page)).toContainText('Source address');
-  await expect(walletDetail(page)).toContainText('10,000,000 sats');
+  await expect(walletDetail(page)).toContainText('10 000 000 sats');
   await expect(walletDetail(page).getByTitle(`${fundingId}:0`, { exact: true })).toBeVisible();
   await expect(walletDetail(page).getByTitle(`${historyOnlyId}:0`, { exact: true })).toHaveCount(0);
   // Only missing direct parents are requested; neither this known source's
@@ -1396,7 +1396,7 @@ test('one-hop Sources and Destinations keep missing evidence and creating-transa
   await expect(walletDetail(page).locator('.wallet-match-value')).toHaveText(
     'No match in this wallet',
   );
-  await expect(walletDetail(page)).toContainText('39,000,000 sats');
+  await expect(walletDetail(page)).toContainText('39 000 000 sats');
   await page.getByRole('img', { name: 'Wallet relationship', exact: true }).focus();
   await expect(page.getByRole('tooltip')).toContainText('undiscovered wallet address');
   await page.keyboard.press('Escape');
@@ -1511,7 +1511,7 @@ for (const phone of [false, true]) {
     await expect(detail(page).locator('.wallet-match-value')).toHaveText('In this wallet');
     await expect(flow.locator('.ownership-wallet')).toHaveCount(2);
     await expect(flow.locator('.ownership-external')).toHaveCount(1);
-    await expect(flow.locator('.is-selected')).toContainText('60,000,000 sats');
+    await expect(flow.locator('.is-selected')).toContainText('60 000 000 sats');
     await expect(flow.locator('.is-selected')).toContainText('Editing output');
     const flowBox = (await flow.boundingBox())!;
     const panelBox = (await detail(page).boundingBox())!;
@@ -1663,7 +1663,7 @@ for (const width of [1440, 390, 320]) {
       ];
     });
     await waitForUtxoCheck(page);
-    await expect(detail(page)).toContainText('60,000,000 sats');
+    await expect(detail(page)).toContainText('60 000 000 sats');
     const trigger = detail(page).getByRole('button', { name: 'Tags', exact: true });
     const popup = page.locator('.metadata-popover');
     const tags = page.getByRole('dialog', { name: 'Tag selected records' });

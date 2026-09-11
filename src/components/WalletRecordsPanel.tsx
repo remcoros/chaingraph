@@ -1,16 +1,10 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { formatGmtTimestamp, walletRecordBlockObservation } from '../domain/transactionTime';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
-import {
-  formatSats,
-  outputNodeId,
-  short,
-  txNodeId,
-  type Wallet,
-  type Workspace,
-} from '../domain/types';
+import { outputNodeId, short, txNodeId, type Wallet, type Workspace } from '../domain/types';
 import {
   listWalletTransactions,
   verifyWalletUtxo,
@@ -210,9 +204,12 @@ export function WalletRecordsPanel({
                     row.mempool,
                   )}
                 />
-                <span title={!row.utxo && row.transaction ? 'Inputs / outputs' : undefined}>
+                <span
+                  className={row.utxo ? 'bitcoin-amount' : undefined}
+                  title={!row.utxo && row.transaction ? 'Inputs / outputs' : undefined}
+                >
                   {row.utxo
-                    ? formatSats(row.utxo.valueSats)
+                    ? formatBitcoinAmount(row.utxo.valueSats)
                     : row.transaction
                       ? `(${row.transaction.vin.length} / ${row.transaction.vout.length})`
                       : 'Load transaction'}

@@ -174,7 +174,7 @@ test('an imported unsupported workspace remains editable offline and reopens wit
   await dialog.getByRole('button', { name: 'Open workspace', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Backend does not support testnet4.');
   await expect(page.getByLabel('Node label')).toHaveValue('Retained transaction');
-  await expect(page.locator('.transaction-view')).toContainText('100,000,000 sats');
+  await expect(page.locator('.transaction-view')).toContainText('1.00 000 000 BTC');
   await page.getByLabel('Node notes').fill('Edited offline and retained');
   await page.getByLabel('Transaction, output, or address').fill(TX_FUNDING);
   await expect(page.getByRole('button', { name: 'Add to graph', exact: true })).toBeDisabled();

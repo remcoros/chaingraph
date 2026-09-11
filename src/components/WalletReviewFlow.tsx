@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -10,7 +11,6 @@ import {
   FileCode,
 } from 'lucide-react';
 import type { Annotation, GraphNode, Workspace } from '../domain/types';
-import { formatSats } from '../domain/types';
 import { listTagsForNode } from '../domain/tags';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../domain/walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from '../domain/walletFlowVisibility';
@@ -311,11 +311,9 @@ function FlowColumn({
                       : 'Unknown';
           const selected = isEditing(entry);
           const value =
-            entry.valueSats === undefined ? 'Value not loaded' : formatSats(entry.valueSats);
-          const fullValue =
             entry.valueSats === undefined
-              ? value
-              : `${entry.valueSats.toLocaleString('en-US')} sats`;
+              ? 'Value not loaded'
+              : formatBitcoinAmount(entry.valueSats);
           return (
             <div
               className={`wallet-flow-node ownership-${entry.ownership}${selected ? ' is-selected' : ''}`}
@@ -326,7 +324,7 @@ function FlowColumn({
                 entry.address,
                 annotation?.label,
                 addressAnnotation?.label,
-                fullValue,
+                value,
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -413,7 +411,12 @@ function FlowColumn({
                   label: '',
                 }}
               />
-              <span title={fullValue}>{value}</span>
+              <span
+                className={entry.valueSats === undefined ? undefined : 'bitcoin-amount'}
+                title={value}
+              >
+                {value}
+              </span>
             </div>
           );
         })}

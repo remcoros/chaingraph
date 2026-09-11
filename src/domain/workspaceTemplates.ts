@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from './amountFormat';
 import type { Annotation, Network, Transaction, Wallet, Workspace, WorkspaceTag } from './types';
 import { outputNodeId, sats, txNodeId } from './types';
 import { newWorkspace, parseWorkspace } from './workspace';
@@ -63,8 +64,7 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
     id: 'mainnet-large-value-path',
     network: 'mainnet',
     name: 'Follow the largest output',
-    description:
-      'Compare a 3,400 BTC output with a 598.50 BTC output. Follow a loaded funding hop, size nodes by value and hide small amounts to see the dominant flow.',
+    description: `Compare a ${formatBitcoinAmount(340_000_000_000)} output with a ${formatBitcoinAmount(59_849_955_894)} output. Follow a loaded funding hop, size nodes by value and hide small amounts to see the dominant flow.`,
     summary: 'Fifteen inputs, a large split, and a highlighted funding hop.',
     icon: '🐋',
     sources: [
@@ -144,8 +144,7 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
     id: 'testnet4-mixed-path',
     network: 'testnet4',
     name: 'From mixed scripts to a spend',
-    description:
-      'Follow a 1,018,062-sat P2WSH output into its 1,000,000-sat successor. Compare the large sibling output and OP_RETURN, then tag the exact path through both transactions.',
+    description: `Follow a P2WSH output of ${formatBitcoinAmount(1_018_062)} into its ${formatBitcoinAmount(1_000_000)} successor. Compare the large sibling output and OP_RETURN, then tag the exact path through both transactions.`,
     summary: 'Two inputs, three script forms, and a verified spending hop.',
     icon: '🧭',
     sources: [
@@ -283,7 +282,7 @@ export async function createTemplateWorkspace(
     annotate(
       txNodeId(equalSeed),
       'Five equal outputs',
-      `Five inputs fund five outputs of 5,000,000 sats. Equal amounts do not establish participants or ownership. ${snapshotNote}`,
+      `Five inputs fund five outputs of ${formatBitcoinAmount(5_000_000)}. Equal amounts do not establish participants or ownership. ${snapshotNote}`,
       '🔬',
       true,
     );
@@ -299,8 +298,8 @@ export async function createTemplateWorkspace(
         outputNodeId(equalSeed, n),
         `Equal output ${n}`,
         n === 2
-          ? '5,000,000 sats. The loaded successor consumes this exact outpoint at input index 1.'
-          : '5,000,000 sats. This amount matches the other four outputs. No spender is included for this output in this template.',
+          ? `${formatBitcoinAmount(5_000_000)}. The loaded successor consumes this exact outpoint at input index 1.`
+          : `${formatBitcoinAmount(5_000_000)}. This amount matches the other four outputs. No spender is included for this output in this template.`,
         n === 2 ? '🔗' : '◇',
         n === 2,
       );
@@ -308,7 +307,7 @@ export async function createTemplateWorkspace(
     annotate(
       outputNodeId(equalSpender, 2),
       'Repeated successor amount',
-      '9,136,520 sats, equal to successor output 3. Matching values alone do not identify an owner or a unique path through the transaction.',
+      `${formatBitcoinAmount(9_136_520)}, equal to successor output 3. Matching values alone do not identify an owner or a unique path through the transaction.`,
       '◇',
     );
     tag(
@@ -323,16 +322,18 @@ export async function createTemplateWorkspace(
       'An exact outpoint relationship present in the loaded transaction inputs.',
       [outputNodeId(equalSeed, 2), txNodeId(equalSpender)],
     );
-    tag('Successor equal pair', '#fbbf24', 'Two successor outputs of 9,136,520 sats.', [
-      outputNodeId(equalSpender, 2),
-      outputNodeId(equalSpender, 3),
-    ]);
+    tag(
+      'Successor equal pair',
+      '#fbbf24',
+      `Two successor outputs of ${formatBitcoinAmount(9_136_520)}.`,
+      [outputNodeId(equalSpender, 2), outputNodeId(equalSpender, 3)],
+    );
   } else if (id === 'mainnet-op-return') {
     selected = outputNodeId(messageSeed, 0);
     annotate(
       txNodeId(messageSeed),
       'Message transaction',
-      `One input funds a zero-value data output and a 200,000-sat P2PKH output. ${snapshotNote}`,
+      `One input funds a zero-value data output and a P2PKH output of ${formatBitcoinAmount(200_000)}. ${snapshotNote}`,
       '📝',
       true,
     );
@@ -346,7 +347,7 @@ export async function createTemplateWorkspace(
     annotate(
       outputNodeId(messageSeed, 1),
       'P2PKH output',
-      '200,000 sats sent to a P2PKH script. The template does not identify this output as payment or change.',
+      `${formatBitcoinAmount(200_000)} sent to a P2PKH script. The template does not identify this output as payment or change.`,
       '◇',
     );
     tag('Data output', '#a78bfa', 'Observed OP_RETURN script; no attribution of the message.', [
@@ -370,7 +371,7 @@ export async function createTemplateWorkspace(
     annotate(
       selected,
       'Follow output 1',
-      '447,915,285 sats. Input index 0 of the loaded spending transaction references this exact outpoint. Follow the spending arrow to inspect that transaction.',
+      `${formatBitcoinAmount(447_915_285)}. Input index 0 of the loaded spending transaction references this exact outpoint. Follow the spending arrow to inspect that transaction.`,
       '🔗',
       true,
     );
@@ -384,7 +385,7 @@ export async function createTemplateWorkspace(
     annotate(
       outputNodeId(spentSeed, 0),
       'Other output',
-      '243,039 sats. No spending transaction for this output is included; its current UTXO status is unknown from this snapshot.',
+      `${formatBitcoinAmount(243_039)}. No spending transaction for this output is included; its current UTXO status is unknown from this snapshot.`,
       '◇',
     );
     tag(
@@ -405,14 +406,14 @@ export async function createTemplateWorkspace(
     annotate(
       selected,
       'Start with output 0',
-      '6,000,000,000 testnet4 sats in a P2WSH output. Follow one selected output at a time. The template includes no spending transactions for this fan-out.',
+      `${formatBitcoinAmount(6_000_000_000)} on testnet4 in a P2WSH output. Follow one selected output at a time. The template includes no spending transactions for this fan-out.`,
       '📍',
       true,
     );
     annotate(
       outputNodeId(fanoutSeed, 51),
       'Different script form',
-      '19,498,000,000 testnet4 sats in a P2WPKH output. A different script type does not establish a payment or change role.',
+      `${formatBitcoinAmount(19_498_000_000)} on testnet4 in a P2WPKH output. A different script type does not establish a payment or change role.`,
       '◇',
       true,
     );
@@ -445,15 +446,15 @@ export async function createTemplateWorkspace(
     );
     annotate(
       selected,
-      '3,400 BTC output',
-      '340,000,000,000 sats in a P2WSH output, about 85% of the transaction output value. Its size does not identify a recipient or establish a payment role.',
+      `${formatBitcoinAmount(340_000_000_000)} output`,
+      `${formatBitcoinAmount(340_000_000_000)} in a P2WSH output, about 85% of the transaction output value. Its size does not identify a recipient or establish a payment role.`,
       '🐋',
       true,
     );
     annotate(
       outputNodeId(largeSeed, 0),
-      '598.50 BTC output',
-      '59,849,955,894 sats in a P2WPKH output. Compare the size and script with output 1. A smaller amount or different script is not proof of change.',
+      `${formatBitcoinAmount(59_849_955_894)} output`,
+      `${formatBitcoinAmount(59_849_955_894)} in a P2WPKH output. Compare the size and script with output 1. A smaller amount or different script is not proof of change.`,
       '◇',
       true,
     );
@@ -497,14 +498,14 @@ export async function createTemplateWorkspace(
       annotate(
         outputNodeId(batchSeed, output.n),
         label,
-        `${sats(output.value).toLocaleString('en-US')} sats. Use this bookmark to compare the extremes before applying an amount filter. No payment or change role has been assigned.`,
+        `${formatBitcoinAmount(sats(output.value))}. Use this bookmark to compare the extremes before applying an amount filter. No payment or change role has been assigned.`,
         icon,
         true,
       );
     }
     const small = outputs.filter((output) => sats(output.value) < 10_000);
     tag(
-      'Below 10,000 sats',
+      `Below ${formatBitcoinAmount(10_000)}`,
       '#fbbf24',
       'Amount comparison group, not a dust-attack attribution.',
       small.map((output) => outputNodeId(batchSeed, output.n)),
@@ -545,16 +546,16 @@ export async function createTemplateWorkspace(
       .sort((a, b) => b[1].length - a[1].length);
     const colors = ['#38bdf8', '#a78bfa', '#fbbf24', '#34d399'];
     for (const [index, [amount, indices]] of ranked.slice(0, 4).entries()) {
-      const amountText = amount.toLocaleString('en-US');
+      const amountText = formatBitcoinAmount(amount);
       tag(
-        `${amountText} sats × ${indices.length}`,
+        `${amountText} × ${indices.length}`,
         colors[index],
         'Repeated output amount, not a common-owner group or proof of a unique input-to-output mapping.',
         indices.map((n) => outputNodeId(wabisabiSeed, n)),
       );
       annotate(
         outputNodeId(wabisabiSeed, indices[0]),
-        `${amountText}-sat group`,
+        `${amountText} group`,
         `One of ${indices.length} outputs with this exact amount. Matching values create multiple plausible paths through the transaction; selecting one does not establish where any particular input went.`,
         '◇',
         true,
@@ -566,7 +567,7 @@ export async function createTemplateWorkspace(
     annotate(
       outputNodeId(wabisabiSeed, largest.n),
       'Largest output',
-      `${sats(largest.value).toLocaleString('en-US')} sats. Compare its amount with the tagged equal-value groups. Neither size nor uniqueness identifies an owner or a payment role.`,
+      `${formatBitcoinAmount(sats(largest.value))}. Compare its amount with the tagged equal-value groups. Neither size nor uniqueness identifies an owner or a payment role.`,
       '🐋',
       true,
     );
@@ -596,7 +597,7 @@ export async function createTemplateWorkspace(
         annotate(
           node,
           branch === 0 ? 'Demo wallet receive output' : 'Demo wallet change-branch output',
-          `${sats(output.value).toLocaleString('en-US')} sats to an address derived from the intentionally published demo zpub at branch ${branch}. This establishes a key derivation match, not the identity of a person. A change derivation branch is not proof of the economic purpose of this output.`,
+          `${formatBitcoinAmount(sats(output.value))} to an address derived from the intentionally published demo zpub at branch ${branch}. This establishes a key derivation match, not the identity of a person. A change derivation branch is not proof of the economic purpose of this output.`,
           '👛',
           matched[branch].length <= 2,
         );
@@ -637,7 +638,7 @@ export async function createTemplateWorkspace(
     );
     annotate(
       selected,
-      'Follow 1,018,062 sats',
+      `Follow ${formatBitcoinAmount(1_018_062)}`,
       'This P2WSH outpoint is consumed by input 0 of the loaded successor. Click the spending arrow to follow its exact connection.',
       '🔗',
       true,
@@ -645,13 +646,13 @@ export async function createTemplateWorkspace(
     annotate(
       txNodeId(mixedSpender),
       'One-input successor',
-      'The observed 1,018,062-sat input funds one 1,000,000-sat P2WPKH output. The 18,062-sat difference is the transaction fee.',
+      `The observed input of ${formatBitcoinAmount(1_018_062)} funds one P2WPKH output of ${formatBitcoinAmount(1_000_000)}. The difference of ${formatBitcoinAmount(18_062)} is the transaction fee.`,
       '🔗',
       true,
     );
     annotate(
       outputNodeId(mixedSpender, 0),
-      '1,000,000-sat destination output',
+      `${formatBitcoinAmount(1_000_000)} destination output`,
       'The next observed output on this path. No further spending transaction is included, so this snapshot does not establish a final destination or current UTXO status.',
       '📍',
       true,
@@ -665,7 +666,7 @@ export async function createTemplateWorkspace(
     annotate(
       outputNodeId(mixedSeed, 2),
       'Large sibling output',
-      '4,998,981,938 sats in a P2WPKH script. Its larger amount is not proof of change. No successor for this sibling is included.',
+      `${formatBitcoinAmount(4_998_981_938)} in a P2WPKH script. Its larger amount is not proof of change. No successor for this sibling is included.`,
       '🐋',
       true,
     );

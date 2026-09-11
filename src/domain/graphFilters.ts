@@ -1,3 +1,4 @@
+import { formatBitcoinAmount } from './amountFormat';
 import type { Annotation, GraphData, GraphNode } from './types';
 import type { EntityVisibility } from './visibility';
 
@@ -322,7 +323,6 @@ export function activeFilterChips(
   filters: GraphFilters,
   names: { walletName?: string; walletNames?: string[]; tagName?: string } = {},
 ): FilterChip[] {
-  const value = (amount?: number) => (amount === undefined ? '' : amount.toLocaleString('en-US'));
   return activeFilterKeys(filters).map((key): FilterChip => {
     switch (key) {
       case 'query':
@@ -379,10 +379,10 @@ export function activeFilterChips(
           kind: 'match',
           label:
             filters.minSats !== undefined && filters.maxSats !== undefined
-              ? `${value(filters.minSats)}–${value(filters.maxSats)} sats`
+              ? `${formatBitcoinAmount(filters.minSats)} – ${formatBitcoinAmount(filters.maxSats)}`
               : filters.minSats !== undefined
-                ? `Min ${value(filters.minSats)} sats`
-                : `Max ${value(filters.maxSats)} sats`,
+                ? `Min ${formatBitcoinAmount(filters.minSats)}`
+                : `Max ${formatBitcoinAmount(filters.maxSats)}`,
         };
       case 'spend':
         return {

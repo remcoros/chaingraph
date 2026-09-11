@@ -1,5 +1,5 @@
+import { formatBitcoinAmount } from '../domain/amountFormat';
 import { Pencil, Plus, RefreshCw, ScanSearch, Wallet as WalletIcon } from 'lucide-react';
-import { formatSats } from '../domain/types';
 import { walletCheckAge } from '../domain/walletActivity';
 import type { WalletReviewCoverage } from '../domain/walletReview';
 import type { WalletUtxoView } from '../lib/useWalletUtxos';
@@ -127,7 +127,10 @@ export function WalletOverview({
               )
             ) : (
               <>
-                {coverage.utxoCount} unspent · {formatSats(coverage.utxoBalanceSats)}
+                {coverage.utxoCount} unspent ·{' '}
+                <span className="bitcoin-amount">
+                  {formatBitcoinAmount(coverage.utxoBalanceSats)}
+                </span>
               </>
             )}
           </dd>
