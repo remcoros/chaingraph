@@ -449,7 +449,7 @@ filtering or adding data; perspective still affects their apparent size.
 
 The Inspector's top-bar refresh icon checks an output's current UTXO status. It queries Core
 with mempool spends included and shows a dismissible notification that hides after eight seconds.
-The timestamped observation remains under **Chain evidence** for the current selection.
+The timestamped observation remains under **More details** for the current selection.
 A missing UTXO result is not treated as proof of spending.
 
 Successful transaction, output and address lookups focus their target even with

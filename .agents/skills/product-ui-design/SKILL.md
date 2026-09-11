@@ -200,6 +200,30 @@ Each local region should have a clear action hierarchy.
 
 For expert-oriented software, support efficient repeat use with keyboard shortcuts or accelerators where appropriate, but keep the ordinary interaction discoverable.
 
+### Control sizing and consistency
+
+Choose an existing control density before adding buttons, inputs, selects or icon
+actions. Quick editors and inspector actions should match nearby workspace
+toolbars. Being inside a dialog does not by itself justify larger controls.
+
+- Reuse a shared component or density class and its tokens. In this repository,
+  `.compact-controls` provides the compact quick-editor treatment: 30px controls,
+  11px button text, 12px input text, and larger targets for coarse pointers.
+- Check the actual CSS cascade: font size alone does not make a control compact.
+  Align minimum height, padding, line height, icon size and gaps; remove competing
+  local overrides when adopting the shared treatment.
+- Keep primary, secondary and icon-only actions at the same density within a
+  group. Use emphasis to express priority. Reserve larger controls for workflows
+  that need them, such as onboarding or touch-first forms.
+- Keep action labels short and on one line. Let the group reflow when necessary;
+  avoid stretched full-width secondary buttons unless the layout needs them.
+- Use the same icon for the same operation across surfaces. Paired Add/Remove
+  membership actions use Plus/Minus; deleting a record uses the delete icon.
+  Keep an accessible name and tooltip for icon-only actions.
+- Check normal, disabled, busy and narrow states without shrinking readable text
+  or pointer targets. Respect the user's validation scope; do not add browser
+  checks solely to confirm styling.
+
 ## 9. Status, async work, and background activity
 
 System status must be visible without becoming the main content when nothing requires attention.

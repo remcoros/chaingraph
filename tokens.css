@@ -33,6 +33,8 @@
   --space-xl: 40px;
   --space-2xl: 64px;
   --text-xs: 11px;
+  --control-height-compact: 30px;
+  --control-padding-compact: 4px 7px;
   --text-sm: 12px;
   --text-base: 13px;
   --text-lg: 17px;

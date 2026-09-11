@@ -44,6 +44,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 10px;
 }
@@ -83,8 +84,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  min-height: 30px;
+  width: var(--control-height-compact);
+  min-height: var(--control-height-compact);
   padding: 0;
   border: 2px solid transparent;
   color: #101b1f;
@@ -129,11 +130,6 @@
   display: flex;
   gap: 5px;
 }
-.metadata-tag-actions button {
-  padding: 5px 7px;
-  min-height: 32px;
-  font-size: 11px;
-}
 @media (max-width: 420px) {
   .metadata-tag-option {
     grid-template-columns: 8px minmax(0, 1fr);
@@ -143,9 +139,9 @@
   }
   .metadata-tag-actions button,
   .metadata-colors button {
-    min-height: 36px;
+    min-height: max(36px, var(--control-height-compact));
   }
   .metadata-colors button {
-    width: 36px;
+    width: max(36px, var(--control-height-compact));
   }
 }

@@ -682,7 +682,7 @@ export function NodeInspector({
           onToggle={(event) => setEvidenceOpen((event.currentTarget as HTMLDetailsElement).open)}
         >
           <summary>
-            <span>Chain evidence</span>
+            <span>More details</span>
             <ChevronDown size={15} aria-hidden="true" />
           </summary>
           <div className="evidence-body">

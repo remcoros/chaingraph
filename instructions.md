@@ -41,7 +41,7 @@ and **Retry previous outputs** retries the lookup without adding the root again.
 For an output's current availability, use the refresh icon in the Inspector's top bar
 (**Check current UTXO status**). This queries Core with mempool spends included and
 timestamps the result. The notification can be dismissed and hides after eight seconds;
-the last successful observation remains under **Chain evidence** for the current selection.
+the last successful observation remains under **More details** for the current selection.
 A positive result means **Unspent at check**. **Not in current UTXO set** does not
 by itself prove a spend, since an output may also belong to a transaction outside
 the active chain. Checks stay in memory for the current selection and can be

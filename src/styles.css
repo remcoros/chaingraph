@@ -109,6 +109,35 @@ select {
 select:hover {
   border-color: var(--color-faint);
 }
+
+/* Opt-in density for workspace toolbars and quick editors. */
+.compact-controls button {
+  min-height: var(--control-height-compact);
+  padding: var(--control-padding-compact);
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.compact-controls .icon-button {
+  min-width: var(--control-height-compact);
+  padding: var(--space-xs);
+}
+.compact-controls input:not([type='checkbox']):not([type='radio']),
+.compact-controls select,
+.compact-controls textarea {
+  min-height: var(--control-height-compact);
+  padding: var(--control-padding-compact);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.compact-controls select {
+  padding-right: 28px;
+}
+@media (pointer: coarse) {
+  .compact-controls {
+    --control-height-compact: 40px;
+  }
+}
 input::placeholder,
 textarea::placeholder {
   color: var(--color-faint);

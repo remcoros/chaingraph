@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Plus, Tag, Trash2 } from 'lucide-react';
+import { Check, Minus, Plus, Tag, Trash2, X } from 'lucide-react';
 import {
   addressNodeId,
   short,
@@ -41,7 +41,7 @@ function TagForm({
   const [description, setDescription] = useState(tag?.description ?? '');
   return (
     <form
-      className="tag-form"
+      className="tag-form compact-controls"
       onSubmit={(event) => {
         event.preventDefault();
         if (!tag && name.trim())
@@ -85,12 +85,13 @@ function TagForm({
       <div className="tag-form-actions">
         {!tag && (
           <button className="primary" disabled={!name.trim()}>
-            Create tag
+            <Plus size={13} /> Create tag
           </button>
         )}
         {tag && <span className="small muted">Changes apply automatically</span>}
         {onCancel && (
           <button type="button" onClick={onCancel}>
+            {tag ? <Check size={13} /> : <X size={13} />}
             {tag ? 'Done' : 'Cancel'}
           </button>
         )}
@@ -235,7 +236,7 @@ function RemoveAddressTag({
   return (
     <div
       ref={ref}
-      className="metadata-editor"
+      className="metadata-editor compact-controls"
       role="dialog"
       aria-modal="false"
       aria-label="Remove address tag"
@@ -249,7 +250,7 @@ function RemoveAddressTag({
           Cancel
         </button>
         <button type="button" onClick={onRemove}>
-          Remove from address + outputs
+          <Minus size={13} /> Remove from address + outputs
         </button>
       </div>
     </div>
@@ -302,9 +303,8 @@ function TagAssignmentPicker({
         }}
         footer={
           <div className="metadata-editor-footer">
-            <span className="small muted">Manual groups do not establish ownership.</span>
             <button type="button" onClick={onManage}>
-              Manage tags
+              <Tag size={13} /> Manage tags
             </button>
           </div>
         }

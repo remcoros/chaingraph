@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X } from 'lucide-react';
+import { Check, Minus, Plus, X } from 'lucide-react';
 import { useDialogFocus } from './Dialogs';
 import {
   applyEntityNote,
@@ -67,7 +67,7 @@ export function BatchLabelEditor({
   return (
     <div
       ref={ref}
-      className="metadata-editor"
+      className="metadata-editor compact-controls"
       role="dialog"
       aria-modal="false"
       id={id}
@@ -205,7 +205,7 @@ export function BatchTagEditor({
   return (
     <div
       ref={ref}
-      className="metadata-editor"
+      className="metadata-editor compact-controls"
       role="dialog"
       aria-modal="false"
       id={id}
@@ -261,7 +261,9 @@ export function BatchTagEditor({
         {name && !duplicate && (
           <div className="metadata-tag-create">
             <ColorPicker value={color} onChange={setColor} />
-            <button className="primary">Create and assign</button>
+            <button className="primary">
+              <Plus size={13} /> Create and assign
+            </button>
           </div>
         )}
       </form>
@@ -285,14 +287,14 @@ export function BatchTagEditor({
                   aria-label={`Add ${tag.name} to selected records`}
                   onClick={() => assign(tag.id, true)}
                 >
-                  Add
+                  <Plus size={13} /> Add
                 </button>
                 <button
                   disabled={!assigned}
                   aria-label={`Remove ${tag.name} from selected records`}
                   onClick={() => assign(tag.id, false)}
                 >
-                  Remove
+                  <Minus size={13} /> Remove
                 </button>
               </div>
             </div>
@@ -394,7 +396,7 @@ export function EntityNoteEditor({
   return (
     <div
       ref={ref}
-      className="metadata-editor"
+      className="metadata-editor compact-controls"
       role="dialog"
       aria-modal="false"
       aria-label="Edit notes"
