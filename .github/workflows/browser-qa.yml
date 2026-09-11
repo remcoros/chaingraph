@@ -9,12 +9,7 @@ on:
         default: runtime
         options:
           - runtime
-          - selected-e2e
-          - full-e2e
-      spec:
-        description: Required for selected-e2e, e.g. tests/e2e/tags.spec.ts
-        required: false
-        type: string
+          - e2e-smoke
 
 permissions:
   contents: read
@@ -33,21 +28,9 @@ jobs:
         shell: bash
         env:
           QA_SCOPE: ${{ inputs.scope }}
-          QA_SPEC: ${{ inputs.spec }}
         run: |
           case "$QA_SCOPE" in
-            runtime|full-e2e)
-              if [[ -n "$QA_SPEC" ]]; then
-                echo 'A spec is only accepted with selected-e2e scope.' >&2
-                exit 1
-              fi
-              ;;
-            selected-e2e)
-              if [[ ! "$QA_SPEC" =~ ^tests/e2e/[a-zA-Z0-9_-]+\.spec\.ts$ ]] || [[ ! -f "$QA_SPEC" ]]; then
-                echo 'Select one existing tests/e2e/*.spec.ts file.' >&2
-                exit 1
-              fi
-              ;;
+            runtime|e2e-smoke) ;;
             *) echo 'Unknown browser QA scope.' >&2; exit 1 ;;
           esac
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -74,17 +57,8 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4300/ >/dev/null
           npm run test:production
-      - name: Run selected browser spec
-        if: inputs.scope == 'selected-e2e'
-        shell: bash
-        env:
-          QA_SPEC: ${{ inputs.spec }}
-        run: |
-          # Playwright treats file selectors as regexes. Match the selected path literally.
-          selector="${QA_SPEC//./\\.}"
-          npm run test:e2e -- --output=artifacts/browser-qa "$selector$"
-      - name: Run full browser suite
-        if: inputs.scope == 'full-e2e'
+      - name: Run E2E smoke suite
+        if: inputs.scope == 'e2e-smoke'
         run: npm run test:e2e -- --output=artifacts/browser-qa
       - name: Retain failed browser diagnostics
         if: failure()

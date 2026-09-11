@@ -315,15 +315,15 @@ npm run test:live          # Read-only smoke for configured network pairs
 npm run test:production:http # Built assets, HTTP headers and network discovery; no browser
 ```
 
-Browser QA is explicitly scoped. The manual **Browser QA** workflow defaults to the production runtime check; a selected E2E spec or the full historical suite is an opt-in. Local equivalents, when browser QA is requested:
+Browser QA is explicitly scoped. The manual **Browser QA** workflow defaults to the production runtime check; the E2E smoke suite is an opt-in. Local equivalents, when browser QA is requested:
 
 ```sh
 npx playwright install chromium
 npm run test:production   # HTTP checks, real encryption worker and encrypted persistence
-npm run test:e2e -- tests/e2e/tags.spec.ts # Example of a selected browser spec
+npm run test:e2e          # Small smoke suite: app renders, a workspace opens and shows its graph
 ```
 
-Production checks need a built server, by default on port 4300; `CHAINGRAPH_SMOKE_URL` selects another origin. Release verification runs the narrow production runtime check against the container, without the full E2E suite. Existing browser journeys remain optional diagnostics rather than a maintenance requirement for every evolving workflow. Passing non-browser checks does not establish visual usability, live upstream health or mobile performance. See [contributor validation guidance](CONTRIBUTING.md#set-up-and-verify) for scope and commands.
+Production checks need a built server, by default on port 4300; `CHAINGRAPH_SMOKE_URL` selects another origin. Release verification runs the narrow production runtime check against the container, without the E2E suite. The E2E suite is deliberately minimal (a couple of smoke tests, not per-feature coverage) so it stays cheap to run and cheap to fix as the UI evolves; it is not a substitute for exploratory browser QA. Passing non-browser checks does not establish visual usability, live upstream health or mobile performance. See [contributor validation guidance](CONTRIBUTING.md#set-up-and-verify) for scope and commands.
 
 See [verified results and limits](docs/validation.md) for automated, live mainnet/testnet4, and production-browser evidence.
 

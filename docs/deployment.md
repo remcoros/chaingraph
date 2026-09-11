@@ -118,7 +118,7 @@ npx playwright install chromium
 CHAINGRAPH_SMOKE_URL=http://127.0.0.1:3000 npm run test:production
 ```
 
-Use the manual **Browser QA** workflow for a production runtime check (default), one selected E2E spec, or an explicitly selected full historical suite. It has no push, PR or scheduled trigger and cannot publish a release. Broader navigation, copy, layout and responsive review belongs in separately scoped exploratory QA. Existing E2E suites remain optional diagnostics rather than a full-suite release gate. Run browser checks serially within each checkout. Failure diagnostics stay under `artifacts/` and are retained by the browser/release workflows for seven days. Passing non-browser checks does not establish visual usability.
+Use the manual **Browser QA** workflow for a production runtime check (default) or the small E2E smoke suite. It has no push, PR or scheduled trigger and cannot publish a release. Broader navigation, copy, layout and responsive review belongs in separately scoped exploratory QA. The E2E suite is a minimal smoke check, not a full-suite release gate. Run browser checks serially within each checkout. Failure diagnostics stay under `artifacts/` and are retained by the browser/release workflows for seven days. Passing non-browser checks does not establish visual usability.
 
 Supply `CHAINGRAPH_SOURCE_URL=https://github.com/<owner>/<repository>` as a public build argument to include the project's GitHub link in the UI; the release workflow supplies the actual repository automatically. `VCS_REF` records the source commit in image metadata. Credentials must only be provided at runtime, never as build arguments, because build provenance may expose build arguments.
 
