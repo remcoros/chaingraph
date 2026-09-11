@@ -1,11 +1,30 @@
 import { chromium, expect } from '@playwright/test';
 import { existsSync, readdirSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { mockBitcoin, TX_SPENDING } from '../tests/fixtures/bitcoin';
+import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
+import { newWorkspace } from '../src/domain/workspace';
+import { transactions } from '../tests/fixtures/bitcoin';
 
-// This checks real built assets and CSP, while isolating chain requests from any personal data.
+// Exercise browser runtime boundaries using only a fresh, synthetic workspace.
+// Panel workflows and visual usability belong to explicitly scoped browser QA.
 const base = process.env.CHAINGRAPH_SMOKE_URL ?? 'http://127.0.0.1:4300';
+const password = 'public-production-test-passphrase';
+const description = 'Public fixture standing in for encrypted private workspace content.';
+const workspaceName = 'Production smoke';
+const storageKey = 'chaingraph.encrypted-workspaces.v1';
+const artifacts = path.resolve('artifacts/production-smoke');
+const workspace = newWorkspace(workspaceName, 'mainnet');
+workspace.transactions = transactions;
+const fixture = JSON.stringify([
+  {
+    id: workspace.id,
+    publicName: workspaceName,
+    savedAt: new Date().toISOString(),
+    envelope: await encryptWorkspace(workspace, password),
+  },
+]);
 const cache = path.join(os.homedir(), '.cache/ms-playwright');
 const executablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
@@ -22,99 +41,178 @@ const browser = await chromium.launch({
   headless: true,
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
+const deadline = setTimeout(() => void browser.close(), 90000);
+let step = 'browser context';
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  context.setDefaultTimeout(20000);
+  await context.tracing.start({ screenshots: false, snapshots: true, sources: false });
+  const page = await context.newPage();
   const errors: string[] = [];
   const workerUrls: string[] = [];
+  let unexpectedApiCalls = 0;
   page.on('worker', (worker) => workerUrls.push(worker.url()));
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', () => errors.push('page error'));
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    if (message.type() === 'error') errors.push('console error');
   });
-  await mockBitcoin(page);
-  await page.goto(base);
-  await page.getByRole('button', { name: 'New workspace', exact: true }).last().click();
-  const create = page.getByRole('dialog', { name: 'Create a workspace' });
-  await create.getByLabel('Name (public)', { exact: true }).fill('Production smoke');
-  await create.getByLabel('Bitcoin network').selectOption('mainnet');
-  await create.getByLabel('Password', { exact: true }).fill('public-production-test-passphrase');
-  await create.getByLabel('Confirm password').fill('public-production-test-passphrase');
-  await create.getByRole('button', { name: 'Create workspace' }).click();
-  await page.getByRole('button', { name: 'Skip tour' }).click();
-  await page.getByLabel('Prefetch previous levels').selectOption('1');
-  await page.getByLabel('Transaction, output, or address').fill(TX_SPENDING);
-  await page.getByRole('button', { name: 'Add to graph' }).click();
-  await expect(page.locator('.statusbar')).toContainText('2 transactions');
-  await expect(page.locator('canvas')).toBeVisible();
-  await page
-    .locator('.transaction-view')
-    .getByRole('button', { name: /^Output 0:/ })
-    .click();
-  await page.getByLabel('Node label').fill('Production saved label');
-  await expect(page.locator('.transaction-view')).toBeVisible();
-  const tags = page.getByRole('region', { name: 'Tags and wallet matches' });
-  await tags.getByRole('button', { name: 'Add or choose tags' }).click();
-  const picker = page.getByRole('dialog', { name: 'Choose tags' });
-  await picker.getByLabel('Find or create tag').fill('Production saved tag');
-  await picker.getByLabel('Find or create tag').press('Enter');
-  await expect(picker.getByRole('checkbox', { name: 'Production saved tag' })).toBeChecked();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
-  expect(
-    workerUrls.some((url) => {
+  // Block every API request from reaching an upstream. HTTP checks run separately.
+  await context.route('**/api/**', (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/networks')
+      return route.fulfill({ json: { networks: ['mainnet', 'testnet4'] } });
+    if (url.pathname === '/api/status')
+      return route.fulfill({
+        json: { network: url.searchParams.get('network'), connected: false },
+      });
+    unexpectedApiCalls++;
+    return route.fulfill({ status: 400, json: { error: 'Unexpected smoke request.' } });
+  });
+  await context.addInitScript(() => {
+    localStorage.setItem('chaingraph.tour.seen', '1');
+    // Observe contexts created by the application; the assertion must not create one.
+    const observed = new WeakSet<HTMLCanvasElement>();
+    HTMLCanvasElement.prototype.getContext = new Proxy(HTMLCanvasElement.prototype.getContext, {
+      apply(target, canvas, args) {
+        const result = Reflect.apply(target, canvas, args);
+        if (args[0] === 'webgl2' && result && !observed.has(canvas)) {
+          observed.add(canvas);
+          canvas.setAttribute('data-smoke-webgl', result.isContextLost() ? 'lost' : 'ready');
+          canvas.addEventListener('webglcontextlost', () =>
+            canvas.setAttribute('data-smoke-webgl', 'lost'),
+          );
+          canvas.addEventListener('webglcontextrestored', () =>
+            canvas.setAttribute('data-smoke-webgl', 'ready'),
+          );
+        }
+        return result;
+      },
+    });
+  });
+  await context.addInitScript(
+    ({ key, fixture }) => {
+      // Seed once; reload must retain the application's own encrypted save.
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, fixture);
+    },
+    { key: storageKey, fixture },
+  );
+  const encryptionWorkers = () =>
+    workerUrls.filter((url) => {
       const parsed = new URL(url);
       return (
         parsed.origin === new URL(base).origin &&
         /\/assets\/workspaceEncryption\.worker-[^/]+\.js$/.test(parsed.pathname)
       );
-    }),
-    'production encrypted saves use the bundled same-origin worker under CSP',
-  ).toBe(true);
-  const stored = await page.evaluate(() => JSON.stringify(localStorage));
-  expect(stored).not.toContain('Production saved label');
-  expect(stored).not.toContain('Production saved tag');
-  await page.getByRole('button', { name: 'Workspace menu' }).click();
-  await page.getByRole('button', { name: 'Lock workspace' }).click();
-  await expect(page.locator('.saved-row')).toBeVisible();
-  await page.reload();
-  await page.locator('.saved-row').click();
-  const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
-  await unlock.getByLabel('Password', { exact: true }).fill('public-production-test-passphrase');
-  await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
-  await expect(page.locator('canvas')).toBeVisible();
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
-  await page.getByLabel('Filter graph entities').fill('Production saved label');
-  await expect(page.locator('.entity-row')).toHaveCount(1);
-  await page.locator('.entity-row').click();
-  await expect(page.locator('.transaction-view')).toContainText('Production saved label');
-  await expect(page.getByRole('region', { name: 'Tags and wallet matches' })).toContainText(
-    'Production saved tag',
+    }).length;
+  try {
+    step = 'built application startup';
+    await page.goto(base);
+    await page.locator('.saved-row').filter({ hasText: workspaceName }).click();
+    const initialUnlock = page.getByRole('dialog', { name: 'Unlock workspace' });
+    await initialUnlock.getByLabel('Password', { exact: true }).fill(password);
+    await initialUnlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Open workspaces' })).toContainText(
+      workspaceName,
+    );
+    step = 'encrypted browser save';
+    const beforeSave = encryptionWorkers();
+    await page.getByRole('button', { name: 'Workspace menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Workspace details', exact: true }).click();
+    const details = page.getByRole('dialog', { name: 'Workspace details' });
+    await details.getByLabel('Workspace description', { exact: true }).fill(description);
+    await details.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect
+      .poll(
+        async () => {
+          const raw = await page.evaluate((key) => localStorage.getItem(key)!, storageKey);
+          const saved = await decryptWorkspace(JSON.parse(raw)[0].envelope, password);
+          return (saved as { description?: string }).description;
+        },
+        {
+          timeout: 20000,
+        },
+      )
+      .toBe(description);
+    const stored = await page.evaluate((key) => localStorage.getItem(key)!, storageKey);
+    expect(stored).not.toContain(description);
+    expect(stored).not.toContain(password);
+    const entries = JSON.parse(stored);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].publicName).toBe(workspaceName);
+    expect(await decryptWorkspace(entries[0].envelope, password)).toMatchObject({
+      name: workspaceName,
+      network: 'mainnet',
+      description,
+    });
+    expect(encryptionWorkers(), 'save executes the bundled encryption worker').toBeGreaterThan(
+      beforeSave,
+    );
+
+    step = 'WebGL initialization';
+    const canvas = page.locator('.graph-stage canvas');
+    await expect(canvas).toBeVisible();
+    expect(
+      await canvas.evaluate((element) => {
+        const canvas = element as HTMLCanvasElement;
+        return (
+          canvas.getAttribute('data-smoke-webgl') === 'ready' &&
+          canvas.width > 0 &&
+          canvas.height > 0
+        );
+      }),
+      'a live WebGL2 context backs the canvas',
+    ).toBe(true);
+
+    step = 'reload and worker unlock';
+    await page.reload();
+    const workerCount = encryptionWorkers();
+    await page.locator('.saved-row').filter({ hasText: workspaceName }).click();
+    const unlock = page.getByRole('dialog', { name: 'Unlock workspace' });
+    await unlock.getByLabel('Password', { exact: true }).fill(password);
+    await unlock.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Open workspaces' })).toContainText(
+      workspaceName,
+    );
+    expect(encryptionWorkers(), 'unlock executes a fresh bundled worker').toBeGreaterThan(
+      workerCount,
+    );
+
+    // Export confirms that the reopened browser session contains the saved data.
+    step = 'encrypted export from reopened session';
+    const downloadReady = page.waitForEvent('download');
+    await page
+      .getByRole('button', { name: 'Export encrypted workspace backup', exact: true })
+      .click();
+    const download = await downloadReady;
+    const downloadedPath = await download.path();
+    expect(downloadedPath).not.toBeNull();
+    const exported = await readFile(downloadedPath!, 'utf8');
+    expect(exported).not.toContain(description);
+    expect(exported).not.toContain(password);
+    expect(await decryptWorkspace(JSON.parse(exported), password)).toMatchObject({
+      id: entries[0].id,
+      name: workspaceName,
+      network: 'mainnet',
+      description,
+    });
+    expect(unexpectedApiCalls, 'runtime smoke requires no chain lookup').toBe(0);
+    expect(errors, 'production browser errors').toEqual([]);
+    await context.tracing.stop();
+    console.log(
+      'Production runtime smoke passed: app boot, WebGL2 context, bundled encryption worker, encrypted save/reload/unlock/export. No live upstream or visual validation.',
+    );
+  } catch (error) {
+    await mkdir(artifacts, { recursive: true });
+    await writeFile(path.join(artifacts, 'failure.txt'), `${step}\n${String(error)}\n`);
+    await context.tracing.stop({ path: path.join(artifacts, 'trace.zip') }).catch(() => {});
+    throw error;
+  }
+} catch {
+  console.error(
+    `Production runtime smoke failed at ${step}. Diagnostics: artifacts/production-smoke.`,
   );
-  await page.getByRole('button', { name: 'Tags', exact: true }).click();
-  await expect(page.locator('.tag-card')).toContainText('Production saved tag');
-  await expect(page.locator('.tag-card')).toContainText(/1 loaded entit(?:y|ies)/);
-  await page.getByRole('button', { name: 'Help and samples', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Example workspaces', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Create An on-chain message workspace', exact: true })
-    .click();
-  const example = page.getByRole('dialog', { name: 'Create a workspace' });
-  await expect(example.getByLabel('Bitcoin network')).toHaveValue('mainnet');
-  await example.getByLabel('Password', { exact: true }).fill('public-production-test-passphrase');
-  await example.getByLabel('Confirm password').fill('public-production-test-passphrase');
-  await example.getByRole('button', { name: 'Create workspace', exact: true }).click();
-  await expect(page.getByLabel('Node label', { exact: true })).toHaveValue('OP_RETURN text');
-  await expect(page.locator('.save-status')).toHaveText('Encrypted · saved', { timeout: 20000 });
-  expect(
-    workerUrls.some((url) =>
-      /\/assets\/templateWorkspace\.worker-[^/]+\.js$/.test(new URL(url).pathname),
-    ),
-    'production template snapshot loads and validates in its bundled worker under CSP',
-  ).toBe(true);
-  expect(errors, 'production browser errors').toEqual([]);
-  console.log(
-    'Production browser smoke passed: built WebGL, CSP, bundled encryption worker, transaction view, annotation, tags, encrypted save and reload/unlock, real template creation.',
-  );
+  process.exitCode = 1;
 } finally {
+  clearTimeout(deadline);
   await browser.close();
 }

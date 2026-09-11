@@ -305,16 +305,25 @@ See the [renderer architecture](docs/architecture.md#default-flow-renderer) and
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for isolated worktrees, configurable browser-test ports, frontend-only previews and review expectations. Security reporting and deployment boundaries are in [SECURITY.md](SECURITY.md).
 
+Routine push/PR checks run build/type checks, domain and integration tests, formatting, portability, license notices and release metadata checks. Engine correctness and data integrity are the testing priority. UI polish does not require new E2E coverage or a browser run.
+
 ```sh
-npm run build     # TypeScript check and frontend build
-npm test          # Unit and integration tests
-npm run test:e2e  # Browser tests; requires Playwright Chromium
-npm run check    # Build and unit/integration tests
-npm run test:live # Read-only smoke for configured network pairs
-npm run test:production # Browser smoke against built server on port 4300
+npm run build             # TypeScript check and frontend build
+npm test                  # Domain and integration tests
+npm run check             # Portability, build and domain/integration tests
+npm run test:live          # Read-only smoke for configured network pairs
+npm run test:production:http # Built assets, HTTP headers and network discovery; no browser
 ```
 
-Use `npx playwright install chromium` if the browser required by the installed Playwright version is missing. Test commands are separate from claims about a live node or mobile performance.
+Browser QA is explicitly scoped. The manual **Browser QA** workflow defaults to the production runtime check; a selected E2E spec or the full historical suite is an opt-in. Local equivalents, when browser QA is requested:
+
+```sh
+npx playwright install chromium
+npm run test:production   # HTTP checks, real encryption worker and encrypted persistence
+npm run test:e2e -- tests/e2e/tags.spec.ts # Example of a selected browser spec
+```
+
+Production checks need a built server, by default on port 4300; `CHAINGRAPH_SMOKE_URL` selects another origin. Release verification runs the narrow production runtime check against the container, without the full E2E suite. Existing browser journeys remain optional diagnostics rather than a maintenance requirement for every evolving workflow. Passing non-browser checks does not establish visual usability, live upstream health or mobile performance. See [contributor validation guidance](CONTRIBUTING.md#set-up-and-verify) for scope and commands.
 
 See [verified results and limits](docs/validation.md) for automated, live mainnet/testnet4, and production-browser evidence.
 

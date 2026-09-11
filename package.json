@@ -21,7 +21,8 @@
     "licenses": "node scripts/licenses.mjs",
     "format": "prettier --write src server scripts tests *.ts *.css *.json",
     "format:check": "prettier --check src server scripts tests *.ts *.css *.json",
-    "test:production": "node --use-system-ca --import tsx scripts/smoke-production.ts"
+    "test:production:http": "node --use-system-ca --import tsx scripts/smoke-production-http.ts",
+    "test:production": "npm run test:production:http && node --use-system-ca --import tsx scripts/smoke-production.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

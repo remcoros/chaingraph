@@ -1,0 +1,96 @@
+name: Browser QA
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Browser validation scope
+        required: true
+        type: choice
+        default: runtime
+        options:
+          - runtime
+          - selected-e2e
+          - full-e2e
+      spec:
+        description: Required for selected-e2e, e.g. tests/e2e/tags.spec.ts
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Validate selected scope
+        shell: bash
+        env:
+          QA_SCOPE: ${{ inputs.scope }}
+          QA_SPEC: ${{ inputs.spec }}
+        run: |
+          case "$QA_SCOPE" in
+            runtime|full-e2e)
+              if [[ -n "$QA_SPEC" ]]; then
+                echo 'A spec is only accepted with selected-e2e scope.' >&2
+                exit 1
+              fi
+              ;;
+            selected-e2e)
+              if [[ ! "$QA_SPEC" =~ ^tests/e2e/[a-zA-Z0-9_-]+\.spec\.ts$ ]] || [[ ! -f "$QA_SPEC" ]]; then
+                echo 'Select one existing tests/e2e/*.spec.ts file.' >&2
+                exit 1
+              fi
+              ;;
+            *) echo 'Unknown browser QA scope.' >&2; exit 1 ;;
+          esac
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Check production runtime
+        if: inputs.scope == 'runtime'
+        shell: bash
+        run: |
+          config_dir=$(mktemp -d)
+          cp .env.example "$config_dir/.env.testnet4"
+          cp .env.example "$config_dir/.env.mainnet"
+          mkdir -p artifacts/production-smoke
+          CHAINGRAPH_NETWORK_CONFIG_DIR="$config_dir" SERVER_PORT=4300 SERVER_HOST=127.0.0.1 NODE_ENV=production node --use-system-ca --import tsx server/index.ts > artifacts/production-smoke/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; rm -rf "$config_dir"' EXIT
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:4300/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4300/ >/dev/null
+          npm run test:production
+      - name: Run selected browser spec
+        if: inputs.scope == 'selected-e2e'
+        shell: bash
+        env:
+          QA_SPEC: ${{ inputs.spec }}
+        run: |
+          # Playwright treats file selectors as regexes. Match the selected path literally.
+          selector="${QA_SPEC//./\\.}"
+          npm run test:e2e -- --output=artifacts/browser-qa "$selector$"
+      - name: Run full browser suite
+        if: inputs.scope == 'full-e2e'
+        run: npm run test:e2e -- --output=artifacts/browser-qa
+      - name: Retain failed browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: browser-qa-failure-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

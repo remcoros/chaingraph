@@ -98,11 +98,27 @@ For example, `SERVER_PORT=4300 CHAINGRAPH_NETWORK_CONFIG_DIR=./config npm start`
 node scripts/release-check.mjs --tag v0.2.0
 npm ci
 npm run check
-npm run test:e2e
 docker build --load -t chaingraph:0.2.0 .
 ```
 
-The repository has no assumed GitHub owner or published image. When an owner intentionally pushes a matching `vX.Y.Z` tag to GitHub, `.github/workflows/release.yml` validates the version, runs build/unit/browser checks, then publishes `ghcr.io/<actual-owner>/<actual-repository>` for linux/amd64 and linux/arm64. Stable releases receive full version, minor and latest tags; prereleases receive their prerelease version. The workflow attaches OCI metadata, provenance and an SBOM. After publication, a separate job creates a GitHub Release with the matching changelog entry and immutable image digest. Reruns preserve an existing Release and any edited notes. Only that final job receives repository contents write permission. Check package visibility in GitHub before expecting unauthenticated pulls.
+The repository has no assumed GitHub owner or published image. When an owner intentionally pushes a matching `vX.Y.Z` tag to GitHub, `.github/workflows/release.yml` validates the version, runs non-browser checks and the narrow production runtime check against the container, then publishes `ghcr.io/<actual-owner>/<actual-repository>` for linux/amd64 and linux/arm64. Stable releases receive full version, minor and latest tags; prereleases receive their prerelease version. The workflow attaches OCI metadata, provenance and an SBOM. After publication, a separate job creates a GitHub Release with the matching changelog entry and immutable image digest. Reruns preserve an existing Release and any edited notes. Only that final job receives repository contents write permission. Check package visibility in GitHub before expecting unauthenticated pulls.
+
+Routine push/PR checks launch no browser. The release workflow installs Chromium only for `npm run test:production`; it does not run the full E2E suite. That command first runs `npm run test:production:http` for built assets, production CSP/security headers and configured-network discovery, then checks real bundled encryption-worker execution under CSP, WebGL context initialization, and encrypted workspace save, reload/unlock and export. The container check uses public synthetic network configuration and mocked browser upstream responses. It does not establish live upstream health, full worker coverage, panel usability or mobile behavior.
+
+To run the HTTP portion locally against an already running built app or container:
+
+```sh
+CHAINGRAPH_SMOKE_URL=http://127.0.0.1:3000 npm run test:production:http
+```
+
+When the production browser runtime check is part of the agreed validation scope, install Chromium and run the combined command against that same server:
+
+```sh
+npx playwright install chromium
+CHAINGRAPH_SMOKE_URL=http://127.0.0.1:3000 npm run test:production
+```
+
+Use the manual **Browser QA** workflow for a production runtime check (default), one selected E2E spec, or an explicitly selected full historical suite. It has no push, PR or scheduled trigger and cannot publish a release. Broader navigation, copy, layout and responsive review belongs in separately scoped exploratory QA. Existing E2E suites remain optional diagnostics rather than a full-suite release gate. Run browser checks serially within each checkout. Failure diagnostics stay under `artifacts/` and are retained by the browser/release workflows for seven days. Passing non-browser checks does not establish visual usability.
 
 Supply `CHAINGRAPH_SOURCE_URL=https://github.com/<owner>/<repository>` as a public build argument to include the project's GitHub link in the UI; the release workflow supplies the actual repository automatically. `VCS_REF` records the source commit in image metadata. Credentials must only be provided at runtime, never as build arguments, because build provenance may expose build arguments.
 

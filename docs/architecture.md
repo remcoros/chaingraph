@@ -473,7 +473,20 @@ Graph filter status exposes isolation, focus and other include filters; reset cl
 
 ## Verification boundaries
 
-Tests focus on protocol/security boundaries, derivation and encryption, domain behavior, and browser workflows. A passing build establishes type/bundle validity; it does not establish a healthy upstream service or a complete wallet scan.
+Routine validation focuses on protocol/security boundaries, derivation and encryption,
+domain behavior, persistence and asynchronous engine coordination. Push and pull-request
+CI runs non-browser checks. UI iteration does not require new or repaired E2E journeys;
+engine and data changes require relevant behavioral checks. Existing browser journeys
+remain optional diagnostics for explicitly scoped QA.
+
+Release validation adds production HTTP checks for built assets, security headers and
+configured networks, followed by a narrow browser runtime check. That check exercises
+application boot, a live WebGL2 context, the bundled encryption worker under production
+CSP, and encrypted save/reload/unlock/export with public synthetic data. It does not
+establish rendered image correctness, template/scan/layout worker execution, gesture
+handling or panel usability. Broader browser and screenshot validation needs an explicit
+QA scope. A passing build establishes type/bundle validity; it does not establish visual
+usability, a healthy upstream service or a complete wallet scan.
 
 The graph received an isolated Chromium/SwiftShader smoke check with 3,001 frozen synthetic nodes and 3,000 links, React StrictMode, live controls, node picking, and context-loss fallback. This is functional rendering evidence, not a mobile-device or frame-rate benchmark. Overall automated and live-node validation belongs in the implementation report and persistent test suite.
 

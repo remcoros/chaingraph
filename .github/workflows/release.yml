@@ -30,7 +30,6 @@ jobs:
       - name: Verify runtime license notices
         run: npm run licenses && git diff --exit-code -- THIRD_PARTY_NOTICES.md
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
       - name: Smoke test production container
         shell: bash
         env:
@@ -61,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-browser-failure-${{ github.run_id }}
-          path: test-results/
+          path: artifacts/production-smoke/
           if-no-files-found: ignore
           retention-days: 7
 

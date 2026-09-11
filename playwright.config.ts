@@ -19,6 +19,7 @@ const cachedChromium = existsSync(cache)
 
 export default defineConfig({
   testDir: './tests/e2e',
+  outputDir: './artifacts/browser-qa',
   fullyParallel: false,
   workers: 1,
   timeout: 60000,

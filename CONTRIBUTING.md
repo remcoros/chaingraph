@@ -19,14 +19,18 @@ Example workspaces bundle verified real-chain snapshots; creation requires suppo
 ```sh
 npm run format:check
 npm run check
-npx playwright install chromium
-npm run test:e2e
 node scripts/release-check.mjs
 ```
 
+Routine push/PR CI runs these non-browser checks and verifies runtime license notices. `npm run check` includes portability, build/type checks and domain/integration tests. Prioritize engine correctness and data integrity: engine or data changes need relevant behavioral checks; UI polish does not require new E2E tests or routine browser runs. Documentation-only changes do not need the application test suite.
+
 Run `npm run format` after editing source. Regenerate `THIRD_PARTY_NOTICES.md` with `npm run licenses` after changing runtime dependencies. MIT compatibility includes fonts and bundled transitive dependencies; research references do not authorize copying an implementation.
 
-To check the built application and its production security headers, start it in a separate terminal with `SERVER_PORT=4300 npm start` after building, then run `npm run test:production`. That browser smoke intercepts chain requests with public fixtures while serving real built assets. `CHAINGRAPH_SMOKE_URL` selects a different production origin. Use [deployment instructions](docs/deployment.md) for actual container validation.
+For non-browser production checks, build and start the app in a separate terminal with `SERVER_PORT=4300 npm start`, then run `npm run test:production:http`. This checks built HTML/JS/CSS, production CSP and security headers, and configured-network discovery. `CHAINGRAPH_SMOKE_URL` selects a different production origin.
+
+When browser QA is explicitly requested, install Chromium with `npx playwright install chromium`. Against that built server, `npm run test:production` runs the HTTP checks followed by a narrow browser runtime check: real bundled encryption-worker execution under production CSP, WebGL context initialization, and encrypted save, reload/unlock and export of a synthetic workspace. It does not establish visual usability or exercise every worker or panel. Use [deployment instructions](docs/deployment.md) for container validation.
+
+The **Browser QA** workflow is manual only and publishes nothing. Choose `runtime` (the default), `selected-e2e` with one existing path such as `tests/e2e/tags.spec.ts`, or explicitly opt into `full-e2e`. A local selected run uses `npm run test:e2e -- tests/e2e/tags.spec.ts`; `npm run test:e2e` runs the full historical suite. Keep existing E2E journeys as optional diagnostics. When one breaks, assess whether it still protects valuable behavior before maintaining it. Routine UI work does not carry an obligation to keep every historical journey current. Plan broader exploratory browser QA when preparing a release or investigating a specific concern; the narrow runtime check does not replace that review.
 
 ## Parallel worktrees and previews
 
@@ -52,11 +56,11 @@ Browser storage is tied to each origin. Two preview ports have separate workspac
 
 ## Review a change
 
-Describe the user-visible problem, what changes, and the checks actually performed. Test complicated arithmetic, cryptography, protocol handling and storage failures with meaningful regressions.
+Describe the user-visible problem, what changes, and the checks actually performed. Test complicated arithmetic, cryptography, protocol handling, cancellation, evidence semantics and storage failures with meaningful regressions. Prefer behavioral checks below the UI for durable contracts; do not move or rewrite tests merely to match a new test hierarchy.
 
 Browser and screenshot validation require explicit user request or an agreed QA scope. Otherwise, run appropriate non-browser checks and state that visual validation was not performed. This applies to targeted browser checks as well as full suites. UI work or skill selection alone does not authorize these checks; do not pause to request them merely to satisfy a checklist.
 
-When browser and screenshot validation is authorized for UI changes, exercise the real workflow with mouse and keyboard, inspect desktop/mobile screenshots within the agreed scope, and check that notes and primary actions remain easy to reach. Count clicks and scrolling, not just green assertions.
+When browser and screenshot validation is authorized for UI changes, exercise the real workflow with mouse and keyboard, inspect desktop/mobile screenshots within the agreed scope, and check that notes and primary actions remain easy to reach. Count clicks and scrolling, not just green assertions. Passing non-browser checks does not establish visual usability.
 
 Independent reviews can start with skills, memory and repository instructions disabled when explicitly requested. Give those sessions the product, privacy and file-ownership constraints in their task. Keep alternative designs in separate branches; compare working previews before adopting a wholesale redesign. Review all generated diffs before integration.
 

@@ -43,7 +43,8 @@ packaging workflows do not apply here.
   Passwords and decrypted state live only in memory. Do not log them.
 - Keep workspace validation/encryption off the browser UI thread. Camera gestures
   must defer snapshots and autosaves; lock/export/switch must capture the latest view.
-  Renderer changes need gesture, flush and save-failure regression checks.
+  Renderer changes need relevant gesture, flush and save-failure regression checks;
+  prefer non-browser coverage of those contracts and keep browser checks explicitly scoped.
 - Prefer vetted Bitcoin primitives and WebCrypto to custom cryptography. Test vectors,
   tampering, network mismatch, cancellations, and storage failure paths matter.
 - MIT application code only. Check dependency and source licenses before reuse.
@@ -57,15 +58,28 @@ packaging workflows do not apply here.
 - `npm run dev` starts the app and proxy; `npm run dev:live` uses the same isolated per-network file discovery as `dev`;
   `.env.live` is not a runtime fallback. Production: `npm run build && npm start`.
 - `npm run build` checks types and builds; `npm test` runs domain/backend tests;
-  `npm run test:e2e` runs browser journeys. Match checks to the change and current
-  user instructions. Documentation-only edits do not need an application test suite.
+  `npm run check` combines portability, build and domain/integration tests. Routine
+  push/PR CI launches no browser. Match checks to the change and current user
+  instructions. Documentation-only edits do not need an application test suite.
+- Prioritize engine correctness and data integrity. Engine or data changes require
+  relevant behavioral checks; UI polish does not require new E2E tests or routine
+  browser runs. Existing `npm run test:e2e` journeys are optional diagnostics, not
+  a maintenance requirement for every evolving workflow. Assess the value of a
+  broken historical test before updating it.
+- Browser QA is available through the manual Browser QA workflow with runtime,
+  selected-spec or explicitly chosen full-suite scope. Release verification uses
+  `npm run test:production` for HTTP checks and a narrow production browser runtime
+  check of the real encryption worker and encrypted persistence. It does not run
+  the full E2E suite. `npm run test:production:http` performs only non-browser checks.
 - Browser and screenshot validation require explicit user request or an agreed QA
   scope. Otherwise, run appropriate non-browser checks and state that visual
   validation was not performed. This applies to targeted browser checks as well as
   full suites. UI work or skill selection alone does not authorize these checks;
   do not pause to request them merely to satisfy a checklist.
-- Test complex domain/security logic and end-to-end user workflows; avoid tests that
-  merely repeat implementation. Exercise real services read-only when available.
+- Test complex domain/security logic with meaningful behavioral regressions; avoid
+  tests that merely repeat implementation. Plan exploratory browser review with an
+  explicit scope when preparing releases or investigating UI behavior. Exercise real
+  services read-only when available.
 - State exactly what was validated. A build or mocked RPC test is not live validation.
 - Keep README and user instructions in sync with changes. Preserve unrelated files.
 - Do not assume that passing non-browser checks establishes visual usability.
