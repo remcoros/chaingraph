@@ -131,18 +131,19 @@ Shared-ancestor results omit paths where the only new node is the transaction
 that created already known outputs. Their outpoint IDs already identify that
 shared creator. Deeper connections and newly discovered shared spenders still appear.
 
-Expand **Path** to inspect directed steps and new nodes. Known nodes in the path
-are clickable to select; new nodes stay marked **New**. Paths ending at an output
-show its creating transaction beneath the steps if it is not already in the path,
-with a small origin icon, selectable when already loaded. This context does not change the path count or the nodes added.
+Expand **Path** to inspect directed steps and new nodes. Click a source, target
+or path node to add it if needed and select it. Clicking adds only that node,
+without the other steps or siblings. Missing transaction evidence loads on demand.
+Paths ending at an output include its creating transaction, shown with a small
+origin icon if it is not already in the path.
+
 Alternative paths to the same finding within a scan share one card; choose an
-alternative inside it. Click
-the source or target row to select that node. A target whose evidence is not yet
-loaded becomes selectable after adding its path. **Add (+N)** adds the displayed
-path with N new nodes in one Undo action, without siblings, from the bottom right.
-**Path length** lets you choose a shorter prefix when needed. Adding reveals the path and resets
-graph filters, preserving annotations and the camera. Select a branch after adding
-its transaction, then use **Scan selection** to continue.
+alternative inside it. **Add (+N)** adds the displayed path, including its terminal
+creating transaction, with N new nodes in one Undo action. **Path length** chooses
+a shorter prefix. Adding reveals the path and resets graph filters, preserving
+annotations and the camera. Select a branch after adding its transaction, then
+use **Scan selection** to continue. Missing evidence is fetched only for the
+requested action; conflicting evidence must be resolved before adding.
 
 **Recheck endpoint**, the circular-arrow button on evidence problems and unspent
 observations, checks that endpoint again without replacing other findings. It

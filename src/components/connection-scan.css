@@ -273,12 +273,13 @@
   text-align: left;
   font-size: inherit;
 }
-.connection-scan-path small {
+.connection-scan-path small,
+.connection-scan-path-creator small {
   color: var(--color-muted);
 }
 .connection-scan-path-creator {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-columns: 14px minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 6px;
   margin-top: 4px;
@@ -288,7 +289,7 @@
   align-self: center;
   display: inline-flex;
 }
-.connection-scan-path-creator > :last-child {
+.connection-scan-path-creator > button {
   min-width: 0;
   overflow-wrap: anywhere;
 }

@@ -6,7 +6,7 @@ import { ScanTargetToolbar } from './components/ScanTargetToolbar';
 import { prepareCustomScanTargets } from './domain/connectionScanTargets';
 import { indexScanNeighbours } from './domain/connectionScanNeighbours';
 import { isScanNodeId } from './domain/connectionScan';
-import { addScanPath } from './domain/connectionScanRecords';
+import { addScanPathAddition, addScanNodeAddition } from './domain/connectionScanAddition';
 import { spendingNotice } from './lib/spendingNotice';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
 import { resolveGraphHandoff } from './domain/graphHandoff';
@@ -166,6 +166,21 @@ function download(name: string, content: string, type = 'application/json') {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function withScanActionEvidence(
+  workspace: Workspace,
+  evidence?: Record<string, Transaction>,
+): Workspace {
+  return evidence
+    ? {
+        ...workspace,
+        connectionScans: {
+          runs: workspace.connectionScans?.runs ?? [],
+          evidence: { ...workspace.connectionScans?.evidence, ...evidence },
+        },
+      }
+    : workspace;
+}
+
 export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
@@ -3039,23 +3054,25 @@ export default function App() {
                       )
                         ws.update(w.id, update, undo);
                     }}
-                    onSelect={(id) => {
+                    onSelect={(id, evidence) => {
+                      if (evidence) {
+                        change(
+                          (current) =>
+                            addScanNodeAddition(withScanActionEvidence(current, evidence), id),
+                          true,
+                          undefined,
+                          id.startsWith('tx:') ? 'Add transaction' : 'Add output',
+                        );
+                        setGraphFilters({});
+                      }
                       select(id, { preserveCamera: true });
                       setRightTab('scan');
                     }}
                     onAdd={(result, prefixLength, evidence) => {
                       change(
                         (current) =>
-                          addScanPath(
-                            evidence
-                              ? {
-                                  ...current,
-                                  connectionScans: {
-                                    runs: current.connectionScans?.runs ?? [],
-                                    evidence: { ...current.connectionScans?.evidence, ...evidence },
-                                  },
-                                }
-                              : current,
+                          addScanPathAddition(
+                            withScanActionEvidence(current, evidence),
                             result,
                             prefixLength,
                           ),

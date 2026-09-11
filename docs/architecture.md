@@ -399,7 +399,18 @@ consistency are validated at the existing encryption-worker boundary. Shared
 evidence is retained only for saved result paths and reused from normal workspace
 observations where present. Frontier queues, visited maps and transport state
 cannot enter the record schema. UI-time edits check compact limits; full workspace
-validation remains off the UI thread. Missing evidence is explicit at Add path.
+validation remains off the UI thread. `domain/connectionScanAddition.ts` plans
+and adds a displayed path plus its terminal creating transaction without changing
+the saved result or search hop count. A creator already in the path is not repeated.
+Its graph-membership count drives Add, and the whole addition is one Undo step.
+Single-node clicks add only the requested node. Both actions validate required
+proof and conflicts before admission, preserving unrelated graph membership.
+`lib/connectionScanActionEvidence.ts` reuses available evidence and fetches only
+missing requested transactions through the network-scoped navigation scheduler,
+with at most 10 transactions and a 30-second action deadline. Selection changes,
+Clear, leaving Scan, workspace changes and scope closure cancel pending actions;
+stale replies cannot select or add nodes. Missing offline proof remains an
+explicit retryable action error. No ancestry expansion accompanies these loads.
 There is no automatic scan resumption. Clear all results cancels active work and
 clears the retained result set. Accumulation, dismissal and clearing carry through
 undo snapshots so an unrelated edit undo cannot restore an older scan. Each

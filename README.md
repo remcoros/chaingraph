@@ -22,8 +22,9 @@ connections. Shared-ancestor paths that only add the already identifiable creato
 of known outputs are omitted. Evidence problems offer a bounded endpoint recheck;
 verified unspent, coinbase and unspendable endings live under **Endpoints**.
 Scan-wide resource limits appear only in the completion status.
-Review exact paths, add a path or an explicit prefix in one undoable action,
-and continue from a stopping point.
+Review exact paths, add a path or an explicit prefix including its terminal creator
+in one undoable action, and continue from a stopping point. Clicking a path node
+loads it if needed, adds only that node, and selects it.
 New scans keep distinct earlier results, with clickable source and target rows in
 each card. Repeated finding paths update the existing observation; dismissed
 paths stay hidden until results are cleared. Results and path evidence stay encrypted; **Clear all results** clears the

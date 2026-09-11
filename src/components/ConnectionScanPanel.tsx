@@ -22,7 +22,9 @@ import {
   type ScanRun,
   type ScanSettings,
 } from '../domain/connectionScan';
-import { replaceScanRun, clearScanRuns, prepareScanPath } from '../domain/connectionScanRecords';
+import { replaceScanRun, clearScanRuns } from '../domain/connectionScanRecords';
+import { prepareScanPathAddition, prepareScanNodeAddition } from '../domain/connectionScanAddition';
+import { loadScanActionEvidence } from '../lib/connectionScanActionEvidence';
 import { runConnectionScanInWorker } from '../lib/connectionScanRunner';
 import type { TransactionFetchScope } from '../lib/transactionScheduler';
 import { traceSourceExists } from '../lib/tracing';
@@ -82,19 +84,21 @@ type Props = {
   scope: TransactionFetchScope;
   isCurrent: () => boolean;
   onChange: (update: (workspace: Workspace) => Workspace, undo?: boolean) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, evidence?: Record<string, Transaction>) => void;
   onAdd: (result: ScanResult, prefixLength: number, evidence?: Record<string, Transaction>) => void;
 };
 
 /** A run owns its source and targets. Selection only supplies an explicit new run. */
 export function ConnectionScanPanel(props: Props) {
-  const { workspace, selectionId, active, scope, canQuery, onChange, onSelect } = props;
+  const { workspace, selectionId, active, scope, canQuery, onChange } = props;
   const [settings, setSettings] = useState<ScanSettings>(() => ({
     ...(workspace.connectionScans?.runs.at(-1)?.settings ?? DEFAULT_SCAN_SETTINGS),
   }));
   const [liveRuns, setLiveRuns] = useState<ScanRun[]>([]);
   const [transientEvidence, setTransientEvidence] = useState<Record<string, Transaction>>();
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState<string>();
+  const actionController = useRef<AbortController | undefined>(undefined);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'findings' | 'connection' | 'branch' | 'issue' | 'endpoint'>(
     'findings',
@@ -161,16 +165,23 @@ export function ConnectionScanPanel(props: Props) {
       mounted.current = false;
       controller.current?.abort();
       retryController.current?.abort();
+      actionController.current?.abort();
     };
   }, []);
   useEffect(() => {
     if (!active) {
       controller.current?.abort();
       retryController.current?.abort();
+      actionController.current?.abort();
     }
   }, [active]);
 
+  useEffect(() => {
+    actionController.current?.abort();
+  }, [selectionId]);
+
   function clearResults() {
+    actionController.current?.abort();
     controller.current?.abort();
     controller.current = undefined;
     retryController.current?.abort();
@@ -227,13 +238,56 @@ export function ConnectionScanPanel(props: Props) {
     }
   }
 
+  async function addOrSelect(result: ScanResult, prefixLength: number, nodeId?: string) {
+    if (actionController.current) return;
+    const owner = current.current;
+    if (nodeId && traceSourceExists(owner.workspace, nodeId)) {
+      owner.onSelect(nodeId);
+      return;
+    }
+    const snapshot = {
+      ...owner.workspace,
+      connectionScans: {
+        runs: owner.workspace.connectionScans?.runs ?? [],
+        evidence: { ...owner.workspace.connectionScans?.evidence, ...transientEvidence },
+      },
+    };
+    const plan = nodeId
+      ? prepareScanNodeAddition(snapshot, nodeId)
+      : prepareScanPathAddition(snapshot, result, prefixLength);
+    if (plan.blockedByConflict) throw new Error('Path evidence conflicts. Choose an earlier step.');
+    const abort = new AbortController();
+    actionController.current = abort;
+    setAdding(nodeId ? `node:${nodeId}` : `path:${result.id}`);
+    try {
+      const evidence = await loadScanActionEvidence({
+        workspace: snapshot,
+        missingTxids: plan.missingTxids,
+        scope: owner.scope,
+        canQuery: owner.canQuery,
+        signal: abort.signal,
+        isCurrent: () => mounted.current && current.current.active && owner.isCurrent(),
+      });
+      abort.signal.throwIfAborted();
+      if (!mounted.current || !current.current.active || !owner.isCurrent())
+        throw new DOMException('Path action cancelled.', 'AbortError');
+      const proof = { ...plan.transactions, ...evidence };
+      if (nodeId) owner.onSelect(nodeId, proof);
+      else owner.onAdd(result, prefixLength, proof);
+    } finally {
+      if (actionController.current === abort) actionController.current = undefined;
+      if (mounted.current) setAdding(undefined);
+    }
+  }
+
   async function start(startSource: string | undefined) {
     if (
       !eligible(startSource) ||
       busy ||
       props.pickingTargets ||
       controller.current ||
-      retryController.current
+      retryController.current ||
+      actionController.current
     )
       return;
     setError('');
@@ -630,12 +684,13 @@ export function ConnectionScanPanel(props: Props) {
             </details>
           </fieldset>
           <div className="connection-scan-actions">
-            {busy || retrying ? (
+            {busy || retrying || adding ? (
               <button
                 type="button"
                 onClick={() => {
                   controller.current?.abort();
                   retryController.current?.abort();
+                  actionController.current?.abort();
                 }}
               >
                 <Square size={13} />
@@ -792,12 +847,15 @@ export function ConnectionScanPanel(props: Props) {
               }
               group={group}
               retrying={retrying?.runId === group.run.id ? retrying.resultId : undefined}
-              retryDisabled={busy || !!retrying}
+              retryDisabled={busy || !!adding || !!retrying}
+              actionBusy={!!adding}
+              activeAction={adding}
               onRetry={(row) => retry(group.run, row)}
               visibleNodeIds={props.visibleNodeIds}
-              onSelect={onSelect}
-              onAdd={(row, length) => props.onAdd(row, length, transientEvidence)}
+              onSelect={(id) => addOrSelect(group.results[0], group.results[0].path.length, id)}
+              onAdd={(row, length) => addOrSelect(row, length)}
               onDismiss={() => {
+                actionController.current?.abort();
                 dismissedGroups.current.add(group.id);
                 const ids = dismissed.current.get(group.run.id) ?? new Set<string>();
                 for (const result of group.results) ids.add(result.id);
@@ -831,8 +889,10 @@ type ResultRowProps = {
   alternatives: ScanResult[];
   onPathChange: (id: string) => void;
   visibleNodeIds: string[];
-  onSelect: (id: string) => void;
-  onAdd: (result: ScanResult, prefixLength: number) => void;
+  onSelect: (id: string) => Promise<void>;
+  onAdd: (result: ScanResult, prefixLength: number) => Promise<void>;
+  actionBusy: boolean;
+  activeAction?: string;
   onDismiss: () => void;
   onRetry: (result: ScanResult) => void;
   retrying?: string;
@@ -870,6 +930,8 @@ function ScanResultRow({
   onRetry,
   retrying,
   retryDisabled,
+  actionBusy,
+  activeAction,
 }: ResultRowProps) {
   const finding = resultFinding(result)!;
   const category = resultCategory(result);
@@ -880,7 +942,7 @@ function ScanResultRow({
   );
   const [error, setError] = useState('');
   const fullPlan = useMemo(
-    () => prepareScanPath(workspace, result),
+    () => prepareScanPathAddition(workspace, result),
     [
       workspace.transactions,
       workspace.connectionScans?.evidence,
@@ -891,9 +953,15 @@ function ScanResultRow({
   const plan =
     prefixLength === result.path.length
       ? fullPlan
-      : prepareScanPath(workspace, result, prefixLength);
-  const lastNode = plan.nodeIds.at(-1);
-  const creatorId = lastNode?.startsWith('out:') ? `tx:${lastNode.split(':')[1]}` : undefined;
+      : prepareScanPathAddition(workspace, result, prefixLength);
+  const creatorId = plan.creatorId;
+  const openNode = (id: string) => {
+    setError('');
+    void onSelect(id).catch((cause) => {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return;
+      setError(cause instanceof Error ? cause.message : 'Could not open this node.');
+    });
+  };
   const connection = category === 'connection';
   const title = titles[finding];
   const visible = new Set(visibleNodeIds);
@@ -967,14 +1035,14 @@ function ScanResultRow({
             <button
               type="button"
               className="text-button"
-              disabled={!traceSourceExists(workspace, id)}
+              disabled={actionBusy}
               title={
                 traceSourceExists(workspace, id)
                   ? `${label === 'source' ? 'Source' : 'Target'}: ${id}`
-                  : `Add the path to select this ${label}: ${id}`
+                  : `Add and select ${label}: ${id}`
               }
               aria-label={`Select scan ${label}: ${nameFor(workspace, id)}`}
-              onClick={() => onSelect(id)}
+              onClick={() => openNode(id)}
             >
               <Icon size={14} />
               <span>{short(id)}</span>
@@ -1019,13 +1087,8 @@ function ScanResultRow({
             <time dateTime={result.checkedAt}>{new Date(result.checkedAt).toLocaleString()}</time>
           </p>
         )}
-        {connection && fullPlan.newNodeIds.includes(result.endpoint) && (
-          <p className="small muted">Endpoint removed from graph. Add restores it.</p>
-        )}
         {plan.missingTxids.length > 0 && (
-          <p className="small connection-scan-error">
-            Path evidence must be reloaded before adding.
-          </p>
+          <p className="small connection-scan-error">Add loads the missing transaction evidence.</p>
         )}
         {plan.blockedByConflict && (
           <p className="small connection-scan-error">
@@ -1044,7 +1107,7 @@ function ScanResultRow({
           <summary>
             Path{' '}
             <span>
-              {prefixLength} {prefixLength === 1 ? 'node' : 'nodes'}
+              {plan.nodeIds.length} {plan.nodeIds.length === 1 ? 'node' : 'nodes'}
               {alternatives.length > 1 ? ` · ${alternatives.length} alternatives` : ''}
             </span>
           </summary>
@@ -1085,45 +1148,44 @@ function ScanResultRow({
                 <span aria-label={index ? result.directions[index - 1] : 'Source'}>
                   {index ? (result.directions[index - 1] === 'upstream' ? '↑' : '↓') : '●'}
                 </span>
-                {traceSourceExists(workspace, id) ? (
-                  <button
-                    type="button"
-                    className="text-button"
-                    aria-label={`Select path node: ${nameFor(workspace, id)}`}
-                    title={id}
-                    onClick={() => onSelect(id)}
-                  >
-                    {nameFor(workspace, id)}
-                  </button>
-                ) : (
-                  <span>{nameFor(workspace, id)}</span>
-                )}
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={actionBusy}
+                  aria-label={`Select path node: ${nameFor(workspace, id)}`}
+                  title={id}
+                  onClick={() => openNode(id)}
+                >
+                  {nameFor(workspace, id)}
+                </button>
                 {plan.newNodeIds.includes(id) && <small>New</small>}
               </li>
             ))}
           </ol>
-          {creatorId && !plan.nodeIds.includes(creatorId) && (
+          {creatorId && (
             <div className="connection-scan-path-creator">
               <span
                 className="muted"
                 title="Creating transaction"
                 aria-label="Creating transaction"
               >
-                <ArrowLeftFromLine size={14} aria-hidden="true" />
+                {activeAction === `node:${creatorId}` ? (
+                  <LoaderCircle size={14} />
+                ) : (
+                  <ArrowLeftFromLine size={14} aria-hidden="true" />
+                )}
               </span>
-              {traceSourceExists(workspace, creatorId) ? (
-                <button
-                  type="button"
-                  className="text-button"
-                  aria-label={`Select creating transaction: ${nameFor(workspace, creatorId)}`}
-                  title={creatorId}
-                  onClick={() => onSelect(creatorId)}
-                >
-                  {nameFor(workspace, creatorId)}
-                </button>
-              ) : (
-                <span title={creatorId}>{nameFor(workspace, creatorId)}</span>
-              )}
+              <button
+                type="button"
+                className="text-button"
+                disabled={actionBusy}
+                aria-label={`Select creating transaction: ${nameFor(workspace, creatorId)}`}
+                title={creatorId}
+                onClick={() => openNode(creatorId)}
+              >
+                {nameFor(workspace, creatorId)}
+              </button>
+              {plan.newNodeIds.includes(creatorId) && <small>New</small>}
             </div>
           )}
         </details>
@@ -1147,19 +1209,20 @@ function ScanResultRow({
         )}
         <button
           type="button"
-          disabled={plan.missingTxids.length > 0 || plan.blockedByConflict}
+          disabled={actionBusy || plan.blockedByConflict}
           title={`Add path: ${plan.newNodeIds.length} new nodes`}
           aria-label={`Add path: ${plan.newNodeIds.length} new nodes`}
           onClick={() => {
-            try {
-              onAdd(result, prefixLength);
-              setError('');
-            } catch (cause) {
+            setError('');
+            void onAdd(result, prefixLength).catch((cause) => {
+              if (cause instanceof DOMException && cause.name === 'AbortError') return;
               setError(cause instanceof Error ? cause.message : 'Path could not be added.');
-            }
+            });
           }}
         >
-          <Plus size={13} /> Add (+{plan.newNodeIds.length})
+          {activeAction === `path:${result.id}` ? <LoaderCircle size={13} /> : <Plus size={13} />}{' '}
+          Add (+
+          {plan.newNodeIds.length})
         </button>
       </footer>
     </article>
