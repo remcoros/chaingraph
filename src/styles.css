@@ -993,7 +993,7 @@ small,
 }
 .inspector-scroll > .panel-section:not(.selection-evidence),
 .inspector-scroll > .connection-scan > .panel-section {
-  padding: 11px 17px;
+  padding: 11px 12px;
 }
 .panel-section > .eyebrow {
   margin-bottom: 10px;
