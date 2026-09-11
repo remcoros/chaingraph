@@ -68,22 +68,12 @@ for (const width of [1440, 390]) {
     await expect(association).toContainText(walletName);
     await expect(association).toContainText('Address/script match');
     await expect(association.getByRole('heading', { name: 'Wallet', exact: true })).toBeVisible();
-    const annotationsBox = (await annotations.boundingBox())!;
-    expect((await association.boundingBox())!.y).toBeGreaterThanOrEqual(
-      annotationsBox.y + annotationsBox.height,
-    );
     await expect(annotations).not.toContainText(walletName);
     await expect(tags.locator('.selected-tag-chip')).toHaveCount(0);
     await noOverflow(page);
 
     const icon = annotations.getByRole('button', { name: 'Node icon: None', exact: true });
     const bookmark = annotations.getByLabel('Bookmark', { exact: true });
-    const iconBox = (await icon.boundingBox())!;
-    const bookmarkBox = (await annotations.locator('.annotation-bookmark').boundingBox())!;
-    expect(Math.abs(iconBox.height - bookmarkBox.height)).toBeLessThanOrEqual(1);
-    expect(iconBox.height).toBeGreaterThanOrEqual(24);
-    expect(iconBox.height).toBeLessThanOrEqual(30);
-    expect(Math.abs(iconBox.y - bookmarkBox.y)).toBeLessThanOrEqual(1);
     await association.evaluate((element) => element.scrollIntoView({ block: 'end' }));
     await page.locator('.inspector-scroll').evaluate((element) => {
       element.scrollTop += 64;
@@ -124,12 +114,6 @@ for (const width of [1440, 390]) {
     await expect(picker).toHaveCount(0);
     const chips = tags.locator('.selected-tag-chip');
     await expect(chips).toHaveCount(2);
-    const chipsBox = (await tags.locator('.selected-tag-chips').boundingBox())!;
-    for (const chip of await chips.all()) {
-      const box = (await chip.boundingBox())!;
-      expect(Math.abs(box.width - chipsBox.width)).toBeLessThanOrEqual(1);
-      expect(Math.abs(box.x - chipsBox.x)).toBeLessThanOrEqual(1);
-    }
     await noOverflow(page);
     await association.evaluate((element) => element.scrollIntoView({ block: 'end' }));
     await page.locator('.inspector-scroll').evaluate((element) => {

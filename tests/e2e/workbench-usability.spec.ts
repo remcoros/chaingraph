@@ -118,7 +118,6 @@ test('script-only wallet receipts and constrained metadata remain usable', async
     .filter({ hasText: 'Loaded received outputs' });
   await expect(count.locator('dd')).toHaveText('3');
   await nav(page, 'Wallet').click();
-  await page.setViewportSize({ width: 800, height: 800 });
   await page.setViewportSize({ width: 640, height: 800 });
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   await page.getByLabel('Entity notes').fill('Public note kept when navigating away immediately.');

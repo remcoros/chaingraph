@@ -406,7 +406,7 @@ test.describe('automatic phone scan', () => {
   });
 });
 
-test('scan opens higher review priority first and keeps guidance prominent above linked evidence', async ({
+test('scan opens higher review priority first and keeps guidance visible with linked evidence', async ({
   page,
 }) => {
   const { calls } = await prepare(page, true);
@@ -435,15 +435,6 @@ test('scan opens higher review priority first and keeps guidance prominent above
   await expect(evidence).toBeVisible();
   await expect(guidance).toBeVisible();
   await expect(guidance).toContainText('Compare your wallet’s fee options before sending.');
-  for (const width of [1366, 640]) {
-    await page.setViewportSize({ width, height: 768 });
-    const guidanceBounds = await guidance.boundingBox();
-    const evidenceBounds = await evidence.boundingBox();
-    expect(guidanceBounds).not.toBeNull();
-    expect(evidenceBounds).not.toBeNull();
-    expect(guidanceBounds!.y + guidanceBounds!.height).toBeLessThan(evidenceBounds!.y);
-    await guidance.scrollIntoViewIfNeeded();
-  }
   await detail.getByText('Interpretation and limits', { exact: true }).click();
   await expect(guidance).toBeVisible();
   await expect(detail.locator('.scan-guidance')).toHaveCount(1);

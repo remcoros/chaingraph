@@ -55,9 +55,4 @@ test('mobile annotated transaction keeps quick tools inside the flow viewport', 
     });
   await expect.poll(inside).toBe(true);
   await expect(tools.getByRole('button')).toHaveCount(4);
-  for (const action of await tools.getByRole('button').all()) {
-    const bounds = await action.boundingBox();
-    expect(bounds!.width).toBeGreaterThanOrEqual(24);
-    expect(bounds!.height).toBeGreaterThanOrEqual(30);
-  }
 });

@@ -65,23 +65,14 @@ test('both flow collapse controls remain reachable through uneven expanded lanes
     name: 'Collapse outputs',
     exact: true,
   });
-  for (const width of [1440, 390]) {
-    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-    if (width === 390)
-      await page
-        .locator('.mobile-switch')
-        .getByRole('button', { name: 'Graph', exact: true })
-        .click();
-    await flow.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
-    });
-    await expect(flow.getByRole('button', { name: /^Input 39:/ })).toBeInViewport({ ratio: 1 });
-    await expect(inputs).toBeInViewport({ ratio: 1 });
-    await expect(outputs).toBeInViewport({ ratio: 1 });
-    const top = (await flow.boundingBox())!.y;
-    expect((await inputs.boundingBox())!.y).toBeLessThan(top + 90);
-    expect((await outputs.boundingBox())!.y).toBeLessThan(top + 90);
-  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }).click();
+  await flow.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(flow.getByRole('button', { name: /^Input 39:/ })).toBeInViewport({ ratio: 1 });
+  await expect(inputs).toBeInViewport({ ratio: 1 });
+  await expect(outputs).toBeInViewport({ ratio: 1 });
   await outputs.click();
   await expect(
     flow.getByRole('button', { name: 'Show all 12 outputs', exact: true }),

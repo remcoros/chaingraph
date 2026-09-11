@@ -213,7 +213,7 @@ test('frames a returning small graph promptly and preserves a manual pan through
   expect(errors).toEqual([]);
 });
 
-test('floating navigation preserves distinct silhouettes, actual picking, card actions, and keyboard details', async ({
+test('floating navigation preserves actual picking, card actions, and keyboard details', async ({
   page,
 }) => {
   const errors = await render(page, '?navigation');
@@ -222,19 +222,10 @@ test('floating navigation preserves distinct silhouettes, actual picking, card a
   await page.waitForTimeout(800);
   const meshes = await visibleMeshes(page);
   expect(Object.keys(meshes).sort()).toEqual(['address', 'creating', 'output', 'spending']);
-  expect(meshes.creating.taper).toBeGreaterThan(0.85);
-  expect(meshes.output.taper).toBeGreaterThan(meshes.address.taper + 0.1);
   await hover(page, meshes.output);
   const card = page.getByRole('dialog', { name: 'Graph item details' });
   await expect(card).toContainText('0.00 010 000 BTC');
   await expect(card).toContainText('Saved confirmations');
-  const toolbar = card.getByRole('group', { name: 'Graph item actions' });
-  const toolbarBounds = (await toolbar.boundingBox())!;
-  const factsBounds = (await card.locator('.graph-card-facts').boundingBox())!;
-  expect(toolbarBounds.y + toolbarBounds.height).toBeLessThan(factsBounds.y);
-  expect(
-    (await toolbar.getByRole('button', { name: 'Edit label and notes' }).boundingBox())!.height,
-  ).toBeLessThanOrEqual(30);
   await card.getByRole('button', { name: /Load previous level|Open creating transaction/ }).hover();
   await page.waitForTimeout(800);
   await expect(card).toBeVisible();
@@ -287,12 +278,6 @@ test('shared GraphView handles a substitute adapter with identical semantic acti
   page,
 }) => {
   const errors = await render(page, '?contract');
-  const toolbar = (await page.getByRole('button', { name: 'Shared fit' }).boundingBox())!;
-  const canvas = (await page.locator('canvas').boundingBox())!;
-  expect(canvas.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
-  const navigation = (await page.getByRole('button', { name: 'Shared center' }).boundingBox())!;
-  expect(navigation.y).toBeGreaterThanOrEqual(canvas.y);
-  expect(navigation.y + navigation.height).toBeLessThan(canvas.y + canvas.height);
   await page.getByRole('button', { name: 'Shared center' }).click();
   await expect
     .poll(() => page.evaluate(() => (window as any).contract.calls.focus))

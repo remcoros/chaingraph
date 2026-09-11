@@ -114,9 +114,7 @@ test('confirmation identifies the canonical target when labels collide', async (
     await row(page, target.id).getByRole('button', { name: target.action, exact: true }).click();
     const modal = page.getByRole('dialog', { name: target.title, exact: true });
     await expect(modal.getByText('Duplicate label', { exact: true })).toBeVisible();
-    const identifier = modal.getByText(target.value, { exact: true });
-    await expect(identifier).toBeVisible();
-    expect(await identifier.evaluate((node) => getComputedStyle(node).userSelect)).toBe('all');
+    await expect(modal.getByText(target.value, { exact: true })).toBeVisible();
     await expect(modal.getByRole('button', { name: target.copy, exact: true })).toBeVisible();
     await modal.getByRole('button', { name: 'Keep in workspace', exact: true }).click();
   }

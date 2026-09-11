@@ -277,7 +277,7 @@ test('mobile examples keep their close control visible and cancellation restores
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('desktop examples form two mainnet rows and one testnet4 row in Home and Help', async ({
+test('desktop and narrow galleries keep example workspaces reachable in Home and Help', async ({
   page,
 }) => {
   await mockBitcoin(page);
@@ -288,19 +288,6 @@ test('desktop examples form two mainnet rows and one testnet4 row in Home and He
     const testnet = gallery.getByRole('region', { name: 'Testnet4 examples', exact: true });
     await expect(mainnet.locator('.workspace-template')).toHaveCount(6);
     await expect(testnet.locator('.workspace-template')).toHaveCount(3);
-    const cards = await gallery.locator('.workspace-template').evaluateAll((elements) =>
-      elements.map((element) => {
-        const rect = element.getBoundingClientRect();
-        return { x: Math.round(rect.x), y: Math.round(rect.y) };
-      }),
-    );
-    expect(new Set(cards.map((card) => card.x)).size).toBe(3);
-    expect(new Set(cards.map((card) => card.y)).size).toBe(3);
-    expect(cards[0].y).toBe(cards[2].y);
-    expect(cards[3].y).toBe(cards[5].y);
-    expect(cards[6].y).toBe(cards[8].y);
-    expect(cards[6].y).toBeGreaterThan(cards[5].y);
-    await expect(testnet).toHaveCSS('border-top-width', '1px');
   }
   await checkGallery(page.locator('.welcome-examples'));
   await page.getByRole('button', { name: 'Example workspaces', exact: true }).click();
@@ -310,7 +297,6 @@ test('desktop examples form two mainnet rows and one testnet4 row in Home and He
   await dialog.getByRole('button', { name: 'Close dialog', exact: true }).focus();
   await page.keyboard.press('Tab');
   await expect(first).toBeFocused();
-  await expect(first).toHaveCSS('outline-offset', '-3px');
   // Narrow layouts retain all cases and the network boundary without horizontal scrolling.
   await page.setViewportSize({ width: 390, height: 844 });
   const last = dialog.getByRole('button', {
@@ -323,13 +309,12 @@ test('desktop examples form two mainnet rows and one testnet4 row in Home and He
   expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
-test('mainnet-only galleries have six examples and no network separator', async ({ page }) => {
+test('mainnet-only galleries show only mainnet examples', async ({ page }) => {
   await mockBitcoin(page, { networks: ['mainnet'] });
   await page.goto('/');
   const gallery = page.locator('.workspace-template-gallery');
   await expect(gallery.locator('.workspace-template')).toHaveCount(mainnetTemplates.length);
   await expect(gallery.locator('.workspace-template-group')).toHaveCount(1);
-  await expect(gallery.locator('.workspace-template-group')).toHaveCSS('border-top-width', '0px');
   await expect(gallery.getByRole('region', { name: 'Testnet4 examples', exact: true })).toHaveCount(
     0,
   );

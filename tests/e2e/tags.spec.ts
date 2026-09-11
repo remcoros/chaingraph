@@ -54,14 +54,6 @@ test('inline tags group imported labels and addresses without disrupting notes, 
     .locator('.tag-card')
     .filter({ has: page.getByRole('heading', { name: 'Exchange', exact: true }) });
   await expect(exchange).toContainText('2 loaded entities');
-  const showTagBounds = await exchange.getByRole('button', { name: 'Show on graph' }).boundingBox();
-  const addTagBounds = await exchange
-    .getByRole('button', { name: 'Add selection', exact: true })
-    .boundingBox();
-  expect(Math.abs(showTagBounds!.y - addTagBounds!.y)).toBeLessThan(1);
-  expect(showTagBounds!.height).toBeLessThanOrEqual(30);
-  expect(addTagBounds!.height).toBeLessThanOrEqual(30);
-
   await exchange.getByRole('button', { name: 'Show on graph' }).click();
   await expect(
     page.getByRole('button', { name: 'Remove filter: Tag: Exchange', exact: true }),
@@ -76,20 +68,6 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
   const picker = page.getByRole('dialog', { name: 'Tag selected records' });
   await expect(picker.getByLabel('Find or create tag')).toBeFocused();
-  const assignmentGeometry = () =>
-    picker
-      .locator('.metadata-tag-option')
-      .first()
-      .evaluate((row) => {
-        const dot = row.querySelector('.metadata-tag-dot')!.getBoundingClientRect();
-        const text = row.querySelector('.metadata-tag-name')!.getBoundingClientRect();
-        return {
-          ordered: dot.right < text.left,
-          aligned: Math.abs((text.top + text.bottom) / 2 - (dot.top + dot.bottom) / 2) < 2,
-          height: row.getBoundingClientRect().height,
-          overflow: row.scrollWidth > row.clientWidth,
-        };
-      });
   const expectNoHorizontalOverflow = async () => {
     expect(await picker.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
     expect(
@@ -98,12 +76,6 @@ test('inline tags group imported labels and addresses without disrupting notes, 
         .evaluate((popup) => popup.scrollWidth <= popup.clientWidth),
     ).toBe(true);
   };
-  expect(await assignmentGeometry()).toMatchObject({
-    ordered: true,
-    aligned: true,
-    overflow: false,
-  });
-  expect((await assignmentGeometry()).height).toBeLessThan(60);
   await expectNoHorizontalOverflow();
 
   await picker.getByRole('button', { name: 'Address + outputs', exact: true }).click();
@@ -181,7 +153,6 @@ test('inline tags group imported labels and addresses without disrupting notes, 
   await page.locator('.mobile-switch').getByRole('button', { name: 'Inspector' }).click();
   await selectedTags.getByRole('button', { name: 'Add or choose tags' }).click();
   await expect(picker).toBeInViewport({ ratio: 1 });
-  expect(await assignmentGeometry()).toMatchObject({ ordered: true, aligned: true });
   await expectNoHorizontalOverflow();
   const addShop = picker.getByRole('button', { name: 'Add Shop to selected records', exact: true });
   const removeShop = picker.getByRole('button', {

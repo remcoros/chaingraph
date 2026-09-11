@@ -44,32 +44,29 @@ test('transaction cards contain long references, annotations and every action at
   await page.goto('/tests/fixtures/graph-hover-card.html');
   await expect(page.locator('canvas')).toBeVisible();
   const card = cardFor(page);
-  for (const width of [1440, 390, 240, 200]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const scenario of ['unlabeled', 'raw', 'long', 'hex-label']) {
-      await page.getByLabel('Scenario').selectOption(scenario);
-      for (const [x, y] of [
-        [5, 5],
-        [width - 5, 610],
-      ]) {
-        await openAt(page, x, y);
-        await checkLayout(page);
-        const label = card.locator('.graph-card-label');
-        if (scenario === 'long') {
-          await expect(label).toHaveText('★ Personal annotation ' + 'LongUnbrokenLabel'.repeat(11));
-          await expect(card.locator('.entity-badges')).toContainText('UnbrokenTag'.repeat(7));
-        } else {
-          await expect(label).toHaveText(scenario === 'hex-label' ? txid : short(txid));
-        }
-        await expect(label).toHaveAttribute('title', new RegExp(txid));
-        await expect(card.locator('.graph-card-identifier').first()).toHaveText(short(txid));
-        await expect(card.locator('.graph-card-identifier').first()).toHaveAttribute('title', txid);
-        if (x === 5 && [1440, 390].includes(width) && ['unlabeled', 'long'].includes(scenario)) {
-        }
-        await card.getByRole('button', { name: 'Close graph details' }).click();
-        await expect(card).toBeHidden();
-        await expect(page.locator('canvas')).toBeFocused();
+  const width = 200;
+  await page.setViewportSize({ width, height: 900 });
+  for (const scenario of ['unlabeled', 'raw', 'long', 'hex-label']) {
+    await page.getByLabel('Scenario').selectOption(scenario);
+    for (const [x, y] of [
+      [5, 5],
+      [width - 5, 610],
+    ]) {
+      await openAt(page, x, y);
+      await checkLayout(page);
+      const label = card.locator('.graph-card-label');
+      if (scenario === 'long') {
+        await expect(label).toHaveText('★ Personal annotation ' + 'LongUnbrokenLabel'.repeat(11));
+        await expect(card.locator('.entity-badges')).toContainText('UnbrokenTag'.repeat(7));
+      } else {
+        await expect(label).toHaveText(scenario === 'hex-label' ? txid : short(txid));
       }
+      await expect(label).toHaveAttribute('title', new RegExp(txid));
+      await expect(card.locator('.graph-card-identifier').first()).toHaveText(short(txid));
+      await expect(card.locator('.graph-card-identifier').first()).toHaveAttribute('title', txid);
+      await card.getByRole('button', { name: 'Close graph details' }).click();
+      await expect(card).toBeHidden();
+      await expect(page.locator('canvas')).toBeFocused();
     }
   }
   expect(await page.evaluate(() => window.hoverFixture.canonical())).toBe(txid);

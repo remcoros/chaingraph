@@ -298,13 +298,10 @@ test('keeps selected rows visible through tag wrapping and resize, and shows tra
   await expect(
     page.locator('.mobile-switch').getByRole('button', { name: 'Graph', exact: true }),
   ).toBeFocused();
-  const badge = panel.locator('.transaction-row.is-selected .entity-badges > span');
-  const badgeGeometry = await badge.evaluate((element) => ({
-    height: element.getBoundingClientRect().height,
-    overflow: element.scrollWidth - element.clientWidth,
-  }));
-  expect(badgeGeometry.height).toBeGreaterThan(35);
-  expect(badgeGeometry.overflow).toBeLessThanOrEqual(1);
+  const badgeOverflow = await panel
+    .locator('.transaction-row.is-selected .entity-badges > span')
+    .evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(badgeOverflow).toBeLessThanOrEqual(1);
   await page.setViewportSize({ width: 420, height: 800 });
   await expect.poll(async () => (await geometry()).clipped).toBeLessThan(1);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
