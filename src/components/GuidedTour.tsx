@@ -230,7 +230,7 @@ export function GuidedTour({
             !previewStatus?.error &&
             (!spotlight || spotlight.fallback) &&
             step.missingTargetText && <p className="tour-prerequisite">{step.missingTargetText}</p>}
-          {previewStatus?.loading && <p role="status">Loading public example...</p>}
+          {previewStatus?.loading && <p role="status">Loading the public example...</p>}
           {previewStatus?.error && (
             <div className="tour-preview-error">
               <p role="alert">{previewStatus.error}</p>

@@ -17,7 +17,7 @@ export function useWalletTourExample(workspaceId: string | undefined, enabled: b
     void loadTemplateWorkspace(
       'mainnet-public-wallet',
       'Public wallet tour example',
-      'Temporary public mainnet snapshot for the guided tour.',
+      'A temporary public example for this tour, using real mainnet data.',
       controller.signal,
     ).then(
       (workspace) => {
@@ -27,7 +27,7 @@ export function useWalletTourExample(workspaceId: string | undefined, enabled: b
         if (!controller.signal.aborted)
           setResult({
             owner: workspaceId,
-            error: 'The public example could not load. Try again or continue with Next.',
+            error: 'Couldn’t load the public example. Try again, or just continue with Next.',
           });
       },
     );
