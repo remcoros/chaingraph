@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeftFromLine,
   Check,
   CircleDot,
   Crosshair,
@@ -1099,7 +1100,13 @@ function ScanResultRow({
           </ol>
           {creatorId && (
             <div className="connection-scan-path-creator">
-              <span className="muted">Created by</span>
+              <span
+                className="muted"
+                title="Creating transaction"
+                aria-label="Creating transaction"
+              >
+                <ArrowLeftFromLine size={14} aria-hidden="true" />
+              </span>
               {traceSourceExists(workspace, creatorId) ? (
                 <button
                   type="button"
@@ -1148,7 +1155,7 @@ function ScanResultRow({
             }
           }}
         >
-          <Plus size={15} /> Add (+{plan.newNodeIds.length})
+          <Plus size={13} /> Add (+{plan.newNodeIds.length})
         </button>
       </footer>
     </article>

@@ -228,6 +228,9 @@
 }
 .connection-scan-result-actions button {
   min-height: 30px;
+  gap: 4px;
+  padding: 4px 7px;
+  font-size: 11px;
 }
 .connection-scan-path-section {
   margin-top: 10px;
@@ -274,20 +277,23 @@
   color: var(--color-muted);
 }
 .connection-scan-path-creator {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
   align-items: baseline;
   gap: 6px;
-  margin: 4px 0 0 20px;
+  margin-top: 4px;
   font-size: var(--text-xs);
 }
 .connection-scan-path-creator > :first-child {
-  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
 }
 .connection-scan-path-creator > :last-child {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .connection-scan-path-creator button {
+  justify-self: start;
   min-height: 24px;
   padding: 2px 0;
   text-align: left;

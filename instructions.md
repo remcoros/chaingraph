@@ -110,8 +110,8 @@ separate filter for natural path endings.
 
 Expand **Path** to inspect directed steps and new nodes. Known nodes in the path
 are clickable to select; new nodes stay marked **New**. Paths ending at an output
-show its creating transaction beneath the steps, selectable when already loaded.
-This **Created by** context does not change the path count or the nodes added.
+show its creating transaction beneath the steps with a small origin icon, selectable
+when already loaded. This context does not change the path count or the nodes added.
 Alternative paths to the same finding within a scan share one card; choose an
 alternative inside it. Click
 the source or target row to select that node. A target whose evidence is not yet
