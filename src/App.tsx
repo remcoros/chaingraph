@@ -775,8 +775,8 @@ export default function App() {
       : undefined;
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
-    (id: string, options?: { preserveCamera?: boolean }) => {
-      if (pickingScanTargets) {
+    (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => {
+      if (pickingScanTargets && options?.pickTarget !== false) {
         toggleScanTarget(id);
         return;
       }
@@ -1111,7 +1111,10 @@ export default function App() {
   const editNode = (id: string, target: 'label' | 'tags' | 'icon' = 'label') => {
     setEditTarget(target);
     setNotice('');
-    select(id);
+    setScanTargetDraft(undefined);
+    select(id, { pickTarget: false });
+    setFocusGraph(false);
+    setRightTab('inspect');
     setMobilePanel('right');
     setEditToken((token) => token + 1);
   };
