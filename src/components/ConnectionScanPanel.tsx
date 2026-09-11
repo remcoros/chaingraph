@@ -50,6 +50,7 @@ import { transactionStatus } from '../domain/transactionStatus';
 import { prepareCustomScanTargets } from '../domain/connectionScanTargets';
 import { prepareNeighbourScanTargets } from '../domain/connectionScanNeighbours';
 import { WalletHelp } from './WalletHelp';
+import { CopyButton } from './CopyButton';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
@@ -536,11 +537,19 @@ export function ConnectionScanPanel(props: Props) {
                 ? 'TRANSACTION OUTPUT'
                 : 'SELECTION'}
           </span>
-          <strong title={source}>
-            {source && eligible(source)
-              ? nameFor(workspace, source)
-              : 'Select a transaction or output'}
-          </strong>
+          <div className="connection-scan-source-identity">
+            <strong title={source}>
+              {source && eligible(source)
+                ? nameFor(workspace, source)
+                : 'Select a transaction or output'}
+            </strong>
+            {source && eligible(source) && (
+              <CopyButton
+                value={source.replace(/^(tx|out):/, '')}
+                label={source.startsWith('tx:') ? 'Copy transaction ID' : 'Copy outpoint'}
+              />
+            )}
+          </div>
         </div>
         <form
           onSubmit={(event) => {
