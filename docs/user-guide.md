@@ -113,11 +113,29 @@ move directly between collapsed and full height. Clicking the title collapses
 an open panel or reopens it at normal height. With no applicable node selected,
 the panel keeps its height and title, clears its content and disables its controls.
 
+Selecting an address replaces the transaction lanes with a small Transactions /
+UTXOs view. Transactions show the recorded height or mempool observation,
+loaded details, and direction only when loaded output or previous-output
+evidence supports it. Select a transaction row to load it when needed, add or
+show it on the graph, and open it in the flow. UTXOs are the unspent outputs
+observed for the address at the last check; selecting one opens its creating
+transaction and output in the graph when needed. Balance and check times are
+shown when available. A history bound, unloaded detail, or missing balance is
+shown as partial or unknown; it does not mean the address has no other
+activity, owns the transaction, or has an unspent output beyond the observation.
+
 The icon toolbar on the right adds, hides or removes a transaction's inputs and
 outputs, or whole branches. **Hide** is temporary and reversible from the hidden
 chip; **Remove from graph** keeps evidence and annotations in the workspace.
 Removing a transaction from the workspace itself is a separate action in the
 Inspector or entity list (see below).
+
+The address button beside **Show all loaded inputs/outputs** opens the history
+for a valid address carried by the selected input or output. It loads the
+bounded address history and balance when no observation is available, then
+selects the address so its transaction and UTXO tabs are available in the flow
+panel. UTXOs and balance are fetched only when that tab or an explicit refresh
+requires them, and each observation includes its last-checked time.
 
 Floating controls over the canvas provide **Fit**, zoom, **Center** on the
 selection, **Lock** (keep the selection centered as it changes), selection
@@ -125,8 +143,9 @@ history, **Isolate**, filters and **Repack**. **Motion** toggles flow dots and
 camera inertia; the dots show transaction direction along the paths connected to
 your selection. **Show labels**, **Show tags** and **Show icons** control captions
 without touching annotations. **Size by** switches between uniform, value-based
-(logarithmic) and degree-based node sizes. On desktop, **Hide panels** gives the
-canvas the full width.
+(logarithmic) and degree-based node sizes. Address nodes use their observed
+balance when one is available; unknown balances are not treated as zero. On
+desktop, **Hide panels** gives the canvas the full width.
 
 Hover a node for a card with identifiers, value, and compact actions. Connection
 lines do not open cards. The Inspector and the entity list provide the same
@@ -283,10 +302,10 @@ scanning.
 | ----------------------------- | -------------------------------------------------------------------------------------------------- |
 | Equal-output detection        | Groups of equal, spendable outputs. A pattern, not a CoinJoin verdict.                             |
 | Common-input ownership        | Tentative input groups, with skipped equal-output candidates and missing evidence made explicit.   |
-| Address reuse                 | Repeated destinations in the scoped history.                                                        |
-| Value flow and fees           | Input/output reconciliation and fees when all inputs are known; otherwise what is missing.          |
-| Consolidation and fan-out     | Transaction shapes matching your thresholds, without assigning intent.                              |
-| Script-type comparisons       | Input/output script patterns and optional change-like hypotheses.                                   |
+| Address reuse                 | Repeated destinations in the scoped history.                                                       |
+| Value flow and fees           | Input/output reconciliation and fees when all inputs are known; otherwise what is missing.         |
+| Consolidation and fan-out     | Transaction shapes matching your thresholds, without assigning intent.                             |
+| Script-type comparisons       | Input/output script patterns and optional change-like hypotheses.                                  |
 | Imported-wallet intersections | Transactions touching more than one imported wallet, distinguishing overlap from independent data. |
 
 Findings open in review-priority order with their tips, affected entities and
@@ -318,14 +337,14 @@ transactions, 60 seconds and 200 branches.
 
 Findings stream into cards while the scan runs:
 
-| Finding                             | Meaning                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| Funding / spending path             | An observed path links the selection to a target.                          |
-| Reconnection                        | The found path and an existing route form a loop; Add reveals both.        |
-| Shared ancestor / shared descendant | Two paths meet at an earlier or later transaction or output.               |
-| Many inputs / many outputs          | A branch threshold was reached; add the path and pick a branch to continue. |
-| Unspent output, Coinbase origin, Unspendable output | Natural path endings, listed under **Endpoints**.           |
-| Transaction unavailable, Lookup failed, Spend status unknown, Conflicting evidence | Evidence problems; **Recheck endpoint** retries one. |
+| Finding                                                                            | Meaning                                                                     |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Funding / spending path                                                            | An observed path links the selection to a target.                           |
+| Reconnection                                                                       | The found path and an existing route form a loop; Add reveals both.         |
+| Shared ancestor / shared descendant                                                | Two paths meet at an earlier or later transaction or output.                |
+| Many inputs / many outputs                                                         | A branch threshold was reached; add the path and pick a branch to continue. |
+| Unspent output, Coinbase origin, Unspendable output                                | Natural path endings, listed under **Endpoints**.                           |
+| Transaction unavailable, Lookup failed, Spend status unknown, Conflicting evidence | Evidence problems; **Recheck endpoint** retries one.                        |
 
 **Add (+N)** adds a path and its connecting links as one Undo step. Clicking a
 node in a path adds just that node. Conflicting evidence allows only **Add

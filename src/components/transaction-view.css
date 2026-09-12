@@ -23,7 +23,7 @@
 }
 .transaction-view-slot:has(.transaction-view[open]) {
   /* Preserve the graph's space while the panel overlays it. */
-  height: min(calc(50% - 28px), 312px);
+  height: min(calc(50% - 20px), 320px);
 }
 .transaction-view-surface {
   position: relative;
@@ -104,6 +104,15 @@
   font-weight: 400;
   overflow-wrap: anywhere;
 }
+.transaction-summary-annotation-icon {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+}
+.transaction-summary-bookmark-icon {
+  flex: none;
+  color: var(--color-warning);
+}
 .transaction-summary-counts {
   color: var(--color-muted);
   font-weight: 400;
@@ -123,6 +132,214 @@
 }
 .transaction-view-body {
   padding: 0 8px 7px;
+}
+.address-history-view {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 7px 0 2px;
+}
+.address-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.address-history-tabs {
+  display: inline-flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.address-history-tabs button {
+  min-height: 22px;
+  padding: 2px 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-tabs button:hover,
+.address-history-tabs button:focus-visible {
+  color: var(--color-ink);
+}
+.address-history-tabs button:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.address-history-tabs button.active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-ink);
+}
+.address-history-balance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.address-history-balance .bitcoin-amount {
+  color: var(--color-ink);
+}
+.address-history-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-coverage > span + span {
+  padding-left: 10px;
+  border-left: 1px solid var(--color-rule);
+}
+.address-history-partial {
+  color: var(--color-warning);
+}
+.address-history-list {
+  display: grid;
+  gap: 3px;
+  max-height: 235px;
+  overflow: auto;
+}
+.address-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, auto);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  background: var(--color-paper);
+  text-align: left;
+}
+.address-history-row:hover:not(:disabled),
+.address-history-row:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-paper));
+}
+.address-history-row.is-on-graph {
+  border-left: 2px solid var(--color-accent);
+}
+.address-history-row-main,
+.address-history-row-detail,
+.address-history-row-amounts {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.address-history-row-main {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+.address-history-row-identity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.address-history-row-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+.address-history-row-title > strong {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.address-history-row-transaction-icon {
+  flex: none;
+  color: var(--color-accent);
+}
+.address-history-row-annotation-icon {
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+}
+.address-history-row-bookmark-icon {
+  flex: none;
+  color: var(--color-warning);
+}
+.address-history-row-detail,
+.address-history-row-amounts {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-row-body {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-row-label {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.address-history-row-body .entity-badges {
+  margin-top: 0;
+}
+.address-history-row-direction {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-self: end;
+  align-items: baseline;
+  gap: 2px 6px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-row-direction .transaction-block-time {
+  display: inline-flex;
+  gap: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+.address-history-row-direction .transaction-block-time time {
+  white-space: nowrap;
+}
+.address-history-row-detail {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  justify-self: end;
+  justify-items: end;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  align-items: center;
+  gap: 2px 8px;
+  text-align: right;
+}
+.address-history-row-detail span:last-child {
+  grid-column: 1 / -1;
+}
+.address-history-row-amounts {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
+  justify-items: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.address-history-row-amounts > span {
+  white-space: nowrap;
+}
+.address-history-more {
+  justify-self: start;
+}
+.address-history-note {
+  margin: 0;
 }
 .transaction-flow {
   --transaction-flow-gap: 20px;

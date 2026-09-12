@@ -545,7 +545,7 @@ describe('compact connection scan records', () => {
     const { workspace } = fixture();
     const legacy = { ...workspace, version: 2, view: { ...workspace.view, graphNodeIds: [] } };
     const parsed = parseWorkspace(legacy);
-    expect(parsed.version).toBe(3);
+    expect(parsed.version).toBe(4);
     expect(parsed.connectionScans).toBeUndefined();
     expect(parsed.view.graphNodeIds).toEqual([]);
     expect(legacy.version).toBe(2);

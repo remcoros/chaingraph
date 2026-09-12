@@ -1,5 +1,5 @@
 /** Decrypted workspace schema version, independent of the encrypted envelope version. */
-export const CURRENT_WORKSPACE_VERSION = 3 as const;
+export const CURRENT_WORKSPACE_VERSION = 4 as const;
 
 export class WorkspaceSchemaVersionError extends Error {
   readonly code = 'unsupported-workspace-version';
@@ -22,7 +22,7 @@ export function migrateWorkspace(data: unknown): unknown {
   const raw = data as Record<string, unknown>;
   if (!Object.prototype.hasOwnProperty.call(raw, 'version') || raw.version === 1)
     return { ...raw, version: CURRENT_WORKSPACE_VERSION };
-  if (raw.version === 2) return { ...raw, version: CURRENT_WORKSPACE_VERSION };
+  if (raw.version === 2 || raw.version === 3) return { ...raw, version: CURRENT_WORKSPACE_VERSION };
   if (raw.version !== CURRENT_WORKSPACE_VERSION) throw new WorkspaceSchemaVersionError();
   return data;
 }

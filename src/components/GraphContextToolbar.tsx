@@ -6,6 +6,7 @@ import {
   ArrowRightToLine,
   Eye,
   EyeOff,
+  Layers,
   Network,
   Plus,
   X,
@@ -32,6 +33,8 @@ export interface GraphContextToolbarProps {
   canForward: boolean;
   onBack: () => void;
   onForward: () => void;
+  canOpenAddressHistory?: boolean;
+  onOpenAddressHistory?: () => void;
   sides?: Record<GraphContextSide, GraphContextSideCounts>;
   onAddSide: (side: GraphContextSide) => void;
   onHideSide: (side: GraphContextSide) => void;
@@ -94,6 +97,15 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
           onClick={props.onShowAllOutputs}
         >
           <Eye size={17} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Open address history for selected input or output"
+          title="Open address history for selected input or output"
+          disabled={props.busy || !props.canOpenAddressHistory || !props.onOpenAddressHistory}
+          onClick={props.onOpenAddressHistory}
+        >
+          <Layers size={17} aria-hidden="true" />
         </button>
       </div>
 

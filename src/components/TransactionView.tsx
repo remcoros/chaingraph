@@ -11,6 +11,7 @@ import {
   memo,
   useId,
   useMemo,
+  useEffect,
   useState,
   useRef,
   useLayoutEffect,
@@ -21,7 +22,10 @@ import {
   Pencil,
   ArrowLeft,
   ArrowRight,
+  ArrowRightFromLine,
+  ArrowRightToLine,
   Box,
+  Bookmark,
   Tags,
   Smile,
   Eye,
@@ -30,8 +34,11 @@ import {
   ArrowUp,
   ChevronsDown,
   ChevronsUp,
+  Layers,
 } from 'lucide-react';
 import {
+  type AddressBalanceObservation,
+  type AddressUtxoObservation,
   type GraphNode,
   type Transaction,
   type TransactionFlowState,
@@ -55,6 +62,7 @@ import type { EntitySelection } from '../lib/useEntitySelection';
 import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import { BatchTagEditor, MetadataPopover } from './MetadataEditors';
 import { IconPalette } from './IconPicker';
+import { addressBalanceSats, type AddressHistory } from '../domain/addressHistory';
 
 interface Props extends VisibilityProps {
   workspace: Workspace;
@@ -76,6 +84,12 @@ interface Props extends VisibilityProps {
   state?: TransactionFlowState;
   onStateChange?: (state: TransactionFlowState) => void;
   selection?: EntitySelection;
+  addressHistory?: AddressHistory;
+  addressBalance?: AddressBalanceObservation;
+  addressUtxos?: AddressUtxoObservation;
+  onLoadAddressHistory?: (force?: boolean) => void;
+  onLoadAddressUtxos?: (force?: boolean) => void;
+  onOpenAddressHistoryTransaction?: (txid: string, height?: number, vout?: number) => void;
 }
 interface Row {
   id?: string;
@@ -585,6 +599,308 @@ function TransactionRows({
   );
 }
 
+function checkedAtLabel(value?: string) {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Not checked';
+  return `Checked ${new Date(value).toLocaleString()}`;
+}
+
+function AddressHistoryView({
+  history,
+  workspace,
+  disabledReason,
+  onLoad,
+  addressBalance,
+  addressUtxos,
+  onLoadUtxos,
+  onOpenTransaction,
+  renderMetadata,
+}: {
+  history: AddressHistory;
+  workspace: Workspace;
+  disabledReason?: string;
+  addressBalance?: AddressBalanceObservation;
+  addressUtxos?: AddressUtxoObservation;
+  onLoad?: (force?: boolean) => void;
+  onLoadUtxos?: (force?: boolean) => void;
+  onOpenTransaction?: (txid: string, height?: number, vout?: number) => void;
+  renderMetadata?: (nodeId: string) => ReactNode;
+}) {
+  const [limit, setLimit] = useState(40);
+  const [tab, setTab] = useState<'transactions' | 'utxos'>('transactions');
+  useEffect(() => setTab('transactions'), [history.address]);
+  const visible = history.entries.slice(0, limit);
+  const canLoad = !!onLoad && !disabledReason;
+  const canLoadUtxos = !!onLoadUtxos && !disabledReason;
+  const balanceTotal = addressBalanceSats(addressBalance);
+  return (
+    <div className="address-history-view" aria-label="Address history">
+      <div className="address-history-header">
+        <div className="address-history-tabs" role="tablist" aria-label="Address details">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'transactions'}
+            className={tab === 'transactions' ? 'active' : undefined}
+            onClick={() => setTab('transactions')}
+          >
+            Transactions
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'utxos'}
+            className={tab === 'utxos' ? 'active' : undefined}
+            onClick={() => {
+              setTab('utxos');
+              if (!addressUtxos && canLoadUtxos) onLoadUtxos?.(false);
+            }}
+          >
+            UTXOs
+          </button>
+        </div>
+        <span className="address-history-balance">
+          Balance <Amount value={balanceTotal} unknown="Unknown" />
+        </span>
+      </div>
+      <div className="address-history-coverage">
+        <span>
+          {tab === 'transactions'
+            ? checkedAtLabel(history.checkedAt)
+            : checkedAtLabel(addressUtxos?.checkedAt)}
+        </span>
+        {addressBalance && <span>{checkedAtLabel(addressBalance.checkedAt)} balance</span>}
+        {tab === 'transactions' &&
+          !history.complete &&
+          history.source !== 'loaded transactions' && (
+            <span className="address-history-partial">Coverage is partial</span>
+          )}
+        {tab === 'transactions' && history.unloadedCount > 0 && (
+          <span>
+            {history.unloadedCount} detail{history.unloadedCount === 1 ? '' : 's'} not loaded
+          </span>
+        )}
+        {tab === 'transactions' &&
+          canLoad &&
+          (history.source === 'loaded transactions' || !history.complete) && (
+            <button
+              type="button"
+              className="text-button"
+              title="Load the address history from the backend"
+              onClick={() => onLoad?.(false)}
+            >
+              Load address history
+            </button>
+          )}
+        {tab === 'transactions' && canLoad && (
+          <button type="button" className="text-button" onClick={() => onLoad?.(true)}>
+            Refresh
+          </button>
+        )}
+        {tab === 'utxos' && canLoadUtxos && (
+          <button type="button" className="text-button" onClick={() => onLoadUtxos?.(true)}>
+            Refresh
+          </button>
+        )}
+      </div>
+      {tab === 'transactions' &&
+        history.source === 'loaded transactions' &&
+        !canLoad &&
+        !history.entries.length && (
+          <p className="small muted">
+            No observed activity for this address in the loaded workspace.
+          </p>
+        )}
+      {tab === 'transactions' &&
+        history.source !== 'loaded transactions' &&
+        !history.entries.length && (
+          <p className="small muted">
+            {history.complete
+              ? 'No observed activity in this address history.'
+              : 'No history rows are currently available; coverage is partial.'}
+          </p>
+        )}
+      {tab === 'transactions' && !!history.entries.length && (
+        <div className="address-history-list" role="list">
+          {visible.map((entry) => {
+            const transactionNodeId = txNodeId(entry.txid);
+            const annotation = workspace.annotations[transactionNodeId];
+            const metadata = renderMetadata?.(transactionNodeId);
+            const observedStatus = entry.transaction
+              ? transactionStatus(entry.transaction)
+              : undefined;
+            const status =
+              observedStatus && observedStatus.kind !== 'unknown'
+                ? observedStatus.label
+                : entry.mempool
+                  ? 'Unconfirmed'
+                  : entry.height !== undefined
+                    ? `#${entry.height}`
+                    : 'Status unknown';
+            const direction =
+              entry.direction === 'activity'
+                ? 'Received and spent'
+                : entry.direction === 'received'
+                  ? 'Received'
+                  : entry.direction === 'spent'
+                    ? 'Spent'
+                    : 'Activity';
+            const historyReference =
+              entry.height !== undefined && entry.height > 0
+                ? ` in #${entry.height}`
+                : entry.mempool
+                  ? ' in mempool'
+                  : '';
+            return (
+              <button
+                key={entry.txid}
+                type="button"
+                role="listitem"
+                className={`address-history-row${entry.onGraph && !entry.hidden ? ' is-on-graph' : ''}`}
+                disabled={(!entry.transaction && !!disabledReason) || !onOpenTransaction}
+                aria-label={`${entry.transaction ? 'Open' : 'Load'} transaction ${entry.txid}`}
+                title={
+                  !entry.transaction && disabledReason
+                    ? disabledReason
+                    : entry.hidden
+                      ? 'Open transaction and show it in the graph'
+                      : entry.onGraph
+                        ? 'Open transaction in the graph'
+                        : 'Add transaction to the graph and open it'
+                }
+                onClick={() => onOpenTransaction?.(entry.txid, entry.height)}
+              >
+                <span className="address-history-row-main">
+                  <span className="address-history-row-identity">
+                    <span className="address-history-row-title">
+                      <Box
+                        size={13}
+                        className="address-history-row-transaction-icon"
+                        aria-hidden="true"
+                      />
+                      {annotation?.icon && (
+                        <span
+                          className="address-history-row-annotation-icon"
+                          role="img"
+                          aria-label={`Annotation icon: ${annotation.icon}`}
+                        >
+                          {annotation.icon}
+                        </span>
+                      )}
+                      {annotation?.bookmarked && (
+                        <Bookmark
+                          size={13}
+                          className="address-history-row-bookmark-icon"
+                          aria-label="Bookmarked"
+                        />
+                      )}
+                      <strong>
+                        <ResponsiveIdentifier value={entry.txid} preferFull />
+                      </strong>
+                    </span>
+                    {(annotation?.label || metadata) && (
+                      <span className="address-history-row-body">
+                        {annotation?.label && (
+                          <span className="address-history-row-label">{annotation.label}</span>
+                        )}
+                        {metadata}
+                      </span>
+                    )}
+                  </span>
+                </span>
+                <span className="address-history-row-direction">
+                  <span>{`${direction}${historyReference}`}</span>
+                  {entry.transaction && (
+                    <TransactionBlockTime transaction={entry.transaction} timestampOnly />
+                  )}
+                </span>
+                <span className="address-history-row-detail">
+                  {status !== `#${entry.height}` && <span>{status}</span>}
+                  {entry.transaction && (
+                    <span>
+                      {entry.transaction.vin.length} in / {entry.transaction.vout.length} out
+                    </span>
+                  )}
+                </span>
+                <span className="address-history-row-amounts">
+                  {entry.receivedSats !== undefined && (
+                    <span>
+                      + <Amount value={entry.receivedSats} />
+                    </span>
+                  )}
+                  {entry.spentSats !== undefined && (
+                    <span>
+                      - <Amount value={entry.spentSats} />
+                    </span>
+                  )}
+                  {!entry.transaction && <span>Load details</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {history.entries.length > visible.length && (
+        <button
+          type="button"
+          className="text-button address-history-more"
+          onClick={() => setLimit((value) => Math.min(history.entries.length, value + 40))}
+        >
+          Show more transactions ({history.entries.length - visible.length} remaining)
+        </button>
+      )}
+      {tab === 'transactions' && history.entries.length > 0 && !history.complete && (
+        <p className="small muted address-history-note">
+          Missing rows or details remain unknown. This list does not establish ownership, balance,
+          or that an output is unspent.
+        </p>
+      )}
+      {tab === 'utxos' && !addressUtxos && (
+        <p className="small muted">UTXOs have not been checked for this address.</p>
+      )}
+      {tab === 'utxos' && addressUtxos && !addressUtxos.utxos.length && (
+        <p className="small muted">No unspent outputs observed at the last check.</p>
+      )}
+      {tab === 'utxos' && !!addressUtxos?.utxos.length && (
+        <div className="address-history-list" role="list">
+          {addressUtxos.utxos.map((utxo) => (
+            <button
+              key={`${utxo.txid}:${utxo.vout}`}
+              type="button"
+              role="listitem"
+              className="address-history-row address-utxo-row"
+              disabled={!onOpenTransaction}
+              aria-label={`Open unspent output ${utxo.txid}:${utxo.vout}`}
+              title="Open this output's transaction in the graph"
+              onClick={() => onOpenTransaction?.(utxo.txid, utxo.height, utxo.vout)}
+            >
+              <span className="address-history-row-main">
+                <span className="address-history-row-identity">
+                  <span className="address-history-row-title">
+                    <Box
+                      size={13}
+                      className="address-history-row-transaction-icon"
+                      aria-hidden="true"
+                    />
+                    <strong>
+                      <ResponsiveIdentifier value={`${utxo.txid}:${utxo.vout}`} preferFull />
+                    </strong>
+                  </span>
+                  <span className="address-history-row-body">
+                    {utxo.height === 0 ? 'Mempool' : `#${utxo.height}`}
+                  </span>
+                </span>
+              </span>
+              <span className="address-history-row-amounts">
+                <Amount value={utxo.valueSats} />
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TransactionView(props: Props) {
   const {
     workspace,
@@ -598,6 +914,7 @@ export function TransactionView(props: Props) {
     inputLoading,
     inputError,
     onRetryInputs,
+    renderMetadata,
   } = props;
   const spends = useMemo(() => indexLoadedSpends(workspace.transactions), [workspace.transactions]);
   const related = useMemo(
@@ -632,9 +949,10 @@ export function TransactionView(props: Props) {
     if (transactionId === state?.transactionId) return;
     onStateChange?.({ ...state, transactionId, expandedInputs: false, expandedOutputs: false });
   };
-  const hasFlowSelection = !!selected && (selected.kind !== 'address' || related.length > 0);
+  const hasFlowSelection = !!selected;
   const currentNotOnGraph =
     !!current &&
+    selected?.kind !== 'address' &&
     props.graphNodeIds !== undefined &&
     !props.graphNodeIds.includes(txNodeId(current.tx.txid));
   const navigate = (txid: string, outputId: string) => {
@@ -706,7 +1024,7 @@ export function TransactionView(props: Props) {
                 </small>
                 <strong>
                   {workspace.annotations[txNodeId(tx.txid)]?.label || (
-                    <ResponsiveIdentifier value={tx.txid} />
+                    <ResponsiveIdentifier value={tx.txid} preferFull />
                   )}
                 </strong>
               </span>
@@ -760,6 +1078,31 @@ export function TransactionView(props: Props) {
       </div>
     );
   };
+  const summaryKind =
+    selected?.kind === 'address'
+      ? 'address'
+      : selected?.kind === 'output' && leg?.direction === 'previous'
+        ? 'input'
+        : selected?.kind === 'output'
+          ? 'output'
+          : 'transaction';
+  const SummaryIcon =
+    summaryKind === 'address'
+      ? Layers
+      : summaryKind === 'input'
+        ? ArrowRightToLine
+        : summaryKind === 'output'
+          ? ArrowRightFromLine
+          : Box;
+  const summaryLabel =
+    summaryKind === 'address'
+      ? 'Address'
+      : summaryKind === 'input'
+        ? 'Input'
+        : summaryKind === 'output'
+          ? 'Output'
+          : 'Transaction';
+  const selectedAnnotation = selected ? workspace.annotations[selected.id] : undefined;
   return (
     <div className="transaction-view-slot">
       <div className={`transaction-view-surface${fullHeight ? ' is-full-height' : ''}`}>
@@ -773,10 +1116,27 @@ export function TransactionView(props: Props) {
           >
             <span className="transaction-summary-content">
               <span className="transaction-summary-title">
-                <span>Transaction flow</span>
+                <SummaryIcon size={16} aria-hidden="true" />
+                {selectedAnnotation?.icon && (
+                  <span
+                    className="transaction-summary-annotation-icon"
+                    role="img"
+                    aria-label={`Annotation icon: ${selectedAnnotation.icon}`}
+                  >
+                    {selectedAnnotation.icon}
+                  </span>
+                )}
+                {selectedAnnotation?.bookmarked && (
+                  <Bookmark
+                    size={14}
+                    className="transaction-summary-bookmark-icon"
+                    aria-label="Bookmarked"
+                  />
+                )}
+                <span>{summaryLabel}</span>
                 {hasFlowSelection && selected && (
                   <code title={selected.id.replace(/^(?:tx|out|addr):/, '')}>
-                    <ResponsiveIdentifier value={selected.id} />
+                    <ResponsiveIdentifier value={selected.id} preferFull />
                   </code>
                 )}
                 {selected?.kind === 'transaction' && current && (
@@ -790,8 +1150,26 @@ export function TransactionView(props: Props) {
                 )}
               </span>
               {hasFlowSelection && (
-                <small title={current ? transactionStatus(current.tx).title : undefined}>
-                  {current ? transactionStatus(current.tx).label : 'Not loaded'}
+                <small
+                  title={
+                    selected?.kind === 'address' || !current
+                      ? undefined
+                      : transactionStatus(current.tx).title
+                  }
+                >
+                  {selected?.kind === 'address'
+                    ? props.addressHistory
+                      ? `${props.addressHistory.knownCount} known transactions`
+                      : 'History not loaded'
+                    : current
+                      ? transactionStatus(current.tx).label
+                      : 'Not loaded'}
+                  {selected?.kind === 'address' && props.addressHistory && (
+                    <>
+                      {' · Balance '}
+                      <Amount value={addressBalanceSats(props.addressBalance)} unknown="Unknown" />
+                    </>
+                  )}
                 </small>
               )}
             </span>
@@ -814,7 +1192,29 @@ export function TransactionView(props: Props) {
                   </button>
                 )}
               </div>
-              {current ? (
+              {selected.kind === 'address' ? (
+                <AddressHistoryView
+                  history={
+                    props.addressHistory ?? {
+                      address: selected.address ?? '',
+                      entries: [],
+                      knownCount: 0,
+                      loadedCount: 0,
+                      unloadedCount: 0,
+                      complete: false,
+                      source: 'loaded transactions',
+                    }
+                  }
+                  workspace={workspace}
+                  disabledReason={disabledReason}
+                  onLoad={props.onLoadAddressHistory}
+                  addressBalance={props.addressBalance}
+                  addressUtxos={props.addressUtxos}
+                  onLoadUtxos={props.onLoadAddressUtxos}
+                  onOpenTransaction={props.onOpenAddressHistoryTransaction}
+                  renderMetadata={renderMetadata}
+                />
+              ) : current ? (
                 <TransactionRows
                   {...props}
                   tx={current.tx}
@@ -871,7 +1271,7 @@ export function TransactionView(props: Props) {
                             ({current.tx.vin.length} / {current.tx.vout.length})
                           </span>
                           <strong className="mono">
-                            <ResponsiveIdentifier value={current.tx.txid} />
+                            <ResponsiveIdentifier value={current.tx.txid} preferFull />
                           </strong>
                           {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
                             <strong

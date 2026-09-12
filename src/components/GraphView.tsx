@@ -604,7 +604,13 @@ export default function GraphView(props: GraphViewProps) {
               </div>
               {hoveredNode.value !== undefined && (
                 <div>
-                  <dt>{hoveredNode.kind === 'transaction' ? 'Total outputs' : 'Output value'}</dt>
+                  <dt>
+                    {hoveredNode.kind === 'transaction'
+                      ? 'Total outputs'
+                      : hoveredNode.kind === 'address'
+                        ? 'Balance'
+                        : 'Output value'}
+                  </dt>
                   <Amount as="dd" value={hoveredNode.value} />
                 </div>
               )}

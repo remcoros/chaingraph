@@ -31,6 +31,11 @@ filter and extend one step at a time. A compact input/output view shows the
 selected transaction, lets you follow an exact output to the transaction that
 spent it, and loads missing details on demand. Hover cards, an inspector and a
 searchable entity list give you the same actions with mouse, touch or keyboard.
+Selecting an address also opens its bounded observed history. The flow panel
+has Transactions and UTXOs tabs: history rows and observed unspent outputs can
+load their transaction when needed, add or show it in the graph, and open it in
+the transaction flow. Balance and last-checked times are shown when available;
+missing or partial observations remain explicit and do not prove ownership.
 
 **Annotate.** Labels, notes, icons, bookmarks and colored tags attach to
 transactions, outputs and addresses. Edit one item or a whole selection at once.

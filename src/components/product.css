@@ -258,6 +258,13 @@ a {
   gap: 4px;
   font-size: 12px;
 }
+.selection-balance {
+  flex-wrap: wrap;
+}
+.selection-observation-time {
+  color: var(--muted);
+  font-size: 10px;
+}
 .selection-facts code {
   overflow: hidden;
   text-overflow: ellipsis;

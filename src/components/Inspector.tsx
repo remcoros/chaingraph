@@ -25,6 +25,7 @@ import {
   short,
   txNodeId,
   addressNodeId,
+  type AddressBalanceObservation,
   type Annotation,
   type Wallet,
   type Workspace,
@@ -32,6 +33,7 @@ import {
   type GraphNode,
   type GraphData,
 } from '../domain/types';
+import { addressBalanceSats } from '../domain/addressHistory';
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
 import { walletCheckAge } from '../domain/walletActivity';
@@ -372,6 +374,7 @@ interface NodeInspectorProps extends VisibilityProps {
   onSelectWallet: (id: string) => void;
   onNotify: (message: string) => void;
   walletUtxoObservation?: WalletUtxoObservation;
+  addressBalance?: AddressBalanceObservation;
   w: Workspace;
   selected: GraphNode;
   tx?: Transaction;
@@ -389,6 +392,7 @@ interface NodeInspectorProps extends VisibilityProps {
   onShowAndCenter?: () => void;
   canRemove?: boolean;
   onRefresh: () => void;
+  onRefreshAddressBalance?: () => void;
   onRemove: () => void;
   onSave: (annotation: Annotation, group?: string) => void;
 }
@@ -398,6 +402,7 @@ export function NodeInspector({
   onSelectWallet,
   onNotify,
   walletUtxoObservation,
+  addressBalance,
   w,
   selected,
   tx,
@@ -418,6 +423,7 @@ export function NodeInspector({
   hiddenNodeIds = [],
   onSetHidden,
   onRefresh,
+  onRefreshAddressBalance,
   onRemove,
   onSave,
 }: NodeInspectorProps) {
@@ -677,8 +683,29 @@ export function NodeInspector({
             </div>
           )}
           <div>
-            <dt>Value</dt>
-            <Amount as="dd" value={selected.value} />
+            <dt>{selected.kind === 'address' ? 'Balance' : 'Value'}</dt>
+            {selected.kind === 'address' ? (
+              <dd className="selection-balance">
+                <Amount value={addressBalanceSats(addressBalance)} unknown="Unknown" />
+                {addressBalance && (
+                  <small className="selection-observation-time">
+                    Checked {new Date(addressBalance.checkedAt).toLocaleString()}
+                  </small>
+                )}
+                {onRefreshAddressBalance && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={!!unavailable}
+                    onClick={onRefreshAddressBalance}
+                  >
+                    Refresh
+                  </button>
+                )}
+              </dd>
+            ) : (
+              <Amount as="dd" value={selected.value} />
+            )}
           </div>
           {(tx || selected.kind === 'output') && (
             <div>
