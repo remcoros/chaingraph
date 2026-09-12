@@ -86,8 +86,6 @@ function ScriptInspectorBody({
   const [error, setError] = useState('');
   const [inputIndex, setInputIndex] = useState(0);
   const [outputIndex, setOutputIndex] = useState(0);
-  const [witnessLimit, setWitnessLimit] = useState(20);
-  useEffect(() => setWitnessLimit(20), [inputIndex, transaction]);
   const request = useRef<AbortController | undefined>(undefined);
   useEffect(() => {
     request.current?.abort();
@@ -230,23 +228,7 @@ function ScriptInspectorBody({
             Sequence: {input?.sequence} (0x{input?.sequence.toString(16).padStart(8, '0')})
           </p>
           <HexField title="scriptSig hex" value={input?.script} decode />
-          <details>
-            <summary>Witness stack ({input?.witness.length ?? 0} items)</summary>
-            <p className="small muted">
-              Witness items are stack bytes, not necessarily scripts. A matching txid does not
-              authenticate witness bytes against a block commitment.
-            </p>
-            <div className="witness-items">
-              {input?.witness.slice(0, witnessLimit).map((item, index) => (
-                <HexField key={index} title={`Witness item ${index}`} value={item} />
-              ))}
-              {(input?.witness.length ?? 0) > witnessLimit && (
-                <button type="button" onClick={() => setWitnessLimit((limit) => limit + 20)}>
-                  Show next witness items ({witnessLimit} of {input?.witness.length} shown)
-                </button>
-              )}
-            </div>
-          </details>
+          <WitnessStack key={(transaction?.txid ?? '') + ':' + inputIndex} input={input} />
           <details>
             <summary>Raw transaction hex</summary>
             <HexField title="Raw transaction hex" value={raw.hex} />
@@ -255,5 +237,28 @@ function ScriptInspectorBody({
         </>
       )}
     </div>
+  );
+}
+
+function WitnessStack({ input }: { input?: RawInspection['inputs'][number] }) {
+  const [limit, setLimit] = useState(20);
+  return (
+    <details>
+      <summary>Witness stack ({input?.witness.length ?? 0} items)</summary>
+      <p className="small muted">
+        Witness items are stack bytes, not necessarily scripts. A matching txid does not
+        authenticate witness bytes against a block commitment.
+      </p>
+      <div className="witness-items">
+        {input?.witness.slice(0, limit).map((item, index) => (
+          <HexField key={index} title={`Witness item ${index}`} value={item} />
+        ))}
+        {(input?.witness.length ?? 0) > limit && (
+          <button type="button" onClick={() => setLimit((value) => value + 20)}>
+            Show next witness items ({limit} of {input?.witness.length} shown)
+          </button>
+        )}
+      </div>
+    </details>
   );
 }

@@ -64,9 +64,6 @@ export function SelectionToolbar({
   // it can never discard an unrelated newer edit.
   const owned =
     undoable?.token === undoToken && undoable?.workspaceId === workspace.id ? undoable : undefined;
-  useEffect(() => {
-    if (undoable && !owned) setUndoable(undefined);
-  }, [owned, undoable]);
   const hiddenIds = useMemo(
     () => new Set(workspace.view.hiddenNodeIds ?? []),
     [workspace.view.hiddenNodeIds],

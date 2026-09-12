@@ -497,13 +497,13 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     [rowsByTab.review],
   );
 
-  useEffect(() => setLimit(PAGE), [tab, query, labelFilter, tagFilter, status, typeIds]);
   useEffect(() => {
     if (selectedKey && window.matchMedia('(max-width: 760px)').matches)
       detailRef.current?.scrollIntoView({ block: 'nearest' });
   }, [selectedKey, batching]);
 
   function changeTab(next: WalletTab) {
+    setLimit(PAGE);
     setTab(next);
     selection.clear();
     setSelectedKey(undefined);
@@ -520,6 +520,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     onChange((current) => applyReviewDecisions(current, wallet, items, action));
     selection.clear();
     if (action === 'reopen') {
+      setLimit(PAGE);
       setStatus('open');
       const reopened =
         tab === 'review' ? rows.find((row) => row.key === items[0]?.key) : selectedRow;
@@ -633,7 +634,10 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
               <select
                 aria-label={tab === 'review' ? 'Review filter' : 'Review state filter'}
                 value={status}
-                onChange={(event) => setStatus(event.target.value as WalletStatusFilter)}
+                onChange={(event) => {
+                  setLimit(PAGE);
+                  setStatus(event.target.value as WalletStatusFilter);
+                }}
               >
                 {(Object.keys(STATUS_LABELS) as WalletStatusFilter[]).map((value) => (
                   <option key={value} value={value}>
@@ -648,7 +652,10 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             <select
               aria-label="Label filter"
               value={labelFilter}
-              onChange={(event) => setLabelFilter(event.target.value)}
+              onChange={(event) => {
+                setLimit(PAGE);
+                setLabelFilter(event.target.value);
+              }}
             >
               <option value="all">All</option>
               <option value="unlabeled">Unlabeled</option>
@@ -660,7 +667,10 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
             <select
               aria-label="Tag filter"
               value={tagFilter}
-              onChange={(event) => setTagFilter(event.target.value)}
+              onChange={(event) => {
+                setLimit(PAGE);
+                setTagFilter(event.target.value);
+              }}
             >
               <option value="all">Any tag state</option>
               <option value="untagged">No tags</option>
@@ -676,7 +686,10 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
               active={active}
               categories={categories}
               selected={selectedTypes}
-              onChange={setTypeIds}
+              onChange={(ids) => {
+                setLimit(PAGE);
+                setTypeIds(ids);
+              }}
             />
           )}
           <label className="wallet-record-search">
@@ -686,7 +699,10 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
               aria-label="Filter wallet records"
               placeholder="Labels, tags or address"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setLimit(PAGE);
+                setQuery(event.target.value);
+              }}
             />
           </label>
         </div>
@@ -700,6 +716,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
               className="text-button"
               aria-label="Clear wallet filters"
               onClick={() => {
+                setLimit(PAGE);
                 setQuery('');
                 setLabelFilter('all');
                 setTagFilter('all');
