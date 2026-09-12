@@ -66,7 +66,7 @@ export function listWalletAddresses(
  * matches add directly received/spent outputs, never unrelated co-inputs.
  */
 export function listWalletTransactions(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
   wallet: Wallet,
 ): WalletTransactionRecord[] {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);

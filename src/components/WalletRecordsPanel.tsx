@@ -38,8 +38,12 @@ export function WalletRecordsPanel({
   onSelect: (nodeId: string, utxo?: WalletUtxoRecord) => void;
 }) {
   const transactions = useMemo(
-    () => listWalletTransactions(workspace, wallet),
-    [workspace.transactions, wallet],
+    () =>
+      listWalletTransactions(
+        { network: workspace.network, transactions: workspace.transactions },
+        wallet,
+      ),
+    [workspace.network, workspace.transactions, wallet],
   );
   const [queries, setQueries] = useState({ addresses: '', transactions: '', utxos: '' });
   const [pages, setPages] = useState({ addresses: 0, transactions: 0, utxos: 0 });
