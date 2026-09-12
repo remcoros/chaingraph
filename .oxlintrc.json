@@ -17,6 +17,7 @@
     "react-perf/jsx-no-new-function-as-prop": "off",
     "oxc/no-async-await": "off",
     "unicorn/no-array-for-each": "off",
+    "unicorn/no-useless-fallback-in-spread": "error",
     "unicorn/no-useless-spread": "error"
   },
   "ignorePatterns": ["dist/**", "node_modules/**", "artifacts/**", "test-results/**", "public/**"]
