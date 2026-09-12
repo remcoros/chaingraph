@@ -145,6 +145,7 @@ import {
   addressNodeId,
   txNodeId,
   type GraphData,
+  type Network,
   type Transaction,
   type Wallet,
   type Workspace,
@@ -156,7 +157,10 @@ import {
   fetchTransaction,
   loadAddress,
   loadSpending,
+  mapLimit,
+  MAX_SCAN_TRANSACTIONS,
   scanWallet,
+  type AddressHistoryLoadCallbacks,
 } from './lib/api';
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { ancestryNotice, loadAncestors, traceSourceExists } from './lib/tracing';
@@ -174,6 +178,18 @@ const WORKBENCH_LABELS: Record<WorkbenchMode, string> = {
   analysis: 'Analysis',
 };
 const ADDRESS_DISPLAY_NOTICE = 'This address is no longer hidden. Address nodes are switched off.';
+type AddressHistoryLoadPhase = 'history' | 'details' | 'balance';
+interface AddressHistoryLoadState {
+  workspaceId: string;
+  address: string;
+  phase: AddressHistoryLoadPhase;
+  done: number;
+  total: number;
+  error?: string;
+}
+
+const addressHistoryLoadKey = (workspaceId: string, network: Network, address: string) =>
+  `${workspaceId}:${network}:${address}`;
 
 function download(name: string, content: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -387,6 +403,9 @@ export default function App() {
   }, [notice, noticeSequence]);
   const [error, setError] = useState('');
   const [operation, setOperation] = useState('');
+  const [addressHistoryLoads, setAddressHistoryLoads] = useState<
+    Record<string, AddressHistoryLoadState>
+  >({});
   const [fitToken, setFitToken] = useState(0);
   // Controls commit first; expensive graph/list projection can yield to newer input.
   const graphRenderRequest = useMemo(
@@ -484,6 +503,10 @@ export default function App() {
     new Map<string, { offset: number; unavailableTxids?: string[] }>(),
   );
   const operationRef = useRef<AbortController | undefined>(undefined);
+  const pendingSelectionRef = useRef<string | undefined>(undefined);
+  const addressHistoryLoadRefs = useRef(
+    new Map<string, { workspaceId: string; controller: AbortController }>(),
+  );
   const fileInput = useRef<HTMLInputElement>(null);
   const labelsInput = useRef<HTMLInputElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -514,6 +537,17 @@ export default function App() {
   useLayoutEffect(() => {
     wRef.current = w;
   });
+  useEffect(() => {
+    const workspaceId = w?.id;
+    const jobs = addressHistoryLoadRefs.current;
+    return () => {
+      for (const [key, job] of jobs) {
+        if (job.workspaceId !== workspaceId) continue;
+        job.controller.abort();
+        jobs.delete(key);
+      }
+    };
+  }, [w?.id]);
   const graphFlush = useRef<{ workspaceId: string; flush: () => void } | undefined>(undefined);
   const flushActiveGraph = useCallback(() => {
     const id = wRef.current?.id;
@@ -817,7 +851,11 @@ export default function App() {
     // hiding an entity keeps it selected, with its scope reported in the toolbar.
     const removed = selection.ids.filter((id) => !available.has(id));
     if (removed.length) selection.remove(removed);
-    if (selectedId && !available.has(selectedId)) setSelectedId(undefined);
+    if (selectedId && !available.has(selectedId)) {
+      if (pendingSelectionRef.current !== selectedId) setSelectedId(undefined);
+    } else if (pendingSelectionRef.current === selectedId) {
+      pendingSelectionRef.current = undefined;
+    }
   }, [recoveryNodesById, selectedId]);
   const renderEntityMetadata = useCallback(
     (id: string) => {
@@ -851,6 +889,13 @@ export default function App() {
     w && selected?.kind === 'address' && selected.address
       ? w.addressUtxos?.[selected.address]
       : undefined;
+  const addressHistoryLoad =
+    w && selected?.kind === 'address' && selected.address
+      ? addressHistoryLoads[addressHistoryLoadKey(w.id, w.network, selected.address)]
+      : undefined;
+  const backgroundAddressHistoryLoad = w
+    ? Object.values(addressHistoryLoads).find((load) => load.workspaceId === w.id && !load.error)
+    : undefined;
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
   }, [w?.id, rightTab]);
@@ -870,6 +915,8 @@ export default function App() {
         toggleScanTarget(id);
         return;
       }
+      if (pendingSelectionRef.current && pendingSelectionRef.current !== id)
+        pendingSelectionRef.current = undefined;
       selectionGeneration.current++;
       cameraPreservedSelection.current = options?.preserveCamera ? id : undefined;
       if (options?.preserveCamera) setFocusRequest(undefined);
@@ -1416,6 +1463,7 @@ export default function App() {
   }
   function revealLookup(id: string) {
     if (!w) return;
+    pendingSelectionRef.current = id;
     const address = id.startsWith('addr:') ? id.slice(5) : undefined;
     ws.update(w.id, (current) => ({
       ...setNodesHidden(current, [id], false),
@@ -1435,13 +1483,12 @@ export default function App() {
     setMobilePanel('graph');
     setFocusRequest({ id, token: Date.now() });
   }
-  function openAddressHistory(force = false) {
-    if (!w || !selected) return;
-    const address = selectedAddressForHistory(selected, w.network);
-    if (!address) return;
-    const addressId = addressNodeId(address);
-    const current = ws.getSession(w.id)?.data;
-    if (!current) return;
+  function startAddressHistoryLoad(address: string, force = false) {
+    const current = wRef.current;
+    if (!current || !canQuery) return;
+    const ownerId = current.id;
+    const key = addressHistoryLoadKey(ownerId, current.network, address);
+    if (addressHistoryLoadRefs.current.has(key)) return;
     const currentHistory = listAddressHistory(current, address);
     const needsHistory =
       force ||
@@ -1449,96 +1496,192 @@ export default function App() {
       currentHistory.source === 'loaded transactions' ||
       !currentHistory.complete;
     const needsBalance = force || !current.addressBalances?.[address];
-    if (!canQuery || (!needsHistory && !needsBalance)) {
-      revealLookup(addressId);
-      if (currentHistory?.source === 'loaded transactions')
+    if (!needsHistory && !needsBalance) return;
+
+    const controller = new AbortController();
+    addressHistoryLoadRefs.current.set(key, { workspaceId: ownerId, controller });
+    setAddressHistoryLoads((loads) => ({
+      ...loads,
+      [key]: {
+        workspaceId: ownerId,
+        address,
+        phase: needsHistory ? 'history' : 'balance',
+        done: 0,
+        total: 0,
+      },
+    }));
+
+    const updateProgress = (update: Partial<AddressHistoryLoadState>) => {
+      setAddressHistoryLoads((loads) => {
+        const previous = loads[key];
+        return previous ? { ...loads, [key]: { ...previous, ...update } } : loads;
+      });
+    };
+    const persistHistory: NonNullable<AddressHistoryLoadCallbacks['onHistory']> = (
+      history,
+      detailTotal,
+      truncated,
+    ) => {
+      if (wRef.current?.id !== ownerId) return;
+      ws.update(
+        ownerId,
+        (latest) => ({
+          ...latest,
+          addressHistories: {
+            ...latest.addressHistories,
+            [address]: {
+              history,
+              truncated,
+              scannedAt: new Date().toISOString(),
+            },
+          },
+        }),
+        false,
+      );
+      updateProgress({ phase: 'details', done: 0, total: detailTotal });
+    };
+    let pendingTransactions: Transaction[] = [];
+    let transactionFlushTimer: ReturnType<typeof setTimeout> | undefined;
+    const flushTransactions = () => {
+      transactionFlushTimer = undefined;
+      const batch = pendingTransactions;
+      pendingTransactions = [];
+      if (!batch.length || wRef.current?.id !== ownerId) return;
+      ws.update(
+        ownerId,
+        (latest) => ({
+          ...clearContextProvenance(
+            latest,
+            batch.map((transaction) => transaction.txid),
+          ),
+          transactions: {
+            ...latest.transactions,
+            ...Object.fromEntries(
+              batch.map((transaction) => [
+                transaction.txid,
+                mergeTransactionObservations(
+                  latest.transactions[transaction.txid],
+                  transaction,
+                  latest.network,
+                ),
+              ]),
+            ),
+          },
+        }),
+        false,
+      );
+    };
+    const persistTransaction = (transaction: Transaction) => {
+      pendingTransactions.push(transaction);
+      if (!transactionFlushTimer) transactionFlushTimer = setTimeout(flushTransactions, 0);
+    };
+
+    let failed = false;
+    void (async () => {
+      let historyError: unknown;
+      let balanceFailed = false;
+      const balancePromise = needsBalance
+        ? fetchAddressBalance(current.network, address, controller.signal).catch(() => {
+            controller.signal.throwIfAborted();
+            balanceFailed = true;
+            return undefined;
+          })
+        : Promise.resolve(undefined);
+      let result: Awaited<ReturnType<typeof loadAddress>> | undefined;
+      try {
+        if (needsHistory) {
+          try {
+            result = await loadAddress(
+              address,
+              current.network,
+              current.transactions,
+              controller.signal,
+              (progress) =>
+                updateProgress({
+                  phase: 'details',
+                  done: progress.done,
+                  total: progress.total ?? 0,
+                }),
+              { scope: fetchScope },
+              { onHistory: persistHistory, onTransaction: persistTransaction },
+            );
+          } catch (error) {
+            controller.signal.throwIfAborted();
+            historyError = error;
+          }
+        }
+        flushTransactions();
+        controller.signal.throwIfAborted();
+        if (result && wRef.current?.id === ownerId)
+          ws.update(
+            ownerId,
+            (latest) => clearContextProvenance(latest, result!.observedTransactionIds),
+            false,
+          );
+        if (needsBalance) updateProgress({ phase: 'balance' });
+        const balance = await balancePromise;
+        controller.signal.throwIfAborted();
+        if (balance && wRef.current?.id === ownerId)
+          ws.update(
+            ownerId,
+            (latest) => ({
+              ...latest,
+              addressBalances: { ...latest.addressBalances, [address]: balance },
+            }),
+            false,
+          );
+        if (historyError) throw historyError;
+        if (balanceFailed)
+          setNotice(
+            result
+              ? 'Address history loaded, but the address balance could not be checked. Retry.'
+              : 'Address balance could not be checked. Retry.',
+          );
+        if (result?.truncated)
+          setNotice(
+            balanceFailed
+              ? 'Address history is partial and the balance could not be checked. Retry.'
+              : 'Address history is partial: some transaction details are not loaded. Select a row to load one.',
+          );
+      } catch {
+        if (controller.signal.aborted) return;
+        failed = true;
+        setAddressHistoryLoads((loads) => ({
+          ...loads,
+          [key]: {
+            ...loads[key],
+            phase: 'history',
+            error: 'Address history could not be loaded. Retry.',
+          },
+        }));
+        setNotice('Address history could not be loaded. Retry.');
+      }
+    })().finally(() => {
+      if (transactionFlushTimer) clearTimeout(transactionFlushTimer);
+      flushTransactions();
+      addressHistoryLoadRefs.current.delete(key);
+      if (!failed)
+        setAddressHistoryLoads((loads) => {
+          if (!loads[key]) return loads;
+          const next = { ...loads };
+          delete next[key];
+          return next;
+        });
+    });
+  }
+  function openAddressHistory(force = false) {
+    if (!w || !selected) return;
+    const address = selectedAddressForHistory(selected, w.network);
+    if (!address) return;
+    const current = ws.getSession(w.id)?.data;
+    if (!current) return;
+    revealLookup(addressNodeId(address));
+    if (!canQuery) {
+      if (listAddressHistory(current, address)?.source === 'loaded transactions')
         setNotice('Showing transactions mentioning this address in the loaded workspace data.');
       return;
     }
-    const ownerId = current.id;
-    const generation = selectionGeneration.current;
-    void run(async (signal) => {
-      let result: Awaited<ReturnType<typeof loadAddress>> | undefined;
-      if (needsHistory) {
-        setOperation('Loading address history…');
-        result = await loadAddress(
-          address,
-          current.network,
-          current.transactions,
-          signal,
-          (progress) => setOperation(progress.message),
-          { scope: fetchScope },
-        );
-      }
-      let balance: Awaited<ReturnType<typeof fetchAddressBalance>> | undefined;
-      let balanceFailed = false;
-      if (needsBalance) {
-        setOperation('Checking address balance…');
-        try {
-          balance = await fetchAddressBalance(current.network, address, signal);
-        } catch {
-          signal.throwIfAborted();
-          balanceFailed = true;
-        }
-      }
-      signal.throwIfAborted();
-      if (selectionGeneration.current !== generation || wRef.current?.id !== ownerId) return;
-      ws.update(
-        ownerId,
-        (latest) => {
-          const base = result
-            ? clearContextProvenance(latest, result.observedTransactionIds)
-            : latest;
-          return {
-            ...base,
-            ...(result
-              ? {
-                  addressHistories: {
-                    ...latest.addressHistories,
-                    [address]: {
-                      history: result.history,
-                      truncated: result.truncated,
-                      scannedAt: new Date().toISOString(),
-                    },
-                  },
-                  transactions: {
-                    ...latest.transactions,
-                    ...Object.fromEntries(
-                      result.transactions.map((transaction) => [
-                        transaction.txid,
-                        mergeTransactionObservations(
-                          latest.transactions[transaction.txid],
-                          transaction,
-                          latest.network,
-                        ),
-                      ]),
-                    ),
-                  },
-                }
-              : {}),
-            ...(balance
-              ? {
-                  addressBalances: {
-                    ...latest.addressBalances,
-                    [address]: balance,
-                  },
-                }
-              : {}),
-          };
-        },
-        false,
-      );
-      revealLookup(addressId);
-      setNotice(
-        balanceFailed
-          ? result?.truncated
-            ? 'Address history is partial and the balance could not be checked. Retry to refresh it.'
-            : 'Address balance could not be checked. Retry to refresh it.'
-          : result?.truncated
-            ? 'Address history is partial: some transaction details are not loaded. Select a row to load one.'
-            : '',
-      );
-    });
+    startAddressHistoryLoad(address, force);
   }
   function refreshAddressBalance() {
     if (!w || !selected) return;
@@ -1608,6 +1751,77 @@ export default function App() {
         false,
       );
       if (balanceFailed) setNotice('UTXOs loaded. Address balance could not be checked. Retry.');
+
+      const latestTransactions = (ws.getSession(ownerId)?.data ?? current).transactions;
+      const detailTargets = [
+        ...new Map(
+          utxos.utxos
+            .filter((utxo) => utxo.height > 0 && !latestTransactions[utxo.txid])
+            .map((utxo) => [utxo.txid, utxo] as const),
+        ).values(),
+      ];
+      const boundedDetailTargets = detailTargets.slice(0, MAX_SCAN_TRANSACTIONS);
+      if (!boundedDetailTargets.length) return;
+      setOperation(
+        `Loading UTXO timestamps 0/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
+      );
+      let loaded = 0;
+      const details = await mapLimit(
+        boundedDetailTargets,
+        4,
+        async (utxo): Promise<Transaction | undefined> => {
+          try {
+            const transaction = await fetchTransaction(
+              current.network,
+              utxo.txid,
+              signal,
+              undefined,
+              {
+                scope: fetchScope,
+                priority: 'background',
+              },
+            );
+            if (transaction.confirmations !== undefined && transaction.confirmations < 0)
+              return undefined;
+            const conflictingHeight =
+              transaction.blockHeight !== undefined && transaction.blockHeight !== utxo.height;
+            const observed = conflictingHeight
+              ? {
+                  ...transaction,
+                  blockHeight: utxo.height,
+                  blockhash: undefined,
+                  blocktime: undefined,
+                  time: undefined,
+                  confirmations: undefined,
+                  mempool: undefined,
+                }
+              : {
+                  ...transaction,
+                  blockHeight: utxo.height,
+                  confirmations:
+                    transaction.confirmations !== undefined && transaction.confirmations > 0
+                      ? transaction.confirmations
+                      : undefined,
+                  mempool: undefined,
+                };
+            setOperation(
+              `Loading UTXO timestamps ${++loaded}/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
+            );
+            return observed;
+          } catch {
+            signal.throwIfAborted();
+            setOperation(
+              `Loading UTXO timestamps ${++loaded}/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
+            );
+            return undefined;
+          }
+        },
+      );
+      signal.throwIfAborted();
+      const loadedDetails = details.filter(
+        (transaction): transaction is Transaction => !!transaction,
+      );
+      if (loadedDetails.length) mergeTransactions(ownerId, loadedDetails);
     });
   }
   function openAddressHistoryTransaction(txid: string, height?: number, vout?: number) {
@@ -1659,17 +1873,24 @@ export default function App() {
     text = text.trim();
     if (/^(bc1|tb1)/i.test(text)) text = text.toLowerCase();
     const existing = loadedLookupId(text);
-    if (existing) {
+    if (existing && !existing.startsWith('addr:')) {
       setError('');
       setNotice('');
-      if (!existing.startsWith('addr:')) mergeTransactions(w.id, [], [existing.split(':')[1]]);
+      mergeTransactions(w.id, [], [existing.split(':')[1]]);
       revealLookup(existing);
-      // Cached navigation needs no backend. Explicit ancestry and address-history
-      // loading can still continue after the selected entity is already in view.
-      if (!canQuery || (!existing.startsWith('addr:') && !prefetchDepth)) {
+      if (!canQuery || !prefetchDepth) {
         clearQuery();
         return;
       }
+    }
+    if (!/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
+      if (!canQuery && !existing) return;
+      setError('');
+      setNotice('');
+      revealLookup(addressNodeId(text));
+      clearQuery();
+      startAddressHistoryLoad(text);
+      return;
     }
     if (!canQuery) return;
     const generation = selectionGeneration.current;
@@ -1711,49 +1932,6 @@ export default function App() {
           )
             setNotice(ancestryNotice(result));
         }
-      } else {
-        setOperation('Discovering address history…');
-        const result = await loadAddress(
-          text,
-          w.network,
-          w.transactions,
-          signal,
-          (p) => setOperation(p.message),
-          { scope: fetchScope },
-        );
-        signal.throwIfAborted();
-        if (selectionGeneration.current !== generation || wRef.current?.id !== w.id) return;
-        ws.update(
-          w.id,
-          (c) => ({
-            ...clearContextProvenance(c, result.observedTransactionIds),
-            addressHistories: {
-              ...c.addressHistories,
-              [text]: {
-                history: result.history,
-                truncated: result.truncated,
-                scannedAt: new Date().toISOString(),
-              },
-            },
-            watchedAddresses: [...new Set([...c.watchedAddresses, text])],
-            transactions: {
-              ...c.transactions,
-              ...Object.fromEntries(
-                result.transactions.map((t) => [
-                  t.txid,
-                  mergeTransactionObservations(c.transactions[t.txid], t, c.network),
-                ]),
-              ),
-            },
-          }),
-          false,
-        );
-        revealLookup(addressNodeId(text));
-        setNotice(
-          result.truncated
-            ? 'Partial address history: 500-transaction limit reached. Search again to load more.'
-            : '',
-        );
       }
       clearQuery();
     });
@@ -3119,6 +3297,7 @@ export default function App() {
                     }
                     workspace={w}
                     addressHistory={addressHistory}
+                    addressHistoryLoad={addressHistoryLoad}
                     addressBalance={addressBalance}
                     addressUtxos={addressUtxos}
                     onLoadAddressHistory={openAddressHistory}
@@ -3230,6 +3409,7 @@ export default function App() {
                         showIcons={appliedGraphRequest.showIcons}
                         fitToken={appliedGraphRequest.fitToken}
                         transactions={w.transactions}
+                        workspace={w}
                         onTrace={(id) => void expand('funding', id)}
                         onEdit={editNode}
                         busy={!!operation}
@@ -3686,6 +3866,15 @@ export default function App() {
                   <LoaderCircle className="spin" size={13} />
                   {operation}
                   <button onClick={() => operationRef.current?.abort()}>Cancel</button>
+                </>
+              ) : backgroundAddressHistoryLoad ? (
+                <>
+                  <LoaderCircle className="spin" size={13} />
+                  {backgroundAddressHistoryLoad.phase === 'history'
+                    ? 'Checking address history…'
+                    : backgroundAddressHistoryLoad.phase === 'details'
+                      ? `Loading address history ${backgroundAddressHistoryLoad.done}/${backgroundAddressHistoryLoad.total}`
+                      : 'Checking address balance…'}
                 </>
               ) : (
                 <>

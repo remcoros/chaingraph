@@ -127,7 +127,11 @@ function ScriptInspectorBody({
         {related.find(({ tx }) => tx.txid === transaction?.txid)?.role} transaction:{' '}
         <ResponsiveIdentifier value={transaction?.txid ?? ''} />
       </p>
-      <TransactionBlockTime transaction={transaction} />
+      <TransactionBlockTime
+        transaction={transaction}
+        workspace={workspace}
+        showFee={selected.kind === 'transaction'}
+      />
       {related.length > 1 && (
         <label>
           Inspect transaction

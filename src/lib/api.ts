@@ -557,7 +557,12 @@ function createAsyncLimiter(limit: number) {
 }
 export interface ScanProgress {
   done: number;
+  total?: number;
   message: string;
+}
+export interface AddressHistoryLoadCallbacks {
+  onHistory?: (history: HistoryEntry[], detailTotal: number, truncated: boolean) => void;
+  onTransaction?: (transaction: Transaction) => void;
 }
 export const MAX_SCAN_TRANSACTIONS = 500;
 export async function scanWallet(
@@ -751,6 +756,7 @@ export async function loadAddress(
   signal?: AbortSignal,
   onProgress?: (p: ScanProgress) => void,
   hints: TransactionFetchHints = {},
+  callbacks: AddressHistoryLoadCallbacks = {},
 ): Promise<{
   transactions: Transaction[];
   truncated: boolean;
@@ -776,23 +782,31 @@ export async function loadAddress(
           (heights.get(id) ?? 0) <= 0),
     ),
   ];
+  const detailTotal = Math.min(ids.length, MAX_SCAN_TRANSACTIONS);
+  callbacks.onHistory?.(history, detailTotal, ids.length > MAX_SCAN_TRANSACTIONS);
   let loaded = 0;
   const transactions = await mapLimit(
-    ids.slice(0, MAX_SCAN_TRANSACTIONS),
+    ids.slice(0, detailTotal),
     TRANSACTION_BATCH_CONCURRENCY,
     async (id) => {
+      const transaction = await fetchTransaction(network, id, signal, heights.get(id), fetchHints);
+      callbacks.onTransaction?.(transaction);
       onProgress?.({
-        done: loaded,
-        message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
+        done: ++loaded,
+        total: detailTotal,
+        message: `Loading address history ${loaded}/${detailTotal}`,
       });
-      return fetchTransaction(network, id, signal, heights.get(id), fetchHints);
+      return transaction;
     },
   );
   const requested = new Set(ids);
   for (const id of allIds) {
     if (!existing[id] || requested.has(id)) continue;
     const observed = withHistoryHeight(existing[id], heights.get(id)!);
-    if (observed !== existing[id]) transactions.push(observed);
+    if (observed !== existing[id]) {
+      transactions.push(observed);
+      callbacks.onTransaction?.(observed);
+    }
   }
   return {
     transactions,

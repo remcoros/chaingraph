@@ -207,6 +207,20 @@ admitted to the graph. An observed address balance supplies only that address
 node's optional graph value for value-based sizing; address nodes are not
 traversed by connection scans.
 
+The UTXO projection counts only entries returned by `listunspent`, separating
+positive observed heights from height-zero mempool entries. Confirmed UTXO
+creating transactions may be loaded, bounded to 500 missing details per
+action, so their block timestamps can be displayed; a missing timestamp remains
+unknown rather than being inferred from the UTXO height.
+
+For a direct address lookup, the browser admits and selects the address before
+loading its history details. The bounded raw history observation is persisted
+as soon as it arrives, then transaction details are persisted in small
+progressive batches. Jobs are keyed by workspace, network and address, may
+continue after selection changes, and are cancelled when the workspace changes.
+The backend remains a bounded read-only proxy with no address-history jobs or
+cache.
+
 Optional encrypted `blockHeight` and `mempool` fields are observations. Direct
 loads use the containing block header; histories supply Electrum heights. A
 bounded 512-entry blockhash-to-height map per network caches immutable

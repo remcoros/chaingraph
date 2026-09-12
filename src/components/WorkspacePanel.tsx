@@ -17,6 +17,7 @@ import {
   type Transaction,
 } from '../domain/types';
 import { walletCheckAge } from '../domain/walletActivity';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import type { GraphFilters } from '../domain/graphFilters';
 import type { EntitySelection } from '../lib/useEntitySelection';
 import EntityBrowser from './EntityBrowser';
@@ -170,9 +171,7 @@ export function WorkspacePanel({
                         {item.scriptType}
                       </small>
                       <small
-                        title={
-                          item.scannedAt ? new Date(item.scannedAt).toLocaleString() : undefined
-                        }
+                        title={item.scannedAt ? formatLocalTimestamp(item.scannedAt) : undefined}
                       >
                         {walletCheckAge(item.scannedAt)}
                         {item.scannedAt && !item.scanComplete ? ' · partial' : ''}
@@ -303,6 +302,7 @@ export function WorkspacePanel({
           hiddenCount={hiddenCount}
           onShowAllHidden={onShowAllHidden}
           transactions={transactions ?? w.transactions}
+          workspace={w}
           removableNodeIds={removableNodeIds}
           onRemoveNode={onRemoveNode}
           wallets={w.wallets}

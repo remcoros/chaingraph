@@ -923,6 +923,8 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                         {row.kind !== 'address' && row.txid && (
                           <TransactionBlockTime
                             timestampOnly
+                            workspace={workspace}
+                            showFee={row.kind === 'transaction'}
                             transaction={
                               row.utxo
                                 ? walletRecordBlockObservation(

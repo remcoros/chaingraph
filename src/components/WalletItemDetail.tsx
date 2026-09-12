@@ -396,7 +396,11 @@ export function WalletItemDetail({
             <div>
               <dt>{row.kind === 'output' ? 'Creating transaction block' : 'Transaction block'}</dt>
               <dd>
-                <TransactionBlockTime transaction={workspace.transactions[row.txid]} />
+                <TransactionBlockTime
+                  transaction={workspace.transactions[row.txid]}
+                  workspace={workspace}
+                  showFee={row.kind !== 'output'}
+                />
               </dd>
             </div>
           )}

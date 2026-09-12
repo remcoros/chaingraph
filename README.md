@@ -31,10 +31,19 @@ filter and extend one step at a time. A compact input/output view shows the
 selected transaction, lets you follow an exact output to the transaction that
 spent it, and loads missing details on demand. Hover cards, an inspector and a
 searchable entity list give you the same actions with mouse, touch or keyboard.
-Selecting an address also opens its bounded observed history. The flow panel
-has Transactions and UTXOs tabs: history rows and observed unspent outputs can
-load their transaction when needed, add or show it in the graph, and open it in
-the transaction flow. Balance and last-checked times are shown when available;
+Selecting an address also opens its bounded observed history. The address is
+admitted and selected immediately while history, transaction details and the
+balance load in the background with visible progress. The flow panel has
+Transactions and UTXOs tabs: history rows and observed unspent outputs can load
+their transaction when needed, add or show it in the graph, and open it in the
+transaction flow. Both tabs show clickable pending and confirmed totals with
+matching collapsible sections, with pending transactions or outputs first; each
+confirmed row includes its observed block and transaction timestamp when that
+detail is loaded. When all input values and virtual size are observed, confirmed
+transactions also show their fee rate and total fee; otherwise fee evidence is
+unknown. Block timestamps use UTC `YYYY-MM-DD HH:mm:ss` without a
+timezone suffix. Other stored timestamps use the user's local time in the same
+format. Balance and last-checked times are shown when available;
 missing or partial observations remain explicit and do not prove ownership.
 
 **Annotate.** Labels, notes, icons, bookmarks and colored tags attach to

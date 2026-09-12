@@ -47,6 +47,7 @@ import {
 } from '../domain/connectionScanGroups';
 import { retryConnectionScanResult, applyScanRecheck } from '../lib/connectionScanRetry';
 import { transactionStatus } from '../domain/transactionStatus';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import { prepareCustomScanTargets } from '../domain/connectionScanTargets';
 import { prepareNeighbourScanTargets } from '../domain/connectionScanNeighbours';
 import { WalletHelp } from './WalletHelp';
@@ -1142,7 +1143,9 @@ function ScanResultRow({
             title={result.bestBlock ? `Observed at block ${result.bestBlock}` : undefined}
           >
             Checked{' '}
-            <time dateTime={result.checkedAt}>{new Date(result.checkedAt).toLocaleString()}</time>
+            <time dateTime={result.checkedAt}>
+              {formatLocalTimestamp(result.checkedAt) ?? 'Unknown time'}
+            </time>
           </p>
         )}
         {plan.missingTxids.length > 0 && (

@@ -137,6 +137,36 @@ describe('browser-side wallet scanner', () => {
     expect(result.wallet.pendingTransactionIds).toEqual([ids[MAX_SCAN_TRANSACTIONS]]);
   });
 
+  it('publishes address history before progressively loading transaction details', async () => {
+    const target = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1)[0];
+    const events: string[] = [];
+    const ids = [txid(1), txid(2)];
+    mockRpc((request) =>
+      request.method === 'blockchain.scripthash.get_history'
+        ? ids.map((id, index) => ({ tx_hash: id, height: 100 + index }))
+        : transaction(request.params[0] as string),
+    );
+
+    const result = await loadAddress(
+      target.address,
+      'mainnet',
+      {},
+      undefined,
+      (progress) => events.push(`progress:${progress.done}/${progress.total}`),
+      {},
+      {
+        onHistory: (history, detailTotal, truncated) =>
+          events.push(`history:${history.length}/${detailTotal}/${truncated}`),
+        onTransaction: (loaded) => events.push(`transaction:${loaded.txid}`),
+      },
+    );
+
+    expect(events[0]).toBe('history:2/2/false');
+    expect(events.filter((event) => event.startsWith('transaction:'))).toHaveLength(2);
+    expect(events.filter((event) => event.startsWith('progress:'))).toHaveLength(2);
+    expect(result.transactions.map(({ txid: id }) => id).sort()).toEqual(ids.sort());
+  });
+
   it('persists skipped changed-height refreshes and completes them on the next scan', async () => {
     const first = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1)[0];
     const ids = Array.from({ length: MAX_SCAN_TRANSACTIONS + 1 }, (_, n) => txid(n + 1));

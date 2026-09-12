@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Network, Pencil, Tag, Smile, X } from 'lucide-re
 import { fetchTransaction } from '../lib/api';
 import { traceSourceExists } from '../lib/tracing';
 import { outputAddress } from '../domain/workspace';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../domain/prevouts';
 import {
   outputNodeId,
@@ -213,7 +214,7 @@ export function TraceWorkbench({
         const coverage = `Checked ${result.inspected} history candidates. ${result.remaining ? `${result.remaining} beyond the ${TRACE_CANDIDATE_LIMIT}-candidate limit. ` : ''}${result.failed ? `${result.failed} failed lookups. Partial results. ` : ''}${result.statusUnavailable ? 'Current UTXO check unavailable. ' : ''}`;
         setMessage(
           result.observation?.status === 'unspent'
-            ? `Observed unspent at ${new Date(result.observation.checkedAt).toLocaleTimeString()}, with mempool spends included. This temporary observation can change.`
+            ? `Observed unspent at ${formatLocalTimestamp(result.observation.checkedAt) ?? 'Unknown time'}, with mempool spends included. This temporary observation can change.`
             : `${result.transactions.length ? 'Exact spending outpoint link found. Choose an output to continue.' : 'No spender found in this bounded search. Spending status remains unknown; absence is not proof of an unspent output.'} ${coverage}`,
         );
       }
@@ -403,7 +404,7 @@ export function TraceWorkbench({
                 </span>
               ) : observedUnspentAt ? (
                 <small>
-                  Observed unspent at {new Date(observedUnspentAt).toLocaleTimeString()}.
+                  Observed unspent at {formatLocalTimestamp(observedUnspentAt) ?? 'Unknown time'}.
                 </small>
               ) : (
                 <small>No spender loaded. Status unknown.</small>

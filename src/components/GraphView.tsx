@@ -14,7 +14,13 @@ import {
   Play,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { short, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
+import {
+  short,
+  type GraphLink,
+  type GraphNode,
+  type Transaction,
+  type Workspace,
+} from '../domain/types';
 import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './graph.css';
 import type { GraphFlowContext } from './graph/flowContext';
@@ -71,6 +77,7 @@ export interface GraphViewProps extends VisibilityProps {
   fitToken: number;
   focusRequest?: { id: string; token: number; preserveZoom?: boolean };
   transactions?: Record<string, Transaction>;
+  workspace?: Pick<Workspace, 'network' | 'transactions'>;
   onTrace?: (id: string) => void;
   onEdit?: (id: string) => void;
   traceDisabledReason?: string;
@@ -634,7 +641,11 @@ export default function GraphView(props: GraphViewProps) {
                 <div className="graph-card-block">
                   <dt>Block</dt>
                   <dd>
-                    <TransactionBlockTime transaction={transaction} />
+                    <TransactionBlockTime
+                      transaction={transaction}
+                      workspace={props.workspace}
+                      showFee={hoveredNode.kind === 'transaction'}
+                    />
                   </dd>
                 </div>
               )}

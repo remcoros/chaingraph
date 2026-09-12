@@ -34,6 +34,7 @@ import {
   type GraphData,
 } from '../domain/types';
 import { addressBalanceSats } from '../domain/addressHistory';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import { equalOutputCount } from '../domain/analysis';
 import { outputAddress } from '../domain/workspace';
 import { walletCheckAge } from '../domain/walletActivity';
@@ -204,7 +205,7 @@ export function WalletInspector({
           </button>
           <p
             className="wallet-inspector-check-age"
-            title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}
+            title={wallet.scannedAt ? formatLocalTimestamp(wallet.scannedAt) : undefined}
           >
             {walletCheckAge(wallet.scannedAt)}
           </p>
@@ -283,7 +284,9 @@ export function WalletInspector({
           {wallet.scannedAt && (
             <p className="wallet-inspector-timestamp">
               Last checked{' '}
-              <time dateTime={wallet.scannedAt}>{new Date(wallet.scannedAt).toLocaleString()}</time>
+              <time dateTime={wallet.scannedAt}>
+                {formatLocalTimestamp(wallet.scannedAt) ?? 'Unknown time'}
+              </time>
             </p>
           )}
           <dl className="details">
@@ -563,7 +566,7 @@ export function NodeInspector({
                         ? 'Status can change.'
                         : 'May be spent or absent from this node’s chain and mempool. This does not identify a spending transaction.';
                     onNotify(
-                      `${outpoint}: ${status} (${new Date(observation.checkedAt).toLocaleTimeString()}). Mempool included. ${detail}`,
+                      `${outpoint}: ${status} (${formatLocalTimestamp(observation.checkedAt) ?? 'Unknown time'}). Mempool included. ${detail}`,
                     );
                   }
                 }}
@@ -685,33 +688,47 @@ export function NodeInspector({
           <div>
             <dt>{selected.kind === 'address' ? 'Balance' : 'Value'}</dt>
             {selected.kind === 'address' ? (
-              <dd className="selection-balance">
+              <dd>
                 <Amount value={addressBalanceSats(addressBalance)} unknown="Unknown" />
-                {addressBalance && (
-                  <small className="selection-observation-time">
-                    Checked {new Date(addressBalance.checkedAt).toLocaleString()}
-                  </small>
-                )}
                 {onRefreshAddressBalance && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={!!unavailable}
-                    onClick={onRefreshAddressBalance}
-                  >
-                    Refresh
-                  </button>
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={!!unavailable}
+                      onClick={onRefreshAddressBalance}
+                    >
+                      Refresh
+                    </button>
+                  </>
                 )}
               </dd>
             ) : (
               <Amount as="dd" value={selected.value} />
             )}
           </div>
+          {selected.kind === 'address' && addressBalance && (
+            <div className="selection-facts-unlabeled">
+              <span aria-hidden="true" />
+              <span className="selection-observation">
+                {addressBalance && (
+                  <small className="selection-observation-time">
+                    Checked {formatLocalTimestamp(addressBalance.checkedAt) ?? 'Unknown time'}
+                  </small>
+                )}
+              </span>
+            </div>
+          )}
           {(tx || selected.kind === 'output') && (
             <div>
               <dt>Block</dt>
               <dd>
-                <TransactionBlockTime transaction={tx} />
+                <TransactionBlockTime
+                  transaction={tx}
+                  workspace={w}
+                  showFee={selected.kind === 'transaction'}
+                />
               </dd>
             </div>
           )}
@@ -723,29 +740,33 @@ export function NodeInspector({
             {cautions.join(' · ')}
           </p>
         )}
-        <div className="selection-trace">
-          <button
-            disabled={!!previousReason}
-            title={previousReason || previousHint}
-            onClick={() => onExpand('funding')}
-          >
-            <ArrowDownLeft size={13} />
-            {selected.kind === 'output' ? 'Open creating tx' : 'Load previous txs'}
-          </button>
-          <button
-            disabled={!!spendingReason}
-            title={spendingReason || spendingHint}
-            onClick={() => onExpand('spending')}
-          >
-            <ArrowUpRight size={13} />
-            Find spending txs
-          </button>
-        </div>
-        {traceReasons.map((reason) => (
-          <p key={reason} className="small muted trace-reason">
-            {reason}
-          </p>
-        ))}
+        {selected.kind !== 'address' && (
+          <>
+            <div className="selection-trace">
+              <button
+                disabled={!!previousReason}
+                title={previousReason || previousHint}
+                onClick={() => onExpand('funding')}
+              >
+                <ArrowDownLeft size={13} />
+                {selected.kind === 'output' ? 'Open creating tx' : 'Load previous txs'}
+              </button>
+              <button
+                disabled={!!spendingReason}
+                title={spendingReason || spendingHint}
+                onClick={() => onExpand('spending')}
+              >
+                <ArrowUpRight size={13} />
+                Find spending txs
+              </button>
+            </div>
+            {traceReasons.map((reason) => (
+              <p key={reason} className="small muted trace-reason">
+                {reason}
+              </p>
+            ))}
+          </>
+        )}
         {relatedNav && (
           <div className="related-transactions">
             {spendingNodes.slice(0, 5).map((id) => (
@@ -829,7 +850,7 @@ export function NodeInspector({
                     <strong>Unspent at wallet check</strong>
                     <small>
                       <time dateTime={walletObservation.checkedAt}>
-                        {new Date(walletObservation.checkedAt).toLocaleString()}
+                        {formatLocalTimestamp(walletObservation.checkedAt) ?? 'Unknown time'}
                       </time>
                       {' · Status can change'}
                     </small>
@@ -845,7 +866,7 @@ export function NodeInspector({
                       <small>
                         Checked{' '}
                         <time dateTime={utxo.observation.checkedAt}>
-                          {new Date(utxo.observation.checkedAt).toLocaleString()}
+                          {formatLocalTimestamp(utxo.observation.checkedAt) ?? 'Unknown time'}
                         </time>
                         {' · Mempool included'}
                       </small>

@@ -80,7 +80,7 @@
   cursor: pointer;
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 4;
   background: var(--color-paper);
   font-weight: 600;
 }
@@ -139,12 +139,33 @@
   gap: 8px;
   padding: 7px 0 2px;
 }
+.address-history-sticky {
+  position: sticky;
+  top: 32px;
+  z-index: 10;
+  isolation: isolate;
+  display: grid;
+  gap: 8px;
+  margin-top: -7px;
+  padding: 7px 0 2px;
+  background: var(--color-paper);
+}
+.address-history-sticky::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 -8px;
+  background: var(--color-paper);
+}
 .address-history-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  background: var(--color-paper);
 }
 .address-history-tabs {
   display: inline-flex;
@@ -172,7 +193,7 @@
   border-bottom-color: var(--color-accent);
   color: var(--color-ink);
 }
-.address-history-balance {
+.address-history-header-actions {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
@@ -180,16 +201,16 @@
   font-size: 10px;
   white-space: nowrap;
 }
-.address-history-balance .bitcoin-amount {
-  color: var(--color-ink);
-}
 .address-history-coverage {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 10px;
   color: var(--color-muted);
   font-size: 10px;
+  background: var(--color-paper);
 }
 .address-history-coverage > span + span {
   padding-left: 10px;
@@ -198,11 +219,74 @@
 .address-history-partial {
   color: var(--color-warning);
 }
+.address-history-loading {
+  color: var(--color-accent);
+}
+.address-history-error {
+  color: var(--color-error);
+}
+.address-history-section-summary {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--color-muted);
+  font-size: 10px;
+  background: var(--color-paper);
+}
+.address-history-section-summary .text-button {
+  min-height: 20px;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: inherit;
+}
+.address-history-section-summary .text-button:hover {
+  color: var(--color-ink);
+}
+.address-history-section-summary-separator {
+  color: var(--color-rule);
+}
+.address-history-sections {
+  display: grid;
+  gap: 8px;
+}
+.address-history-section {
+  min-width: 0;
+  scroll-margin-top: calc(var(--transaction-lane-top, 38px) + 64px);
+}
+.address-history-section-heading {
+  margin: 0 0 3px;
+}
+.address-history-section-toggle {
+  width: 100%;
+  min-height: 22px;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-muted);
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 500;
+}
+.address-history-section-toggle:hover,
+.address-history-section-toggle:focus-visible {
+  color: var(--color-ink);
+}
+.address-history-section-toggle:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.address-history-row-utxo-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
 .address-history-list {
   display: grid;
   gap: 3px;
-  max-height: 235px;
-  overflow: auto;
 }
 .address-history-row {
   display: grid;
@@ -551,6 +635,7 @@
 }
 .transaction-view-identity > .transaction-block-time {
   justify-content: center;
+  gap: 2px 0;
   padding: 0 6px 6px;
 }
 .transaction-identity-tools .icon-button {

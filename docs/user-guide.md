@@ -114,15 +114,30 @@ an open panel or reopens it at normal height. With no applicable node selected,
 the panel keeps its height and title, clears its content and disables its controls.
 
 Selecting an address replaces the transaction lanes with a small Transactions /
-UTXOs view. Transactions show the recorded height or mempool observation,
-loaded details, and direction only when loaded output or previous-output
-evidence supports it. Select a transaction row to load it when needed, add or
-show it on the graph, and open it in the flow. UTXOs are the unspent outputs
-observed for the address at the last check; selecting one opens its creating
-transaction and output in the graph when needed. Balance and check times are
-shown when available. A history bound, unloaded detail, or missing balance is
-shown as partial or unknown; it does not mean the address has no other
-activity, owns the transaction, or has an unspent output beyond the observation.
+UTXOs view. The address is admitted and selected immediately; history and
+transaction details load in the background, so the panel can show progress and
+partial rows while a long history is being fetched. Transactions show the
+recorded block or mempool observation, loaded details, and amounts. Select a transaction row
+to load it when needed, add or show it on the graph, and open it in the flow.
+UTXOs are the unspent outputs observed for the address at the last check;
+selecting one opens its creating transaction and output in the graph when
+needed. Balance and check times are shown when available. A history bound,
+unloaded detail, or missing balance is shown as partial or unknown; it does not
+mean the address has no other activity, owns the transaction, or has an
+unspent output beyond the observation.
+
+The Transactions tab groups observed history into clickable, collapsible Pending
+and Confirmed sections, with pending transactions first. The UTXOs tab is
+populated only from the backend's current unspent-output observation, not from
+every loaded output. It shows confirmed and pending totals with matching
+collapsible sections, with pending outputs first. Confirmed rows show the
+observed block and transaction timestamp when the creating transaction detail
+is loaded; pending rows are marked as Pending. Confirmed transactions show their
+fee rate and total fee when all input values and virtual size are observed;
+otherwise fee evidence remains unknown. An unavailable timestamp remains
+unknown. Blockchain block timestamps use UTC `YYYY-MM-DD HH:mm:ss` without a
+timezone suffix. Other stored timestamps are kept as canonical UTC instants and
+shown in the user's local time using the same format.
 
 The icon toolbar on the right adds, hides or removes a transaction's inputs and
 outputs, or whole branches. **Hide** is temporary and reversible from the hidden

@@ -1,6 +1,6 @@
 import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
-import { formatGmtTimestamp, walletRecordBlockObservation } from '../domain/transactionTime';
+import { formatLocalTimestamp, walletRecordBlockObservation } from '../domain/transactionTime';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
@@ -141,9 +141,9 @@ export function WalletRecordsPanel({
             </p>
           )}
           {utxos && (
-            <p className="small muted" title={utxos.checkedAt}>
+            <p className="small muted" title={formatLocalTimestamp(utxos.checkedAt)}>
               Checked {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
-              {formatGmtTimestamp(Date.parse(utxos.checkedAt) / 1000)?.compact}
+              {formatLocalTimestamp(utxos.checkedAt) ?? 'Unknown time'}
               {utxos.failed > 0 && ` · ${utxos.failed} failed; refresh to retry`}
             </p>
           )}
@@ -204,6 +204,8 @@ export function WalletRecordsPanel({
               )}
               <span className="wallet-record-meta">
                 <TransactionBlockTime
+                  workspace={workspace}
+                  showFee={!row.utxo}
                   transaction={walletRecordBlockObservation(
                     row.txid,
                     row.transaction,
