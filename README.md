@@ -31,6 +31,8 @@ filter and extend one step at a time. A compact input/output view shows the
 selected transaction, lets you follow an exact output to the transaction that
 spent it, and loads missing details on demand. Hover cards, an inspector and a
 searchable entity list give you the same actions with mouse, touch or keyboard.
+The entity list can unlink its filters from the graph for panel-only browsing;
+linking it again follows the graph's current filters and selection.
 Selecting an address also opens its bounded observed history. The address is
 admitted and selected immediately while history, transaction details and the
 balance load in the background with visible progress. The flow panel has

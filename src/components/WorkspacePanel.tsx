@@ -54,6 +54,8 @@ interface Props {
   graphFilters?: GraphFilters;
   onGraphFiltersChange?: (filters: GraphFilters) => void;
   onResetGraphFilters?: () => void;
+  entityFiltersLinked?: boolean;
+  onEntityFiltersLinkedChange?: (linked: boolean) => void;
   entityTotalCount?: number;
   contextCount?: number;
   contextNodeCount?: number;
@@ -100,6 +102,8 @@ export function WorkspacePanel({
   graphFilters,
   onGraphFiltersChange,
   onResetGraphFilters,
+  entityFiltersLinked = true,
+  onEntityFiltersLinkedChange,
   entityTotalCount,
   contextCount,
   contextNodeCount,
@@ -281,7 +285,9 @@ export function WorkspacePanel({
             graphFilters ?? { query: entityFilter, kind: entityKind as GraphFilters['kind'] }
           }
           onResetFilters={onResetGraphFilters}
-          extraFiltersActive={!!w.view.smallAmountThreshold}
+          extraFiltersActive={entityFiltersLinked && !!w.view.smallAmountThreshold}
+          filtersLinked={entityFiltersLinked}
+          onFiltersLinkedChange={onEntityFiltersLinkedChange}
           onFiltersChange={
             onGraphFiltersChange ??
             ((filters) => {

@@ -350,12 +350,14 @@ export function GraphFilterButton({
   className,
   onReset,
   extraFiltersActive = false,
+  title = 'Filter the graph and entity list',
   ...props
 }: FilterFieldProps & {
   className?: string;
   triggerLabel?: string;
   onReset?: () => void;
   extraFiltersActive?: boolean;
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
@@ -370,7 +372,7 @@ export function GraphFilterButton({
         type="button"
         className={`graph-filter-trigger ${count ? 'active' : ''} ${className ?? ''}`}
         aria-label={count ? `${triggerLabel}, ${count} active` : triggerLabel}
-        title="Filter the graph and entity list"
+        title={title}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}

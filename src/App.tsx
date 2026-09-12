@@ -200,6 +200,17 @@ interface AddressHistoryLoadState {
 const addressHistoryLoadKey = (workspaceId: string, network: Network, address: string) =>
   `${workspaceId}:${network}:${address}`;
 
+/** Panel-local filters do not own graph scope actions such as isolate or context. */
+function entityPanelFiltersFromGraph(filters: GraphFilters): GraphFilters {
+  const panelFilters = { ...filters };
+  delete panelFilters.excludeIds;
+  delete panelFilters.focus;
+  delete panelFilters.includeIds;
+  delete panelFilters.preserveContext;
+  delete panelFilters.showAddresses;
+  return panelFilters;
+}
+
 function download(name: string, content: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement('a');
@@ -287,6 +298,8 @@ export default function App() {
   const selectionGeneration = useRef(0);
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
+  const [entityFiltersLinked, setEntityFiltersLinked] = useState(true);
+  const [entityPanelFilters, setEntityPanelFilters] = useState<GraphFilters>({});
   const selection = useEntitySelection(w?.id);
   const [scanTargets, setScanTargets] = useState<string[]>([]);
   const [scanTargetDraft, setScanTargetDraft] = useState<{
@@ -679,27 +692,33 @@ export default function App() {
     source: GraphData,
     sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
     sourceTags: ReadonlyMap<string, unknown>,
+    filters: GraphFilters,
   ): GraphFilters => {
-    const includes: (string[] | undefined)[] = [appliedGraphFilters.includeIds];
+    const includes: (string[] | undefined)[] = [filters.includeIds];
     const excludes: string[] = [];
-    includes.push(matchingWalletFilterNodeIds(appliedGraphFilters, sourceMatches));
-    if (appliedGraphFilters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
-    else if (appliedGraphFilters.walletMatch === 'unmatched')
+    includes.push(matchingWalletFilterNodeIds(filters, sourceMatches));
+    if (filters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
+    else if (filters.walletMatch === 'unmatched')
       excludes.push(...sourceMatches.keys());
-    if (appliedGraphFilters.tagId) {
-      const tag = w?.tags?.find((entry) => entry.id === appliedGraphFilters.tagId);
+    if (filters.tagId) {
+      const tag = w?.tags?.find((entry) => entry.id === filters.tagId);
       includes.push(tag ? tagNodeIds(tag, source) : []);
     }
-    if (appliedGraphFilters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
-    else if (appliedGraphFilters.tagState === 'untagged') excludes.push(...sourceTags.keys());
+    if (filters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
+    else if (filters.tagState === 'untagged') excludes.push(...sourceTags.keys());
     const includeIds = intersectIds(includes);
     return includeIds || excludes.length
-      ? { ...appliedGraphFilters, includeIds, excludeIds: excludes.length ? excludes : undefined }
-      : appliedGraphFilters;
+      ? { ...filters, includeIds, excludeIds: excludes.length ? excludes : undefined }
+      : filters;
   };
   const effectiveFilters = useMemo(
-    () => membershipFilters(completeGraph, walletMatches, tagIndex),
+    () => membershipFilters(completeGraph, walletMatches, tagIndex, appliedGraphFilters),
     [appliedGraphFilters, w?.tags, completeGraph, walletMatches, tagIndex],
+  );
+  const entityFilterRequest = entityFiltersLinked ? appliedGraphFilters : entityPanelFilters;
+  const effectiveEntityFilters = useMemo(
+    () => membershipFilters(completeGraph, walletMatches, tagIndex, entityFilterRequest),
+    [entityFilterRequest, w?.tags, completeGraph, walletMatches, tagIndex],
   );
   const automaticContextIds = useMemo(
     () => [
@@ -745,6 +764,12 @@ export default function App() {
     appliedGraphFilters.query?.trim() ||
     (appliedGraphFilters.label && appliedGraphFilters.label !== 'all') ||
     appliedGraphFilters.bookmarkedOnly
+      ? w?.annotations
+      : EMPTY_GRAPH_ANNOTATIONS;
+  const entityFilterAnnotations =
+    entityFilterRequest.query?.trim() ||
+    (entityFilterRequest.label && entityFilterRequest.label !== 'all') ||
+    entityFilterRequest.bookmarkedOnly
       ? w?.annotations
       : EMPTY_GRAPH_ANNOTATIONS;
   const canvasFilterResult = useMemo(
@@ -814,26 +839,42 @@ export default function App() {
   const entityVisibility = w?.view.entityVisibility ?? 'graph';
   const recoveryFilterIndex = useMemo(() => buildGraphFilterIndex(recoveryGraph), [recoveryGraph]);
   const entityGraph = useMemo(() => {
-    if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
-    if (entityVisibility === 'visible' && !appliedGraphRequest.smallAmountThreshold)
-      return canvasFilterResult;
-    const source = entityVisibility === 'visible' ? admittedGraph : recoveryGraph;
+    if (entityFiltersLinked) {
+      if (entityVisibility === 'graph') return { ...visibleGraph, matchedNodes: visibleGraph.nodes };
+      if (entityVisibility === 'visible' && !appliedGraphRequest.smallAmountThreshold)
+        return canvasFilterResult;
+      const source = entityVisibility === 'visible' ? admittedGraph : recoveryGraph;
+      return filterGraph(
+        source,
+        {
+          ...effectiveFilters,
+          showAddresses: entityVisibility === 'visible' ? canvasShowAddresses : true,
+        },
+        filterAnnotations,
+        { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
+        { index: source === recoveryGraph ? recoveryFilterIndex : undefined },
+      );
+    }
+    const source =
+      entityVisibility === 'hidden' || entityVisibility === 'all' ? recoveryGraph : admittedGraph;
     return filterGraph(
       source,
+      effectiveEntityFilters,
+      entityFilterAnnotations,
       {
-        ...effectiveFilters,
-        showAddresses: entityVisibility === 'visible' ? canvasShowAddresses : true,
+        hiddenNodeIds: w?.view.hiddenNodeIds,
+        mode:
+          entityVisibility === 'hidden' ? 'hidden' : entityVisibility === 'all' ? 'all' : 'visible',
       },
-      filterAnnotations,
-      { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
       { index: source === recoveryGraph ? recoveryFilterIndex : undefined },
     );
   }, [
-    graph,
     admittedGraph,
     recoveryGraph,
+    entityFilterAnnotations,
+    entityFiltersLinked,
+    effectiveEntityFilters,
     effectiveFilters,
-    appliedGraphFilters,
     recoveryFilterIndex,
     canvasFilterResult,
     appliedGraphRequest.smallAmountThreshold,
@@ -1042,7 +1083,10 @@ export default function App() {
     setQueryError('');
     setMenu(false);
     setFocusRequest(undefined);
-    setGraphFilters(w?.view.filters ?? {});
+    const savedGraphFilters = w?.view.filters ?? {};
+    setGraphFilters(savedGraphFilters);
+    setEntityPanelFilters(entityPanelFiltersFromGraph(savedGraphFilters));
+    setEntityFiltersLinked(true);
     setNavigation(
       w?.view.selectionId ? { ids: [w.view.selectionId], index: 0 } : { ids: [], index: -1 },
     );
@@ -2669,6 +2713,10 @@ export default function App() {
     setGraphFilters(filters);
     setFitToken((token) => token + 1);
   }
+  function setEntityFilterLink(linked: boolean) {
+    setEntityPanelFilters(entityPanelFiltersFromGraph(graphFilters));
+    setEntityFiltersLinked(linked);
+  }
   function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {
     pendingWorkbenchFocus.current =
       handoffFocus && w ? { workspaceId: w.id, mode: next, destination } : undefined;
@@ -2754,6 +2802,10 @@ export default function App() {
       (current) => ({ ...current, view: { ...current.view, smallAmountThreshold: undefined } }),
       false,
     );
+  }
+  function resetEntityFilters() {
+    if (entityFiltersLinked) resetGraphFilters();
+    else setEntityPanelFilters({});
   }
   async function updateAllGraphOutputs(action: 'hide' | 'show') {
     if (!w) return;
@@ -3537,15 +3589,26 @@ export default function App() {
               live={live}
               setLive={setLive}
               canQuery={canQuery}
-              entityFilter={graphFilters.query ?? ''}
-              setEntityFilter={(query) => updateFilters({ ...graphFilters, query })}
-              entityKind={graphFilters.kind ?? 'all'}
-              setEntityKind={(kind) =>
-                updateFilters({ ...graphFilters, kind: kind as GraphFilters['kind'] })
+              entityFilter={(entityFiltersLinked ? graphFilters : entityPanelFilters).query ?? ''}
+              setEntityFilter={(query) =>
+                entityFiltersLinked
+                  ? updateFilters({ ...graphFilters, query })
+                  : setEntityPanelFilters((filters) => ({ ...filters, query }))
               }
-              graphFilters={graphFilters}
-              onGraphFiltersChange={updateFilters}
-              onResetGraphFilters={resetGraphFilters}
+              entityKind={(entityFiltersLinked ? graphFilters : entityPanelFilters).kind ?? 'all'}
+              setEntityKind={(kind) =>
+                entityFiltersLinked
+                  ? updateFilters({ ...graphFilters, kind: kind as GraphFilters['kind'] })
+                  : setEntityPanelFilters((filters) => ({
+                      ...filters,
+                      kind: kind as GraphFilters['kind'],
+                    }))
+              }
+              graphFilters={entityFiltersLinked ? graphFilters : entityPanelFilters}
+              onGraphFiltersChange={entityFiltersLinked ? updateFilters : setEntityPanelFilters}
+              onResetGraphFilters={entityFiltersLinked ? resetGraphFilters : resetEntityFilters}
+              entityFiltersLinked={entityFiltersLinked}
+              onEntityFiltersLinkedChange={setEntityFilterLink}
               entityTotalCount={
                 entityVisibility === 'hidden'
                   ? hiddenCount
@@ -3554,12 +3617,15 @@ export default function App() {
                     : recoveryGraph.nodes.length
               }
               contextCount={
-                entityVisibility === 'visible' || entityVisibility === 'graph'
+                entityFiltersLinked &&
+                (entityVisibility === 'visible' || entityVisibility === 'graph')
                   ? visibleGraph.contextNodeIds.length
                   : 0
               }
-              contextNodeCount={canvasFilterResult.availableContextNodeCount}
-              contextPreviewPending={graphFiltering}
+              contextNodeCount={
+                entityFiltersLinked ? canvasFilterResult.availableContextNodeCount : 0
+              }
+              contextPreviewPending={entityFiltersLinked && graphFiltering}
               hiddenNodeIds={w.view.hiddenNodeIds}
               onSetHidden={setEntityHidden}
               visibility={entityVisibility}

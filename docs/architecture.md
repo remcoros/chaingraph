@@ -364,6 +364,11 @@ Amount thresholds (`smallAmounts.ts`) are strictly greater-than, preserve
 unknown and selected values, and drop branches that become detached; the canvas
 and flow thresholds are separate encrypted preferences.
 
+The **Entities** panel reads the graph filters and shared selection by default.
+Its link toggle can detach panel-only filter state while leaving graph filters,
+graph scope and selection unchanged. Re-enabling the link switches the panel back
+to the graph's current filter and selection state.
+
 `useEntitySelection` holds selection mode and an ordered ID set as UI state,
 cleared on workspace change and pruned only when entities disappear. Adapters
 report modifier keys; `GraphView` decides inspect versus toggle. `batchEdits.ts`

@@ -178,9 +178,15 @@ actions with the keyboard.
 The **Filters** popover (also **More filters** in **Entities**) restricts the
 canvas and the list by entity type, label or tag state, wallet membership,
 satoshi bounds, loaded funding or spending evidence, and bookmarks. Active
-filters appear as removable chips under the graph controls; **Reset filters**
-clears all of them but never restores manually hidden entities, which have their
-own chip.
+graph filters appear as removable chips under the graph controls; **More
+filters** in **Entities** shows the active count. **Reset filters** clears all of
+them but never restores manually hidden entities, which have their own chip.
+
+The link icon in **Entities** is enabled by default, so its filters also change
+the graph. Turn it off to keep filters local to the panel; the graph keeps its
+current filters and selection, and **Select** is disabled until the link is
+restored. Restoring the link makes the panel follow the graph's current filters
+and selection.
 
 **Isolate** limits the view to one or two hops around the current selection and
 follows it as you navigate. **Show connections (+N)** adds loaded one-hop
@@ -198,12 +204,13 @@ find items that filters or hiding have removed from view.
 
 **Select** in the graph controls or in **Entities** turns on selection mode:
 checkboxes appear on rows, and Ctrl/Cmd+click toggles a node on the canvas, in
-the list or in the transaction view. **Select N matching …** takes the current
-filter results. The floating toolbar shows the count, how many selected items
-are not on the canvas, and offers **Label**, **Tags**, **Icon**, **Hide**,
-**Isolate** and **Clear**. Batch labels and icons keep existing values unless
-you tick Replace. Every batch is one autosave and one Undo step. Selections are
-cleared when you switch workspaces.
+the list or in the transaction view. The **Entities** link icon must be enabled
+for panel selection. **Select all (N)** takes the current filter results. The
+floating toolbar shows the count, how many selected items are not on the canvas,
+and offers **Label**, **Tags**, **Icon**, **Hide**, **Isolate** and **Clear**.
+Batch labels and icons keep existing values unless you tick Replace. Every batch
+is one autosave and one Undo step. Selections are cleared when you switch
+workspaces.
 
 ### Hide, restore and remove
 

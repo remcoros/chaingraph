@@ -109,6 +109,20 @@
 .entity-filter-actions .graph-nav-caption {
   display: inline;
 }
+.entity-filter-actions .entity-filter-link {
+  flex: 0 0 30px;
+  width: 30px;
+  padding: 4px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  color: var(--color-muted);
+}
+.entity-filter-actions .entity-filter-link.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper));
+}
 .entity-selection-bar {
   display: flex;
   flex-wrap: wrap;
@@ -131,6 +145,11 @@
   min-width: 0;
 }
 @media (max-width: 999px) {
+  .entity-filter-actions .entity-filter-link {
+    flex-basis: 36px;
+    width: 36px;
+    min-height: 36px;
+  }
   .selection-toolbar {
     bottom: 34px;
     gap: 4px;

@@ -12,12 +12,13 @@ import {
   Eye,
   EyeOff,
   Layers,
+  Link2,
+  Link2Off,
   CheckSquare,
   Trash2,
   X,
 } from 'lucide-react';
 import {
-  describeMatchScope,
   sortEntities,
   valueFilterError,
   hasActiveFilters,
@@ -176,6 +177,8 @@ interface Props extends VisibilityProps {
   wallets?: readonly { id: string; name: string }[];
   tags?: readonly { id: string; name: string }[];
   selection?: EntitySelection;
+  filtersLinked?: boolean;
+  onFiltersLinkedChange?: (linked: boolean) => void;
 }
 
 export default function EntityBrowser({
@@ -205,6 +208,8 @@ export default function EntityBrowser({
   wallets = [],
   tags = [],
   selection,
+  filtersLinked = true,
+  onFiltersLinkedChange,
 }: Props) {
   const removable = useMemo(() => new Set(removableNodeIds), [removableNodeIds]);
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
@@ -231,14 +236,13 @@ export default function EntityBrowser({
   }, [selectedId]);
   const activeFilters = hasActiveFilters(filters) || extraFiltersActive;
   const selectable = batchNodes ?? nodes;
-  const scope = describeMatchScope(selectable);
   const excludedContext = nodes.length - selectable.length;
   return (
     <div className="entity-browser" aria-busy={contextPreviewPending}>
       <div className="entity-filters">
         <input
           data-testid="entity-filter-query"
-          aria-label="Filter graph entities"
+          aria-label={filtersLinked ? 'Filter graph entities' : 'Filter entities in the list'}
           type="search"
           placeholder="Search labels, IDs, notes…"
           value={filters.query ?? ''}
@@ -297,6 +301,11 @@ export default function EntityBrowser({
             onChange={onFiltersChange}
             onReset={onResetFilters}
             extraFiltersActive={extraFiltersActive}
+            title={
+              filtersLinked
+                ? 'Filter the graph and entity list'
+                : 'Filter entities in this list only'
+            }
             wallets={wallets}
             tags={tags}
           />
@@ -305,10 +314,33 @@ export default function EntityBrowser({
               type="button"
               className={`selection-mode-toggle ${selection.mode ? 'active' : ''}`}
               aria-pressed={selection.mode}
-              title="Show checkboxes for choosing several entities. Single click still inspects an entity."
+              disabled={!filtersLinked}
+              title={
+                filtersLinked
+                  ? 'Show checkboxes for choosing several entities. Single click still inspects an entity.'
+                  : 'Link filters to the graph to select entities from this panel.'
+              }
               onClick={() => selection.setMode(!selection.mode)}
             >
               <CheckSquare size={13} /> Select
+            </button>
+          )}
+          {onFiltersLinkedChange && (
+            <button
+              type="button"
+              className={`entity-filter-link ${filtersLinked ? 'active' : ''}`}
+              aria-label={
+                filtersLinked ? 'Unlink entity filters from graph' : 'Link entity filters to graph'
+              }
+              aria-pressed={filtersLinked}
+              title={
+                filtersLinked
+                  ? 'Entity filters are linked to the graph. Click to filter this list only.'
+                  : 'Entity filters are local to this list. Click to follow the graph filters.'
+              }
+              onClick={() => onFiltersLinkedChange(!filtersLinked)}
+            >
+              {filtersLinked ? <Link2 size={14} /> : <Link2Off size={14} />}
             </button>
           )}
         </div>
@@ -317,19 +349,18 @@ export default function EntityBrowser({
             type="button"
             className="entity-clear-filters"
             onClick={() => (onResetFilters ? onResetFilters() : onFiltersChange({}))}
-            aria-label="Clear entity and graph filters"
+            aria-label={filtersLinked ? 'Clear entity and graph filters' : 'Clear entity filters'}
           >
             <X size={12} /> Clear filters
           </button>
         )}
-        {selection?.mode && (
+        {filtersLinked && selection?.mode && (
           <div className="entity-selection-bar">
-            <span role="status">{selection.count.toLocaleString()} selected</span>
             {selectable.length > 0 && (
               <button
                 type="button"
                 className="entity-selection-primary"
-                aria-label={`Select ${scope} in the entity list`}
+                aria-label={`Select all (${selectable.length.toLocaleString()})`}
                 disabled={contextPreviewPending}
                 title={
                   excludedContext > 0
@@ -340,7 +371,7 @@ export default function EntityBrowser({
                   if (!contextPreviewPending) selection.replace(selectable.map((node) => node.id));
                 }}
               >
-                Select {scope}
+                Select all ({selectable.length.toLocaleString()})
               </button>
             )}
             {excludedContext > 0 && (
@@ -351,7 +382,7 @@ export default function EntityBrowser({
             )}
             {selection.count > 0 && (
               <button type="button" onClick={selection.clear}>
-                Clear selection
+                Clear ({selection.count.toLocaleString()})
               </button>
             )}
           </div>
@@ -406,7 +437,7 @@ export default function EntityBrowser({
         ref={listRef}
         className="entity-list"
         data-testid="entity-list"
-        aria-label="Matching graph entities"
+        aria-label={filtersLinked ? 'Matching graph entities' : 'Matching entities'}
       >
         {sorted.slice(first, first + pageSize).map((node) => {
           const KindIcon = TYPE_ICON[node.kind];
@@ -416,9 +447,9 @@ export default function EntityBrowser({
           return (
             <div
               key={node.id}
-              className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${selection?.has(node.id) ? 'is-batch-selected' : ''}`}
+              className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${filtersLinked && selection?.has(node.id) ? 'is-batch-selected' : ''}`}
             >
-              {selection?.mode && (
+              {filtersLinked && selection?.mode && (
                 <SelectionCheckbox
                   id={node.id}
                   label={node.label}
@@ -433,13 +464,15 @@ export default function EntityBrowser({
                 tabIndex={0}
                 aria-pressed={selectedId === node.id}
                 onClick={(event) => {
-                  if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
+                  if (filtersLinked && selection && (event.ctrlKey || event.metaKey))
+                    selection.toggle(node.id);
                   else onSelect(node.id);
                 }}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' && event.key !== ' ') return;
                   event.preventDefault();
-                  if (selection && (event.ctrlKey || event.metaKey)) selection.toggle(node.id);
+                  if (filtersLinked && selection && (event.ctrlKey || event.metaKey))
+                    selection.toggle(node.id);
                   else onSelect(node.id);
                 }}
                 title={node.id}
