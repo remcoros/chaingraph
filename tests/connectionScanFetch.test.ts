@@ -529,6 +529,14 @@ describe('scan stopping-point evidence', () => {
       observation: { finding: 'many-outputs', branchCount: 81 },
     });
   });
+  it('uses the global branch limit when no fetch limit is supplied', async () => {
+    const many = tx(1);
+    many.vout = Array.from({ length: 201 }, (_, n) => ({ ...tx(1).vout[0], n }));
+    const s = setup([many], false, undefined, { fanOut: undefined });
+    const result = await s.resolveNeighbors(`tx:${id(1)}`, 'downstream', budget());
+    expect(result.nodeIds).toHaveLength(201);
+    expect(result.stopReason).toBeUndefined();
+  });
   it('recognizes only raw OP_RETURN scripts as unspendable', async () => {
     const root = tx(1);
     root.vout[0].scriptPubKey = { hex: '6a026162', type: 'nulldata' };

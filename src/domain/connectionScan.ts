@@ -93,7 +93,7 @@ export const SCAN_LIMITS = {
   maxHops: 8,
   maxTransactions: 1000,
   maxMilliseconds: 60_000,
-  fanOut: 200,
+  fanOut: 1000,
   maxTargets: 1000,
   maxResults: 50,
   maxEndpointResults: 10,
@@ -106,7 +106,7 @@ export const DEFAULT_SCAN_SETTINGS: ScanSettings = {
   maxHops: 3,
   maxTransactions: 200,
   maxMilliseconds: 30_000,
-  fanOut: 50,
+  fanOut: 1000,
 };
 export function isScanNodeId(id: string): boolean {
   return (

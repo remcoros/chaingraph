@@ -361,8 +361,8 @@ either search side. Open its details for the number of connections found in that
 run and its limits. Older saved scans may not have a recorded depth.
 
 Defaults are 3 transaction hops, 200 examined transactions, 30 seconds and a
-50-branch stopping point; advanced controls allow up to 8 hops, 1,000
-transactions, 60 seconds and 200 branches.
+1,000-branch stopping point; advanced controls allow up to 8 hops, 1,000
+transactions, 60 seconds and 1,000 branches.
 
 Findings stream into cards while the scan runs:
 

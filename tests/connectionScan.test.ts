@@ -541,6 +541,8 @@ describe('bounded connection traversal', () => {
   });
 
   it('validates hard bounds, canonical ids and target caps without silent truncation', async () => {
+    expect(DEFAULT_SCAN_SETTINGS.fanOut).toBe(SCAN_LIMITS.fanOut);
+    expect(DEFAULT_SCAN_SETTINGS.fanOut).toBe(1000);
     expect(() =>
       validateScanSettings({ ...DEFAULT_SCAN_SETTINGS, maxHops: SCAN_LIMITS.maxHops + 1 }),
     ).toThrow();

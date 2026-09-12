@@ -461,8 +461,8 @@ observed edge and, for targets in the source's component, retain a distinct
 existing route (bounded to 8 transactions) so Add closes a loop; merely loading a
 known creator is not a finding.
 
-Defaults are 3 hops, 200 transactions, 30 seconds and a 50-branch boundary;
-hard limits are 8 hops, 1,000 transactions, 60 seconds, 200 branches, 1,000
+Defaults are 3 hops, 200 transactions, 30 seconds and a 1,000-branch boundary;
+hard limits are 8 hops, 1,000 transactions, 60 seconds, 1,000 branches, 1,000
 targets and 50 results, with at most 10 endpoint and 10 evidence-problem paths
 per run. Time and depth limits produce a run-level reason, never cards.
 Run details show grouped connections found and optional deepest transaction-hop

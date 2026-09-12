@@ -7,7 +7,7 @@ import type {
   ScanNeighbors,
   ScanObservation,
 } from '../domain/connectionScan';
-import { ScanBudgetExceeded, isScanNodeId } from '../domain/connectionScan';
+import { SCAN_LIMITS, ScanBudgetExceeded, isScanNodeId } from '../domain/connectionScan';
 import { outputAddress } from '../domain/workspace';
 import { addressToScriptHash } from './wallet';
 import {
@@ -258,7 +258,7 @@ export function createConnectionScanFetch(
           direction === 'downstream'
             ? tx.vout.length
             : tx.vin.filter((input) => input.txid && input.vout !== undefined).length;
-        if (branches >= (options.fanOut ?? 200))
+        if (branches >= (options.fanOut ?? SCAN_LIMITS.fanOut))
           return {
             nodeIds: [],
             stopReason: 'fan-out',
