@@ -68,7 +68,7 @@ export function TraceWorkbench({
   );
   const pointId = point && traceId(point);
   const sourceExists = useMemo(
-    () => !!pointId && traceSourceExists(workspace, pointId),
+    () => !!pointId && traceSourceExists({ transactions: workspace.transactions }, pointId),
     [workspace.transactions, pointId],
   );
   const creator = point && workspace.transactions[point.txid];
@@ -86,8 +86,8 @@ export function TraceWorkbench({
       ? resolution.output
       : undefined;
   const spenders = useMemo(
-    () => (point ? loadedSpenders(workspace, point) : []),
-    [workspace.transactions, pointId],
+    () => (point ? loadedSpenders({ transactions: workspace.transactions }, point) : []),
+    [workspace.transactions, point],
   );
   const [choices, setChoices] = useState<Choices>();
   const [branch, setBranch] = useState('');

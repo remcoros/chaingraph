@@ -21,7 +21,10 @@ export function selectedOutpoint(selected?: GraphNode): TraceOutpoint | undefine
     : undefined;
 }
 export const traceId = (point: TraceOutpoint) => outputNodeId(point.txid, point.vout);
-export function loadedSpenders(workspace: Workspace, point: TraceOutpoint): Transaction[] {
+export function loadedSpenders(
+  workspace: Pick<Workspace, 'transactions'>,
+  point: TraceOutpoint,
+): Transaction[] {
   return Object.values(workspace.transactions).filter((tx) =>
     tx.vin.some((input) => input.txid === point.txid && input.vout === point.vout),
   );
