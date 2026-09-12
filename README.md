@@ -38,7 +38,8 @@ Transactions and UTXOs tabs: history rows and observed unspent outputs can load
 their transaction when needed, add or show it in the graph, and open it in the
 transaction flow. Both tabs show clickable pending and confirmed totals with
 matching collapsible sections, with pending transactions or outputs first; each
-confirmed row includes its observed block and transaction timestamp when that
+tab renders a bounded first page and offers **Show more** for larger observations.
+Each confirmed row includes its observed block and transaction timestamp when that
 detail is loaded. When all input values and virtual size are observed, confirmed
 transactions also show their fee rate and total fee; otherwise fee evidence is
 unknown. Block timestamps use UTC `YYYY-MM-DD HH:mm:ss` without a

@@ -11,7 +11,6 @@ import {
   memo,
   useId,
   useMemo,
-  useEffect,
   useState,
   useRef,
   useLayoutEffect,
@@ -347,6 +346,7 @@ function TransactionRows({
   previous: ReactNode;
   next: ReactNode;
 }) {
+  const { network, transactions } = workspace;
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
   const admitted = useMemo(
     () => (graphNodeIds === undefined ? undefined : new Set(graphNodeIds)),
@@ -487,7 +487,7 @@ function TransactionRows({
   const inputRows = useMemo<Row[]>(
     () =>
       tx.vin.map((input, index) => {
-        const resolution = resolvePreviousOutput(workspace, input, previousOutputs);
+        const resolution = resolvePreviousOutput({ network, transactions }, input, previousOutputs);
         return {
           id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
           index,
@@ -499,7 +499,7 @@ function TransactionRows({
           coinbase: input.coinbase !== undefined,
         };
       }),
-    [tx, workspace.transactions, workspace.network, previousOutputs],
+    [tx, transactions, network, previousOutputs],
   );
   const outputRows = useMemo<Row[]>(
     () =>
@@ -623,6 +623,50 @@ function checkedAtLabel(value?: string) {
   return `Checked ${formatLocalTimestamp(value) ?? 'Unknown time'}`;
 }
 
+function AddressHistorySection<T>({
+  idPrefix,
+  section,
+  label,
+  items,
+  visibleItems,
+  collapsed,
+  onToggle,
+  sectionRef,
+  renderItem,
+}: {
+  idPrefix: string;
+  section: string;
+  label: string;
+  items: readonly T[];
+  visibleItems: readonly T[];
+  collapsed: boolean;
+  onToggle: () => void;
+  sectionRef: RefObject<HTMLElement | null>;
+  renderItem: (item: T) => ReactNode;
+}) {
+  const listId = `${idPrefix}-${section}-list`;
+  return (
+    <section id={`${idPrefix}-${section}`} className="address-history-section" ref={sectionRef}>
+      <h4 className="address-history-section-heading">
+        <button
+          type="button"
+          className="address-history-section-toggle"
+          aria-expanded={!collapsed}
+          aria-controls={listId}
+          onClick={onToggle}
+        >
+          {label} ({items.length})
+        </button>
+      </h4>
+      {!collapsed && (
+        <div id={listId} className="address-history-list" role="list">
+          {visibleItems.map(renderItem)}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AddressHistoryView({
   history,
   workspace,
@@ -650,10 +694,12 @@ function AddressHistoryView({
   renderMetadata?: (nodeId: string) => ReactNode;
 }) {
   const [limit, setLimit] = useState(40);
+  const [utxoLimit, setUtxoLimit] = useState(40);
   const [tab, setTab] = useState<'transactions' | 'utxos'>('transactions');
   const [collapsedUtxoSections, setCollapsedUtxoSections] = useState({
     pending: false,
     confirmed: false,
+    unknown: false,
   });
   const [collapsedTransactionSections, setCollapsedTransactionSections] = useState({
     pending: false,
@@ -662,10 +708,10 @@ function AddressHistoryView({
   });
   const pendingUtxosSection = useRef<HTMLElement>(null);
   const confirmedUtxosSection = useRef<HTMLElement>(null);
+  const unknownUtxosSection = useRef<HTMLElement>(null);
   const pendingTransactionsSection = useRef<HTMLElement>(null);
   const confirmedTransactionsSection = useRef<HTMLElement>(null);
   const unknownTransactionsSection = useRef<HTMLElement>(null);
-  useEffect(() => setTab('transactions'), [history.address]);
   const pendingTransactions = history.entries.filter((entry) => entry.mempool);
   const confirmedTransactions = history.entries.filter(
     (entry) => !entry.mempool && entry.height !== undefined && entry.height > 0,
@@ -688,19 +734,32 @@ function AddressHistoryView({
     visibleUnknownTransactions.length;
   const pendingUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height === 0) ?? [];
   const confirmedUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height > 0) ?? [];
+  const unknownUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height < 0) ?? [];
+  const visiblePendingUtxos = pendingUtxos.slice(0, utxoLimit);
+  const visibleConfirmedUtxos = confirmedUtxos.slice(
+    0,
+    Math.max(0, utxoLimit - visiblePendingUtxos.length),
+  );
+  const visibleUnknownUtxos = unknownUtxos.slice(
+    0,
+    Math.max(0, utxoLimit - visiblePendingUtxos.length - visibleConfirmedUtxos.length),
+  );
+  const visibleUtxoCount =
+    visiblePendingUtxos.length + visibleConfirmedUtxos.length + visibleUnknownUtxos.length;
   const hasLoad = !!onLoad;
   const hasLoadUtxos = !!onLoadUtxos;
   const isLoading = !!loading && !loading.error;
   const canLoad = !!onLoad && !disabledReason && !isLoading;
   const canLoadUtxos = !!onLoadUtxos && !disabledReason;
-  const jumpToUtxoSection = (section: 'pending' | 'confirmed') => {
+  const jumpToUtxoSection = (section: 'pending' | 'confirmed' | 'unknown') => {
     setCollapsedUtxoSections((current) => ({ ...current, [section]: false }));
     requestAnimationFrame(() => {
-      (section === 'pending' ? pendingUtxosSection : confirmedUtxosSection).current?.scrollIntoView(
-        {
-          block: 'start',
-        },
-      );
+      (section === 'pending'
+        ? pendingUtxosSection
+        : section === 'confirmed'
+          ? confirmedUtxosSection
+          : unknownUtxosSection
+      ).current?.scrollIntoView({ block: 'start' });
     });
   };
   const jumpToTransactionSection = (section: 'pending' | 'confirmed' | 'unknown') => {
@@ -775,36 +834,6 @@ function AddressHistoryView({
       </button>
     );
   };
-  const renderUtxoSection = (
-    section: 'pending' | 'confirmed',
-    label: string,
-    items: AddressUtxoObservation['utxos'],
-    sectionRef: RefObject<HTMLElement | null>,
-  ) => (
-    <section id={`address-utxos-${section}`} className="address-history-section" ref={sectionRef}>
-      <h4 className="address-history-section-heading">
-        <button
-          type="button"
-          className="address-history-section-toggle"
-          aria-expanded={!collapsedUtxoSections[section]}
-          aria-controls={`address-utxos-${section}-list`}
-          onClick={() =>
-            setCollapsedUtxoSections((current) => ({
-              ...current,
-              [section]: !current[section],
-            }))
-          }
-        >
-          {label} ({items.length})
-        </button>
-      </h4>
-      {!collapsedUtxoSections[section] && (
-        <div id={`address-utxos-${section}-list`} className="address-history-list" role="list">
-          {items.map(renderUtxo)}
-        </div>
-      )}
-    </section>
-  );
   const renderHistoryEntry = (entry: AddressHistory['entries'][number]) => {
     const transactionNodeId = txNodeId(entry.txid);
     const annotation = workspace.annotations[transactionNodeId];
@@ -915,37 +944,6 @@ function AddressHistoryView({
       </button>
     );
   };
-  const renderTransactionSection = (
-    section: 'pending' | 'confirmed' | 'unknown',
-    label: string,
-    items: AddressHistory['entries'],
-    visibleItems: AddressHistory['entries'],
-    sectionRef: RefObject<HTMLElement | null>,
-  ) => (
-    <section id={`address-history-${section}`} className="address-history-section" ref={sectionRef}>
-      <h4 className="address-history-section-heading">
-        <button
-          type="button"
-          className="address-history-section-toggle"
-          aria-expanded={!collapsedTransactionSections[section]}
-          aria-controls={`address-history-${section}-list`}
-          onClick={() =>
-            setCollapsedTransactionSections((current) => ({
-              ...current,
-              [section]: !current[section],
-            }))
-          }
-        >
-          {label} ({items.length})
-        </button>
-      </h4>
-      {!collapsedTransactionSections[section] && (
-        <div id={`address-history-${section}-list`} className="address-history-list" role="list">
-          {visibleItems.map(renderHistoryEntry)}
-        </div>
-      )}
-    </section>
-  );
   return (
     <div className="address-history-view" aria-label="Address history">
       <div className="address-history-sticky">
@@ -1088,8 +1086,19 @@ function AddressHistoryView({
             >
               {confirmedUtxos.length} confirmed
             </button>
-            {addressUtxos.utxos.some((utxo) => utxo.height < 0) && (
-              <span>{addressUtxos.utxos.filter((utxo) => utxo.height < 0).length} unknown</span>
+            {unknownUtxos.length > 0 && (
+              <>
+                <span className="address-history-section-summary-separator" aria-hidden="true">
+                  |
+                </span>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => jumpToUtxoSection('unknown')}
+                >
+                  {unknownUtxos.length} unknown
+                </button>
+              </>
             )}
           </div>
         )}
@@ -1113,30 +1122,60 @@ function AddressHistoryView({
         )}
       {tab === 'transactions' && !!history.entries.length && (
         <div className="address-history-sections">
-          {pendingTransactions.length > 0 &&
-            renderTransactionSection(
-              'pending',
-              'Pending',
-              pendingTransactions,
-              visiblePendingTransactions,
-              pendingTransactionsSection,
-            )}
-          {confirmedTransactions.length > 0 &&
-            renderTransactionSection(
-              'confirmed',
-              'Confirmed',
-              confirmedTransactions,
-              visibleConfirmedTransactions,
-              confirmedTransactionsSection,
-            )}
-          {unknownTransactions.length > 0 &&
-            renderTransactionSection(
-              'unknown',
-              'Unknown',
-              unknownTransactions,
-              visibleUnknownTransactions,
-              unknownTransactionsSection,
-            )}
+          {pendingTransactions.length > 0 && (
+            <AddressHistorySection
+              idPrefix="address-history"
+              section="pending"
+              label="Pending"
+              items={pendingTransactions}
+              visibleItems={visiblePendingTransactions}
+              collapsed={collapsedTransactionSections.pending}
+              onToggle={() =>
+                setCollapsedTransactionSections((current) => ({
+                  ...current,
+                  pending: !current.pending,
+                }))
+              }
+              sectionRef={pendingTransactionsSection}
+              renderItem={renderHistoryEntry}
+            />
+          )}
+          {confirmedTransactions.length > 0 && (
+            <AddressHistorySection
+              idPrefix="address-history"
+              section="confirmed"
+              label="Confirmed"
+              items={confirmedTransactions}
+              visibleItems={visibleConfirmedTransactions}
+              collapsed={collapsedTransactionSections.confirmed}
+              onToggle={() =>
+                setCollapsedTransactionSections((current) => ({
+                  ...current,
+                  confirmed: !current.confirmed,
+                }))
+              }
+              sectionRef={confirmedTransactionsSection}
+              renderItem={renderHistoryEntry}
+            />
+          )}
+          {unknownTransactions.length > 0 && (
+            <AddressHistorySection
+              idPrefix="address-history"
+              section="unknown"
+              label="Unknown"
+              items={unknownTransactions}
+              visibleItems={visibleUnknownTransactions}
+              collapsed={collapsedTransactionSections.unknown}
+              onToggle={() =>
+                setCollapsedTransactionSections((current) => ({
+                  ...current,
+                  unknown: !current.unknown,
+                }))
+              }
+              sectionRef={unknownTransactionsSection}
+              renderItem={renderHistoryEntry}
+            />
+          )}
         </div>
       )}
       {tab === 'transactions' && history.entries.length > visibleTransactionCount && (
@@ -1162,12 +1201,73 @@ function AddressHistoryView({
       )}
       {tab === 'utxos' && !!addressUtxos?.utxos.length && (
         <div className="address-history-sections">
-          {pendingUtxos.length > 0 &&
-            renderUtxoSection('pending', 'Pending', pendingUtxos, pendingUtxosSection)}
-          {confirmedUtxos.length > 0 &&
-            renderUtxoSection('confirmed', 'Confirmed', confirmedUtxos, confirmedUtxosSection)}
+          {pendingUtxos.length > 0 && (
+            <AddressHistorySection
+              idPrefix="address-utxos"
+              section="pending"
+              label="Pending"
+              items={pendingUtxos}
+              visibleItems={visiblePendingUtxos}
+              collapsed={collapsedUtxoSections.pending}
+              onToggle={() =>
+                setCollapsedUtxoSections((current) => ({
+                  ...current,
+                  pending: !current.pending,
+                }))
+              }
+              sectionRef={pendingUtxosSection}
+              renderItem={renderUtxo}
+            />
+          )}
+          {confirmedUtxos.length > 0 && (
+            <AddressHistorySection
+              idPrefix="address-utxos"
+              section="confirmed"
+              label="Confirmed"
+              items={confirmedUtxos}
+              visibleItems={visibleConfirmedUtxos}
+              collapsed={collapsedUtxoSections.confirmed}
+              onToggle={() =>
+                setCollapsedUtxoSections((current) => ({
+                  ...current,
+                  confirmed: !current.confirmed,
+                }))
+              }
+              sectionRef={confirmedUtxosSection}
+              renderItem={renderUtxo}
+            />
+          )}
+          {unknownUtxos.length > 0 && (
+            <AddressHistorySection
+              idPrefix="address-utxos"
+              section="unknown"
+              label="Unknown"
+              items={unknownUtxos}
+              visibleItems={visibleUnknownUtxos}
+              collapsed={collapsedUtxoSections.unknown}
+              onToggle={() =>
+                setCollapsedUtxoSections((current) => ({
+                  ...current,
+                  unknown: !current.unknown,
+                }))
+              }
+              sectionRef={unknownUtxosSection}
+              renderItem={renderUtxo}
+            />
+          )}
         </div>
       )}
+      {tab === 'utxos' &&
+        !!addressUtxos?.utxos.length &&
+        addressUtxos.utxos.length > visibleUtxoCount && (
+          <button
+            type="button"
+            className="text-button address-history-more"
+            onClick={() => setUtxoLimit((value) => Math.min(addressUtxos.utxos.length, value + 40))}
+          >
+            Show more UTXOs ({addressUtxos.utxos.length - visibleUtxoCount} remaining)
+          </button>
+        )}
     </div>
   );
 }
@@ -1187,14 +1287,15 @@ export function TransactionView(props: Props) {
     onRetryInputs,
     renderMetadata,
   } = props;
-  const spends = useMemo(() => indexLoadedSpends(workspace.transactions), [workspace.transactions]);
+  const { network, transactions } = workspace;
+  const spends = useMemo(() => indexLoadedSpends(transactions), [transactions]);
   const related = useMemo(
-    () => (selected ? relatedTransactions(workspace.transactions, selected, spends) : []),
-    [workspace.transactions, selected?.id, spends],
+    () => (selected ? relatedTransactions(transactions, selected, spends) : []),
+    [transactions, selected, spends],
   );
   const previousOutputs = useMemo(
-    () => indexPreviousOutputs(workspace),
-    [workspace.transactions, workspace.network],
+    () => indexPreviousOutputs({ network, transactions }),
+    [transactions, network],
   );
   const [choice, setChoice] = useState('');
   const [quickEditor, setQuickEditor] = useState<{
@@ -1473,6 +1574,7 @@ export function TransactionView(props: Props) {
               </div>
               {selected.kind === 'address' ? (
                 <AddressHistoryView
+                  key={selected.address}
                   history={
                     props.addressHistory ?? {
                       address: selected.address ?? '',

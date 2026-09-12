@@ -1,6 +1,10 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
-import { addressBalanceSats, listAddressHistory } from '../src/domain/addressHistory';
+import {
+  addressBalanceSats,
+  indexAddressHistoryTransactions,
+  listAddressHistory,
+} from '../src/domain/addressHistory';
 import { addressToScriptHash } from '../src/lib/wallet';
 import { newWorkspace } from '../src/domain/workspace';
 import type { Transaction } from '../src/domain/types';
@@ -108,5 +112,17 @@ describe('address history projection', () => {
     expect(listAddressHistory(workspace, address(3))).toBeDefined();
     expect(listAddressHistory(workspace, address(3).replace('bc1', 'tb1'))).toBeUndefined();
     expect(listAddressHistory(workspace, 'not-an-address')).toBeUndefined();
+  });
+
+  it('reuses an index for an immutable transaction snapshot and rebuilds after changes', () => {
+    const workspace = newWorkspace('Address history index', 'mainnet');
+    const first = indexAddressHistoryTransactions(workspace);
+    expect(indexAddressHistoryTransactions(workspace)).toBe(first);
+
+    const changed = {
+      ...workspace,
+      transactions: { ...workspace.transactions, [received.txid]: received },
+    };
+    expect(indexAddressHistoryTransactions(changed)).not.toBe(first);
   });
 });

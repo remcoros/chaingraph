@@ -409,30 +409,6 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
         'input-context-limit',
         'Workspace exceeds the 10,000 input-context transaction limit.',
       );
-    if (
-      raw.addressHistories &&
-      typeof raw.addressHistories === 'object' &&
-      !Array.isArray(raw.addressHistories)
-    ) {
-      const histories = Object.values(raw.addressHistories);
-      if (histories.length > 10000)
-        throw new WorkspaceValidationError(
-          'wallet-address-limit',
-          'Workspace exceeds the 10,000 watched address history limit.',
-        );
-      let entries = 0;
-      for (const history of histories) {
-        if (!history || typeof history !== 'object') continue;
-        entries += Array.isArray((history as { history?: unknown }).history)
-          ? (history as { history: unknown[] }).history.length
-          : 0;
-        if (entries > MAX_GRAPH_RECORDS)
-          throw new WorkspaceValidationError(
-            'graph-limit',
-            'Workspace exceeds the 50,000 address history entry limit.',
-          );
-      }
-    }
     let outputs = 0;
     for (const scope of scopes) {
       outputs += Array.isArray(scope) ? scope.length : 0;
@@ -440,6 +416,30 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
         throw new WorkspaceValidationError(
           'input-context-limit',
           'Workspace exceeds the 50,000 input-context output limit.',
+        );
+    }
+  }
+  if (
+    raw.addressHistories &&
+    typeof raw.addressHistories === 'object' &&
+    !Array.isArray(raw.addressHistories)
+  ) {
+    const histories = Object.values(raw.addressHistories);
+    if (histories.length > 10000)
+      throw new WorkspaceValidationError(
+        'wallet-address-limit',
+        'Workspace exceeds the 10,000 watched address history limit.',
+      );
+    let entries = 0;
+    for (const history of histories) {
+      if (!history || typeof history !== 'object') continue;
+      entries += Array.isArray((history as { history?: unknown }).history)
+        ? (history as { history: unknown[] }).history.length
+        : 0;
+      if (entries > MAX_GRAPH_RECORDS)
+        throw new WorkspaceValidationError(
+          'graph-limit',
+          'Workspace exceeds the 50,000 address history entry limit.',
         );
     }
   }

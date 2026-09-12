@@ -130,7 +130,8 @@ The Transactions tab groups observed history into clickable, collapsible Pending
 and Confirmed sections, with pending transactions first. The UTXOs tab is
 populated only from the backend's current unspent-output observation, not from
 every loaded output. It shows confirmed and pending totals with matching
-collapsible sections, with pending outputs first. Confirmed rows show the
+collapsible sections, with pending outputs first. Both tabs render a bounded
+first page and offer **Show more** for larger observations. Confirmed rows show the
 observed block and transaction timestamp when the creating transaction detail
 is loaded; pending rows are marked as Pending. Confirmed transactions show their
 fee rate and total fee when all input values and virtual size are observed;

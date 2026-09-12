@@ -19,7 +19,9 @@ import {
 } from './domain/walletRecords';
 import { listWalletRelationships } from './domain/walletRelationships';
 import {
+  buildAddressHistoryTransactionIndex,
   listAddressHistory,
+  projectAddressHistory,
   selectedAddress as selectedAddressForHistory,
 } from './domain/addressHistory';
 import { useFlowInputs } from './lib/useFlowInputs';
@@ -877,10 +879,57 @@ export default function App() {
   const selected = selectedId
     ? (graphMetadata.labeledNodes.get(selectedId) ?? recoveryNodesById.get(selectedId))
     : undefined;
+  const addressHistoryNetwork = w?.network;
+  const addressHistoryTransactions = w?.transactions;
+  const addressHistoryWallets = w?.wallets;
+  const addressHistoryObservations = w?.addressHistories;
+  const addressHistoryGraphNodeIds = w?.view.graphNodeIds;
+  const addressHistoryHiddenNodeIds = w?.view.hiddenNodeIds;
+  const addressHistoryIndex = useMemo(
+    () =>
+      addressHistoryNetwork && addressHistoryTransactions
+        ? buildAddressHistoryTransactionIndex({
+            network: addressHistoryNetwork,
+            transactions: addressHistoryTransactions,
+          })
+        : undefined,
+    [addressHistoryNetwork, addressHistoryTransactions],
+  );
   const addressHistory = useMemo(() => {
-    if (!w || selected?.kind !== 'address' || !selected.address) return undefined;
-    return listAddressHistory(w, selected.address);
-  }, [w, selected]);
+    const selectedAddressValue = selectedId?.startsWith('addr:')
+      ? selectedId.slice('addr:'.length)
+      : undefined;
+    if (
+      !addressHistoryNetwork ||
+      !addressHistoryTransactions ||
+      !addressHistoryIndex ||
+      !selectedAddressValue
+    )
+      return undefined;
+    return projectAddressHistory(
+      {
+        network: addressHistoryNetwork,
+        transactions: addressHistoryTransactions,
+        wallets: addressHistoryWallets ?? [],
+        addressHistories: addressHistoryObservations,
+        view: {
+          graphNodeIds: addressHistoryGraphNodeIds,
+          hiddenNodeIds: addressHistoryHiddenNodeIds,
+        },
+      },
+      selectedAddressValue,
+      addressHistoryIndex,
+    );
+  }, [
+    addressHistoryIndex,
+    addressHistoryNetwork,
+    addressHistoryTransactions,
+    addressHistoryWallets,
+    addressHistoryObservations,
+    addressHistoryGraphNodeIds,
+    addressHistoryHiddenNodeIds,
+    selectedId,
+  ]);
   const addressBalance =
     w && selected?.kind === 'address' && selected.address
       ? w.addressBalances?.[selected.address]
@@ -1543,7 +1592,10 @@ export default function App() {
     let pendingTransactions: Transaction[] = [];
     let transactionFlushTimer: ReturnType<typeof setTimeout> | undefined;
     const flushTransactions = () => {
-      transactionFlushTimer = undefined;
+      if (transactionFlushTimer) {
+        clearTimeout(transactionFlushTimer);
+        transactionFlushTimer = undefined;
+      }
       const batch = pendingTransactions;
       pendingTransactions = [];
       if (!batch.length || wRef.current?.id !== ownerId) return;
@@ -1573,7 +1625,7 @@ export default function App() {
     };
     const persistTransaction = (transaction: Transaction) => {
       pendingTransactions.push(transaction);
-      if (!transactionFlushTimer) transactionFlushTimer = setTimeout(flushTransactions, 0);
+      if (!transactionFlushTimer) transactionFlushTimer = setTimeout(flushTransactions, 16);
     };
 
     let failed = false;
@@ -2204,52 +2256,74 @@ export default function App() {
         let refreshed = checked.refreshed;
         let partial = checked.partial;
         let snapshot = checked.snapshot;
-        for (const address of current.watchedAddresses) {
-          const result = await loadAddress(
-            address,
-            current.network,
-            snapshot.transactions,
-            signal,
-            undefined,
-            { scope: fetchScope },
-          );
-          signal.throwIfAborted();
-          mergeTransactions(current.id, result.transactions, result.observedTransactionIds);
-          ws.update(
-            current.id,
-            (latest) => ({
-              ...latest,
-              addressHistories: {
-                ...latest.addressHistories,
-                [address]: {
-                  history: result.history,
-                  truncated: result.truncated,
-                  scannedAt: new Date().toISOString(),
-                },
+        const polledTransactions: Transaction[] = [];
+        const polledObservedTransactionIds = new Set<string>();
+        const refreshedHistories: NonNullable<Workspace['addressHistories']> = {};
+        let pollFailed = false;
+        let pollFailure: unknown;
+        try {
+          for (const address of current.watchedAddresses) {
+            const result = await loadAddress(
+              address,
+              current.network,
+              snapshot.transactions,
+              signal,
+              undefined,
+              { scope: fetchScope },
+            );
+            signal.throwIfAborted();
+            polledTransactions.push(...result.transactions);
+            for (const txid of result.observedTransactionIds)
+              polledObservedTransactionIds.add(txid);
+            refreshedHistories[address] = {
+              history: result.history,
+              truncated: result.truncated,
+              scannedAt: new Date().toISOString(),
+            };
+            added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
+            refreshed += result.transactions.filter(
+              (tx) => !!snapshot.transactions[tx.txid],
+            ).length;
+            snapshot = {
+              ...clearContextProvenance(snapshot, result.observedTransactionIds),
+              transactions: {
+                ...snapshot.transactions,
+                ...Object.fromEntries(
+                  result.transactions.map((tx) => [
+                    tx.txid,
+                    mergeTransactionObservations(
+                      snapshot.transactions[tx.txid],
+                      tx,
+                      snapshot.network,
+                    ),
+                  ]),
+                ),
               },
-            }),
-            false,
-          );
-          added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
-          refreshed += result.transactions.filter((tx) => !!snapshot.transactions[tx.txid]).length;
-          snapshot = {
-            ...clearContextProvenance(snapshot, result.observedTransactionIds),
-            transactions: {
-              ...snapshot.transactions,
-              ...Object.fromEntries(
-                result.transactions.map((tx) => [
-                  tx.txid,
-                  mergeTransactionObservations(
-                    snapshot.transactions[tx.txid],
-                    tx,
-                    snapshot.network,
-                  ),
-                ]),
-              ),
-            },
-          };
-          partial = partial || result.truncated;
+            };
+            partial = partial || result.truncated;
+          }
+        } catch (error) {
+          pollFailed = true;
+          pollFailure = error;
         }
+        // Publish completed work as one immutable snapshot. If polling is cancelled,
+        // preserve the addresses already checked before the abort as well.
+        if (wRef.current?.id === current.id && wRef.current.network === current.network) {
+          mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
+          if (Object.keys(refreshedHistories).length)
+            ws.update(
+              current.id,
+              (latest) => ({
+                ...latest,
+                addressHistories: {
+                  ...latest.addressHistories,
+                  ...refreshedHistories,
+                },
+              }),
+              false,
+            );
+        }
+        if (pollFailed) throw pollFailure;
         setNotice(
           `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
         );
