@@ -108,7 +108,13 @@ export function useWalletUtxos({
   enabled: boolean;
 }): WalletUtxoController {
   const scope = useMemo(
-    () => ({}),
+    () => ({
+      workspaceId: workspace?.id,
+      network: workspace?.network,
+      walletId: wallet?.id,
+      addresses: wallet?.addresses,
+      scannedAt: wallet?.scannedAt,
+    }),
     [workspace?.id, workspace?.network, wallet?.id, wallet?.addresses, wallet?.scannedAt],
   );
   const activeScope = useRef(scope);
