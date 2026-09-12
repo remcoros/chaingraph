@@ -467,6 +467,18 @@ export default function App() {
     deferredGraphRequest.workspaceId === w?.id ? deferredGraphRequest : graphRenderRequest;
   const appliedGraphFilters = appliedGraphRequest.filters;
   const graphFiltering = appliedGraphRequest !== graphRenderRequest;
+  // Selection drives the inspector and transaction flow immediately. The canvas can
+  // retain its previous highlight briefly, so an expensive renderer update does not
+  // hold those panels behind a large graph presentation pass.
+  const graphSelectionRequest = useMemo(
+    () => ({ workspaceId: w?.id, selectedId }),
+    [w?.id, selectedId],
+  );
+  const deferredGraphSelectionRequest = useDeferredValue(graphSelectionRequest);
+  const graphSelectedId =
+    deferredGraphSelectionRequest.workspaceId === w?.id
+      ? deferredGraphSelectionRequest.selectedId
+      : graphSelectionRequest.selectedId;
   const [tour, setTour] = useState<string>();
   const tourSteps = availableTourSteps(WORKBENCH_TOUR, {
     hasSelection: !!selectedId,
@@ -645,8 +657,8 @@ export default function App() {
     [graphWithoutAddresses],
   );
   const graphFlowContext = useMemo(
-    () => flowIndex.resolve(selectedId, w?.view.transactionFlow?.transactionId),
-    [flowIndex, selectedId, w?.view.transactionFlow?.transactionId],
+    () => flowIndex.resolve(graphSelectedId, w?.view.transactionFlow?.transactionId),
+    [flowIndex, graphSelectedId, w?.view.transactionFlow?.transactionId],
   );
   const walletMatches = useMemo(
     () => (w ? buildWalletMatches(w, completeGraph) : new Map()),
@@ -741,7 +753,7 @@ export default function App() {
     () => new Set(admittedGraph.nodes.map((node) => node.id)),
     [admittedGraph],
   );
-  const amountSelectionId = appliedGraphRequest.smallAmountThreshold ? selectedId : undefined;
+  const amountSelectionId = appliedGraphRequest.smallAmountThreshold ? graphSelectedId : undefined;
   const amountGraph = useMemo(
     () =>
       filterSmallAmounts(
@@ -793,9 +805,14 @@ export default function App() {
     return appliedGraphRequest.smallAmountThreshold ||
       effectiveFilters.minSats !== undefined ||
       effectiveFilters.maxSats !== undefined
-      ? omitAmountOrphans(canvasFilterResult, selectedId)
+      ? omitAmountOrphans(canvasFilterResult, graphSelectedId)
       : canvasFilterResult;
-  }, [canvasFilterResult, effectiveFilters, appliedGraphRequest.smallAmountThreshold, selectedId]);
+  }, [
+    canvasFilterResult,
+    effectiveFilters,
+    appliedGraphRequest.smallAmountThreshold,
+    graphSelectedId,
+  ]);
   const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
   const connectionGraph = completeGraph;
   const connectionMembers = useMemo(
@@ -3772,7 +3789,7 @@ export default function App() {
                         nodes={visibleGraph.nodes}
                         links={visibleGraph.links}
                         focusRequest={focusRequest}
-                        selectedId={selectedId}
+                        selectedId={graphSelectedId}
                         onSelect={select}
                         selectionMode={pickingScanTargets || selection.mode}
                         selectionPurpose={pickingScanTargets ? 'scan-target' : 'batch'}
