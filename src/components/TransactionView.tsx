@@ -1045,7 +1045,9 @@ function AddressHistoryView({
             >
               {pendingTransactions.length} pending
             </button>
-            <span aria-hidden="true">|</span>
+            <span className="address-history-section-summary-separator" aria-hidden="true">
+              |
+            </span>
             <button
               type="button"
               className="text-button"
@@ -1055,7 +1057,9 @@ function AddressHistoryView({
             </button>
             {!!unknownTransactions.length && (
               <>
-                <span aria-hidden="true">|</span>
+                <span className="address-history-section-summary-separator" aria-hidden="true">
+                  |
+                </span>
                 <button
                   type="button"
                   className="text-button"

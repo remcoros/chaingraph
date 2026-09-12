@@ -213,8 +213,9 @@ creating transactions may be loaded, bounded to 500 missing details per
 action, so their block timestamps can be displayed; a missing timestamp remains
 unknown rather than being inferred from the UTXO height.
 
-For a direct address lookup, the browser admits and selects the address before
-loading its history details. The bounded raw history observation is persisted
+For a selected or directly looked-up address, the browser admits and selects the
+address before loading its history details when no direct history is available.
+The bounded raw history observation is persisted
 as soon as it arrives, then transaction details are persisted in small
 progressive batches. Jobs are keyed by workspace, network and address, may
 continue after selection changes, and are cancelled when the workspace changes.

@@ -4,6 +4,7 @@ import {
   addressBalanceSats,
   indexAddressHistoryTransactions,
   listAddressHistory,
+  shouldLoadAddressHistory,
 } from '../src/domain/addressHistory';
 import { addressToScriptHash } from '../src/lib/wallet';
 import { newWorkspace } from '../src/domain/workspace';
@@ -105,6 +106,48 @@ describe('address history projection', () => {
     expect(result.source).toBe('wallet history');
     expect(result.complete).toBe(false);
     expect(result.entries[0]).toMatchObject({ txid: id(4), mempool: true });
+  });
+
+  it('requests a network check for missing, empty, or loaded-only history', () => {
+    const workspace = newWorkspace('Address history refresh', 'mainnet');
+    const target = address(3);
+    const empty = listAddressHistory(
+      {
+        ...workspace,
+        addressHistories: { [target]: { history: [], truncated: false } },
+      },
+      target,
+    );
+    expect(shouldLoadAddressHistory(undefined)).toBe(true);
+    expect(shouldLoadAddressHistory(empty)).toBe(true);
+    const loadedOnlyEntry = {
+      txid: id(5),
+      height: 1,
+      mempool: false,
+      direction: 'unknown' as const,
+      onGraph: false,
+      hidden: false,
+    };
+    expect(
+      shouldLoadAddressHistory({
+        ...empty!,
+        entries: [loadedOnlyEntry],
+        knownCount: 1,
+        loadedCount: 1,
+        unloadedCount: 0,
+        source: 'loaded transactions',
+      }),
+    ).toBe(true);
+    expect(
+      shouldLoadAddressHistory({
+        ...empty!,
+        entries: [{ ...loadedOnlyEntry, txid: id(6) }],
+        knownCount: 1,
+        loadedCount: 0,
+        unloadedCount: 1,
+        source: 'address history',
+      }),
+    ).toBe(false);
   });
 
   it('rejects an address from another network or malformed address', () => {

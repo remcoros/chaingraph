@@ -38,6 +38,11 @@ export interface AddressHistory {
   source: 'address history' | 'wallet history' | 'loaded transactions';
 }
 
+/** A selected address needs a network check when no direct history is known yet. */
+export function shouldLoadAddressHistory(history: AddressHistory | undefined): boolean {
+  return !history || history.knownCount === 0 || history.source === 'loaded transactions';
+}
+
 interface AddressHistoryTransactionMatch {
   receivedSats?: number;
   spentSats?: number;

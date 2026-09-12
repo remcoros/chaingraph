@@ -22,6 +22,7 @@ import {
   buildAddressHistoryTransactionIndex,
   listAddressHistory,
   projectAddressHistory,
+  shouldLoadAddressHistory,
   selectedAddress as selectedAddressForHistory,
 } from './domain/addressHistory';
 import { useFlowInputs } from './lib/useFlowInputs';
@@ -220,6 +221,8 @@ export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
   const fetchScope = ws.active?.fetchScope;
+  const updateWorkspace = ws.update;
+  const getWorkspaceSession = ws.getSession;
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
@@ -1532,7 +1535,7 @@ export default function App() {
     setMobilePanel('graph');
     setFocusRequest({ id, token: Date.now() });
   }
-  function startAddressHistoryLoad(address: string, force = false) {
+  const startAddressHistoryLoad = useCallback((address: string, force = false) => {
     const current = wRef.current;
     if (!current || !canQuery) return;
     const ownerId = current.id;
@@ -1541,9 +1544,8 @@ export default function App() {
     const currentHistory = listAddressHistory(current, address);
     const needsHistory =
       force ||
-      !currentHistory ||
-      currentHistory.source === 'loaded transactions' ||
-      !currentHistory.complete;
+      shouldLoadAddressHistory(currentHistory) ||
+      !currentHistory?.complete;
     const needsBalance = force || !current.addressBalances?.[address];
     if (!needsHistory && !needsBalance) return;
 
@@ -1572,7 +1574,7 @@ export default function App() {
       truncated,
     ) => {
       if (wRef.current?.id !== ownerId) return;
-      ws.update(
+      updateWorkspace(
         ownerId,
         (latest) => ({
           ...latest,
@@ -1599,7 +1601,7 @@ export default function App() {
       const batch = pendingTransactions;
       pendingTransactions = [];
       if (!batch.length || wRef.current?.id !== ownerId) return;
-      ws.update(
+      updateWorkspace(
         ownerId,
         (latest) => ({
           ...clearContextProvenance(
@@ -1665,7 +1667,7 @@ export default function App() {
         flushTransactions();
         controller.signal.throwIfAborted();
         if (result && wRef.current?.id === ownerId)
-          ws.update(
+          updateWorkspace(
             ownerId,
             (latest) => clearContextProvenance(latest, result!.observedTransactionIds),
             false,
@@ -1674,7 +1676,7 @@ export default function App() {
         const balance = await balancePromise;
         controller.signal.throwIfAborted();
         if (balance && wRef.current?.id === ownerId)
-          ws.update(
+          updateWorkspace(
             ownerId,
             (latest) => ({
               ...latest,
@@ -1720,7 +1722,19 @@ export default function App() {
           return next;
         });
     });
-  }
+  }, [canQuery, fetchScope, updateWorkspace]);
+  const autoLoadAddress =
+    w && selected?.kind === 'address' && selected.address
+      ? selectedAddressForHistory(selected, w.network)
+      : undefined;
+  useEffect(() => {
+    if (!w?.id || !canQuery || !autoLoadAddress) return;
+    const current = getWorkspaceSession(w.id)?.data;
+    if (!current || !shouldLoadAddressHistory(listAddressHistory(current, autoLoadAddress))) return;
+    // Selection is the stable trigger. Do not depend on the observation itself:
+    // an empty successful result must not start an endless refresh loop.
+    startAddressHistoryLoad(autoLoadAddress);
+  }, [autoLoadAddress, canQuery, getWorkspaceSession, startAddressHistoryLoad, w?.id]);
   function openAddressHistory(force = false) {
     if (!w || !selected) return;
     const address = selectedAddressForHistory(selected, w.network);
