@@ -20,7 +20,6 @@ import {
   continuationHint,
   loadedSpenders,
   searchTraceSpenders,
-  selectedOutpoint,
   traceId,
   TRACE_CANDIDATE_LIMIT,
   TRACE_TIMEOUT_MS,
@@ -57,7 +56,16 @@ export function TraceWorkbench({
   onAnnotate,
   renderMetadata,
 }: TraceWorkbenchProps) {
-  const point = selectedOutpoint(selected);
+  const selectedKind = selected?.kind;
+  const selectedTxid = selected?.txid;
+  const selectedVout = selected?.vout;
+  const point = useMemo(
+    () =>
+      selectedKind === 'output' && selectedTxid !== undefined && selectedVout !== undefined
+        ? { txid: selectedTxid, vout: selectedVout }
+        : undefined,
+    [selectedKind, selectedTxid, selectedVout],
+  );
   const pointId = point && traceId(point);
   const sourceExists = useMemo(
     () => !!pointId && traceSourceExists(workspace, pointId),
@@ -135,7 +143,7 @@ export function TraceWorkbench({
           ? previous
           : [...previous, { point, via: 'Selected output' }].slice(-TRACE_TRAIL_LIMIT),
       );
-  }, [pointId, active]);
+  }, [point, active]);
 
   function go(next: TraceOutpoint, via: string) {
     request.current?.abort();
