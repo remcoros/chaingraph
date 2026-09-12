@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
 import {
   addressNodeId,
@@ -158,6 +158,7 @@ export function SelectedTags({
   const [removal, setRemoval] = useState<{ tag: WorkspaceTag; anchor: HTMLElement } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [triggerAnchor, setTriggerAnchor] = useState<HTMLButtonElement | null>(null);
+  const handleOpenHandled = useEffectEvent(() => onOpenHandled?.());
   useEffect(() => {
     setOpen(false);
     setRemoval(null);
@@ -168,7 +169,7 @@ export function SelectedTags({
     currentTrigger?.focus();
     setTriggerAnchor(currentTrigger);
     setOpen(true);
-    onOpenHandled?.();
+    handleOpenHandled();
   }, [openToken]);
   const id = useId();
   return (
