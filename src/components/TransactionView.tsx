@@ -1273,17 +1273,15 @@ function AddressHistoryView({
           )}
         </div>
       )}
-      {tab === 'utxos' &&
-        !!addressUtxos?.utxos.length &&
-        expandedUtxoCount > visibleUtxoCount && (
-          <button
-            type="button"
-            className="text-button address-history-more"
-            onClick={() => setUtxoLimit((value) => Math.min(expandedUtxoCount, value + 40))}
-          >
-            Show more UTXOs ({expandedUtxoCount - visibleUtxoCount} remaining)
-          </button>
-        )}
+      {tab === 'utxos' && !!addressUtxos?.utxos.length && expandedUtxoCount > visibleUtxoCount && (
+        <button
+          type="button"
+          className="text-button address-history-more"
+          onClick={() => setUtxoLimit((value) => Math.min(expandedUtxoCount, value + 40))}
+        >
+          Show more UTXOs ({expandedUtxoCount - visibleUtxoCount} remaining)
+        </button>
+      )}
     </div>
   );
 }

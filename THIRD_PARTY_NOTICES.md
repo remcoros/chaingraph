@@ -2339,7 +2339,7 @@ licenses; we recommend you read them, as their terms may differ from the
 terms above.
 ```
 
-## lucide-react 1.44.0
+## lucide-react 1.45.0
 
 Declared license: ISC
 
@@ -3955,7 +3955,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## zod 4.6.1
+## zod 4.6.2
 
 Declared license: MIT
 
