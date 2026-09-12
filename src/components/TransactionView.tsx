@@ -61,7 +61,11 @@ import type { EntitySelection } from '../lib/useEntitySelection';
 import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import { BatchTagEditor, MetadataPopover } from './MetadataEditors';
 import { IconPalette } from './IconPicker';
-import { addressBalanceSats, type AddressHistory } from '../domain/addressHistory';
+import {
+  addressBalanceSats,
+  paginateAddressHistorySections,
+  type AddressHistory,
+} from '../domain/addressHistory';
 import { formatLocalTimestamp } from '../domain/transactionTime';
 
 interface Props extends VisibilityProps {
@@ -719,15 +723,15 @@ function AddressHistoryView({
   const unknownTransactions = history.entries.filter(
     (entry) => !entry.mempool && (entry.height === undefined || entry.height <= 0),
   );
-  const visiblePendingTransactions = pendingTransactions.slice(0, limit);
-  const visibleConfirmedTransactions = confirmedTransactions.slice(
-    0,
-    Math.max(0, limit - visiblePendingTransactions.length),
-  );
-  const visibleUnknownTransactions = unknownTransactions.slice(
-    0,
-    Math.max(0, limit - visiblePendingTransactions.length - visibleConfirmedTransactions.length),
-  );
+  const [visiblePendingTransactions, visibleConfirmedTransactions, visibleUnknownTransactions] =
+    paginateAddressHistorySections(
+      [
+        { items: pendingTransactions, collapsed: collapsedTransactionSections.pending },
+        { items: confirmedTransactions, collapsed: collapsedTransactionSections.confirmed },
+        { items: unknownTransactions, collapsed: collapsedTransactionSections.unknown },
+      ],
+      limit,
+    );
   const visibleTransactionCount =
     visiblePendingTransactions.length +
     visibleConfirmedTransactions.length +
@@ -735,15 +739,15 @@ function AddressHistoryView({
   const pendingUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height === 0) ?? [];
   const confirmedUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height > 0) ?? [];
   const unknownUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height < 0) ?? [];
-  const visiblePendingUtxos = pendingUtxos.slice(0, utxoLimit);
-  const visibleConfirmedUtxos = confirmedUtxos.slice(
-    0,
-    Math.max(0, utxoLimit - visiblePendingUtxos.length),
-  );
-  const visibleUnknownUtxos = unknownUtxos.slice(
-    0,
-    Math.max(0, utxoLimit - visiblePendingUtxos.length - visibleConfirmedUtxos.length),
-  );
+  const [visiblePendingUtxos, visibleConfirmedUtxos, visibleUnknownUtxos] =
+    paginateAddressHistorySections(
+      [
+        { items: pendingUtxos, collapsed: collapsedUtxoSections.pending },
+        { items: confirmedUtxos, collapsed: collapsedUtxoSections.confirmed },
+        { items: unknownUtxos, collapsed: collapsedUtxoSections.unknown },
+      ],
+      utxoLimit,
+    );
   const visibleUtxoCount =
     visiblePendingUtxos.length + visibleConfirmedUtxos.length + visibleUnknownUtxos.length;
   const hasLoad = !!onLoad;

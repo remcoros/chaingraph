@@ -4,6 +4,7 @@ import {
   addressBalanceSats,
   indexAddressHistoryTransactions,
   listAddressHistory,
+  paginateAddressHistorySections,
   recentAddressHistoryEntries,
   recentAddressUtxos,
   RECENT_ADDRESS_GRAPH_LIMIT,
@@ -204,6 +205,30 @@ describe('address history projection', () => {
       recentAddressUtxos({ network: 'mainnet', checkedAt: new Date().toISOString(), utxos: [] }, 0),
     ).toEqual([]);
     expect(RECENT_ADDRESS_GRAPH_LIMIT).toBe(10);
+  });
+
+  it('keeps expanded sections represented within a bounded pending-first page', () => {
+    const page = paginateAddressHistorySections(
+      [
+        { items: ['pending-1', 'pending-2', 'pending-3'], collapsed: false },
+        { items: ['confirmed-1', 'confirmed-2'], collapsed: false },
+        { items: ['unknown-1', 'unknown-2'], collapsed: false },
+      ],
+      4,
+    );
+    expect(page).toEqual([['pending-1', 'pending-2'], ['confirmed-1'], ['unknown-1']]);
+    expect(page.flat()).toHaveLength(4);
+
+    expect(
+      paginateAddressHistorySections(
+        [
+          { items: ['pending-1', 'pending-2'], collapsed: true },
+          { items: ['confirmed-1', 'confirmed-2'], collapsed: false },
+          { items: ['unknown-1'], collapsed: false },
+        ],
+        40,
+      ),
+    ).toEqual([[], ['confirmed-1', 'confirmed-2'], ['unknown-1']]);
   });
 
   it('rejects an address from another network or malformed address', () => {

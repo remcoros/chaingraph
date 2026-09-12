@@ -894,25 +894,26 @@ export default function App() {
   const addressHistoryObservations = w?.addressHistories;
   const addressHistoryGraphNodeIds = w?.view.graphNodeIds;
   const addressHistoryHiddenNodeIds = w?.view.hiddenNodeIds;
+  const addressHistorySelectedAddress =
+    w && selected?.kind === 'address' && selected.address
+      ? selectedAddressForHistory(selected, w.network)
+      : undefined;
   const addressHistoryIndex = useMemo(
     () =>
-      addressHistoryNetwork && addressHistoryTransactions
+      addressHistorySelectedAddress && addressHistoryNetwork && addressHistoryTransactions
         ? buildAddressHistoryTransactionIndex({
             network: addressHistoryNetwork,
             transactions: addressHistoryTransactions,
           })
         : undefined,
-    [addressHistoryNetwork, addressHistoryTransactions],
+    [addressHistoryNetwork, addressHistorySelectedAddress, addressHistoryTransactions],
   );
   const addressHistory = useMemo(() => {
-    const selectedAddressValue = selectedId?.startsWith('addr:')
-      ? selectedId.slice('addr:'.length)
-      : undefined;
     if (
       !addressHistoryNetwork ||
       !addressHistoryTransactions ||
       !addressHistoryIndex ||
-      !selectedAddressValue
+      !addressHistorySelectedAddress
     )
       return undefined;
     return projectAddressHistory(
@@ -926,7 +927,7 @@ export default function App() {
           hiddenNodeIds: addressHistoryHiddenNodeIds,
         },
       },
-      selectedAddressValue,
+      addressHistorySelectedAddress,
       addressHistoryIndex,
     );
   }, [
@@ -937,7 +938,7 @@ export default function App() {
     addressHistoryObservations,
     addressHistoryGraphNodeIds,
     addressHistoryHiddenNodeIds,
-    selectedId,
+    addressHistorySelectedAddress,
   ]);
   const addressBalance =
     w && selected?.kind === 'address' && selected.address
