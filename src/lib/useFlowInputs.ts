@@ -1,5 +1,5 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
 import {
@@ -11,9 +11,13 @@ import { indexLoadedSpends } from '../domain/transactionFlow';
 import { mergeTransactionObservations } from '../domain/prevouts';
 import { mapLimit } from './api';
 
+type FlowPlanWorkspace = Pick<Workspace, 'network' | 'transactions'> & {
+  view: Pick<Workspace['view'], 'transactionFlow'>;
+};
+
 /** Default navigation resolves only the selected outpoint. Bulk input details are explicit. */
 export function flowInputPlan(
-  workspace: Workspace,
+  workspace: FlowPlanWorkspace,
   selected?: GraphNode,
   allInputs = false,
   prepared?: {
@@ -107,20 +111,41 @@ export function useFlowInputs(options: {
     latest.current = options;
   });
   const workspace = options.workspace;
-  // Selection and view changes reuse chain-evidence indexes. Rebuilding these
-  // during every render can dominate click latency in a large loaded wallet.
-  const spends = workspace ? indexLoadedSpends(workspace.transactions) : undefined;
-  const related =
-    workspace && options.selected
-      ? relatedTransactions(workspace.transactions, options.selected, spends)
-      : [];
-  const prevouts = workspace ? indexPreviousOutputs(workspace) : new Map();
-  const plans = workspace
-    ? {
-        selected: flowInputPlan(workspace, options.selected, false, { related, prevouts }),
-        all: flowInputPlan(workspace, options.selected, true, { related, prevouts }),
-      }
-    : undefined;
+  const transactions = workspace?.transactions;
+  const network = workspace?.network;
+  const selected = options.selected;
+  const flowState = workspace?.view.transactionFlow;
+  const flowWorkspace = useMemo<FlowPlanWorkspace | undefined>(
+    () =>
+      transactions && network
+        ? { network, transactions, view: { transactionFlow: flowState } }
+        : undefined,
+    [transactions, network, flowState],
+  );
+  // These indexes cover all loaded transactions. Keep them stable across selection
+  // and presentation updates so an inspection click only resolves its local flow.
+  const spends = useMemo(
+    () => (transactions ? indexLoadedSpends(transactions) : undefined),
+    [transactions],
+  );
+  const related = useMemo(
+    () => (transactions && selected ? relatedTransactions(transactions, selected, spends) : []),
+    [transactions, selected, spends],
+  );
+  const prevouts = useMemo(
+    () => (transactions && network ? indexPreviousOutputs({ transactions, network }) : new Map()),
+    [transactions, network],
+  );
+  const plans = useMemo(
+    () =>
+      flowWorkspace
+        ? {
+            selected: flowInputPlan(flowWorkspace, selected, false, { related, prevouts }),
+            all: flowInputPlan(flowWorkspace, selected, true, { related, prevouts }),
+          }
+        : undefined,
+    [flowWorkspace, selected, related, prevouts],
+  );
   const plan = plans?.selected;
   const target =
     options.workspace && options.selected
