@@ -54,7 +54,7 @@ export function ScriptInspector(props: ScriptInspectorProps) {
   const [open, setOpen] = useState(false);
   const related = useMemo(
     () => relatedTransactions(workspace.transactions, selected, loadedSpends),
-    [workspace.transactions, selected.id, loadedSpends],
+    [workspace.transactions, selected, loadedSpends],
   );
   if (!related.length) return null;
   return (
@@ -97,7 +97,7 @@ function ScriptInspectorBody({
     setInputIndex(Math.max(0, input));
     setOutputIndex(transaction?.txid === selected.txid ? (selected.vout ?? 0) : 0);
     return () => request.current?.abort();
-  }, [workspace.id, workspace.network, transaction, selected.id]);
+  }, [workspace.id, workspace.network, transaction, selected.id, selected.txid, selected.vout]);
   async function load() {
     if (!transaction || !canQuery || workspace.demo) return;
     request.current?.abort();
