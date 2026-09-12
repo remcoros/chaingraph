@@ -441,8 +441,13 @@ export function AnalysisWorkbench({
   const recoveryScope = scan?.scope ?? scope;
   const recoverScripts = (scan?.options ?? options)['script-types']?.scriptMode !== 'outputs';
   const scopeGaps = useMemo(
-    () => analysisDataGaps(workspace, recoveryScope.txids, recoverScripts),
-    [workspace.transactions, recoveryScope, recoverScripts],
+    () =>
+      analysisDataGaps(
+        { network: workspace.network, transactions: workspace.transactions },
+        recoveryScope.txids,
+        recoverScripts,
+      ),
+    [workspace.network, workspace.transactions, recoveryScope, recoverScripts],
   );
   const detailTxids =
     detail?.scopeTxids ?? detail?.txids.filter((id) => workspace.transactions[id]) ?? [];
