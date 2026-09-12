@@ -1072,6 +1072,9 @@ export default function App() {
       transactions: addressHistoryTransactions,
     });
   }, [addressHistoryNetwork, addressHistoryTransactions, hasAddressHistorySelection]);
+  // React Compiler cannot prove the validated address result is immutable. Retain this
+  // bounded projection memo because App itself is not compiler-transformed.
+  // oxlint-disable react/preserve-manual-memoization
   const addressHistory = useMemo(() => {
     if (
       !addressHistoryNetwork ||
@@ -1095,15 +1098,16 @@ export default function App() {
       addressHistoryIndex,
     );
   }, [
-    addressHistoryIndex,
     addressHistoryNetwork,
     addressHistoryTransactions,
     addressHistoryWallets,
     addressHistoryObservations,
     addressHistoryGraphNodeIds,
     addressHistoryHiddenNodeIds,
+    addressHistoryIndex,
     addressHistorySelectedAddress,
   ]);
+  // oxlint-enable react/preserve-manual-memoization
   const addressBalance =
     w && selected?.kind === 'address' && selected.address
       ? w.addressBalances?.[selected.address]

@@ -7,6 +7,7 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/set-state-in-render": "error",
     "react-hooks/exhaustive-deps": "error",
+    "react/preserve-manual-memoization": "error",
     "react/immutability": "error",
     "react/purity": "error",
     "eslint/no-control-regex": "error",
