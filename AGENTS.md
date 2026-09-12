@@ -46,9 +46,15 @@ personal wallets and on-chain investigation. Read `README.md`,
 
 ## Validation
 
-- `npm run check` (portability, build, domain and integration tests) is the
-  routine gate. Engine or data changes need relevant behavioral tests; UI polish
-  does not need new E2E coverage. Documentation-only edits need no test run.
+- `npm run check` (portability, linting, build, domain and integration tests) is
+  the routine gate and must pass without lint warnings. Engine or data changes
+  need relevant behavioral tests; UI polish does not need new E2E coverage.
+  Documentation-only edits need no test run.
+- Do not suppress a lint diagnostic merely to make the check pass. A suppression
+  is allowed only when the diagnostic is demonstrably incorrect, or when a
+  deliberate technical decision accepts it, such as a measured performance or
+  compatibility tradeoff. Keep suppressions as narrow as possible and add a
+  concise comment directly beside each suppression explaining the reason.
 - Browser and screenshot validation happen only on explicit request or within an
   agreed QA scope. Otherwise run non-browser checks and say that visual
   validation was not performed. Do not pause merely to ask for it.
