@@ -20,7 +20,7 @@ import {
 import { listWalletRelationships } from './domain/walletRelationships';
 import { useFlowInputs } from './lib/useFlowInputs';
 import { ExamplesDialog } from './components/ExamplesDialog';
-import type { NodePresentation } from './components/graph/presentation';
+import { EMPTY_GRAPH_ANNOTATIONS, GraphMetadataProjection } from './lib/graphMetadata';
 import { GraphLegend } from './components/GraphLegend';
 import { indexGraphFlow } from './components/graph/flowContext';
 import { GraphContextToolbar, type GraphContextSideCounts } from './components/GraphContextToolbar';
@@ -556,10 +556,13 @@ export default function App() {
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   }, [ws.persist, flushActiveGraph]);
-  // Evidence and indexes outlive visibility toggles; only their projection changes.
+  // Topology and chain indexes do not depend on human labels, icons or bookmarks.
   const completeGraph = useMemo(
-    () => (w ? fullGraphMembershipEvidence(w) : { nodes: [], links: [] }),
-    [w?.id, w?.network, w?.transactions, w?.annotations, w?.findings, w?.watchedAddresses],
+    () =>
+      w
+        ? fullGraphMembershipEvidence({ ...w, annotations: EMPTY_GRAPH_ANNOTATIONS })
+        : { nodes: [], links: [] },
+    [w?.id, w?.network, w?.transactions, w?.findings, w?.watchedAddresses],
   );
   const graphWithoutAddresses = useMemo(
     () => projectGraphAddresses(completeGraph, false),
@@ -583,33 +586,27 @@ export default function App() {
     () => (w ? buildTagIndex(w, completeGraph) : new Map<string, WorkspaceTag[]>()),
     [w?.tags, completeGraph],
   );
-  const nodePresentation = useMemo(() => {
-    const presentation = new Map<string, NodePresentation>();
-    if (!w) return presentation;
-    const mode = appliedGraphRequest.highlightMode;
-    for (const node of completeGraph.nodes) {
-      const tags = mode === 'all' || mode === 'tags' ? (tagIndex.get(node.id) ?? []) : [];
-      const match = mode === 'all' || mode === 'wallets' ? walletMatches.get(node.id) : undefined;
-      const walletColor = match
-        ? w.wallets.find((wallet) => match.walletIds.includes(wallet.id))?.color
-        : undefined;
-      presentation.set(node.id, {
-        color: tags.length || match ? (tags[0]?.color ?? walletColor) : undefined,
-        highlight: tags.length || match ? true : undefined,
-        tags: (tagIndex.get(node.id) ?? []).map((tag) => tag.name),
-        label: w.annotations[node.id]?.label ?? '',
-        icon: w.annotations[node.id]?.icon ?? '',
-      });
-    }
-    return presentation;
-  }, [
-    w?.annotations,
-    w?.wallets,
-    appliedGraphRequest.highlightMode,
-    completeGraph,
-    walletMatches,
-    tagIndex,
-  ]);
+  const metadataProjection = useMemo(() => new GraphMetadataProjection(), [w?.id]);
+  const graphMetadata = useMemo(
+    () =>
+      metadataProjection.project(
+        completeGraph,
+        w,
+        tagIndex,
+        walletMatches,
+        appliedGraphRequest.highlightMode,
+      ),
+    [
+      metadataProjection,
+      w?.annotations,
+      w?.wallets,
+      appliedGraphRequest.highlightMode,
+      completeGraph,
+      walletMatches,
+      tagIndex,
+    ],
+  );
+  const nodePresentation = graphMetadata.presentation;
   // Batch selection is shared UI state projected onto the neutral display contract.
   const highlightedSelection = pickingScanTargets ? scanTargetDraft!.ids : selection.ids;
   const batchPresentation = useMemo(() => {
@@ -686,12 +683,19 @@ export default function App() {
     ],
   );
   const amountFilterIndex = useMemo(() => buildGraphFilterIndex(amountGraph), [amountGraph]);
+  // Metadata only changes canvas membership when a metadata filter is active.
+  const filterAnnotations =
+    appliedGraphFilters.query?.trim() ||
+    (appliedGraphFilters.label && appliedGraphFilters.label !== 'all') ||
+    appliedGraphFilters.bookmarkedOnly
+      ? w?.annotations
+      : EMPTY_GRAPH_ANNOTATIONS;
   const canvasFilterResult = useMemo(
     () =>
       filterGraph(
         amountGraph,
         { ...effectiveFilters, showAddresses: canvasShowAddresses },
-        w?.annotations,
+        filterAnnotations,
         { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
         { index: amountFilterIndex, previewContext: true },
       ),
@@ -701,7 +705,7 @@ export default function App() {
       effectiveFilters,
       canvasShowAddresses,
       w?.view.hiddenNodeIds,
-      w?.annotations,
+      filterAnnotations,
     ],
   );
   const visibleGraph = useMemo(() => {
@@ -763,7 +767,7 @@ export default function App() {
         ...effectiveFilters,
         showAddresses: entityVisibility === 'visible' ? canvasShowAddresses : true,
       },
-      w?.annotations,
+      filterAnnotations,
       { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
       { index: source === recoveryGraph ? recoveryFilterIndex : undefined },
     );
@@ -778,7 +782,7 @@ export default function App() {
     appliedGraphRequest.smallAmountThreshold,
     w?.wallets,
     w?.tags,
-    w?.annotations,
+    filterAnnotations,
     canvasShowAddresses,
     w?.view.hiddenNodeIds,
     entityVisibility,
@@ -820,7 +824,9 @@ export default function App() {
     },
     [walletMatches, tagIndex, w?.wallets],
   );
-  const selected = selectedId ? recoveryNodesById.get(selectedId) : undefined;
+  const selected = selectedId
+    ? (graphMetadata.labeledNodes.get(selectedId) ?? recoveryNodesById.get(selectedId))
+    : undefined;
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
   }, [w?.id, rightTab]);
@@ -1812,7 +1818,10 @@ export default function App() {
       monitorOperation?.abort();
     };
   }, [live, canQuery, w?.id, gap, scanLimit]);
-  const entityNodes = entityGraph.matchedNodes;
+  const entityNodes = useMemo(
+    () => entityGraph.matchedNodes.map((node) => graphMetadata.labeledNodes.get(node.id) ?? node),
+    [entityGraph.matchedNodes, graphMetadata.labeledNodes],
+  );
   // Match graph lists connected context so links stay explainable. Context is
   // excluded from Select matching; explicit selections remain batch targets.
   const entityBatchNodes = useMemo(() => {

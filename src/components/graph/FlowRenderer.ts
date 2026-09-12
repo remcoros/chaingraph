@@ -26,6 +26,7 @@ import type {
   GraphHit,
   RenderNode,
   RenderLink,
+  NodeAppearancePatch,
 } from './adapter';
 import {
   graphSnapshotSchema,
@@ -50,6 +51,11 @@ const point = (p: Vector3) => ({
   y: Math.round(p.y * 1000) / 1000,
   z: Math.round(p.z * 1000) / 1000,
 });
+type NodeBatch = {
+  mesh: InstancedMesh<BufferGeometry, MeshLambertMaterial>;
+  pickMesh: InstancedMesh;
+  nodes: RenderNode[];
+};
 
 /** Renderer-only state. Frames are immutable; shared GraphView owns all entity actions. */
 export class FlowRenderer implements GraphAdapter {
@@ -75,11 +81,7 @@ export class FlowRenderer implements GraphAdapter {
     octahedron: new OctahedronGeometry(1.4),
   };
   private material = new MeshLambertMaterial();
-  private batches: {
-    mesh: InstancedMesh<BufferGeometry, MeshLambertMaterial>;
-    pickMesh: InstancedMesh;
-    nodes: RenderNode[];
-  }[] = [];
+  private batches: NodeBatch[] = [];
   private nodes: RenderNode[] = [];
   private links: RenderLink[] = [];
   private positions = new Map<string, Position>();
@@ -90,6 +92,9 @@ export class FlowRenderer implements GraphAdapter {
   private revision = 0;
   private layouts: LayoutScheduler;
   private requestedFrame?: GraphFrame;
+  private requestedNodes = new Map<string, RenderNode>();
+  private nodeInstances = new Map<string, { batch: NodeBatch; index: number }>();
+  private fullColorUploads = new WeakSet<NonNullable<InstancedMesh['instanceColor']>>();
   private displayedNodes: RenderNode[] = [];
   private displayedLinks: RenderLink[] = [];
   private displayedDimensions: 2 | 3 = 3;
@@ -557,8 +562,11 @@ export class FlowRenderer implements GraphAdapter {
     const selected = frame.nodes.find((node) => node.selected);
     if (selected?.shape === 'sphere') this.selectedOutpoint = selected.id;
     else if (selected && this.cache.has(selected.id)) this.selectedOutpoint = undefined;
-    this.requestedFrame = frame;
     this.nodes = frame.nodes.map((n) => ({ ...n }));
+    // Keep an owned frame so metadata patches survive pending layouts and Repack
+    // without mutating the caller's immutable presentation.
+    this.requestedFrame = { ...frame, nodes: this.nodes };
+    this.requestedNodes = new Map(this.nodes.map((node) => [node.id, node]));
     const ids = new Set(this.nodes.map((n) => n.id));
     this.links = frame.links
       .filter((l) => ids.has(l.source) && ids.has(l.target))
@@ -646,6 +654,46 @@ export class FlowRenderer implements GraphAdapter {
     this.events.layout?.({ busy: true, nodeCount: request.nodes.length });
     this.layouts.request(request);
   }
+  updateNodeAppearance(patches: readonly NodeAppearancePatch[]) {
+    if (this.dead) return;
+    const tint = new Color();
+    let visibleChanged = false;
+    const apply = (node: RenderNode | undefined, patch: NodeAppearancePatch) => {
+      if (
+        !node ||
+        (node.text === patch.text &&
+          node.captionPriority === patch.captionPriority &&
+          node.color === patch.color &&
+          node.highlight === patch.highlight)
+      )
+        return false;
+      node.text = patch.text;
+      node.captionPriority = patch.captionPriority;
+      node.color = patch.color;
+      node.highlight = patch.highlight;
+      return true;
+    };
+    for (const patch of patches) {
+      const requested = this.requestedNodes.get(patch.id);
+      const displayed = this.flowNodes.get(patch.id);
+      const previousColor = displayed?.color;
+      const requestedChanged = apply(requested, patch);
+      const displayedChanged = displayed === requested ? requestedChanged : apply(displayed, patch);
+      if (!displayedChanged) continue;
+      visibleChanged = true;
+      const instance = this.nodeInstances.get(patch.id);
+      if (instance && previousColor !== patch.color) {
+        const { batch, index } = instance;
+        batch.mesh.setColorAt(index, tint.set(patch.color));
+        const colors = batch.mesh.instanceColor!;
+        // Do not narrow a full upload that has not reached the GPU yet. Preserve
+        // earlier partial ranges when multiple edits precede the next frame.
+        if (!this.fullColorUploads.has(colors)) colors.addUpdateRange(index * 3, 3);
+        colors.needsUpdate = true;
+      }
+    }
+    if (visibleChanged) this.invalidate();
+  }
   private accept(result: LayoutResult) {
     if (this.dead || !this.pending || result.revision !== this.revision) return;
     this.pending = undefined;
@@ -680,6 +728,9 @@ export class FlowRenderer implements GraphAdapter {
       mesh.count = nodes.length;
       return { mesh, pickMesh: pickMesh!, nodes };
     });
+    this.nodeInstances.clear();
+    for (const batch of this.batches)
+      batch.nodes.forEach((node, index) => this.nodeInstances.set(node.id, { batch, index }));
     this.refresh(true);
     this.fulfillCamera();
     this.canvas.setAttribute('aria-busy', 'false');
@@ -717,7 +768,13 @@ export class FlowRenderer implements GraphAdapter {
         batch.mesh.computeBoundingSphere();
         syncNodePickMesh(batch.mesh, batch.pickMesh);
       }
-      if (colorsChanged && batch.mesh.instanceColor) batch.mesh.instanceColor.needsUpdate = true;
+      if (colorsChanged && batch.mesh.instanceColor) {
+        const colors = batch.mesh.instanceColor;
+        colors.clearUpdateRanges();
+        this.fullColorUploads.add(colors);
+        colors.onUpload(() => this.fullColorUploads.delete(colors));
+        colors.needsUpdate = true;
+      }
     }
     // Selection and captions often change without changing any edge geometry or style.
     const edgesChanged =
@@ -876,13 +933,13 @@ export class FlowRenderer implements GraphAdapter {
   }
 
   private placeLabels() {
-    const candidates = this.nodes
+    const candidates = this.displayedNodes
       .map((n) => {
         if (!n.text && !n.selected && !n.highlight && !n.marker && n.id !== this.hovered)
           return undefined;
         const p = this.positions.get(n.id);
         if (!p) return undefined;
-        const world = new Vector3(p.x, p.y, this.dimensions === 2 ? 0 : p.z);
+        const world = new Vector3(p.x, p.y, this.displayedDimensions === 2 ? 0 : p.z);
         const view = world.clone().applyMatrix4(this.camera.matrixWorldInverse);
         const projected = world.project(this.camera);
         return {

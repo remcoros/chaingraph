@@ -183,7 +183,13 @@ export function filterGraph(
     const annotation = annotations[node.id];
     if (
       query &&
-      ![node.label, node.id, node.address, annotation?.label, annotation?.note]
+      ![
+        [annotation?.icon, annotation?.label || node.label].filter(Boolean).join(' '),
+        node.id,
+        node.address,
+        annotation?.label,
+        annotation?.note,
+      ]
         .filter(Boolean)
         .join(' ')
         .toLocaleLowerCase()

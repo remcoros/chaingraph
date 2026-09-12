@@ -266,6 +266,17 @@ The browser remembers its accent preference separately from encrypted workspaces
 `accentTheme.ts` applies it before mounting the app; `GraphView.tsx` observes the
 root accent attribute and refreshes presentation colors on the existing renderer.
 
+The application keeps chain topology separate from human metadata. Its bounded
+`GraphMetadataProjection` retains unchanged node appearances and projects labels
+for inspector and entity-list use without rebuilding chain, wallet or scan indexes.
+Bookmarks and notes only invalidate canvas membership when a relevant filter is
+active. `GraphPresentationUpdates` projects changed visible appearances and uses
+the optional `updateNodeAppearance` adapter method for caption, color and highlight
+patches. The Three.js renderer updates those node instances without restarting
+layout, edges, flow particles or camera persistence; pending layouts retain patches.
+Topology, selection, sizing and other global changes still use complete frames,
+as do adapters without the patch method.
+
 `graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`,
 optional `flushSnapshot`, `zoom`, `repack`, `setMotion`, and events for
 hover/select (`{ type, id }` plus pointer coordinates and modifiers), activity

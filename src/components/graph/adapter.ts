@@ -35,6 +35,11 @@ export interface RenderLink {
   /** Stable side of transaction flow, independent of the currently hovered endpoint. */
   flowSide?: 'incoming' | 'outgoing';
 }
+/** Complete appearance for one existing node; undefined text/priority clears it. */
+export type NodeAppearancePatch = Pick<
+  RenderNode,
+  'id' | 'text' | 'captionPriority' | 'color' | 'highlight'
+>;
 export interface GraphFrame {
   nodes: readonly RenderNode[];
   links: readonly RenderLink[];
@@ -71,6 +76,8 @@ export interface GraphAdapterEvents {
 export interface GraphAdapter {
   readonly canvas: HTMLCanvasElement;
   update(frame: GraphFrame): void;
+  /** Update metadata appearance without replacing geometry, selection or camera state. */
+  updateNodeAppearance?(patches: readonly NodeAppearancePatch[]): void;
   /** topInset reserves overlaid navigation in CSS pixels, without reducing the canvas. */
   resize(width: number, height: number, topInset?: number, rightInset?: number): void;
   /** Center a node; preserveZoom pans without changing the current camera distance. */

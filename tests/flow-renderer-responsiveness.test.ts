@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InstancedBufferGeometry, InstancedMesh, Mesh, ShaderMaterial, Vector3 } from 'three';
+import {
+  BufferAttribute,
+  Color,
+  InstancedBufferGeometry,
+  InstancedMesh,
+  Mesh,
+  ShaderMaterial,
+  Vector3,
+} from 'three';
 import type { GraphAdapterEvents, GraphFrame } from '../src/components/graph/adapter';
 import type { LayoutRequest, LayoutResult } from '../src/components/graph/flowLayout';
 import { cachedLayout, LayoutScheduler } from '../src/components/graph/layoutScheduler';
@@ -39,6 +47,8 @@ class Element extends EventTarget {
   attributes = new Map<string, string>();
   style = { setProperty: vi.fn() };
   children: unknown[] = [];
+  textContent = '';
+  hidden = false;
   append(...children: unknown[]) {
     this.children.push(...children);
   }
@@ -138,9 +148,10 @@ function setup() {
     activity: vi.fn(),
     layout: vi.fn(),
   };
-  const renderer = new FlowRenderer(new Element() as unknown as HTMLElement, events);
+  const container = new Element();
+  const renderer = new FlowRenderer(container as unknown as HTMLElement, events);
   renderer.resize(900, 600);
-  return { renderer, events };
+  return { renderer, events, container };
 }
 
 describe('latest graph layout scheduling', () => {
@@ -672,6 +683,160 @@ function directedFrame(selected = true): GraphFrame {
   graph.links = graph.links.map((link) => ({ ...link, directed: true }));
   return graph;
 }
+describe('partial node appearance updates', () => {
+  const appearance = (id: string, text?: string, color = '#ff8800') => ({
+    id,
+    text,
+    captionPriority: text ? true : undefined,
+    color,
+    highlight: Boolean(text),
+  });
+  const nodeMesh = (renderer: FlowRenderer) =>
+    renderer.scene.children.find((child) => child instanceof InstancedMesh) as InstancedMesh;
+  const colorAt = (renderer: FlowRenderer, index: number) => {
+    const color = new Color();
+    nodeMesh(renderer).getColorAt(index, color);
+    return `#${color.getHexString()}`;
+  };
+  const captions = (container: Element) =>
+    ((container.children[1] as Element).children as Element[])
+      .filter((child) => !child.hidden && child.textContent)
+      .map((child) => child.textContent);
+  const projectCaptions = (renderer: FlowRenderer) => {
+    // Supply the camera matrix work normally done by OrbitControls and WebGL.
+    vi.mocked(renderer.renderer.render).mockImplementation(() => {
+      renderer.camera.lookAt(renderer.controls.target);
+      renderer.camera.updateMatrixWorld();
+    });
+  };
+
+  it('uploads only changed colors without resetting geometry, particles, camera or persistence', () => {
+    const animation = animationHarness();
+    const { renderer, events } = setup();
+    const original = directedFrame();
+    original.nodes.forEach(Object.freeze);
+    renderer.update(original);
+    WorkerMock.instances[0].reply();
+    animation.step(0);
+    vi.advanceTimersByTime(1200);
+    const mesh = nodeMesh(renderer);
+    const colors = mesh.instanceColor!;
+    const matrixVersion = mesh.instanceMatrix.version;
+    const bounds = vi.spyOn(mesh, 'computeBoundingSphere');
+    const writeColor = vi.spyOn(mesh, 'setColorAt');
+    const particles = particleMesh(renderer);
+    const particleStart = particles.geometry.getAttribute('start') as BufferAttribute;
+    const particleVersion = particleStart.version;
+    const edge = renderer.scene.children.find(
+      (child) =>
+        child instanceof Mesh &&
+        child.name !== 'flow-particles' &&
+        !(child instanceof InstancedMesh),
+    ) as Mesh;
+    const edgeStart = edge.geometry.getAttribute('start') as BufferAttribute;
+    const edgeVersion = edgeStart.version;
+    const camera = renderer.camera.position.clone();
+    vi.mocked(events.snapshot!).mockClear();
+    vi.mocked(events.activity!).mockClear();
+    vi.mocked(events.layout!).mockClear();
+
+    // The first full upload has not happened in this WebGL mock. A patch must
+    // not narrow it and leave untouched instances uninitialized on the GPU.
+    renderer.updateNodeAppearance([appearance('n0', 'Label')]);
+    expect(colors.updateRanges).toEqual([]);
+    colors.onUploadCallback();
+    writeColor.mockClear();
+    renderer.updateNodeAppearance([
+      appearance('n0', 'Renamed', '#00ff88'),
+      appearance('n2', 'Tagged'),
+      appearance('unknown', 'Ignored'),
+    ]);
+    expect(writeColor).toHaveBeenCalledTimes(2);
+    expect(colors.updateRanges).toEqual([
+      { start: 0, count: 3 },
+      { start: 6, count: 3 },
+    ]);
+    expect(colorAt(renderer, 1)).toBe(original.nodes[1].color);
+    expect(original.nodes[0].text).toBeUndefined();
+    expect(mesh.instanceMatrix.version).toBe(matrixVersion);
+    expect(bounds).not.toHaveBeenCalled();
+    expect(edgeStart.version).toBe(edgeVersion);
+    expect(particleStart.version).toBe(particleVersion);
+    animation.step(16);
+    animation.step(32);
+    expect(particles.material.uniforms.phase.value).toBeGreaterThan(0);
+    expect(renderer.camera.position).toEqual(camera);
+    vi.advanceTimersByTime(1500);
+    expect(events.snapshot).not.toHaveBeenCalled();
+    expect(events.activity).not.toHaveBeenCalled();
+    expect(events.layout).not.toHaveBeenCalled();
+    expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(1);
+
+    // A later full frame must replace any outstanding partial upload ranges.
+    renderer.update(original);
+    expect(colors.updateRanges).toEqual([]);
+    renderer.dispose();
+  });
+
+  it('retains edits through pending layouts, context restoration and repack, including caption removal', () => {
+    const animation = animationHarness();
+    const { renderer, container } = setup();
+    projectCaptions(renderer);
+    renderer.update(frame());
+    renderer.updateNodeAppearance([appearance('n0', 'First label')]);
+    WorkerMock.instances[0].reply();
+    animation.step(0);
+    expect(captions(container)).toContain('First label');
+
+    renderer.update(frame(4));
+    renderer.updateNodeAppearance([
+      appearance('n0', 'Updated label', '#44aaff'),
+      appearance('n3', 'New node'),
+    ]);
+    animation.step(16);
+    expect(captions(container)).toContain('Updated label');
+    expect(colorAt(renderer, 0)).toBe('#44aaff');
+    expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(2);
+    WorkerMock.instances[0].reply();
+    expect(colorAt(renderer, 3)).toBe('#ff8800');
+
+    renderer.canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    renderer.updateNodeAppearance([appearance('n0', 'Restored label', '#aa44ff')]);
+    renderer.canvas.dispatchEvent(new Event('webglcontextrestored'));
+    animation.step(32);
+    expect(captions(container)).toContain('Restored label');
+    expect(colorAt(renderer, 0)).toBe('#aa44ff');
+    renderer.repack();
+    WorkerMock.instances[0].reply();
+    animation.step(48);
+    expect(captions(container)).toContain('Restored label');
+    renderer.updateNodeAppearance([appearance('n0', undefined, '#aabbcc')]);
+    animation.step(64);
+    expect(captions(container)).not.toContain('Restored label');
+    expect(colorAt(renderer, 0)).toBe('#aabbcc');
+    renderer.dispose();
+  });
+
+  it('preserves requested-node edits when a failed expansion falls back to the displayed graph', () => {
+    const animation = animationHarness();
+    const { renderer, container } = setup();
+    projectCaptions(renderer);
+    renderer.update(frame());
+    WorkerMock.instances[0].reply();
+    renderer.update(frame(4));
+    WorkerMock.instances[0].fail();
+    renderer.updateNodeAppearance([
+      appearance('n0', 'Visible edit'),
+      appearance('n3', 'Pending edit', '#44aaff'),
+    ]);
+    animation.step(0);
+    expect(captions(container)).toContain('Visible edit');
+    renderer.repack();
+    WorkerMock.instances[1].reply();
+    expect(colorAt(renderer, 3)).toBe('#44aaff');
+    renderer.dispose();
+  });
+});
 describe('flow motion stays independent of graph persistence and layout', () => {
   it('animates selected/batch flow without camera updates, node/edge uploads, activity or snapshots', () => {
     const animation = animationHarness(),

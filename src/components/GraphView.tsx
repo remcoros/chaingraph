@@ -27,11 +27,11 @@ import type { GraphAdapter, GraphAdapterFactory } from './graph/adapter';
 import { createDefaultAdapter } from './graph/defaultAdapter';
 import {
   buildGraphPresentationIndex,
-  presentGraph,
   readGraphPalette,
   resolveGraphHit,
   type NodePresentation,
 } from './graph/presentation';
+import { GraphPresentationUpdates } from './graph/presentationUpdates';
 
 export interface GraphViewProps extends VisibilityProps {
   adapterFactory?: GraphAdapterFactory;
@@ -369,11 +369,15 @@ export default function GraphView(props: GraphViewProps) {
     () => buildGraphPresentationIndex(props.nodes, props.links),
     [props.nodes, props.links],
   );
+  const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), [adapterFactory]);
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    const update = () =>
-      graphRef.current?.update(presentGraph(props, readGraphPalette(element), presentationIndex));
+    const update = () => {
+      const adapter = graphRef.current;
+      if (adapter)
+        presentationUpdates.update(adapter, props, readGraphPalette(element), presentationIndex);
+    };
     update();
     // Accent changes affect canvas colors as well as CSS, without replacing the renderer.
     const observer = new MutationObserver(update);
@@ -384,6 +388,7 @@ export default function GraphView(props: GraphViewProps) {
     return () => observer.disconnect();
   }, [
     adapterFactory,
+    presentationUpdates,
     presentationIndex,
     props.nodes,
     props.links,

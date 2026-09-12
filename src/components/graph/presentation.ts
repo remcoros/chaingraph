@@ -1,5 +1,5 @@
 import type { GraphLink, GraphNode } from '../../domain/types';
-import type { GraphFrame, GraphHit } from './adapter';
+import type { GraphFrame, GraphHit, RenderNode } from './adapter';
 import type { GraphFlowContext } from './flowContext';
 
 /** Callers interpret tags, wallets or findings and supply only visual overrides. */
@@ -92,94 +92,106 @@ export function buildGraphPresentationIndex(
   return { nodes, sourceLinks, links, bridges, degrees };
 }
 
-export function presentGraph(
-  input: {
-    nodes: readonly GraphNode[];
-    links: readonly GraphLink[];
-    dimensions: 2 | 3;
-    selectedId?: string;
-    batchSelectedIds?: readonly string[];
-    sizeBy: 'uniform' | 'value' | 'degree';
-    glow: boolean;
-    showLabels?: boolean;
-    showTags?: boolean;
-    showIcons?: boolean;
-    nodePresentation?: ReadonlyMap<string, NodePresentation>;
-    flowContext?: GraphFlowContext;
-  },
+export interface GraphPresentationInput {
+  nodes: readonly GraphNode[];
+  links: readonly GraphLink[];
+  dimensions: 2 | 3;
+  selectedId?: string;
+  batchSelectedIds?: readonly string[];
+  sizeBy: 'uniform' | 'value' | 'degree';
+  glow: boolean;
+  showLabels?: boolean;
+  showTags?: boolean;
+  showIcons?: boolean;
+  nodePresentation?: ReadonlyMap<string, NodePresentation>;
+  flowContext?: GraphFlowContext;
+}
+
+/** Build once per update, then project only the nodes whose visual overrides changed. */
+export function createGraphNodePresenter(
+  input: GraphPresentationInput,
   palette: GraphPalette,
-  index?: GraphPresentationIndex,
-): GraphFrame {
-  const { links, bridges, degrees } =
-    index?.nodes === input.nodes && index.sourceLinks === input.links
-      ? index
-      : buildGraphPresentationIndex(input.nodes, input.links);
+  index: GraphPresentationIndex,
+): (node: GraphNode) => RenderNode {
+  const { degrees } = index;
   const activeIds = new Set(input.batchSelectedIds);
   if (input.selectedId) activeIds.add(input.selectedId);
   const shapes = { transaction: 'box', output: 'sphere', address: 'octahedron' } as const;
+  return (node) => {
+    const override = input.nodePresentation?.get(node.id);
+    const selected = node.id === input.selectedId;
+    const role = input.flowContext?.nodes.get(node.id);
+    const roleColor =
+      role === 'input' ? (palette.input ?? '#83baff') : (palette.flowOutput ?? palette.output);
+    const radius =
+      input.sizeBy === 'value'
+        ? valueRadius(node.value)
+        : DEFAULT_NODE_RADIUS *
+          Math.cbrt(
+            input.sizeBy === 'degree' ? Math.min(14, 1 + Math.sqrt(degrees.get(node.id) || 0)) : 1,
+          );
+    const scale = override?.scale;
+    // Explicit coordinates are transient layout hints, never renderer-owned state.
+    const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
+    return {
+      id: node.id,
+      text:
+        [
+          [
+            input.showIcons !== false ? override?.icon : undefined,
+            input.showLabels !== false ? (override?.label ?? node.label) : undefined,
+          ]
+            .filter(Boolean)
+            .join(' '),
+          input.showTags !== false && override?.tags?.length
+            ? override.tags.map((tag) => `#${tag}`).join(' · ')
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join('\n') || undefined,
+      shape: shapes[node.kind],
+      captionPriority:
+        (input.showTags !== false && !!override?.tags?.length) ||
+        (input.showLabels !== false && !!override?.label),
+      marker: role
+        ? {
+            shape: role === 'input' ? ('brackets' as const) : ('ring' as const),
+            color: roleColor,
+          }
+        : undefined,
+      color: selected
+        ? palette.accent
+        : (override?.color ??
+          (node.cluster ? clusterColor(node.cluster) : role ? roleColor : palette[node.kind])),
+      radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
+      selected,
+      flowActive: activeIds.has(node.id),
+      highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
+      x: node.x,
+      y: node.y,
+      z: node.z,
+      fx: fixed.fx,
+      fy: fixed.fy,
+      fz: fixed.fz,
+    };
+  };
+}
+
+export function presentGraph(
+  input: GraphPresentationInput,
+  palette: GraphPalette,
+  index?: GraphPresentationIndex,
+): GraphFrame {
+  const topology =
+    index?.nodes === input.nodes && index.sourceLinks === input.links
+      ? index
+      : buildGraphPresentationIndex(input.nodes, input.links);
+  const { links, bridges } = topology;
+  const presentNode = createGraphNodePresenter(input, palette, topology);
   return {
     dimensions: input.dimensions,
     background: palette.background,
-    nodes: input.nodes.map((node) => {
-      const override = input.nodePresentation?.get(node.id);
-      const selected = node.id === input.selectedId;
-      const role = input.flowContext?.nodes.get(node.id);
-      const roleColor =
-        role === 'input' ? (palette.input ?? '#83baff') : (palette.flowOutput ?? palette.output);
-      const radius =
-        input.sizeBy === 'value'
-          ? valueRadius(node.value)
-          : DEFAULT_NODE_RADIUS *
-            Math.cbrt(
-              input.sizeBy === 'degree'
-                ? Math.min(14, 1 + Math.sqrt(degrees.get(node.id) || 0))
-                : 1,
-            );
-      const scale = override?.scale;
-      // Explicit coordinates are transient layout hints, never renderer-owned state.
-      const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
-      return {
-        id: node.id,
-        text:
-          [
-            [
-              input.showIcons !== false ? override?.icon : undefined,
-              input.showLabels !== false ? (override?.label ?? node.label) : undefined,
-            ]
-              .filter(Boolean)
-              .join(' '),
-            input.showTags !== false && override?.tags?.length
-              ? override.tags.map((tag) => `#${tag}`).join(' · ')
-              : undefined,
-          ]
-            .filter(Boolean)
-            .join('\n') || undefined,
-        shape: shapes[node.kind],
-        captionPriority:
-          (input.showTags !== false && !!override?.tags?.length) ||
-          (input.showLabels !== false && !!override?.label),
-        marker: role
-          ? {
-              shape: role === 'input' ? ('brackets' as const) : ('ring' as const),
-              color: roleColor,
-            }
-          : undefined,
-        color: selected
-          ? palette.accent
-          : (override?.color ??
-            (node.cluster ? clusterColor(node.cluster) : role ? roleColor : palette[node.kind])),
-        radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
-        selected,
-        flowActive: activeIds.has(node.id),
-        highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
-        x: node.x,
-        y: node.y,
-        z: node.z,
-        fx: fixed.fx,
-        fy: fixed.fy,
-        fz: fixed.fz,
-      };
-    }),
+    nodes: input.nodes.map(presentNode),
     links: links.map((link) => {
       const bridge =
         (link.kind === 'creates' && bridges.has(link.target)) ||
