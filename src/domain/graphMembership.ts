@@ -1,6 +1,7 @@
 import { canonicalEntityNodeId } from './entityReferences';
 import { graphRemovalClosure, graphTransactionOutputIds } from './graphBranch';
 import type { GraphData, Workspace } from './types';
+import type { GraphEvidenceWorkspace } from './workspace';
 import { setNodesHidden } from './visibility';
 import { buildGraph } from './workspace';
 import {
@@ -82,7 +83,7 @@ export function addGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): 
 }
 
 /** Connection checks use all loaded evidence, independent of display preferences. */
-export function fullGraphMembershipEvidence(workspace: Workspace): GraphData {
+export function fullGraphMembershipEvidence(workspace: GraphEvidenceWorkspace): GraphData {
   return buildGraph({
     ...workspace,
     inputContext: undefined,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, List, Lightbulb } from 'lucide-react';
 import { useDialogFocus } from './Dialogs';
 import type { TourStep } from '../features/tour/steps';
@@ -56,9 +56,12 @@ export function GuidedTour({
     () => onStepChange(undefined),
     '[aria-label="Help and samples"]',
   );
-  useEffect(() => {
+  const returnFocusToContents = useEffectEvent(() => {
     if (!dialogRef.current?.contains(document.activeElement))
       contentsButton.current?.focus({ preventScroll: true });
+  });
+  useEffect(() => {
+    returnFocusToContents();
   }, [step?.id, previewLabel, previewStatus?.loading]);
   useEffect(() => {
     if (previewStatus?.loading || previewStatus?.error) {

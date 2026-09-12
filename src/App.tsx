@@ -57,6 +57,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -143,6 +144,7 @@ import {
   markContextTransactions,
   promoteInputContext,
   outputAddress,
+  type GraphEvidenceWorkspace,
 } from './domain/workspace';
 import { mergeTransactionObservations } from './domain/prevouts';
 import { withHistoryHeight } from './domain/transactionStatus';
@@ -156,7 +158,6 @@ import {
   type Transaction,
   type Wallet,
   type Workspace,
-  type WorkspaceTag,
 } from './domain/types';
 import {
   fetchAddressBalance,
@@ -187,6 +188,8 @@ const WORKBENCH_LABELS: Record<WorkbenchMode, string> = {
   analysis: 'Analysis',
 };
 const ADDRESS_DISPLAY_NOTICE = 'This address is no longer hidden. Address nodes are switched off.';
+const EMPTY_GRAPH_FILTERS: GraphFilters = {};
+const EMPTY_WALLETS: Workspace['wallets'] = [];
 type AddressHistoryLoadPhase = 'history' | 'details' | 'balance';
 interface AddressHistoryLoadState {
   workspaceId: string;
@@ -234,12 +237,108 @@ function withScanActionEvidence(
     : workspace;
 }
 
+type GraphEvidenceInput = Omit<GraphEvidenceWorkspace, 'inputContext' | 'annotations' | 'view'>;
+
+/** Build the complete graph from its chain evidence, excluding display metadata. */
+function completeGraphFromEvidence(input: GraphEvidenceInput | undefined): GraphData {
+  if (!input) return { nodes: [], links: [] };
+  return fullGraphMembershipEvidence({
+    ...input,
+    inputContext: undefined,
+    annotations: EMPTY_GRAPH_ANNOTATIONS,
+    view: { showAddresses: true },
+  });
+}
+
+type WalletMatchInput = Pick<Workspace, 'network' | 'transactions' | 'wallets'>;
+
+function walletMatchesFromEvidence(input: WalletMatchInput | undefined, graph: GraphData) {
+  return input ? buildWalletMatches(input, graph) : new Map();
+}
+
+function tagIndexFromTags(tags: Workspace['tags'], graph: GraphData) {
+  return buildTagIndex({ tags }, graph);
+}
+
+function graphMetadataWorkspace(
+  annotations: Workspace['annotations'] | undefined,
+  wallets: Workspace['wallets'] | undefined,
+) {
+  return {
+    annotations: annotations ?? EMPTY_GRAPH_ANNOTATIONS,
+    wallets: wallets ?? EMPTY_WALLETS,
+  };
+}
+
+type EntityRemovalInput = Pick<
+  Workspace,
+  | 'network'
+  | 'transactions'
+  | 'inputContext'
+  | 'contextTransactionIds'
+  | 'annotations'
+  | 'tags'
+  | 'wallets'
+  | 'watchedAddresses'
+>;
+
+function entityRemovalPlan(input: EntityRemovalInput | undefined, nodeId: string) {
+  return input ? planEntityRemoval(input as Workspace, nodeId) : undefined;
+}
+
+type WalletUtxoObservationInput = Pick<Workspace, 'id' | 'network' | 'transactions'>;
+
+function resolveWalletUtxoObservationFromEvidence(
+  input: WalletUtxoObservationInput | undefined,
+  wallet: Pick<Wallet, 'addresses'> | undefined,
+  view: { records: WalletUtxoRecord[]; checkedAt: string } | undefined,
+  selectedId: string | undefined,
+) {
+  return resolveWalletUtxoObservation(input, wallet, view, selectedId);
+}
+
+function membershipFilters(
+  source: GraphData,
+  sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
+  sourceTags: ReadonlyMap<string, unknown>,
+  filters: GraphFilters,
+  tags: Workspace['tags'],
+): GraphFilters {
+  const includes: (string[] | undefined)[] = [filters.includeIds];
+  const excludes: string[] = [];
+  includes.push(matchingWalletFilterNodeIds(filters, sourceMatches));
+  if (filters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
+  else if (filters.walletMatch === 'unmatched') excludes.push(...sourceMatches.keys());
+  if (filters.tagId) {
+    const tag = tags?.find((entry) => entry.id === filters.tagId);
+    includes.push(tag ? tagNodeIds(tag, source) : []);
+  }
+  if (filters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
+  else if (filters.tagState === 'untagged') excludes.push(...sourceTags.keys());
+  const includeIds = intersectIds(includes);
+  return includeIds || excludes.length
+    ? { ...filters, includeIds, excludeIds: excludes.length ? excludes : undefined }
+    : filters;
+}
+
 export default function App() {
   const ws = useWorkspaces();
   const w = ws.active?.data;
   const fetchScope = ws.active?.fetchScope;
   const updateWorkspace = ws.update;
   const getWorkspaceSession = ws.getSession;
+  const persistWorkspace = ws.persist;
+  const workspaceId = w?.id;
+  const workspaceNetwork = w?.network;
+  const workspaceTransactions = w?.transactions;
+  const workspaceInputContext = w?.inputContext;
+  const workspaceContextTransactionIds = w?.contextTransactionIds;
+  const workspaceFindings = w?.findings;
+  const workspaceAnnotations = w?.annotations;
+  const workspaceTags = w?.tags;
+  const workspaceWallets = w?.wallets;
+  const workspaceWatchedAddresses = w?.watchedAddresses;
+  const workspaceAddressBalances = w?.addressBalances;
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
@@ -301,6 +400,8 @@ export default function App() {
   const [entityFiltersLinked, setEntityFiltersLinked] = useState(true);
   const [entityPanelFilters, setEntityPanelFilters] = useState<GraphFilters>({});
   const selection = useEntitySelection(w?.id);
+  const selectedBatchIds = selection.ids;
+  const removeSelectedBatchIds = selection.remove;
   const [scanTargets, setScanTargets] = useState<string[]>([]);
   const [scanTargetDraft, setScanTargetDraft] = useState<{
     workspaceId: string;
@@ -541,6 +642,7 @@ export default function App() {
     new Map<string, { offset: number; unavailableTxids?: string[] }>(),
   );
   const operationRef = useRef<AbortController | undefined>(undefined);
+  const monitorOperationRef = useRef<AbortController | undefined>(undefined);
   const pendingSelectionRef = useRef<string | undefined>(undefined);
   const addressHistoryLoadRefs = useRef(
     new Map<string, { workspaceId: string; controller: AbortController }>(),
@@ -594,7 +696,7 @@ export default function App() {
   }, []);
   const saveBeforeLeaving = () => {
     const id = flushActiveGraph();
-    return id ? ws.persist(id) : Promise.resolve();
+    return id ? persistWorkspace(id) : Promise.resolve();
   };
   const activateWorkspace = (id?: string) => {
     if (id !== wRef.current?.id) void saveBeforeLeaving().catch(() => {});
@@ -607,7 +709,7 @@ export default function App() {
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       const id = flushActiveGraph();
-      const session = id ? ws.getSession(id) : undefined;
+      const session = id ? getWorkspaceSession(id) : undefined;
       if (session && session.revision !== session.savedRevision) {
         event.preventDefault();
         event.returnValue = '';
@@ -615,7 +717,7 @@ export default function App() {
     };
     window.addEventListener('beforeunload', beforeUnload);
     return () => window.removeEventListener('beforeunload', beforeUnload);
-  }, [flushActiveGraph, ws.getSession]);
+  }, [flushActiveGraph, getWorkspaceSession]);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
@@ -623,11 +725,9 @@ export default function App() {
       if (event.key.toLowerCase() === 's' && current) {
         event.preventDefault();
         flushActiveGraph();
-        void ws
-          .persist(current.id)
-          .catch((error) =>
-            setError(error instanceof Error ? error.message : 'Encrypted save failed.'),
-          );
+        void persistWorkspace(current.id).catch((error) =>
+          setError(error instanceof Error ? error.message : 'Encrypted save failed.'),
+        );
       } else if (
         event.key.toLowerCase() === 'k' &&
         current &&
@@ -639,14 +739,33 @@ export default function App() {
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [ws.persist, flushActiveGraph]);
+  }, [persistWorkspace, flushActiveGraph]);
   // Topology and chain indexes do not depend on human labels, icons or bookmarks.
+  const graphEvidenceInput = useMemo<GraphEvidenceInput | undefined>(() => {
+    if (
+      !workspaceNetwork ||
+      !workspaceTransactions ||
+      !workspaceFindings ||
+      !workspaceWatchedAddresses
+    )
+      return undefined;
+    return {
+      network: workspaceNetwork,
+      transactions: workspaceTransactions,
+      findings: workspaceFindings,
+      addressBalances: workspaceAddressBalances,
+      watchedAddresses: workspaceWatchedAddresses,
+    };
+  }, [
+    workspaceNetwork,
+    workspaceTransactions,
+    workspaceFindings,
+    workspaceWatchedAddresses,
+    workspaceAddressBalances,
+  ]);
   const completeGraph = useMemo(
-    () =>
-      w
-        ? fullGraphMembershipEvidence({ ...w, annotations: EMPTY_GRAPH_ANNOTATIONS })
-        : { nodes: [], links: [] },
-    [w?.id, w?.network, w?.transactions, w?.findings, w?.watchedAddresses, w?.addressBalances],
+    () => completeGraphFromEvidence(graphEvidenceInput),
+    [graphEvidenceInput],
   );
   const graphWithoutAddresses = useMemo(
     () => projectGraphAddresses(completeGraph, false),
@@ -662,28 +781,36 @@ export default function App() {
     () => flowIndex.resolve(graphSelectedId, w?.view.transactionFlow?.transactionId),
     [flowIndex, graphSelectedId, w?.view.transactionFlow?.transactionId],
   );
+  const walletMatchInput = useMemo<WalletMatchInput | undefined>(() => {
+    if (!workspaceNetwork || !workspaceTransactions || !workspaceWallets) return undefined;
+    return {
+      network: workspaceNetwork,
+      transactions: workspaceTransactions,
+      wallets: workspaceWallets,
+    };
+  }, [workspaceNetwork, workspaceTransactions, workspaceWallets]);
   const walletMatches = useMemo(
-    () => (w ? buildWalletMatches(w, completeGraph) : new Map()),
-    [w?.network, w?.transactions, w?.wallets, completeGraph],
+    () => walletMatchesFromEvidence(walletMatchInput, completeGraph),
+    [walletMatchInput, completeGraph],
   );
   const tagIndex = useMemo(
-    () => (w ? buildTagIndex(w, completeGraph) : new Map<string, WorkspaceTag[]>()),
-    [w?.tags, completeGraph],
+    () => tagIndexFromTags(workspaceTags, completeGraph),
+    [workspaceTags, completeGraph],
   );
-  const metadataProjection = useMemo(() => new GraphMetadataProjection(), [w?.id]);
+  const metadataProjection = useMemo(() => new GraphMetadataProjection(), []);
   const graphMetadata = useMemo(
     () =>
       metadataProjection.project(
         completeGraph,
-        w,
+        graphMetadataWorkspace(workspaceAnnotations, workspaceWallets),
         tagIndex,
         walletMatches,
         appliedGraphRequest.highlightMode,
       ),
     [
       metadataProjection,
-      w?.annotations,
-      w?.wallets,
+      workspaceAnnotations,
+      workspaceWallets,
       appliedGraphRequest.highlightMode,
       completeGraph,
       walletMatches,
@@ -702,36 +829,16 @@ export default function App() {
     }
     return merged;
   }, [nodePresentation, highlightedSelection]);
-  const membershipFilters = (
-    source: GraphData,
-    sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
-    sourceTags: ReadonlyMap<string, unknown>,
-    filters: GraphFilters,
-  ): GraphFilters => {
-    const includes: (string[] | undefined)[] = [filters.includeIds];
-    const excludes: string[] = [];
-    includes.push(matchingWalletFilterNodeIds(filters, sourceMatches));
-    if (filters.walletMatch === 'matched') includes.push([...sourceMatches.keys()]);
-    else if (filters.walletMatch === 'unmatched') excludes.push(...sourceMatches.keys());
-    if (filters.tagId) {
-      const tag = w?.tags?.find((entry) => entry.id === filters.tagId);
-      includes.push(tag ? tagNodeIds(tag, source) : []);
-    }
-    if (filters.tagState === 'tagged') includes.push([...sourceTags.keys()]);
-    else if (filters.tagState === 'untagged') excludes.push(...sourceTags.keys());
-    const includeIds = intersectIds(includes);
-    return includeIds || excludes.length
-      ? { ...filters, includeIds, excludeIds: excludes.length ? excludes : undefined }
-      : filters;
-  };
   const effectiveFilters = useMemo(
-    () => membershipFilters(completeGraph, walletMatches, tagIndex, appliedGraphFilters),
-    [appliedGraphFilters, w?.tags, completeGraph, walletMatches, tagIndex],
+    () =>
+      membershipFilters(completeGraph, walletMatches, tagIndex, appliedGraphFilters, workspaceTags),
+    [appliedGraphFilters, workspaceTags, completeGraph, walletMatches, tagIndex],
   );
   const entityFilterRequest = entityFiltersLinked ? appliedGraphFilters : entityPanelFilters;
   const effectiveEntityFilters = useMemo(
-    () => membershipFilters(completeGraph, walletMatches, tagIndex, entityFilterRequest),
-    [entityFilterRequest, w?.tags, completeGraph, walletMatches, tagIndex],
+    () =>
+      membershipFilters(completeGraph, walletMatches, tagIndex, entityFilterRequest, workspaceTags),
+    [entityFilterRequest, workspaceTags, completeGraph, walletMatches, tagIndex],
   );
   const automaticContextIds = useMemo(
     () => [
@@ -897,8 +1004,6 @@ export default function App() {
     recoveryFilterIndex,
     canvasFilterResult,
     appliedGraphRequest.smallAmountThreshold,
-    w?.wallets,
-    w?.tags,
     filterAnnotations,
     canvasShowAddresses,
     w?.view.hiddenNodeIds,
@@ -920,14 +1025,14 @@ export default function App() {
     });
     // Only entities that no longer exist leave the batch selection. Filtering or
     // hiding an entity keeps it selected, with its scope reported in the toolbar.
-    const removed = selection.ids.filter((id) => !available.has(id));
-    if (removed.length) selection.remove(removed);
+    const removed = selectedBatchIds.filter((id) => !available.has(id));
+    if (removed.length) removeSelectedBatchIds(removed);
     if (selectedId && !available.has(selectedId)) {
       if (pendingSelectionRef.current !== selectedId) setSelectedId(undefined);
     } else if (pendingSelectionRef.current === selectedId) {
       pendingSelectionRef.current = undefined;
     }
-  }, [recoveryNodesById, selectedId]);
+  }, [recoveryNodesById, selectedId, selectedBatchIds, removeSelectedBatchIds]);
   const renderEntityMetadata = useCallback(
     (id: string) => {
       const match = walletMatches.get(id);
@@ -1038,9 +1143,9 @@ export default function App() {
       selectionGeneration.current++;
       cameraPreservedSelection.current = options?.preserveCamera ? id : undefined;
       if (options?.preserveCamera) setFocusRequest(undefined);
-      const active = ws.getSession(wRef.current?.id ?? '')?.data;
+      const active = getWorkspaceSession(wRef.current?.id ?? '')?.data;
       // A click admits exactly one entity, never its transaction's other branches.
-      if (active) ws.update(active.id, (current) => addGraphNodes(current, [id]), false);
+      if (active) updateWorkspace(active.id, (current) => addGraphNodes(current, [id]), false);
       setSelectedId(id);
       setGraphFilters((filters) =>
         filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
@@ -1055,9 +1160,9 @@ export default function App() {
       );
       setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
-    [ws.update, ws.getSession, pickingScanTargets, toggleScanTarget],
+    [updateWorkspace, getWorkspaceSession, pickingScanTargets, toggleScanTarget],
   );
-  useEffect(() => {
+  const resetWorkspacePresentation = useEffectEvent(() => {
     operationRef.current?.abort();
     cameraPreservedSelection.current = undefined;
     setTour(undefined);
@@ -1109,9 +1214,12 @@ export default function App() {
     setFocusGraph(w?.view.focusGraph ?? false);
     spendingOffsets.current.clear();
     if (!w?.view.graphSnapshot) setFitToken((t) => t + 1);
-  }, [w?.id]);
+  });
   useEffect(() => {
-    if (!w) return;
+    resetWorkspacePresentation();
+  }, [workspaceId]);
+  useEffect(() => {
+    if (!workspaceId) return;
     try {
       if (!localStorage.getItem('chaingraph.tour.seen')) {
         setTour(WORKBENCH_TOUR[0].id);
@@ -1121,12 +1229,12 @@ export default function App() {
       // A denied/full store must not crash an unlocked workspace or block export.
       setTour(WORKBENCH_TOUR[0].id);
     }
-  }, [w?.id]);
+  }, [workspaceId]);
   const change = useCallback(
     (fn: (data: Workspace) => Workspace, undo = true, group?: string, description?: string) => {
-      if (w) ws.update(w.id, fn, undo, group, description);
+      if (workspaceId) updateWorkspace(workspaceId, fn, undo, group, description);
     },
-    [w, ws.update],
+    [workspaceId, updateWorkspace],
   );
   const changeGraphView = (update: (view: Workspace['view']) => Workspace['view']) =>
     change((current) => {
@@ -1135,12 +1243,16 @@ export default function App() {
     }, false);
   // Hydration has its own owner so a workspace switch never writes the previous view
   // into the newly active workspace. Presentation does not consume annotation undo.
+  const savedGraphFilters = w?.view.filters;
+  const presentationFilters = valueFilterError(graphFilters)
+    ? (savedGraphFilters ?? EMPTY_GRAPH_FILTERS)
+    : graphFilters;
   useEffect(() => {
-    if (!w || viewOwner !== w.id) return;
+    if (!workspaceId || viewOwner !== workspaceId) return;
     const presentation = {
       selectionId: selectedId,
       selectedWallet,
-      filters: valueFilterError(graphFilters) ? (w.view.filters ?? {}) : graphFilters,
+      filters: presentationFilters,
       leftTab,
       rightTab,
       workbench,
@@ -1148,8 +1260,8 @@ export default function App() {
       focusGraph,
       prefetchDepth,
     };
-    ws.update(
-      w.id,
+    updateWorkspace(
+      workspaceId,
       (current) => {
         // Compare only these UI settings, never the saved graph geometry or membership.
         const unchanged = (Object.keys(presentation) as (keyof typeof presentation)[]).every(
@@ -1163,17 +1275,18 @@ export default function App() {
       false,
     );
   }, [
-    w?.id,
+    workspaceId,
     viewOwner,
     selectedId,
     selectedWallet,
-    graphFilters,
+    presentationFilters,
     leftTab,
     rightTab,
     workbench,
     mobilePanel,
     focusGraph,
     prefetchDepth,
+    updateWorkspace,
   ]);
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
@@ -1208,24 +1321,42 @@ export default function App() {
     change((current) => removeGraphNodes(current, ids));
   };
   const showAllHidden = () => change(showAllNodes);
-  const removalPlan = useMemo(
-    () =>
-      w && entityRemoval?.workspaceId === w.id
-        ? planEntityRemoval(w, entityRemoval.nodeId)
-        : undefined,
-    [
-      w?.id,
-      w?.transactions,
-      w?.annotations,
-      w?.tags,
-      w?.watchedAddresses,
-      entityRemoval?.workspaceId,
-      entityRemoval?.nodeId,
-    ],
-  );
+  const entityRemovalInput = useMemo<EntityRemovalInput | undefined>(() => {
+    if (
+      !workspaceNetwork ||
+      !workspaceTransactions ||
+      !workspaceAnnotations ||
+      !workspaceWallets ||
+      !workspaceWatchedAddresses
+    )
+      return undefined;
+    return {
+      network: workspaceNetwork,
+      transactions: workspaceTransactions,
+      inputContext: workspaceInputContext,
+      contextTransactionIds: workspaceContextTransactionIds,
+      annotations: workspaceAnnotations,
+      tags: workspaceTags,
+      wallets: workspaceWallets,
+      watchedAddresses: workspaceWatchedAddresses,
+    };
+  }, [
+    workspaceNetwork,
+    workspaceTransactions,
+    workspaceInputContext,
+    workspaceContextTransactionIds,
+    workspaceAnnotations,
+    workspaceTags,
+    workspaceWallets,
+    workspaceWatchedAddresses,
+  ]);
+  const removalPlan = useMemo(() => {
+    if (!entityRemoval || entityRemoval.workspaceId !== workspaceId) return undefined;
+    return entityRemovalPlan(entityRemovalInput, entityRemoval.nodeId);
+  }, [workspaceId, entityRemovalInput, entityRemoval]);
   const selectedRemovalPlan = useMemo(
-    () => (w && selectedId ? planEntityRemoval(w, selectedId) : undefined),
-    [w?.id, w?.transactions, w?.annotations, w?.tags, w?.watchedAddresses, selectedId],
+    () => (selectedId ? entityRemovalPlan(entityRemovalInput, selectedId) : undefined),
+    [entityRemovalInput, selectedId],
   );
   const hasRemovalPlan = removalPlan !== undefined;
   useEffect(() => {
@@ -1233,10 +1364,13 @@ export default function App() {
   }, [entityRemoval, hasRemovalPlan]);
   const removableNodeIds = useMemo(
     () =>
-      w
-        ? [...Object.keys(w.transactions).map(txNodeId), ...w.watchedAddresses.map(addressNodeId)]
+      workspaceTransactions && workspaceWatchedAddresses
+        ? [
+            ...Object.keys(workspaceTransactions).map(txNodeId),
+            ...workspaceWatchedAddresses.map(addressNodeId),
+          ]
         : [],
-    [w?.transactions, w?.watchedAddresses],
+    [workspaceTransactions, workspaceWatchedAddresses],
   );
   const applyEntityRemoval = (workspaceId: string, nodeId: string) => {
     const current = wRef.current;
@@ -1342,8 +1476,23 @@ export default function App() {
       (workbench === 'wallet' || (workbench === 'graph' && rightTab === 'utxos')),
   });
   const walletUtxoObservation = useMemo(
-    () => resolveWalletUtxoObservation(w, evidenceWallet, walletUtxos.utxos, selectedId),
-    [w?.id, w?.network, w?.transactions, evidenceWallet, walletUtxos.utxos, selectedId],
+    () =>
+      resolveWalletUtxoObservationFromEvidence(
+        workspaceId && workspaceNetwork && workspaceTransactions
+          ? { id: workspaceId, network: workspaceNetwork, transactions: workspaceTransactions }
+          : undefined,
+        evidenceWallet,
+        walletUtxos.utxos,
+        selectedId,
+      ),
+    [
+      workspaceId,
+      workspaceNetwork,
+      workspaceTransactions,
+      evidenceWallet,
+      walletUtxos.utxos,
+      selectedId,
+    ],
   );
   const getTransaction = async (
     id: string,
@@ -2511,102 +2660,99 @@ export default function App() {
       setNotice('Encrypted workspace exported. Keep the file and password safe.');
     });
   }
+  const pollWalletActivity = useEffectEvent(() => {
+    if (operationRef.current) return;
+    const current = wRef.current;
+    if (!current) return;
+    void run(async (signal) => {
+      monitorOperationRef.current = operationRef.current;
+      setOperation('Checking watched activity…');
+      const checked = await refreshWallets(current.wallets, current, signal);
+      let added = checked.added;
+      let refreshed = checked.refreshed;
+      let partial = checked.partial;
+      let snapshot = checked.snapshot;
+      const polledTransactions: Transaction[] = [];
+      const polledObservedTransactionIds = new Set<string>();
+      const refreshedHistories: NonNullable<Workspace['addressHistories']> = {};
+      let pollFailed = false;
+      let pollFailure: unknown;
+      try {
+        for (const address of current.watchedAddresses) {
+          const result = await loadAddress(
+            address,
+            current.network,
+            snapshot.transactions,
+            signal,
+            undefined,
+            { scope: fetchScope },
+          );
+          signal.throwIfAborted();
+          polledTransactions.push(...result.transactions);
+          for (const txid of result.observedTransactionIds) polledObservedTransactionIds.add(txid);
+          refreshedHistories[address] = {
+            history: result.history,
+            truncated: result.truncated,
+            scannedAt: new Date().toISOString(),
+          };
+          added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
+          refreshed += result.transactions.filter((tx) => !!snapshot.transactions[tx.txid]).length;
+          snapshot = {
+            ...clearContextProvenance(snapshot, result.observedTransactionIds),
+            transactions: {
+              ...snapshot.transactions,
+              ...Object.fromEntries(
+                result.transactions.map((tx) => [
+                  tx.txid,
+                  mergeTransactionObservations(
+                    snapshot.transactions[tx.txid],
+                    tx,
+                    snapshot.network,
+                  ),
+                ]),
+              ),
+            },
+          };
+          partial = partial || result.truncated;
+        }
+      } catch (error) {
+        pollFailed = true;
+        pollFailure = error;
+      }
+      // Publish completed work as one immutable snapshot. If polling is cancelled,
+      // preserve the addresses already checked before the abort as well.
+      if (wRef.current?.id === current.id && wRef.current.network === current.network) {
+        mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
+        if (Object.keys(refreshedHistories).length)
+          updateWorkspace(
+            current.id,
+            (latest) => ({
+              ...latest,
+              addressHistories: {
+                ...latest.addressHistories,
+                ...refreshedHistories,
+              },
+            }),
+            false,
+          );
+      }
+      if (pollFailed) throw pollFailure;
+      setNotice(
+        `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
+      );
+    }).finally(() => {
+      monitorOperationRef.current = undefined;
+    });
+  });
   // Poll from the client, only while this workspace is unlocked. Backend never owns scan state.
   useEffect(() => {
-    if (!live || !canQuery || !w) return;
-    let monitorOperation: AbortController | undefined;
-    const timer = setInterval(() => {
-      if (operationRef.current) return;
-      const current = wRef.current;
-      if (!current) return;
-      void run(async (signal) => {
-        monitorOperation = operationRef.current;
-        setOperation('Checking watched activity…');
-        const checked = await refreshWallets(current.wallets, current, signal);
-        let added = checked.added;
-        let refreshed = checked.refreshed;
-        let partial = checked.partial;
-        let snapshot = checked.snapshot;
-        const polledTransactions: Transaction[] = [];
-        const polledObservedTransactionIds = new Set<string>();
-        const refreshedHistories: NonNullable<Workspace['addressHistories']> = {};
-        let pollFailed = false;
-        let pollFailure: unknown;
-        try {
-          for (const address of current.watchedAddresses) {
-            const result = await loadAddress(
-              address,
-              current.network,
-              snapshot.transactions,
-              signal,
-              undefined,
-              { scope: fetchScope },
-            );
-            signal.throwIfAborted();
-            polledTransactions.push(...result.transactions);
-            for (const txid of result.observedTransactionIds)
-              polledObservedTransactionIds.add(txid);
-            refreshedHistories[address] = {
-              history: result.history,
-              truncated: result.truncated,
-              scannedAt: new Date().toISOString(),
-            };
-            added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
-            refreshed += result.transactions.filter(
-              (tx) => !!snapshot.transactions[tx.txid],
-            ).length;
-            snapshot = {
-              ...clearContextProvenance(snapshot, result.observedTransactionIds),
-              transactions: {
-                ...snapshot.transactions,
-                ...Object.fromEntries(
-                  result.transactions.map((tx) => [
-                    tx.txid,
-                    mergeTransactionObservations(
-                      snapshot.transactions[tx.txid],
-                      tx,
-                      snapshot.network,
-                    ),
-                  ]),
-                ),
-              },
-            };
-            partial = partial || result.truncated;
-          }
-        } catch (error) {
-          pollFailed = true;
-          pollFailure = error;
-        }
-        // Publish completed work as one immutable snapshot. If polling is cancelled,
-        // preserve the addresses already checked before the abort as well.
-        if (wRef.current?.id === current.id && wRef.current.network === current.network) {
-          mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
-          if (Object.keys(refreshedHistories).length)
-            ws.update(
-              current.id,
-              (latest) => ({
-                ...latest,
-                addressHistories: {
-                  ...latest.addressHistories,
-                  ...refreshedHistories,
-                },
-              }),
-              false,
-            );
-        }
-        if (pollFailed) throw pollFailure;
-        setNotice(
-          `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
-        );
-      }).finally(() => {
-        monitorOperation = undefined;
-      });
-    }, 30000);
+    if (!live || !canQuery || !workspaceId) return;
+    const timer = setInterval(pollWalletActivity, 30000);
     return () => {
       clearInterval(timer);
-      monitorOperation?.abort();
+      monitorOperationRef.current?.abort();
     };
-  }, [live, canQuery, w?.id, gap, scanLimit]);
+  }, [live, canQuery, workspaceId, gap, scanLimit]);
   const entityNodes = useMemo(
     () => entityGraph.matchedNodes.map((node) => graphMetadata.labeledNodes.get(node.id) ?? node),
     [entityGraph.matchedNodes, graphMetadata.labeledNodes],
@@ -2664,27 +2810,46 @@ export default function App() {
     return after;
   };
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
+  const lockToSelection = w?.view.lockToSelection ?? false;
+  const showAddresses = w?.view.showAddresses ?? false;
+  const selectedNodeIsVisible = useMemo(
+    () => !!selectedId && visibleGraph.nodes.some((node) => node.id === selectedId),
+    [selectedId, visibleGraph.nodes],
+  );
   useEffect(() => {
     if (
-      !w ||
-      viewOwner !== w.id ||
-      !w.view.lockToSelection ||
+      !workspaceId ||
+      viewOwner !== workspaceId ||
+      !lockToSelection ||
       !selectedId ||
       cameraPreservedSelection.current === selectedId ||
       hiddenIds.has(selectedId)
     )
       return;
-    if (!visibleGraph.nodes.some((node) => node.id === selectedId)) {
+    if (!selectedNodeIsVisible) {
       setGraphFilters({});
-      if (selectedId.startsWith('addr:') && !w.view.showAddresses)
-        ws.update(
-          w.id,
+      if (selectedId.startsWith('addr:') && !showAddresses)
+        updateWorkspace(
+          workspaceId,
           (current) => ({ ...current, view: { ...current.view, showAddresses: true } }),
           false,
         );
     }
-    setFocusRequest({ id: selectedId, token: Date.now(), preserveZoom: true });
-  }, [w?.id, viewOwner, w?.view.lockToSelection, selectedId, hiddenIds]);
+    setFocusRequest((previous) =>
+      previous?.id === selectedId && previous.preserveZoom
+        ? previous
+        : { id: selectedId, token: Date.now(), preserveZoom: true },
+    );
+  }, [
+    workspaceId,
+    viewOwner,
+    lockToSelection,
+    selectedId,
+    hiddenIds,
+    selectedNodeIsVisible,
+    showAddresses,
+    updateWorkspace,
+  ]);
   function centerNode(id = selectedId, filters?: GraphFilters, showHidden = false) {
     if (!id) return;
     if (hiddenIds.has(id) && !showHidden) {

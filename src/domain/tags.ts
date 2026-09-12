@@ -54,7 +54,10 @@ export function parseWorkspaceTags(tags: unknown, network: Network): WorkspaceTa
 }
 
 /** Address membership extends to its outputs, never implicitly to transactions. */
-export function listTagsForNode(workspace: Workspace, node: GraphNode): WorkspaceTag[] {
+export function listTagsForNode(
+  workspace: Pick<Workspace, 'tags'>,
+  node: GraphNode,
+): WorkspaceTag[] {
   const address = node.address ? `addr:${canonicalAddress(node.address)}` : undefined;
   return (workspace.tags ?? []).filter((tag) =>
     tag.nodeIds.some(
@@ -65,7 +68,10 @@ export function listTagsForNode(workspace: Workspace, node: GraphNode): Workspac
 }
 
 /** Build once per workspace/graph update, then use constant-time node lookups. */
-export function buildTagIndex(workspace: Workspace, graph: GraphData): Map<string, WorkspaceTag[]> {
+export function buildTagIndex(
+  workspace: Pick<Workspace, 'tags'>,
+  graph: GraphData,
+): Map<string, WorkspaceTag[]> {
   const loaded = new Set<string>();
   const addressNodes = new Map<string, string[]>();
   for (const node of graph.nodes) {
@@ -147,7 +153,7 @@ export interface WalletMatch {
  * output script, when present, is authoritative over decoded address text.
  */
 export function buildWalletMatches(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'network' | 'transactions' | 'wallets'>,
   graph: GraphData,
 ): Map<string, WalletMatch> {
   const walletsByScript = new Map<string, Set<string>>();

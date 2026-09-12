@@ -1,6 +1,14 @@
 import { Amount } from './Amount';
 import { TransactionBlockTime, TransactionFeeLabel } from './TransactionBlockTime';
-import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from 'react';
 import {
   ArrowRightFromLine,
   ArrowUpDown,
@@ -230,10 +238,13 @@ export default function EntityBrowser({
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
   }, [activePage, filterKey, sort, visibility]);
-  useEffect(() => {
+  const showSelectedPage = useEffectEvent(() => {
     if (!selectedId) return;
     const index = sorted.findIndex((node) => node.id === selectedId);
     if (index >= 0) setPage(Math.floor(index / pageSize));
+  });
+  useEffect(() => {
+    showSelectedPage();
     // Follow explicit selection changes without undoing the user's next-page action.
   }, [selectedId]);
   const activeFilters = hasActiveFilters(filters) || extraFiltersActive;

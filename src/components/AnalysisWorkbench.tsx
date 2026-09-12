@@ -22,6 +22,9 @@ import {
   scanAnalysis,
   scanDefaults,
   type AnalysisScan,
+  type AnalysisScopeSelection,
+  type AnalysisScopeWallet,
+  type AnalysisScopeWorkspace,
 } from '../domain/analysisScan';
 import { formatLocalTimestamp } from '../domain/transactionTime';
 import {
@@ -278,23 +281,59 @@ export function AnalysisWorkbench({
     notice,
     limit,
   ]);
-  const { mode, selectionLabel, hasSelection, scope, walletUnavailable } = useMemo(
-    () => analysisScopeChoice(workspace, scopeMode, selected, wallet),
+  const analysisScopeWorkspace = useMemo<AnalysisScopeWorkspace>(
+    () => ({
+      network: workspace.network,
+      transactions: workspace.transactions,
+      wallets: workspace.wallets,
+    }),
+    [workspace.network, workspace.transactions, workspace.wallets],
+  );
+  const scopeSelectedId = selected?.id;
+  const scopeSelectedKind = selected?.kind;
+  const scopeSelectedTxid = selected?.txid;
+  const scopeSelectedVout = selected?.vout;
+  const scopeSelectedAddress = selected?.address;
+  const analysisScopeSelection = useMemo<AnalysisScopeSelection | undefined>(
+    () =>
+      scopeSelectedId === undefined || scopeSelectedKind === undefined
+        ? undefined
+        : {
+            id: scopeSelectedId,
+            kind: scopeSelectedKind,
+            txid: scopeSelectedTxid,
+            vout: scopeSelectedVout,
+            address: scopeSelectedAddress,
+          },
     [
-      workspace.id,
-      workspace.network,
-      workspace.transactions,
-      workspace.wallets,
-      selected?.id,
-      selected?.kind,
-      selected?.txid,
-      selected?.vout,
-      selected?.address,
-      wallet?.id,
-      wallet?.name,
-      wallet?.addresses,
-      scopeMode,
+      scopeSelectedId,
+      scopeSelectedKind,
+      scopeSelectedTxid,
+      scopeSelectedVout,
+      scopeSelectedAddress,
     ],
+  );
+  const walletName = wallet?.name;
+  const walletAddresses = wallet?.addresses;
+  const analysisScopeWallet = useMemo<AnalysisScopeWallet | undefined>(
+    () =>
+      walletName === undefined
+        ? undefined
+        : {
+            name: walletName,
+            addresses: walletAddresses ?? [],
+          },
+    [walletName, walletAddresses],
+  );
+  const { mode, selectionLabel, hasSelection, scope, walletUnavailable } = useMemo(
+    () =>
+      analysisScopeChoice(
+        analysisScopeWorkspace,
+        scopeMode,
+        analysisScopeSelection,
+        analysisScopeWallet,
+      ),
+    [analysisScopeWorkspace, scopeMode, analysisScopeSelection, analysisScopeWallet],
   );
   const selectionUnavailable = (mode === 'context' && !hasSelection) || walletUnavailable;
   const changed =

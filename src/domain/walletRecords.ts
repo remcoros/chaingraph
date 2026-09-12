@@ -25,7 +25,10 @@ export interface WalletAddressRecord extends WalletAddress {
 }
 
 /** An address claim must agree with its network and recorded Electrum hash. */
-export function verifiedWalletAddresses(wallet: Wallet, network: Network): WalletAddress[] {
+export function verifiedWalletAddresses(
+  wallet: Pick<Wallet, 'addresses'>,
+  network: Network,
+): WalletAddress[] {
   const unique = new Map<string, WalletAddress>();
   for (const address of wallet.addresses) {
     try {
@@ -43,7 +46,7 @@ export function verifiedWalletAddresses(wallet: Wallet, network: Network): Walle
  */
 export function listWalletAddresses(
   workspace: Pick<Workspace, 'network' | 'transactions'>,
-  wallet: Wallet,
+  wallet: Pick<Wallet, 'addresses'>,
 ): WalletAddressRecord[] {
   const records = verifiedWalletAddresses(wallet, workspace.network).map((address) => ({
     ...address,
@@ -67,7 +70,7 @@ export function listWalletAddresses(
  */
 export function listWalletTransactions(
   workspace: Pick<Workspace, 'network' | 'transactions'>,
-  wallet: Wallet,
+  wallet: Pick<Wallet, 'addresses'>,
 ): WalletTransactionRecord[] {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
   const hashes = new Set(addresses.map((address) => address.scripthash));

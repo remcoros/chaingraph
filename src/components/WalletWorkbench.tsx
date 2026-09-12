@@ -37,6 +37,7 @@ import {
   walletReviewCategories,
   matchesReviewCategories,
   walletReviewCategoryScanState,
+  type WalletReviewCategoryWorkspace,
 } from '../domain/walletReviewCategories';
 import type { AnalysisScan } from '../domain/analysisScan';
 import { useRecordSelection } from '../lib/useRecordSelection';
@@ -124,6 +125,75 @@ const PREVIEW_ACTIONS = {
   onInspect: noop,
   onAnalyze: noop,
 };
+
+function buildWalletRows(
+  workspace: Pick<Workspace, 'network' | 'transactions' | 'walletReviews'>,
+  wallet: Pick<Wallet, 'id' | 'addresses'>,
+  currentUtxos: readonly WalletUtxoRecord[],
+  reviewItems: readonly WalletReviewItem[],
+  relationships: ReturnType<WalletPreparationCache['prepare']>['relationships'],
+  tab: WalletTab,
+): Record<WalletTab, WalletRow[]> {
+  const records =
+    tab === 'utxos' || tab === 'transactions' || tab === 'addresses'
+      ? buildWalletRecordRows(workspace, wallet, currentUtxos, reviewItems, tab)
+      : { utxos: [], transactions: [], addresses: [] };
+  const sourceContexts = new Map(
+    [
+      ...relationships.sourceExceptions,
+      ...relationships.sources.flatMap((group) => group.outpoints),
+    ].map((entry) => [entry.id, entry.transactionIds]),
+  );
+  return {
+    review: reviewItems.map((item) => {
+      const row = reviewRow(item);
+      if (item.reason === 'funding-source')
+        row.contextTransactionIds = sourceContexts.get(item.nodeId) ?? row.contextTransactionIds;
+      return row;
+    }),
+    ...records,
+    ...(tab === 'sources' || tab === 'destinations'
+      ? buildWalletRelationshipRows(workspace, relationships, reviewItems)
+      : { sources: [], destinations: [] }),
+  };
+}
+
+function buildWalletRowTagIndex(tags: Workspace['tags'], rows: readonly WalletRow[]) {
+  return buildTagIndex(
+    { tags },
+    {
+      nodes: rows.map((row) => ({
+        id: row.nodeId,
+        kind: row.kind,
+        address: row.address,
+        label: '',
+      })),
+      links: [],
+    },
+  );
+}
+
+function walletCategoryScanState(
+  findings: Workspace['findings'],
+  currentScan: AnalysisScan | undefined,
+) {
+  return walletReviewCategoryScanState({ findings }, currentScan);
+}
+
+function walletCategories(
+  workspace: WalletReviewCategoryWorkspace,
+  items: readonly WalletReviewItem[],
+) {
+  return walletReviewCategories(workspace, items);
+}
+
+function matchesWalletCategory(
+  item: WalletReviewItem,
+  selectedTypes: readonly string[],
+  workspace: WalletReviewCategoryWorkspace,
+) {
+  return matchesReviewCategories(item, selectedTypes, workspace);
+}
 
 export const WalletWorkbench = memo(
   function WalletWorkbench(props: WalletWorkbenchProps) {
@@ -266,54 +336,35 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     update: props.updateEvidence,
   });
   const counterpartyReady = active && tab === 'sources';
-  const rowsByTab = useMemo<Record<WalletTab, WalletRow[]>>(() => {
-    const records =
-      tab === 'utxos' || tab === 'transactions' || tab === 'addresses'
-        ? buildWalletRecordRows(workspace, wallet, currentUtxos, review.items, tab)
-        : { utxos: [], transactions: [], addresses: [] };
-    const sourceContexts = new Map(
-      [
-        ...relationships.sourceExceptions,
-        ...relationships.sources.flatMap((group) => group.outpoints),
-      ].map((entry) => [entry.id, entry.transactionIds]),
-    );
-    return {
-      review: review.items.map((item) => {
-        const row = reviewRow(item);
-        if (item.reason === 'funding-source')
-          row.contextTransactionIds = sourceContexts.get(item.nodeId) ?? row.contextTransactionIds;
-        return row;
-      }),
-      ...records,
-      ...(tab === 'sources' || tab === 'destinations'
-        ? buildWalletRelationshipRows(workspace, relationships, review.items)
-        : { sources: [], destinations: [] }),
-    };
-  }, [
-    workspace.network,
-    workspace.transactions,
-    workspace.annotations,
-    workspace.tags,
-    workspace.walletReviews,
-    wallet.id,
-    wallet.addresses,
-    currentUtxos,
-    review.items,
-    relationships,
-    tab,
-  ]);
+  const rowsByTab = useMemo(
+    () =>
+      buildWalletRows(
+        {
+          network: workspace.network,
+          transactions: workspace.transactions,
+          walletReviews: workspace.walletReviews,
+        },
+        { id: wallet.id, addresses: wallet.addresses },
+        currentUtxos,
+        review.items,
+        relationships,
+        tab,
+      ),
+    [
+      workspace.network,
+      workspace.transactions,
+      workspace.walletReviews,
+      wallet.id,
+      wallet.addresses,
+      currentUtxos,
+      review.items,
+      relationships,
+      tab,
+    ],
+  );
   const rows = rowsByTab[tab];
   const rowTags = useMemo(
-    () =>
-      buildTagIndex(workspace, {
-        nodes: rows.map((row) => ({
-          id: row.nodeId,
-          kind: row.kind,
-          address: row.address,
-          label: '',
-        })),
-        links: [],
-      }),
+    () => buildWalletRowTagIndex(workspace.tags, rows),
     [workspace.tags, rows],
   );
   const search = query.trim().toLowerCase();
@@ -354,15 +405,20 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
   );
   const currentScan = walletScan.scan ?? props.analysisScan;
   const scanState = useMemo(
-    () => walletReviewCategoryScanState(workspace, currentScan),
+    () => walletCategoryScanState(workspace.findings, currentScan),
     [workspace.findings, currentScan],
   );
   const categories = useMemo(
     () =>
       tab !== 'review'
         ? []
-        : walletReviewCategories(
-            workspace,
+        : walletCategories(
+            {
+              annotations: workspace.annotations,
+              tags: workspace.tags,
+              findings: workspace.findings,
+              walletReviews: workspace.walletReviews,
+            },
             statusFiltered.flatMap((row) => row.reviews),
           ).map((category) => {
             const tool = scanState.tools.find((entry) => entry.id === category.algorithm);
@@ -384,6 +440,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
       workspace.annotations,
       workspace.tags,
       workspace.findings,
+      workspace.walletReviews,
       statusFiltered,
       scanState,
       currentScan,
@@ -398,7 +455,14 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     () =>
       tab === 'review' && !allTypes
         ? statusFiltered.filter((row) =>
-            row.reviews.some((item) => matchesReviewCategories(item, selectedTypes, workspace)),
+            row.reviews.some((item) =>
+              matchesWalletCategory(item, selectedTypes, {
+                annotations: workspace.annotations,
+                tags: workspace.tags,
+                findings: workspace.findings,
+                walletReviews: workspace.walletReviews,
+              }),
+            ),
           )
         : statusFiltered,
     [
@@ -409,6 +473,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
       workspace.annotations,
       workspace.tags,
       workspace.findings,
+      workspace.walletReviews,
     ],
   );
   const displayedRows = filteredRows.slice(0, limit);

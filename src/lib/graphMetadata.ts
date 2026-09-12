@@ -29,7 +29,7 @@ export class GraphMetadataProjection {
 
   project(
     graph: GraphData,
-    workspace: Workspace | undefined,
+    workspace: Pick<Workspace, 'annotations' | 'wallets'> | undefined,
     tags: ReadonlyMap<string, WorkspaceTag[]>,
     matches: ReadonlyMap<string, WalletMatch>,
     mode: Workspace['view']['highlightMode'],

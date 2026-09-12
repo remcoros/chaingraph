@@ -15,6 +15,14 @@ export interface ScanScope {
   txids: string[];
 }
 export type ScanOptions = Record<string, AnalysisOptions>;
+export type AnalysisScopeWorkspace = Pick<Workspace, 'network' | 'transactions' | 'wallets'>;
+export type AnalysisScopeSelection = Pick<
+  GraphNode,
+  'id' | 'kind' | 'txid' | 'vout' | 'address'
+> & {
+  label?: string;
+};
+export type AnalysisScopeWallet = Pick<Wallet, 'name' | 'addresses'>;
 export interface ScanToolReport {
   toolId: string;
   status: 'complete' | 'skipped' | 'error';
@@ -36,10 +44,10 @@ export type AnalysisScopeMode = 'context' | 'workspace' | `wallet:${string}`;
  * removed wallet keeps an empty scope rather than broadening the scan.
  */
 export function analysisScopeChoice(
-  workspace: Workspace,
+  workspace: AnalysisScopeWorkspace,
   choice: string | undefined,
-  selected?: GraphNode,
-  wallet?: Wallet,
+  selected?: AnalysisScopeSelection,
+  wallet?: AnalysisScopeWallet,
 ) {
   const walletId = choice?.startsWith('wallet:') ? choice.slice('wallet:'.length) : undefined;
   const mode: AnalysisScopeMode =
@@ -82,9 +90,9 @@ export function analysisScopeChoice(
 
 /** Graph filters and manual visibility never limit analysis observations. */
 export function analysisScanScope(
-  workspace: Workspace,
-  selected?: GraphNode,
-  wallet?: Wallet,
+  workspace: AnalysisScopeWorkspace,
+  selected?: AnalysisScopeSelection,
+  wallet?: AnalysisScopeWallet,
 ): ScanScope {
   const loaded = (ids: string[]) =>
     [...new Set(ids)].filter((id) => workspace.transactions[id]).sort();

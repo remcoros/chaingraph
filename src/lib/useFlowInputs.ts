@@ -146,10 +146,11 @@ export function useFlowInputs(options: {
         : undefined,
     [flowWorkspace, selected, related, prevouts],
   );
-  const plan = plans?.selected;
+  const selectedPlan = plans?.selected;
+  const allPlan = plans?.all;
   const target =
     options.workspace && options.selected
-      ? `${options.workspace.id}:${options.workspace.network}:${plan?.transactionId ?? ''}:${options.selected.id}`
+      ? `${options.workspace.id}:${options.workspace.network}:${selectedPlan?.transactionId ?? ''}:${options.selected.id}`
       : '';
   const enabled = options.enabled && options.workspace?.view.transactionFlow?.open !== false;
   const [attempt, setAttempt] = useState(0);
@@ -157,13 +158,13 @@ export function useFlowInputs(options: {
   const allInputs = bulkTarget === target;
   // Returning to an earlier selection must not silently repeat a bulk action.
   useEffect(() => setBulkTarget(''), [target]);
-  const missingInputCount = plans?.all.missing.length ?? 0;
+  const missingInputCount = allPlan?.missing.length ?? 0;
   const [state, setState] = useState({ target: '', loading: false, error: '' });
+  const activePlan = allInputs ? allPlan : selectedPlan;
   useEffect(() => {
     if (!target || !enabled) return;
     const { workspace, selected, fetch, update } = latest.current;
     if (!workspace) return;
-    const activePlan = allInputs ? plans?.all : plans?.selected;
     if (!activePlan) return;
     const { transactionId, missing } = activePlan;
     update(
@@ -240,7 +241,7 @@ export function useFlowInputs(options: {
         });
     });
     return () => controller.abort();
-  }, [target, enabled, attempt, allInputs]);
+  }, [target, enabled, attempt, allInputs, activePlan]);
   return {
     missingInputCount,
     onLoadAllInputs: () => {

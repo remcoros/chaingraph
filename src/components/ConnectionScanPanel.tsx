@@ -22,7 +22,11 @@ import {
   type ScanRun,
   type ScanSettings,
 } from '../domain/connectionScan';
-import { replaceScanRun, clearScanRuns } from '../domain/connectionScanRecords';
+import {
+  replaceScanRun,
+  clearScanRuns,
+  type ScanPathWorkspace,
+} from '../domain/connectionScanRecords';
 import { prepareScanPathAddition, prepareScanNodeAddition } from '../domain/connectionScanAddition';
 import { loadScanActionEvidence } from '../lib/connectionScanActionEvidence';
 import { runConnectionScanInWorker } from '../lib/connectionScanRunner';
@@ -1002,15 +1006,37 @@ function ScanResultRow({
   const conflict = finding === 'conflicting-evidence';
   const prefixLength = conflict ? Math.max(1, result.path.length - 1) : result.path.length;
   const [error, setError] = useState('');
-  const plan = useMemo(
-    () => prepareScanPathAddition(workspace, result, prefixLength),
+  const scanPathWorkspace = useMemo<ScanPathWorkspace>(
+    () => ({
+      network: workspace.network,
+      transactions: workspace.transactions,
+      inputContext: workspace.inputContext,
+      findings: workspace.findings,
+      annotations: workspace.annotations,
+      addressBalances: workspace.addressBalances,
+      watchedAddresses: workspace.watchedAddresses,
+      connectionScans: workspace.connectionScans,
+      view: {
+        showAddresses: workspace.view.showAddresses,
+        graphNodeIds: workspace.view.graphNodeIds,
+      },
+    }),
     [
+      workspace.network,
       workspace.transactions,
-      workspace.connectionScans?.evidence,
+      workspace.inputContext,
+      workspace.findings,
+      workspace.annotations,
+      workspace.addressBalances,
+      workspace.watchedAddresses,
+      workspace.connectionScans,
+      workspace.view.showAddresses,
       workspace.view.graphNodeIds,
-      result,
-      prefixLength,
     ],
+  );
+  const plan = useMemo(
+    () => prepareScanPathAddition(scanPathWorkspace, result, prefixLength),
+    [scanPathWorkspace, result, prefixLength],
   );
   const creatorId = plan.creatorId;
   const openNode = (id: string) => {

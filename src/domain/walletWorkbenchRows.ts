@@ -60,7 +60,7 @@ export interface WalletRow {
   ownership?: 'wallet' | 'external' | 'unknown';
 }
 
-export function walletRowFinding(workspace: Workspace, row: WalletRow) {
+export function walletRowFinding(workspace: Pick<Workspace, 'findings'>, row: WalletRow) {
   const review = row.reviews.find((item) => item.reason === 'link' && item.key === row.key);
   return review
     ? workspace.findings.find((finding) => review.key.endsWith(`|link|${finding.id}`))
@@ -148,7 +148,7 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
 }
 
 export function buildWalletRelationshipRows(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'walletReviews'>,
   groups: WalletAddressRelationships,
   items: readonly WalletReviewItem[],
 ): Record<'sources' | 'destinations', WalletRow[]> {
@@ -184,7 +184,7 @@ export function buildWalletRelationshipRows(
 
 export function decorateWalletRow(
   row: Omit<WalletRow, 'reviews' | 'status' | 'changed'>,
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'walletReviews'>,
   items: readonly WalletReviewItem[],
   fallbackReviewKey?: string,
 ): WalletRow {
@@ -205,8 +205,8 @@ export function decorateWalletRow(
 }
 
 export function buildWalletRecordRows(
-  workspace: Workspace,
-  wallet: Wallet,
+  workspace: Pick<Workspace, 'network' | 'transactions' | 'walletReviews'>,
+  wallet: Pick<Wallet, 'id' | 'addresses'>,
   utxos: readonly WalletUtxoRecord[],
   reviewItems: readonly WalletReviewItem[],
   tab: 'utxos' | 'transactions' | 'addresses' | 'all' = 'all',

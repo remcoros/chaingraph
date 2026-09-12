@@ -15,6 +15,12 @@ import {
   type WalletFlowInputReference,
 } from './walletFlowInputs';
 
+/** The loader observes only the evidence that can change its one-hop input plan. */
+export type WalletCounterpartyWorkspace = Pick<
+  Workspace,
+  'id' | 'network' | 'wallets' | 'transactions'
+>;
+
 export interface WalletCounterpartyOptions {
   workspace: Workspace;
   wallet: Wallet;
@@ -24,6 +30,14 @@ export interface WalletCounterpartyOptions {
   fetch: (network: Network, id: string, signal: AbortSignal) => Promise<Transaction>;
   update: (id: string, change: (current: Workspace) => Workspace, undo?: boolean) => void;
 }
+
+export type WalletCounterpartyConfiguration = Omit<
+  WalletCounterpartyOptions,
+  'workspace' | 'wallet'
+> & {
+  workspace: WalletCounterpartyWorkspace;
+  wallet: Pick<Wallet, 'id'>;
+};
 
 interface InputContext {
   transactionId: string;
@@ -42,13 +56,17 @@ export interface WalletCounterpartyInputPlan {
   unavailableCount: number;
 }
 
-function loaded(workspace: Workspace, id: string) {
+function loaded(workspace: Pick<Workspace, 'transactions'>, id: string) {
   const transaction = workspace.transactions[id];
   return canonicalTransactionId(transaction?.txid) === id ? transaction : undefined;
 }
 
 /** Revalidate receiving contexts, not address history or newly fetched ancestry. */
-function sourceEvidence(workspace: Workspace, walletId: string, contexts: InputContext[]) {
+function sourceEvidence(
+  workspace: WalletCounterpartyWorkspace,
+  walletId: string,
+  contexts: InputContext[],
+) {
   const wallet = workspace.wallets.find((entry) => entry.id === walletId);
   if (!wallet) return { contexts: [], sourceKey: '' };
   const hashes = new Set(
@@ -92,8 +110,8 @@ function sourceEvidence(workspace: Workspace, walletId: string, contexts: InputC
 }
 
 export function walletCounterpartyInputPlan(
-  workspace: Workspace,
-  wallet: Wallet,
+  workspace: WalletCounterpartyWorkspace,
+  wallet: Pick<Wallet, 'id'>,
   groups: WalletAddressRelationships,
 ): WalletCounterpartyInputPlan {
   const byTransaction = new Map<
@@ -220,8 +238,8 @@ export interface WalletCounterpartyState {
 
 /** Testable lifecycle shared by the hook. One automatic wave per activation;
  * source changes cancel work but never grant another automatic wave. */
-export function createWalletCounterpartyLoader(readLatest?: () => WalletCounterpartyOptions) {
-  let options: WalletCounterpartyOptions | undefined;
+export function createWalletCounterpartyLoader(readLatest?: () => WalletCounterpartyConfiguration) {
+  let options: WalletCounterpartyConfiguration | undefined;
   const liveOptions = () => readLatest?.() ?? options;
   let target = '';
   let source = '';
@@ -238,7 +256,7 @@ export function createWalletCounterpartyLoader(readLatest?: () => WalletCounterp
     nonAddressCount: 0,
     unavailableCount: 0,
   };
-  const planFor = (value: WalletCounterpartyOptions) =>
+  const planFor = (value: WalletCounterpartyConfiguration) =>
     walletCounterpartyInputPlan(value.workspace, value.wallet, value.groups);
   const refresh = () => {
     const plan = options?.active ? planFor(options) : undefined;
@@ -338,7 +356,7 @@ export function createWalletCounterpartyLoader(readLatest?: () => WalletCounterp
       });
   };
   return {
-    configure(next: WalletCounterpartyOptions) {
+    configure(next: WalletCounterpartyConfiguration) {
       const key = JSON.stringify([next.workspace.id, next.workspace.network, next.wallet.id]);
       const activated = next.active && !options?.active;
       if (key !== target || activated) {
