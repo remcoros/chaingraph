@@ -163,7 +163,9 @@ export function useFlowInputs(options: {
     if (!target || !enabled) return;
     const { workspace, selected, fetch, update } = latest.current;
     if (!workspace) return;
-    const { transactionId, missing } = (allInputs ? plans?.all : plans?.selected)!;
+    const activePlan = allInputs ? plans?.all : plans?.selected;
+    if (!activePlan) return;
+    const { transactionId, missing } = activePlan;
     update(
       workspace.id,
       (current) => mergeFlowInputs(current, transactionId, selected, [], allInputs),
