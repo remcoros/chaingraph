@@ -199,7 +199,14 @@ export function AnalysisWorkbench({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(saved?.notice ?? '');
   const [graphNotice, setGraphNotice] = useState<{ findingId: string; message: string }>();
-  const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
+  const prevouts = useMemo(
+    () =>
+      indexPreviousOutputs({
+        network: workspace.network,
+        transactions: workspace.transactions,
+      }),
+    [workspace.network, workspace.transactions],
+  );
   const pending = useRef<AbortController | undefined>(undefined);
   const latest = useRef(workspace);
   latest.current = workspace;
