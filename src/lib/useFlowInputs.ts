@@ -161,6 +161,7 @@ export function useFlowInputs(options: {
   const missingInputCount = allPlan?.missing.length ?? 0;
   const [state, setState] = useState({ target: '', loading: false, error: '' });
   const activePlan = allInputs ? allPlan : selectedPlan;
+  const hasMissingInputs = (activePlan?.missing.length ?? 0) > 0;
   useEffect(() => {
     if (!target || !enabled) return;
     const { workspace, selected, fetch, update } = latest.current;
@@ -172,10 +173,7 @@ export function useFlowInputs(options: {
       (current) => mergeFlowInputs(current, transactionId, selected, [], allInputs),
       false,
     );
-    if (!missing.length) {
-      setState({ target, loading: false, error: '' });
-      return;
-    }
+    if (!missing.length) return;
     const controller = new AbortController();
     setState({ target, loading: true, error: '' });
     // Pin the displayed transaction before parent arrivals can change related-transaction ordering.
@@ -248,8 +246,8 @@ export function useFlowInputs(options: {
       setBulkTarget(target);
       setAttempt((value) => value + 1);
     },
-    inputLoading: enabled && state.target === target && state.loading,
-    inputError: state.target === target ? state.error : '',
+    inputLoading: enabled && hasMissingInputs && state.target === target && state.loading,
+    inputError: hasMissingInputs && state.target === target ? state.error : '',
     onRetryInputs: () => setAttempt((value) => value + 1),
   };
 }
