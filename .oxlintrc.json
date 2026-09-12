@@ -9,6 +9,7 @@
     "react-hooks/exhaustive-deps": "warn",
     "react/immutability": "error",
     "eslint/no-control-regex": "error",
+    "eslint/no-unused-vars": "error",
     "eslint/no-useless-escape": "error",
     "react/jsx-key": "error",
     "react/no-array-index-key": "off",

@@ -103,13 +103,13 @@ export function applyScanRecheck(
       if (scanResultGroupKey(item) !== key) return [item];
       if (!observation) return [];
       const {
-        finding,
-        branchCount,
-        checkedAt,
-        bestBlock,
-        includesMempool,
-        issueCode,
-        reason,
+        finding: _finding,
+        branchCount: _branchCount,
+        checkedAt: _checkedAt,
+        bestBlock: _bestBlock,
+        includesMempool: _includesMempool,
+        issueCode: _issueCode,
+        reason: _reason,
         ...path
       } = item;
       const kind = ['unspent', 'coinbase', 'unspendable'].includes(observation.finding)
