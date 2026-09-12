@@ -19,7 +19,8 @@
     "oxc/no-async-await": "off",
     "unicorn/no-array-for-each": "off",
     "unicorn/no-useless-fallback-in-spread": "error",
-    "unicorn/no-useless-spread": "error"
+    "unicorn/no-useless-spread": "error",
+    "unicorn/prefer-string-starts-ends-with": "error"
   },
   "ignorePatterns": ["dist/**", "node_modules/**", "artifacts/**", "test-results/**", "public/**"]
 }

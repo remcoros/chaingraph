@@ -21,7 +21,7 @@ function* sources(dir) {
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
     if (statSync(full).isDirectory()) yield* sources(full);
-    else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) && !/\.worker\.ts$/.test(entry))
+    else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) && !entry.endsWith('.worker.ts'))
       yield full;
   }
 }
@@ -35,7 +35,7 @@ const affected = [];
 for (const file of sources(root)) {
   const source = readFileSync(file, 'utf8');
   // Only files that can contain components or hooks are worth reporting.
-  if (!/\.tsx$/.test(file) && !/\buse[A-Z]/.test(source)) continue;
+  if (!file.endsWith('.tsx') && !/\buse[A-Z]/.test(source)) continue;
   files++;
   const result = transformSync(file, source, {});
   const errors = result.errors ?? [];
