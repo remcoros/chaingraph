@@ -265,8 +265,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     fetch: fetchTransaction,
     update: props.updateEvidence,
   });
-  const [counterpartyReady, setCounterpartyReady] = useState(false);
-  useEffect(() => setCounterpartyReady(active && tab === 'sources'), [active, tab]);
+  const counterpartyReady = active && tab === 'sources';
   const rowsByTab = useMemo<Record<WalletTab, WalletRow[]>>(() => {
     const records =
       tab === 'utxos' || tab === 'transactions' || tab === 'addresses'
