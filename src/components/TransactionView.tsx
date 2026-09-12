@@ -118,6 +118,12 @@ interface FlowRowActions {
   toggleSelection?: (id: string) => void;
 }
 
+function moveSelectedRowFirst(rows: Row[], selectedId?: string) {
+  const selectedIndex = selectedId ? rows.findIndex((row) => row.id === selectedId) : -1;
+  if (selectedIndex <= 0) return rows;
+  return [rows[selectedIndex], ...rows.slice(0, selectedIndex), ...rows.slice(selectedIndex + 1)];
+}
+
 // A selection change should update two rows, not recreate every expanded row.
 const TransactionFlowRow = memo(function TransactionFlowRow({
   row,
@@ -380,6 +386,7 @@ function TransactionRows({
   const controlled = state?.transactionId === tx.txid;
   const expandedInputs = controlled ? (state.expandedInputs ?? false) : localInputs;
   const expandedOutputs = controlled ? (state.expandedOutputs ?? false) : localOutputs;
+  const selectedOutputId = selected?.kind === 'output' ? selected.id : undefined;
   const setExpandedInputs = (expanded: boolean) => {
     setLocalInputs(expanded);
     onStateChange?.({
@@ -488,6 +495,12 @@ function TransactionRows({
     inputLoading,
     inputError,
   ]);
+  useLayoutEffect(() => {
+    if (!selectedOutputId) return;
+    flow.current
+      ?.querySelector<HTMLElement>('.transaction-row.is-pinned')
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [selectedOutputId]);
   const inputRows = useMemo<Row[]>(
     () =>
       tx.vin.map((input, index) => {
@@ -540,6 +553,8 @@ function TransactionRows({
         const shown = expanded
           ? retained
           : retained.filter((row, index) => index < 3 || matches(row));
+        // Keep the exact selected input or output at the visible start of its lane.
+        const displayedRows = moveSelectedRowFirst(shown, selectedOutputId);
         return (
           <section
             key={name}
@@ -586,7 +601,7 @@ function TransactionRows({
               </div>
             </div>
             <div className="transaction-rows">
-              {shown.map((row) => (
+              {displayedRows.map((row) => (
                 <TransactionFlowRow
                   key={row.index}
                   row={row}
