@@ -518,8 +518,10 @@ export default function App() {
     setMobilePanel('right');
     requestAnimationFrame(() => scanTargetInvoker.current?.focus({ preventScroll: true }));
   };
+  const activeWorkspaceId = w?.id;
   const scanTargetPreview = useMemo(() => {
-    if (!w || !scanTargetDraft || scanTargetDraft.workspaceId !== w.id) return {};
+    if (!activeWorkspaceId || !scanTargetDraft || scanTargetDraft.workspaceId !== activeWorkspaceId)
+      return {};
     try {
       return {
         targetCount: prepareCustomScanTargets({
@@ -530,7 +532,7 @@ export default function App() {
     } catch (cause) {
       return { error: cause instanceof Error ? cause.message : 'Targets could not be prepared.' };
     }
-  }, [scanTargetDraft, w?.id]);
+  }, [scanTargetDraft, activeWorkspaceId]);
   const [live, setLive] = useState(false);
   const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const [scanLimit, setScanLimit] = useState(200);
@@ -1225,9 +1227,10 @@ export default function App() {
     () => (w && selectedId ? planEntityRemoval(w, selectedId) : undefined),
     [w?.id, w?.transactions, w?.annotations, w?.tags, w?.watchedAddresses, selectedId],
   );
+  const hasRemovalPlan = removalPlan !== undefined;
   useEffect(() => {
-    if (entityRemoval && !removalPlan) setEntityRemoval(undefined);
-  }, [entityRemoval, Boolean(removalPlan)]);
+    if (entityRemoval && !hasRemovalPlan) setEntityRemoval(undefined);
+  }, [entityRemoval, hasRemovalPlan]);
   const removableNodeIds = useMemo(
     () =>
       w
