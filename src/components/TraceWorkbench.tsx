@@ -64,7 +64,14 @@ export function TraceWorkbench({
     [workspace.transactions, pointId],
   );
   const creator = point && workspace.transactions[point.txid];
-  const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
+  const prevouts = useMemo(
+    () =>
+      indexPreviousOutputs({
+        network: workspace.network,
+        transactions: workspace.transactions,
+      }),
+    [workspace.network, workspace.transactions],
+  );
   const resolution = point && resolvePreviousOutput(workspace, point, prevouts);
   const output =
     resolution && (resolution.status === 'loaded' || resolution.status === 'attached')
