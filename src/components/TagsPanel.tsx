@@ -521,9 +521,10 @@ export default function TagsPanel({
   onSelect: (id: string) => void;
 }) {
   const loadedIds = useMemo(() => new Set(graph.nodes.map((node) => node.id)), [graph]);
+  const selectedId = selected?.id;
   const targetIds = useMemo(
-    () => [...new Set(selectedIds?.length ? selectedIds : selected ? [selected.id] : [])],
-    [selectedIds, selected?.id],
+    () => [...new Set(selectedIds?.length ? selectedIds : selectedId ? [selectedId] : [])],
+    [selectedIds, selectedId],
   );
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
