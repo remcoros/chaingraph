@@ -471,6 +471,7 @@ export default function GraphView(props: GraphViewProps) {
     hoveredNode?.kind === 'output'
       ? (loadedSpenders.get(`${hoveredNode.txid}:${hoveredNode.vout}`) ?? 0)
       : 0;
+  const hasHoveredNode = hoveredNode !== undefined;
   const traceReason = props.busy
     ? 'Another operation is running.'
     : hoveredNode?.kind === 'output' && transaction
@@ -478,7 +479,7 @@ export default function GraphView(props: GraphViewProps) {
       : props.traceDisabledReason;
 
   useEffect(() => {
-    if (hover && !hoveredNode) dismissCard();
+    if (hover && !hasHoveredNode) dismissCard();
     const card = cardRef.current;
     const container = containerRef.current;
     if (!card || !container) return;
@@ -497,7 +498,7 @@ export default function GraphView(props: GraphViewProps) {
     observer.observe(card);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [hover?.id, hover?.type, Boolean(hoveredNode)]);
+  }, [hover?.id, hover?.type, hasHoveredNode]);
 
   return (
     <div className="graph-view" data-testid="graph-view" onPointerLeave={scheduleCardClose}>
