@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ListFilter } from 'lucide-react';
 import { AnchoredPopover } from './AnchoredPopover';
 import { WalletHelp } from './WalletHelp';
@@ -27,7 +27,7 @@ export function WalletCategoryFilter({
   onChange: (ids: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   useEffect(() => {
     if (!active) setOpen(false);
@@ -35,21 +35,23 @@ export function WalletCategoryFilter({
   return (
     <>
       <button
-        ref={trigger}
         aria-haspopup="dialog"
         aria-expanded={active && open}
         aria-controls={active && open ? id : undefined}
-        onClick={() => setOpen(!open)}
+        onClick={(event) => {
+          setTrigger(event.currentTarget);
+          setOpen((wasOpen) => !wasOpen);
+        }}
       >
         <ListFilter size={14} /> Finding types
         <span className="wallet-count">
           {selected.length === categories.length ? 'All' : selected.length || 'None'}
         </span>
       </button>
-      {active && open && (
+      {active && open && trigger && (
         <AnchoredPopover
           id={id}
-          anchor={trigger.current!}
+          anchor={trigger}
           title={title}
           width={390}
           onClose={() => setOpen(false)}
