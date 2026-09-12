@@ -29,8 +29,7 @@
   outline-offset: 2px;
 }
 
-.graph-context-navigation,
-.graph-context-transactions,
+.graph-context-top,
 .graph-context-actions,
 .graph-context-sides {
   display: grid;
@@ -38,7 +37,6 @@
   gap: 3px;
 }
 
-.graph-context-navigation button:last-child,
 .graph-context-wide {
   grid-column: 1 / -1;
 }
@@ -63,10 +61,6 @@
   border-radius: 2px;
   background: var(--color-surface);
   stroke-width: 2.5;
-}
-
-.graph-context-transactions {
-  margin-top: 4px;
 }
 
 .graph-context-restore {

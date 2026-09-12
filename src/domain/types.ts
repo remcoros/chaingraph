@@ -45,6 +45,29 @@ export interface WalletAddress {
   branch: 0 | 1;
   history?: { tx_hash: string; height: number }[];
 }
+export interface AddressHistoryObservation {
+  history: { tx_hash: string; height: number }[];
+  /** Transaction details were capped while the complete history was observed. */
+  truncated: boolean;
+  scannedAt?: string;
+}
+export interface AddressBalanceObservation {
+  network: Network;
+  confirmedSats: number;
+  unconfirmedSats: number;
+  checkedAt: string;
+}
+export interface AddressUtxoRecord {
+  txid: string;
+  vout: number;
+  valueSats: number;
+  height: number;
+}
+export interface AddressUtxoObservation {
+  network: Network;
+  utxos: AddressUtxoRecord[];
+  checkedAt: string;
+}
 export interface Wallet {
   id: string;
   name: string;
@@ -103,7 +126,7 @@ export interface TransactionFlowState {
 }
 export interface Workspace {
   /** Decrypted data schema version, independent of the encrypted envelope format. */
-  version: 3;
+  version: 4;
   id: string;
   name: string;
   description?: string;
@@ -126,6 +149,12 @@ export interface Workspace {
   connectionScans?: import('./connectionScanRecords').ConnectionScanRecords;
   findings: AnalysisFinding[];
   watchedAddresses: string[];
+  /** Bounded Electrum history observations for directly watched addresses. */
+  addressHistories?: Record<string, AddressHistoryObservation>;
+  /** Bounded current balance observations for directly inspected addresses. */
+  addressBalances?: Record<string, AddressBalanceObservation>;
+  /** Bounded current UTXO observations for directly inspected addresses. */
+  addressUtxos?: Record<string, AddressUtxoObservation>;
   demo: boolean;
   view: {
     dimensions: 2 | 3;

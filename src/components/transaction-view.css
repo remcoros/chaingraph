@@ -23,7 +23,7 @@
 }
 .transaction-view-slot:has(.transaction-view[open]) {
   /* Preserve the graph's space while the panel overlays it. */
-  height: min(calc(50% - 28px), 312px);
+  height: min(calc(50% - 20px), 320px);
 }
 .transaction-view-surface {
   position: relative;
@@ -80,7 +80,7 @@
   cursor: pointer;
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 4;
   background: var(--color-paper);
   font-weight: 600;
 }
@@ -104,6 +104,15 @@
   font-weight: 400;
   overflow-wrap: anywhere;
 }
+.transaction-summary-annotation-icon {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+}
+.transaction-summary-bookmark-icon {
+  flex: none;
+  color: var(--color-warning);
+}
 .transaction-summary-counts {
   color: var(--color-muted);
   font-weight: 400;
@@ -123,6 +132,299 @@
 }
 .transaction-view-body {
   padding: 0 8px 7px;
+}
+.address-history-view {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 7px 0 2px;
+}
+.address-history-sticky {
+  position: sticky;
+  top: 32px;
+  z-index: 10;
+  isolation: isolate;
+  display: grid;
+  gap: 8px;
+  margin-top: -7px;
+  padding: 7px 0 2px;
+  background: var(--color-paper);
+}
+.address-history-sticky::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 -8px;
+  background: var(--color-paper);
+}
+.address-history-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  background: var(--color-paper);
+}
+.address-history-tabs {
+  display: inline-flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.address-history-tabs button {
+  min-height: 22px;
+  padding: 2px 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-tabs button:hover,
+.address-history-tabs button:focus-visible {
+  color: var(--color-ink);
+}
+.address-history-tabs button:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.address-history-tabs button.active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-ink);
+}
+.address-history-header-actions {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.address-history-coverage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--color-muted);
+  font-size: 10px;
+  background: var(--color-paper);
+}
+.address-history-coverage > span + span {
+  padding-left: 10px;
+  border-left: 1px solid var(--color-rule);
+}
+.address-history-partial {
+  color: var(--color-warning);
+}
+.address-history-loading {
+  color: var(--color-accent);
+}
+.address-history-error {
+  color: var(--color-error);
+}
+.address-history-section-summary {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--color-muted);
+  font-size: 10px;
+  background: var(--color-paper);
+}
+.address-history-section-summary .text-button {
+  min-height: 20px;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: inherit;
+}
+.address-history-section-summary .text-button:hover {
+  color: var(--color-ink);
+}
+.address-history-section-summary-separator {
+  color: inherit;
+}
+.address-history-sections {
+  display: grid;
+  gap: 8px;
+}
+.address-history-section {
+  min-width: 0;
+  scroll-margin-top: calc(var(--transaction-lane-top, 38px) + 64px);
+}
+.address-history-section-heading {
+  margin: 0 0 3px;
+}
+.address-history-section-toggle {
+  width: 100%;
+  min-height: 22px;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-muted);
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 500;
+}
+.address-history-section-toggle:hover,
+.address-history-section-toggle:focus-visible {
+  color: var(--color-ink);
+}
+.address-history-section-toggle:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.address-history-row-utxo-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.address-history-list {
+  display: grid;
+  gap: 3px;
+}
+.address-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, auto);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  background: var(--color-paper);
+  text-align: left;
+}
+.address-history-row:hover:not(:disabled),
+.address-history-row:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-paper));
+}
+.address-history-row.is-on-graph {
+  border-left: 2px solid var(--color-accent);
+}
+.address-history-row-main,
+.address-history-row-detail,
+.address-history-row-amounts {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.address-history-row-main {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+.address-history-row-identity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.address-history-row-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+.address-history-row-title > strong {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.address-history-row-transaction-icon {
+  flex: none;
+  color: var(--color-accent);
+}
+.address-history-row-annotation-icon {
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+}
+.address-history-row-bookmark-icon {
+  flex: none;
+  color: var(--color-warning);
+}
+.address-history-row-detail,
+.address-history-row-amounts {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-row-body {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-row-label {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.address-history-row-body .entity-badges {
+  margin-top: 0;
+}
+.address-history-row-direction {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-self: end;
+  align-items: baseline;
+  gap: 2px 6px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.address-history-row-direction .transaction-block-time {
+  display: inline-flex;
+  gap: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+.address-history-row-direction .transaction-block-time time {
+  white-space: nowrap;
+}
+.address-history-row-detail {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  justify-self: end;
+  justify-items: end;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  align-items: center;
+  gap: 2px 8px;
+  text-align: right;
+}
+.address-history-row-detail span:last-child {
+  grid-column: 1 / -1;
+}
+.address-history-row-amounts {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
+  justify-items: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.address-history-row-amounts > span {
+  white-space: nowrap;
+}
+.address-history-more {
+  justify-self: start;
+}
+.address-history-note {
+  margin: 0;
 }
 .transaction-flow {
   --transaction-flow-gap: 20px;
@@ -242,7 +544,10 @@
 }
 .transaction-view-identity {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 180px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-rule));
   border-radius: 9px;
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper));
@@ -274,44 +579,60 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  flex: 1;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 79px;
   border: 0;
   border-radius: 8px 8px 0 0;
-  padding: 12px 8px;
+  padding: 8px;
   background: transparent;
   font-size: 11px;
-  text-align: center;
+  text-align: left;
 }
-.transaction-identity-select > svg {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 16px;
-  height: 16px;
+.transaction-identity-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.transaction-identity-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
   color: var(--color-accent);
 }
-.transaction-identity-select > strong.mono {
+.transaction-identity-icons .transaction-annotation-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.transaction-identity-id {
+  flex: 1;
   min-width: 0;
   max-width: 100%;
+  overflow-wrap: anywhere;
 }
-.transaction-identity-caption {
-  max-width: calc(100% - 36px);
-}
-.transaction-identity-select > span {
+.transaction-identity-io {
+  flex: none;
+  margin-left: auto;
+  align-self: end;
   font-size: 10px;
-  white-space: normal;
   color: var(--color-muted);
+  white-space: nowrap;
 }
-.transaction-identity-select > .transaction-annotation-icon {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  font-size: 16px;
-  line-height: 1;
+.transaction-identity-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.transaction-identity-body > .transaction-block-time {
+  justify-content: flex-start;
+  gap: 0;
 }
 .transaction-identity-label {
   display: -webkit-box;
@@ -332,9 +653,26 @@
   padding: 3px;
   border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-rule));
 }
-.transaction-view-identity > .transaction-block-time {
-  justify-content: center;
-  padding: 0 6px 6px;
+.transaction-identity-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: auto;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.transaction-identity-footer > .transaction-block-time {
+  min-width: 0;
+  gap: 2px 8px;
+}
+.transaction-identity-footer > .transaction-block-time-fee {
+  margin-inline-start: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 .transaction-identity-tools .icon-button {
   min-height: 27px;
@@ -472,9 +810,6 @@
   font-size: 14px;
   line-height: 1;
 }
-.transaction-row.has-annotation-icon .op-return-data {
-  margin-left: 28px;
-}
 .transaction-row-select {
   width: 100%;
   min-width: 0;
@@ -487,9 +822,16 @@
   justify-content: flex-start;
   gap: 5px;
   border-radius: 4px;
+  cursor: pointer;
 }
-.transaction-row-select:disabled {
-  opacity: 1;
+.transaction-row-select:hover {
+  background: var(--color-hover);
+}
+.transaction-row-select:active {
+  background: var(--color-paper);
+}
+.transaction-row.is-selected .transaction-row-select:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-hover));
 }
 .transaction-row-index {
   color: var(--color-muted);
@@ -567,13 +909,15 @@
   font-size: 9px;
   margin-left: auto;
 }
-.transaction-view .entity-badges {
+.transaction-flow .entity-badges {
   white-space: normal;
+  justify-content: flex-start;
 }
-.transaction-view-identity .entity-badges {
-  justify-content: center;
+.transaction-flow .transaction-identity-body > .entity-badges {
+  align-self: stretch;
+  max-width: 100%;
 }
-.transaction-view .entity-badges > span {
+.transaction-flow .entity-badges > span {
   font-size: 9px;
   padding: 1px 4px;
 }
@@ -592,6 +936,9 @@
   .transaction-view-identity::after {
     width: 7px;
   }
+  .transaction-view-identity {
+    min-height: 0;
+  }
   .transaction-identity-select {
     min-height: 0;
     padding: 6px 3px;
@@ -602,7 +949,7 @@
     min-height: 30px;
     padding: 4px;
   }
-  .transaction-view-identity > .transaction-block-time {
+  .transaction-identity-footer {
     font-size: 9px;
     line-height: 1.3;
   }
@@ -728,7 +1075,6 @@
   overflow-wrap: anywhere;
 }
 .transaction-row .op-return-data {
-  margin: 0 5px;
   font-size: 10px;
 }
 

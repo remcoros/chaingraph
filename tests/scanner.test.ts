@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchTransaction,
   fetchHistory,
+  fetchAddressBalance,
+  fetchAddressUtxos,
   loadAddress,
   mapLimit,
   scanWallet,
@@ -10,6 +12,7 @@ import {
 import { deriveAddresses } from '../src/lib/wallet';
 import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
 import type { Network, Transaction, Wallet } from '../src/domain/types';
+import { address as bitcoinAddress } from 'bitcoinjs-lib';
 
 const zpub =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
@@ -44,6 +47,32 @@ function mockRpc(
 afterEach(() => vi.unstubAllGlobals());
 
 describe('browser-side wallet scanner', () => {
+  it('fetches bounded address balance and UTXO observations on the selected network', async () => {
+    const target = bitcoinAddress.toBech32(new Uint8Array(20).fill(7), 0, 'bc');
+    const requests: Request[] = [];
+    mockRpc(async (request) => {
+      requests.push(request);
+      return request.method.endsWith('get_balance')
+        ? { confirmed: 100_000, unconfirmed: -1_000 }
+        : [{ tx_hash: txid(1), tx_pos: 2, height: 123, value: 99_000 }];
+    });
+    const balance = await fetchAddressBalance('mainnet', target);
+    const utxos = await fetchAddressUtxos('mainnet', target);
+    expect(balance).toMatchObject({
+      network: 'mainnet',
+      confirmedSats: 100_000,
+      unconfirmedSats: -1_000,
+    });
+    expect(utxos).toMatchObject({
+      network: 'mainnet',
+      utxos: [{ txid: txid(1), vout: 2, height: 123, valueSats: 99_000 }],
+    });
+    expect(requests.map(({ network, method }) => [network, method])).toEqual([
+      ['mainnet', 'blockchain.scripthash.get_balance'],
+      ['mainnet', 'blockchain.scripthash.listunspent'],
+    ]);
+  });
+
   it('rejects history heights that would make the encrypted workspace invalid', async () => {
     for (const height of [-2, 0x80000000, 1.5]) {
       mockRpc(() => [{ tx_hash: txid(1), height }]);
@@ -106,6 +135,36 @@ describe('browser-side wallet scanner', () => {
     expect(result.truncated).toBe(true);
     expect(result.wallet.scanComplete).toBe(false);
     expect(result.wallet.pendingTransactionIds).toEqual([ids[MAX_SCAN_TRANSACTIONS]]);
+  });
+
+  it('publishes address history before progressively loading transaction details', async () => {
+    const target = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1)[0];
+    const events: string[] = [];
+    const ids = [txid(1), txid(2)];
+    mockRpc((request) =>
+      request.method === 'blockchain.scripthash.get_history'
+        ? ids.map((id, index) => ({ tx_hash: id, height: 100 + index }))
+        : transaction(request.params[0] as string),
+    );
+
+    const result = await loadAddress(
+      target.address,
+      'mainnet',
+      {},
+      undefined,
+      (progress) => events.push(`progress:${progress.done}/${progress.total}`),
+      {},
+      {
+        onHistory: (history, detailTotal, truncated) =>
+          events.push(`history:${history.length}/${detailTotal}/${truncated}`),
+        onTransaction: (loaded) => events.push(`transaction:${loaded.txid}`),
+      },
+    );
+
+    expect(events[0]).toBe('history:2/2/false');
+    expect(events.filter((event) => event.startsWith('transaction:'))).toHaveLength(2);
+    expect(events.filter((event) => event.startsWith('progress:'))).toHaveLength(2);
+    expect(result.transactions.map(({ txid: id }) => id).sort()).toEqual(ids.sort());
   });
 
   it('persists skipped changed-height refreshes and completes them on the next scan', async () => {

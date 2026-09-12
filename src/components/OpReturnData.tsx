@@ -7,9 +7,10 @@ import './op-return-data.css';
 export function OpReturnData({ hex }: { hex?: string }) {
   const data = useMemo(() => decodeOpReturn(hex), [hex]);
   if (!data) return null;
+  const preview = data.preview.replace(/^OP_RETURN(?:\s+|$)/, '') || '(empty data)';
   return (
     <details className="op-return-data">
-      <summary title={data.display || 'OP_RETURN with no data'}>{data.preview}</summary>
+      <summary title={data.display || 'OP_RETURN with no data'}>{preview}</summary>
       <div className="op-return-body">
         <div className="op-return-heading">
           <small className="muted">
@@ -22,14 +23,6 @@ export function OpReturnData({ hex }: { hex?: string }) {
           )}
         </div>
         <pre tabIndex={0}>{data.display || '(empty data)'}</pre>
-        {data.hex && data.format === 'text' && (
-          <div className="op-return-heading">
-            <small className="muted">
-              Exact data hex{data.pushes > 1 ? ' (space-separated pushes)' : ''}
-            </small>
-            <CopyButton value={data.hex} label="Copy OP_RETURN data hex" />
-          </div>
-        )}
         {data.warning && <p className="small warning">{data.warning}</p>}
       </div>
     </details>

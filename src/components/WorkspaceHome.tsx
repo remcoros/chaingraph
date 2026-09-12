@@ -1,15 +1,9 @@
 import { useState } from 'react';
-import {
-  FolderOpen,
-  LockKeyhole,
-  Plus,
-  ShieldCheck,
-  Upload,
-  Trash2,
-} from 'lucide-react';
+import { FolderOpen, LockKeyhole, Plus, ShieldCheck, Upload, Trash2 } from 'lucide-react';
 import type { Network } from '../domain/types';
 import { WorkspaceTemplateCards } from './WorkspaceTemplateCards';
 import type { SavedWorkspace, Session } from '../lib/useWorkspaces';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 interface Props {
   saved: SavedWorkspace[];
   sessions: Session[];
@@ -116,7 +110,7 @@ export function WorkspaceHome({
                         entry.publicName ??
                         `Encrypted workspace ${saved.length - i}`}
                     </strong>
-                    <small>{new Date(entry.savedAt).toLocaleString()}</small>
+                    <small>{formatLocalTimestamp(entry.savedAt) ?? 'Unknown time'}</small>
                     {sessions.find((session) => session.data.id === entry.id)?.data.description && (
                       <small className="workspace-description">
                         {sessions.find((session) => session.data.id === entry.id)?.data.description}

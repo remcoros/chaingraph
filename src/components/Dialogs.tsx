@@ -8,6 +8,7 @@ import { inspectExtendedPublicKey, deriveAddresses } from '../lib/wallet';
 import { decryptWorkspaceOffThread } from '../lib/workspaceEncryptionClient';
 import { WorkspaceOperationError } from '../lib/workspaceOperationError';
 import type { SavedWorkspace } from '../lib/useWorkspaces';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import './dialogs.css';
 export function useDialogFocus(
   onClose: () => void,
@@ -518,8 +519,8 @@ export function UnlockDialog({
   return (
     <Modal title="Unlock workspace" onClose={read.close}>
       <p className="muted">
-        Saved {new Date(entry.savedAt).toLocaleString()}. Workspace names are public. Descriptions,
-        wallet names and contents stay encrypted until unlocked.
+        Saved {formatLocalTimestamp(entry.savedAt) ?? 'Unknown time'}. Workspace names are public.
+        Descriptions, wallet names and contents stay encrypted until unlocked.
       </p>
       <PasswordControls
         label="Unlock workspace encryption"

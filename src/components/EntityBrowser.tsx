@@ -1,5 +1,5 @@
 import { Amount } from './Amount';
-import { TransactionBlockTime } from './TransactionBlockTime';
+import { TransactionBlockTime, TransactionFeeLabel } from './TransactionBlockTime';
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   ArrowRightFromLine,
@@ -25,7 +25,7 @@ import {
   type GraphFilters,
 } from '../domain/graphFilters';
 import { transactionStatus } from '../domain/transactionStatus';
-import type { Annotation, GraphNode, Transaction } from '../domain/types';
+import type { Annotation, GraphNode, Transaction, Workspace } from '../domain/types';
 import './entity-browser.css';
 import type { VisibilityProps } from './VisibilityActions';
 import { AnchoredPopover } from './AnchoredPopover';
@@ -152,6 +152,7 @@ function nextVisibility(current: VisibilityMode): VisibilityMode {
 
 interface Props extends VisibilityProps {
   transactions?: Record<string, Transaction>;
+  workspace?: Pick<Workspace, 'network' | 'transactions'>;
   removableNodeIds?: readonly string[];
   onRemoveNode?: (id: string) => void;
   visibility?: 'visible' | 'hidden' | 'all' | 'graph';
@@ -193,6 +194,7 @@ export default function EntityBrowser({
   contextPreviewPending,
   hiddenNodeIds = [],
   transactions = {},
+  workspace,
   removableNodeIds = [],
   onRemoveNode,
   onSetHidden,
@@ -469,13 +471,23 @@ export default function EntityBrowser({
                     <span className="entity-row-amount-line">
                       <Amount as="small" className="entity-row-amount" value={node.value} />
                     </span>
+                    {transaction && workspace && (
+                      <span className="entity-row-fee">
+                        <TransactionFeeLabel transaction={transaction} workspace={workspace} />
+                      </span>
+                    )}
                     {transaction && status && (
                       <span className="entity-row-metadata">
                         <small className="entity-chain-status" title={status.title}>
                           {status.label}
                         </small>
                         <span className="entity-row-time">
-                          <TransactionBlockTime transaction={transaction} timestampOnly />
+                          <TransactionBlockTime
+                            transaction={transaction}
+                            workspace={workspace}
+                            showFee={false}
+                            timestampOnly
+                          />
                         </span>
                       </span>
                     )}

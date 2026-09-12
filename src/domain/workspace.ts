@@ -180,6 +180,28 @@ const transactionSchema = z
       });
     }
   });
+const addressHistorySchema = z.object({
+  history: z.array(z.object({ tx_hash: txid, height })).max(10000),
+  truncated: z.boolean(),
+  scannedAt: timestamp.optional(),
+});
+const addressBalanceSchema = z.object({
+  network: z.enum(['mainnet', 'testnet4']),
+  confirmedSats: z.number().int().min(0).max(MAX_MONEY_SATS),
+  unconfirmedSats: z.number().int().min(-MAX_MONEY_SATS).max(MAX_MONEY_SATS),
+  checkedAt: timestamp,
+});
+const addressUtxoSchema = z.object({
+  txid,
+  vout: uint32,
+  valueSats: z.number().int().min(0).max(MAX_MONEY_SATS),
+  height,
+});
+const addressUtxoObservationSchema = z.object({
+  network: z.enum(['mainnet', 'testnet4']),
+  utxos: z.array(addressUtxoSchema).max(10000),
+  checkedAt: timestamp,
+});
 const walletSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(200),
@@ -268,6 +290,15 @@ const workspaceSchema = z.object({
     )
     .max(10000),
   watchedAddresses: z.array(z.string().max(150)).max(10000),
+  addressHistories: z.record(z.string().min(1).max(150), addressHistorySchema).optional(),
+  addressBalances: z
+    .record(z.string().min(1).max(150), addressBalanceSchema)
+    .refine((value) => Object.keys(value).length <= 10000, 'Too many address balance records.')
+    .optional(),
+  addressUtxos: z
+    .record(z.string().min(1).max(150), addressUtxoObservationSchema)
+    .refine((value) => Object.keys(value).length <= 10000, 'Too many address UTXO records.')
+    .optional(),
   view: z.object({
     dimensions: z.union([z.literal(2), z.literal(3)]),
     sizeBy: z.enum(['uniform', 'value', 'degree']),
@@ -358,6 +389,9 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
     walletReviews?: unknown;
     inputContext?: unknown;
     contextTransactionIds?: unknown;
+    addressHistories?: unknown;
+    addressBalances?: unknown;
+    addressUtxos?: unknown;
   };
   if (Array.isArray(raw.contextTransactionIds) && raw.contextTransactionIds.length > 10000)
     throw new WorkspaceValidationError(
@@ -382,6 +416,55 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
         throw new WorkspaceValidationError(
           'input-context-limit',
           'Workspace exceeds the 50,000 input-context output limit.',
+        );
+    }
+  }
+  if (
+    raw.addressHistories &&
+    typeof raw.addressHistories === 'object' &&
+    !Array.isArray(raw.addressHistories)
+  ) {
+    const histories = Object.values(raw.addressHistories);
+    if (histories.length > 10000)
+      throw new WorkspaceValidationError(
+        'wallet-address-limit',
+        'Workspace exceeds the 10,000 watched address history limit.',
+      );
+    let entries = 0;
+    for (const history of histories) {
+      if (!history || typeof history !== 'object') continue;
+      entries += Array.isArray((history as { history?: unknown }).history)
+        ? (history as { history: unknown[] }).history.length
+        : 0;
+      if (entries > MAX_GRAPH_RECORDS)
+        throw new WorkspaceValidationError(
+          'graph-limit',
+          'Workspace exceeds the 50,000 address history entry limit.',
+        );
+    }
+  }
+  for (const [kind, observations] of [
+    ['addressBalances', raw.addressBalances],
+    ['addressUtxos', raw.addressUtxos],
+  ] as const) {
+    if (!observations || typeof observations !== 'object' || Array.isArray(observations)) continue;
+    const records = Object.values(observations);
+    if (records.length > 10000)
+      throw new WorkspaceValidationError(
+        'wallet-address-limit',
+        `Workspace exceeds the 10,000 ${kind} limit.`,
+      );
+    if (kind !== 'addressUtxos') continue;
+    let entries = 0;
+    for (const observation of records) {
+      if (!observation || typeof observation !== 'object') continue;
+      entries += Array.isArray((observation as { utxos?: unknown }).utxos)
+        ? (observation as { utxos: unknown[] }).utxos.length
+        : 0;
+      if (entries > MAX_GRAPH_RECORDS)
+        throw new WorkspaceValidationError(
+          'graph-limit',
+          'Workspace exceeds the 50,000 address UTXO entry limit.',
         );
     }
   }
@@ -490,7 +573,7 @@ export function parseWorkspace(
   const parsed = workspaceSchema.parse(migrated);
   if (
     parsed.view.graphNodeIds === undefined &&
-    [2, CURRENT_WORKSPACE_VERSION].includes((data as { version?: number }).version ?? 0)
+    [2, 3, CURRENT_WORKSPACE_VERSION].includes((data as { version?: number }).version ?? 0)
   )
     throw new Error('Workspace is missing explicit graph entity membership.');
   if (parsed.view.graphNodeIds !== undefined)
@@ -570,6 +653,20 @@ export function parseWorkspace(
       verifyWalletAddresses(wallet.key, parsed.network, wallet.scriptType, wallet.addresses);
   }
   for (const address of parsed.watchedAddresses) addressToScriptHash(address, parsed.network);
+  for (const address of Object.keys(parsed.addressHistories ?? {}))
+    addressToScriptHash(address, parsed.network);
+  for (const [address, observation] of Object.entries(parsed.addressBalances ?? {})) {
+    addressToScriptHash(address, parsed.network);
+    if (observation.network !== parsed.network)
+      throw new Error('Address balance observation belongs to a different network.');
+  }
+  for (const [address, observation] of Object.entries(parsed.addressUtxos ?? {})) {
+    addressToScriptHash(address, parsed.network);
+    if (observation.network !== parsed.network)
+      throw new Error('Address UTXO observation belongs to a different network.');
+    if (observation.utxos.some((entry) => entry.txid.length !== 64))
+      throw new Error('Address UTXO observation contains an invalid transaction ID.');
+  }
   if (parsed.view.graphNodeIds === undefined)
     parsed.view.graphNodeIds = parseGraphNodeIds(
       buildGraph(parsed).nodes.map((node) => node.id),
@@ -649,6 +746,12 @@ export function clearContextProvenance(
 export function buildGraph(workspace: Workspace): GraphData {
   const nodes = new Map<string, GraphNode>();
   const links = new Map<string, GraphData['links'][number]>();
+  const addressBalanceValue = (address: string) => {
+    const observation = workspace.addressBalances?.[address];
+    if (!observation || observation.network !== workspace.network) return undefined;
+    const total = observation.confirmedSats + observation.unconfirmedSats;
+    return Number.isSafeInteger(total) && total >= 0 ? total : undefined;
+  };
   const previousOutputs = indexPreviousOutputs(workspace);
   const contextOutputs = new Map(
     Object.entries(workspace.inputContext ?? {}).map(([id, indexes]) => [id, new Set(indexes)]),
@@ -704,7 +807,13 @@ export function buildGraph(workspace: Workspace): GraphData {
       link(txNodeId(tx.txid), id, 'creates');
       if (address && workspace.view.showAddresses) {
         const aid = addressNodeId(address);
-        add({ id: aid, kind: 'address', label: short(address), address });
+        add({
+          id: aid,
+          kind: 'address',
+          label: short(address),
+          address,
+          value: addressBalanceValue(address),
+        });
         link(id, aid, 'address');
       }
     }
@@ -732,7 +841,13 @@ export function buildGraph(workspace: Workspace): GraphData {
         });
         if (address && workspace.view.showAddresses) {
           const aid = addressNodeId(address);
-          add({ id: aid, kind: 'address', label: short(address), address });
+          add({
+            id: aid,
+            kind: 'address',
+            label: short(address),
+            address,
+            value: addressBalanceValue(address),
+          });
           link(id, aid, 'address');
         }
       }
@@ -742,7 +857,14 @@ export function buildGraph(workspace: Workspace): GraphData {
   if (workspace.view.showAddresses) {
     for (const address of workspace.watchedAddresses) {
       const id = addressNodeId(address);
-      if (!nodes.has(id)) add({ id, kind: 'address', label: short(address), address });
+      if (!nodes.has(id))
+        add({
+          id,
+          kind: 'address',
+          label: short(address),
+          address,
+          value: addressBalanceValue(address),
+        });
     }
   }
   return { nodes: [...nodes.values()], links: [...links.values()] };

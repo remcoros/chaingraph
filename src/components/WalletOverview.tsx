@@ -9,6 +9,7 @@ import {
   Wallet as WalletIcon,
 } from 'lucide-react';
 import { walletCheckAge } from '../domain/walletActivity';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import type { WalletReviewCoverage } from '../domain/walletReview';
 import type { WalletUtxoView } from '../lib/useWalletUtxos';
 import type { WalletWorkbenchProps } from './WalletWorkbench';
@@ -142,7 +143,7 @@ export function WalletOverview({
         </div>
         <div>
           <dt>Wallet refreshed</dt>
-          <dd title={wallet.scannedAt ? new Date(wallet.scannedAt).toLocaleString() : undefined}>
+          <dd title={wallet.scannedAt ? formatLocalTimestamp(wallet.scannedAt) : undefined}>
             {walletCheckAge(wallet.scannedAt)}
           </dd>
         </div>
@@ -196,9 +197,9 @@ export function WalletOverview({
           </span>
         )}
         {utxos && (
-          <span className="small muted" title={utxos.checkedAt}>
+          <span className="small muted" title={formatLocalTimestamp(utxos.checkedAt)}>
             UTXOs checked · {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
-            {new Date(utxos.checkedAt).toLocaleTimeString()}
+            {formatLocalTimestamp(utxos.checkedAt) ?? 'Unknown time'}
             {utxos.failed ? ` · ${utxos.failed} failed` : ''}
           </span>
         )}

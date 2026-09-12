@@ -113,7 +113,7 @@ export function WalletReviewFlow({
               workspace={workspace}
               node={{ id: context.transactionNodeId!, kind: 'transaction', label: '' }}
             />
-            <TransactionBlockTime transaction={context.transaction} />
+            <TransactionBlockTime transaction={context.transaction} workspace={workspace} />
             <ShowOnGraph
               id={context.transactionNodeId!}
               kind="transaction"

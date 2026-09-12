@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  formatGmtTimestamp,
+  formatBlockTimestamp,
+  formatLocalTimestamp,
   transactionBlockTime,
   walletRecordBlockObservation,
 } from '../src/domain/transactionTime';
@@ -15,15 +16,15 @@ const tx: Transaction = {
   blocktime: 1690168629,
 };
 
-describe('saved block times in GMT', () => {
+describe('saved block times', () => {
   it('formats the same historical time across browser timezones with exact seconds', () => {
     const previous = process.env.TZ;
     try {
       for (const timezone of ['Pacific/Honolulu', 'Europe/Amsterdam', 'Asia/Tokyo']) {
         process.env.TZ = timezone;
         expect(transactionBlockTime(tx)).toEqual({
-          compact: '24 Jul 2023 · 03:17 GMT',
-          exact: '2023-07-24 03:17:09 GMT',
+          compact: '2023-07-24 03:17:09',
+          exact: '2023-07-24 03:17:09',
           iso: '2023-07-24T03:17:09.000Z',
         });
       }
@@ -56,8 +57,22 @@ describe('saved block times in GMT', () => {
 
   it('handles missing/invalid times and the epoch without inventing dates', () => {
     for (const value of [undefined, NaN, Infinity, -1, 1e20])
-      expect(formatGmtTimestamp(value)).toBeUndefined();
-    expect(formatGmtTimestamp(0)?.exact).toBe('1970-01-01 00:00:00 GMT');
+      expect(formatBlockTimestamp(value)).toBeUndefined();
+    expect(formatBlockTimestamp(0)?.exact).toBe('1970-01-01 00:00:00');
+  });
+
+  it('renders stored instants in the user timezone without a timezone suffix', () => {
+    const previous = process.env.TZ;
+    try {
+      process.env.TZ = 'Europe/Amsterdam';
+      expect(formatLocalTimestamp('2026-09-11T19:53:28.000Z')).toBe('2026-09-11 21:53:28');
+      process.env.TZ = 'Pacific/Honolulu';
+      expect(formatLocalTimestamp('2026-09-11T19:53:28.000Z')).toBe('2026-09-11 09:53:28');
+      expect(formatLocalTimestamp('not a timestamp')).toBeUndefined();
+    } finally {
+      if (previous === undefined) delete process.env.TZ;
+      else process.env.TZ = previous;
+    }
   });
 
   it('keeps Wallet history/UTXO height observations separate from loaded block times', () => {

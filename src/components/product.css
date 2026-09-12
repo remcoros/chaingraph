@@ -258,6 +258,19 @@ a {
   gap: 4px;
   font-size: 12px;
 }
+.selection-facts-unlabeled > span:last-child {
+  grid-column: 2;
+}
+.selection-observation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.selection-observation-time {
+  color: var(--muted);
+  font-size: 10px;
+}
 .selection-facts code {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -161,4 +161,34 @@ describe('automatically hydrated transaction context', () => {
       }),
     ).toThrow('50,000 input-context output limit');
   });
+
+  it('checks address-history budgets even when input context is absent', () => {
+    const base = newWorkspace('Address history budgets', 'mainnet');
+    expect(() =>
+      parseWorkspace({
+        ...base,
+        addressHistories: Object.fromEntries(
+          Array.from({ length: 10001 }, (_, n) => [id(n), { history: [], truncated: false }]),
+        ),
+      }),
+    ).toThrow('10,000 watched address history limit');
+
+    expect(() =>
+      parseWorkspace({
+        ...base,
+        addressHistories: Object.fromEntries(
+          Array.from({ length: 6 }, (_, n) => [
+            id(n),
+            {
+              history: Array.from({ length: 10000 }, (_, index) => ({
+                tx_hash: id(index),
+                height: 1,
+              })),
+              truncated: false,
+            },
+          ]),
+        ),
+      }),
+    ).toThrow('50,000 address history entry limit');
+  });
 });

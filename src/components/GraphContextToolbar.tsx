@@ -1,11 +1,11 @@
 import {
-  ArrowLeft,
   ArrowLeftToLine,
-  ArrowRight,
   ArrowRightFromLine,
   ArrowRightToLine,
+  Box,
   Eye,
   EyeOff,
+  Layers,
   Network,
   Plus,
   X,
@@ -28,10 +28,14 @@ export interface GraphContextToolbarProps {
   contextTitle?: string;
   selectedKind?: 'transaction' | 'output' | 'address';
   selectedCount: number;
-  canBack: boolean;
-  canForward: boolean;
-  onBack: () => void;
-  onForward: () => void;
+  canOpenAddressHistory?: boolean;
+  onOpenAddressHistory?: () => void;
+  canShowRecentUtxos?: boolean;
+  recentUtxoCount?: number;
+  onShowRecentUtxos?: () => void;
+  canShowRecentTransactions?: boolean;
+  recentTransactionCount?: number;
+  onShowRecentTransactions?: () => void;
   sides?: Record<GraphContextSide, GraphContextSideCounts>;
   onAddSide: (side: GraphContextSide) => void;
   onHideSide: (side: GraphContextSide) => void;
@@ -65,44 +69,12 @@ const countLabel = (count: number) => count.toLocaleString('en-US');
 
 export function GraphContextToolbar(props: GraphContextToolbarProps) {
   const selected = `${countLabel(props.selectedCount)} selected ${props.selectedCount === 1 ? 'node' : 'nodes'}`;
+  const recentUtxoCount = Math.max(0, props.recentUtxoCount ?? 0);
+  const recentTransactionCount = Math.max(0, props.recentTransactionCount ?? 0);
   return (
     <div className="graph-context-toolbar" role="group" aria-label="Graph exploration">
-      <div className="graph-context-navigation" role="group" aria-label="Graph navigation">
-        <button
-          type="button"
-          aria-label="Previous graph selection"
-          title="Previous graph selection"
-          disabled={!props.canBack}
-          onClick={props.onBack}
-        >
-          <ArrowLeft size={15} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="Next graph selection"
-          title="Next graph selection"
-          disabled={!props.canForward}
-          onClick={props.onForward}
-        >
-          <ArrowRight size={15} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="Show all inputs and outputs"
-          title="Show all loaded inputs/outputs for transactions on the graph"
-          disabled={props.busy || props.showAllOutputCount === 0}
-          onClick={props.onShowAllOutputs}
-        >
-          <Eye size={17} aria-hidden="true" />
-        </button>
-      </div>
-
       {props.selectedKind === 'output' && (
-        <div
-          className="graph-context-transactions"
-          role="group"
-          aria-label="Follow selected output"
-        >
+        <div className="graph-context-top" role="group" aria-label="Follow selected output">
           <button
             type="button"
             disabled={props.busy || !props.canOpenCreatingTx || !props.onOpenCreatingTx}
@@ -117,12 +89,75 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
             disabled={props.busy || !props.canOpenSpendingTx || !props.onOpenSpendingTx}
             onClick={props.onOpenSpendingTx}
             aria-label="Open or find spending transaction"
-            title="Open spending transaction"
+            title="Open or find spending transaction"
           >
             <ArrowRightFromLine size={16} aria-hidden="true" />
           </button>
         </div>
       )}
+      <div
+        className={`graph-context-top${props.selectedKind === 'output' ? ' graph-context-section' : ''}`}
+        role="group"
+        aria-label="Graph actions"
+      >
+        {props.selectedKind === 'address' ? (
+          <>
+            <button
+              type="button"
+              aria-label={`Show recent UTXOs (${recentUtxoCount})`}
+              title={`Show recent UTXOs (${recentUtxoCount})`}
+              disabled={
+                props.busy ||
+                recentUtxoCount === 0 ||
+                !props.canShowRecentUtxos ||
+                !props.onShowRecentUtxos
+              }
+              onClick={props.onShowRecentUtxos}
+            >
+              <ArrowRightFromLine size={17} aria-hidden="true" />
+              <Eye className="graph-context-action-badge" size={10} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Show recent transactions (${recentTransactionCount})`}
+              title={`Show recent transactions (${recentTransactionCount})`}
+              disabled={
+                props.busy ||
+                recentTransactionCount === 0 ||
+                !props.canShowRecentTransactions ||
+                !props.onShowRecentTransactions
+              }
+              onClick={props.onShowRecentTransactions}
+            >
+              <Box size={17} aria-hidden="true" />
+              <Eye className="graph-context-action-badge" size={10} aria-hidden="true" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              aria-label="Show all inputs and outputs"
+              title="Show all loaded inputs/outputs for transactions on the graph"
+              disabled={props.busy || props.showAllOutputCount === 0}
+              onClick={props.onShowAllOutputs}
+            >
+              <Eye size={17} aria-hidden="true" />
+            </button>
+            {props.selectedKind === 'output' && (
+              <button
+                type="button"
+                aria-label="Add/show address"
+                title="Add/show address"
+                disabled={props.busy || !props.canOpenAddressHistory || !props.onOpenAddressHistory}
+                onClick={props.onOpenAddressHistory}
+              >
+                <Layers size={17} aria-hidden="true" />
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
       {props.sides && (
         <div

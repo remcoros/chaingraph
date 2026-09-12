@@ -6,7 +6,14 @@ import {
 } from './transactionScheduler';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import type { Network, Transaction, Wallet, Workspace } from '../domain/types';
+import type {
+  AddressBalanceObservation,
+  AddressUtxoObservation,
+  Network,
+  Transaction,
+  Wallet,
+  Workspace,
+} from '../domain/types';
 import { parseTransaction, outputAddress, validateTransactionAddresses } from '../domain/workspace';
 import { addressToScriptHash, deriveAddresses } from './wallet';
 import { withHistoryHeight } from '../domain/transactionStatus';
@@ -20,6 +27,24 @@ export interface HistoryEntry {
   tx_hash: string;
   height: number;
 }
+const MAX_MONEY_SATS = 2_100_000_000_000_000;
+const addressBalanceResponseSchema = z.object({
+  confirmed: z.number().int().min(0).max(MAX_MONEY_SATS),
+  unconfirmed: z.number().int().min(-MAX_MONEY_SATS).max(MAX_MONEY_SATS),
+});
+const addressUtxoResponseSchema = z
+  .array(
+    z.object({
+      tx_hash: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/i)
+        .transform((id) => id.toLowerCase()),
+      tx_pos: z.number().int().min(0).max(0xffffffff),
+      height: z.number().int().min(0).max(0x7fffffff),
+      value: z.number().int().min(0).max(MAX_MONEY_SATS),
+    }),
+  )
+  .max(10000);
 class RpcError extends Error {
   constructor(
     message: string,
@@ -416,6 +441,52 @@ export async function fetchHistory(
     throw new Error('Invalid or oversized address history.');
   return data;
 }
+export async function fetchAddressBalance(
+  network: Network,
+  address: string,
+  signal?: AbortSignal,
+): Promise<AddressBalanceObservation> {
+  const data = await rpc<unknown>(
+    network,
+    'electrum',
+    'blockchain.scripthash.get_balance',
+    [addressToScriptHash(address, network)],
+    signal,
+  );
+  const parsed = addressBalanceResponseSchema.safeParse(data);
+  if (!parsed.success) throw new Error('Invalid address balance response.');
+  return {
+    network,
+    confirmedSats: parsed.data.confirmed,
+    unconfirmedSats: parsed.data.unconfirmed,
+    checkedAt: new Date().toISOString(),
+  };
+}
+export async function fetchAddressUtxos(
+  network: Network,
+  address: string,
+  signal?: AbortSignal,
+): Promise<AddressUtxoObservation> {
+  const data = await rpc<unknown>(
+    network,
+    'electrum',
+    'blockchain.scripthash.listunspent',
+    [addressToScriptHash(address, network)],
+    signal,
+  );
+  const parsed = addressUtxoResponseSchema.safeParse(data);
+  if (!parsed.success) throw new Error('Invalid address UTXO response.');
+  return {
+    network,
+    utxos: parsed.data.map((entry) => ({
+      txid: entry.tx_hash,
+      vout: entry.tx_pos,
+      valueSats: entry.value,
+      height: entry.height,
+    })),
+    checkedAt: new Date().toISOString(),
+  };
+}
 export async function mapLimit<T, R>(
   values: T[],
   limit: number,
@@ -486,7 +557,12 @@ function createAsyncLimiter(limit: number) {
 }
 export interface ScanProgress {
   done: number;
+  total?: number;
   message: string;
+}
+export interface AddressHistoryLoadCallbacks {
+  onHistory?: (history: HistoryEntry[], detailTotal: number, truncated: boolean) => void;
+  onTransaction?: (transaction: Transaction) => void;
 }
 export const MAX_SCAN_TRANSACTIONS = 500;
 export async function scanWallet(
@@ -680,7 +756,13 @@ export async function loadAddress(
   signal?: AbortSignal,
   onProgress?: (p: ScanProgress) => void,
   hints: TransactionFetchHints = {},
-): Promise<{ transactions: Transaction[]; truncated: boolean; observedTransactionIds: string[] }> {
+  callbacks: AddressHistoryLoadCallbacks = {},
+): Promise<{
+  transactions: Transaction[];
+  truncated: boolean;
+  observedTransactionIds: string[];
+  history: HistoryEntry[];
+}> {
   const fetchHints: TransactionFetchHints = {
     ...hints,
     priority: 'background',
@@ -700,28 +782,37 @@ export async function loadAddress(
           (heights.get(id) ?? 0) <= 0),
     ),
   ];
+  const detailTotal = Math.min(ids.length, MAX_SCAN_TRANSACTIONS);
+  callbacks.onHistory?.(history, detailTotal, ids.length > MAX_SCAN_TRANSACTIONS);
   let loaded = 0;
   const transactions = await mapLimit(
-    ids.slice(0, MAX_SCAN_TRANSACTIONS),
+    ids.slice(0, detailTotal),
     TRANSACTION_BATCH_CONCURRENCY,
     async (id) => {
+      const transaction = await fetchTransaction(network, id, signal, heights.get(id), fetchHints);
+      callbacks.onTransaction?.(transaction);
       onProgress?.({
-        done: loaded,
-        message: `Loading address history ${++loaded}/${Math.min(ids.length, MAX_SCAN_TRANSACTIONS)}`,
+        done: ++loaded,
+        total: detailTotal,
+        message: `Loading address history ${loaded}/${detailTotal}`,
       });
-      return fetchTransaction(network, id, signal, heights.get(id), fetchHints);
+      return transaction;
     },
   );
   const requested = new Set(ids);
   for (const id of allIds) {
     if (!existing[id] || requested.has(id)) continue;
     const observed = withHistoryHeight(existing[id], heights.get(id)!);
-    if (observed !== existing[id]) transactions.push(observed);
+    if (observed !== existing[id]) {
+      transactions.push(observed);
+      callbacks.onTransaction?.(observed);
+    }
   }
   return {
     transactions,
     truncated: ids.length > MAX_SCAN_TRANSACTIONS,
     observedTransactionIds: allIds,
+    history,
   };
 }
 export async function loadFunding(

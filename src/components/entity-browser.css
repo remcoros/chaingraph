@@ -301,7 +301,7 @@
 }
 .entity-row-lower {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
   min-width: 0;
 }
@@ -316,11 +316,20 @@
   display: flex;
   min-width: 0;
 }
+.entity-row-fee {
+  display: flex;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .entity-row-metadata {
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  margin-top: auto;
 }
 .entity-row-time {
   margin-left: auto;

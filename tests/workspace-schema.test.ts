@@ -6,6 +6,7 @@ import {
   WorkspaceSchemaVersionError,
 } from '../src/domain/workspaceMigrations';
 import { laboratoryWorkspace } from './fixtures/laboratory';
+import { address as bitcoinAddress } from 'bitcoinjs-lib';
 
 describe('decrypted workspace schema boundary', () => {
   it('migrates a versionless backup without changing its original data', () => {
@@ -36,7 +37,7 @@ describe('decrypted workspace schema boundary', () => {
     expect(legacy).toEqual({ name: 'Public fixture', custom: { preserved: true } });
   });
 
-  it.each([null, 0, 4, -1, 1.5, '1', undefined, {}, ['private fixture detail']])(
+  it.each([null, 0, 5, -1, 1.5, '1', undefined, {}, ['private fixture detail']])(
     'rejects an explicit unsupported schema version without exposing its value: %j',
     (version) => {
       const original = { ...newWorkspace('Public fixture', 'mainnet'), version };
@@ -64,5 +65,32 @@ describe('decrypted workspace schema boundary', () => {
     expect(() => parseWorkspace({ name: 'Incomplete legacy workspace' })).toThrow();
     for (const invalid of [null, [], 1, 'workspace'])
       expect(() => parseWorkspace(invalid)).toThrow();
+  });
+
+  it('round-trips optional address balance and UTXO observations at schema v4', () => {
+    const workspace = newWorkspace('Address observations', 'mainnet');
+    const target = bitcoinAddress.toBech32(new Uint8Array(20).fill(9), 0, 'bc');
+    workspace.addressBalances = {
+      [target]: {
+        network: 'mainnet',
+        confirmedSats: 100_000,
+        unconfirmedSats: 0,
+        checkedAt: new Date().toISOString(),
+      },
+    };
+    workspace.addressUtxos = {
+      [target]: {
+        network: 'mainnet',
+        utxos: [{ txid: 'a'.repeat(64), vout: 0, valueSats: 100_000, height: 10 }],
+        checkedAt: new Date().toISOString(),
+      },
+    };
+    const parsed = parseWorkspace(workspace);
+    expect(parsed.version).toBe(4);
+    expect(parsed.addressBalances?.[target].confirmedSats).toBe(100_000);
+    expect(parsed.addressUtxos?.[target].utxos[0]).toMatchObject({
+      txid: 'a'.repeat(64),
+      valueSats: 100_000,
+    });
   });
 });

@@ -23,6 +23,7 @@ import {
   scanDefaults,
   type AnalysisScan,
 } from '../domain/analysisScan';
+import { formatLocalTimestamp } from '../domain/transactionTime';
 import {
   addressNodeId,
   sats,
@@ -148,7 +149,9 @@ function EvidenceReference({
           <Amount className="scan-evidence-value" value={output ? sats(output.value) : undefined} />
         )}
       </div>
-      {prefix === 'tx' && <TransactionBlockTime transaction={workspace.transactions[txid]} />}
+      {prefix === 'tx' && (
+        <TransactionBlockTime transaction={workspace.transactions[txid]} workspace={workspace} />
+      )}
       {label && <span className="scan-evidence-label">{label}</span>}
       {address && (
         <button
@@ -763,7 +766,9 @@ export function AnalysisWorkbench({
           {scan && (
             <p className="scan-run-note">
               Last scan: {scan.scope.label} · {scan.scope.txids.length} transactions ·{' '}
-              <time dateTime={scan.runAt}>{new Date(scan.runAt).toLocaleTimeString()}</time>
+              <time dateTime={scan.runAt}>
+                {formatLocalTimestamp(scan.runAt) ?? 'Unknown time'}
+              </time>
             </p>
           )}
         </div>
