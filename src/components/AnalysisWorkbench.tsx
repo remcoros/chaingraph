@@ -223,14 +223,24 @@ export function AnalysisWorkbench({
     },
     [cache, workspace.id],
   );
-  const evidence = useRef(workspace);
+  const evidence = useRef({
+    id: workspace.id,
+    network: workspace.network,
+    transactions: workspace.transactions,
+    wallets: workspace.wallets,
+  });
   useEffect(() => {
     const dataChanged =
       evidence.current.id !== workspace.id ||
       evidence.current.network !== workspace.network ||
       evidence.current.transactions !== workspace.transactions ||
       walletEvidenceChanged(evidence.current.wallets, workspace.wallets);
-    evidence.current = workspace;
+    evidence.current = {
+      id: workspace.id,
+      network: workspace.network,
+      transactions: workspace.transactions,
+      wallets: workspace.wallets,
+    };
     if (pending.current && (!active || dataChanged)) {
       pending.current.abort();
       pending.current = undefined;
