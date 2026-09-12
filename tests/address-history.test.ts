@@ -226,9 +226,9 @@ describe('address history projection', () => {
           { items: ['confirmed-1', 'confirmed-2'], collapsed: false },
           { items: ['unknown-1'], collapsed: false },
         ],
-        40,
+        2,
       ),
-    ).toEqual([[], ['confirmed-1', 'confirmed-2'], ['unknown-1']]);
+    ).toEqual([[], ['confirmed-1'], ['unknown-1']]);
   });
 
   it('rejects an address from another network or malformed address', () => {

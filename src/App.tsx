@@ -19,7 +19,7 @@ import {
 } from './domain/walletRecords';
 import { listWalletRelationships } from './domain/walletRelationships';
 import {
-  buildAddressHistoryTransactionIndex,
+  indexAddressHistoryTransactions,
   listAddressHistory,
   projectAddressHistory,
   recentAddressHistoryEntries,
@@ -898,15 +898,17 @@ export default function App() {
     w && selected?.kind === 'address' && selected.address
       ? selectedAddressForHistory(selected, w.network)
       : undefined;
+  const hasAddressHistorySelection = addressHistorySelectedAddress !== undefined;
   const addressHistoryIndex = useMemo(
-    () =>
-      addressHistorySelectedAddress && addressHistoryNetwork && addressHistoryTransactions
-        ? buildAddressHistoryTransactionIndex({
-            network: addressHistoryNetwork,
-            transactions: addressHistoryTransactions,
-          })
-        : undefined,
-    [addressHistoryNetwork, addressHistorySelectedAddress, addressHistoryTransactions],
+    () => {
+      if (!hasAddressHistorySelection || !addressHistoryNetwork || !addressHistoryTransactions)
+        return undefined;
+      return indexAddressHistoryTransactions({
+        network: addressHistoryNetwork,
+        transactions: addressHistoryTransactions,
+      });
+    },
+    [addressHistoryNetwork, addressHistoryTransactions, hasAddressHistorySelection],
   );
   const addressHistory = useMemo(() => {
     if (

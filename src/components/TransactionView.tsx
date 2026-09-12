@@ -736,6 +736,10 @@ function AddressHistoryView({
     visiblePendingTransactions.length +
     visibleConfirmedTransactions.length +
     visibleUnknownTransactions.length;
+  const expandedTransactionCount =
+    (collapsedTransactionSections.pending ? 0 : pendingTransactions.length) +
+    (collapsedTransactionSections.confirmed ? 0 : confirmedTransactions.length) +
+    (collapsedTransactionSections.unknown ? 0 : unknownTransactions.length);
   const pendingUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height === 0) ?? [];
   const confirmedUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height > 0) ?? [];
   const unknownUtxos = addressUtxos?.utxos.filter((utxo) => utxo.height < 0) ?? [];
@@ -750,6 +754,10 @@ function AddressHistoryView({
     );
   const visibleUtxoCount =
     visiblePendingUtxos.length + visibleConfirmedUtxos.length + visibleUnknownUtxos.length;
+  const expandedUtxoCount =
+    (collapsedUtxoSections.pending ? 0 : pendingUtxos.length) +
+    (collapsedUtxoSections.confirmed ? 0 : confirmedUtxos.length) +
+    (collapsedUtxoSections.unknown ? 0 : unknownUtxos.length);
   const hasLoad = !!onLoad;
   const hasLoadUtxos = !!onLoadUtxos;
   const isLoading = !!loading && !loading.error;
@@ -1186,13 +1194,13 @@ function AddressHistoryView({
           )}
         </div>
       )}
-      {tab === 'transactions' && history.entries.length > visibleTransactionCount && (
+      {tab === 'transactions' && expandedTransactionCount > visibleTransactionCount && (
         <button
           type="button"
           className="text-button address-history-more"
-          onClick={() => setLimit((value) => Math.min(history.entries.length, value + 40))}
+          onClick={() => setLimit((value) => Math.min(expandedTransactionCount, value + 40))}
         >
-          Show more transactions ({history.entries.length - visibleTransactionCount} remaining)
+          Show more transactions ({expandedTransactionCount - visibleTransactionCount} remaining)
         </button>
       )}
       {tab === 'transactions' && history.entries.length > 0 && !history.complete && (
@@ -1267,13 +1275,13 @@ function AddressHistoryView({
       )}
       {tab === 'utxos' &&
         !!addressUtxos?.utxos.length &&
-        addressUtxos.utxos.length > visibleUtxoCount && (
+        expandedUtxoCount > visibleUtxoCount && (
           <button
             type="button"
             className="text-button address-history-more"
-            onClick={() => setUtxoLimit((value) => Math.min(addressUtxos.utxos.length, value + 40))}
+            onClick={() => setUtxoLimit((value) => Math.min(expandedUtxoCount, value + 40))}
           >
-            Show more UTXOs ({addressUtxos.utxos.length - visibleUtxoCount} remaining)
+            Show more UTXOs ({expandedUtxoCount - visibleUtxoCount} remaining)
           </button>
         )}
     </div>
