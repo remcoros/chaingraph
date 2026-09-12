@@ -157,13 +157,16 @@ export function SelectedTags({
   const [open, setOpen] = useState(false);
   const [removal, setRemoval] = useState<{ tag: WorkspaceTag; anchor: HTMLElement } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const [triggerAnchor, setTriggerAnchor] = useState<HTMLButtonElement | null>(null);
   useEffect(() => {
     setOpen(false);
     setRemoval(null);
   }, [workspace.id, selected.id]);
   useEffect(() => {
     if (!openToken) return;
-    trigger.current?.focus();
+    const currentTrigger = trigger.current;
+    currentTrigger?.focus();
+    setTriggerAnchor(currentTrigger);
     setOpen(true);
     onOpenHandled?.();
   }, [openToken]);
@@ -180,7 +183,10 @@ export function SelectedTags({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? id : undefined}
-          onClick={() => setOpen((current) => !current)}
+          onClick={(event) => {
+            setTriggerAnchor(event.currentTarget);
+            setOpen((current) => !current);
+          }}
         >
           <Plus size={13} /> Add
         </button>
@@ -195,7 +201,9 @@ export function SelectedTags({
                 title={tag.name}
                 aria-label={`Edit assignment for ${tag.name}`}
                 onClick={() => {
-                  trigger.current?.focus();
+                  const currentTrigger = trigger.current;
+                  currentTrigger?.focus();
+                  setTriggerAnchor(currentTrigger);
                   setOpen(true);
                 }}
               >
@@ -229,11 +237,11 @@ export function SelectedTags({
           ))}
         </div>
       )}
-      {open && trigger.current && (
+      {open && triggerAnchor && (
         <TagAssignmentPicker
           key={selected.id}
           id={id}
-          anchor={trigger.current}
+          anchor={triggerAnchor}
           workspace={workspace}
           selected={selected}
           onChange={onChange}
