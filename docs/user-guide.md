@@ -153,6 +153,12 @@ selects the address so its transaction and UTXO tabs are available in the flow
 panel. UTXOs and balance are fetched only when that tab or an explicit refresh
 requires them, and each observation includes its last-checked time.
 
+When an address is selected, those two toolbar buttons become **Show recent
+UTXOs (10)** and **Show recent transactions (10)**. They use cached observations
+when available, fetch only the bounded recent details that are missing, and add
+or reveal up to ten graph items without changing the current selection. The
+address-history button remains available for selected inputs and outputs.
+
 Floating controls over the canvas provide **Fit**, zoom, **Center** on the
 selection, **Lock** (keep the selection centered as it changes), selection
 history, **Isolate**, filters and **Repack**. **Motion** toggles flow dots and

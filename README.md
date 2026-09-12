@@ -39,6 +39,9 @@ their transaction when needed, add or show it in the graph, and open it in the
 transaction flow. Both tabs show clickable pending and confirmed totals with
 matching collapsible sections, with pending transactions or outputs first; each
 tab renders a bounded first page and offers **Show more** for larger observations.
+When an address is selected, the floating toolbar also offers **Show recent
+UTXOs (10)** and **Show recent transactions (10)**. These actions add or reveal
+up to ten recent cached or observed graph items without changing selection.
 Each confirmed row includes its observed block and transaction timestamp when that
 detail is loaded. When all input values and virtual size are observed, confirmed
 transactions also show their fee rate and total fee; otherwise fee evidence is

@@ -22,6 +22,9 @@ import {
   buildAddressHistoryTransactionIndex,
   listAddressHistory,
   projectAddressHistory,
+  recentAddressHistoryEntries,
+  recentAddressUtxos,
+  RECENT_ADDRESS_GRAPH_LIMIT,
   shouldLoadAddressHistory,
   selectedAddress as selectedAddressForHistory,
 } from './domain/addressHistory';
@@ -142,6 +145,7 @@ import {
   outputAddress,
 } from './domain/workspace';
 import { mergeTransactionObservations } from './domain/prevouts';
+import { withHistoryHeight } from './domain/transactionStatus';
 import { filterSmallAmounts, omitAmountOrphans } from './domain/smallAmounts';
 import {
   outputNodeId,
@@ -157,6 +161,7 @@ import {
 import {
   fetchAddressBalance,
   fetchAddressUtxos,
+  fetchHistory,
   fetchTransaction,
   loadAddress,
   loadSpending,
@@ -165,6 +170,7 @@ import {
   scanWallet,
   type AddressHistoryLoadCallbacks,
 } from './lib/api';
+import { addressToScriptHash } from './lib/wallet';
 import { useBackendNetworks } from './lib/useBackendNetworks';
 import { ancestryNotice, loadAncestors, traceSourceExists } from './lib/tracing';
 import { WORKBENCH_TOUR, availableTourSteps } from './features/tour/steps';
@@ -1890,6 +1896,192 @@ export default function App() {
       if (loadedDetails.length) mergeTransactions(ownerId, loadedDetails);
     });
   }
+  function selectedAddressGraphAction() {
+    if (!w || selected?.kind !== 'address' || !selected.address) return undefined;
+    const address = selectedAddressForHistory(selected, w.network);
+    return address
+      ? { address, generation: selectionGeneration.current, ownerId: w.id }
+      : undefined;
+  }
+  function revealAddressGraphNodes(ownerId: string, ids: string[]) {
+    if (!ids.length) return;
+    updateWorkspace(
+      ownerId,
+      (current) => {
+        const revealed = addGraphNodes(current, ids);
+        return {
+          ...revealed,
+          view: { ...revealed.view, smallAmountThreshold: undefined },
+        };
+      },
+      false,
+    );
+    setGraphFilters({});
+  }
+  function showRecentAddressUtxos() {
+    const action = selectedAddressGraphAction();
+    if (!action) return;
+    const current = getWorkspaceSession(action.ownerId)?.data;
+    if (!current) return;
+    const cached = current.addressUtxos?.[action.address];
+    if (!cached && !canQuery) return;
+    void run(async (signal) => {
+      setOperation('Loading recent UTXOs…');
+      const observation =
+        cached ?? (await fetchAddressUtxos(current.network, action.address, signal));
+      signal.throwIfAborted();
+      if (selectionGeneration.current !== action.generation || wRef.current?.id !== action.ownerId)
+        return;
+      if (!cached)
+        updateWorkspace(
+          action.ownerId,
+          (latest) => ({
+            ...latest,
+            addressUtxos: {
+              ...latest.addressUtxos,
+              [action.address]: observation,
+            },
+          }),
+          false,
+        );
+      const recent = recentAddressUtxos(observation, RECENT_ADDRESS_GRAPH_LIMIT);
+      if (!recent.length) {
+        setNotice('No unspent outputs observed for this address.');
+        return;
+      }
+      const latestTransactions = (getWorkspaceSession(action.ownerId)?.data ?? current)
+        .transactions;
+      const detailTargets = [
+        ...new Map(
+          recent
+            .filter((utxo) => !latestTransactions[utxo.txid])
+            .map((utxo) => [utxo.txid, utxo] as const),
+        ).values(),
+      ];
+      const details = await mapLimit(
+        canQuery ? detailTargets : [],
+        4,
+        async (utxo): Promise<Transaction | undefined> => {
+          try {
+            const transaction = await fetchTransaction(
+              current.network,
+              utxo.txid,
+              signal,
+              utxo.height,
+              { scope: fetchScope, priority: 'visible' },
+            );
+            return transaction.confirmations !== undefined && transaction.confirmations < 0
+              ? undefined
+              : withHistoryHeight(transaction, utxo.height);
+          } catch {
+            signal.throwIfAborted();
+            return undefined;
+          }
+        },
+      );
+      signal.throwIfAborted();
+      if (selectionGeneration.current !== action.generation || wRef.current?.id !== action.ownerId)
+        return;
+      mergeTransactions(
+        action.ownerId,
+        details.filter((transaction): transaction is Transaction => !!transaction),
+        [...new Set(recent.map((utxo) => utxo.txid))],
+      );
+      const latest = getWorkspaceSession(action.ownerId)?.data;
+      if (!latest) return;
+      const outpointIds = recent.flatMap((utxo) => {
+        const transaction = latest.transactions[utxo.txid];
+        return transaction?.vout.some((output) => output.n === utxo.vout)
+          ? [outputNodeId(utxo.txid, utxo.vout)]
+          : [];
+      });
+      revealAddressGraphNodes(action.ownerId, outpointIds);
+    });
+  }
+  function showRecentAddressTransactions() {
+    const action = selectedAddressGraphAction();
+    if (!action) return;
+    const current = getWorkspaceSession(action.ownerId)?.data;
+    if (!current) return;
+    const historyKey = addressHistoryLoadKey(action.ownerId, current.network, action.address);
+    void run(async (signal) => {
+      let latest = getWorkspaceSession(action.ownerId)?.data ?? current;
+      let history = listAddressHistory(latest, action.address);
+      let historyLoadActive = addressHistoryLoadRefs.current.has(historyKey);
+      const needsObservedHistory =
+        !history || history.source === 'loaded transactions' || history.entries.length === 0;
+      if (needsObservedHistory && !historyLoadActive && canQuery) {
+        setOperation('Loading recent transactions…');
+        const observedHistory = await fetchHistory(
+          latest.network,
+          addressToScriptHash(action.address, latest.network),
+          signal,
+        );
+        signal.throwIfAborted();
+        if (
+          selectionGeneration.current !== action.generation ||
+          wRef.current?.id !== action.ownerId
+        )
+          return;
+        updateWorkspace(
+          action.ownerId,
+          (workspace) => ({
+            ...workspace,
+            addressHistories: {
+              ...workspace.addressHistories,
+              [action.address]: {
+                history: observedHistory,
+                truncated: false,
+                scannedAt: new Date().toISOString(),
+              },
+            },
+          }),
+          false,
+        );
+        latest = getWorkspaceSession(action.ownerId)?.data ?? latest;
+        history = listAddressHistory(latest, action.address);
+        historyLoadActive = addressHistoryLoadRefs.current.has(historyKey);
+      }
+      const recent = recentAddressHistoryEntries(history, RECENT_ADDRESS_GRAPH_LIMIT);
+      if (!recent.length) {
+        setNotice(
+          historyLoadActive
+            ? 'Address history is still loading. Try again when recent transactions are available.'
+            : 'No observed transactions for this address.',
+        );
+        return;
+      }
+      const latestTransactions = latest.transactions;
+      const detailTargets = recent.filter((entry) => !latestTransactions[entry.txid]);
+      const details = await mapLimit(
+        canQuery ? detailTargets : [],
+        4,
+        async (entry): Promise<Transaction | undefined> => {
+          try {
+            return await fetchTransaction(latest.network, entry.txid, signal, entry.height, {
+              scope: fetchScope,
+              priority: 'visible',
+            });
+          } catch {
+            signal.throwIfAborted();
+            return undefined;
+          }
+        },
+      );
+      signal.throwIfAborted();
+      if (selectionGeneration.current !== action.generation || wRef.current?.id !== action.ownerId)
+        return;
+      mergeTransactions(
+        action.ownerId,
+        details.filter((transaction): transaction is Transaction => !!transaction),
+        [...new Set(recent.map((entry) => entry.txid))],
+      );
+      revealAddressGraphNodes(
+        action.ownerId,
+        recent.map((entry) => txNodeId(entry.txid)),
+      );
+    });
+  }
   function openAddressHistoryTransaction(txid: string, height?: number, vout?: number) {
     if (!w || !/^[0-9a-f]{64}$/i.test(txid)) return;
     const ownerId = w.id;
@@ -2366,6 +2558,14 @@ export default function App() {
     [visibleGraph],
   );
   const selectionOnCanvas = selection.ids.filter((id) => canvasIds.has(id)).length;
+  const recentAddressUtxoTargets = useMemo(
+    () => recentAddressUtxos(addressUtxos, RECENT_ADDRESS_GRAPH_LIMIT),
+    [addressUtxos],
+  );
+  const recentAddressTransactionTargets = useMemo(
+    () => recentAddressHistoryEntries(addressHistory, RECENT_ADDRESS_GRAPH_LIMIT),
+    [addressHistory],
+  );
   const matchingScope = useMemo(
     () => ({
       label: describeMatchScope(visibleGraph.matchedNodes),
@@ -2667,6 +2867,28 @@ export default function App() {
   };
   const selectedInputOutputAddress =
     w && selected?.kind === 'output' ? selectedAddressForHistory(selected, w.network) : undefined;
+  const selectedAddressForToolbar =
+    w && selected?.kind === 'address' ? selectedAddressForHistory(selected, w.network) : undefined;
+  const recentUtxoCount = selectedAddressForToolbar
+    ? addressUtxos
+      ? recentAddressUtxoTargets.filter(
+          (utxo) => !canvasIds.has(outputNodeId(utxo.txid, utxo.vout)),
+        ).length
+      : canQuery
+        ? RECENT_ADDRESS_GRAPH_LIMIT
+        : 0
+    : 0;
+  const recentTransactionNeedsFetch =
+    !addressHistory ||
+    addressHistory.source === 'loaded transactions' ||
+    addressHistory.entries.length === 0;
+  const recentTransactionCount = selectedAddressForToolbar
+    ? recentTransactionNeedsFetch && canQuery
+      ? RECENT_ADDRESS_GRAPH_LIMIT
+      : recentAddressTransactionTargets.filter(
+          (entry) => !canvasIds.has(txNodeId(entry.txid)),
+        ).length
+    : 0;
   const graphContextToolbar = w ? (
     <GraphContextToolbar
       contextTitle={
@@ -2674,12 +2896,16 @@ export default function App() {
       }
       selectedKind={selected?.kind}
       selectedCount={toolbarSelection.length}
-      canBack={navigation.index > 0}
-      canForward={navigation.index < navigation.ids.length - 1}
-      onBack={() => navigateSelection(-1)}
-      onForward={() => navigateSelection(1)}
       canOpenAddressHistory={!!selectedInputOutputAddress}
       onOpenAddressHistory={openAddressHistory}
+      canShowRecentUtxos={!!selectedAddressForToolbar && (!!addressUtxos || canQuery)}
+      recentUtxoCount={recentUtxoCount}
+      onShowRecentUtxos={showRecentAddressUtxos}
+      canShowRecentTransactions={
+        !!selectedAddressForToolbar && (!!addressHistory?.entries.length || canQuery)
+      }
+      recentTransactionCount={recentTransactionCount}
+      onShowRecentTransactions={showRecentAddressTransactions}
       sides={contextSides}
       onAddSide={(side) => revealGraphNodes(contextSideIds?.[side] ?? [])}
       onHideSide={(side) =>

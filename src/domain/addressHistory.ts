@@ -6,6 +6,7 @@ import {
   sats,
   type AddressBalanceObservation,
   type AddressHistoryObservation,
+  type AddressUtxoObservation,
   type GraphNode,
   type Transaction,
   type Workspace,
@@ -41,6 +42,32 @@ export interface AddressHistory {
 /** A selected address needs a network check when no direct history is known yet. */
 export function shouldLoadAddressHistory(history: AddressHistory | undefined): boolean {
   return !history || history.knownCount === 0 || history.source === 'loaded transactions';
+}
+
+export const RECENT_ADDRESS_GRAPH_LIMIT = 10;
+
+/** History projections are already ordered newest-first, including pending entries. */
+export function recentAddressHistoryEntries(
+  history: AddressHistory | undefined,
+  limit = RECENT_ADDRESS_GRAPH_LIMIT,
+): AddressHistoryEntry[] {
+  return history?.entries.slice(0, Math.max(0, limit)) ?? [];
+}
+
+/** Electrum does not promise list order, so order UTXOs by height explicitly. */
+export function recentAddressUtxos(
+  observation: AddressUtxoObservation | undefined,
+  limit = RECENT_ADDRESS_GRAPH_LIMIT,
+): AddressUtxoObservation['utxos'] {
+  return [...(observation?.utxos ?? [])]
+    .sort(
+      (a, b) =>
+        (b.height === 0 ? Number.MAX_SAFE_INTEGER : b.height) -
+          (a.height === 0 ? Number.MAX_SAFE_INTEGER : a.height) ||
+        b.txid.localeCompare(a.txid) ||
+        b.vout - a.vout,
+    )
+    .slice(0, Math.max(0, limit));
 }
 
 interface AddressHistoryTransactionMatch {

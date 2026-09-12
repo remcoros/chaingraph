@@ -29,8 +29,6 @@
   padding: 2px;
 }
 .op-return-body pre {
-  max-height: 9rem;
-  overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: inherit;

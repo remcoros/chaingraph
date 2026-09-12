@@ -4,6 +4,9 @@ import {
   addressBalanceSats,
   indexAddressHistoryTransactions,
   listAddressHistory,
+  recentAddressHistoryEntries,
+  recentAddressUtxos,
+  RECENT_ADDRESS_GRAPH_LIMIT,
   shouldLoadAddressHistory,
 } from '../src/domain/addressHistory';
 import { addressToScriptHash } from '../src/lib/wallet';
@@ -148,6 +151,59 @@ describe('address history projection', () => {
         source: 'address history',
       }),
     ).toBe(false);
+  });
+
+  it('orders recent graph items with pending and newest heights first', () => {
+    const entries = recentAddressHistoryEntries({
+      address: address(4),
+      entries: [
+        {
+          txid: id(2),
+          height: 0,
+          mempool: true,
+          direction: 'unknown',
+          onGraph: false,
+          hidden: false,
+        },
+        {
+          txid: id(3),
+          height: 12,
+          mempool: false,
+          direction: 'unknown',
+          onGraph: false,
+          hidden: false,
+        },
+        {
+          txid: id(1),
+          height: 10,
+          mempool: false,
+          direction: 'unknown',
+          onGraph: false,
+          hidden: false,
+        },
+      ],
+      knownCount: 3,
+      loadedCount: 0,
+      unloadedCount: 3,
+      complete: true,
+      source: 'address history',
+    });
+    expect(entries.map(({ txid }) => txid)).toEqual([id(2), id(3), id(1)]);
+
+    const utxos = recentAddressUtxos({
+      network: 'mainnet',
+      checkedAt: new Date().toISOString(),
+      utxos: [
+        { txid: id(1), vout: 0, valueSats: 1, height: 100 },
+        { txid: id(2), vout: 0, valueSats: 1, height: 0 },
+        { txid: id(3), vout: 0, valueSats: 1, height: 110 },
+      ],
+    });
+    expect(utxos.map(({ txid }) => txid)).toEqual([id(2), id(3), id(1)]);
+    expect(
+      recentAddressUtxos({ network: 'mainnet', checkedAt: new Date().toISOString(), utxos: [] }, 0),
+    ).toEqual([]);
+    expect(RECENT_ADDRESS_GRAPH_LIMIT).toBe(10);
   });
 
   it('rejects an address from another network or malformed address', () => {
