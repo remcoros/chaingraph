@@ -1,4 +1,4 @@
-import { StrictMode, useMemo, useState } from 'react';
+import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../src/styles.css';
 import '../../src/components/tags.css';
@@ -63,17 +63,25 @@ function Fixture() {
         : [];
     return next;
   }, [scenario]);
-  const graph = useMemo(() => buildGraph(workspace), [workspace]);
-  if (scenario === 'raw') graph.nodes[0].label = txid;
-  window.hoverFixture = {
-    hover: (type, x, y, nodeId = id) =>
-      events.hover({
-        hit: { type, id: type === 'link' ? graph.links[0].id : nodeId },
-        point: { x, y, pointerType: 'mouse' },
-      }),
-    clear: () => events.hover({ point: { x: 0, y: 0, pointerType: 'mouse' } }),
-    canonical: () => workspace.transactions[txid].txid,
-  };
+  const graph = useMemo(() => {
+    const next = buildGraph(workspace);
+    if (scenario !== 'raw') return next;
+    return {
+      ...next,
+      nodes: next.nodes.map((node) => (node.id === id ? { ...node, label: txid } : node)),
+    };
+  }, [scenario, workspace]);
+  useEffect(() => {
+    window.hoverFixture = {
+      hover: (type, x, y, nodeId = id) =>
+        events.hover({
+          hit: { type, id: type === 'link' ? graph.links[0].id : nodeId },
+          point: { x, y, pointerType: 'mouse' },
+        }),
+      clear: () => events.hover({ point: { x: 0, y: 0, pointerType: 'mouse' } }),
+      canonical: () => workspace.transactions[txid].txid,
+    };
+  }, [graph, workspace]);
   return (
     <>
       <label>

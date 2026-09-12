@@ -5,7 +5,9 @@
   "categories": {},
   "rules": {
     "react-hooks/rules-of-hooks": "error",
+    "react-hooks/set-state-in-render": "error",
     "react-hooks/exhaustive-deps": "warn",
+    "react/immutability": "error",
     "react/jsx-key": "error",
     "react/no-array-index-key": "off",
     "react/no-danger": "error",
