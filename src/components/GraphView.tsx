@@ -377,7 +377,7 @@ export default function GraphView(props: GraphViewProps) {
     () => buildGraphPresentationIndex(props.nodes, props.links),
     [props.nodes, props.links],
   );
-  const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), [adapterFactory]);
+  const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), []);
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
