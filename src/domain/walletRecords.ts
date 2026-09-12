@@ -1,5 +1,5 @@
 import { addressToScriptHash } from '../lib/wallet';
-import type { Network, Transaction, TxOutput, Wallet, WalletAddress, Workspace } from './types';
+import type { Network, Transaction, Wallet, WalletAddress, Workspace } from './types';
 import { outputNodeId, sats } from './types';
 import { indexPreviousOutputs, outputScriptHash } from './prevouts';
 

@@ -137,7 +137,7 @@ export async function searchTraceSpenders(
       output,
       signal,
     );
-  } catch (error) {
+  } catch {
     signal.throwIfAborted();
     result.statusUnavailable = true;
   }
@@ -190,7 +190,7 @@ export async function searchTraceSpenders(
         ];
         if ((candidateTx.confirmations ?? 0) >= 0) failedIds.delete(candidateTx.txid);
       }
-    } catch (error) {
+    } catch {
       signal.throwIfAborted();
       failedIds.add(candidate.tx_hash);
     }

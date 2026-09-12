@@ -151,7 +151,7 @@ export async function loadWalletFlowInputWave(
       if (transaction.txid !== id) throw new Error('Unexpected transaction.');
       validateTransactionAddresses(transaction, network);
       loaded.push(transaction);
-    } catch (error) {
+    } catch {
       signal.throwIfAborted();
       failed.push(id);
     }
