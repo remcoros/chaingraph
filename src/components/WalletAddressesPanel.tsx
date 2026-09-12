@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { addressNodeId, short, type Wallet, type Workspace } from '../domain/types';
+import { addressNodeId, type Wallet, type Workspace } from '../domain/types';
 import { listWalletAddresses } from '../domain/walletRecords';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 
 const PAGE_SIZE = 40;
 
@@ -77,9 +78,15 @@ export function WalletAddressesPanel({
             >
               <span className="wallet-record-title">
                 <span aria-hidden="true">{annotation?.icon}</span>
-                <strong>{annotation?.label || short(record.address)}</strong>
+                <strong>
+                  {annotation?.label || <ResponsiveIdentifier value={record.address} />}
+                </strong>
               </span>
-              {annotation?.label && <span className="mono muted">{short(record.address)}</span>}
+              {annotation?.label && (
+                <span className="mono muted">
+                  <ResponsiveIdentifier value={record.address} />
+                </span>
+              )}
               <span className="wallet-record-meta">
                 <span>
                   {record.branch ? 'Change' : 'Receive'} / {record.index}

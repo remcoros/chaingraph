@@ -24,13 +24,15 @@ import {
   type EntitySort,
   type GraphFilters,
 } from '../domain/graphFilters';
-import { short, type Annotation, type GraphNode, type Transaction } from '../domain/types';
+import { transactionStatus } from '../domain/transactionStatus';
+import type { Annotation, GraphNode, Transaction } from '../domain/types';
 import './entity-browser.css';
 import type { VisibilityProps } from './VisibilityActions';
 import { AnchoredPopover } from './AnchoredPopover';
 import { GraphConnectionsAction, GraphFilterButton } from './GraphFilterControls';
 import { SelectionCheckbox } from './SelectionToolbar';
 import type { EntitySelection } from '../lib/useEntitySelection';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 
 /** Icons mirror the transaction flow block (Box), output side toolbar (ArrowRightFromLine)
  * and the graph's address-node toggle (Layers), so entities read the same way everywhere. */
@@ -406,6 +408,9 @@ export default function EntityBrowser({
       >
         {sorted.slice(first, first + pageSize).map((node) => {
           const KindIcon = TYPE_ICON[node.kind];
+          const transaction =
+            node.kind === 'transaction' ? transactions[node.txid ?? ''] : undefined;
+          const status = transaction ? transactionStatus(transaction) : undefined;
           return (
             <div
               key={node.id}
@@ -439,12 +444,16 @@ export default function EntityBrowser({
               >
                 <span className="entity-row-header">
                   <KindIcon size={12} className={`entity-row-icon ${node.kind}`} />
+                  {annotations[node.id]?.bookmarked && (
+                    <Bookmark size={12} className="entity-row-bookmark" aria-label="Bookmarked" />
+                  )}
                   <span className="entity-row-title">
-                    <strong>{short(node.id)}</strong>
-                    {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
+                    <strong>
+                      <ResponsiveIdentifier value={node.id} preferFull />
+                    </strong>
+                    {transaction && (
                       <small className="entity-row-io">
-                        ({transactions[node.txid!].vin.length} /{' '}
-                        {transactions[node.txid!].vout.length})
+                        {transaction.vin.length}/{transaction.vout.length}
                       </small>
                     )}
                   </span>
@@ -457,16 +466,18 @@ export default function EntityBrowser({
                         {annotations[node.id]!.label}
                       </small>
                     )}
-                    {node.kind === 'transaction' && transactions[node.txid ?? ''] && (
-                      <span className="entity-chain-status">
-                        <TransactionBlockTime transaction={transactions[node.txid!]} />
+                    <span className="entity-row-amount-line">
+                      <Amount as="small" className="entity-row-amount" value={node.value} />
+                    </span>
+                    {transaction && status && (
+                      <span className="entity-row-metadata">
+                        <small className="entity-chain-status" title={status.title}>
+                          {status.label}
+                        </small>
+                        <span className="entity-row-time">
+                          <TransactionBlockTime transaction={transaction} timestampOnly />
+                        </span>
                       </span>
-                    )}
-                    <Amount as="small" value={node.value} />
-                  </span>
-                  <span className="entity-row-status">
-                    {annotations[node.id]?.bookmarked && (
-                      <Bookmark size={12} aria-label="Bookmarked" />
                     )}
                   </span>
                   <span className="entity-row-actions">

@@ -10,7 +10,6 @@ import {
   Wallet as WalletIcon,
 } from 'lucide-react';
 import {
-  short,
   type Annotation,
   type GraphNode,
   type Wallet,
@@ -21,6 +20,7 @@ import { walletCheckAge } from '../domain/walletActivity';
 import type { GraphFilters } from '../domain/graphFilters';
 import type { EntitySelection } from '../lib/useEntitySelection';
 import EntityBrowser from './EntityBrowser';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 interface Props {
   w: Workspace;
   tagsPanel?: ReactNode;
@@ -315,7 +315,7 @@ export function WorkspacePanel({
             <button className="entity-row" key={id} onClick={() => onSelectNode(id)}>
               <Bookmark size={15} />
               <span>
-                <strong>{a.label || short(id)}</strong>
+                <strong>{a.label || <ResponsiveIdentifier value={id} />}</strong>
                 <small>{a.note || 'Saved for later'}</small>
               </span>
             </button>

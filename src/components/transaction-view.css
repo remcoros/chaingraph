@@ -294,6 +294,10 @@
   height: 16px;
   color: var(--color-accent);
 }
+.transaction-identity-select > strong.mono {
+  min-width: 0;
+  max-width: 100%;
+}
 .transaction-identity-caption {
   max-width: calc(100% - 36px);
 }
@@ -336,13 +340,6 @@
   min-height: 27px;
   min-width: 27px;
   padding: 5px;
-}
-.transaction-choice {
-  width: calc(100% - 8px);
-  margin: 0 4px 4px;
-  min-width: 0;
-  font-size: 9px;
-  padding: 4px 14px 4px 3px;
 }
 .transaction-flow section {
   min-width: 0;
@@ -411,6 +408,7 @@
   position: relative;
   display: flex;
   min-width: 0;
+  min-height: 64px;
   border: 1px solid var(--color-rule);
   border-radius: 5px;
   scroll-margin-top: 38px;
@@ -435,9 +433,7 @@
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 .transaction-row.is-pinned {
-  /* Pin visually without moving every preceding row in the DOM on each click.
-     Keyboard and screen-reader traversal retain the original outpoint order. */
-  order: -1;
+  /* Keep the selected row in outpoint order until scrolling reaches it. */
   position: sticky;
   top: var(--transaction-selected-top, 71px);
   z-index: 1;

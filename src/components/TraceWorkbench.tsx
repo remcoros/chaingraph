@@ -27,6 +27,7 @@ import {
   type TraceOutpoint,
 } from '../domain/traceWorkbench';
 import './trace-workbench.css';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 
 export interface TraceWorkbenchProps {
   workspace: Workspace;
@@ -339,7 +340,7 @@ export function TraceWorkbench({
                 disabled={!creator}
                 onClick={() => onGraph(txNodeId(point.txid))}
               >
-                {short(point.txid)}
+                <ResponsiveIdentifier value={point.txid} />
               </button>
               <small>Exact creation link</small>
               <button disabled={busy || !sourceExists} onClick={() => void scan('backward')}>
@@ -349,7 +350,7 @@ export function TraceWorkbench({
             <div className="trace-current">
               <span>Current output</span>
               <strong className="trace-id" title={`${point.txid}:${point.vout}`}>
-                {short(point.txid)}:{point.vout}
+                <ResponsiveIdentifier value={`${point.txid}:${point.vout}`} />
               </strong>
               <details className="trace-outpoint">
                 <summary>Full outpoint</summary>
@@ -394,9 +395,11 @@ export function TraceWorkbench({
               <strong>Spending transaction</strong>
               {spenders.length ? (
                 <span>
-                  {spenders.length === 1
-                    ? short(spenders[0].txid)
-                    : 'Multiple loaded spend alternatives'}
+                  {spenders.length === 1 ? (
+                    <ResponsiveIdentifier value={spenders[0].txid} />
+                  ) : (
+                    'Multiple loaded spend alternatives'
+                  )}
                 </span>
               ) : observedUnspentAt ? (
                 <small>
@@ -447,7 +450,7 @@ export function TraceWorkbench({
                 return (
                   <div key={tx.txid} className="trace-explanation">
                     <button className="trace-id" onClick={() => onGraph(txNodeId(tx.txid))}>
-                      {short(tx.txid)}
+                      <ResponsiveIdentifier value={tx.txid} />
                     </button>
                     <strong>
                       {choices.direction === 'backward' ? 'Input branch choice' : hint.title}
@@ -519,7 +522,7 @@ export function TraceWorkbench({
                       onSelect(traceId(item.point));
                     }}
                   >
-                    {short(item.point.txid)}:{item.point.vout}
+                    <ResponsiveIdentifier value={`${item.point.txid}:${item.point.vout}`} />
                   </button>
                   <span>
                     {item.via}

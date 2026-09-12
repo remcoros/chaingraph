@@ -127,7 +127,7 @@ export function IconPicker({
         {compact && <span>{caption ?? 'Icon'}</span>}
       </button>
       {open && triggerElement && (
-        <MetadataPopover anchor={triggerElement} onClose={() => setOpen(false)}>
+        <MetadataPopover anchor={triggerElement} compact onClose={() => setOpen(false)}>
           <IconPalette
             id={id}
             value={mixed ? '' : value}
@@ -140,12 +140,17 @@ export function IconPicker({
   );
 }
 
-function IconPalette({
+export function IconPalette({
   id,
   value,
   onChange,
   onClose,
-}: Props & { id: string; onClose: () => void }) {
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+}) {
   const ref = useDialogFocus(onClose, undefined, false);
   const options: readonly (readonly [string, string])[] =
     value && !icons.some(([symbol]) => symbol === value)
@@ -225,7 +230,7 @@ function IconPalette({
         ))}
       </div>
       <div className="icon-palette-footer">
-        <span>{options[active][1]}</span>
+        <span>{value ? options[active][1] : ''}</span>
         <button
           type="button"
           className="text-button"

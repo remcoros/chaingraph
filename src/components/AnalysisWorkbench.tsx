@@ -24,7 +24,6 @@ import {
   type AnalysisScan,
 } from '../domain/analysisScan';
 import {
-  short,
   addressNodeId,
   sats,
   txNodeId,
@@ -51,6 +50,7 @@ import {
 } from '../domain/analysisReview';
 import { analysisDataGaps, recoverAnalysisData, recoveryLimits } from '../domain/analysisRecovery';
 import { useTransactionFetch } from '../lib/useTransactionFetch';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './analysis-workbench.css';
 
 const allTypes = () => analysisTools.map((tool) => tool.id);
@@ -141,7 +141,7 @@ function EvidenceReference({
         >
           <span>{kind}</span>
           <span className="mono">
-            {prefix === 'out' ? `${short(txid)}:${index}` : short(reference)}
+            <ResponsiveIdentifier value={prefix === 'out' ? `${txid}:${index}` : reference} />
           </span>
         </button>
         {prefix === 'out' && (
@@ -158,7 +158,9 @@ function EvidenceReference({
           onClick={() => onGraph([addressNodeId(address)])}
         >
           <span>Address</span>
-          <span className="mono">{short(address)}</span>
+          <span className="mono">
+            <ResponsiveIdentifier value={address} />
+          </span>
         </button>
       )}
     </li>

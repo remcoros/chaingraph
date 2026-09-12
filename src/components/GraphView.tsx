@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { short, type GraphLink, type GraphNode, type Transaction } from '../domain/types';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './graph.css';
 import type { GraphFlowContext } from './graph/flowContext';
 import { VisibilityActions, type VisibilityProps } from './VisibilityActions';
@@ -437,6 +438,10 @@ export default function GraphView(props: GraphViewProps) {
       : hoveredNode?.label === hoveredIdentifier || hoveredNode?.label === hoveredNode?.id
         ? short(hoveredIdentifier)
         : hoveredNode?.label;
+  const hoveredLabelIsIdentifier =
+    hoveredPresentation?.label !== undefined
+      ? !hoveredPresentation.label
+      : hoveredNode?.label === hoveredIdentifier || hoveredNode?.label === hoveredNode?.id;
   const transaction = hoveredNode?.txid ? props.transactions?.[hoveredNode.txid] : undefined;
   const missingCreatingTransaction =
     hoveredNode?.kind === 'output' &&
@@ -574,7 +579,14 @@ export default function GraphView(props: GraphViewProps) {
                 dismissCard();
               }}
             >
-              {hoveredLabel}
+              {hoveredLabelIsIdentifier ? (
+                <>
+                  {hoveredPresentation?.icon && `${hoveredPresentation.icon} `}
+                  <ResponsiveIdentifier value={hoveredIdentifier} />
+                </>
+              ) : (
+                hoveredLabel
+              )}
             </button>
             {props.renderMetadata?.(hoveredNode.id)}
             <dl className="graph-card-facts">
@@ -587,7 +599,7 @@ export default function GraphView(props: GraphViewProps) {
                       : 'Address'}
                 </dt>
                 <dd className="graph-card-identifier" title={hoveredIdentifier}>
-                  {short(hoveredIdentifier)}
+                  <ResponsiveIdentifier value={hoveredIdentifier} />
                 </dd>
               </div>
               {hoveredNode.value !== undefined && (
@@ -600,7 +612,7 @@ export default function GraphView(props: GraphViewProps) {
                 <div>
                   <dt>Address</dt>
                   <dd className="graph-card-identifier" title={hoveredNode.address}>
-                    {short(hoveredNode.address)}
+                    <ResponsiveIdentifier value={hoveredNode.address} />
                   </dd>
                 </div>
               )}

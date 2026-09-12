@@ -112,7 +112,11 @@ export function BatchMetadataBar({
             <Tag size={14} /> Tags
           </button>
           {open === 'tags' && (
-            <MetadataPopover anchor={tagTrigger.current!} onClose={() => setOpen(undefined)}>
+            <MetadataPopover
+              anchor={tagTrigger.current!}
+              compact
+              onClose={() => setOpen(undefined)}
+            >
               <BatchTagEditor
                 workspace={workspace}
                 ids={ids}

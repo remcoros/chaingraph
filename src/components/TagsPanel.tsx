@@ -2,7 +2,6 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
 import {
   addressNodeId,
-  short,
   type GraphData,
   type GraphNode,
   type Workspace,
@@ -21,6 +20,7 @@ import './tags.css';
 import { applyBatchTag } from '../domain/batchMetadata';
 import { canonicalAddress } from '../domain/entityReferences';
 import { Modal, useDialogFocus } from './Dialogs';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
 type TagValue = { name: string; color: string; description: string };
@@ -318,7 +318,7 @@ function TagAssignmentPicker({
   const target =
     scope === 'address' && selected.address ? addressNodeId(selected.address) : selected.id;
   return (
-    <MetadataPopover anchor={anchor} onClose={onClose}>
+    <MetadataPopover anchor={anchor} compact onClose={onClose}>
       <BatchTagEditor
         id={id}
         workspace={workspace}
@@ -420,12 +420,19 @@ function TagMembers({
                     aria-label={`Inspect ${workspace.annotations[id]?.label || id}`}
                     onClick={() => onSelect(id)}
                   >
-                    {workspace.annotations[id]?.label || <code>{short(id)}</code>}
+                    {workspace.annotations[id]?.label || (
+                      <code>
+                        <ResponsiveIdentifier value={id} />
+                      </code>
+                    )}
                   </button>
                   <small>
                     {workspace.annotations[id]?.label && (
                       <>
-                        <code title={id}>{short(id)}</code> ·{' '}
+                        <code title={id}>
+                          <ResponsiveIdentifier value={id} />
+                        </code>{' '}
+                        ·{' '}
                       </>
                     )}
                     {id.startsWith('tx:')

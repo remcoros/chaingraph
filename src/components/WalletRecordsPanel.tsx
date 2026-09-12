@@ -4,13 +4,14 @@ import { formatGmtTimestamp, walletRecordBlockObservation } from '../domain/tran
 import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
-import { outputNodeId, short, txNodeId, type Wallet, type Workspace } from '../domain/types';
+import { outputNodeId, txNodeId, type Wallet, type Workspace } from '../domain/types';
 import {
   listWalletTransactions,
   verifyWalletUtxo,
   type WalletUtxoRecord,
 } from '../domain/walletRecords';
 import type { WalletUtxoController } from '../lib/useWalletUtxos';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './wallet-records.css';
 
 export type WalletRecordsTab = 'addresses' | 'transactions' | 'utxos';
@@ -194,9 +195,13 @@ export function WalletRecordsPanel({
             >
               <span className="wallet-record-title">
                 <span aria-hidden="true">{annotation?.icon}</span>
-                <strong>{annotation?.label || short(identifier)}</strong>
+                <strong>{annotation?.label || <ResponsiveIdentifier value={identifier} />}</strong>
               </span>
-              {annotation?.label && <span className="mono muted">{short(identifier)}</span>}
+              {annotation?.label && (
+                <span className="mono muted">
+                  <ResponsiveIdentifier value={identifier} />
+                </span>
+              )}
               <span className="wallet-record-meta">
                 <TransactionBlockTime
                   transaction={walletRecordBlockObservation(
@@ -218,7 +223,7 @@ export function WalletRecordsPanel({
               </span>
               {row.utxo && (
                 <span className="mono muted" title={row.utxo.address}>
-                  {short(row.utxo.address)}
+                  <ResponsiveIdentifier value={row.utxo.address} />
                 </span>
               )}
             </button>

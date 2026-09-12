@@ -9,6 +9,7 @@ import { transactionStatus } from '../domain/transactionStatus';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import {
   memo,
+  useId,
   useMemo,
   useState,
   useRef,
@@ -38,7 +39,6 @@ import {
   type Workspace,
   outputNodeId,
   txNodeId,
-  short,
   sats,
 } from '../domain/types';
 import { relatedTransactions } from '../domain/transactionInspection';
@@ -52,6 +52,9 @@ import './transaction-view.css';
 import type { VisibilityProps } from './VisibilityActions';
 import { SelectionCheckbox } from './SelectionToolbar';
 import type { EntitySelection } from '../lib/useEntitySelection';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
+import { BatchTagEditor, MetadataPopover } from './MetadataEditors';
+import { IconPalette } from './IconPicker';
 
 interface Props extends VisibilityProps {
   workspace: Workspace;
@@ -59,6 +62,8 @@ interface Props extends VisibilityProps {
   selected?: GraphNode;
   onSelect: (id: string) => void;
   onEdit: (id: string, target?: 'label' | 'tags' | 'icon') => void;
+  onApplyTags: (update: (workspace: Workspace) => Workspace) => void;
+  onSetIcon: (id: string, icon: string) => void;
   onTrace: (direction: 'funding' | 'spending', id: string) => void;
   disabledReason?: string;
   inputLoading?: boolean;
@@ -189,17 +194,21 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
           <span className="transaction-row-main">
             <span className="transaction-row-heading">
               <strong>
-                {row.coinbase
-                  ? 'Coinbase'
-                  : opReturn
-                    ? 'OP_RETURN'
-                    : address
-                      ? short(address)
-                      : !row.output
-                        ? inputLoading && selected
-                          ? 'Loading previous output…'
-                          : 'Select to load previous output'
-                        : 'Script output'}
+                {row.coinbase ? (
+                  'Coinbase'
+                ) : opReturn ? (
+                  'OP_RETURN'
+                ) : address ? (
+                  <ResponsiveIdentifier value={address} preferFull />
+                ) : !row.output ? (
+                  inputLoading && selected ? (
+                    'Loading previous output…'
+                  ) : (
+                    'Select to load previous output'
+                  )
+                ) : (
+                  'Script output'
+                )}
               </strong>
               {!row.coinbase && <Amount value={row.output ? sats(row.output.value) : undefined} />}
             </span>
@@ -600,6 +609,13 @@ export function TransactionView(props: Props) {
     [workspace.transactions, workspace.network],
   );
   const [choice, setChoice] = useState('');
+  const [quickEditor, setQuickEditor] = useState<{
+    kind: 'tags' | 'icon';
+    nodeId: string;
+    anchor: HTMLElement;
+    point?: { x: number; y: number };
+  }>();
+  const quickEditorId = useId();
   const [fullHeight, setFullHeight] = useState(false);
   const [localOpen, setLocalOpen] = useState(true);
   const open = state?.open ?? localOpen;
@@ -688,7 +704,11 @@ export function TransactionView(props: Props) {
                       ? 'Loaded spend alternative'
                       : 'Spending transaction'}
                 </small>
-                <strong>{workspace.annotations[txNodeId(tx.txid)]?.label || short(tx.txid)}</strong>
+                <strong>
+                  {workspace.annotations[txNodeId(tx.txid)]?.label || (
+                    <ResponsiveIdentifier value={tx.txid} />
+                  )}
+                </strong>
               </span>
               {direction === 'next' && <ArrowRight size={15} />}
             </button>
@@ -756,7 +776,7 @@ export function TransactionView(props: Props) {
                 <span>Transaction flow</span>
                 {hasFlowSelection && selected && (
                   <code title={selected.id.replace(/^(?:tx|out|addr):/, '')}>
-                    {short(selected.id)}
+                    <ResponsiveIdentifier value={selected.id} />
                   </code>
                 )}
                 {selected?.kind === 'transaction' && current && (
@@ -850,7 +870,9 @@ export function TransactionView(props: Props) {
                               : `${current.role} transaction`}{' '}
                             ({current.tx.vin.length} / {current.tx.vout.length})
                           </span>
-                          <strong className="mono">{short(current.tx.txid)}</strong>
+                          <strong className="mono">
+                            <ResponsiveIdentifier value={current.tx.txid} />
+                          </strong>
                           {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
                             <strong
                               className="transaction-identity-label"
@@ -881,7 +903,16 @@ export function TransactionView(props: Props) {
                             className="icon-button"
                             aria-label="Edit displayed transaction tags"
                             title="Choose transaction tags"
-                            onClick={() => props.onEdit(txNodeId(current.tx.txid), 'tags')}
+                            onClick={(event) =>
+                              setQuickEditor({
+                                kind: 'tags',
+                                nodeId: txNodeId(current.tx.txid),
+                                anchor: event.currentTarget,
+                                point: event.detail
+                                  ? { x: event.clientX, y: event.clientY }
+                                  : undefined,
+                              })
+                            }
                           >
                             <Tags size={13} />
                           </button>
@@ -890,7 +921,16 @@ export function TransactionView(props: Props) {
                             className="icon-button"
                             aria-label="Edit displayed transaction icon"
                             title="Choose transaction icon"
-                            onClick={() => props.onEdit(txNodeId(current.tx.txid), 'icon')}
+                            onClick={(event) =>
+                              setQuickEditor({
+                                kind: 'icon',
+                                nodeId: txNodeId(current.tx.txid),
+                                anchor: event.currentTarget,
+                                point: event.detail
+                                  ? { x: event.clientX, y: event.clientY }
+                                  : undefined,
+                              })
+                            }
                           >
                             <Smile size={13} />
                           </button>
@@ -923,24 +963,6 @@ export function TransactionView(props: Props) {
                             )}
                           </div>
                         )}
-                        {related.length > 1 && (
-                          <select
-                            className="transaction-choice"
-                            aria-label="Displayed transaction"
-                            value={current.tx.txid}
-                            onChange={(e) => navigate(e.target.value, selected.id)}
-                          >
-                            {related.map(({ tx, role }) => (
-                              <option key={tx.txid} value={tx.txid}>
-                                {role}:{' '}
-                                {workspace.annotations[txNodeId(tx.txid)]?.label
-                                  ? `${workspace.annotations[txNodeId(tx.txid)].label} · `
-                                  : ''}
-                                {short(tx.txid)}
-                              </option>
-                            ))}
-                          </select>
-                        )}
                       </div>
                     </div>
                   }
@@ -951,6 +973,38 @@ export function TransactionView(props: Props) {
                     ? 'Loading creating transaction…'
                     : 'Creating transaction unavailable.'}
                 </p>
+              )}
+              {quickEditor?.kind === 'tags' && (
+                <MetadataPopover
+                  anchor={quickEditor.anchor}
+                  compact
+                  point={quickEditor.point}
+                  onClose={() => setQuickEditor(undefined)}
+                >
+                  <BatchTagEditor
+                    id={quickEditorId}
+                    workspace={workspace}
+                    ids={[quickEditor.nodeId]}
+                    single
+                    onClose={() => setQuickEditor(undefined)}
+                    onApply={(_summary, update) => props.onApplyTags(update)}
+                  />
+                </MetadataPopover>
+              )}
+              {quickEditor?.kind === 'icon' && (
+                <MetadataPopover
+                  anchor={quickEditor.anchor}
+                  compact
+                  point={quickEditor.point}
+                  onClose={() => setQuickEditor(undefined)}
+                >
+                  <IconPalette
+                    id={quickEditorId}
+                    value={workspace.annotations[quickEditor.nodeId]?.icon ?? ''}
+                    onChange={(icon) => props.onSetIcon(quickEditor.nodeId, icon)}
+                    onClose={() => setQuickEditor(undefined)}
+                  />
+                </MetadataPopover>
               )}
               <div className="transaction-view-actions">
                 {selected.kind === 'output' &&

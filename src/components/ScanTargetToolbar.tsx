@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { Check, Crosshair, X } from 'lucide-react';
-import { short } from '../domain/types';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './scan-target-toolbar.css';
 
 export interface ScanTargetToolbarProps {
@@ -95,7 +95,9 @@ export function ScanTargetToolbar({
                   title={label}
                   onClick={() => onRemove(id)}
                 >
-                  <span>{short(id)}</span>
+                  <span>
+                    <ResponsiveIdentifier value={id} />
+                  </span>
                   <X size={12} aria-hidden="true" />
                 </button>
               </li>

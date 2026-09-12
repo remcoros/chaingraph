@@ -26,6 +26,21 @@
 .metadata-editor-heading .icon-button {
   flex: none;
 }
+.metadata-tag-editor {
+  padding: 8px;
+}
+.metadata-tag-editor .metadata-editor-heading {
+  margin-bottom: 5px;
+}
+.metadata-tag-editor .metadata-editor-heading strong {
+  font-size: 12px;
+}
+.metadata-tag-editor .metadata-editor-heading .icon-button {
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px;
+}
 .metadata-editor label {
   display: flex;
   flex-direction: column;
@@ -62,6 +77,11 @@
 .metadata-editor input[type='search'] {
   margin-bottom: 8px;
 }
+.metadata-tag-editor input[type='search'] {
+  min-height: 30px;
+  margin-bottom: 5px;
+  padding-block: 4px;
+}
 .metadata-editor .button-row,
 .metadata-tag-create {
   display: flex;
@@ -72,6 +92,12 @@
 .metadata-tag-create {
   justify-content: space-between;
   margin-bottom: 10px;
+}
+.metadata-tag-editor .metadata-tag-create {
+  margin-bottom: 6px;
+}
+.metadata-tag-editor .metadata-editor-footer {
+  margin-top: 6px;
 }
 .metadata-colors {
   display: flex;
@@ -106,18 +132,38 @@
 .metadata-tag-options {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   max-height: 240px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+.metadata-tag-editor .metadata-tag-options {
+  max-height: 210px;
 }
 .metadata-tag-option {
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--color-rule);
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.metadata-tag-option:hover {
+  background: var(--color-raised);
+}
+.metadata-tag-option.has-assignment {
+  border-color: color-mix(in srgb, var(--color-accent) 32%, var(--color-rule));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+.metadata-tag-option[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-rule));
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
 }
 .metadata-tag-dot {
   display: inline-block;
@@ -136,19 +182,12 @@
 .metadata-tag-name small {
   font-size: 10px;
 }
-.metadata-tag-actions {
-  display: flex;
-  gap: 5px;
+.metadata-tag-state {
+  color: var(--color-accent);
+  flex-shrink: 0;
 }
 @media (max-width: 420px) {
   .metadata-tag-option {
-    grid-template-columns: 8px minmax(0, 1fr);
-  }
-  .metadata-tag-actions {
-    grid-column: 2;
-  }
-  .metadata-tag-actions button,
-  .metadata-colors button {
     min-height: max(36px, var(--control-height-compact));
   }
   .metadata-colors button {

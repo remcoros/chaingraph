@@ -223,7 +223,7 @@ export function SelectionToolbar({
         </MetadataPopover>
       )}
       {editor === 'tag' && tagButton && (
-        <MetadataPopover anchor={tagButton} onClose={() => setEditor(undefined)}>
+        <MetadataPopover anchor={tagButton} compact onClose={() => setEditor(undefined)}>
           <BatchTagEditor
             id={tagId}
             workspace={workspace}

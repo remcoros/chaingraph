@@ -833,24 +833,17 @@ small,
   white-space: nowrap;
 }
 .entity-row-io {
+  margin-left: auto;
   color: var(--color-muted);
   white-space: nowrap;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .entity-row-label {
   color: var(--color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.entity-row-status {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  flex-shrink: 0;
-  color: var(--color-muted);
-  padding-top: 1px;
 }
 .entity-dot {
   display: inline-block;

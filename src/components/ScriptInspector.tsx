@@ -11,6 +11,7 @@ import {
 import { fetchRawInspection } from '../lib/transactionInspection';
 import { CopyButton } from './CopyButton';
 import { OpReturnData } from './OpReturnData';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './transaction-view.css';
 
 function HexField({
@@ -124,7 +125,7 @@ function ScriptInspectorBody({
     <div className="script-inspector-body">
       <p className="small mono" title={transaction?.txid}>
         {related.find(({ tx }) => tx.txid === transaction?.txid)?.role} transaction:{' '}
-        {short(transaction?.txid ?? '')}
+        <ResponsiveIdentifier value={transaction?.txid ?? ''} />
       </p>
       <TransactionBlockTime transaction={transaction} />
       {related.length > 1 && (

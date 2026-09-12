@@ -44,6 +44,7 @@ import { decodeOpReturn } from '../domain/opReturn';
 import { indexLoadedSpends } from '../domain/transactionFlow';
 import type { WalletMatch } from '../domain/tags';
 import { WalletHelp } from './WalletHelp';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 
 export function AnnotationEditor({
   annotation,
@@ -612,14 +613,7 @@ export function NodeInspector({
                 title={identifier}
                 className={selected.kind === 'output' ? 'outpoint-identity' : undefined}
               >
-                {selected.kind === 'output' ? (
-                  <>
-                    <span>{short(selected.txid ?? '')}</span>
-                    <span>:{selected.vout}</span>
-                  </>
-                ) : (
-                  short(identifier)
-                )}
+                <ResponsiveIdentifier value={identifier} preferFull />
               </code>
               <CopyButton
                 value={identifier}
@@ -648,7 +642,9 @@ export function NodeInspector({
                     else onExpand('funding');
                   }}
                 >
-                  <code>{short(selected.txid)}</code>
+                  <code>
+                    <ResponsiveIdentifier value={selected.txid} preferFull />
+                  </code>
                 </button>
                 <CopyButton value={selected.txid} label="Copy transaction ID" />
               </dd>
@@ -668,7 +664,9 @@ export function NodeInspector({
                       aria-label={`Add and select address: ${address}`}
                       onClick={() => onSelectNode?.(addressNodeId(address))}
                     >
-                      <code>{short(address)}</code>
+                      <code>
+                        <ResponsiveIdentifier value={address} preferFull />
+                      </code>
                     </button>
                     <CopyButton value={address} label="Copy address" />
                   </>
@@ -731,7 +729,10 @@ export function NodeInspector({
                 title={id.slice(3)}
                 onClick={() => onSelectNode?.(id)}
               >
-                <span>Spending tx:</span> <code>{short(id.slice(3))}</code>
+                <span>Spending tx:</span>{' '}
+                <code>
+                  <ResponsiveIdentifier value={id.slice(3)} preferFull />
+                </code>
               </button>
             ))}
             {spendingCount > 5 && (

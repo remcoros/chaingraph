@@ -191,7 +191,7 @@ export const short = (value: string) => {
   const outpoint = /^([0-9a-f]{64}):(\d+)$/i.exec(reference);
   const identifier = outpoint?.[1] ?? reference;
   const abbreviated =
-    identifier.length > 17 ? `${identifier.slice(0, 7)}...${identifier.slice(-7)}` : identifier;
+    identifier.length > 19 ? `${identifier.slice(0, 8)}...${identifier.slice(-8)}` : identifier;
   return `${abbreviated}${outpoint ? `:${outpoint[2]}` : ''}`;
 };
 export const sats = (btc: number) => Math.round(btc * 100_000_000);

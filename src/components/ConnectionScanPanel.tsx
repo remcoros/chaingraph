@@ -51,6 +51,7 @@ import { prepareCustomScanTargets } from '../domain/connectionScanTargets';
 import { prepareNeighbourScanTargets } from '../domain/connectionScanNeighbours';
 import { WalletHelp } from './WalletHelp';
 import { CopyButton } from './CopyButton';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {
@@ -643,7 +644,7 @@ export function ConnectionScanPanel(props: Props) {
                           aria-label={`Remove target ${id}`}
                           onClick={() => props.onRemoveTarget(id)}
                         >
-                          {short(id)} <X size={12} />
+                          <ResponsiveIdentifier value={id} /> <X size={12} />
                         </button>
                       ))}
                     </div>
@@ -958,7 +959,9 @@ function ScanPathNodeLabel({ workspace, id }: { workspace: Workspace; id: string
     : undefined;
   return (
     <>
-      <span className="connection-scan-path-name">{nameFor(workspace, id)}</span>
+      <span className="connection-scan-path-name">
+        {workspace.annotations[id]?.label || <ResponsiveIdentifier value={id} />}
+      </span>
       {id.startsWith('tx:') && (
         <span
           className="connection-scan-path-counts"
@@ -1092,7 +1095,9 @@ function ScanResultRow({
               onClick={() => openNode(id)}
             >
               <Icon size={14} />
-              <span>{short(id)}</span>
+              <span>
+                <ResponsiveIdentifier value={id} />
+              </span>
             </button>
             {index === 1 && (
               <small>
@@ -1120,7 +1125,7 @@ function ScanResultRow({
               aria-label={`Select meeting point: ${nameFor(workspace, meeting)}`}
               onClick={() => openNode(meeting)}
             >
-              {nameFor(workspace, meeting)}
+              {workspace.annotations[meeting]?.label || <ResponsiveIdentifier value={meeting} />}
             </button>
           </div>
         )}

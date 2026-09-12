@@ -357,13 +357,9 @@ a {
   display: flex;
   min-width: 0;
 }
-.outpoint-identity > span:first-child {
+.outpoint-identity > .responsive-identifier {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.outpoint-identity > span:last-child {
-  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .network-connections {

@@ -109,6 +109,7 @@ import {
   type GraphFilters,
 } from './domain/graphFilters';
 import { useEntitySelection } from './lib/useEntitySelection';
+import { applyBatchIcon } from './domain/batchMetadata';
 import { SelectionToolbar } from './components/SelectionToolbar';
 import {
   FilterChips,
@@ -2856,6 +2857,10 @@ export default function App() {
                     {...flowInputs}
                     onSelect={select}
                     onEdit={editNode}
+                    onApplyTags={changeTags}
+                    onSetIcon={(id, icon) =>
+                      change((current) => applyBatchIcon(current, [id], icon, true))
+                    }
                     onTrace={(direction, id) => void expand(direction, id)}
                     disabledReason={
                       operation ? 'Wait for the current operation to finish.' : queryDisabledReason

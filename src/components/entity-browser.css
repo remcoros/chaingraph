@@ -306,8 +306,33 @@
   min-width: 0;
 }
 .entity-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
   min-width: 0;
+}
+.entity-row-amount-line {
+  display: flex;
+  min-width: 0;
+}
+.entity-row-metadata {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.entity-row-time {
+  margin-left: auto;
+  min-width: 0;
+  text-align: right;
+}
+.entity-row-amount {
+  flex-shrink: 0;
+  text-align: left;
+}
+.entity-browser .entity-row .entity-chain-status {
+  font-size: 10px;
 }
 .entity-row-actions {
   display: flex;
@@ -315,6 +340,10 @@
   align-items: center;
   flex-shrink: 0;
   gap: 1px;
+}
+.entity-row-bookmark {
+  flex-shrink: 0;
+  color: var(--color-muted);
 }
 .entity-row-actions .icon-button {
   padding: 4px;

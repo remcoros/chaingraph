@@ -12,7 +12,7 @@ import {
   Wallet as WalletIcon,
   LoaderCircle,
 } from 'lucide-react';
-import { short, type Wallet, type Workspace } from '../domain/types';
+import type { Wallet, Workspace } from '../domain/types';
 import type { WalletUtxoRecord } from '../domain/walletRecords';
 import {
   applyReviewDecisions,
@@ -61,6 +61,7 @@ import { TransactionBlockTime } from './TransactionBlockTime';
 import { walletRecordBlockObservation } from '../domain/transactionTime';
 import { CopyButton } from './CopyButton';
 import { buildTagIndex } from '../domain/tags';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 import { WalletPreparationCache } from '../lib/walletPreparation';
 import './wallet-workbench.css';
 
@@ -887,7 +888,7 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
                             className="mono muted wallet-review-record-id"
                             title={row.identifier}
                           >
-                            {short(row.identifier)}
+                            <ResponsiveIdentifier value={row.identifier} />
                           </span>
                         )}
                       </button>

@@ -1,5 +1,5 @@
-import { short } from '../domain/types';
 import type { GraphFlowContext } from './graph/flowContext';
+import { ResponsiveIdentifier } from './ResponsiveIdentifier';
 
 export function GraphLegend({
   dimensions,
@@ -25,7 +25,7 @@ export function GraphLegend({
             className="graph-flow-context"
             title={`Flow through ${flowContext.transactionId.slice(3)}`}
           >
-            Flow · {short(flowContext.transactionId.slice(3))}
+            Flow · <ResponsiveIdentifier value={flowContext.transactionId.slice(3)} />
           </span>
         )}
         <span>

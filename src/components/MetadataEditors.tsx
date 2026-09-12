@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Minus, Plus, X } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 import { useDialogFocus } from './Dialogs';
 import {
   applyEntityNote,
@@ -154,6 +154,7 @@ export function BatchLabelEditor({
 export function BatchTagEditor({
   workspace,
   ids,
+  single = false,
   id,
   onClose,
   onApply,
@@ -172,9 +173,15 @@ export function BatchTagEditor({
   const [error, setError] = useState('');
   const tags = workspace.tags ?? [];
   const name = query.trim();
-  const matching = tags.filter((tag) =>
-    `${tag.name} ${tag.description ?? ''}`.toLowerCase().includes(name.toLowerCase()),
-  );
+  const matching = tags
+    .filter((tag) =>
+      `${tag.name} ${tag.description ?? ''}`.toLowerCase().includes(name.toLowerCase()),
+    )
+    .map((tag, index) => {
+      const plan = planBatchTag(workspace, ids, tag.id, true);
+      return { tag, assigned: ids.length - plan.targets.length, index };
+    })
+    .sort((a, b) => Number(b.assigned > 0) - Number(a.assigned > 0) || a.index - b.index);
   const duplicate = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
   function assign(tagId: string, add: boolean) {
     const plan = planBatchTag(workspace, ids, tagId, add);
@@ -193,7 +200,7 @@ export function BatchTagEditor({
         return false;
       }
       setError('');
-      // Add/Remove becomes disabled after applying. Keep keyboard focus usable.
+      // Return focus to search after the workspace update reorders assigned tags.
       search.current?.focus({ preventScroll: true });
       return true;
     } catch (cause) {
@@ -204,7 +211,7 @@ export function BatchTagEditor({
   return (
     <div
       ref={ref}
-      className="metadata-editor compact-controls"
+      className="metadata-editor metadata-tag-editor compact-controls"
       role="dialog"
       aria-modal="false"
       id={id}
@@ -267,36 +274,33 @@ export function BatchTagEditor({
         )}
       </form>
       <div className="metadata-tag-options" role="group" aria-label="Existing tags">
-        {matching.map((tag) => {
-          const plan = planBatchTag(workspace, ids, tag.id, true);
-          const assigned = ids.length - plan.targets.length;
+        {matching.map(({ tag, assigned }) => {
+          const fullyAssigned = assigned === ids.length;
           return (
-            <div className="metadata-tag-option" key={tag.id}>
+            <button
+              type="button"
+              className={`metadata-tag-option ${assigned > 0 ? 'has-assignment' : ''}`}
+              key={tag.id}
+              aria-pressed={fullyAssigned}
+              aria-label={`${fullyAssigned ? 'Remove' : 'Add'} ${tag.name} ${
+                fullyAssigned ? 'from' : 'to'
+              } selected records`}
+              onClick={() => assign(tag.id, !fullyAssigned)}
+            >
               <span className="metadata-tag-dot" style={{ backgroundColor: tag.color }} />
               <span className="metadata-tag-name">
                 {tag.name}
-                <small className="muted">
-                  {assigned} of {ids.length} selected
-                </small>
+                {!single && (
+                  <small className="muted">
+                    {assigned} of {ids.length} selected
+                  </small>
+                )}
                 {membershipHint?.(tag)}
               </span>
-              <div className="metadata-tag-actions">
-                <button
-                  disabled={assigned === ids.length}
-                  aria-label={`Add ${tag.name} to selected records`}
-                  onClick={() => assign(tag.id, true)}
-                >
-                  <Plus size={13} /> Add
-                </button>
-                <button
-                  disabled={!assigned}
-                  aria-label={`Remove ${tag.name} from selected records`}
-                  onClick={() => assign(tag.id, false)}
-                >
-                  <Minus size={13} /> Remove
-                </button>
-              </div>
-            </div>
+              {fullyAssigned && (
+                <Check className="metadata-tag-state" size={14} aria-hidden="true" />
+              )}
+            </button>
           );
         })}
         {!matching.length && (
@@ -320,10 +324,14 @@ export function MetadataPopover({
   anchor,
   onClose,
   children,
+  compact = false,
+  point,
 }: {
   anchor: HTMLElement;
   onClose: () => void;
   children: ReactNode;
+  compact?: boolean;
+  point?: { x: number; y: number };
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -335,16 +343,25 @@ export function MetadataPopover({
       const top = viewport?.offsetTop ?? 0;
       const width = viewport?.width ?? window.innerWidth;
       const height = viewport?.height ?? window.innerHeight;
-      element.style.width = `${Math.max(0, Math.min(380, width - 24))}px`;
-      element.style.maxHeight = `${height - 24}px`;
+      const gutter = compact ? 8 : 12;
+      const anchorGap = compact ? 4 : 6;
+      element.style.width = `${Math.max(0, Math.min(compact ? 320 : 380, width - gutter * 2))}px`;
+      element.style.maxHeight = `${height - gutter * 2}px`;
       const trigger = anchor.getBoundingClientRect();
       const box = element.getBoundingClientRect();
-      element.style.left = `${Math.max(left + 12, Math.min(trigger.left, left + width - box.width - 12))}px`;
+      const preferredLeft = point
+        ? point.x + anchorGap + box.width > left + width - gutter
+          ? point.x - box.width - anchorGap
+          : point.x + anchorGap
+        : trigger.left;
+      element.style.left = `${Math.max(left + gutter, Math.min(preferredLeft, left + width - box.width - gutter))}px`;
+      const anchorBottom = point?.y ?? trigger.bottom;
+      const anchorTop = point?.y ?? trigger.top;
       const preferredTop =
-        trigger.bottom + 6 + box.height > top + height - 12
-          ? trigger.top - box.height - 6
-          : trigger.bottom + 6;
-      element.style.top = `${Math.max(top + 12, Math.min(preferredTop, top + height - box.height - 12))}px`;
+        anchorBottom + anchorGap + box.height > top + height - gutter
+          ? anchorTop - box.height - anchorGap
+          : anchorBottom + anchorGap;
+      element.style.top = `${Math.max(top + gutter, Math.min(preferredTop, top + height - box.height - gutter))}px`;
     };
     const schedule = () => {
       cancelAnimationFrame(frame);
@@ -375,9 +392,9 @@ export function MetadataPopover({
       window.visualViewport?.removeEventListener('resize', schedule);
       document.removeEventListener('pointerdown', outside);
     };
-  }, [anchor, onClose]);
+  }, [anchor, compact, onClose, point]);
   return createPortal(
-    <div className="metadata-popover" ref={ref}>
+    <div className={`metadata-popover ${compact ? 'is-compact' : ''}`} ref={ref}>
       {children}
     </div>,
     document.body,
