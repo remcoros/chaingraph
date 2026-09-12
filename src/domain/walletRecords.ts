@@ -41,7 +41,10 @@ export function verifiedWalletAddresses(wallet: Wallet, network: Network): Walle
 /** Count received outputs in the local transaction snapshot, including spent
  * outputs. This is neither a complete history count nor an unspent balance.
  */
-export function listWalletAddresses(workspace: Workspace, wallet: Wallet): WalletAddressRecord[] {
+export function listWalletAddresses(
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  wallet: Wallet,
+): WalletAddressRecord[] {
   const records = verifiedWalletAddresses(wallet, workspace.network).map((address) => ({
     ...address,
     loadedOutputCount: 0,

@@ -20,8 +20,12 @@ export function WalletAddressesPanel({
   onSelect: (id: string) => void;
 }) {
   const addresses = useMemo(
-    () => listWalletAddresses(workspace, wallet),
-    [workspace.transactions, wallet],
+    () =>
+      listWalletAddresses(
+        { network: workspace.network, transactions: workspace.transactions },
+        wallet,
+      ),
+    [workspace.network, workspace.transactions, wallet],
   );
   const [query, setQuery] = useState('');
   const [requestedPage, setPage] = useState(0);
