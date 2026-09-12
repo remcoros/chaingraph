@@ -8,6 +8,7 @@
     "react-hooks/set-state-in-render": "error",
     "react-hooks/exhaustive-deps": "warn",
     "react/immutability": "error",
+    "react/purity": "error",
     "eslint/no-control-regex": "error",
     "eslint/no-unused-vars": "error",
     "eslint/no-useless-escape": "error",

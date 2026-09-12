@@ -1600,7 +1600,7 @@ export default function App() {
     setGraphFilters({});
     setLeftTab('entities');
     setMobilePanel('graph');
-    setFocusRequest({ id, token: Date.now() });
+    setFocusRequest((previous) => ({ id, token: (previous?.token ?? 0) + 1 }));
   }
   const startAddressHistoryLoad = useCallback(
     (address: string, force = false) => {
@@ -2807,7 +2807,11 @@ export default function App() {
         'The requested entity cannot be opened directly. Showing its supporting transaction.',
       );
     updateFilters(isolate ? { includeIds: target.ids, preserveContext: true } : {});
-    if (!isolate) setFocusRequest({ id: target.selectedId, token: Date.now() });
+    if (!isolate)
+      setFocusRequest((previous) => ({
+        id: target.selectedId,
+        token: (previous?.token ?? 0) + 1,
+      }));
     setMobilePanel('graph');
     return true;
   }
