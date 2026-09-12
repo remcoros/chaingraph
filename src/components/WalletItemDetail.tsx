@@ -158,13 +158,14 @@ export function WalletItemDetail({
         entry.address === row.address &&
         entry.history?.some((transaction) => !selectionIndex.transactions.has(transaction.tx_hash)),
     );
+  const contextReview = row.reviews.find((item) => item.key === row.key);
   const context = useMemo(
     () =>
       contextId
         ? buildWalletReviewContext(
             workspace,
             wallet,
-            row.reviews.find((item) => item.key === row.key) ?? {
+            contextReview ?? {
               nodeId: row.nodeId,
               txid: row.txid,
             },
@@ -173,14 +174,7 @@ export function WalletItemDetail({
             walletAddresses,
           )
         : undefined,
-    [
-      selectionIndex,
-      walletAddresses,
-      row.nodeId,
-      row.key,
-      row.reviews.find((item) => item.key === row.key)?.evidence,
-      contextId,
-    ],
+    [selectionIndex, walletAddresses, row.nodeId, row.key, contextReview?.evidence, contextId],
   );
   const onVisibleInputsChange = useCallback(
     (inputs: readonly WalletReviewFlowEntry[]) => {
