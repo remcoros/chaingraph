@@ -42,6 +42,7 @@ describe('contextual transaction flow', () => {
     expect(index.resolve('out:a:0', 'a')).toBe(a);
     expect(index.resolve('out:a:0', 'unrelated')).toBe(a);
     expect(index.resolve('out:a:0')).toBe(a);
+    expect(index.spenders.get('out:a:0')).toEqual(['b']);
   });
 
   it('uses observed input links with unknown prevouts and leaves address/background selections neutral', () => {

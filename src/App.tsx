@@ -2913,19 +2913,13 @@ export default function App() {
     unconnectedForRemoval,
   ]);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
-  // Single pass over every graph link, memoized: this ran filter+map across the
-  // whole link set on each render, including on every keystroke in the lookup field.
-  const selectedSpenders = useMemo(() => {
-    if (selected?.kind !== 'output') return [];
-    const spenders: string[] = [];
-    for (const link of graph.links)
-      if (link.kind === 'spends' && link.source === selected.id) spenders.push(link.target);
-    return spenders;
-  }, [selected?.kind, selected?.id, graph.links]);
+  const selectedSpenderTxids =
+    selected?.kind === 'output' ? (flowIndex.spenders.get(selected.id) ?? []) : [];
   const openSpendingFromToolbar = () => {
     if (!selectedId) return;
-    if (selectedSpenders.length === 1) select(selectedSpenders[0], { preserveCamera: true });
-    else if (selectedSpenders.length > 1) {
+    if (selectedSpenderTxids.length === 1)
+      select(txNodeId(selectedSpenderTxids[0]), { preserveCamera: true });
+    else if (selectedSpenderTxids.length > 1) {
       change(
         (current) => ({
           ...current,
@@ -2995,7 +2989,7 @@ export default function App() {
         )
       }
       canOpenCreatingTx={!!tx || canTrace}
-      canOpenSpendingTx={selectedSpenders.length > 0 || canTrace}
+      canOpenSpendingTx={selectedSpenderTxids.length > 0 || canTrace}
       onOpenCreatingTx={() => void expand('funding', selectedId, { preserveCamera: true })}
       onOpenSpendingTx={openSpendingFromToolbar}
       canShowSelection={toolbarSelection.some((id) => !canvasIds.has(id))}
