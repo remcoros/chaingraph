@@ -157,29 +157,27 @@ export function buildWalletRelationshipRows(
     const reason = direction === 'source' ? 'source-address' : 'destination-address';
     const addresses = direction === 'source' ? counterparties.sources : counterparties.destinations;
     const directionItems = items.filter((item) => item.reason === reason);
-    return [
-      ...addresses.map((group) =>
-        decorateWalletRow(
-          {
-            key: group.id,
-            nodeId: group.id,
-            identifier: group.address,
-            title: short(group.address),
-            kind: 'address',
-            address: group.address,
-            description: `${group.count} distinct observed outputs in ${group.transactionIds.length} one-hop transaction contexts. Labels, tags and review decisions apply to this address only. The observed total is not an allocated payment or balance.`,
-            meta: `${group.count} outpoint${group.count === 1 ? '' : 's'} · ${group.transactionIds.length} transaction${group.transactionIds.length === 1 ? '' : 's'}`,
-            contextTransactionIds: group.transactionIds,
-            outpointIds: group.outpointIds,
-            relationshipDirection: direction,
-            ownership: group.ownership,
-            amountSats: group.amountSats,
-          },
-          workspace,
-          directionItems,
-        ),
+    return addresses.map((group) =>
+      decorateWalletRow(
+        {
+          key: group.id,
+          nodeId: group.id,
+          identifier: group.address,
+          title: short(group.address),
+          kind: 'address',
+          address: group.address,
+          description: `${group.count} distinct observed outputs in ${group.transactionIds.length} one-hop transaction contexts. Labels, tags and review decisions apply to this address only. The observed total is not an allocated payment or balance.`,
+          meta: `${group.count} outpoint${group.count === 1 ? '' : 's'} · ${group.transactionIds.length} transaction${group.transactionIds.length === 1 ? '' : 's'}`,
+          contextTransactionIds: group.transactionIds,
+          outpointIds: group.outpointIds,
+          relationshipDirection: direction,
+          ownership: group.ownership,
+          amountSats: group.amountSats,
+        },
+        workspace,
+        directionItems,
       ),
-    ];
+    );
   };
   return { sources: project('source'), destinations: project('destination') };
 }
