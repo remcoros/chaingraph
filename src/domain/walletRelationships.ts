@@ -106,7 +106,9 @@ export function validOutputIndex(value: number | undefined): value is number {
 }
 
 /** Ignore inconsistent map keys rather than borrowing another transaction's outputs. */
-export function loadedWalletTransactions(workspace: Workspace): Map<string, Transaction> {
+export function loadedWalletTransactions(
+  workspace: Pick<Workspace, 'transactions'>,
+): Map<string, Transaction> {
   const transactions = new Map<string, Transaction>();
   for (const [key, transaction] of Object.entries(workspace.transactions)) {
     const txid = canonicalTransactionId(transaction.txid);
@@ -381,7 +383,10 @@ export function groupWalletRelationships(
 
 /** Loaded creating and spending contexts verified against this address's script.
  * History membership and display metadata alone never add a context. */
-export function listLoadedAddressTransactionIds(workspace: Workspace, address: string): string[] {
+export function listLoadedAddressTransactionIds(
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  address: string,
+): string[] {
   let scripthash: string;
   try {
     scripthash = addressToScriptHash(address, workspace.network);

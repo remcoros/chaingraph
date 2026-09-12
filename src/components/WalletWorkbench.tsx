@@ -432,8 +432,15 @@ function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: b
     ? undefined
     : (retainedRow ?? resolveWalletRow(filteredRows, selectedKey, previousRow.current));
   const selectedRow = useMemo(
-    () => (currentRow ? walletRowWithContext(workspace, currentRow, selectionIndex) : undefined),
-    [selectionIndex, currentRow],
+    () =>
+      currentRow
+        ? walletRowWithContext(
+            { network: workspace.network, transactions: workspace.transactions },
+            currentRow,
+            selectionIndex,
+          )
+        : undefined,
+    [workspace.network, workspace.transactions, selectionIndex, currentRow],
   );
   const selectionKeys = useMemo(() => new Set(selection.ids), [selection.ids]);
   const rowKeys = useMemo(() => new Set(rows.map((row) => row.key)), [rows]);

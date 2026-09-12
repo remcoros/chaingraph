@@ -77,7 +77,7 @@ export function walletRowTags(workspace: Workspace, row: WalletRow) {
 }
 
 export function walletRowWithContext(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
   row: WalletRow,
   index?: WalletSelectionIndex,
 ): WalletRow {
