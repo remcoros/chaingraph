@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, EyeOff, Layers, X } from 'lucide-react';
 import type { Transaction } from '../domain/types';
@@ -39,9 +39,11 @@ export function VisibilityActions({
     setOpen(next);
     onOpenChange?.(next);
   };
-  useEffect(() => () => onOpenChange?.(false), []);
+  const notifyOpenChange = useEffectEvent((next: boolean) => onOpenChange?.(next));
+  useEffect(() => () => notifyOpenChange(false), []);
   useEffect(() => {
-    setMenu(false);
+    setOpen(false);
+    notifyOpenChange(false);
   }, [nodeId]);
   if (!onSetHidden) return null;
   return (

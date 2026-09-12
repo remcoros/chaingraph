@@ -8,7 +8,7 @@ import { useUtxoStatus } from '../lib/useUtxoStatus';
 import './utxo-status.css';
 import { TransactionBlockTime } from './TransactionBlockTime';
 import { transactionStatus } from '../domain/transactionStatus';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -67,13 +67,14 @@ export function AnnotationEditor({
   const editGroup = useRef('');
   const labelRef = useRef<HTMLInputElement>(null);
   const previousEditToken = useRef<number | undefined>(undefined);
+  const handleEditHandled = useEffectEvent(() => onEditHandled?.());
   useEffect(() => {
     if (editTarget !== 'icon' && editToken && editToken !== previousEditToken.current) {
       labelRef.current?.focus();
-      onEditHandled?.();
+      handleEditHandled();
     }
     previousEditToken.current = editToken;
-  }, [editToken]);
+  }, [editToken, editTarget]);
   return (
     <section
       className="panel-section annotation-editor"
