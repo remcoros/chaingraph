@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
 import {
   addressNodeId,
@@ -157,15 +157,19 @@ export function SelectedTags({
   const [open, setOpen] = useState(false);
   const [removal, setRemoval] = useState<{ tag: WorkspaceTag; anchor: HTMLElement } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const [triggerAnchor, setTriggerAnchor] = useState<HTMLButtonElement | null>(null);
+  const handleOpenHandled = useEffectEvent(() => onOpenHandled?.());
   useEffect(() => {
     setOpen(false);
     setRemoval(null);
   }, [workspace.id, selected.id]);
   useEffect(() => {
     if (!openToken) return;
-    trigger.current?.focus();
+    const currentTrigger = trigger.current;
+    currentTrigger?.focus();
+    setTriggerAnchor(currentTrigger);
     setOpen(true);
-    onOpenHandled?.();
+    handleOpenHandled();
   }, [openToken]);
   const id = useId();
   return (
@@ -180,7 +184,10 @@ export function SelectedTags({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? id : undefined}
-          onClick={() => setOpen((current) => !current)}
+          onClick={(event) => {
+            setTriggerAnchor(event.currentTarget);
+            setOpen((current) => !current);
+          }}
         >
           <Plus size={13} /> Add
         </button>
@@ -195,7 +202,9 @@ export function SelectedTags({
                 title={tag.name}
                 aria-label={`Edit assignment for ${tag.name}`}
                 onClick={() => {
-                  trigger.current?.focus();
+                  const currentTrigger = trigger.current;
+                  currentTrigger?.focus();
+                  setTriggerAnchor(currentTrigger);
                   setOpen(true);
                 }}
               >
@@ -229,11 +238,11 @@ export function SelectedTags({
           ))}
         </div>
       )}
-      {open && trigger.current && (
+      {open && triggerAnchor && (
         <TagAssignmentPicker
           key={selected.id}
           id={id}
-          anchor={trigger.current}
+          anchor={triggerAnchor}
           workspace={workspace}
           selected={selected}
           onChange={onChange}
@@ -513,9 +522,10 @@ export default function TagsPanel({
   onSelect: (id: string) => void;
 }) {
   const loadedIds = useMemo(() => new Set(graph.nodes.map((node) => node.id)), [graph]);
+  const selectedId = selected?.id;
   const targetIds = useMemo(
-    () => [...new Set(selectedIds?.length ? selectedIds : selected ? [selected.id] : [])],
-    [selectedIds, selected?.id],
+    () => [...new Set(selectedIds?.length ? selectedIds : selectedId ? [selectedId] : [])],
+    [selectedIds, selectedId],
   );
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);

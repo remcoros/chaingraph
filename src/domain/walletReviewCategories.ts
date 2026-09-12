@@ -73,7 +73,12 @@ const metadataCategories = [
   },
 ] as const;
 
-function effectiveMetadata(workspace: Workspace, item: WalletReviewItem) {
+export type WalletReviewCategoryWorkspace = Pick<
+  Workspace,
+  'annotations' | 'tags' | 'findings' | 'walletReviews'
+>;
+
+function effectiveMetadata(workspace: WalletReviewCategoryWorkspace, item: WalletReviewItem) {
   const label = (workspace.annotations[item.nodeId]?.label ?? item.label).trim();
   const tags = listTagsForNode(workspace, {
     id: item.nodeId,
@@ -88,7 +93,10 @@ function effectiveMetadata(workspace: Workspace, item: WalletReviewItem) {
   return { labelled: !!label, tagged: tags.some((tag) => !!tag.name.trim()) };
 }
 
-function algorithmFor(workspace: Workspace, item: WalletReviewItem): string | undefined {
+function algorithmFor(
+  workspace: Pick<WalletReviewCategoryWorkspace, 'findings'>,
+  item: WalletReviewItem,
+): string | undefined {
   if (item.reason !== 'link') return undefined;
   return (
     item.algorithm ??
@@ -96,7 +104,10 @@ function algorithmFor(workspace: Workspace, item: WalletReviewItem): string | un
   );
 }
 
-function categoryIds(workspace: Workspace, item: WalletReviewItem): Set<string> {
+function categoryIds(
+  workspace: WalletReviewCategoryWorkspace,
+  item: WalletReviewItem,
+): Set<string> {
   const ids = new Set<string>([item.reason]);
   if (item.reason === 'counterparty' || item.reason === 'funding-source')
     ids.add('saved-output-reviews');
@@ -120,7 +131,7 @@ function categoryIds(workspace: Workspace, item: WalletReviewItem): Set<string> 
 /** Every supported category is present, including zero counts. Supply candidates
  * after other filters but before category selection; overlapping counts are intentional. */
 export function walletReviewCategories(
-  workspace: Workspace,
+  workspace: WalletReviewCategoryWorkspace,
   items: readonly WalletReviewItem[],
 ): WalletReviewCategory[] {
   const counts = new Map<string, number>();
@@ -164,7 +175,7 @@ export function walletReviewCategories(
 export function matchesReviewCategories(
   item: WalletReviewItem,
   selected: readonly string[] | ReadonlySet<string>,
-  workspace: Workspace,
+  workspace: WalletReviewCategoryWorkspace,
 ): boolean {
   const ids = categoryIds(workspace, item);
   for (const id of selected) if (ids.has(id)) return true;
@@ -185,7 +196,7 @@ export interface WalletReviewCategoryScanState {
 /** Scan execution is session state, separate from category counts. An absent
  * report never establishes that an algorithm ran and found zero results. */
 export function walletReviewCategoryScanState(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'findings'>,
   scan?: AnalysisScan,
 ): WalletReviewCategoryScanState {
   const tools: WalletReviewCategoryScanState['tools'] = analysisTools.map((tool) => {

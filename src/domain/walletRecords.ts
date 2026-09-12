@@ -1,5 +1,5 @@
 import { addressToScriptHash } from '../lib/wallet';
-import type { Network, Transaction, TxOutput, Wallet, WalletAddress, Workspace } from './types';
+import type { Network, Transaction, Wallet, WalletAddress, Workspace } from './types';
 import { outputNodeId, sats } from './types';
 import { indexPreviousOutputs, outputScriptHash } from './prevouts';
 
@@ -25,7 +25,10 @@ export interface WalletAddressRecord extends WalletAddress {
 }
 
 /** An address claim must agree with its network and recorded Electrum hash. */
-export function verifiedWalletAddresses(wallet: Wallet, network: Network): WalletAddress[] {
+export function verifiedWalletAddresses(
+  wallet: Pick<Wallet, 'addresses'>,
+  network: Network,
+): WalletAddress[] {
   const unique = new Map<string, WalletAddress>();
   for (const address of wallet.addresses) {
     try {
@@ -41,7 +44,10 @@ export function verifiedWalletAddresses(wallet: Wallet, network: Network): Walle
 /** Count received outputs in the local transaction snapshot, including spent
  * outputs. This is neither a complete history count nor an unspent balance.
  */
-export function listWalletAddresses(workspace: Workspace, wallet: Wallet): WalletAddressRecord[] {
+export function listWalletAddresses(
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  wallet: Pick<Wallet, 'addresses'>,
+): WalletAddressRecord[] {
   const records = verifiedWalletAddresses(wallet, workspace.network).map((address) => ({
     ...address,
     loadedOutputCount: 0,
@@ -63,8 +69,8 @@ export function listWalletAddresses(workspace: Workspace, wallet: Wallet): Walle
  * matches add directly received/spent outputs, never unrelated co-inputs.
  */
 export function listWalletTransactions(
-  workspace: Workspace,
-  wallet: Wallet,
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  wallet: Pick<Wallet, 'addresses'>,
 ): WalletTransactionRecord[] {
   const addresses = verifiedWalletAddresses(wallet, workspace.network);
   const hashes = new Set(addresses.map((address) => address.scripthash));

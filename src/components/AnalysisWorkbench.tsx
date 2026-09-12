@@ -22,6 +22,9 @@ import {
   scanAnalysis,
   scanDefaults,
   type AnalysisScan,
+  type AnalysisScopeSelection,
+  type AnalysisScopeWallet,
+  type AnalysisScopeWorkspace,
 } from '../domain/analysisScan';
 import { formatLocalTimestamp } from '../domain/transactionTime';
 import {
@@ -199,7 +202,14 @@ export function AnalysisWorkbench({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(saved?.notice ?? '');
   const [graphNotice, setGraphNotice] = useState<{ findingId: string; message: string }>();
-  const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
+  const prevouts = useMemo(
+    () =>
+      indexPreviousOutputs({
+        network: workspace.network,
+        transactions: workspace.transactions,
+      }),
+    [workspace.network, workspace.transactions],
+  );
   const pending = useRef<AbortController | undefined>(undefined);
   const latest = useRef(workspace);
   latest.current = workspace;
@@ -216,14 +226,24 @@ export function AnalysisWorkbench({
     },
     [cache, workspace.id],
   );
-  const evidence = useRef(workspace);
+  const evidence = useRef({
+    id: workspace.id,
+    network: workspace.network,
+    transactions: workspace.transactions,
+    wallets: workspace.wallets,
+  });
   useEffect(() => {
     const dataChanged =
       evidence.current.id !== workspace.id ||
       evidence.current.network !== workspace.network ||
       evidence.current.transactions !== workspace.transactions ||
       walletEvidenceChanged(evidence.current.wallets, workspace.wallets);
-    evidence.current = workspace;
+    evidence.current = {
+      id: workspace.id,
+      network: workspace.network,
+      transactions: workspace.transactions,
+      wallets: workspace.wallets,
+    };
     if (pending.current && (!active || dataChanged)) {
       pending.current.abort();
       pending.current = undefined;
@@ -261,23 +281,59 @@ export function AnalysisWorkbench({
     notice,
     limit,
   ]);
-  const { mode, selectionLabel, hasSelection, scope, walletUnavailable } = useMemo(
-    () => analysisScopeChoice(workspace, scopeMode, selected, wallet),
+  const analysisScopeWorkspace = useMemo<AnalysisScopeWorkspace>(
+    () => ({
+      network: workspace.network,
+      transactions: workspace.transactions,
+      wallets: workspace.wallets,
+    }),
+    [workspace.network, workspace.transactions, workspace.wallets],
+  );
+  const scopeSelectedId = selected?.id;
+  const scopeSelectedKind = selected?.kind;
+  const scopeSelectedTxid = selected?.txid;
+  const scopeSelectedVout = selected?.vout;
+  const scopeSelectedAddress = selected?.address;
+  const analysisScopeSelection = useMemo<AnalysisScopeSelection | undefined>(
+    () =>
+      scopeSelectedId === undefined || scopeSelectedKind === undefined
+        ? undefined
+        : {
+            id: scopeSelectedId,
+            kind: scopeSelectedKind,
+            txid: scopeSelectedTxid,
+            vout: scopeSelectedVout,
+            address: scopeSelectedAddress,
+          },
     [
-      workspace.id,
-      workspace.network,
-      workspace.transactions,
-      workspace.wallets,
-      selected?.id,
-      selected?.kind,
-      selected?.txid,
-      selected?.vout,
-      selected?.address,
-      wallet?.id,
-      wallet?.name,
-      wallet?.addresses,
-      scopeMode,
+      scopeSelectedId,
+      scopeSelectedKind,
+      scopeSelectedTxid,
+      scopeSelectedVout,
+      scopeSelectedAddress,
     ],
+  );
+  const walletName = wallet?.name;
+  const walletAddresses = wallet?.addresses;
+  const analysisScopeWallet = useMemo<AnalysisScopeWallet | undefined>(
+    () =>
+      walletName === undefined
+        ? undefined
+        : {
+            name: walletName,
+            addresses: walletAddresses ?? [],
+          },
+    [walletName, walletAddresses],
+  );
+  const { mode, selectionLabel, hasSelection, scope, walletUnavailable } = useMemo(
+    () =>
+      analysisScopeChoice(
+        analysisScopeWorkspace,
+        scopeMode,
+        analysisScopeSelection,
+        analysisScopeWallet,
+      ),
+    [analysisScopeWorkspace, scopeMode, analysisScopeSelection, analysisScopeWallet],
   );
   const selectionUnavailable = (mode === 'context' && !hasSelection) || walletUnavailable;
   const changed =
@@ -424,8 +480,13 @@ export function AnalysisWorkbench({
   const recoveryScope = scan?.scope ?? scope;
   const recoverScripts = (scan?.options ?? options)['script-types']?.scriptMode !== 'outputs';
   const scopeGaps = useMemo(
-    () => analysisDataGaps(workspace, recoveryScope.txids, recoverScripts),
-    [workspace.transactions, recoveryScope, recoverScripts],
+    () =>
+      analysisDataGaps(
+        { network: workspace.network, transactions: workspace.transactions },
+        recoveryScope.txids,
+        recoverScripts,
+      ),
+    [workspace.network, workspace.transactions, recoveryScope, recoverScripts],
   );
   const detailTxids =
     detail?.scopeTxids ?? detail?.txids.filter((id) => workspace.transactions[id]) ?? [];

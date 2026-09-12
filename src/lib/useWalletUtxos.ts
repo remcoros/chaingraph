@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { Wallet, Workspace } from '../domain/types';
 import type { WalletUtxoRecord } from '../domain/walletRecords';
 import { fetchWalletUtxos } from './walletUtxos';
@@ -108,7 +108,13 @@ export function useWalletUtxos({
   enabled: boolean;
 }): WalletUtxoController {
   const scope = useMemo(
-    () => ({}),
+    () => ({
+      workspaceId: workspace?.id,
+      network: workspace?.network,
+      walletId: wallet?.id,
+      addresses: wallet?.addresses,
+      scannedAt: wallet?.scannedAt,
+    }),
     [workspace?.id, workspace?.network, wallet?.id, wallet?.addresses, wallet?.scannedAt],
   );
   const activeScope = useRef(scope);
@@ -152,6 +158,10 @@ export function useWalletUtxos({
     });
   }
 
+  const startAutomaticCheck = useEffectEvent(() => {
+    if (enabled && !attempted.current) void check();
+  });
+
   useEffect(() => {
     request.current?.abort();
     request.current = undefined;
@@ -164,7 +174,7 @@ export function useWalletUtxos({
   }, [scope]);
 
   useEffect(() => {
-    if (enabled && !attempted.current) void check();
+    startAutomaticCheck();
     return () => {
       if (request.current) {
         request.current.abort();

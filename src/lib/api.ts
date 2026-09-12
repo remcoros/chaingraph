@@ -88,7 +88,7 @@ export async function rpc<T>(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ network, target, method, params }),
     signal,
-  }).catch((error: unknown) => {
+  }).catch(() => {
     signal?.throwIfAborted();
     throw new RpcError('Backend request unavailable.', undefined, undefined, 'backend-unavailable');
   });

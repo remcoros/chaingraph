@@ -12,7 +12,6 @@ import {
   short,
   txNodeId,
   type AnalysisFinding,
-  type Transaction,
   type Wallet,
   type Workspace,
 } from './types';
@@ -692,7 +691,7 @@ export function applyReviewDecisions(
   now = new Date().toISOString(),
 ): Workspace {
   if (!items.length) return workspace;
-  const reviews = { ...(workspace.walletReviews ?? {}) };
+  const reviews = { ...workspace.walletReviews };
   const acknowledged = new Set<string>();
   let changed = false;
   for (const item of items) {

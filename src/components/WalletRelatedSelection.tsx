@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { CheckSquare, ChevronDown } from 'lucide-react';
 import { AnchoredPopover } from './AnchoredPopover';
 import { matchRelatedEntities } from '../domain/walletReviewContext';
@@ -23,7 +23,7 @@ export function WalletRelatedSelection({
   onSelect: (ids: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   useEffect(() => {
     if (!active) setOpen(false);
@@ -34,17 +34,19 @@ export function WalletRelatedSelection({
   return (
     <>
       <button
-        ref={trigger}
         aria-haspopup="dialog"
         aria-expanded={open && active}
-        onClick={() => setOpen(!open)}
+        onClick={(event) => {
+          setTrigger(event.currentTarget);
+          setOpen((wasOpen) => !wasOpen);
+        }}
       >
         <CheckSquare size={13} /> Select related <ChevronDown size={12} />
       </button>
-      {open && active && (
+      {open && active && trigger && (
         <AnchoredPopover
           id={id}
-          anchor={trigger.current!}
+          anchor={trigger}
           title="Select related results"
           onClose={() => setOpen(false)}
           width={300}

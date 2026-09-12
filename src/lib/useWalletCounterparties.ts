@@ -1,29 +1,48 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   createWalletCounterpartyLoader,
+  type WalletCounterpartyConfiguration,
   type WalletCounterpartyOptions,
+  type WalletCounterpartyWorkspace,
 } from './walletCounterparties';
 
 export type { WalletCounterpartyOptions, WalletCounterpartyState } from './walletCounterparties';
 
-export function useWalletCounterparties(options: WalletCounterpartyOptions) {
+export function useWalletCounterparties({
+  workspace,
+  wallet,
+  groups,
+  active,
+  enabled,
+  fetch,
+  update,
+}: WalletCounterpartyOptions) {
   const [current] = useState(() => createWalletCounterpartyLoader());
   const state = useSyncExternalStore(current.subscribe, current.getSnapshot, current.getSnapshot);
+  const evidence = useMemo<WalletCounterpartyWorkspace>(
+    () => ({
+      id: workspace.id,
+      network: workspace.network,
+      wallets: workspace.wallets,
+      transactions: workspace.transactions,
+    }),
+    [workspace.id, workspace.network, workspace.wallets, workspace.transactions],
+  );
+  const options = useMemo<WalletCounterpartyConfiguration>(
+    () => ({
+      workspace: evidence,
+      wallet: { id: wallet.id },
+      groups,
+      active,
+      enabled,
+      fetch,
+      update,
+    }),
+    [evidence, wallet.id, groups, active, enabled, fetch, update],
+  );
   useEffect(() => {
     current.configure(options);
-  }, [
-    current,
-    options.workspace.id,
-    options.workspace.network,
-    options.workspace.transactions,
-    options.wallet.id,
-    options.wallet.addresses,
-    options.groups,
-    options.active,
-    options.enabled,
-    options.fetch,
-    options.update,
-  ]);
+  }, [current, options]);
   useEffect(() => () => current.stop(), [current]);
   return { ...state, loadMore: current.loadMore, retry: current.retry };
 }

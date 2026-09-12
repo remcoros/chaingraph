@@ -2,11 +2,11 @@ import { deduplicateScanRuns } from './connectionScanGroups';
 import { z } from 'zod';
 import type { ScanResult, ScanRun } from './connectionScan';
 import { SCAN_LIMITS, scanPathHops, isScanNodeId } from './connectionScan';
-import { addGraphNodes, ensureGraphMembership } from './graphMembership';
+import { addGraphNodes } from './graphMembership';
 import { indexPreviousOutputs, previousOutputsConflict } from './prevouts';
 import type { Transaction, Workspace } from './types';
 import { outputNodeId } from './types';
-import { clearContextProvenance } from './workspace';
+import { buildGraph, clearContextProvenance, type GraphEvidenceWorkspace } from './workspace';
 
 export const MAX_SCAN_EVIDENCE_TRANSACTIONS = 200;
 export const MAX_SCAN_RECORD_BYTES = 2 * 1024 * 1024;
@@ -15,6 +15,12 @@ export interface ConnectionScanRecords {
   runs: ScanRun[];
   evidence: Record<string, Transaction>;
 }
+
+/** Evidence needed to preview one retained scan path without subscribing to presentation state. */
+export type ScanPathWorkspace = GraphEvidenceWorkspace &
+  Pick<Workspace, 'connectionScans'> & {
+    view: Pick<Workspace['view'], 'showAddresses' | 'graphNodeIds'>;
+  };
 const txid = z.string().regex(/^[0-9a-f]{64}$/);
 const nodeId = z
   .string()
@@ -551,8 +557,8 @@ export function dismissScanResult(
 }
 
 const membershipCache = new WeakMap<string[], Set<string>>();
-function scanMembership(workspace: Workspace): Set<string> {
-  const ids = ensureGraphMembership(workspace).view.graphNodeIds!;
+function scanMembership(workspace: ScanPathWorkspace): Set<string> {
+  const ids = workspace.view.graphNodeIds ?? buildGraph(workspace).nodes.map((node) => node.id);
   let membership = membershipCache.get(ids);
   if (!membership) {
     membership = new Set(ids);
@@ -562,7 +568,7 @@ function scanMembership(workspace: Workspace): Set<string> {
 }
 
 export function prepareScanPath(
-  workspace: Workspace,
+  workspace: ScanPathWorkspace,
   result: ScanResult,
   prefixLength = result.path.length,
 ) {

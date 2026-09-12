@@ -3,7 +3,10 @@ import type { Transaction, Workspace } from '../domain/types';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from './api';
 
 /** A hidden entity is still a valid trace source; a removed branch is not. */
-export function traceSourceExists(workspace: Workspace, nodeId: string): boolean {
+export function traceSourceExists(
+  workspace: Pick<Workspace, 'transactions'>,
+  nodeId: string,
+): boolean {
   const [kind, txid, index] = nodeId.split(':');
   if (kind === 'tx') return !!workspace.transactions[txid];
   if (kind !== 'out') return false;

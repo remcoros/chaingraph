@@ -41,6 +41,33 @@ import { walletReviewGuidance, walletSubjectTitle } from '../domain/walletReview
 
 export type WalletDecisionAction = 'reviewed' | 'later' | 'reopen';
 
+/** The selected context already receives indexes and verified addresses. */
+function selectedWalletReviewContext(
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  wallet: Pick<Wallet, 'addresses'>,
+  subject: { nodeId: string; txid?: string; nodeIds?: readonly string[]; reason?: string },
+  contextId: string,
+  selectionIndex: WalletSelectionIndex,
+  walletAddresses: WalletSelectionAddresses,
+) {
+  return buildWalletReviewContext(
+    workspace,
+    wallet,
+    subject,
+    contextId,
+    selectionIndex,
+    walletAddresses,
+  );
+}
+
+function selectedWalletRelatedRecords(
+  workspace: Pick<Workspace, 'network' | 'transactions' | 'findings'>,
+  row: WalletRow,
+  selectionIndex: WalletSelectionIndex,
+) {
+  return walletRelatedRecords(workspace, row, selectionIndex);
+}
+
 export function WalletDecisionButtons({
   items,
   busy,
@@ -158,15 +185,22 @@ export function WalletItemDetail({
         entry.address === row.address &&
         entry.history?.some((transaction) => !selectionIndex.transactions.has(transaction.tx_hash)),
     );
+  const contextReview = row.reviews.find((item) => item.key === row.key);
+  const contextReviewNodeId = contextReview?.nodeId;
+  const contextReviewTxid = contextReview?.txid;
+  const contextReviewNodeIds = contextReview?.nodeIds;
+  const contextReviewReason = contextReview?.reason;
   const context = useMemo(
     () =>
       contextId
-        ? buildWalletReviewContext(
-            workspace,
-            wallet,
-            row.reviews.find((item) => item.key === row.key) ?? {
-              nodeId: row.nodeId,
-              txid: row.txid,
+        ? selectedWalletReviewContext(
+            { network: workspace.network, transactions: workspace.transactions },
+            { addresses: wallet.addresses },
+            {
+              nodeId: contextReviewNodeId ?? row.nodeId,
+              txid: contextReviewTxid ?? row.txid,
+              nodeIds: contextReviewNodeIds,
+              reason: contextReviewReason,
             },
             contextId,
             selectionIndex,
@@ -174,12 +208,18 @@ export function WalletItemDetail({
           )
         : undefined,
     [
+      workspace.network,
+      workspace.transactions,
+      wallet.addresses,
+      contextReviewNodeId,
+      contextReviewTxid,
+      contextReviewNodeIds,
+      contextReviewReason,
+      row.nodeId,
+      row.txid,
+      contextId,
       selectionIndex,
       walletAddresses,
-      row.nodeId,
-      row.key,
-      row.reviews.find((item) => item.key === row.key)?.evidence,
-      contextId,
     ],
   );
   const onVisibleInputsChange = useCallback(
@@ -265,8 +305,17 @@ export function WalletItemDetail({
           ? 'Review later'
           : 'Not reviewed';
   const related = useMemo(
-    () => walletRelatedRecords(workspace, row, selectionIndex),
-    [selectionIndex, row, finding],
+    () =>
+      selectedWalletRelatedRecords(
+        {
+          network: workspace.network,
+          transactions: workspace.transactions,
+          findings: workspace.findings,
+        },
+        row,
+        selectionIndex,
+      ),
+    [workspace.network, workspace.transactions, workspace.findings, row, selectionIndex],
   );
   return (
     <>

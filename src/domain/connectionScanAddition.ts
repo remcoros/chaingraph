@@ -1,5 +1,10 @@
 import type { ScanResult } from './connectionScan';
-import { addScanPath, prepareScanPath, scanContextPath } from './connectionScanRecords';
+import {
+  addScanPath,
+  prepareScanPath,
+  scanContextPath,
+  type ScanPathWorkspace,
+} from './connectionScanRecords';
 import { ensureGraphMembership } from './graphMembership';
 import { indexPreviousOutputs, type PreviousOutputIndex } from './prevouts';
 import { outputNodeId, type Workspace } from './types';
@@ -22,7 +27,7 @@ const previousOutputIndexes = new WeakMap<
 >();
 
 /** Card plans share an index while their immutable transaction and evidence maps are unchanged. */
-function additionPreviousOutputs(workspace: Workspace): PreviousOutputIndex {
+function additionPreviousOutputs(workspace: ScanPathWorkspace): PreviousOutputIndex {
   const evidence = workspace.connectionScans?.evidence ?? emptyEvidence;
   let byEvidence = previousOutputIndexes.get(workspace.transactions);
   if (!byEvidence) {
@@ -43,7 +48,7 @@ function additionPreviousOutputs(workspace: Workspace): PreviousOutputIndex {
   }));
 }
 
-function addedTransactionConflicts(workspace: Workspace, txid: string): boolean {
+function addedTransactionConflicts(workspace: ScanPathWorkspace, txid: string): boolean {
   const transaction = workspace.transactions[txid] ?? workspace.connectionScans?.evidence[txid];
   if (!transaction) return false;
   const index = additionPreviousOutputs(workspace);
@@ -61,7 +66,7 @@ function addedTransactionConflicts(workspace: Workspace, txid: string): boolean 
 
 /** The terminal creator is display context, included in Add without changing saved search hops. */
 function prepareScanPrimaryPath(
-  workspace: Workspace,
+  workspace: ScanPathWorkspace,
   result: ScanResult,
   prefixLength = result.path.length,
 ) {
@@ -80,7 +85,7 @@ function prepareScanPrimaryPath(
 
 /** Full connection actions include both routes; a partial prefix stays explicitly bounded. */
 export function prepareScanPathAddition(
-  workspace: Workspace,
+  workspace: ScanPathWorkspace,
   result: ScanResult,
   prefixLength = result.path.length,
 ) {

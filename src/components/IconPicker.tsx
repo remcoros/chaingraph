@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { useDialogFocus } from './Dialogs';
 import { MetadataPopover } from './MetadataEditors';
@@ -84,11 +84,12 @@ export function IconPicker({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const [triggerElement, setTriggerElement] = useState<HTMLButtonElement | null>(null);
+  const handleOpenHandled = useEffectEvent(() => onOpenHandled?.());
   useEffect(() => {
     if (!openToken || disabled) return;
     trigger.current?.focus();
     setOpen(true);
-    onOpenHandled?.();
+    handleOpenHandled();
   }, [openToken, disabled]);
   useEffect(() => {
     if (disabled) setOpen(false);

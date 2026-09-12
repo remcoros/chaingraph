@@ -146,10 +146,11 @@ export function useFlowInputs(options: {
         : undefined,
     [flowWorkspace, selected, related, prevouts],
   );
-  const plan = plans?.selected;
+  const selectedPlan = plans?.selected;
+  const allPlan = plans?.all;
   const target =
     options.workspace && options.selected
-      ? `${options.workspace.id}:${options.workspace.network}:${plan?.transactionId ?? ''}:${options.selected.id}`
+      ? `${options.workspace.id}:${options.workspace.network}:${selectedPlan?.transactionId ?? ''}:${options.selected.id}`
       : '';
   const enabled = options.enabled && options.workspace?.view.transactionFlow?.open !== false;
   const [attempt, setAttempt] = useState(0);
@@ -157,22 +158,22 @@ export function useFlowInputs(options: {
   const allInputs = bulkTarget === target;
   // Returning to an earlier selection must not silently repeat a bulk action.
   useEffect(() => setBulkTarget(''), [target]);
-  const missingInputCount = plans?.all.missing.length ?? 0;
+  const missingInputCount = allPlan?.missing.length ?? 0;
   const [state, setState] = useState({ target: '', loading: false, error: '' });
+  const activePlan = allInputs ? allPlan : selectedPlan;
+  const hasMissingInputs = (activePlan?.missing.length ?? 0) > 0;
   useEffect(() => {
     if (!target || !enabled) return;
     const { workspace, selected, fetch, update } = latest.current;
     if (!workspace) return;
-    const { transactionId, missing } = (allInputs ? plans?.all : plans?.selected)!;
+    if (!activePlan) return;
+    const { transactionId, missing } = activePlan;
     update(
       workspace.id,
       (current) => mergeFlowInputs(current, transactionId, selected, [], allInputs),
       false,
     );
-    if (!missing.length) {
-      setState({ target, loading: false, error: '' });
-      return;
-    }
+    if (!missing.length) return;
     const controller = new AbortController();
     setState({ target, loading: true, error: '' });
     // Pin the displayed transaction before parent arrivals can change related-transaction ordering.
@@ -238,15 +239,15 @@ export function useFlowInputs(options: {
         });
     });
     return () => controller.abort();
-  }, [target, enabled, attempt, allInputs]);
+  }, [target, enabled, attempt, allInputs, activePlan]);
   return {
     missingInputCount,
     onLoadAllInputs: () => {
       setBulkTarget(target);
       setAttempt((value) => value + 1);
     },
-    inputLoading: enabled && state.target === target && state.loading,
-    inputError: state.target === target ? state.error : '',
+    inputLoading: enabled && hasMissingInputs && state.target === target && state.loading,
+    inputError: hasMissingInputs && state.target === target ? state.error : '',
     onRetryInputs: () => setAttempt((value) => value + 1),
   };
 }

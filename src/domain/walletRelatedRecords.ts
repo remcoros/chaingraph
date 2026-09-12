@@ -11,7 +11,7 @@ export interface WalletRelatedRecords {
 }
 
 export function walletRelatedRecords(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'network' | 'transactions' | 'findings'>,
   row: WalletRow,
   index?: WalletSelectionIndex,
 ): WalletRelatedRecords {

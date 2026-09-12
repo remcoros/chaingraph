@@ -11,8 +11,8 @@ export interface WalletUtxoObservation {
 
 /** Positive evidence only. An absent record says nothing about spend status. */
 export function resolveWalletUtxoObservation(
-  workspace: Workspace | undefined,
-  wallet: Wallet | undefined,
+  workspace: Pick<Workspace, 'id' | 'network' | 'transactions'> | undefined,
+  wallet: Pick<Wallet, 'addresses'> | undefined,
   view: { records: WalletUtxoRecord[]; checkedAt: string } | undefined,
   selectedId: string | undefined,
 ): WalletUtxoObservation | undefined {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Tag, TextCursorInput } from 'lucide-react';
 import { IconPicker } from './IconPicker';
 import {
@@ -43,9 +43,7 @@ export function BatchMetadataBar({
 }: BatchMetadataBarProps) {
   const [openState, setOpen] = useState<'label' | 'tags' | 'notes' | undefined>();
   const [replaceIcons, setReplaceIcons] = useState(false);
-  const labelTrigger = useRef<HTMLButtonElement>(null);
-  const noteTrigger = useRef<HTMLButtonElement>(null);
-  const tagTrigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
   const [previousScopeKey, setPreviousScopeKey] = useState(scopeKey);
   const open = active && previousScopeKey === scopeKey ? openState : undefined;
@@ -76,17 +74,19 @@ export function BatchMetadataBar({
       <div className="batch-actions">
         <div className="batch-popover-anchor">
           <button
-            ref={labelTrigger}
             className={guidedActions?.includes('label') ? 'wallet-guided-action' : undefined}
             aria-haspopup="dialog"
             aria-expanded={open === 'label'}
             disabled={disabled}
-            onClick={() => setOpen(open === 'label' ? undefined : 'label')}
+            onClick={(event) => {
+              setTrigger(event.currentTarget);
+              setOpen(open === 'label' ? undefined : 'label');
+            }}
           >
             <TextCursorInput size={14} /> Label
           </button>
-          {open === 'label' && (
-            <MetadataPopover anchor={labelTrigger.current!} onClose={() => setOpen(undefined)}>
+          {open === 'label' && trigger && (
+            <MetadataPopover anchor={trigger} onClose={() => setOpen(undefined)}>
               <BatchLabelEditor
                 workspace={workspace}
                 ids={ids}
@@ -102,21 +102,19 @@ export function BatchMetadataBar({
         </div>
         <div className="batch-popover-anchor">
           <button
-            ref={tagTrigger}
             className={guidedActions?.includes('tags') ? 'wallet-guided-action' : undefined}
             aria-haspopup="dialog"
             aria-expanded={open === 'tags'}
             disabled={disabled}
-            onClick={() => setOpen(open === 'tags' ? undefined : 'tags')}
+            onClick={(event) => {
+              setTrigger(event.currentTarget);
+              setOpen(open === 'tags' ? undefined : 'tags');
+            }}
           >
             <Tag size={14} /> Tags
           </button>
-          {open === 'tags' && (
-            <MetadataPopover
-              anchor={tagTrigger.current!}
-              compact
-              onClose={() => setOpen(undefined)}
-            >
+          {open === 'tags' && trigger && (
+            <MetadataPopover anchor={trigger} compact onClose={() => setOpen(undefined)}>
               <BatchTagEditor
                 workspace={workspace}
                 ids={ids}
@@ -132,16 +130,18 @@ export function BatchMetadataBar({
         {single && ids.length === 1 && (
           <div className="batch-popover-anchor">
             <button
-              ref={noteTrigger}
               aria-haspopup="dialog"
               aria-expanded={open === 'notes'}
               disabled={disabled}
-              onClick={() => setOpen(open === 'notes' ? undefined : 'notes')}
+              onClick={(event) => {
+                setTrigger(event.currentTarget);
+                setOpen(open === 'notes' ? undefined : 'notes');
+              }}
             >
               Notes
             </button>
-            {open === 'notes' && (
-              <MetadataPopover anchor={noteTrigger.current!} onClose={() => setOpen(undefined)}>
+            {open === 'notes' && trigger && (
+              <MetadataPopover anchor={trigger} onClose={() => setOpen(undefined)}>
                 <EntityNoteEditor
                   key={scopeKey}
                   workspace={workspace}

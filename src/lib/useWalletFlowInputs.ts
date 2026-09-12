@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { PreviousOutputIndex } from '../domain/prevouts';
 import type { Network, Transaction, Workspace } from '../domain/types';
 import type { WalletReviewFlowEntry } from '../domain/walletReviewContext';
@@ -82,8 +82,11 @@ export function useWalletFlowInputs(options: Options) {
     if (scope !== scopeState) setScopeState(scope);
   }, [scope, scopeState]);
   const attempted = new Set(scope.attempted);
-  const failed = new Set(scope.failed);
-  const missingOutputs = new Set(scope.missingOutputs);
+  const currentScope = useEffectEvent(() => ({
+    attempted: new Set(scope.attempted),
+    failed: new Set(scope.failed),
+    missingOutputs: new Set(scope.missingOutputs),
+  }));
   const plan = walletFlowInputPlan(
     options.workspace,
     options.walletId,
@@ -97,9 +100,11 @@ export function useWalletFlowInputs(options: Options) {
   const [state, setState] = useState({ key: '', loading: false, error: '' });
   useEffect(() => {
     if (!options.enabled || !source) return;
-    const ownedAttempted = new Set(attempted);
-    const ownedFailed = new Set(failed);
-    const ownedMissingOutputs = new Set(missingOutputs);
+    const {
+      attempted: ownedAttempted,
+      failed: ownedFailed,
+      missingOutputs: ownedMissingOutputs,
+    } = currentScope();
     const { workspace, walletId, transactionId, inputs, fetch, update } = latest.current;
     const controller = new AbortController();
     const active = () =>

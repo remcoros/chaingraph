@@ -134,7 +134,7 @@ export function useWalletScan(options: WalletScanOptions) {
     } else if (scan && changed) {
       setMessage('Data changed · Scan again');
     }
-  }, [options.active, options.workspace]);
+  }, [options.active, options.workspace, scan]);
   useEffect(() => () => pending.current?.abort(), []);
 
   async function run(row?: WalletRow) {

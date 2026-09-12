@@ -743,7 +743,20 @@ export function clearContextProvenance(
   return { ...promoted, contextTransactionIds: remaining.length ? remaining : undefined };
 }
 
-export function buildGraph(workspace: Workspace): GraphData {
+export type GraphEvidenceWorkspace = Pick<
+  Workspace,
+  | 'network'
+  | 'transactions'
+  | 'inputContext'
+  | 'findings'
+  | 'annotations'
+  | 'addressBalances'
+  | 'watchedAddresses'
+> & {
+  view: Pick<Workspace['view'], 'showAddresses'>;
+};
+
+export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
   const nodes = new Map<string, GraphNode>();
   const links = new Map<string, GraphData['links'][number]>();
   const addressBalanceValue = (address: string) => {

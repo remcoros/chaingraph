@@ -91,7 +91,7 @@ function outpoint(id: string): { txid: string; vout: number } | undefined {
   return match ? { txid: match[1], vout: Number(match[2]) } : undefined;
 }
 
-function canonicalId(id: string, workspace: Workspace): string | undefined {
+function canonicalId(id: string, workspace: Pick<Workspace, 'network'>): string | undefined {
   try {
     return canonicalEntityNodeId(id, workspace.network);
   } catch {
@@ -103,8 +103,8 @@ function canonicalId(id: string, workspace: Workspace): string | undefined {
  * graph widening, automatic downloads or inferred input-to-output value mapping.
  * Wallet address derivation was verified at the workspace import/scan boundary. */
 export function buildWalletReviewContext(
-  workspace: Workspace,
-  wallet: Wallet,
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  wallet: Pick<Wallet, 'addresses'>,
   item: WalletReviewContextSubject,
   contextTransactionId?: string,
   index?: WalletSelectionIndex,

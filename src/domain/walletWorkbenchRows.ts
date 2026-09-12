@@ -60,7 +60,7 @@ export interface WalletRow {
   ownership?: 'wallet' | 'external' | 'unknown';
 }
 
-export function walletRowFinding(workspace: Workspace, row: WalletRow) {
+export function walletRowFinding(workspace: Pick<Workspace, 'findings'>, row: WalletRow) {
   const review = row.reviews.find((item) => item.reason === 'link' && item.key === row.key);
   return review
     ? workspace.findings.find((finding) => review.key.endsWith(`|link|${finding.id}`))
@@ -77,7 +77,7 @@ export function walletRowTags(workspace: Workspace, row: WalletRow) {
 }
 
 export function walletRowWithContext(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
   row: WalletRow,
   index?: WalletSelectionIndex,
 ): WalletRow {
@@ -148,7 +148,7 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
 }
 
 export function buildWalletRelationshipRows(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'walletReviews'>,
   groups: WalletAddressRelationships,
   items: readonly WalletReviewItem[],
 ): Record<'sources' | 'destinations', WalletRow[]> {
@@ -157,36 +157,34 @@ export function buildWalletRelationshipRows(
     const reason = direction === 'source' ? 'source-address' : 'destination-address';
     const addresses = direction === 'source' ? counterparties.sources : counterparties.destinations;
     const directionItems = items.filter((item) => item.reason === reason);
-    return [
-      ...addresses.map((group) =>
-        decorateWalletRow(
-          {
-            key: group.id,
-            nodeId: group.id,
-            identifier: group.address,
-            title: short(group.address),
-            kind: 'address',
-            address: group.address,
-            description: `${group.count} distinct observed outputs in ${group.transactionIds.length} one-hop transaction contexts. Labels, tags and review decisions apply to this address only. The observed total is not an allocated payment or balance.`,
-            meta: `${group.count} outpoint${group.count === 1 ? '' : 's'} · ${group.transactionIds.length} transaction${group.transactionIds.length === 1 ? '' : 's'}`,
-            contextTransactionIds: group.transactionIds,
-            outpointIds: group.outpointIds,
-            relationshipDirection: direction,
-            ownership: group.ownership,
-            amountSats: group.amountSats,
-          },
-          workspace,
-          directionItems,
-        ),
+    return addresses.map((group) =>
+      decorateWalletRow(
+        {
+          key: group.id,
+          nodeId: group.id,
+          identifier: group.address,
+          title: short(group.address),
+          kind: 'address',
+          address: group.address,
+          description: `${group.count} distinct observed outputs in ${group.transactionIds.length} one-hop transaction contexts. Labels, tags and review decisions apply to this address only. The observed total is not an allocated payment or balance.`,
+          meta: `${group.count} outpoint${group.count === 1 ? '' : 's'} · ${group.transactionIds.length} transaction${group.transactionIds.length === 1 ? '' : 's'}`,
+          contextTransactionIds: group.transactionIds,
+          outpointIds: group.outpointIds,
+          relationshipDirection: direction,
+          ownership: group.ownership,
+          amountSats: group.amountSats,
+        },
+        workspace,
+        directionItems,
       ),
-    ];
+    );
   };
   return { sources: project('source'), destinations: project('destination') };
 }
 
 export function decorateWalletRow(
   row: Omit<WalletRow, 'reviews' | 'status' | 'changed'>,
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'walletReviews'>,
   items: readonly WalletReviewItem[],
   fallbackReviewKey?: string,
 ): WalletRow {
@@ -207,8 +205,8 @@ export function decorateWalletRow(
 }
 
 export function buildWalletRecordRows(
-  workspace: Workspace,
-  wallet: Wallet,
+  workspace: Pick<Workspace, 'network' | 'transactions' | 'walletReviews'>,
+  wallet: Pick<Wallet, 'id' | 'addresses'>,
   utxos: readonly WalletUtxoRecord[],
   reviewItems: readonly WalletReviewItem[],
   tab: 'utxos' | 'transactions' | 'addresses' | 'all' = 'all',

@@ -5,7 +5,14 @@
   "categories": {},
   "rules": {
     "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn",
+    "react-hooks/set-state-in-render": "error",
+    "react-hooks/exhaustive-deps": "error",
+    "react/preserve-manual-memoization": "error",
+    "react/immutability": "error",
+    "react/purity": "error",
+    "eslint/no-control-regex": "error",
+    "eslint/no-unused-vars": "error",
+    "eslint/no-useless-escape": "error",
     "react/jsx-key": "error",
     "react/no-array-index-key": "off",
     "react/no-danger": "error",
@@ -13,7 +20,10 @@
     "react-perf/jsx-no-new-array-as-prop": "off",
     "react-perf/jsx-no-new-function-as-prop": "off",
     "oxc/no-async-await": "off",
-    "unicorn/no-array-for-each": "off"
+    "unicorn/no-array-for-each": "off",
+    "unicorn/no-useless-fallback-in-spread": "error",
+    "unicorn/no-useless-spread": "error",
+    "unicorn/prefer-string-starts-ends-with": "error"
   },
   "ignorePatterns": ["dist/**", "node_modules/**", "artifacts/**", "test-results/**", "public/**"]
 }

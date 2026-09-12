@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, Wallet } from 'lucide-react';
 import { selectedWalletFilterIds, type GraphFilters } from '../domain/graphFilters';
 import { AnchoredPopover } from './AnchoredPopover';
@@ -90,7 +90,7 @@ export function GraphWalletFilter({
   ...props
 }: WalletFilterProps & { active?: boolean }) {
   const [openState, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   const count = selectedWalletFilterIds(props.filters).length;
   if (!active && openState) setOpen(false);
@@ -98,7 +98,6 @@ export function GraphWalletFilter({
   return (
     <>
       <button
-        ref={trigger}
         type="button"
         className={`graph-filter-trigger ${count ? 'active' : ''}`}
         aria-label={count ? `Wallets, ${count} selected` : 'Wallets'}
@@ -106,16 +105,19 @@ export function GraphWalletFilter({
         aria-haspopup="dialog"
         aria-expanded={active && open}
         aria-controls={active && open ? id : undefined}
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          setTrigger(event.currentTarget);
+          setOpen((value) => !value);
+        }}
       >
         <Wallet size={14} /> Wallets
         {count > 0 && <span className="graph-filter-count">{count}</span>}
         <ChevronDown size={12} />
       </button>
-      {active && open && trigger.current && (
+      {active && open && trigger && (
         <AnchoredPopover
           id={id}
-          anchor={trigger.current}
+          anchor={trigger}
           title="Wallets"
           width={320}
           onClose={() => setOpen(false)}

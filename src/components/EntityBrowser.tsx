@@ -1,6 +1,14 @@
 import { Amount } from './Amount';
 import { TransactionBlockTime, TransactionFeeLabel } from './TransactionBlockTime';
-import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from 'react';
 import {
   ArrowRightFromLine,
   ArrowUpDown,
@@ -67,28 +75,30 @@ function EntitySortButton({
   onChange: (sort: EntitySort) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   const current = SORT_OPTIONS.find((option) => option.value === sort);
   return (
     <>
       <button
-        ref={trigger}
         type="button"
         className={`entity-sort-trigger ${sort !== 'graph' ? 'active' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         title="Sort the entity list"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          setTrigger(event.currentTarget);
+          setOpen((value) => !value);
+        }}
       >
         <ArrowUpDown size={12} />
         <span>{current?.label ?? 'Sort'}</span>
       </button>
-      {open && trigger.current && (
+      {open && trigger && (
         <AnchoredPopover
           id={id}
-          anchor={trigger.current}
+          anchor={trigger}
           title="Sort entities"
           width={200}
           className="entity-sort-popover"
@@ -228,10 +238,13 @@ export default function EntityBrowser({
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
   }, [activePage, filterKey, sort, visibility]);
-  useEffect(() => {
+  const showSelectedPage = useEffectEvent(() => {
     if (!selectedId) return;
     const index = sorted.findIndex((node) => node.id === selectedId);
     if (index >= 0) setPage(Math.floor(index / pageSize));
+  });
+  useEffect(() => {
+    showSelectedPage();
     // Follow explicit selection changes without undoing the user's next-page action.
   }, [selectedId]);
   const activeFilters = hasActiveFilters(filters) || extraFiltersActive;

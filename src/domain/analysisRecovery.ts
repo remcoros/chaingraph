@@ -34,7 +34,11 @@ const validPoint = (input: TxInput) =>
   input.vout! <= 0xffffffff;
 
 /** Same resolver as the analyses: attached evidence counts without loading parents. */
-export function analysisDataGaps(workspace: Workspace, txids: readonly string[], scripts = true) {
+export function analysisDataGaps(
+  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  txids: readonly string[],
+  scripts = true,
+) {
   const index = indexPreviousOutputs(workspace);
   return [...new Set(txids)].sort().flatMap((txid) => {
     const tx = workspace.transactions[txid];

@@ -85,7 +85,7 @@ export function loadNetworkConfig(network: Network, env: NodeJS.ProcessEnv): Net
   if (!['true', 'false'].includes(env.CHAINGRAPH_USE_TXOSPENDERINDEX ?? 'false'))
     throw new Error('Invalid configuration: CHAINGRAPH_USE_TXOSPENDERINDEX');
   const electrumHost = required(env, 'FULCRUM_HOST');
-  if (electrumHost.length > 253 || /[\s\/@?#]/.test(electrumHost))
+  if (electrumHost.length > 253 || /[\s/@?#]/.test(electrumHost))
     throw new Error('Invalid configuration: FULCRUM_HOST');
   required(env, 'FULCRUM_PORT');
   return Object.freeze({
@@ -135,7 +135,7 @@ export function loadConfig(
     }
   }
   const host = env.SERVER_HOST ?? '127.0.0.1';
-  if (!host || host.length > 253 || /[\s\/@?#]/.test(host))
+  if (!host || host.length > 253 || /[\s/@?#]/.test(host))
     throw new Error('Invalid configuration: SERVER_HOST');
   return Object.freeze({
     networks: Object.freeze(

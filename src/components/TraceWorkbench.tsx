@@ -20,7 +20,6 @@ import {
   continuationHint,
   loadedSpenders,
   searchTraceSpenders,
-  selectedOutpoint,
   traceId,
   TRACE_CANDIDATE_LIMIT,
   TRACE_TIMEOUT_MS,
@@ -57,22 +56,38 @@ export function TraceWorkbench({
   onAnnotate,
   renderMetadata,
 }: TraceWorkbenchProps) {
-  const point = selectedOutpoint(selected);
+  const selectedKind = selected?.kind;
+  const selectedTxid = selected?.txid;
+  const selectedVout = selected?.vout;
+  const point = useMemo(
+    () =>
+      selectedKind === 'output' && selectedTxid !== undefined && selectedVout !== undefined
+        ? { txid: selectedTxid, vout: selectedVout }
+        : undefined,
+    [selectedKind, selectedTxid, selectedVout],
+  );
   const pointId = point && traceId(point);
   const sourceExists = useMemo(
-    () => !!pointId && traceSourceExists(workspace, pointId),
+    () => !!pointId && traceSourceExists({ transactions: workspace.transactions }, pointId),
     [workspace.transactions, pointId],
   );
   const creator = point && workspace.transactions[point.txid];
-  const prevouts = useMemo(() => indexPreviousOutputs(workspace), [workspace.transactions]);
+  const prevouts = useMemo(
+    () =>
+      indexPreviousOutputs({
+        network: workspace.network,
+        transactions: workspace.transactions,
+      }),
+    [workspace.network, workspace.transactions],
+  );
   const resolution = point && resolvePreviousOutput(workspace, point, prevouts);
   const output =
     resolution && (resolution.status === 'loaded' || resolution.status === 'attached')
       ? resolution.output
       : undefined;
   const spenders = useMemo(
-    () => (point ? loadedSpenders(workspace, point) : []),
-    [workspace.transactions, pointId],
+    () => (point ? loadedSpenders({ transactions: workspace.transactions }, point) : []),
+    [workspace.transactions, point],
   );
   const [choices, setChoices] = useState<Choices>();
   const [branch, setBranch] = useState('');
@@ -128,7 +143,7 @@ export function TraceWorkbench({
           ? previous
           : [...previous, { point, via: 'Selected output' }].slice(-TRACE_TRAIL_LIMIT),
       );
-  }, [pointId, active]);
+  }, [point, active]);
 
   function go(next: TraceOutpoint, via: string) {
     request.current?.abort();

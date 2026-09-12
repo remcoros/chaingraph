@@ -37,6 +37,7 @@ import {
   readGraphPalette,
   resolveGraphHit,
   type NodePresentation,
+  type GraphPresentationInput,
 } from './graph/presentation';
 import { GraphPresentationUpdates } from './graph/presentationUpdates';
 
@@ -377,14 +378,49 @@ export default function GraphView(props: GraphViewProps) {
     () => buildGraphPresentationIndex(props.nodes, props.links),
     [props.nodes, props.links],
   );
-  const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), [adapterFactory]);
+  const presentationInput = useMemo<GraphPresentationInput>(
+    () => ({
+      nodes: props.nodes,
+      links: props.links,
+      dimensions: props.dimensions,
+      selectedId: props.selectedId,
+      batchSelectedIds: props.batchSelectedIds,
+      sizeBy: props.sizeBy,
+      glow: props.glow,
+      showLabels: props.showLabels,
+      showTags: props.showTags,
+      showIcons: props.showIcons,
+      nodePresentation: props.nodePresentation,
+      flowContext: props.flowContext,
+    }),
+    [
+      props.nodes,
+      props.links,
+      props.dimensions,
+      props.selectedId,
+      props.batchSelectedIds,
+      props.sizeBy,
+      props.glow,
+      props.showLabels,
+      props.showTags,
+      props.showIcons,
+      props.nodePresentation,
+      props.flowContext,
+    ],
+  );
+  const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), []);
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
     const update = () => {
       const adapter = graphRef.current;
       if (adapter)
-        presentationUpdates.update(adapter, props, readGraphPalette(element), presentationIndex);
+        presentationUpdates.update(
+          adapter,
+          presentationInput,
+          readGraphPalette(element),
+          presentationIndex,
+        );
     };
     update();
     // Accent changes affect canvas colors as well as CSS, without replacing the renderer.
@@ -394,23 +430,7 @@ export default function GraphView(props: GraphViewProps) {
       attributeFilter: ['data-accent-theme'],
     });
     return () => observer.disconnect();
-  }, [
-    adapterFactory,
-    presentationUpdates,
-    presentationIndex,
-    props.nodes,
-    props.links,
-    props.dimensions,
-    props.selectedId,
-    props.batchSelectedIds,
-    props.sizeBy,
-    props.glow,
-    props.showLabels,
-    props.showTags,
-    props.showIcons,
-    props.nodePresentation,
-    props.flowContext,
-  ]);
+  }, [adapterFactory, presentationUpdates, presentationIndex, presentationInput]);
 
   useEffect(() => {
     if (props.fitToken === lastFitToken.current) return;
@@ -471,6 +491,8 @@ export default function GraphView(props: GraphViewProps) {
     hoveredNode?.kind === 'output'
       ? (loadedSpenders.get(`${hoveredNode.txid}:${hoveredNode.vout}`) ?? 0)
       : 0;
+  const hasHover = hover !== undefined;
+  const hasHoveredNode = hoveredNode !== undefined;
   const traceReason = props.busy
     ? 'Another operation is running.'
     : hoveredNode?.kind === 'output' && transaction
@@ -478,7 +500,7 @@ export default function GraphView(props: GraphViewProps) {
       : props.traceDisabledReason;
 
   useEffect(() => {
-    if (hover && !hoveredNode) dismissCard();
+    if (hasHover && !hasHoveredNode) dismissCard();
     const card = cardRef.current;
     const container = containerRef.current;
     if (!card || !container) return;
@@ -497,7 +519,7 @@ export default function GraphView(props: GraphViewProps) {
     observer.observe(card);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [hover?.id, hover?.type, Boolean(hoveredNode)]);
+  }, [hasHover, hasHoveredNode]);
 
   return (
     <div className="graph-view" data-testid="graph-view" onPointerLeave={scheduleCardClose}>

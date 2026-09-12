@@ -1,6 +1,6 @@
 import { formatBitcoinAmount } from '../domain/amountFormat';
 import { Amount } from './Amount';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Box,
@@ -233,9 +233,10 @@ function FlowColumn({
     key === 'scriptPubKey' ? undefined : value,
   );
   const reportsVisible = !!onVisibleEntriesChange;
+  const reportVisibleEntries = useEffectEvent(() => onVisibleEntriesChange?.(visible));
   useEffect(() => {
-    onVisibleEntriesChange?.(visible);
-  }, [visibleKey, reportsVisible, onVisibleEntriesChange]);
+    reportVisibleEntries();
+  }, [visibleKey, reportsVisible]);
   useLayoutEffect(() => {
     const container = list.current;
     const selected = container?.querySelector<HTMLElement>('.is-selected');
