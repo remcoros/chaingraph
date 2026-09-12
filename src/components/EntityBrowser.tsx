@@ -67,28 +67,30 @@ function EntitySortButton({
   onChange: (sort: EntitySort) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
   const current = SORT_OPTIONS.find((option) => option.value === sort);
   return (
     <>
       <button
-        ref={trigger}
         type="button"
         className={`entity-sort-trigger ${sort !== 'graph' ? 'active' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         title="Sort the entity list"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          setTrigger(event.currentTarget);
+          setOpen((value) => !value);
+        }}
       >
         <ArrowUpDown size={12} />
         <span>{current?.label ?? 'Sort'}</span>
       </button>
-      {open && trigger.current && (
+      {open && trigger && (
         <AnchoredPopover
           id={id}
-          anchor={trigger.current}
+          anchor={trigger}
           title="Sort entities"
           width={200}
           className="entity-sort-popover"
