@@ -8,6 +8,7 @@
     "react-hooks/set-state-in-render": "error",
     "react-hooks/exhaustive-deps": "warn",
     "react/immutability": "error",
+    "eslint/no-control-regex": "error",
     "react/jsx-key": "error",
     "react/no-array-index-key": "off",
     "react/no-danger": "error",

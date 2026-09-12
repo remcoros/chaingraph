@@ -41,6 +41,18 @@ export function isOpReturn(hex?: string): hex is string {
   return hex?.slice(0, 2).toLowerCase() === '6a';
 }
 
+function hasBinaryControlCharacter(text: string): boolean {
+  return Array.from(text).some((character) => {
+    const codePoint = character.codePointAt(0)!;
+    return (
+      (codePoint >= 0 && codePoint <= 8) ||
+      (codePoint >= 11 && codePoint <= 12) ||
+      (codePoint >= 14 && codePoint <= 31) ||
+      (codePoint >= 127 && codePoint <= 159)
+    );
+  });
+}
+
 /** Inspect literal push data only. Never executes a script or interprets a protocol. */
 export function decodeOpReturn(hex?: string): OpReturnData | undefined {
   if (!isOpReturn(hex)) return undefined;
@@ -91,7 +103,7 @@ export function decodeOpReturn(hex?: string): OpReturnData | undefined {
     const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
     const text = chunks.map((chunk) => decoder.decode(chunk));
     // A valid UTF-8 encoding can still be binary data. Keep these bytes as hex.
-    if (text.some((part) => /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u.test(part)))
+    if (text.some(hasBinaryControlCharacter))
       return result(`0x${dataHex}`, dataHex, 'hex', byteLength, chunks.length);
     let escaped = false;
     const display = text
