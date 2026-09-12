@@ -543,7 +543,10 @@
 }
 .transaction-view-identity {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 180px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-rule));
   border-radius: 9px;
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper));
@@ -575,44 +578,60 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  flex: 1;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 79px;
   border: 0;
   border-radius: 8px 8px 0 0;
-  padding: 12px 8px;
+  padding: 8px;
   background: transparent;
   font-size: 11px;
-  text-align: center;
+  text-align: left;
 }
-.transaction-identity-select > svg {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 16px;
-  height: 16px;
+.transaction-identity-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.transaction-identity-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
   color: var(--color-accent);
 }
-.transaction-identity-select > strong.mono {
+.transaction-identity-icons .transaction-annotation-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.transaction-identity-id {
+  flex: 1;
   min-width: 0;
   max-width: 100%;
+  overflow-wrap: anywhere;
 }
-.transaction-identity-caption {
-  max-width: calc(100% - 36px);
-}
-.transaction-identity-select > span {
+.transaction-identity-io {
+  flex: none;
+  margin-left: auto;
+  align-self: end;
   font-size: 10px;
-  white-space: normal;
   color: var(--color-muted);
+  white-space: nowrap;
 }
-.transaction-identity-select > .transaction-annotation-icon {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  font-size: 16px;
-  line-height: 1;
+.transaction-identity-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.transaction-identity-body > .transaction-block-time {
+  justify-content: flex-start;
+  gap: 0;
 }
 .transaction-identity-label {
   display: -webkit-box;
@@ -633,10 +652,26 @@
   padding: 3px;
   border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-rule));
 }
-.transaction-view-identity > .transaction-block-time {
-  justify-content: center;
-  gap: 2px 0;
-  padding: 0 6px 6px;
+.transaction-identity-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: auto;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.transaction-identity-footer > .transaction-block-time {
+  min-width: 0;
+  gap: 2px 8px;
+}
+.transaction-identity-footer > .transaction-block-time-fee {
+  margin-inline-start: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 .transaction-identity-tools .icon-button {
   min-height: 27px;
@@ -774,9 +809,6 @@
   font-size: 14px;
   line-height: 1;
 }
-.transaction-row.has-annotation-icon .op-return-data {
-  margin-left: 28px;
-}
 .transaction-row-select {
   width: 100%;
   min-width: 0;
@@ -789,9 +821,16 @@
   justify-content: flex-start;
   gap: 5px;
   border-radius: 4px;
+  cursor: pointer;
 }
-.transaction-row-select:disabled {
-  opacity: 1;
+.transaction-row-select:hover {
+  background: var(--color-hover);
+}
+.transaction-row-select:active {
+  background: var(--color-paper);
+}
+.transaction-row.is-selected .transaction-row-select:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-hover));
 }
 .transaction-row-index {
   color: var(--color-muted);
@@ -869,13 +908,15 @@
   font-size: 9px;
   margin-left: auto;
 }
-.transaction-view .entity-badges {
+.transaction-flow .entity-badges {
   white-space: normal;
+  justify-content: flex-start;
 }
-.transaction-view-identity .entity-badges {
-  justify-content: center;
+.transaction-flow .transaction-identity-body > .entity-badges {
+  align-self: stretch;
+  max-width: 100%;
 }
-.transaction-view .entity-badges > span {
+.transaction-flow .entity-badges > span {
   font-size: 9px;
   padding: 1px 4px;
 }
@@ -894,6 +935,9 @@
   .transaction-view-identity::after {
     width: 7px;
   }
+  .transaction-view-identity {
+    min-height: 0;
+  }
   .transaction-identity-select {
     min-height: 0;
     padding: 6px 3px;
@@ -904,7 +948,7 @@
     min-height: 30px;
     padding: 4px;
   }
-  .transaction-view-identity > .transaction-block-time {
+  .transaction-identity-footer {
     font-size: 9px;
     line-height: 1.3;
   }
@@ -1030,7 +1074,6 @@
   overflow-wrap: anywhere;
 }
 .transaction-row .op-return-data {
-  margin: 0 5px;
   font-size: 10px;
 }
 

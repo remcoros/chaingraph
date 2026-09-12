@@ -17,8 +17,16 @@
 .op-return-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0;
+  text-align: right;
+}
+.op-return-heading > :first-child {
+  margin-inline-start: auto;
+}
+.op-return-heading .copy-control .icon-button {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px;
 }
 .op-return-body pre {
   max-height: 9rem;

@@ -6,7 +6,7 @@ import {
 import { SmallAmountControl } from './SmallAmountControl';
 import { isSmallAmount } from '../domain/smallAmounts';
 import { transactionStatus } from '../domain/transactionStatus';
-import { TransactionBlockTime } from './TransactionBlockTime';
+import { TransactionBlockTime, TransactionFeeLabel } from './TransactionBlockTime';
 import {
   memo,
   useId,
@@ -197,18 +197,30 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
         />
       )}
       <div className="transaction-row-content">
-        <button
-          type="button"
+        <div
           className="transaction-row-select"
-          disabled={!row.id}
+          role={row.id ? 'button' : undefined}
+          tabIndex={row.id ? 0 : undefined}
           aria-label={`${inputs ? 'Input' : 'Output'} ${row.index}${row.id ? `: ${row.id.slice(4)}` : ': Coinbase'}`}
-          aria-pressed={selected}
+          aria-pressed={row.id ? selected : undefined}
           title={row.id ? `${address ? `${address}\n` : ''}${row.id.slice(4)}` : 'Coinbase'}
           onClick={(event) => {
             if (!row.id) return;
+            const target = event.target;
+            if (
+              target instanceof Element &&
+              target.closest('.transaction-row-tools, .op-return-data button')
+            )
+              return;
             if (actions.current.toggleSelection && (event.ctrlKey || event.metaKey))
               actions.current.toggleSelection?.(row.id);
             else actions.current.onSelect(row.id);
+          }}
+          onKeyDown={(event) => {
+            if (!row.id || event.target !== event.currentTarget) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            actions.current.onSelect(row.id);
           }}
         >
           <span className="transaction-row-index">#{row.index}</span>
@@ -234,6 +246,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
               {!row.coinbase && <Amount value={row.output ? sats(row.output.value) : undefined} />}
             </span>
             {label && <span className="transaction-row-label">{label}</span>}
+            {opReturn && <OpReturnData hex={row.output!.scriptPubKey.hex} />}
             {row.coinbase && <span>Newly created coins</span>}
             {selected && belowThreshold && (
               <span
@@ -259,45 +272,44 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
               {icon}
             </span>
           )}
-        </button>
-        {opReturn && <OpReturnData hex={row.output!.scriptPubKey.hex} />}
-      </div>
-      {row.id && (
-        <div className="transaction-row-tools">
-          {!opReturn && (
-            <button
-              type="button"
-              className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
-              aria-label={navigationLabel}
-              title={!loaded && disabledReason ? disabledReason : navigationLabel}
-              disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
-              onClick={navigate}
-            >
-              {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
-            </button>
+          {row.id && (
+            <div className="transaction-row-tools" onClick={(event) => event.stopPropagation()}>
+              {!opReturn && (
+                <button
+                  type="button"
+                  className={`icon-button transaction-row-follow ${loaded ? 'is-loaded' : ''}`}
+                  aria-label={navigationLabel}
+                  title={!loaded && disabledReason ? disabledReason : navigationLabel}
+                  disabled={!loaded && (!!disabledReason || (inputs && inputLoading))}
+                  onClick={navigate}
+                >
+                  {inputs ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
+                </button>
+              )}
+              {offGraph && canShowHidden && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={visibilityLabel}
+                  title={visibilityLabel}
+                  onClick={() => actions.current.onSetHidden?.([row.id!], false)}
+                >
+                  <Eye size={12} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="icon-button transaction-row-edit"
+                aria-label={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
+                title={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
+                onClick={() => actions.current.onEdit(row.id!)}
+              >
+                <Pencil size={12} />
+              </button>
+            </div>
           )}
-          {offGraph && canShowHidden && (
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={visibilityLabel}
-              title={visibilityLabel}
-              onClick={() => actions.current.onSetHidden?.([row.id!], false)}
-            >
-              <Eye size={12} />
-            </button>
-          )}
-          <button
-            type="button"
-            className="icon-button transaction-row-edit"
-            aria-label={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
-            title={`Edit ${inputs ? 'input' : 'output'} ${row.index} annotation`}
-            onClick={() => actions.current.onEdit(row.id!)}
-          >
-            <Pencil size={12} />
-          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 });
@@ -1521,40 +1533,54 @@ export function TransactionView(props: Props) {
                           title={current.tx.txid}
                           onClick={() => onSelect(txNodeId(current.tx.txid))}
                         >
-                          <Box size={25} aria-hidden="true" />
-                          {workspace.annotations[txNodeId(current.tx.txid)]?.icon && (
-                            <span
-                              className="transaction-annotation-icon"
-                              role="img"
-                              aria-label={`Annotation icon: ${workspace.annotations[txNodeId(current.tx.txid)].icon}`}
-                            >
-                              {workspace.annotations[txNodeId(current.tx.txid)].icon}
+                          <span className="transaction-identity-titlebar">
+                            <span className="transaction-identity-icons">
+                              <Box size={16} aria-hidden="true" />
+                              {workspace.annotations[txNodeId(current.tx.txid)]?.icon && (
+                                <span
+                                  className="transaction-annotation-icon"
+                                  role="img"
+                                  aria-label={`Annotation icon: ${workspace.annotations[txNodeId(current.tx.txid)].icon}`}
+                                >
+                                  {workspace.annotations[txNodeId(current.tx.txid)].icon}
+                                </span>
+                              )}
+                              {workspace.annotations[txNodeId(current.tx.txid)]?.bookmarked && (
+                                <Bookmark size={14} aria-label="Bookmarked" />
+                              )}
                             </span>
-                          )}
-                          <span className="transaction-identity-caption" title="Inputs / outputs">
-                            {current.role === 'Selected'
-                              ? 'Transaction'
-                              : `${current.role} transaction`}{' '}
-                            ({current.tx.vin.length} / {current.tx.vout.length})
-                          </span>
-                          <strong className="mono">
-                            <ResponsiveIdentifier value={current.tx.txid} preferFull />
-                          </strong>
-                          {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
-                            <strong
-                              className="transaction-identity-label"
-                              title={workspace.annotations[txNodeId(current.tx.txid)].label}
-                            >
-                              {workspace.annotations[txNodeId(current.tx.txid)].label}
+                            <strong className="mono transaction-identity-id">
+                              <ResponsiveIdentifier value={current.tx.txid} />
                             </strong>
-                          )}
-                          {props.renderMetadata?.(txNodeId(current.tx.txid))}
+                            <span
+                              className="transaction-identity-io"
+                              title="Inputs / outputs"
+                              aria-label={`${current.tx.vin.length} inputs / ${current.tx.vout.length} outputs`}
+                            >
+                              {current.tx.vin.length}/{current.tx.vout.length}
+                            </span>
+                          </span>
+                          <span className="transaction-identity-body">
+                            <TransactionBlockTime
+                              transaction={current.tx}
+                              workspace={workspace}
+                              showFee={false}
+                              separateStatusAndTime
+                            />
+                            {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
+                              <strong
+                                className="transaction-identity-label"
+                                title={workspace.annotations[txNodeId(current.tx.txid)].label}
+                              >
+                                {workspace.annotations[txNodeId(current.tx.txid)].label}
+                              </strong>
+                            )}
+                            {props.renderMetadata?.(txNodeId(current.tx.txid))}
+                          </span>
+                          <span className="transaction-identity-footer">
+                            <TransactionFeeLabel transaction={current.tx} workspace={workspace} />
+                          </span>
                         </button>
-                        <TransactionBlockTime
-                          transaction={current.tx}
-                          workspace={workspace}
-                          separateStatusAndTime
-                        />
                         <div
                           className="transaction-identity-tools"
                           role="group"

@@ -29,23 +29,26 @@ export function TransactionBlockTime({
   timestampOnly = false,
   showFee = true,
   separateStatusAndTime = false,
+  showTimestamp = true,
 }: {
   transaction?: Transaction;
   workspace?: Pick<Workspace, 'network' | 'transactions'>;
   timestampOnly?: boolean;
   showFee?: boolean;
   separateStatusAndTime?: boolean;
+  showTimestamp?: boolean;
 }) {
   const status = transactionStatus(transaction);
   const time = transactionBlockTime(transaction);
   const explicitFeeSeparator =
     timestampOnly &&
+    showTimestamp &&
     showFee &&
     !!time &&
     !!transaction &&
     !!workspace &&
     status.kind === 'confirmed';
-  if (timestampOnly && !time) return null;
+  if (timestampOnly && (!time || !showTimestamp)) return null;
   return (
     <span
       className={`transaction-block-time${separateStatusAndTime || explicitFeeSeparator ? ' transaction-block-time-separated' : ''}`}
@@ -56,7 +59,7 @@ export function TransactionBlockTime({
           ·
         </span>
       )}
-      {time && (
+      {showTimestamp && time && (
         <time
           dateTime={time.iso}
           title={`Block timestamp: ${time.exact}. Not the exact payment time.`}
@@ -64,12 +67,14 @@ export function TransactionBlockTime({
           {time.compact}
         </time>
       )}
-      {time && showFee && transaction && workspace && (
+      {showTimestamp && time && showFee && transaction && workspace && (
         <span className="transaction-block-time-separator" aria-hidden="true">
           ·
         </span>
       )}
-      {time && showFee && <TransactionFeeLabel transaction={transaction} workspace={workspace} />}
+      {showTimestamp && time && showFee && (
+        <TransactionFeeLabel transaction={transaction} workspace={workspace} />
+      )}
     </span>
   );
 }
