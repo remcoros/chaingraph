@@ -124,7 +124,9 @@ export function ConnectionScanPanel(props: Props) {
     { run: ScanRun; evidence: Record<string, Transaction> } | undefined
   >(undefined);
   const current = useRef(props);
-  current.current = props;
+  useEffect(() => {
+    current.current = props;
+  });
   const runs = workspace.connectionScans?.runs ?? [];
   const scanRuns = mergeScanRunSnapshots(runs, liveRuns).map((item) =>
     presentScanRun(item, dismissed.current.get(item.id) ?? new Set()),

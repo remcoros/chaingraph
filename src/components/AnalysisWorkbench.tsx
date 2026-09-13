@@ -212,7 +212,9 @@ function AnalysisWorkbench({
   );
   const pending = useRef<AbortController | undefined>(undefined);
   const latest = useRef(workspace);
-  latest.current = workspace;
+  useEffect(() => {
+    latest.current = workspace;
+  });
   useEffect(
     () => () => {
       if (!pending.current) return;

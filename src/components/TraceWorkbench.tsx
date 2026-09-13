@@ -109,13 +109,15 @@ export function TraceWorkbench({
     active,
     transactions: workspace.transactions,
   });
-  source.current = {
-    workspaceId: workspace.id,
-    network: workspace.network,
-    pointId,
-    active,
-    transactions: workspace.transactions,
-  };
+  useEffect(() => {
+    source.current = {
+      workspaceId: workspace.id,
+      network: workspace.network,
+      pointId,
+      active,
+      transactions: workspace.transactions,
+    };
+  });
 
   useEffect(() => {
     request.current?.abort();
