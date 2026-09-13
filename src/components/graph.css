@@ -257,12 +257,8 @@
   border-radius: 50%;
 }
 .graph-viewport .graph-legend {
-  right: max(17px, var(--graph-context-right-inset, 17px));
   flex-wrap: wrap;
   row-gap: 5px;
-}
-.graph-flow-context {
-  color: var(--color-ink);
 }
 .graph-flow-key {
   display: inline-block;
