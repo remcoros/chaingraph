@@ -1,9 +1,11 @@
 import type { Workspace } from './types';
+import type { GraphFilters } from './graphFilters';
+import { addGraphNodes } from './graphMembership';
 import { buildGraph, outputAddress, promoteInputContext } from './workspace';
 
-/** Resolve loaded evidence before leaving a finding. Promoting compact context
- * exposes observations already in memory, including unknown input placeholders.
- * It neither downloads parents nor turns missing values into known amounts.
+/** Resolve exact evidence references before leaving a finding, including input
+ * outpoints whose creators are not loaded. Selection can hydrate that one creator
+ * through the normal flow-input path; this pure resolver never fetches or invents values.
  */
 export function resolveGraphHandoff(
   workspace: Workspace,
@@ -40,20 +42,78 @@ export function resolveGraphHandoff(
     ? { ...promoted, view: { ...promoted.view, showAddresses: true } }
     : promoted;
   const available = new Set(buildGraph(next).nodes.map((node) => node.id));
-  // Selecting a missing creator's placeholder starts an automatic parent lookup.
-  // Keep a finding handoff on loaded evidence and show that input in its supporting
-  // transaction's flow, where the user can explicitly choose to investigate it.
   let ids = [...new Set(requestedIds)].filter((id) => available.has(id));
-  let selectableIds = ids.filter((id) => {
-    const output = /^out:([0-9a-f]{64}):[0-9]+$/.exec(id);
-    return !output || !!workspace.transactions[output[1]];
-  });
-  const usedSupportingTransaction = !selectableIds.length;
-  if (usedSupportingTransaction) {
-    selectableIds = supportingTxids.map((txid) => `tx:${txid}`).filter((id) => available.has(id));
-    ids = [...new Set([...ids, ...selectableIds])];
-  }
+  // Findings without entity references can still open their supporting transactions.
+  // Never silently substitute a different entity for an explicitly clicked reference.
+  if (!requestedIds.length)
+    ids = [...new Set(supportingTxids.map((txid) => `tx:${txid}`))].filter((id) =>
+      available.has(id),
+    );
   const hidden = new Set(next.view.hiddenNodeIds);
-  const selectedId = selectableIds.find((id) => !hidden.has(id)) ?? selectableIds[0];
-  return selectedId ? { workspace: next, ids, selectedId, usedSupportingTransaction } : undefined;
+  const selectedId = ids.find((id) => !hidden.has(id)) ?? ids[0];
+  return selectedId ? { workspace: next, ids, selectedId } : undefined;
+}
+
+export interface GraphNavigationOptions {
+  isolate?: boolean;
+  selectedId?: string;
+  /** Tag/wallet scope controls retain their live membership filter. */
+  filters?: GraphFilters;
+}
+
+/** Only explicitly referenced transactions, never their ancestors or other inputs. */
+export function graphNavigationTransactionIds(nodeIds: readonly string[]): string[] {
+  return [
+    ...new Set(
+      nodeIds.flatMap((id) => {
+        const match = /^(?:tx|out):([0-9a-f]{64})(?::[0-9]+)?$/.exec(id);
+        return match ? [match[1]] : [];
+      }),
+    ),
+  ];
+}
+
+/** Shared Show/Isolate preparation. Callers own fetching and wallet verification;
+ * the UI consumes the returned selection and filters and requests explicit centering.
+ */
+export function prepareGraphNavigation(
+  workspace: Workspace,
+  nodeIds: readonly string[],
+  options: GraphNavigationOptions = {},
+) {
+  const ids = [...new Set(nodeIds)];
+  if (!ids.length) return undefined;
+  const selectedId =
+    options.selectedId && ids.includes(options.selectedId) ? options.selectedId : ids[0];
+  const transactionIds = graphNavigationTransactionIds(ids);
+  const admitted = addGraphNodes(promoteInputContext(workspace, transactionIds), ids);
+  const addresses = ids.filter((id) => id.startsWith('addr:')).map((id) => id.slice(5));
+  const filters: GraphFilters =
+    options.filters ??
+    (options.isolate
+      ? ids.length === 1
+        ? { focus: { id: selectedId, hops: 1 } }
+        : { includeIds: ids, preserveContext: true }
+      : {});
+  return {
+    ids,
+    selectedId,
+    filters,
+    workspace: {
+      ...admitted,
+      watchedAddresses: addresses.length
+        ? [...new Set([...admitted.watchedAddresses, ...addresses])]
+        : admitted.watchedAddresses,
+      view: {
+        ...admitted.view,
+        showAddresses: addresses.length > 0 || admitted.view.showAddresses,
+        smallAmountThreshold: undefined,
+        // An outpoint link must expose its input/output row, even when the flow
+        // was collapsed. Missing creators use the existing bounded input loader.
+        transactionFlow: selectedId.startsWith('out:')
+          ? { ...admitted.view.transactionFlow, open: true }
+          : admitted.view.transactionFlow,
+      },
+    },
+  };
 }

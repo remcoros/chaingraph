@@ -9,7 +9,12 @@ import { isScanNodeId } from './domain/connectionScan';
 import { addScanPathAddition, addScanNodeAddition } from './domain/connectionScanAddition';
 import { spendingNotice } from './lib/spendingNotice';
 import { WalletRecordsPanel } from './components/WalletRecordsPanel';
-import { resolveGraphHandoff } from './domain/graphHandoff';
+import {
+  graphNavigationTransactionIds,
+  prepareGraphNavigation,
+  resolveGraphHandoff,
+  type GraphNavigationOptions,
+} from './domain/graphHandoff';
 import { resolveWalletUtxoObservation } from './domain/walletUtxoObservation';
 import { useWalletUtxos } from './lib/useWalletUtxos';
 import {
@@ -1652,37 +1657,27 @@ export default function App() {
       };
     };
     const finish = () => {
-      select(nodeId, { preserveCamera: options.isolate });
+      if (center) showOnGraph(ids, { isolate: options.isolate, selectedId: nodeId });
+      else {
+        select(nodeId);
+        setGraphFilters({});
+      }
       setRightTab(tab);
       if (options.selectionIds) {
         selection.replace(ids.length > 1 ? ids : []);
         selection.setMode(ids.length > 1);
       }
-      if (options.isolate) {
-        prepareIsolation(ids);
-        updateFilters(
-          ids.length === 1
-            ? { focus: { id: nodeId, hops: 1 } }
-            : { includeIds: ids, preserveContext: true },
-        );
-      } else setGraphFilters({});
-      if (center && !options.isolate) setFocusRequest({ id: nodeId, token: Date.now() });
     };
-    if (nodeId.startsWith('addr:')) {
-      ws.update(ownerId, reveal, false);
+    const transactionIds = graphNavigationTransactionIds(ids);
+    if (!transactionIds.length) {
+      if (!center) ws.update(ownerId, reveal, false);
       finish();
       return;
     }
     const transactionId = nodeId.split(':')[1];
     const generation = selectionGeneration.current;
     void run(async (signal) => {
-      const cachedTransaction = ws.getSession(ownerId)?.data.transactions[transactionId];
-      const transaction =
-        cachedTransaction ??
-        (await fetchTransaction(w.network, transactionId, signal, undefined, {
-          scope: fetchScope,
-          priority: 'navigation',
-        }));
+      const loaded = await loadGraphTransactions(ids, signal);
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation) return;
       const current = ws.getSession(ownerId)?.data;
@@ -1692,14 +1687,16 @@ export default function App() {
         wRef.current?.id !== ownerId
       )
         return;
-      if (utxo && !verifyWalletUtxo(utxo, transaction, w.network))
+      const transaction =
+        current.transactions[transactionId] ?? loaded.find((tx) => tx.txid === transactionId);
+      if (utxo && (!transaction || !verifyWalletUtxo(utxo, transaction, w.network)))
         throw new Error(
           'The UTXO response does not match its transaction. Refresh the wallet UTXOs and retry.',
         );
       // Cached navigation promotes graph context without replacing chain evidence.
       // A new transaction still takes the normal history/findings invalidation path.
-      mergeTransactions(ownerId, cachedTransaction ? [] : [transaction], [transactionId]);
-      ws.update(ownerId, reveal, false);
+      mergeTransactions(ownerId, loaded, transactionIds);
+      if (!center) ws.update(ownerId, reveal, false);
       finish();
     });
   }
@@ -2910,6 +2907,35 @@ export default function App() {
     flushActiveGraph();
     setWorkbench(next);
   }
+  function showOnGraph(ids: readonly string[], options: GraphNavigationOptions = {}) {
+    const current = ws.getSession(wRef.current?.id ?? '')?.data;
+    if (!current) return false;
+    const navigation = prepareGraphNavigation(current, ids, options);
+    if (!navigation) return false;
+    ws.update(
+      current.id,
+      (latest) => prepareGraphNavigation(latest, ids, options)!.workspace,
+      false,
+    );
+    // Explicit centering owns this camera move, not Lock or a deferred fit-all.
+    select(navigation.selectedId, { preserveCamera: true, pickTarget: false });
+    setGraphFilters(navigation.filters);
+    setFocusRequest((previous) => ({
+      id: navigation.selectedId,
+      token: (previous?.token ?? 0) + 1,
+    }));
+    setMobilePanel('graph');
+    return true;
+  }
+  async function loadGraphTransactions(ids: readonly string[], signal: AbortSignal) {
+    const current = ws.getSession(w?.id ?? '')?.data;
+    if (!current) return [];
+    const missing = graphNavigationTransactionIds(ids).filter((id) => !current.transactions[id]);
+    if (missing.length > MAX_SCAN_TRANSACTIONS)
+      throw new Error('Select at most 500 missing transactions to show on graph at once.');
+    if (missing.length) setOperation('Loading graph selection…');
+    return mapLimit(missing, 4, (id) => getTransaction(id, signal));
+  }
   function prepareIsolation(ids: string[], preserveFilters = false) {
     cameraPreservedSelection.current = ids[0];
     setFocusRequest(undefined);
@@ -2948,43 +2974,34 @@ export default function App() {
     const current = w && ws.getSession(w.id)?.data;
     if (!current) return false;
     const target = resolveGraphHandoff(current, ids, supportingTxids);
-    if (!target) return false;
     recordHandoffInvoker('analysis');
-    change((latest) => {
-      const resolved = resolveGraphHandoff(latest, ids, supportingTxids);
-      if (!resolved) return latest;
-      const revealed = addGraphNodes(resolved.workspace, [...resolved.ids, resolved.selectedId]);
-      return {
-        ...revealed,
-        view: {
-          ...revealed.view,
-          smallAmountThreshold: undefined,
-          ...(resolved.usedSupportingTransaction
-            ? {
-                transactionFlow: {
-                  ...revealed.view.transactionFlow,
-                  open: true,
-                  transactionId: resolved.selectedId.slice(3),
-                },
-              }
-            : {}),
-        },
-      };
-    }, false);
-    setReturnWorkbench('analysis');
-    switchWorkbench('graph', true);
-    select(target.selectedId, { preserveCamera: isolate });
-    if (target.usedSupportingTransaction)
-      setNotice(
-        'The requested entity cannot be opened directly. Showing its supporting transaction.',
-      );
-    updateFilters(isolate ? { includeIds: target.ids, preserveContext: true } : {});
-    if (!isolate)
-      setFocusRequest((previous) => ({
-        id: target.selectedId,
-        token: (previous?.token ?? 0) + 1,
-      }));
-    setMobilePanel('graph');
+    const finish = () => {
+      const latest = ws.getSession(current.id)?.data;
+      const resolved = latest && resolveGraphHandoff(latest, ids, supportingTxids);
+      if (!resolved) return false;
+      ws.update(current.id, () => resolved.workspace, false);
+      setReturnWorkbench('analysis');
+      switchWorkbench('graph', true);
+      return showOnGraph(resolved.ids, { isolate, selectedId: resolved.selectedId });
+    };
+    const unresolved = ids.length
+      ? ids.filter((id) => !target?.ids.includes(id))
+      : target
+        ? []
+        : supportingTxids.map(txNodeId);
+    if (!unresolved.length) return finish();
+    const missing = graphNavigationTransactionIds(unresolved).filter(
+      (id) => !current.transactions[id],
+    );
+    if (!missing.length || !canQuery || operationRef.current) return false;
+    const generation = selectionGeneration.current;
+    void run(async (signal) => {
+      const loaded = await loadGraphTransactions(unresolved, signal);
+      signal.throwIfAborted();
+      if (wRef.current?.id !== current.id || selectionGeneration.current !== generation) return;
+      mergeTransactions(current.id, loaded, missing);
+      if (!finish()) setNotice('The requested entity is not present in its transaction.');
+    });
     return true;
   }
   function resetGraphFilters() {

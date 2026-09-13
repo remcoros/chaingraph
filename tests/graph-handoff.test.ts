@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { resolveGraphHandoff } from '../src/domain/graphHandoff';
+import {
+  graphNavigationTransactionIds,
+  prepareGraphNavigation,
+  resolveGraphHandoff,
+} from '../src/domain/graphHandoff';
+import { analysisTools } from '../src/domain/analysis';
+import { filterGraph } from '../src/domain/graphFilters';
+import { projectGraphMembership } from '../src/domain/graphMembership';
+import { flowInputPlan, mergeFlowInputs } from '../src/lib/useFlowInputs';
 import { buildGraph, newWorkspace } from '../src/domain/workspace';
 import { outputNodeId, txNodeId } from '../src/domain/types';
 
@@ -25,13 +33,12 @@ function fixture() {
 }
 
 describe('finding navigation using loaded evidence', () => {
-  it('opens the loaded supporting transaction while retaining its unknown input value', () => {
+  it('selects the exact input outpoint while retaining its unknown value', () => {
     const workspace = fixture();
     const requested = outputNodeId(missing, 3);
     expect(buildGraph(workspace).nodes.some((node) => node.id === requested)).toBe(false);
     const target = resolveGraphHandoff(workspace, [requested], [parent])!;
-    expect(target.selectedId).toBe(txNodeId(parent));
-    expect(target.usedSupportingTransaction).toBe(true);
+    expect(target.selectedId).toBe(requested);
     expect(
       buildGraph(target.workspace).nodes.find((node) => node.id === requested)?.value,
     ).toBeUndefined();
@@ -47,23 +54,19 @@ describe('finding navigation using loaded evidence', () => {
     expect(target.workspace.inputContext).toEqual({ [child]: [0] });
   });
 
-  it('retains missing input evidence in isolation while selecting a loaded entity', () => {
+  it('retains the requested input and output identities for isolation', () => {
     const workspace = fixture();
     const unknownInput = outputNodeId(missing, 3);
     const loadedOutput = outputNodeId(parent, 0);
     const target = resolveGraphHandoff(workspace, [unknownInput, loadedOutput], [parent])!;
-    expect(target.selectedId).toBe(loadedOutput);
+    expect(target.selectedId).toBe(unknownInput);
     expect(target.ids).toEqual([unknownInput, loadedOutput]);
-    expect(target.usedSupportingTransaction).toBe(false);
-    const fallback = resolveGraphHandoff(workspace, [unknownInput], [parent])!;
-    expect(fallback.ids).toEqual([unknownInput, txNodeId(parent)]);
+    expect(resolveGraphHandoff(workspace, [unknownInput], [parent])!.ids).toEqual([unknownInput]);
   });
 
-  it('falls back to a loaded supporting transaction or declines an impossible handoff', () => {
+  it('does not substitute a supporting transaction for an unavailable requested entity', () => {
     const workspace = fixture();
-    expect(resolveGraphHandoff(workspace, [outputNodeId(missing, 7)], [parent])?.selectedId).toBe(
-      txNodeId(parent),
-    );
+    expect(resolveGraphHandoff(workspace, [outputNodeId(missing, 7)], [parent])).toBeUndefined();
     expect(resolveGraphHandoff(workspace, [outputNodeId(missing, 7)], [missing])).toBeUndefined();
     expect(resolveGraphHandoff(workspace, [], [child])?.selectedId).toBe(txNodeId(child));
   });
@@ -77,5 +80,109 @@ describe('finding navigation using loaded evidence', () => {
     ])!;
     expect(target.selectedId).toBe(outputNodeId(child, 0));
     expect(target.workspace.view.hiddenNodeIds).toEqual(workspace.view.hiddenNodeIds);
+  });
+});
+
+describe('shared Show and Isolate preparation', () => {
+  it.each([false, true])('retains the clicked mixed-script input with isolate=%s', (isolate) => {
+    const workspace = fixture();
+    workspace.transactions[parent].vin[0].prevout = {
+      value: 0.3,
+      scriptPubKey: { type: 'witness_v0_keyhash' },
+    };
+    workspace.transactions[parent].vout[0].scriptPubKey.type = 'witness_v0_keyhash';
+    workspace.transactions[parent].vout[1].scriptPubKey.type = 'witness_v1_taproot';
+    workspace.view.transactionFlow = { open: false };
+    const tool = analysisTools.find((entry) => entry.id === 'script-types')!;
+    const finding = tool.run(workspace, [parent])[0];
+    expect(finding.title).toBe('Mixed output script types');
+    const requested = outputNodeId(missing, 3);
+    expect(finding.nodeIds).toContain(requested);
+    const target = resolveGraphHandoff(workspace, [requested], finding.txids)!;
+    const navigation = prepareGraphNavigation(target.workspace, target.ids, { isolate })!;
+    const shown = filterGraph(
+      projectGraphMembership(
+        buildGraph(navigation.workspace),
+        navigation.workspace.view.graphNodeIds,
+      ),
+      navigation.filters,
+    );
+    expect(navigation.selectedId).toBe(requested);
+    expect(shown.nodes.map((node) => node.id)).toContain(requested);
+    expect(navigation.workspace.view.transactionFlow?.open).toBe(true);
+    const selected = shown.nodes.find((node) => node.id === requested)!;
+    const plan = flowInputPlan(navigation.workspace, selected);
+    expect(plan).toEqual({ transactionId: parent, missing: [missing] });
+    const hydrated = mergeFlowInputs(navigation.workspace, parent, selected, [
+      {
+        txid: missing,
+        vin: [{ txid: '8'.repeat(64), vout: 0 }],
+        vout: [{ n: 3, value: 0.3, scriptPubKey: { type: 'witness_v0_keyhash' } }],
+      },
+    ]);
+    expect(flowInputPlan(hydrated, selected).missing).toEqual([]);
+    expect(buildGraph(hydrated).nodes.some((node) => node.id === requested)).toBe(true);
+    expect(hydrated.inputContext?.[missing]).toEqual([3]);
+  });
+
+  it.each([false, true])('reveals a hidden loaded wallet outpoint with isolate=%s', (isolate) => {
+    const workspace = fixture();
+    const requested = outputNodeId(parent, 1);
+    workspace.view.hiddenNodeIds = [requested, txNodeId(child)];
+    workspace.view.smallAmountThreshold = 100_000_000;
+    const navigation = prepareGraphNavigation(workspace, [requested], { isolate })!;
+    expect(navigation.selectedId).toBe(requested);
+    expect(navigation.workspace.view.graphNodeIds).toContain(requested);
+    expect(navigation.workspace.view.hiddenNodeIds).toEqual([txNodeId(child)]);
+    expect(navigation.workspace.view.smallAmountThreshold).toBeUndefined();
+    expect(navigation.workspace.transactions).toBe(workspace.transactions);
+    expect(navigation.workspace.annotations).toBe(workspace.annotations);
+    expect(navigation.workspace.wallets).toBe(workspace.wallets);
+    const selected = buildGraph(navigation.workspace).nodes.find((node) => node.id === requested)!;
+    expect(flowInputPlan(navigation.workspace, selected).missing).toEqual([]);
+    expect(navigation.filters).toEqual(isolate ? { focus: { id: requested, hops: 1 } } : {});
+    expect(workspace.view.hiddenNodeIds).toContain(requested);
+  });
+
+  it('isolates batches with a preferred member and deduplicated explicit scope', () => {
+    const ids = [outputNodeId(parent, 0), outputNodeId(child, 0)];
+    const result = prepareGraphNavigation(fixture(), [...ids, ids[0]], {
+      isolate: true,
+      selectedId: ids[1],
+    })!;
+    expect(result.ids).toEqual(ids);
+    expect(result.selectedId).toBe(ids[1]);
+    expect(result.filters).toEqual({ includeIds: ids, preserveContext: true });
+    expect(prepareGraphNavigation(fixture(), [])).toBeUndefined();
+  });
+
+  it('admits and watches an address with address display previously disabled', () => {
+    const workspace = fixture();
+    const address = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu';
+    const id = `addr:${address}`;
+    const result = prepareGraphNavigation(workspace, [id])!;
+    expect(result.workspace.watchedAddresses).toContain(address);
+    expect(result.workspace.view.showAddresses).toBe(true);
+    expect(buildGraph(result.workspace).nodes.some((node) => node.id === id)).toBe(true);
+    expect(workspace.watchedAddresses).not.toContain(address);
+  });
+
+  it('keeps live tag/wallet filters while revealing their explicit current members', () => {
+    const filters = { walletId: 'wallet-a', preserveContext: true };
+    const result = prepareGraphNavigation(fixture(), [txNodeId(parent)], { filters })!;
+    expect(result.filters).toBe(filters);
+    expect(result.workspace.view.graphNodeIds).toContain(txNodeId(parent));
+  });
+
+  it('loads only distinct transactions referenced by a requested batch', () => {
+    expect(
+      graphNavigationTransactionIds([
+        txNodeId(parent),
+        outputNodeId(parent, 0),
+        outputNodeId(child, 0),
+        'addr:example',
+        'not-an-entity',
+      ]),
+    ).toEqual([parent, child]);
   });
 });
