@@ -69,3 +69,18 @@ Gzip in envelope v2 cuts stored size by about 82 to 84 percent on wallet
 fixtures but does not speed up save or unlock, which are dominated by PBKDF2 and
 full wallet-derivation validation. Details and tables are in
 [encryption-and-storage.md](encryption-and-storage.md#compression-envelope-v2).
+
+## Entity browser selection
+
+The paginated entity list memoizes each row using its node, annotation, selection
+and visibility flags. Row actions read the latest committed callbacks through a
+shared ref, matching the transaction-flow row pattern. Parent callback changes
+therefore do not invalidate unchanged rows. Transaction rows receive only the
+network and immutable transaction evidence needed for fees; saving view selection
+does not invalidate that evidence. Output and address rows receive no transaction
+workspace. Sorting remains keyed to nodes and sort order, independently of selection.
+
+This retains the existing 25/50/100-row pagination and keyboard and batch actions.
+It does not virtualize the list or change inactive workbench behavior. Non-browser
+checks do not establish the reduction in interaction latency; compare a new
+selection trace in the same build mode to measure it.

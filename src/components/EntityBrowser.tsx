@@ -1,6 +1,8 @@
 import { Amount } from './Amount';
 import { TransactionBlockTime, TransactionFeeLabel } from './TransactionBlockTime';
 import {
+  memo,
+  useLayoutEffect,
   useEffect,
   useEffectEvent,
   useId,
@@ -8,6 +10,7 @@ import {
   useRef,
   useState,
   type ComponentType,
+  type RefObject,
 } from 'react';
 import {
   ArrowRightFromLine,
@@ -191,6 +194,166 @@ interface Props extends VisibilityProps {
   onFiltersLinkedChange?: (linked: boolean) => void;
 }
 
+interface EntityRowActions {
+  onSelect: Props['onSelect'];
+  onSetHidden: Props['onSetHidden'];
+  onRemoveNode: Props['onRemoveNode'];
+  toggleSelection: EntitySelection['toggle'] | undefined;
+}
+
+interface EntityRowProps {
+  node: GraphNode;
+  annotation?: Annotation;
+  transaction?: Transaction;
+  workspace?: Pick<Workspace, 'network' | 'transactions'>;
+  selected: boolean;
+  hidden: boolean;
+  canSetHidden: boolean;
+  canRemove: boolean;
+  batchMode: boolean;
+  batchSelected: boolean;
+  actions: RefObject<EntityRowActions>;
+}
+
+const EntityRow = memo(function EntityRow({
+  node,
+  annotation,
+  transaction,
+  workspace,
+  selected,
+  hidden,
+  canSetHidden,
+  canRemove,
+  batchMode,
+  batchSelected,
+  actions,
+}: EntityRowProps) {
+  const KindIcon = TYPE_ICON[node.kind];
+  const status = transaction ? transactionStatus(transaction) : undefined;
+  return (
+    <div
+      className={`entity-list-entry ${hidden ? 'is-hidden' : ''} ${canSetHidden ? 'has-visibility' : ''} ${canRemove ? 'has-removal' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
+    >
+      {batchMode && (
+        <SelectionCheckbox
+          id={node.id}
+          label={node.label}
+          checked={batchSelected}
+          onToggle={(id) => actions.current.toggleSelection?.(id)}
+        />
+      )}
+      <div
+        className={`entity-row ${selected ? 'selected' : ''}`}
+        data-testid="entity-row"
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        onClick={(event) => {
+          if (actions.current.toggleSelection && (event.ctrlKey || event.metaKey))
+            actions.current.toggleSelection(node.id);
+          else actions.current.onSelect(node.id);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          if (actions.current.toggleSelection && (event.ctrlKey || event.metaKey))
+            actions.current.toggleSelection(node.id);
+          else actions.current.onSelect(node.id);
+        }}
+        title={node.id}
+      >
+        <span className="entity-row-header">
+          <KindIcon size={12} className={`entity-row-icon ${node.kind}`} />
+          {annotation?.bookmarked && (
+            <Bookmark size={12} className="entity-row-bookmark" aria-label="Bookmarked" />
+          )}
+          <span className="entity-row-title">
+            <strong>
+              <ResponsiveIdentifier value={node.id} preferFull />
+            </strong>
+            {transaction && (
+              <small className="entity-row-io">
+                {transaction.vin.length}/{transaction.vout.length}
+              </small>
+            )}
+          </span>
+        </span>
+        <span className="entity-row-lower">
+          <span className="entity-row-body">
+            {annotation?.label && (
+              <small className="entity-row-label">
+                {annotation!.icon ? `${annotation!.icon} ` : ''}
+                {annotation!.label}
+              </small>
+            )}
+            <span className="entity-row-amount-line">
+              <Amount as="small" className="entity-row-amount" value={node.value} />
+            </span>
+            {transaction && workspace && (
+              <span className="entity-row-fee">
+                <TransactionFeeLabel transaction={transaction} workspace={workspace} />
+              </span>
+            )}
+            {transaction && status && (
+              <span className="entity-row-metadata">
+                <small className="entity-chain-status" title={status.title}>
+                  {status.label}
+                </small>
+                <span className="entity-row-time">
+                  <TransactionBlockTime
+                    transaction={transaction}
+                    workspace={workspace}
+                    showFee={false}
+                    timestampOnly
+                  />
+                </span>
+              </span>
+            )}
+          </span>
+          <span className="entity-row-actions">
+            {canSetHidden && (
+              <button
+                type="button"
+                className="icon-button entity-row-restore"
+                aria-label={`${hidden ? 'Show' : 'Hide'} ${node.label} ${hidden ? 'in' : 'from'} graph`}
+                title={hidden ? 'Show entity in graph' : 'Hide entity from graph'}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  actions.current.onSetHidden?.([node.id], !hidden);
+                }}
+              >
+                {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+              </button>
+            )}
+            {canRemove && (
+              <button
+                type="button"
+                className="icon-button danger entity-row-remove"
+                aria-label={
+                  node.kind === 'address'
+                    ? `Stop watching ${node.label}`
+                    : `Remove ${node.label} from workspace`
+                }
+                title={
+                  node.kind === 'address'
+                    ? 'Stop watching address'
+                    : 'Remove transaction from workspace'
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+                  actions.current.onRemoveNode?.(node.id);
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+});
+
 export default function EntityBrowser({
   nodes,
   batchNodes,
@@ -221,6 +384,30 @@ export default function EntityBrowser({
   filtersLinked = true,
   onFiltersLinkedChange,
 }: Props) {
+  // Rows read actions only from event handlers. Refresh after commit so new
+  // parent callbacks do not invalidate every row or retain stale selection logic.
+  const rowActions = useRef<EntityRowActions>({
+    onSelect,
+    onSetHidden,
+    onRemoveNode,
+    toggleSelection: filtersLinked ? selection?.toggle : undefined,
+  });
+  useLayoutEffect(() => {
+    rowActions.current = {
+      onSelect,
+      onSetHidden,
+      onRemoveNode,
+      toggleSelection: filtersLinked ? selection?.toggle : undefined,
+    };
+  });
+  const network = workspace?.network;
+  const evidenceTransactions = workspace?.transactions;
+  // A saved view change is not new fee evidence. Output/address rows need none.
+  const rowWorkspace = useMemo(
+    () =>
+      network && evidenceTransactions ? { network, transactions: evidenceTransactions } : undefined,
+    [network, evidenceTransactions],
+  );
   const removable = useMemo(() => new Set(removableNodeIds), [removableNodeIds]);
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
   const [sort, setSort] = useState<EntitySort>('graph');
@@ -452,137 +639,22 @@ export default function EntityBrowser({
         data-testid="entity-list"
         aria-label={filtersLinked ? 'Matching graph entities' : 'Matching entities'}
       >
-        {sorted.slice(first, first + pageSize).map((node) => {
-          const KindIcon = TYPE_ICON[node.kind];
-          const transaction =
-            node.kind === 'transaction' ? transactions[node.txid ?? ''] : undefined;
-          const status = transaction ? transactionStatus(transaction) : undefined;
-          return (
-            <div
-              key={node.id}
-              className={`entity-list-entry ${hidden.has(node.id) ? 'is-hidden' : ''} ${onSetHidden ? 'has-visibility' : ''} ${removable.has(node.id) && onRemoveNode ? 'has-removal' : ''} ${filtersLinked && selection?.has(node.id) ? 'is-batch-selected' : ''}`}
-            >
-              {filtersLinked && selection?.mode && (
-                <SelectionCheckbox
-                  id={node.id}
-                  label={node.label}
-                  checked={selection.has(node.id)}
-                  onToggle={selection.toggle}
-                />
-              )}
-              <div
-                className={`entity-row ${selectedId === node.id ? 'selected' : ''}`}
-                data-testid="entity-row"
-                role="button"
-                tabIndex={0}
-                aria-pressed={selectedId === node.id}
-                onClick={(event) => {
-                  if (filtersLinked && selection && (event.ctrlKey || event.metaKey))
-                    selection.toggle(node.id);
-                  else onSelect(node.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return;
-                  event.preventDefault();
-                  if (filtersLinked && selection && (event.ctrlKey || event.metaKey))
-                    selection.toggle(node.id);
-                  else onSelect(node.id);
-                }}
-                title={node.id}
-              >
-                <span className="entity-row-header">
-                  <KindIcon size={12} className={`entity-row-icon ${node.kind}`} />
-                  {annotations[node.id]?.bookmarked && (
-                    <Bookmark size={12} className="entity-row-bookmark" aria-label="Bookmarked" />
-                  )}
-                  <span className="entity-row-title">
-                    <strong>
-                      <ResponsiveIdentifier value={node.id} preferFull />
-                    </strong>
-                    {transaction && (
-                      <small className="entity-row-io">
-                        {transaction.vin.length}/{transaction.vout.length}
-                      </small>
-                    )}
-                  </span>
-                </span>
-                <span className="entity-row-lower">
-                  <span className="entity-row-body">
-                    {annotations[node.id]?.label && (
-                      <small className="entity-row-label">
-                        {annotations[node.id]!.icon ? `${annotations[node.id]!.icon} ` : ''}
-                        {annotations[node.id]!.label}
-                      </small>
-                    )}
-                    <span className="entity-row-amount-line">
-                      <Amount as="small" className="entity-row-amount" value={node.value} />
-                    </span>
-                    {transaction && workspace && (
-                      <span className="entity-row-fee">
-                        <TransactionFeeLabel transaction={transaction} workspace={workspace} />
-                      </span>
-                    )}
-                    {transaction && status && (
-                      <span className="entity-row-metadata">
-                        <small className="entity-chain-status" title={status.title}>
-                          {status.label}
-                        </small>
-                        <span className="entity-row-time">
-                          <TransactionBlockTime
-                            transaction={transaction}
-                            workspace={workspace}
-                            showFee={false}
-                            timestampOnly
-                          />
-                        </span>
-                      </span>
-                    )}
-                  </span>
-                  <span className="entity-row-actions">
-                    {onSetHidden && (
-                      <button
-                        type="button"
-                        className="icon-button entity-row-restore"
-                        aria-label={`${hidden.has(node.id) ? 'Show' : 'Hide'} ${node.label} ${hidden.has(node.id) ? 'in' : 'from'} graph`}
-                        title={
-                          hidden.has(node.id) ? 'Show entity in graph' : 'Hide entity from graph'
-                        }
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onSetHidden([node.id], !hidden.has(node.id));
-                        }}
-                      >
-                        {hidden.has(node.id) ? <Eye size={14} /> : <EyeOff size={14} />}
-                      </button>
-                    )}
-                    {removable.has(node.id) && onRemoveNode && (
-                      <button
-                        type="button"
-                        className="icon-button danger entity-row-remove"
-                        aria-label={
-                          node.kind === 'address'
-                            ? `Stop watching ${node.label}`
-                            : `Remove ${node.label} from workspace`
-                        }
-                        title={
-                          node.kind === 'address'
-                            ? 'Stop watching address'
-                            : 'Remove transaction from workspace'
-                        }
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRemoveNode(node.id);
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </span>
-                </span>
-              </div>
-            </div>
-          );
-        })}
+        {sorted.slice(first, first + pageSize).map((node) => (
+          <EntityRow
+            key={node.id}
+            node={node}
+            annotation={annotations[node.id]}
+            transaction={node.kind === 'transaction' ? transactions[node.txid ?? ''] : undefined}
+            workspace={node.kind === 'transaction' ? rowWorkspace : undefined}
+            selected={selectedId === node.id}
+            hidden={hidden.has(node.id)}
+            canSetHidden={!!onSetHidden}
+            canRemove={removable.has(node.id) && !!onRemoveNode}
+            batchMode={filtersLinked && !!selection?.mode}
+            batchSelected={filtersLinked && !!selection?.has(node.id)}
+            actions={rowActions}
+          />
+        ))}
         {!nodes.length && (
           <p className="empty-panel">
             {totalCount
