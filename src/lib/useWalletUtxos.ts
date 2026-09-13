@@ -165,7 +165,6 @@ export function useWalletUtxos({
   useEffect(() => {
     request.current?.abort();
     request.current = undefined;
-    setState({ scope, loading: false, error: '' });
     attempted.current = false;
     return () => {
       request.current?.abort();
