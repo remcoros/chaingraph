@@ -84,3 +84,12 @@ This retains the existing 25/50/100-row pagination and keyboard and batch action
 It does not virtualize the list or change inactive workbench behavior. Non-browser
 checks do not establish the reduction in interaction latency; compare a new
 selection trace in the same build mode to measure it.
+
+## Inactive analysis workbench
+
+Analysis skips parent-driven updates while it remains inactive in the same
+workspace, network and session cache. Activation always renders with current
+props. Deactivation still renders so the existing effect cancels pending scans
+and recovery. This reuses the component's existing in-memory settings and results;
+it adds no selection snapshot or persisted state. Initial mounts and internal
+state updates can still render while inactive.
