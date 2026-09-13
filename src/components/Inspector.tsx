@@ -6,7 +6,7 @@ import {
 } from '../domain/walletUtxoObservation';
 import { useUtxoStatus } from '../lib/useUtxoStatus';
 import './utxo-status.css';
-import { TransactionBlockTime } from './TransactionBlockTime';
+import { TransactionBlockTime, TransactionFeeLabel } from './TransactionBlockTime';
 import { transactionStatus } from '../domain/transactionStatus';
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -535,6 +535,16 @@ export function NodeInspector({
         <div className="selection-top">
           <span className="eyebrow">
             {selected.kind === 'output' ? 'TRANSACTION OUTPUT' : selected.kind.toUpperCase()}
+            {selected.kind === 'transaction' && tx && (
+              <span
+                className="selection-title-io"
+                title={`${tx.vin.length} inputs / ${tx.vout.length} outputs`}
+                aria-label={`${tx.vin.length} inputs / ${tx.vout.length} outputs`}
+              >
+                {' '}
+                ({tx.vin.length}/{tx.vout.length})
+              </span>
+            )}
           </span>
           <div className="selection-node-actions">
             {selected.kind === 'output' && selected.txid && selected.vout !== undefined && (
@@ -686,6 +696,18 @@ export function NodeInspector({
               </dd>
             </div>
           )}
+          {(tx || selected.kind === 'output') && (
+            <div>
+              <dt>Block</dt>
+              <dd>
+                <TransactionBlockTime
+                  transaction={tx}
+                  workspace={w}
+                  showFee={false}
+                />
+              </dd>
+            </div>
+          )}
           <div>
             <dt>{selected.kind === 'address' ? 'Balance' : 'Value'}</dt>
             {selected.kind === 'address' ? (
@@ -721,15 +743,11 @@ export function NodeInspector({
               </span>
             </div>
           )}
-          {(tx || selected.kind === 'output') && (
+          {selected.kind === 'transaction' && tx && transactionStatus(tx).kind === 'confirmed' && (
             <div>
-              <dt>Block</dt>
+              <dt>Fee</dt>
               <dd>
-                <TransactionBlockTime
-                  transaction={tx}
-                  workspace={w}
-                  showFee={selected.kind === 'transaction'}
-                />
+                <TransactionFeeLabel transaction={tx} workspace={w} />
               </dd>
             </div>
           )}
