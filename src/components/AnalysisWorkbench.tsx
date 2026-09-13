@@ -1,6 +1,6 @@
 import { Amount } from './Amount';
 import { TransactionBlockTime } from './TransactionBlockTime';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   SlidersHorizontal,
@@ -173,7 +173,7 @@ function EvidenceReference({
   );
 }
 
-export function AnalysisWorkbench({
+function AnalysisWorkbench({
   workspace,
   selected,
   wallet,
@@ -1066,3 +1066,17 @@ export function AnalysisWorkbench({
     </section>
   );
 }
+
+// Deliver activation/deactivation and session changes immediately. Other parent
+// updates can wait while hidden; activation always supplies the latest props.
+const MemoizedAnalysisWorkbench = memo(
+  AnalysisWorkbench,
+  (before, after) =>
+    !before.active &&
+    !after.active &&
+    before.workspace.id === after.workspace.id &&
+    before.workspace.network === after.workspace.network &&
+    before.cache === after.cache,
+);
+
+export { MemoizedAnalysisWorkbench as AnalysisWorkbench };
