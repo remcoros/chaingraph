@@ -118,6 +118,8 @@ interface FlowRowActions {
   toggleSelection?: (id: string) => void;
 }
 
+const INITIAL_FLOW_ROW_LIMIT = 25;
+
 function moveSelectedRowFirst(rows: Row[], selectedId?: string) {
   const selectedIndex = selectedId ? rows.findIndex((row) => row.id === selectedId) : -1;
   if (selectedIndex <= 0) return rows;
@@ -205,33 +207,33 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
           onToggle={(id) => actions.current.toggleSelection?.(id)}
         />
       )}
-      <div className="transaction-row-content">
-        <div
-          className="transaction-row-select"
-          role={row.id ? 'button' : undefined}
-          tabIndex={row.id ? 0 : undefined}
-          aria-label={`${inputs ? 'Input' : 'Output'} ${row.index}${row.id ? `: ${row.id.slice(4)}` : ': Coinbase'}`}
-          aria-pressed={row.id ? selected : undefined}
-          title={row.id ? `${address ? `${address}\n` : ''}${row.id.slice(4)}` : 'Coinbase'}
-          onClick={(event) => {
-            if (!row.id) return;
-            const target = event.target;
-            if (
-              target instanceof Element &&
-              target.closest('.transaction-row-tools, .op-return-data button')
-            )
-              return;
-            if (actions.current.toggleSelection && (event.ctrlKey || event.metaKey))
-              actions.current.toggleSelection?.(row.id);
-            else actions.current.onSelect(row.id);
-          }}
-          onKeyDown={(event) => {
-            if (!row.id || event.target !== event.currentTarget) return;
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            actions.current.onSelect(row.id);
-          }}
-        >
+      <div
+        className="transaction-row-content"
+        role={row.id ? 'button' : undefined}
+        tabIndex={row.id ? 0 : undefined}
+        aria-label={`${inputs ? 'Input' : 'Output'} ${row.index}${row.id ? `: ${row.id.slice(4)}` : ': Coinbase'}`}
+        aria-pressed={row.id ? selected : undefined}
+        title={row.id ? `${address ? `${address}\n` : ''}${row.id.slice(4)}` : 'Coinbase'}
+        onClick={(event) => {
+          if (!row.id) return;
+          const target = event.target;
+          if (
+            target instanceof Element &&
+            target.closest('.transaction-row-tools, .op-return-data button')
+          )
+            return;
+          if (actions.current.toggleSelection && (event.ctrlKey || event.metaKey))
+            actions.current.toggleSelection?.(row.id);
+          else actions.current.onSelect(row.id);
+        }}
+        onKeyDown={(event) => {
+          if (!row.id || event.target !== event.currentTarget) return;
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          actions.current.onSelect(row.id);
+        }}
+      >
+        <div className="transaction-row-select">
           <span className="transaction-row-index">#{row.index}</span>
           <span className="transaction-row-main">
             <span className="transaction-row-heading">
@@ -552,9 +554,21 @@ function TransactionRows({
         // The selected outpoint remains present even below the threshold or beyond the collapsed window.
         const shown = expanded
           ? retained
-          : retained.filter((row, index) => index < 3 || matches(row));
+          : retained.filter((row, index) => index < INITIAL_FLOW_ROW_LIMIT || matches(row));
         // Keep the exact selected input or output at the visible start of its lane.
         const displayedRows = moveSelectedRowFirst(shown, selectedOutputId);
+        const canExpand = retained.length > INITIAL_FLOW_ROW_LIMIT;
+        const expandButton = canExpand ? (
+          <button
+            type="button"
+            className="text-button transaction-expand"
+            aria-label={`${expanded ? 'Collapse' : 'Show all'} ${retained.length} ${name.toLowerCase()}`}
+            aria-expanded={expanded}
+            onClick={() => toggle(!expanded)}
+          >
+            {expanded ? 'Collapse' : 'Show all'}
+          </button>
+        ) : null;
         return (
           <section
             key={name}
@@ -566,36 +580,38 @@ function TransactionRows({
               <div className={inputs ? 'transaction-flow-previous' : 'transaction-flow-next'}>
                 {inputs ? previous : next}
               </div>
-              <div className="transaction-lane-header">
-                <h4>
-                  {rows.length}{' '}
-                  {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
-                </h4>
-                {(filteredCount > 0 || retained.length > 3) && (
+              <div
+                className={`transaction-lane-header ${inputs ? 'transaction-lane-header-inputs' : 'transaction-lane-header-outputs'}`}
+              >
+                <div className="transaction-lane-summary">
+                  {inputs && expandButton}
+                  {inputs && canExpand && (
+                    <span className="address-history-section-summary-separator" aria-hidden="true">
+                      |
+                    </span>
+                  )}
+                  <h4>
+                    {rows.length}{' '}
+                    {rows.length === 1 ? name.toLowerCase().slice(0, -1) : name.toLowerCase()}
+                  </h4>
+                  {!inputs && canExpand && (
+                    <span className="address-history-section-summary-separator" aria-hidden="true">
+                      |
+                    </span>
+                  )}
+                  {!inputs && expandButton}
+                </div>
+                {filteredCount > 0 && (
                   <div className="transaction-lane-actions">
-                    {filteredCount > 0 && (
-                      <button
-                        type="button"
-                        className="text-button transaction-amount-recovery"
-                        aria-label={`${filteredCount} amounts filtered from ${name.toLowerCase()}. Clear amount filter`}
-                        title="Clear amount filter"
-                        onClick={() => onSmallAmountThresholdChange?.(0)}
-                      >
-                        {filteredCount} amounts filtered
-                      </button>
-                    )}
-                    {retained.length > 3 && (
-                      <button
-                        type="button"
-                        className="text-button transaction-expand"
-                        aria-expanded={expanded}
-                        onClick={() => toggle(!expanded)}
-                      >
-                        {expanded
-                          ? `Collapse ${name.toLowerCase()}`
-                          : `Show all ${retained.length} ${name.toLowerCase()}`}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="text-button transaction-amount-recovery"
+                      aria-label={`${filteredCount} amounts filtered from ${name.toLowerCase()}. Clear amount filter`}
+                      title="Clear amount filter"
+                      onClick={() => onSmallAmountThresholdChange?.(0)}
+                    >
+                      {filteredCount} amounts filtered
+                    </button>
                   </div>
                 )}
               </div>
@@ -1683,13 +1699,6 @@ export function TransactionView(props: Props) {
                             <strong className="mono transaction-identity-id">
                               <ResponsiveIdentifier value={current.tx.txid} />
                             </strong>
-                            <span
-                              className="transaction-identity-io"
-                              title="Inputs / outputs"
-                              aria-label={`${current.tx.vin.length} inputs / ${current.tx.vout.length} outputs`}
-                            >
-                              {current.tx.vin.length}/{current.tx.vout.length}
-                            </span>
                           </span>
                           <span className="transaction-identity-body">
                             <TransactionBlockTime
