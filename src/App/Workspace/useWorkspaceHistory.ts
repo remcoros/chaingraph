@@ -22,8 +22,9 @@ export function useWorkspaceHistory({ activeWorkspace, workspaces }: Inputs) {
   const undoDescription = workspaces.active?.history.at(-1)?.description;
   const redoDescription = workspaces.active?.redoHistory.at(-1)?.description;
   return {
-    canUndo: !!workspaces.active?.history.length,
-    canRedo: !!workspaces.active?.redoHistory.length,
+    // A locking workspace accepts neither, so the buttons must not offer them.
+    canUndo: !!workspaces.active?.history.length && !workspaces.active.locking,
+    canRedo: !!workspaces.active?.redoHistory.length && !workspaces.active.locking,
     undo: () => {
       if (activeWorkspace) workspaces.undo(activeWorkspace.id);
     },

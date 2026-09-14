@@ -88,6 +88,9 @@ export interface UnlockedWorkspace {
   savedRevision: number;
   history: UndoEntry[];
   redoHistory: UndoEntry[];
+  /** True while this workspace is being saved and closed. It accepts no edits,
+   * undo or redo until that finishes. */
+  locking: boolean;
   /** Increments whenever the undo head changes, so a caller can tell whether its
    * own edit is still the step that Undo would restore. Presentation-only writes
    * leave it untouched. */
@@ -221,6 +224,17 @@ export class WorkspaceStore {
     this.state = { ...this.state, ...update };
     for (const listener of this.listeners) listener();
   }
+  /** Replaces one unlocked workspace, leaving the rest of the snapshot untouched. */
+  private patchUnlocked(id: string, update: (entry: UnlockedWorkspace) => UnlockedWorkspace) {
+    let changed = false;
+    const unlocked = this.state.unlocked.map((entry) => {
+      if (entry.data.id !== id) return entry;
+      const next = update(entry);
+      changed ||= next !== entry;
+      return next;
+    });
+    if (changed) this.patch({ unlocked });
+  }
   private assertStorageUnchanged() {
     if (this.storageInvalid)
       throw new Error('Saved storage is malformed or unavailable; it will not be overwritten.');
@@ -314,6 +328,8 @@ export class WorkspaceStore {
     this.patch({ activeId });
   };
   private add(data: Workspace, password: string, alreadySaved: boolean) {
+    // The in-flight handle, not the record: a finished lock has already removed
+    // its record but may still be settling.
     if (this.locking.has(data.id)) throw new Error('This workspace is currently locking.');
     if (this.state.unlocked.some((s) => s.data.id === data.id)) {
       this.setActiveId(data.id);
@@ -331,6 +347,7 @@ export class WorkspaceStore {
           password,
           revision: 0,
           savedRevision: alreadySaved ? 0 : -1,
+          locking: false,
           history: [],
           redoHistory: [],
           undoRevision: 0,
@@ -387,6 +404,9 @@ export class WorkspaceStore {
     // Legacy or stale index labels are migrated from the authenticated workspace on save.
     this.add(data, password, entry.publicName === data.name);
   };
+  private isLocking(id: string) {
+    return this.state.unlocked.some((entry) => entry.data.id === id && entry.locking);
+  }
   update = (
     id: string,
     fn: (w: Workspace) => Workspace,
@@ -394,7 +414,7 @@ export class WorkspaceStore {
     group?: string,
     description?: string,
   ) => {
-    if (this.locking.has(id)) return;
+    if (this.isLocking(id)) return;
     const current = this.state.unlocked.find((s) => s.data.id === id);
     if (!current) return;
     let data = fn(current.data);
@@ -477,7 +497,7 @@ export class WorkspaceStore {
     });
   };
   undo = (id: string) => {
-    if (this.locking.has(id)) return;
+    if (this.isLocking(id)) return;
     this.editGroups.delete(id);
     this.patch({
       unlocked: this.state.unlocked.map((s) =>
@@ -499,7 +519,7 @@ export class WorkspaceStore {
   };
 
   redo = (id: string) => {
-    if (this.locking.has(id)) return;
+    if (this.isLocking(id)) return;
     this.editGroups.delete(id);
     this.patch({
       unlocked: this.state.unlocked.map((s) =>
@@ -667,6 +687,7 @@ export class WorkspaceStore {
     const pending = this.locking.get(id);
     if (pending) return pending;
     // No state callbacks are queued: all earlier edits are already in state.
+    this.patchUnlocked(id, (entry) => ({ ...entry, locking: true }));
     const operation = Promise.resolve()
       .then(async () => {
         await this.persist(id);
@@ -685,6 +706,8 @@ export class WorkspaceStore {
       })
       .finally(() => {
         this.locking.delete(id);
+        // A failed lock leaves the workspace open, so it must accept edits again.
+        this.patchUnlocked(id, (entry) => (entry.locking ? { ...entry, locking: false } : entry));
       });
     this.locking.set(id, operation);
     return operation;

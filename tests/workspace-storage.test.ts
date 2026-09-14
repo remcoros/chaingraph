@@ -41,6 +41,34 @@ describe('workspace persistence state transitions', () => {
     }
   });
 
+  it('reports a locking workspace as accepting no edits, undo or redo', async () => {
+    const envelopes = deferred();
+    const store = new WorkspaceStore({
+      storage: memoryStorage(),
+      envelopes: {
+        get: async () => undefined,
+        put: async () => {
+          await envelopes.promise;
+        },
+        remove: async () => {},
+      },
+    });
+    const w = newWorkspace('Locking', 'testnet4');
+    store.open(w, password);
+    store.update(w.id, (current) => ({ ...current, name: 'Edited' }), true, 'name');
+    const locking = store.lock(w.id);
+    const entry = store.getSnapshot().unlocked.find((item) => item.data.id === w.id)!;
+    expect(entry.locking).toBe(true);
+    // Undo history still exists, but the workspace must not offer it while locking.
+    expect(entry.history).toHaveLength(1);
+    store.undo(w.id);
+    expect(store.getSnapshot().unlocked.find((item) => item.data.id === w.id)?.data.name).toBe(
+      'Edited',
+    );
+    envelopes.resolve();
+    await locking;
+  });
+
   it('groups continuous typing without losing the latest view or merging across undo', () => {
     const store = new WorkspaceStore({ storage: memoryStorage() });
     const w = newWorkspace('Typing', 'testnet4');
