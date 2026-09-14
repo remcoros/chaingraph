@@ -105,6 +105,17 @@ before adopting a redesign. Do not push or publish because a local check
 passed; the [release process](docs/deployment.md#release-process) describes the
 tag workflow.
 
+## Layer boundaries
+
+`npm run lint` (part of `npm run check`) enforces the dependency direction as
+well as style. `Domain` may not import `App`, `Infra` or `Shared`; `Infra` and
+`Shared` may not import `App`; workspace-scope code under `ChainData` and
+`Selection` may not import a workbench; and Wallet and Analysis reach Graph only
+through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`. New
+import cycles are rejected, with a short list of pre-existing cycles in workspace
+persistence and scan records pinned as exceptions in `.oxlintrc.json`. Prefer a
+declared contract over widening one of these exceptions.
+
 ## Portable content
 
 Use repository-relative references in committed documentation. Do not commit a

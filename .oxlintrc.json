@@ -1,7 +1,17 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "react-perf", "typescript", "unicorn", "oxc"],
-  "env": { "browser": true, "es2024": true },
+  "plugins": [
+    "react",
+    "react-perf",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import"
+  ],
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
   "categories": {},
   "rules": {
     "react-hooks/rules-of-hooks": "error",
@@ -23,7 +33,137 @@
     "unicorn/no-array-for-each": "off",
     "unicorn/no-useless-fallback-in-spread": "error",
     "unicorn/no-useless-spread": "error",
-    "unicorn/prefer-string-starts-ends-with": "error"
+    "unicorn/prefer-string-starts-ends-with": "error",
+    "import/no-cycle": "error"
   },
-  "ignorePatterns": ["dist/**", "node_modules/**", "artifacts/**", "test-results/**", "public/**"]
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "artifacts/**",
+    "test-results/**",
+    "public/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "src/Domain/**"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/App/**",
+                  "**/Infra/**",
+                  "**/Shared/**"
+                ],
+                "message": "Domain holds contracts and pure logic. It must not depend on the app, transport, storage or UI."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/Infra/**"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/App/**",
+                  "**/Shared/**"
+                ],
+                "message": "Infra carries transport and storage. Depend on Domain only, never on the app or UI."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/Shared/**"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/App/**",
+                  "**/Infra/**"
+                ],
+                "message": "Shared controls are reusable. Depend on Domain only, never on the app shell or transport."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/App/Workspace/Workbenches/Wallet/**",
+        "src/App/Workspace/Workbenches/Analysis/**"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/Workbenches/Graph/**",
+                  "../Graph/**",
+                  "../../Graph/**"
+                ],
+                "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/App/Workspace/ChainData/**",
+        "src/App/Workspace/Selection/**"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/Workbenches/**",
+                  "../Workbenches/**"
+                ],
+                "message": "Workspace-scope code is shared by every workbench and must not depend on one of them."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/Domain/Workspace/workspace.ts",
+        "src/Domain/ConnectionScan/connectionScan.ts",
+        "src/Domain/ConnectionScan/connectionScanContext.ts",
+        "src/Domain/ConnectionScan/connectionScanRecords.ts",
+        "src/Domain/Graph/graphMembership.ts"
+      ],
+      "rules": {
+        "import/no-cycle": "off"
+      }
+    }
+  ]
 }
