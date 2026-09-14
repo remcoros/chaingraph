@@ -14,7 +14,14 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     canLoadChainData,
     edit,
   } = workspace;
-  const { setMobilePanel, leftTab: shownLeftTab, setLeftTab, setRightTab } = workspace.graph.panels;
+  const {
+    setMobilePanel,
+    leftTab: shownLeftTab,
+    setLeftTab,
+    setRightTab,
+    leftPanelCollapsed,
+    setLeftPanelCollapsed,
+  } = workspace.graph.panels;
   const { scanTargets: connectionScanTargets } = workspace.graph;
   const { selected: wallet, discovery: walletDiscovery } = workspace.wallet;
   const {
@@ -82,6 +89,8 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       }
       leftTab={shownLeftTab}
       setLeftTab={setLeftTab}
+      collapsed={leftPanelCollapsed}
+      onToggleCollapsed={() => setLeftPanelCollapsed((value) => !value)}
       selectedWalletId={wallet?.id}
       selectedId={selectedId}
       onSelectWallet={(id) => {

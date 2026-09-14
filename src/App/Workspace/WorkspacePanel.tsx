@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import {
   Tag,
   Bookmark,
+  ChevronLeft,
   ChevronRight,
   Plus,
   Pencil,
@@ -28,6 +29,8 @@ interface Props {
   tagsPanel?: ReactNode;
   leftTab: 'wallets' | 'entities' | 'bookmarks' | 'tags';
   setLeftTab: (tab: 'wallets' | 'entities' | 'bookmarks' | 'tags') => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
   selectedWalletId?: string;
   selectedId?: string;
   onSelectWallet: (id: string) => void;
@@ -77,6 +80,8 @@ export function WorkspacePanel({
   tagsPanel,
   leftTab,
   setLeftTab,
+  collapsed = false,
+  onToggleCollapsed,
   selectedWalletId,
   selectedId,
   onSelectWallet,
@@ -121,7 +126,10 @@ export function WorkspacePanel({
   selection,
 }: Props) {
   return (
-    <aside className="left-panel" data-tour="wallet-panel">
+    <aside
+      className={`left-panel ${collapsed ? 'panel-collapsed' : ''}`}
+      data-tour="wallet-panel"
+    >
       <div className="panel-tabs left-panel-tabs">
         <button
           data-testid="panel-tab-entities"
@@ -155,6 +163,17 @@ export function WorkspacePanel({
         >
           <Bookmark size={15} />
         </button>
+        {onToggleCollapsed && (
+          <button
+            className="icon-button panel-collapse-toggle"
+            aria-label={collapsed ? 'Expand left panel' : 'Collapse left panel'}
+            title={collapsed ? 'Expand left panel' : 'Collapse left panel'}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+        )}
       </div>
       {leftTab === 'tags' ? (
         tagsPanel

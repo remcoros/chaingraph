@@ -59,6 +59,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     focusGraph: shownFocusGraph,
     setFocusGraph,
     mobilePanel: shownMobilePanel,
+    leftPanelCollapsed,
+    rightPanelCollapsed,
   } = workspace.graph.panels;
   const { flowInputs, scanTargets: connectionScanTargets } = workspace.graph;
   const { utxoObservation: walletUtxoObservation, selected: selectedWallet } = workspace.wallet;
@@ -484,7 +486,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       ref={graphWorkspaceRef}
       id="main-workspace"
       tabIndex={-1}
-      className={`workbench show-${shownMobilePanel} ${shownFocusGraph ? 'focus-graph' : ''}`}
+      className={`workbench show-${shownMobilePanel} ${shownFocusGraph ? 'focus-graph' : ''} ${leftPanelCollapsed ? 'left-panel-collapsed' : ''} ${rightPanelCollapsed ? 'right-panel-collapsed' : ''}`}
     >
       <EntitiesPanel workspace={workspace} />
       <section

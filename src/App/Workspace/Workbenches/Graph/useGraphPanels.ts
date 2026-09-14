@@ -33,6 +33,10 @@ export interface GraphPanels extends GraphPanelChoice {
   setRightTab: Dispatch<SetStateAction<GraphRightTab>>;
   setMobilePanel: Dispatch<SetStateAction<GraphMobilePanel>>;
   setFocusGraph: Dispatch<SetStateAction<boolean>>;
+  leftPanelCollapsed: boolean;
+  rightPanelCollapsed: boolean;
+  setLeftPanelCollapsed: Dispatch<SetStateAction<boolean>>;
+  setRightPanelCollapsed: Dispatch<SetStateAction<boolean>>;
   /** Shows a newly selected entity, without interrupting a scan in progress. */
   revealInspector: () => void;
   revealEntities: () => void;
@@ -76,6 +80,8 @@ export function useGraphPanels(): GraphPanels {
   const [rightTab, setRightTab] = useState<GraphRightTab>('inspect');
   const [mobilePanel, setMobilePanel] = useState<GraphMobilePanel>('graph');
   const [focusGraph, setFocusGraph] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const chosen = { leftTab, rightTab, mobilePanel, focusGraph };
   return {
     ...chosen,
@@ -84,8 +90,18 @@ export function useGraphPanels(): GraphPanels {
     setRightTab,
     setMobilePanel,
     setFocusGraph,
-    revealInspector: () => setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect')),
-    revealEntities: () => setLeftTab('entities'),
+    leftPanelCollapsed,
+    rightPanelCollapsed,
+    setLeftPanelCollapsed,
+    setRightPanelCollapsed,
+    revealInspector: () => {
+      setRightPanelCollapsed(false);
+      setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
+    },
+    revealEntities: () => {
+      setLeftPanelCollapsed(false);
+      setLeftTab('entities');
+    },
     showPanel: setMobilePanel,
     hydrate: (view) => {
       setLeftTab(view?.leftTab ?? 'wallets');
@@ -94,6 +110,8 @@ export function useGraphPanels(): GraphPanels {
       setRightTab(view?.rightTab === 'analysis' ? 'inspect' : (view?.rightTab ?? 'inspect'));
       setMobilePanel(view?.mobilePanel ?? 'graph');
       setFocusGraph(view?.focusGraph ?? false);
+      setLeftPanelCollapsed(false);
+      setRightPanelCollapsed(false);
     },
   };
 }

@@ -308,9 +308,13 @@ small,
   letter-spacing: -0.8px;
   text-decoration: none;
 }
-.wordmark svg,
 .wordmark-dot {
   color: var(--color-accent);
+}
+.wordmark-icon {
+  width: 23px;
+  height: 23px;
+  flex-shrink: 0;
 }
 .connection {
   display: flex;
@@ -358,6 +362,9 @@ small,
   background: var(--color-surface);
   border-bottom-color: var(--color-accent);
   color: var(--color-ink);
+}
+.workspace-tabs button:not(.active):not(.icon-button):hover {
+  background: var(--color-hover);
 }
 .workspace-tab {
   max-width: 250px;
@@ -636,6 +643,7 @@ small,
   display: none;
 }
 .panel-tabs {
+  position: relative;
   display: flex;
   height: 45px;
   flex-shrink: 0;
@@ -659,6 +667,9 @@ small,
   color: var(--color-ink);
   border-bottom-color: var(--color-accent);
 }
+.panel-tabs button:not(.active):hover {
+  background: var(--color-hover);
+}
 .panel-tabs button span {
   font-size: 9px;
   color: var(--color-faint);
@@ -670,11 +681,13 @@ small,
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)) repeat(2, 52px);
   gap: 4px;
-  padding-right: 0;
 }
 .left-panel-tabs > button {
   min-width: 0;
   justify-content: center;
+}
+.panel-collapse-toggle {
+  display: none;
 }
 .panel-body {
   padding: var(--panel-padding-block) var(--panel-padding-inline);
@@ -1457,7 +1470,50 @@ small,
     padding: 75px max(60px, calc((100% - 1150px) / 2));
   }
   .workbench {
-    grid-template-columns: 238px minmax(0, 1fr) 280px;
+    --left-panel-width: 280px;
+    --right-panel-width: 280px;
+    grid-template-columns:
+      var(--left-panel-width) minmax(0, 1fr) var(--right-panel-width);
+  }
+  .workbench.left-panel-collapsed {
+    --left-panel-width: 24px;
+  }
+  .workbench.right-panel-collapsed {
+    --right-panel-width: 24px;
+  }
+  .left-panel-tabs {
+    padding-right: 24px;
+  }
+  .right-panel-tabs {
+    padding-left: 24px;
+  }
+  .panel-tabs .panel-collapse-toggle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    display: flex;
+    width: 24px;
+    min-width: 24px;
+    min-height: 44px;
+    padding-inline: 4px;
+    justify-content: center;
+    border-bottom: 0;
+  }
+  .right-panel-tabs .panel-collapse-toggle {
+    right: auto;
+    left: 0;
+  }
+  .panel-collapsed > :not(.panel-tabs),
+  .panel-collapsed .panel-tabs > :not(.panel-collapse-toggle) {
+    display: none;
+  }
+  .panel-collapsed .panel-tabs {
+    display: flex;
+    padding: 0;
+  }
+  .panel-collapsed .panel-tabs .panel-collapse-toggle {
+    position: static;
+    min-height: 44px;
   }
   .mobile-switch {
     display: none;
@@ -1478,7 +1534,8 @@ small,
 }
 @media (min-width: 1450px) {
   .workbench {
-    grid-template-columns: 265px minmax(0, 1fr) 310px;
+    --left-panel-width: 310px;
+    --right-panel-width: 310px;
   }
   .graph-controls {
     left: 20px;
@@ -1496,8 +1553,9 @@ small,
     font-size: 18px;
     gap: 6px;
   }
-  .wordmark > svg {
+  .wordmark-icon {
     width: 19px;
+    height: 19px;
   }
   .connection {
     font-size: 8px;

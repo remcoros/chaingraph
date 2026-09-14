@@ -1,7 +1,7 @@
 import './component-styles';
 import { TransactionFetchShell } from './Workspace/useTransactionFetch';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
-import { BookOpen, FolderOpen, Info, Library, Network as NetworkIcon, Plus, X } from 'lucide-react';
+import { BookOpen, FolderOpen, Info, Library, Plus, X } from 'lucide-react';
 import { CreateDialog, ImportDialog, UnlockDialog, Modal } from './Dialogs';
 import { HelpMenu } from './Help/HelpMenu';
 import { AboutDialog } from './Help/AboutDialog';
@@ -48,7 +48,7 @@ export default function App() {
           }}
           aria-label="Chaingraph home"
         >
-          <NetworkIcon size={23} />
+          <img className="wordmark-icon" src="/favicon.svg" alt="" />
           <span>
             chaingraph<span className="wordmark-dot">.</span>
           </span>

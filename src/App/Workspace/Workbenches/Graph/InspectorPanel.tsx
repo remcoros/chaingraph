@@ -9,6 +9,8 @@ import {
   ArrowLeftRight,
   ArrowRightFromLine,
   Box,
+  ChevronLeft,
+  ChevronRight,
   Coins,
   Layers,
   MapPin,
@@ -47,7 +49,12 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     operationStatus: operation,
     rightPanelRef,
   } = workspace;
-  const { rightTab: shownRightTab, setRightTab } = workspace.graph.panels;
+  const {
+    rightTab: shownRightTab,
+    setRightTab,
+    rightPanelCollapsed,
+    setRightPanelCollapsed,
+  } = workspace.graph.panels;
   const { scanTargets: connectionScanTargets } = workspace.graph;
   const { selected: wallet, utxos: walletUtxos } = workspace.wallet;
   const { setFocusRequest } = workspace.graph.canvas;
@@ -76,8 +83,22 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   }, [selectedId, selectedWallet, rightTab]);
   if (!activeWorkspace) return null;
   return (
-    <aside className="right-panel" ref={rightPanelRef} tabIndex={-1} data-tour="analysis-panel">
-      <div className={`panel-tabs ${wallet ? 'has-wallet-tabs' : ''}`}>
+    <aside
+      className={`right-panel ${rightPanelCollapsed ? 'panel-collapsed' : ''}`}
+      ref={rightPanelRef}
+      tabIndex={-1}
+      data-tour="analysis-panel"
+    >
+      <div className={`panel-tabs right-panel-tabs ${wallet ? 'has-wallet-tabs' : ''}`}>
+        <button
+          className="icon-button panel-collapse-toggle"
+          aria-label={rightPanelCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+          title={rightPanelCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+          aria-expanded={!rightPanelCollapsed}
+          onClick={() => setRightPanelCollapsed((value) => !value)}
+        >
+          {rightPanelCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
         <button
           className={shownRightTab === 'inspect' ? 'active' : ''}
           onClick={() => setRightTab('inspect')}
