@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   planEntityRemoval,
   removeWorkspaceEntity,
@@ -104,9 +104,7 @@ export function useEntityRemoval({
   const hasPlan = plan !== undefined;
   // A pending removal cannot outlive its plan, so switching or locking a
   // workspace clears it without a separate reset step.
-  useEffect(() => {
-    if (pending && !hasPlan) setPending(undefined);
-  }, [pending, hasPlan]);
+  if (pending && !hasPlan) setPending(undefined);
   const removableNodeIds = useMemo(
     () =>
       transactions && watchedAddresses

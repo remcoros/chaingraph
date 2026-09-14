@@ -48,9 +48,9 @@ export function useConnectionScanTargets({
   const [draft, setDraft] = useState<ConnectionScanTargetDraft>();
   const invoker = useRef<HTMLElement | null>(null);
   const picking = !!draft && draft.workspaceId === workspaceId && canPick;
-  useEffect(() => {
-    if (!picking) setDraft(undefined);
-  }, [picking]);
+  // Adjusting during render rather than in an effect: a draft that can no longer
+  // be picked into is dropped in the same pass that stops picking.
+  if (draft && !picking) setDraft(undefined);
   const toggle = useCallback((id: string) => {
     if (!isScanNodeId(id)) return;
     setDraft((current) =>
