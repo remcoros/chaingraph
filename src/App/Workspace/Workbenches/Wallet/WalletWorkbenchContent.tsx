@@ -67,7 +67,7 @@ import { ResponsiveIdentifier } from '../../../../Shared/Display/ResponsiveIdent
 import { WalletPreparationCache } from './walletPreparation';
 import './wallet-workbench.css';
 
-export interface WalletWorkbenchProps extends WalletWorkbenchContext {
+export interface WalletWorkbenchContentProps extends WalletWorkbenchContext {
   walletUtxos: WalletUtxoController;
   preparationCache?: WalletPreparationCache;
   analysisScan?: AnalysisScan;
@@ -177,8 +177,8 @@ function matchesWalletCategory(
   return matchesReviewCategories(item, selectedTypes, workspace);
 }
 
-export const WalletWorkbench = memo(
-  function WalletWorkbench(props: WalletWorkbenchProps) {
+export const WalletWorkbenchContent = memo(
+  function WalletWorkbenchContent(props: WalletWorkbenchContentProps) {
     const previewWorkspace = props.tourPreview?.example ?? props.workspace;
     const previewWallet = props.tourPreview?.example?.wallets[0] ?? props.wallet;
     const walletIdentity = props.wallet ? `${props.workspace.id}:${props.wallet.id}` : undefined;
@@ -265,7 +265,7 @@ export const WalletWorkbench = memo(
     before.wallet?.id === after.wallet?.id,
 );
 
-function WalletReview(props: WalletWorkbenchProps & { wallet: Wallet; hidden?: boolean }) {
+function WalletReview(props: WalletWorkbenchContentProps & { wallet: Wallet; hidden?: boolean }) {
   const { workspace, wallet, active, busy, canQuery, onChange } = props;
   const [localPreparation] = useState(() => new WalletPreparationCache());
   const preparation = props.preparationCache ?? localPreparation;

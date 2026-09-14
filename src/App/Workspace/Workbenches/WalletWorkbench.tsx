@@ -1,4 +1,4 @@
-import { WalletWorkbench as WalletWorkbenchContent } from './Wallet/WalletWorkbench';
+import { WalletWorkbenchContent } from './Wallet/WalletWorkbenchContent';
 import type { WorkspaceController } from '../useWorkspace';
 
 export function WalletWorkbench({ workspace }: { workspace: WorkspaceController }) {

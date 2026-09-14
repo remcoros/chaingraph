@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { analysisTools } from '../src/Domain/Analysis/analysis';
 import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
-import { AnalysisWorkbench } from '../src/App/Workspace/Workbenches/Analysis/AnalysisWorkbench';
+import { AnalysisWorkbenchContent } from '../src/App/Workspace/Workbenches/Analysis/AnalysisWorkbenchContent';
 
 function feeExample() {
   const w = newWorkspace('Public fee example', 'mainnet');
@@ -48,7 +48,7 @@ it('explains the small-transfer fee example and saves guidance with the finding'
 it('renders guidance and one reference per transaction, with no scan totals in finding details', () => {
   const workspace = feeExample();
   const html = renderToStaticMarkup(
-    createElement(AnalysisWorkbench, {
+    createElement(AnalysisWorkbenchContent, {
       workspace,
       active: true,
       onFindings: () => {},

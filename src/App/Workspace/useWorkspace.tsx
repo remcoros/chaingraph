@@ -19,7 +19,7 @@ import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from '../../Domain/Workspace/entityRemoval';
-import { type AnalysisWorkbenchSession } from './Workbenches/Analysis/AnalysisWorkbench';
+import { type AnalysisWorkbenchContentSession } from './Workbenches/Analysis/AnalysisWorkbenchContent';
 import { buildGraph, outputAddress } from '../../Domain/Workspace/workspace';
 import {
   outputNodeId,
@@ -166,7 +166,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const setScanTargetInvoker = useCallback((element: HTMLElement) => {
     scanTargetInvoker.current = element;
   }, []);
-  const analysisSessions = useRef(new Map<string, AnalysisWorkbenchSession>());
+  const analysisSessions = useRef(new Map<string, AnalysisWorkbenchContentSession>());
   const [walletScanRevision, setWalletScanRevision] = useState(0);
   useEffect(() => {
     const unlocked = new Set(ws.sessions.map((session) => session.data.id));

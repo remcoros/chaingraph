@@ -90,7 +90,7 @@ function FindingGuidance({ guidance }: { guidance: NonNullable<AnalysisFinding['
   );
 }
 
-export interface AnalysisWorkbenchSession {
+export interface AnalysisWorkbenchContentSession {
   scopeMode?: string;
   options: ReturnType<typeof scanDefaults>;
   scan?: AnalysisScan;
@@ -103,9 +103,9 @@ export interface AnalysisWorkbenchSession {
   autoLoad?: boolean;
 }
 
-export interface AnalysisWorkbenchProps {
+export interface AnalysisWorkbenchContentProps {
   active: boolean;
-  cache?: Map<string, AnalysisWorkbenchSession>;
+  cache?: Map<string, AnalysisWorkbenchContentSession>;
   workspace: Workspace;
   selected?: GraphNode;
   wallet?: Wallet;
@@ -122,7 +122,7 @@ function EvidenceReference({
 }: {
   id: string;
   workspace: Workspace;
-  onGraph: AnalysisWorkbenchProps['onGraph'];
+  onGraph: AnalysisWorkbenchContentProps['onGraph'];
   prevouts: PreviousOutputIndex;
 }) {
   const [prefix, txid, index] = id.split(':');
@@ -177,7 +177,7 @@ function EvidenceReference({
   );
 }
 
-function AnalysisWorkbench({
+function AnalysisWorkbenchContent({
   workspace,
   selected,
   wallet,
@@ -186,7 +186,7 @@ function AnalysisWorkbench({
   onGraph,
   active,
   cache,
-}: AnalysisWorkbenchProps) {
+}: AnalysisWorkbenchContentProps) {
   const fetchTransaction = useTransactionFetch('background');
   const saved = cache?.get(workspace.id);
   const [scopeMode, setScopeMode] = useState(saved?.scopeMode);
@@ -1076,7 +1076,7 @@ function AnalysisWorkbench({
 // Deliver activation/deactivation and session changes immediately. Other parent
 // updates can wait while hidden; activation always supplies the latest props.
 const MemoizedAnalysisWorkbench = memo(
-  AnalysisWorkbench,
+  AnalysisWorkbenchContent,
   (before, after) =>
     !before.active &&
     !after.active &&
@@ -1085,4 +1085,4 @@ const MemoizedAnalysisWorkbench = memo(
     before.cache === after.cache,
 );
 
-export { MemoizedAnalysisWorkbench as AnalysisWorkbench };
+export { MemoizedAnalysisWorkbench as AnalysisWorkbenchContent };

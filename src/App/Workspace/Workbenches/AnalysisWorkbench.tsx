@@ -1,4 +1,4 @@
-import { AnalysisWorkbench as AnalysisWorkbenchContent } from './Analysis/AnalysisWorkbench';
+import { AnalysisWorkbenchContent } from './Analysis/AnalysisWorkbenchContent';
 import type { WorkspaceController } from '../useWorkspace';
 
 export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceController }) {
