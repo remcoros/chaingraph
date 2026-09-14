@@ -23,6 +23,8 @@ src/
       ChainData/            bounded evidence loading, spending notices and cancellation
       useEntityRemoval.ts   removal plans, confirmation and applied removals
       useWorkspaceLookup.ts lookup field, reset signal and loaded-id resolution
+      useWorkspaceHistory.ts undo, redo and single-step batch edits
+      useDialogState.ts     which workspace dialog is open and its target
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
       Inspector/            node, wallet and script inspection

@@ -19,9 +19,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     tourStep,
     w,
     selection,
-    applyBatch,
-    undoToken,
-    undoDescription,
+    history,
     setNotice,
     ws,
     connectionScanTargets,
@@ -87,9 +85,9 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
         hiddenSelectedCount={selection.count - selectionOnCanvas}
         matching={matchingScope}
         matchingPending={graphFiltering}
-        onApply={applyBatch}
-        undoToken={undoToken}
-        undoDescription={undoDescription}
+        onApply={history.applyBatch}
+        undoToken={history.token}
+        undoDescription={history.undoDescription}
         onSetHidden={setEntityHidden}
         onIsolate={(ids) => {
           prepareIsolation(ids);

@@ -34,9 +34,8 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     operation,
     prefetchDepth,
     setPrefetchDepth,
-    undoLabel,
+    history,
     ws,
-    redoLabel,
     exportWorkspace,
     dialogs,
     setNotice,
@@ -149,19 +148,19 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
       <div className="workspace-actions" data-tour="workspace-actions">
         <button
           className="icon-button workspace-undo"
-          aria-label={undoLabel}
-          title={undoLabel}
-          disabled={!ws.active?.history.length || !!operation}
-          onClick={() => ws.undo(w.id)}
+          aria-label={history.undoLabel}
+          title={history.undoLabel}
+          disabled={!history.canUndo || !!operation}
+          onClick={history.undo}
         >
           <Undo2 size={17} />
         </button>
         <button
           className="icon-button workspace-redo"
-          aria-label={redoLabel}
-          title={redoLabel}
-          disabled={!ws.active?.redoHistory.length || !!operation}
-          onClick={() => ws.redo(w.id)}
+          aria-label={history.redoLabel}
+          title={history.redoLabel}
+          disabled={!history.canRedo || !!operation}
+          onClick={history.redo}
         >
           <Redo2 size={17} />
         </button>
@@ -201,9 +200,9 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
             >
               <button
                 className="mobile-workspace-undo"
-                aria-label={undoLabel}
-                title={undoLabel}
-                disabled={!ws.active?.history.length || !!operation}
+                aria-label={history.undoLabel}
+                title={history.undoLabel}
+                disabled={!history.canUndo || !!operation}
                 onClick={() => {
                   setMenu(false);
                   ws.undo(w.id);
@@ -213,9 +212,9 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               </button>
               <button
                 className="mobile-workspace-redo"
-                aria-label={redoLabel}
-                title={redoLabel}
-                disabled={!ws.active?.redoHistory.length || !!operation}
+                aria-label={history.redoLabel}
+                title={history.redoLabel}
+                disabled={!history.canRedo || !!operation}
                 onClick={() => {
                   setMenu(false);
                   ws.redo(w.id);

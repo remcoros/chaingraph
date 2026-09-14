@@ -18,6 +18,7 @@ import { useEntitySelection } from './Selection/useEntitySelection';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
+import { useWorkspaceHistory } from './useWorkspaceHistory';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
@@ -591,31 +592,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     updateWorkspace,
     workspaceId,
   });
-  const undoToken = ws.getSession(w?.id ?? '')?.undoRevision ?? 0;
-  const undoDescription = ws.active?.history.at(-1)?.description;
-  const undoLabel = undoDescription ? `Undo: ${undoDescription}` : 'Nothing to undo';
-  const redoDescription = ws.active?.redoHistory.at(-1)?.description;
-  const redoLabel = redoDescription ? `Redo: ${redoDescription}` : 'Nothing to redo';
-  const applyBatch = (summary: string, update: (data: Workspace) => Workspace) => {
-    if (!w) return undefined;
-    const before = ws.getSession(w.id)?.undoRevision;
-    try {
-      // A single workspace update keeps one Undo step for the whole batch.
-      change(update);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'The batch edit could not be applied.');
-      return undefined;
-    }
-    const after = ws.getSession(w.id)?.undoRevision;
-    setError('');
-    if (after === undefined || after === before) {
-      // Nothing changed, so no undo step exists and none is offered.
-      setNotice('That batch left every selected entity unchanged.');
-      return undefined;
-    }
-    setNotice(`${summary}. Undo restores the previous values.`);
-    return after;
-  };
+  const history = useWorkspaceHistory({ w, ws, change, setError, setNotice });
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   const graphActions = useGraphActions({
     cancelScanTargetPicking: connectionScanTargets.cancelPicking,
@@ -727,6 +704,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    history,
     dialogs,
     lookup,
     graphProjection,
@@ -801,8 +779,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     returnWorkbench,
     prefetchDepth,
     setPrefetchDepth,
-    undoLabel,
-    redoLabel,
     exportWorkspace,
     flushActiveGraph,
     setLockingWorkspace,
@@ -813,9 +789,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     walletWorkspaceRef,
     walletAnalysisRevision,
     analysisWorkspaceRef,
-    applyBatch,
-    undoToken,
-    undoDescription,
     pendingGraphWorkspace,
     setTour,
     entityRemoval,
