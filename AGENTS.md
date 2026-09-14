@@ -54,6 +54,12 @@ under `src/Domain/` and `src/Infra/`. Follow direct imports from the affected ar
   the routine gate and must pass without lint errors. Engine or data changes
   need relevant behavioral tests; UI polish does not need new E2E coverage.
   Documentation-only edits need no test run.
+- Keep to the tools the repository already has. Do not add a linter, test
+  framework, build step or runtime dependency in order to finish a task. When
+  one would genuinely help, report it instead of quietly working around it:
+  name the gap it would close, what adopting it would cost, and what the work
+  settled for in its absence. An unreported gap is the failure this rule guards
+  against, not the missing tool.
 - Do not suppress a lint diagnostic merely to make the check pass. A suppression
   is allowed only when the diagnostic is demonstrably incorrect, or when a
   deliberate technical decision accepts it, such as a measured performance or
