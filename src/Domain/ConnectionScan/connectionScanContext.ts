@@ -2,9 +2,9 @@ import {
   SCAN_LIMITS,
   isScanNodeId,
   scanPathHops,
-  type ScanResult,
   type ScanDirection,
-} from './connectionScan';
+  type ScanRoute,
+} from './connectionScanPaths';
 
 export const scanEdgeKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
@@ -83,7 +83,7 @@ export async function prepareScanContext(
 
 /** Opposite presentations of the same closed route are one relationship. */
 export function scanReconnectionKey(
-  result: Pick<ScanResult, 'path' | 'context'>,
+  result: { path: string[]; context?: ScanRoute },
 ): string | undefined {
   if (!result.context) return;
   const edges = new Set<string>();

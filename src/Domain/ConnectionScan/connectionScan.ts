@@ -4,8 +4,16 @@ import {
   scanReconnectionKey,
   type ScanContextIndex,
 } from './connectionScanContext';
+import {
+  SCAN_LIMITS,
+  isScanNodeId,
+  scanPathHops,
+  type ScanDirection,
+  type ScanRoute,
+} from './connectionScanPaths';
 /** Bounded observed-edge search. Exploration and its budgets are deliberately transient. */
-export type ScanDirection = 'upstream' | 'downstream';
+export { SCAN_LIMITS, isScanNodeId, scanPathHops };
+export type { ScanDirection, ScanRoute };
 export type ScanStopReason =
   | 'depth'
   | 'fan-out'
@@ -52,7 +60,7 @@ export interface ScanResult {
   kind: 'connection' | 'boundary' | 'endpoint';
   relationship?: 'direct' | 'shared-ancestor' | 'shared-descendant';
   /** A bounded existing source-to-target route that explains the reconnection. */
-  context?: { path: string[]; directions: ScanDirection[] };
+  context?: ScanRoute;
   /** Connection between frozen targets in disconnected loaded components. */
   bridge?: true;
   endpoint: string;
@@ -89,17 +97,6 @@ export interface ScanRun {
   results: ScanResult[];
   omittedResults?: { endpoints: number; issues: number };
 }
-export const SCAN_LIMITS = {
-  maxHops: 8,
-  maxTransactions: 1000,
-  maxMilliseconds: 60_000,
-  fanOut: 1000,
-  maxTargets: 1000,
-  maxResults: 50,
-  maxEndpointResults: 10,
-  maxIssueResults: 10,
-  maxRuns: 20,
-} as const;
 export const DEFAULT_SCAN_SETTINGS: ScanSettings = {
   direction: 'both',
   targetScope: 'neighbours',
@@ -108,12 +105,6 @@ export const DEFAULT_SCAN_SETTINGS: ScanSettings = {
   maxMilliseconds: 30_000,
   fanOut: 1000,
 };
-export function isScanNodeId(id: string): boolean {
-  return (
-    /^tx:[0-9a-f]{64}$/.test(id) ||
-    (/^out:[0-9a-f]{64}:(0|[1-9][0-9]*)$/.test(id) && Number(id.split(':')[2]) <= 0xffffffff)
-  );
-}
 export function validateScanSettings(settings: ScanSettings): ScanSettings {
   if (
     !settings ||
@@ -131,10 +122,6 @@ export function validateScanSettings(settings: ScanSettings): ScanSettings {
     }
   }
   return { ...settings };
-}
-/** A hop enters another transaction; its output edge does not add another hop. */
-export function scanPathHops(path: readonly string[]): number {
-  return path.slice(1).filter((node) => node.startsWith('tx:')).length;
 }
 export class ScanBudgetExceeded extends Error {
   constructor(public readonly reason: 'transactions' | 'time' | 'cancelled') {
