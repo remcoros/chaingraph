@@ -23,6 +23,7 @@ export function useAppState() {
   const statusError =
     discoveryError ||
     (unsupportedNetwork ? `Backend does not support ${w!.network}.` : (status?.error ?? ''));
+  const connected = !!status?.connected && !statusError;
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [notice, setNotice] = useState('');
@@ -124,6 +125,7 @@ export function useAppState() {
     status,
     unsupportedNetwork,
     statusError,
+    connected,
     deleteEntry,
     setDeleteEntry,
     examplesOpen,

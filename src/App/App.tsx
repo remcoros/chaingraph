@@ -31,74 +31,16 @@ import { useWorkspace } from './Workspace/useWorkspace';
 export default function App() {
   const app = useAppState();
   const workspace = useWorkspace(app);
-  const {
-    workbench,
-    w,
-    activateWorkspace,
-    pendingGraphWorkspace,
-    ws,
-    setCreate,
-    workspaceTabs,
-    status,
-    connected,
-    displayNetwork,
-    setAboutOpen,
-    statusError,
-    setTour,
-    discoveryError,
-    networks,
-    setExamplesOpen,
-    fileInput,
-    setUnlock,
-    setDeleteEntry,
-    settingsOpen,
-    setSettingsOpen,
-    change,
-    examplesOpen,
-    aboutOpen,
-    statuses,
-    setConnectionCheck,
-    deleteEntry,
-    setError,
-    setNotice,
-    error,
-    notice,
-    canQuery,
-    queryDisabledReason,
-    unsupportedNetwork,
-    setFileDialog,
-    labelsInput,
-    entityRemoval,
-    removalPlan,
-    setEntityRemoval,
-    applyEntityRemoval,
-    create,
-    openWorkspace,
-    unlock,
-    saveBeforeLeaving,
-    editingWallet,
-    lockingWorkspace,
-    walletNameDialog,
-    setWalletNameDialog,
-    walletDialog,
-    setSelectedWallet,
-    setSelectedId,
-    setRightTab,
-    setMobilePanel,
-    switchWorkbench,
-    setWalletDialog,
-    fileDialog,
-    tour,
-    tourSteps,
-    needsTourExample,
-    walletTourExample,
-    fetchScope,
-  } = workspace;
+  const { w, ws, fileInput, workspaceTabs } = app;
   return (
-    <TransactionFetchShell scope={fetchScope}>
+    <TransactionFetchShell scope={app.fetchScope}>
       <a
         className="skip-link"
-        href={workbench === 'graph' || !w ? '#main-workspace' : `#${workbench}-workspace`}
+        href={
+          workspace.workbench === 'graph' || !w
+            ? '#main-workspace'
+            : `#${workspace.workbench}-workspace`
+        }
       >
         Skip to workspace
       </a>
@@ -108,7 +50,7 @@ export default function App() {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            if (w) activateWorkspace(undefined);
+            if (w) app.activateWorkspace(undefined);
           }}
           aria-label="Chaingraph home"
         >
@@ -126,7 +68,7 @@ export default function App() {
           <button
             aria-label="Workspaces"
             className={!w ? 'home-tab active' : 'home-tab'}
-            onClick={() => activateWorkspace(undefined)}
+            onClick={() => app.activateWorkspace(undefined)}
           >
             <FolderOpen size={15} />
             <span>Workspaces</span>
@@ -137,11 +79,11 @@ export default function App() {
               key={s.data.id}
               title={s.data.name}
               aria-current={s.data.id === w?.id ? 'page' : undefined}
-              onClick={() => activateWorkspace(s.data.id)}
+              onClick={() => app.activateWorkspace(s.data.id)}
             >
               <span className="tab-network">{s.data.network === 'mainnet' ? 'M' : 'T'}</span>
               <span>{s.data.name}</span>
-              {(s.revision !== s.savedRevision || pendingGraphWorkspace === s.data.id) && (
+              {(s.revision !== s.savedRevision || app.pendingGraphWorkspace === s.data.id) && (
                 <span aria-label="Unsaved changes" className="dirty-dot">
                   ●
                 </span>
@@ -153,37 +95,38 @@ export default function App() {
             data-testid="new-workspace-button"
             aria-label="New workspace"
             title="New workspace"
-            onClick={() => setCreate('empty')}
+            onClick={() => app.setCreate('empty')}
           >
             <Plus size={16} />
           </button>
         </nav>
         <button
-          onClick={() => setAboutOpen('connection')}
+          onClick={() => app.setAboutOpen('connection')}
           aria-label="Connection details"
-          className={`connection connection-action ${connected ? 'online' : ''}`}
-          title={status?.error || statusError || 'Your self-hosted backend'}
+          className={`connection connection-action ${app.connected ? 'online' : ''}`}
+          title={app.status?.error || app.statusError || 'Your self-hosted backend'}
         >
           <span className="status-dot" />
           <span className="connection-text">
-            {connected
-              ? `${status?.network} · ${status?.height?.toLocaleString() ?? 'connected'}`
+            {app.connected
+              ? `${app.status?.network} · ${app.status?.height?.toLocaleString() ?? 'connected'}`
               : 'Offline'}
           </span>
-          <span className="connection-network">{displayNetwork ?? 'Offline'}</span>
+          <span className="connection-network">{app.displayNetwork ?? 'Offline'}</span>
         </button>
         <HelpMenu
           actions={[
             {
               label: w ? 'Show guided tour' : 'Getting started',
-              onSelect: () => (w ? setTour(WORKBENCH_TOUR[0].id) : setAboutOpen('guide')),
+              onSelect: () =>
+                w ? workspace.setTour(WORKBENCH_TOUR[0].id) : app.setAboutOpen('guide'),
             },
             {
               label: 'Example workspaces',
-              disabled: !!discoveryError || !networks?.length,
-              onSelect: () => setExamplesOpen(true),
+              disabled: !!app.discoveryError || !app.networks?.length,
+              onSelect: () => app.setExamplesOpen(true),
             },
-            { label: 'About Chaingraph', onSelect: () => setAboutOpen('about') },
+            { label: 'About Chaingraph', onSelect: () => app.setAboutOpen('about') },
           ]}
         />
       </header>
@@ -192,25 +135,25 @@ export default function App() {
         <WorkspaceHome
           saved={ws.saved}
           sessions={ws.sessions}
-          onCreate={() => setCreate('empty')}
-          networks={discoveryError ? undefined : networks}
-          onTemplate={setCreate}
-          onExamples={() => setExamplesOpen(true)}
+          onCreate={() => app.setCreate('empty')}
+          networks={app.discoveryError ? undefined : app.networks}
+          onTemplate={app.setCreate}
+          onExamples={() => app.setExamplesOpen(true)}
           onOpenFile={() => fileInput.current?.click()}
-          onActivate={activateWorkspace}
-          onUnlock={setUnlock}
-          onDelete={setDeleteEntry}
+          onActivate={app.activateWorkspace}
+          onUnlock={app.setUnlock}
+          onDelete={app.setDeleteEntry}
         />
       ) : (
         <Workspace workspace={workspace} />
       )}
-      {w && settingsOpen && (
+      {w && workspace.settingsOpen && (
         <WorkspaceDetailsDialog
           key={w.id}
           workspace={w}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => workspace.setSettingsOpen(false)}
           onSave={(name, description) =>
-            change(
+            workspace.change(
               (c) =>
                 c.name === name && c.description === description ? c : { ...c, name, description },
               true,
@@ -219,47 +162,47 @@ export default function App() {
           }
         />
       )}
-      {examplesOpen && (
+      {app.examplesOpen && (
         <ExamplesDialog
-          networks={discoveryError ? undefined : networks}
-          onClose={() => setExamplesOpen(false)}
+          networks={app.discoveryError ? undefined : app.networks}
+          onClose={() => app.setExamplesOpen(false)}
           onTemplate={(id) => {
-            setExamplesOpen(false);
-            setCreate(id);
+            app.setExamplesOpen(false);
+            app.setCreate(id);
           }}
         />
       )}
-      {aboutOpen && (
+      {app.aboutOpen && (
         <AboutDialog
-          initialTab={aboutOpen}
-          onClose={() => setAboutOpen(false)}
-          onTour={w ? () => setTour(WORKBENCH_TOUR[0].id) : undefined}
-          status={status}
-          networks={networks}
-          statuses={statuses}
-          statusError={statusError}
-          onReconnect={() => setConnectionCheck((value) => value + 1)}
+          initialTab={app.aboutOpen}
+          onClose={() => app.setAboutOpen(false)}
+          onTour={w ? () => workspace.setTour(WORKBENCH_TOUR[0].id) : undefined}
+          status={app.status}
+          networks={app.networks}
+          statuses={app.statuses}
+          statusError={app.statusError}
+          onReconnect={() => app.setConnectionCheck((value) => value + 1)}
         />
       )}
-      {deleteEntry && (
-        <Modal title="Delete saved workspace?" onClose={() => setDeleteEntry(undefined)}>
+      {app.deleteEntry && (
+        <Modal title="Delete saved workspace?" onClose={() => app.setDeleteEntry(undefined)}>
           <p>
-            Delete <strong>{deleteEntry.publicName ?? 'this encrypted workspace'}</strong> from this
-            browser? Keep an encrypted export if you may need it again. This deletion cannot be
+            Delete <strong>{app.deleteEntry.publicName ?? 'this encrypted workspace'}</strong> from
+            this browser? Keep an encrypted export if you may need it again. This deletion cannot be
             undone.
           </p>
           <div className="button-row">
-            <button onClick={() => setDeleteEntry(undefined)}>Keep workspace</button>
+            <button onClick={() => app.setDeleteEntry(undefined)}>Keep workspace</button>
             <button
               className="danger"
               onClick={() =>
                 void ws
-                  .removeSaved(deleteEntry.id)
+                  .removeSaved(app.deleteEntry!.id)
                   .then(() => {
-                    setDeleteEntry(undefined);
-                    setNotice('Saved workspace deleted from this browser.');
+                    app.setDeleteEntry(undefined);
+                    app.setNotice('Saved workspace deleted from this browser.');
                   })
-                  .catch((error) => setError(error.message))
+                  .catch((error) => app.setError(error.message))
               }
             >
               Delete from this browser
@@ -267,24 +210,24 @@ export default function App() {
           </div>
         </Modal>
       )}
-      {(error || ws.storageError || notice) && (
+      {(app.error || ws.storageError || app.notice) && (
         <div
-          className={`toast ${error || ws.storageError ? 'error' : ''}`}
-          role={error || ws.storageError ? 'alert' : 'status'}
+          className={`toast ${app.error || ws.storageError ? 'error' : ''}`}
+          role={app.error || ws.storageError ? 'alert' : 'status'}
         >
-          <span>{error || ws.storageError || notice}</span>
-          {!error &&
+          <span>{app.error || ws.storageError || app.notice}</span>
+          {!app.error &&
             !ws.storageError &&
-            notice === ADDRESS_DISPLAY_NOTICE &&
+            app.notice === ADDRESS_DISPLAY_NOTICE &&
             w &&
             !w.view.showAddresses && (
               <button
                 onClick={() => {
-                  change((current) => ({
+                  workspace.change((current) => ({
                     ...current,
                     view: { ...current.view, showAddresses: true },
                   }));
-                  setNotice('');
+                  app.setNotice('');
                 }}
               >
                 Enable address display
@@ -295,8 +238,8 @@ export default function App() {
               className="icon-button"
               aria-label="Dismiss message"
               onClick={() => {
-                setError('');
-                setNotice('');
+                app.setError('');
+                app.setNotice('');
               }}
             >
               <X size={15} />
@@ -304,12 +247,16 @@ export default function App() {
           )}
         </div>
       )}
-      {w && !w.demo && !canQuery && (
+      {w && !w.demo && !workspace.canQuery && (
         <div
           className="connection-banner"
-          role={unsupportedNetwork || discoveryError || (status && !connected) ? 'alert' : 'status'}
+          role={
+            app.unsupportedNetwork || app.discoveryError || (app.status && !app.connected)
+              ? 'alert'
+              : 'status'
+          }
         >
-          {queryDisabledReason} Saved data remains available for offline analysis.
+          {workspace.queryDisabledReason} Saved data remains available for offline analysis.
         </div>
       )}
       <input
@@ -320,14 +267,14 @@ export default function App() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
-            if (file.size > MAX_ENCRYPTED_FILE_BYTES) setError('Workspace file is too large.');
-            else setFileDialog(file);
+            if (file.size > MAX_ENCRYPTED_FILE_BYTES) app.setError('Workspace file is too large.');
+            else app.setFileDialog(file);
           }
           e.target.value = '';
         }}
       />
       <input
-        ref={labelsInput}
+        ref={workspace.labelsInput}
         type="file"
         accept=".jsonl,.json,.txt"
         hidden
@@ -338,7 +285,7 @@ export default function App() {
           try {
             if (file.size > 5_000_000) throw new Error('Label file exceeds 5 MB.');
             const result = importLabels(await file.text());
-            change((c) => {
+            workspace.change((c) => {
               const annotations = { ...c.annotations };
               for (const [id, a] of Object.entries(result.annotations))
                 annotations[id] = {
@@ -354,90 +301,111 @@ export default function App() {
                 })),
               };
             });
-            setNotice(
+            app.setNotice(
               `Imported ${Object.keys(result.annotations).length} labels. ${result.skipped} records skipped (unsupported type or no label).`,
             );
           } catch (err) {
-            setError(err instanceof Error ? err.message : 'Label import failed.');
+            app.setError(err instanceof Error ? err.message : 'Label import failed.');
           }
         }}
       />
-      {entityRemoval && removalPlan && (
+      {workspace.entityRemoval && workspace.removalPlan && (
         <Modal
           title={
-            removalPlan.kind === 'transaction' ? 'Remove transaction?' : 'Stop watching address?'
+            workspace.removalPlan.kind === 'transaction'
+              ? 'Remove transaction?'
+              : 'Stop watching address?'
           }
-          onClose={() => setEntityRemoval(undefined)}
+          onClose={() => workspace.setEntityRemoval(undefined)}
         >
-          <p>{removalPlan.title}</p>
+          <p>{workspace.removalPlan.title}</p>
           <div className="selection-facts">
-            <span>{removalPlan.kind === 'transaction' ? 'Transaction ID' : 'Address'}</span>
+            <span>
+              {workspace.removalPlan.kind === 'transaction' ? 'Transaction ID' : 'Address'}
+            </span>
             <code className="mono wrap" style={{ userSelect: 'all', display: 'block' }}>
-              {removalPlan.nodeId.slice(removalPlan.kind === 'transaction' ? 3 : 5)}
+              {workspace.removalPlan.nodeId.slice(
+                workspace.removalPlan.kind === 'transaction' ? 3 : 5,
+              )}
             </code>
             <CopyButton
-              value={removalPlan.nodeId.slice(removalPlan.kind === 'transaction' ? 3 : 5)}
+              value={workspace.removalPlan.nodeId.slice(
+                workspace.removalPlan.kind === 'transaction' ? 3 : 5,
+              )}
               label={
-                removalPlan.kind === 'transaction'
+                workspace.removalPlan.kind === 'transaction'
                   ? 'Copy transaction ID to remove'
                   : 'Copy address to stop watching'
               }
             />
           </div>
           <p>
-            {removalPlan.kind === 'transaction'
+            {workspace.removalPlan.kind === 'transaction'
               ? 'Remove the cached transaction and its transaction/output annotations and tag memberships from this workspace. Unused input context is removed too; shared, independently added or annotated context is retained. Outputs referenced by retained transactions may remain as placeholders.'
               : 'Stop watching this address and clear its annotation and tag memberships. Loaded transaction data remains in the workspace.'}
           </p>
           <p>
-            This removes {removalPlan.annotationCount} annotated{' '}
-            {removalPlan.annotationCount === 1 ? 'entity' : 'entities'} and{' '}
-            {removalPlan.tagMembershipCount} tag{' '}
-            {removalPlan.tagMembershipCount === 1 ? 'membership' : 'memberships'}. Tag definitions
-            remain. Undo can restore this change during the current session.
+            This removes {workspace.removalPlan.annotationCount} annotated{' '}
+            {workspace.removalPlan.annotationCount === 1 ? 'entity' : 'entities'} and{' '}
+            {workspace.removalPlan.tagMembershipCount} tag{' '}
+            {workspace.removalPlan.tagMembershipCount === 1 ? 'membership' : 'memberships'}. Tag
+            definitions remain. Undo can restore this change during the current session.
           </p>
           <div className="button-row">
-            <button onClick={() => setEntityRemoval(undefined)}>Keep in workspace</button>
+            <button onClick={() => workspace.setEntityRemoval(undefined)}>Keep in workspace</button>
             <button
               className="danger"
-              onClick={() => applyEntityRemoval(entityRemoval.workspaceId, entityRemoval.nodeId)}
+              onClick={() =>
+                workspace.applyEntityRemoval(
+                  workspace.entityRemoval!.workspaceId,
+                  workspace.entityRemoval!.nodeId,
+                )
+              }
             >
-              {removalPlan.kind === 'transaction' ? 'Remove transaction' : 'Stop watching address'}
+              {workspace.removalPlan.kind === 'transaction'
+                ? 'Remove transaction'
+                : 'Stop watching address'}
             </button>
           </div>
         </Modal>
       )}
-      {create && (
+      {app.create && (
         <CreateDialog
-          networks={discoveryError ? undefined : networks}
-          key={create}
-          template={WORKSPACE_TEMPLATES.find((template) => template.id === create)}
-          onCreate={openWorkspace}
-          onClose={() => setCreate(undefined)}
+          networks={app.discoveryError ? undefined : app.networks}
+          key={app.create}
+          template={WORKSPACE_TEMPLATES.find((template) => template.id === app.create)}
+          onCreate={app.openWorkspace}
+          onClose={() => app.setCreate(undefined)}
         />
       )}
-      {unlock && (
+      {app.unlock && (
         <UnlockDialog
-          entry={unlock}
+          entry={app.unlock}
           onUnlock={async (entry, password, signal) => {
-            await saveBeforeLeaving();
+            await app.saveBeforeLeaving();
             signal.throwIfAborted();
             const current = ws.getSaved(entry.id);
             if (!current) throw new Error('Saved workspace changed; reload before unlocking.');
             return ws.unlock(current, password, signal);
           }}
-          onClose={() => setUnlock(undefined)}
+          onClose={() => app.setUnlock(undefined)}
         />
       )}
-      {w && editingWallet && !lockingWorkspace && (
+      {w && workspace.editingWallet && !workspace.lockingWorkspace && (
         <WalletNameDialog
-          key={`${w.id}:${editingWallet.id}`}
-          wallet={editingWallet}
+          key={`${w.id}:${workspace.editingWallet.id}`}
+          wallet={workspace.editingWallet}
           onChange={(name) =>
-            change(
+            workspace.change(
               (current) => {
-                const target = current.wallets.find((item) => item.id === editingWallet.id);
-                if (current.id !== walletNameDialog?.workspaceId || !target || target.name === name)
+                const target = current.wallets.find(
+                  (item) => item.id === workspace.editingWallet!.id,
+                );
+                if (
+                  current.id !== workspace.walletNameDialog?.workspaceId ||
+                  !target ||
+                  target.name === name
+                )
                   return current;
                 return {
                   ...current,
@@ -447,13 +415,13 @@ export default function App() {
                 };
               },
               true,
-              `wallet-name:${editingWallet.id}`,
+              `wallet-name:${workspace.editingWallet!.id}`,
             )
           }
-          onClose={() => setWalletNameDialog(undefined)}
+          onClose={() => workspace.setWalletNameDialog(undefined)}
         />
       )}
-      {walletDialog && w && (
+      {workspace.walletDialog && w && (
         <WalletDialog
           network={w.network}
           onAdd={(newWallet) => {
@@ -462,22 +430,22 @@ export default function App() {
                 (x) => x.key === newWallet.key && x.scriptType === newWallet.scriptType,
               )
             ) {
-              setError('That wallet is already in this workspace.');
+              app.setError('That wallet is already in this workspace.');
               return;
             }
-            change((c) => ({ ...c, wallets: [...c.wallets, newWallet] }));
-            setSelectedWallet(newWallet.id);
-            setSelectedId(undefined);
-            setRightTab('inspect');
-            setMobilePanel('right');
-            switchWorkbench('wallet', true);
+            workspace.change((c) => ({ ...c, wallets: [...c.wallets, newWallet] }));
+            workspace.setSelectedWallet(newWallet.id);
+            workspace.setSelectedId(undefined);
+            workspace.setRightTab('inspect');
+            workspace.setMobilePanel('right');
+            workspace.switchWorkbench('wallet', true);
           }}
-          onClose={() => setWalletDialog(false)}
+          onClose={() => workspace.setWalletDialog(false)}
         />
       )}
-      {fileDialog && (
+      {app.fileDialog && (
         <ImportDialog
-          file={fileDialog}
+          file={app.fileDialog}
           onImport={(data, password) => {
             const existing =
               ws.sessions.find((s) => s.data.id === data.id) ||
@@ -488,23 +456,25 @@ export default function App() {
                 id: crypto.randomUUID(),
                 name: `${data.name.slice(0, 93)} (copy)`,
               };
-            openWorkspace(data, password);
+            app.openWorkspace(data, password);
           }}
-          onClose={() => setFileDialog(undefined)}
+          onClose={() => app.setFileDialog(undefined)}
         />
       )}
-      {tour !== undefined && !!w && (
+      {workspace.tour !== undefined && !!w && (
         <GuidedTour
-          steps={tourSteps}
-          activeId={tour}
-          onStepChange={setTour}
-          previewLabel={needsTourExample ? 'Public example · preview only (mainnet)' : undefined}
+          steps={workspace.tourSteps}
+          activeId={workspace.tour}
+          onStepChange={workspace.setTour}
+          previewLabel={
+            workspace.needsTourExample ? 'Public example · preview only (mainnet)' : undefined
+          }
           previewStatus={
-            needsTourExample
+            workspace.needsTourExample
               ? {
-                  loading: walletTourExample.loading,
-                  error: walletTourExample.error,
-                  onRetry: walletTourExample.retry,
+                  loading: workspace.walletTourExample.loading,
+                  error: workspace.walletTourExample.error,
+                  onRetry: workspace.walletTourExample.retry,
                 }
               : undefined
           }
