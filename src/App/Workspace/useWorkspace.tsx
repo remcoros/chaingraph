@@ -15,6 +15,7 @@ import { useWorkspaceSelection } from './Selection/useWorkspaceSelection';
 import { useWorkspaceFilters } from './Workbenches/Graph/Filters/useWorkspaceFilters';
 import { useGraphCanvas } from './Workbenches/Graph/useGraphCanvas';
 import type { WorkspaceCore } from './workspaceCore';
+import type { GraphHandoff } from './Workbenches/workbenchHandoff';
 import { graphPanelsInView, useGraphPanels } from './Workbenches/Graph/useGraphPanels';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
@@ -171,7 +172,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     select,
     setNavigation,
     prune,
-    generation: selectionGeneration,
     preserveCamera: preserveSelectionCamera,
   } = selection;
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
@@ -239,7 +239,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     entityPanelFilters,
     entityFiltersLinked,
   });
-  const { graph, recoveryGraph, recoveryNodesById, selected } = graphProjection;
+  const { recoveryGraph, recoveryNodesById, selected } = graphProjection;
   useEffect(() => {
     prune(recoveryNodesById);
   }, [recoveryNodesById, prune]);
@@ -440,7 +440,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     prefetchDepth,
     revealLookup,
   });
-  const { run, mergeTransactions } = workspaceEvidence;
+  const { run } = workspaceEvidence;
   const flowInputs = useFlowInputs({
     workspace: activeWorkspace,
     selected,
@@ -489,19 +489,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     });
   }
   const walletDiscovery = useWalletActivity({
-    getUnlockedWorkspace,
-    setOperation,
+    core,
+    evidence: workspaceEvidence,
     fetchScope,
-    workspaces,
-    activeWorkspace,
     canLoadChainData,
-    setNotice,
-    fitAll,
-    run,
     operationRef,
-    activeWorkspaceRef,
-    mergeTransactions,
-    workspaceId,
+    fitAll,
   });
   const history = useWorkspaceHistory({ workspaces });
   const graphActions = useGraphActions({
@@ -516,7 +509,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     evidence: workspaceEvidence,
     viewOwner,
   });
-  const { revealGraphNodes, updateFilters, showOnGraph, loadGraphTransactions } = graphActions;
   function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {
     pendingWorkbenchFocus.current =
       handoffFocus && activeWorkspace
@@ -537,52 +529,40 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   }
   // The factory only creates event handlers; refs are read when an action runs, not during render.
   // oxlint-disable-next-line react/refs
+  // What Graph publishes to the other workbenches, assembled once.
+  const graphHandoff: GraphHandoff = {
+    ...graphActions,
+    graph: graphProjection.graph,
+    recoveryGraph: graphProjection.recoveryGraph,
+    showRecordTab: setRightTab,
+    showPanel: setMobilePanel,
+    revealEntities: graphPanels.revealEntities,
+  };
   const walletActions = createWalletActions({
-    selectionGeneration,
-    select,
-    setSelectedId,
-    activeWorkspace,
+    core,
+    selection,
+    handoff: graphHandoff,
+    evidence: workspaceEvidence,
     wallet,
     shownRightTab,
-    setNotice,
     setGraphFilters,
-    showOnGraph,
-    showRecordTab: setRightTab,
-    selection: selection.batch,
-    workspaces,
-    loadGraphTransactions,
-    activeWorkspaceRef,
-    mergeTransactions,
-    run,
     recordHandoffInvoker,
     setReturnWorkbench,
     switchWorkbench,
-    showPanel: setMobilePanel,
-    recoveryGraph,
-    graph,
-    revealGraphNodes,
-    updateFilters,
-    revealEntities: graphPanels.revealEntities,
-    edit,
   });
 
   // The factory only creates event handlers; refs are read when an action runs, not during render.
   // oxlint-disable-next-line react/refs
   const analysisActions = createAnalysisActions({
-    selectionGeneration,
-    activeWorkspace,
-    workspaces,
+    core,
+    selection,
+    handoff: graphHandoff,
+    evidence: workspaceEvidence,
+    canLoadChainData,
+    operationRef,
     recordHandoffInvoker,
     setReturnWorkbench,
     switchWorkbench,
-    showOnGraph,
-    canLoadChainData,
-    operationRef,
-    loadGraphTransactions,
-    activeWorkspaceRef,
-    mergeTransactions,
-    setNotice,
-    run,
   });
 
   return {

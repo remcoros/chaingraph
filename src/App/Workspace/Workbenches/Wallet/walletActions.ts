@@ -6,76 +6,60 @@ import {
 } from '../../../../Domain/Wallet/walletRecords';
 import { listWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
 import { addGraphNodes } from '../../../../Domain/Graph/graphMembership';
-import { useEntitySelection } from '../../Selection/useEntitySelection';
 import { type GraphFilters, type Wallet, type Workspace } from '../../../../Domain/types';
-import type { Dispatch, SetStateAction, RefObject } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 
 import type { WorkbenchMode } from '../../workbenchTypes';
+import type { WorkspaceCore } from '../../workspaceCore';
+import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
-import type { AppState } from '../../../useAppState';
 import type { GraphHandoff } from '../workbenchHandoff';
 import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
-  activeWorkspace: AppState['activeWorkspace'];
+  core: WorkspaceCore;
+  selection: WorkspaceSelection;
+  /** Everything this workbench needs to hand a record over to Graph. */
+  handoff: GraphHandoff;
+  evidence: WorkspaceEvidence;
   wallet: Wallet | undefined;
   shownRightTab: NonNullable<Workspace['view']['rightTab']>;
-  setNotice: AppState['setNotice'];
-  select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  showOnGraph: GraphHandoff['showOnGraph'];
-  showRecordTab: GraphHandoff['showRecordTab'];
-  selection: ReturnType<typeof useEntitySelection>;
-  workspaces: AppState['workspaces'];
-  selectionGeneration: RefObject<number>;
-  loadGraphTransactions: GraphHandoff['loadGraphTransactions'];
-  activeWorkspaceRef: AppState['activeWorkspaceRef'];
-  mergeTransactions: WorkspaceEvidence['mergeTransactions'];
-  run: WorkspaceEvidence['run'];
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
   switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
-  showPanel: GraphHandoff['showPanel'];
-  recoveryGraph: GraphHandoff['recoveryGraph'];
-  setSelectedId: Dispatch<SetStateAction<string | undefined>>;
-  graph: GraphHandoff['graph'];
-  revealGraphNodes: GraphHandoff['revealGraphNodes'];
-  updateFilters: GraphHandoff['updateFilters'];
-  revealEntities: GraphHandoff['revealEntities'];
-  edit: (
-    fn: (data: Workspace) => Workspace,
-    undo?: boolean,
-    group?: string,
-    description?: string,
-  ) => void;
 }
 export function createWalletActions({
-  activeWorkspace,
+  core,
+  selection: workspaceSelection,
+  handoff,
+  evidence,
   wallet,
   shownRightTab,
-  setNotice,
-  select,
   setGraphFilters,
-  showOnGraph,
-  showRecordTab,
-  selection,
-  workspaces,
-  selectionGeneration,
-  loadGraphTransactions,
-  activeWorkspaceRef,
-  mergeTransactions,
-  run,
   recordHandoffInvoker,
   setReturnWorkbench,
   switchWorkbench,
-  showPanel,
-  recoveryGraph,
-  setSelectedId,
-  graph,
-  revealGraphNodes,
-  updateFilters,
-  revealEntities,
-  edit,
 }: Inputs) {
+  const { activeWorkspace, activeWorkspaceRef, workspaces, setNotice, edit } = core;
+  const {
+    batch: selection,
+    generation: selectionGeneration,
+    select,
+    setSelectedId,
+  } = workspaceSelection;
+  const {
+    showOnGraph,
+    showRecordTab,
+    showPanel,
+    revealEntities,
+    revealGraphNodes,
+    updateFilters,
+    loadGraphTransactions,
+    graph,
+    recoveryGraph,
+  } = handoff;
+  const { mergeTransactions, run } = evidence;
+
   function selectWalletRecord(
     nodeId: string,
     utxo?: WalletUtxoRecord,

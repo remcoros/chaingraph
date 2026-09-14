@@ -4,10 +4,11 @@ import { clearContextProvenance } from '../../../../Domain/Workspace/workspace';
 import { mergeTransactionObservations } from '../../../../Domain/Chain/prevouts';
 import { type Transaction, type Wallet, type Workspace } from '../../../../Domain/types';
 import { loadAddress, scanWallet } from '../../../../Infra/Bitcoin/api';
-import type { Dispatch, SetStateAction, RefObject } from 'react';
+import type { RefObject } from 'react';
 
 import type { AppState } from '../../../useAppState';
 import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+import type { WorkspaceCore } from '../../workspaceCore';
 /**
  * Address discovery for wallets: derive branches, pull their history and
  * optionally keep checking for new activity. Distinct from wallet analysis,
@@ -26,35 +27,26 @@ export interface WalletDiscovery {
   run: (wallet?: Wallet) => Promise<void> | void;
 }
 interface Inputs {
-  setOperation: Dispatch<SetStateAction<string>>;
+  core: WorkspaceCore;
+  evidence: WorkspaceEvidence;
   fetchScope: AppState['fetchScope'];
-  workspaces: AppState['workspaces'];
-  activeWorkspace: AppState['activeWorkspace'];
   canLoadChainData: boolean;
-  setNotice: AppState['setNotice'];
-  fitAll: () => void;
-  run: WorkspaceEvidence['run'];
   operationRef: RefObject<AbortController | undefined>;
-  activeWorkspaceRef: AppState['activeWorkspaceRef'];
-  mergeTransactions: WorkspaceEvidence['mergeTransactions'];
-  getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
-  workspaceId: AppState['workspaceId'];
+  /** Fits the graph once a first scan brings a wallet's transactions in. */
+  fitAll: () => void;
 }
 export function useWalletActivity({
-  setOperation,
+  core,
+  evidence,
   fetchScope,
-  workspaces,
-  activeWorkspace,
   canLoadChainData,
-  setNotice,
-  fitAll,
-  run,
   operationRef,
-  activeWorkspaceRef,
-  mergeTransactions,
-  getUnlockedWorkspace,
-  workspaceId,
+  fitAll,
 }: Inputs): WalletDiscovery {
+  const { activeWorkspace, activeWorkspaceRef, workspaceId, workspaces, setOperation, setNotice } =
+    core;
+  const { run, mergeTransactions } = evidence;
+
   const [gapLimit, setGapLimit] = useState(20);
   const [addressesPerBranch, setAddressesPerBranch] = useState(200);
   // Scoped to the workspace being monitored, so switching or locking one stops
@@ -181,7 +173,7 @@ export function useWalletActivity({
       ) {
         mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
         if (Object.keys(refreshedHistories).length)
-          getUnlockedWorkspace(current.id)?.edit(
+          workspaces.getUnlocked(current.id)?.edit(
             (latest) => ({
               ...latest,
               addressHistories: {

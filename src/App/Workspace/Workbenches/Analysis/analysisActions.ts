@@ -6,42 +6,38 @@ import { txNodeId } from '../../../../Domain/types';
 import type { Dispatch, SetStateAction, RefObject } from 'react';
 
 import type { WorkbenchMode } from '../../workbenchTypes';
+import type { WorkspaceCore } from '../../workspaceCore';
+import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
-import type { AppState } from '../../../useAppState';
 import type { GraphHandoff } from '../workbenchHandoff';
 import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
-  activeWorkspace: AppState['activeWorkspace'];
-  workspaces: AppState['workspaces'];
+  core: WorkspaceCore;
+  selection: WorkspaceSelection;
+  handoff: GraphHandoff;
+  evidence: WorkspaceEvidence;
+  canLoadChainData: boolean;
+  operationRef: RefObject<AbortController | undefined>;
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
   switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
-  showOnGraph: GraphHandoff['showOnGraph'];
-  canLoadChainData: boolean;
-  operationRef: RefObject<AbortController | undefined>;
-  selectionGeneration: RefObject<number>;
-  loadGraphTransactions: GraphHandoff['loadGraphTransactions'];
-  activeWorkspaceRef: AppState['activeWorkspaceRef'];
-  mergeTransactions: WorkspaceEvidence['mergeTransactions'];
-  setNotice: AppState['setNotice'];
-  run: WorkspaceEvidence['run'];
 }
 export function createAnalysisActions({
-  activeWorkspace,
-  workspaces,
+  core,
+  selection,
+  handoff,
+  evidence,
+  canLoadChainData,
+  operationRef,
   recordHandoffInvoker,
   setReturnWorkbench,
   switchWorkbench,
-  showOnGraph,
-  canLoadChainData,
-  operationRef,
-  selectionGeneration,
-  loadGraphTransactions,
-  activeWorkspaceRef,
-  mergeTransactions,
-  setNotice,
-  run,
 }: Inputs) {
+  const { activeWorkspace, activeWorkspaceRef, workspaces, setNotice } = core;
+  const { generation: selectionGeneration } = selection;
+  const { showOnGraph, loadGraphTransactions } = handoff;
+  const { mergeTransactions, run } = evidence;
+
   function showFindingOnGraph(ids: string[], isolate = false, supportingTxids: string[] = []) {
     const current = activeWorkspace && workspaces.getUnlocked(activeWorkspace.id)?.data;
     if (!current) return false;
