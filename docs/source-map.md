@@ -21,6 +21,7 @@ src/
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
       WorkspaceTour.tsx     guided tour and example preview wiring
       ChainData/            bounded evidence loading, spending notices and cancellation
+      useEntityRemoval.ts   removal plans, confirmation and applied removals
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
       Inspector/            node, wallet and script inspection

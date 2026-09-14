@@ -71,12 +71,13 @@ export function WorkspaceLabelImport({ workspace }: Props) {
 }
 
 export function EntityRemovalDialog({ workspace }: Props) {
-  const { entityRemoval, removalPlan } = workspace;
-  if (!entityRemoval || !removalPlan) return null;
+  const { entityRemoval } = workspace;
+  const { pending, plan: removalPlan } = entityRemoval;
+  if (!pending || !removalPlan) return null;
   return (
     <Modal
       title={removalPlan.kind === 'transaction' ? 'Remove transaction?' : 'Stop watching address?'}
-      onClose={() => workspace.setEntityRemoval(undefined)}
+      onClose={() => entityRemoval.cancel()}
     >
       <p>{removalPlan.title}</p>
       <div className="selection-facts">
@@ -106,12 +107,10 @@ export function EntityRemovalDialog({ workspace }: Props) {
         remain. Undo can restore this change during the current session.
       </p>
       <div className="button-row">
-        <button onClick={() => workspace.setEntityRemoval(undefined)}>Keep in workspace</button>
+        <button onClick={() => entityRemoval.cancel()}>Keep in workspace</button>
         <button
           className="danger"
-          onClick={() =>
-            workspace.applyEntityRemoval(entityRemoval.workspaceId, entityRemoval.nodeId)
-          }
+          onClick={() => entityRemoval.confirm(pending.workspaceId, pending.nodeId)}
         >
           {removalPlan.kind === 'transaction' ? 'Remove transaction' : 'Stop watching address'}
         </button>

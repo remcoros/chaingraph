@@ -7,8 +7,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
   const {
     connectionScanTargets,
     w,
-    removableNodeIds,
-    requestEntityRemoval,
+    entityRemoval,
     selection,
     changeTags,
     select,
@@ -62,8 +61,8 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     <WorkspacePanel
       w={w}
       transactions={w.transactions}
-      removableNodeIds={removableNodeIds}
-      onRemoveNode={requestEntityRemoval}
+      removableNodeIds={entityRemoval.removableNodeIds}
+      onRemoveNode={entityRemoval.request}
       selection={connectionScanTargets.picking ? undefined : selection}
       tagsPanel={
         <TagsPanel

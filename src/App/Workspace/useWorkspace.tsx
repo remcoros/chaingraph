@@ -15,11 +15,11 @@ import {
 } from 'react';
 import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
+import { useEntityRemoval } from './useEntityRemoval';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
-import { planEntityRemoval, removeWorkspaceEntity } from '../../Domain/Workspace/entityRemoval';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
-import { buildGraph, outputAddress } from '../../Domain/Workspace/workspace';
+import { outputAddress } from '../../Domain/Workspace/workspace';
 import {
   outputNodeId,
   addressNodeId,
@@ -45,20 +45,6 @@ import { createWalletActions } from './Workbenches/Wallet/walletActions';
 import { createAnalysisActions } from './Workbenches/Analysis/analysisActions';
 
 const EMPTY_GRAPH_FILTERS: GraphFilters = {};
-type EntityRemovalInput = Pick<
-  Workspace,
-  | 'network'
-  | 'transactions'
-  | 'inputContext'
-  | 'contextTransactionIds'
-  | 'annotations'
-  | 'tags'
-  | 'wallets'
-  | 'watchedAddresses'
->;
-function entityRemovalPlan(input: EntityRemovalInput | undefined, nodeId: string) {
-  return input ? planEntityRemoval(input as Workspace, nodeId) : undefined;
-}
 function resolveWalletUtxoObservationFromEvidence(
   input: WalletUtxoObservationInput | undefined,
   wallet: Pick<Wallet, 'addresses'> | undefined,
@@ -95,15 +81,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   } = app;
   const workspaceNetwork = w?.network;
   const workspaceTransactions = w?.transactions;
-  const workspaceInputContext = w?.inputContext;
-  const workspaceContextTransactionIds = w?.contextTransactionIds;
 
-  const workspaceAnnotations = w?.annotations;
-  const workspaceTags = w?.tags;
-  const workspaceWallets = w?.wallets;
-  const workspaceWatchedAddresses = w?.watchedAddresses;
-
-  const [entityRemoval, setEntityRemoval] = useState<{ workspaceId: string; nodeId: string }>();
   const [walletDialog, setWalletDialog] = useState(false);
   const [walletNameDialog, setWalletNameDialog] = useState<{
     workspaceId: string;
@@ -388,7 +366,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setSettingsOpen(false);
     setWalletNameDialog(undefined);
     setExamplesOpen(false);
-    setEntityRemoval(undefined);
     setEditToken(0);
     clearQuery();
     setQueryError('');
@@ -478,96 +455,16 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     prefetchDepth,
     updateWorkspace,
   ]);
-  const entityRemovalInput = useMemo<EntityRemovalInput | undefined>(() => {
-    if (
-      !workspaceNetwork ||
-      !workspaceTransactions ||
-      !workspaceAnnotations ||
-      !workspaceWallets ||
-      !workspaceWatchedAddresses
-    )
-      return undefined;
-    return {
-      network: workspaceNetwork,
-      transactions: workspaceTransactions,
-      inputContext: workspaceInputContext,
-      contextTransactionIds: workspaceContextTransactionIds,
-      annotations: workspaceAnnotations,
-      tags: workspaceTags,
-      wallets: workspaceWallets,
-      watchedAddresses: workspaceWatchedAddresses,
-    };
-  }, [
-    workspaceNetwork,
-    workspaceTransactions,
-    workspaceInputContext,
-    workspaceContextTransactionIds,
-    workspaceAnnotations,
-    workspaceTags,
-    workspaceWallets,
-    workspaceWatchedAddresses,
-  ]);
-  const removalPlan = useMemo(() => {
-    if (!entityRemoval || entityRemoval.workspaceId !== workspaceId) return undefined;
-    return entityRemovalPlan(entityRemovalInput, entityRemoval.nodeId);
-  }, [workspaceId, entityRemovalInput, entityRemoval]);
-  const selectedRemovalPlan = useMemo(
-    () => (selectedId ? entityRemovalPlan(entityRemovalInput, selectedId) : undefined),
-    [entityRemovalInput, selectedId],
-  );
-  const hasRemovalPlan = removalPlan !== undefined;
-  useEffect(() => {
-    if (entityRemoval && !hasRemovalPlan) setEntityRemoval(undefined);
-  }, [entityRemoval, hasRemovalPlan]);
-  const removableNodeIds = useMemo(
-    () =>
-      workspaceTransactions && workspaceWatchedAddresses
-        ? [
-            ...Object.keys(workspaceTransactions).map(txNodeId),
-            ...workspaceWatchedAddresses.map(addressNodeId),
-          ]
-        : [],
-    [workspaceTransactions, workspaceWatchedAddresses],
-  );
-  const applyEntityRemoval = (workspaceId: string, nodeId: string) => {
-    const current = wRef.current;
-    if (!current || current.id !== workspaceId) {
-      setEntityRemoval(undefined);
-      return;
-    }
-    const plan = planEntityRemoval(current, nodeId);
-    if (!plan) {
-      setEntityRemoval(undefined);
-      return;
-    }
-    ws.update(workspaceId, (latest) => removeWorkspaceEntity(latest, nodeId));
-    setEntityRemoval(undefined);
-    const remaining = ws.getSession(workspaceId)?.data;
-    if (
-      plan.kind === 'transaction' &&
-      selectedId &&
-      (plan.affectedNodeIds.includes(selectedId) ||
-        !remaining ||
-        !buildGraph(remaining).nodes.some((node) => node.id === selectedId))
-    ) {
-      setSelectedId(undefined);
-      setFocusRequest(undefined);
-    }
-    setNotice(
-      plan.kind === 'transaction'
-        ? `Transaction removed${plan.automaticContextCount ? ` with ${plan.automaticContextCount} unused input context transaction${plan.automaticContextCount === 1 ? '' : 's'}` : ''}. Shared, independently added or annotated context is retained. Undo restores the removed data.`
-        : 'Address is no longer watched. Loaded transactions remain. Undo restores the watch and annotations.',
-    );
-  };
-  const requestEntityRemoval = (nodeId = selectedId) => {
-    const current = wRef.current;
-    if (!current || !nodeId) return;
-    const plan = planEntityRemoval(current, nodeId);
-    if (!plan) return;
-    if (plan.requiresConfirmation)
-      setEntityRemoval({ workspaceId: current.id, nodeId: plan.nodeId });
-    else applyEntityRemoval(current.id, plan.nodeId);
-  };
+  const entityRemoval = useEntityRemoval({
+    w,
+    wRef,
+    ws,
+    workspaceId,
+    selectedId,
+    setSelectedId,
+    clearFocusRequest: () => setFocusRequest(undefined),
+    setNotice,
+  });
   const changeTags = (update: (workspace: Workspace) => Workspace) => {
     try {
       change((current) => {
@@ -903,8 +800,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     canTrace,
     queryDisabledReason,
     select,
-    selectedRemovalPlan,
-    requestEntityRemoval,
     change,
     wallet,
     canQuery,
@@ -925,7 +820,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setFocusRequest,
     walletUtxos,
     rightPanelRef,
-    removableNodeIds,
     selection,
     shownLeftTab,
     setWalletDialog,
@@ -981,9 +875,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setTour,
     settingsOpen,
     entityRemoval,
-    removalPlan,
-    setEntityRemoval,
-    applyEntityRemoval,
     editingWallet,
     walletNameDialog,
     walletDialog,

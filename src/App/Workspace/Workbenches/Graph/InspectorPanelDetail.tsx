@@ -27,8 +27,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     canTrace,
     queryDisabledReason,
     select,
-    selectedRemovalPlan,
-    requestEntityRemoval,
+    entityRemoval,
     change,
     wallet,
     canQuery,
@@ -133,8 +132,8 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
         })
       }
       onRefreshAddressBalance={refreshAddressBalance}
-      canRemove={!!selectedRemovalPlan}
-      onRemove={() => requestEntityRemoval()}
+      canRemove={!!entityRemoval.selectedPlan}
+      onRemove={() => entityRemoval.request()}
       onSave={(annotation, group) => {
         const previous = w.annotations[selected.id] ?? {
           label: '',
