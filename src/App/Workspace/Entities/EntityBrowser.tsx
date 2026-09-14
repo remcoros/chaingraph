@@ -427,7 +427,15 @@ export default function EntityBrowser({
   const filterKey = JSON.stringify(filters);
   const error = valueFilterError(filters);
   const patch = (change: Partial<GraphFilters>) => onFiltersChange({ ...filters, ...change });
-  useEffect(() => setPage(0), [filterKey, sort, pageSize, visibility]);
+  // Adjusting during render rather than in an effect: a page of the old results
+  // says nothing about the new ones and can be past their end, so paging resets
+  // in the same pass that changes them.
+  const listing = `${filterKey}|${sort}|${pageSize}|${visibility}`;
+  const [shownListing, setShownListing] = useState(listing);
+  if (shownListing !== listing) {
+    setShownListing(listing);
+    setPage(0);
+  }
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
   }, [activePage, filterKey, sort, visibility]);
@@ -437,6 +445,7 @@ export default function EntityBrowser({
     if (index >= 0) setPage(Math.floor(index / pageSize));
   });
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Follows an explicit selection change without undoing the page the user just turned to.
     showSelectedPage();
     // Follow explicit selection changes without undoing the user's next-page action.
   }, [selectedId]);

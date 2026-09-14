@@ -89,6 +89,7 @@ function ScriptInspectorBody({
   const request = useRef<AbortController | undefined>(undefined);
   useEffect(() => {
     request.current?.abort();
+    // oxlint-disable-next-line react/set-state-in-effect -- Aborts the previous request and starts another; the reset belongs with that.
     setRaw(undefined);
     setError('');
     setLoading(false);

@@ -22,6 +22,7 @@ export function useWalletTourExample(
   }>();
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Loads a snapshot over the network and reports the outcome when it arrives.
     setResult(undefined);
     if (!workspaceId || !enabled) return;
     const controller = new AbortController();

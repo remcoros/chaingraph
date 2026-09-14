@@ -88,6 +88,7 @@ export function IconPicker({
   useEffect(() => {
     if (!openToken || disabled) return;
     trigger.current?.focus();
+    // oxlint-disable-next-line react/set-state-in-effect -- Focuses the trigger as it opens, which must happen after commit.
     setOpen(true);
     handleOpenHandled();
   }, [openToken, disabled]);

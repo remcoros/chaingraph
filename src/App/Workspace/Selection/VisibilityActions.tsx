@@ -42,6 +42,7 @@ export function VisibilityActions({
   const notifyOpenChange = useEffectEvent((next: boolean) => onOpenChange?.(next));
   useEffect(() => () => notifyOpenChange(false), []);
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Tells the parent the popover closed, which must not happen during render.
     setOpen(false);
     notifyOpenChange(false);
   }, [nodeId]);

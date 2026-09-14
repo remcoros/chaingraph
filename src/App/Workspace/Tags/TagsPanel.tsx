@@ -164,10 +164,16 @@ export function SelectedTags({
   const trigger = useRef<HTMLButtonElement>(null);
   const [triggerAnchor, setTriggerAnchor] = useState<HTMLButtonElement | null>(null);
   const handleOpenHandled = useEffectEvent(() => onOpenHandled?.());
-  useEffect(() => {
+  // Adjusting during render rather than in an effect: a picker and a pending
+  // removal belong to one entity in one workspace, so they close in the same
+  // pass that moves to another rather than a frame later.
+  const subject = `${workspace.id}:${selected.id}`;
+  const [shownSubject, setShownSubject] = useState(subject);
+  if (shownSubject !== subject) {
+    setShownSubject(subject);
     setOpen(false);
     setRemoval(null);
-  }, [workspace.id, selected.id]);
+  }
   useEffect(() => {
     if (!openToken) return;
     const currentTrigger = trigger.current;

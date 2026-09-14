@@ -70,6 +70,7 @@ export function useFlowInputs(options: {
   const [bulkTarget, setBulkTarget] = useState('');
   const allInputs = bulkTarget === target;
   // Returning to an earlier selection must not silently repeat a bulk action.
+  // oxlint-disable-next-line react/set-state-in-effect -- Reports the outcome of fetching previous outputs.
   useEffect(() => setBulkTarget(''), [target]);
   const missingInputCount = allPlan?.missing.length ?? 0;
   const [state, setState] = useState({ target: '', loading: false, error: '' });
@@ -88,6 +89,7 @@ export function useFlowInputs(options: {
     );
     if (!missing.length) return;
     const controller = new AbortController();
+    // oxlint-disable-next-line react/set-state-in-effect -- Reports the outcome of fetching previous outputs.
     setState({ target, loading: true, error: '' });
     // Pin the displayed transaction before parent arrivals can change related-transaction ordering.
     if (transactionId && workspace.view.transactionFlow?.transactionId !== transactionId)

@@ -65,6 +65,7 @@ export function GuidedTour({
   }, [step?.id, previewLabel, previewStatus?.loading]);
   useEffect(() => {
     if (previewStatus?.loading || previewStatus?.error) {
+      // oxlint-disable-next-line react/set-state-in-effect -- Measures the spotlight target from the laid-out DOM, which only exists after commit.
       setSpotlight(undefined);
       return;
     }

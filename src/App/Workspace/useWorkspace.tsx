@@ -283,6 +283,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     if (!activeWorkspace?.view.graphSnapshot) fitAll();
   });
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Aborts running work and restores a saved presentation when the workspace changes.
     resetWorkspacePresentation();
   }, [workspaceId]);
   const active = workspaces.active;

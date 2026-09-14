@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Filter, RotateCcw, X } from 'lucide-react';
 import {
   activeFilterChips,
@@ -24,9 +24,14 @@ export function SatoshiBound({
   onChange: (value?: number) => void;
 }) {
   const [text, setText] = useState(value?.toString() ?? '');
-  useEffect(() => {
+  const [shown, setShown] = useState(value);
+  // Adjusting during render rather than in an effect, so the field never paints
+  // a stale entry for a frame. Object.is keeps an unparsable entry, which
+  // reports NaN, from counting as a change on every render.
+  if (!Object.is(shown, value)) {
+    setShown(value);
     if (value === undefined || Number.isFinite(value)) setText(value?.toString() ?? '');
-  }, [value]);
+  }
   return (
     <input
       aria-label={label}

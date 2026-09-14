@@ -82,9 +82,10 @@ export async function prepareScanContext(
 }
 
 /** Opposite presentations of the same closed route are one relationship. */
-export function scanReconnectionKey(
-  result: { path: string[]; context?: ScanRoute },
-): string | undefined {
+export function scanReconnectionKey(result: {
+  path: string[];
+  context?: ScanRoute;
+}): string | undefined {
   if (!result.context) return;
   const edges = new Set<string>();
   for (const path of [result.path, result.context.path])

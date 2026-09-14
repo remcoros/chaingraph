@@ -123,6 +123,7 @@ export default function GraphView(props: GraphViewProps) {
   const [showBusyStatus, setShowBusyStatus] = useState(false);
   useEffect(() => {
     if (!graphBusy || error) {
+      // oxlint-disable-next-line react/set-state-in-effect -- Reports renderer state that only exists once the canvas adapter has been created.
       setShowBusyStatus(false);
       return;
     }
@@ -312,6 +313,7 @@ export default function GraphView(props: GraphViewProps) {
       });
       if (savedSnapshot.current) adapter.restoreSnapshot?.(savedSnapshot.current);
       graphRef.current = adapter;
+      // oxlint-disable-next-line react/set-state-in-effect -- Reports renderer state that only exists once the canvas adapter has been created.
       setRendererActions({
         zoom: !!adapter.zoom,
         repack: !!adapter.repack,
@@ -500,6 +502,7 @@ export default function GraphView(props: GraphViewProps) {
       : props.traceDisabledReason;
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Reports what the renderer measured, which is only known after it has drawn.
     if (hasHover && !hasHoveredNode) dismissCard();
     const card = cardRef.current;
     const container = containerRef.current;

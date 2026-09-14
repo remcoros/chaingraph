@@ -48,6 +48,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/express": "^5.0.6",
     "@types/node": "^26.5.1",
     "@types/react": "^19.3.0",
@@ -55,6 +57,7 @@
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.1",
     "esbuild": "^0.28.2",
+    "jsdom": "^30.0.1",
     "oxc-transform-react": "^0.145.0",
     "oxlint": "^1.82.0",
     "prettier": "^3.9.6",

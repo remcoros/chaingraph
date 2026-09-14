@@ -27,6 +27,7 @@ export function useUtxoStatus(
   useEffect(() => {
     request.current?.abort();
     request.current = undefined;
+    // oxlint-disable-next-line react/set-state-in-effect -- Aborts the in-flight check for the previous outpoint before clearing its result.
     setState({ key });
     return () => request.current?.abort();
   }, [key]);

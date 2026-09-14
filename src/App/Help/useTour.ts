@@ -52,6 +52,7 @@ export function useTour(subject: TourSubject): Tour {
     if (!workspaceId) return;
     try {
       if (!localStorage.getItem(SEEN_KEY)) {
+        // oxlint-disable-next-line react/set-state-in-effect -- Reads and marks a visit in localStorage; the tour it opens follows that external record.
         setActiveId(WORKBENCH_TOUR[0].id);
         localStorage.setItem(SEEN_KEY, '1');
       }

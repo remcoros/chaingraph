@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { CheckSquare, Eye, EyeOff, Focus, Plus, Tag, Type, Undo2, X } from 'lucide-react';
 import type { Workspace } from '../../../Domain/types';
 import { labelBatchPlan } from '../../../Domain/Metadata/batchEdits';
@@ -86,8 +86,14 @@ export function SelectionToolbar({
   // Adjusting during render rather than in an effect: losing the toolbar closes
   // its editor in the same pass, with no extra render showing it still open.
   if (editor && !active) setEditor(undefined);
+  // Adjusting during render rather than in an effect: an editor belongs to the
+  // batch it was opened for, so it closes in the same pass that changes it.
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
-  useEffect(() => setEditor(undefined), [scopeKey]);
+  const [shownScope, setShownScope] = useState(scopeKey);
+  if (shownScope !== scopeKey) {
+    setShownScope(scopeKey);
+    setEditor(undefined);
+  }
   if (!active || (!selection.mode && !count)) return null;
   return (
     <div className="selection-toolbar" role="group" aria-label="Selected entity actions">

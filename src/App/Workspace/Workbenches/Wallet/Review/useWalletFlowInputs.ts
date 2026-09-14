@@ -79,6 +79,7 @@ export function useWalletFlowInputs(options: Options) {
   );
   const scope = currentFlowInputScope(scopeState, scopeKey, attempt);
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Reports the outcome of fetching previous outputs for a review row.
     if (scope !== scopeState) setScopeState(scope);
   }, [scope, scopeState]);
   const attempted = new Set(scope.attempted);
