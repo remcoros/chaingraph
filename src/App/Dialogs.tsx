@@ -210,6 +210,7 @@ export function CreateDialog({
   }
   const pending = useRef<AbortController | undefined>(undefined);
   const supported = useRef(networks);
+  // oxlint-disable-next-line react/refs -- Read after awaiting the template load, so it has to be the value as of then, not as of submit.
   supported.current = networks;
   const close = () => {
     pending.current?.abort();

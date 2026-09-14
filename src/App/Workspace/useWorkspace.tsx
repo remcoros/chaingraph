@@ -520,6 +520,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     showPanel: setMobilePanel,
     revealEntities: graphPanels.revealEntities,
   };
+  // oxlint-disable-next-line react/refs -- The factory only creates event handlers; refs are read when an action runs, not during render.
   const walletActions = createWalletActions({
     core,
     selection,

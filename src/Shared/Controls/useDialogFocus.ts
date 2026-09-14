@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 let openFocusTraps = 0;
 
@@ -25,8 +25,7 @@ export function useDialogFocus(
   const ref = useRef<HTMLDivElement>(null);
   // Capture the invoker before children mount and React applies autoFocus.
   const [previous] = useState(() => document.activeElement as HTMLElement | null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  const requestClose = useEffectEvent(() => onClose());
   useEffect(() => {
     if (!trapFocus) return;
     openFocusTraps += 1;
@@ -44,7 +43,7 @@ export function useDialogFocus(
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        closeRef.current();
+        requestClose();
       }
       if (e.key === 'Tab' && trapFocus) {
         const items = [
@@ -77,7 +76,7 @@ export function useDialogFocus(
         !el?.contains(event.target) &&
         !previous?.contains(event.target)
       )
-        closeRef.current();
+        requestClose();
     };
     document.addEventListener('keydown', key);
     document.addEventListener('focusin', focusOutside);
