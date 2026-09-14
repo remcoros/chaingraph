@@ -502,8 +502,12 @@ outputs) and wallet-script matches (raw script over decoded address;
 transactions associated through matching outputs or loaded prevouts, never a
 heuristic). Both are presentation inputs and do not touch annotations.
 
-**Transaction inspection.** `TransactionView` projects creating/spending
-relationships through `transactionInspection.ts`. `ScriptInspector` decodes
+**Flow panel.** `FlowPanel` owns the panel shell and composes
+`FlowPanelTransactionView` and `FlowPanelAddressView`. Each view keeps its
+downstream components and helpers in its own file. Transaction choice and quick
+editors have panel lifetime; address tabs and pagination have address lifetime.
+The transaction view projects creating/spending relationships through
+`transactionInspection.ts`. `ScriptInspector` decodes
 saved scripts to opcodes; `src/App/Workspace/Inspector/transactionInspection.ts` fetches raw bytes on
 demand, verifies them against the ID and loaded observations with bitcoinjs,
 and keeps them in component memory only. Sources are in

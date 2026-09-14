@@ -20,7 +20,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { TransactionView } from './Graph/TransactionFlow/TransactionView';
+import { FlowPanel } from './Graph/TransactionFlow/FlowPanel';
 import { hasActiveFilters, selectedWalletFilterIds } from '../../../Domain/Graph/graphFilters';
 import { applyBatchIcon } from '../../../Domain/Metadata/batchMetadata';
 import {
@@ -477,7 +477,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       >
         <div className="graph-stage-content">
           {viewOwner === w.id && (
-            <TransactionView
+            <FlowPanel
               walletUtxoObservation={walletUtxoObservation}
               key={w.id}
               state={

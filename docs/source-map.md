@@ -40,7 +40,10 @@ src/
           useGraphActions.ts graph navigation, visibility and filter actions
           useGraphProjection.tsx graph, entity and selection projections
           Filters/          graph and wallet filter controls
-          TransactionFlow/  selected transaction and address history view
+          TransactionFlow/  flow panel and its selected-entity views
+            FlowPanel.tsx   panel shell, summary and view composition
+            FlowPanelTransactionView.tsx transaction lanes, navigation and metadata tools
+            FlowPanelAddressView.tsx address history and UTXO tabs
           ConnectionScan/   scan panel, runner, worker and bounded fetching
           Renderer/         adapter contract, Three.js, layout and picking
         Analysis/           analysis controls and reports
