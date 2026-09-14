@@ -29,8 +29,6 @@ export interface WorkspaceSelection {
   /** Back and forward history of visited entities. */
   navigation: { ids: string[]; index: number };
   setNavigation: Dispatch<SetStateAction<{ ids: string[]; index: number }>>;
-  /** Keeps a selection that is still loading, so pruning does not drop it. */
-  markPending: (id: string | undefined) => void;
   /** Drops selections and history entries whose entity no longer exists. */
   prune: (available: ReadonlySet<string> | ReadonlyMap<string, unknown>) => void;
   /**
@@ -38,6 +36,24 @@ export interface WorkspaceSelection {
    * picking connection-scan targets. Pass undefined to restore normal selection.
    */
   setPickHandler: (handler: ((id: string) => void) | undefined) => void;
+}
+
+/**
+ * What one prune pass leaves selected.
+ *
+ * A selection is made together with the edit that admits its entity, but the
+ * graph projection is deferred, so the first pass after a selection can run
+ * against a graph that does not list it yet. `held` carries that selection
+ * through exactly one such pass. A second pass without it means the entity is
+ * genuinely gone, not merely not projected yet.
+ */
+export function prunedSelection(
+  selectedId: string | undefined,
+  available: ReadonlySet<string> | ReadonlyMap<string, unknown>,
+  held: string | undefined,
+): string | undefined {
+  if (!selectedId || available.has(selectedId)) return selectedId;
+  return held === selectedId ? selectedId : undefined;
 }
 
 interface Inputs {
@@ -78,9 +94,6 @@ export function useWorkspaceSelection({
   const setPickHandler = useCallback((handler: ((id: string) => void) | undefined) => {
     pickHandler.current = handler;
   }, []);
-  const markPending = useCallback((id: string | undefined) => {
-    pending.current = id;
-  }, []);
   const { getUnlocked } = sessions;
   const select = useCallback(
     (id: string, options?: SelectOptions) => {
@@ -88,7 +101,10 @@ export function useWorkspaceSelection({
         pickHandler.current(id);
         return;
       }
-      if (pending.current && pending.current !== id) pending.current = undefined;
+      // This admits the node, so the projection has not caught up with it yet.
+      // Hold it against one prune pass until the graph reports it, which the
+      // deferred projection can only do a render later.
+      pending.current = id;
       generation.current++;
       cameraPreserved.current = options?.preserveCamera ? id : undefined;
       // A click admits exactly one entity, never its transaction's other branches.
@@ -127,14 +143,11 @@ export function useWorkspaceSelection({
       // hiding an entity keeps it selected, with its scope reported in the toolbar.
       const removed = batchIds.filter((id) => !available.has(id));
       if (removed.length) removeBatchIds(removed);
-      setSelectedId((current) => {
-        if (current && !available.has(current)) {
-          if (pending.current !== current) return undefined;
-        } else if (pending.current === current) {
-          pending.current = undefined;
-        }
-        return current;
-      });
+      // Read and spend the hold here rather than inside the updater, which React
+      // may run more than once.
+      const held = pending.current;
+      pending.current = undefined;
+      setSelectedId((current) => prunedSelection(current, available, held));
     },
     [batchIds, removeBatchIds],
   );
@@ -151,7 +164,6 @@ export function useWorkspaceSelection({
     cameraPreserved,
     navigation,
     setNavigation,
-    markPending,
     prune,
     setPickHandler,
   };

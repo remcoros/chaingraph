@@ -440,7 +440,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
   function revealLookup(id: string) {
     if (!activeWorkspace) return;
-    selection.markPending(id);
     const address = id.startsWith('addr:') ? id.slice(5) : undefined;
     active?.edit((current) => ({
       ...setNodesHidden(current, [id], false),
