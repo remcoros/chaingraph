@@ -19,6 +19,7 @@ import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
 import { useWorkspaceHistory } from './useWorkspaceHistory';
+import { useMetadataEditRequest } from './useMetadataEditRequest';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
@@ -174,8 +175,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
-  const [editToken, setEditToken] = useState(0);
-  const [editTarget, setEditTarget] = useState<'label' | 'tags' | 'icon'>('label');
+  const metadataEdit = useMetadataEditRequest();
   const [operation, setOperation] = useState('');
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
     Record<string, AddressHistoryLoadState>
@@ -343,7 +343,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setNotice('');
     dialogs.closeAll();
     setExamplesOpen(false);
-    setEditToken(0);
+    metadataEdit.acknowledge();
     lookup.clear();
     lookup.setError('');
     setFocusRequest(undefined);
@@ -601,12 +601,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     w,
     setError,
     setGraphFilters,
-    setEditTarget,
+    requestMetadataEdit: metadataEdit.request,
     select,
     setFocusGraph,
     setRightTab,
     setMobilePanel,
-    setEditToken,
     workspaceId,
     viewOwner,
     selectedId,
@@ -700,6 +699,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    metadataEdit,
     history,
     dialogs,
     lookup,
@@ -718,9 +718,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setSelectedId,
     setRightTab,
     setMobilePanel,
-    editToken,
-    editTarget,
-    setEditToken,
     changeTags,
     setLeftTab,
     tx,

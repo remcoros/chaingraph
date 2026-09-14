@@ -51,13 +51,12 @@ interface Inputs {
   w: AppState['w'];
   setError: AppState['setError'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  setEditTarget: Dispatch<SetStateAction<'label' | 'tags' | 'icon'>>;
+  requestMetadataEdit: (target: 'label' | 'tags' | 'icon') => void;
   cancelScanTargetPicking: () => void;
   select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
   setFocusGraph: Dispatch<SetStateAction<boolean>>;
   setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
   setMobilePanel: Dispatch<SetStateAction<'graph' | 'left' | 'right'>>;
-  setEditToken: Dispatch<SetStateAction<number>>;
   workspaceId: AppState['workspaceId'];
   viewOwner: string | undefined;
   selectedId: string | undefined;
@@ -93,13 +92,12 @@ export function useGraphActions({
   w,
   setError,
   setGraphFilters,
-  setEditTarget,
+  requestMetadataEdit,
   cancelScanTargetPicking,
   select,
   setFocusGraph,
   setRightTab,
   setMobilePanel,
-  setEditToken,
   workspaceId,
   viewOwner,
   selectedId,
@@ -159,14 +157,13 @@ export function useGraphActions({
   };
   const showAllHidden = () => change(showAllNodes);
   const editNode = (id: string, target: 'label' | 'tags' | 'icon' = 'label') => {
-    setEditTarget(target);
     setNotice('');
     cancelScanTargetPicking();
     select(id, { pickTarget: false });
     setFocusGraph(false);
     setRightTab('inspect');
     setMobilePanel('right');
-    setEditToken((token) => token + 1);
+    requestMetadataEdit(target);
   };
   const lockToSelection = w?.view.lockToSelection ?? false;
   const showAddresses = w?.view.showAddresses ?? false;
