@@ -14,6 +14,7 @@ import {
 import { useWorkspaceSelection } from './Selection/useWorkspaceSelection';
 import { useWorkspaceFilters } from './Workbenches/Graph/Filters/useWorkspaceFilters';
 import { useGraphCanvas } from './Workbenches/Graph/useGraphCanvas';
+import type { WorkspaceCore } from './workspaceCore';
 import { graphPanelsInView, useGraphPanels } from './Workbenches/Graph/useGraphPanels';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
@@ -79,7 +80,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const dialogs = useDialogState(activeWorkspace);
   const [viewOwner, setViewOwner] = useState<string>();
   const graphPanels = useGraphPanels();
-  const { setLeftTab, setRightTab, setMobilePanel, setFocusGraph } = graphPanels;
+  const { setLeftTab, setRightTab, setMobilePanel } = graphPanels;
   const graphCanvas = useGraphCanvas({
     getUnlockedWorkspace,
     workspaceId,
@@ -95,9 +96,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     graph: graphFilters,
     setGraph: setGraphFilters,
     entityPanel: entityPanelFilters,
-    setEntityPanel: setEntityPanelFilters,
     entityLinked: entityFiltersLinked,
-    setEntityLinked: setEntityFiltersLinked,
   } = filters;
   const analysis = useWorkspaceAnalysis(workspaces.unlocked);
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
@@ -171,13 +170,10 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selectedWallet,
     setSelectedWallet,
     select,
-    navigation,
     setNavigation,
     prune,
     generation: selectionGeneration,
-    invalidate: invalidateSelection,
     preserveCamera: preserveSelectionCamera,
-    cameraPreserved: cameraPreservedSelection,
   } = selection;
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [operation, setOperation] = useState('');
@@ -253,17 +249,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     entityPanelFilters,
     entityFiltersLinked,
   });
-  const {
-    graph,
-    effectiveFilters,
-    admittedIds,
-    visibleGraph,
-    hiddenIds,
-    recoveryGraph,
-    recoveryNodesById,
-    selected,
-    selectedNodeIsVisible,
-  } = graphProjection;
+  const { graph, recoveryGraph, recoveryNodesById, selected } = graphProjection;
   useEffect(() => {
     prune(recoveryNodesById);
   }, [recoveryNodesById, prune]);
@@ -469,7 +455,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     canTraceAncestry,
     spendingOffsets,
   });
-  const { getTransaction, run, mergeTransactions } = workspaceEvidence;
+  const { run, mergeTransactions } = workspaceEvidence;
   const flowInputs = useFlowInputs({
     workspace: activeWorkspace,
     selected,
@@ -533,46 +519,27 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspaceId,
   });
   const history = useWorkspaceHistory({ workspaces });
-  const graphActions = useGraphActions({
-    getUnlockedWorkspace,
-    cancelScanTargetPicking: connectionScanTargets.cancelPicking,
-    selectionGeneration,
-    invalidateSelection,
-    preserveSelectionCamera,
-    select,
-    selectedId,
-    setSelectedId,
-    navigation,
-    cameraPreservedSelection,
-    edit,
-    setFocusRequest,
-    setNotice,
+  const core: WorkspaceCore = {
     activeWorkspace,
-    setError,
-    setGraphFilters,
-    requestMetadataEdit: annotations.edit.request,
-    setFocusGraph,
-    setRightTab,
-    setMobilePanel,
-    workspaceId,
-    viewOwner,
-    hiddenIds,
-    selectedNodeIsVisible,
-    admittedIds,
-    visibleGraph,
-    graph,
-    effectiveFilters,
-    setNavigation,
-    fitAll,
-    graphFilters,
-    setEntityPanelFilters,
-    setEntityFiltersLinked,
     activeWorkspaceRef,
+    workspaceId,
     workspaces,
+    edit,
+    setNotice,
+    setError,
     setOperation,
-    getTransaction,
-    entityFiltersLinked,
-    run,
+  };
+  const graphActions = useGraphActions({
+    core,
+    selection,
+    projection: graphProjection,
+    filters,
+    panels: graphPanels,
+    canvas: graphCanvas,
+    scanTargets: connectionScanTargets,
+    annotations,
+    evidence: workspaceEvidence,
+    viewOwner,
   });
   const { revealGraphNodes, updateFilters, showOnGraph, loadGraphTransactions } = graphActions;
   function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {

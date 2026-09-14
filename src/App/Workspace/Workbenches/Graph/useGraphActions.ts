@@ -17,112 +17,81 @@ import { filterGraph } from '../../../../Domain/Graph/graphFilters';
 import { type GraphFilters } from '../../../../Domain/types';
 import { setNodesHidden, showAllNodes } from '../../../../Domain/Graph/visibility';
 import { promoteInputContext } from '../../../../Domain/Workspace/workspace';
-import { type Workspace } from '../../../../Domain/types';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../Infra/Bitcoin/api';
-import type { Dispatch, SetStateAction, RefObject } from 'react';
 
 import { entityPanelFiltersFromGraph } from './Filters/entityPanelFilters';
 import { ADDRESS_DISPLAY_NOTICE } from '../../workspaceNotices';
 
-import type { AppState } from '../../../useAppState';
 import type { GraphProjection } from './useGraphProjection';
 import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+import type { WorkspaceCore } from '../../workspaceCore';
+import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
+import type { ConnectionScanTargets } from '../../Selection/useConnectionScanTargets';
+import type { WorkspaceAnnotations } from '../../Annotations/useAnnotations';
+import type { WorkspaceFilters } from './Filters/useWorkspaceFilters';
+import type { GraphPanels } from './useGraphPanels';
+import type { GraphCanvas } from './useGraphCanvas';
 interface Inputs {
-  selectionGeneration: Readonly<RefObject<number>>;
-  invalidateSelection: () => void;
-  preserveSelectionCamera: (id: string | undefined) => void;
-  edit: (
-    fn: (data: Workspace) => Workspace,
-    undo?: boolean,
-    group?: string,
-    description?: string,
-  ) => void;
-  setFocusRequest: Dispatch<
-    SetStateAction<
-      | {
-          id: string;
-          token: number;
-          preserveZoom?: boolean;
-        }
-      | undefined
-    >
-  >;
-  setNotice: AppState['setNotice'];
-  activeWorkspace: AppState['activeWorkspace'];
-  setError: AppState['setError'];
-  setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  requestMetadataEdit: (target: 'label' | 'tags' | 'icon') => void;
-  cancelScanTargetPicking: () => void;
-  select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
-  setFocusGraph: Dispatch<SetStateAction<boolean>>;
-  setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
-  setMobilePanel: Dispatch<SetStateAction<'graph' | 'left' | 'right'>>;
-  workspaceId: AppState['workspaceId'];
+  core: WorkspaceCore;
+  selection: WorkspaceSelection;
+  projection: GraphProjection;
+  filters: WorkspaceFilters;
+  panels: GraphPanels;
+  canvas: GraphCanvas;
+  scanTargets: ConnectionScanTargets;
+  annotations: WorkspaceAnnotations;
+  evidence: WorkspaceEvidence;
   viewOwner: string | undefined;
-  selectedId: string | undefined;
-  cameraPreservedSelection: RefObject<string | undefined>;
-  hiddenIds: GraphProjection['hiddenIds'];
-  getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
-  selectedNodeIsVisible: GraphProjection['selectedNodeIsVisible'];
-  admittedIds: GraphProjection['admittedIds'];
-  visibleGraph: GraphProjection['visibleGraph'];
-  graph: GraphProjection['graph'];
-  effectiveFilters: GraphProjection['effectiveFilters'];
-  navigation: { ids: string[]; index: number };
-  setNavigation: Dispatch<SetStateAction<{ ids: string[]; index: number }>>;
-  setSelectedId: Dispatch<SetStateAction<string | undefined>>;
-  fitAll: () => void;
-  graphFilters: GraphFilters;
-  setEntityPanelFilters: Dispatch<SetStateAction<GraphFilters>>;
-  setEntityFiltersLinked: Dispatch<SetStateAction<boolean>>;
-  activeWorkspaceRef: AppState['activeWorkspaceRef'];
-  workspaces: AppState['workspaces'];
-  setOperation: Dispatch<SetStateAction<string>>;
-  getTransaction: WorkspaceEvidence['getTransaction'];
-  entityFiltersLinked: boolean;
-  run: WorkspaceEvidence['run'];
 }
 export function useGraphActions({
-  selectionGeneration,
-  invalidateSelection,
-  preserveSelectionCamera,
-  edit,
-  setFocusRequest,
-  setNotice,
-  activeWorkspace,
-  setError,
-  setGraphFilters,
-  requestMetadataEdit,
-  cancelScanTargetPicking,
-  select,
-  setFocusGraph,
-  setRightTab,
-  setMobilePanel,
-  workspaceId,
+  core,
+  selection,
+  projection,
+  filters,
+  panels,
+  canvas,
+  scanTargets,
+  annotations,
+  evidence,
   viewOwner,
-  selectedId,
-  cameraPreservedSelection,
-  hiddenIds,
-  getUnlockedWorkspace,
-  selectedNodeIsVisible,
-  admittedIds,
-  visibleGraph,
-  graph,
-  effectiveFilters,
-  navigation,
-  setNavigation,
-  setSelectedId,
-  fitAll,
-  graphFilters,
-  setEntityPanelFilters,
-  setEntityFiltersLinked,
-  activeWorkspaceRef,
-  workspaces,
-  setOperation,
-  getTransaction,
-  entityFiltersLinked,
-  run,
 }: Inputs) {
+  const {
+    activeWorkspace,
+    activeWorkspaceRef,
+    workspaceId,
+    workspaces,
+    edit,
+    setNotice,
+    setError,
+    setOperation,
+  } = core;
+  const {
+    generation: selectionGeneration,
+    invalidate: invalidateSelection,
+    preserveCamera: preserveSelectionCamera,
+    cameraPreserved: cameraPreservedSelection,
+    select,
+    selectedId,
+    setSelectedId,
+    navigation,
+    setNavigation,
+  } = selection;
+  const { hiddenIds, selectedNodeIsVisible, admittedIds, visibleGraph, graph, effectiveFilters } =
+    projection;
+  const {
+    graph: graphFilters,
+    setGraph: setGraphFilters,
+    setEntityPanel: setEntityPanelFilters,
+    entityLinked: entityFiltersLinked,
+    setEntityLinked: setEntityFiltersLinked,
+  } = filters;
+  const { setFocusGraph, setRightTab, setMobilePanel } = panels;
+  const { setFocusRequest, fitAll } = canvas;
+  const { cancelPicking: cancelScanTargetPicking } = scanTargets;
+  const { edit: metadataEdit } = annotations;
+  const requestMetadataEdit = metadataEdit.request;
+  const { getTransaction, run } = evidence;
+
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
       if (hidden) invalidateSelection();
@@ -184,10 +153,7 @@ export function useGraphActions({
     if (!selectedNodeIsVisible) {
       setGraphFilters({});
       if (selectedId.startsWith('addr:') && !showAddresses)
-        getUnlockedWorkspace(workspaceId)?.edit(
-          (current) => ({ ...current, view: { ...current.view, showAddresses: true } }),
-          false,
-        );
+        edit((current) => ({ ...current, view: { ...current.view, showAddresses: true } }), false);
     }
     setFocusRequest((previous) =>
       previous?.id === selectedId && previous.preserveZoom
@@ -197,12 +163,12 @@ export function useGraphActions({
   }, [
     workspaceId,
     viewOwner,
+    edit,
     lockToSelection,
     selectedId,
     hiddenIds,
     selectedNodeIsVisible,
     showAddresses,
-    getUnlockedWorkspace,
     setFocusRequest,
     cameraPreservedSelection,
     setGraphFilters,
