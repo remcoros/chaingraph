@@ -253,11 +253,11 @@ export function CreateDialog({
     try {
       const w = template
         ? await loadTemplateWorkspace(
-            template.id,
-            name.trim(),
-            description.trim(),
-            controller.signal,
-          )
+          template.id,
+          name.trim(),
+          description.trim(),
+          controller.signal,
+        )
         : { ...newWorkspace(name.trim(), selectedNet), description: description.trim() };
       controller.signal.throwIfAborted();
       if (!supported.current?.includes(w.network))
@@ -297,6 +297,9 @@ export function CreateDialog({
       >
         <label>
           Name (public)
+          <span className="small muted">
+            Stays visible when locked. Keep private details in the description.
+          </span>
           <input
             disabled={busy}
             ref={nameInput}
@@ -324,9 +327,6 @@ export function CreateDialog({
             }}
           />
         </label>
-        <p className="small muted">
-          The name stays visible when locked. Keep private details in the encrypted description.
-        </p>
         <label>
           Description (encrypted, optional)
           <textarea
