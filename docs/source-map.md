@@ -18,6 +18,8 @@ src/
       useWorkspace.tsx      shared state, selection and workbench coordination
       useWorkspaces.ts      sessions, undo/redo, autosave and locking
       WorkspaceToolbar.tsx  workbench navigation, lookup and workspace actions
+      WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
+      WorkspaceTour.tsx     guided tour and example preview wiring
       ChainData/            bounded evidence loading and cancellation
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
@@ -92,10 +94,14 @@ storage are separate from the server. Global styles live in `App/styles.css`, wo
 styles in `App/Workspace/Workbenches/workbenches.css`, and design tokens live
 in the root `tokens.css`. Tool configuration stays at the repository root.
 
+`App/useAppState.ts` owns app sessions, navigation, connection status and feedback.
+`App.tsx` reads these directly; Workspace consumes the app services it needs.
 `Workspace/useWorkspace.tsx` owns shared state, selection, presentation hydration
 and workbench switching/focus. Workbench action modules implement Graph, Wallet
 and Analysis behavior over that state. Owned panels receive the Workspace
-controller; reusable controls keep focused props. The shared evidence-loading
+controller; reusable controls keep focused props. Workspace dialog and tour
+components bind that controller to their UI without owning another copy of state.
+The shared evidence-loading
 and flow-input hooks and transaction-fetch context live at Workspace scope. The
 dialog module exports modal and focus helpers used by
 other areas. Graph filter controls are also used by the entity browser, and
