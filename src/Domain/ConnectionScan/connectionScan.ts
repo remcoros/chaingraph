@@ -11,32 +11,27 @@ import {
   type ScanDirection,
   type ScanRoute,
 } from './connectionScanPaths';
+import type {
+  ConnectionScanRecords,
+  ScanFinding,
+  ScanObservation,
+  ScanResult,
+  ScanRun,
+  ScanSettings,
+  ScanStopReason,
+} from '../types';
 /** Bounded observed-edge search. Exploration and its budgets are deliberately transient. */
 export { SCAN_LIMITS, isScanNodeId, scanPathHops };
 export type { ScanDirection, ScanRoute };
-export type ScanStopReason =
-  | 'depth'
-  | 'fan-out'
-  | 'time'
-  | 'transactions'
-  | 'unknown'
-  | 'failure'
-  | 'results'
-  | 'cancelled'
-  | 'backend-unavailable'
-  | 'rate-limited'
-  | 'offline';
-export type ScanFinding =
-  | 'many-inputs'
-  | 'many-outputs'
-  | 'unspent'
-  | 'coinbase'
-  | 'unspendable'
-  | 'transaction-unavailable'
-  | 'spend-unknown'
-  | 'lookup-failed'
-  | 'conflicting-evidence';
-/** These describe the run, never a transaction or outpoint finding. */
+export type {
+  ConnectionScanRecords,
+  ScanFinding,
+  ScanObservation,
+  ScanResult,
+  ScanRun,
+  ScanSettings,
+  ScanStopReason,
+};
 export const SCAN_STATUS_ONLY_REASONS: readonly ScanStopReason[] = [
   'depth',
   'time',
@@ -47,56 +42,7 @@ export const SCAN_STATUS_ONLY_REASONS: readonly ScanStopReason[] = [
   'rate-limited',
   'offline',
 ];
-export interface ScanSettings {
-  direction: ScanDirection | 'both';
-  targetScope: 'neighbours' | 'visible' | 'added' | 'custom';
-  maxHops: number;
-  maxTransactions: number;
-  maxMilliseconds: number;
-  fanOut: number;
-}
-export interface ScanResult {
-  id: string;
-  kind: 'connection' | 'boundary' | 'endpoint';
-  relationship?: 'direct' | 'shared-ancestor' | 'shared-descendant';
-  /** A bounded existing source-to-target route that explains the reconnection. */
-  context?: ScanRoute;
-  /** Connection between frozen targets in disconnected loaded components. */
-  bridge?: true;
-  endpoint: string;
-  path: string[];
-  /** Direction followed on each observed edge, in path order from the source. */
-  directions: ScanDirection[];
-  hops: number;
-  reason?: ScanStopReason;
-  dismissed?: boolean;
-  finding?: ScanFinding;
-  scanDirection?: ScanDirection;
-  branchCount?: number;
-  checkedAt?: string;
-  bestBlock?: string;
-  includesMempool?: boolean;
-  issueCode?: 'timeout' | 'invalid-response' | 'lookup-failed';
-  meetingNode?: string;
-}
-export type ScanObservation = Pick<
-  ScanResult,
-  'finding' | 'branchCount' | 'checkedAt' | 'bestBlock' | 'includesMempool' | 'issueCode'
-> & { finding: ScanFinding };
-export interface ScanRun {
-  id: string;
-  source: string;
-  targetIds: string[];
-  settings: ScanSettings;
-  startedAt: string;
-  status: 'running' | 'complete' | 'cancelled' | 'interrupted' | 'failed';
-  examined: number;
-  /** Deepest transaction-hop distance reached from a source or target root. */
-  deepestHop?: number;
-  stopReasons: ScanStopReason[];
-  results: ScanResult[];
-  omittedResults?: { endpoints: number; issues: number };
-}
+
 export const DEFAULT_SCAN_SETTINGS: ScanSettings = {
   direction: 'both',
   targetScope: 'neighbours',

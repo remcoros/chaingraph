@@ -1,9 +1,9 @@
 import { canonicalEntityNodeId } from '../Metadata/entityReferences';
 import { graphRemovalClosure, graphTransactionOutputIds } from './graphBranch';
 import type { GraphData, Workspace } from '../types';
-import type { GraphEvidenceWorkspace } from '../Workspace/workspace';
+import type { GraphEvidenceWorkspace } from '../Workspace/graphEvidence';
 import { setNodesHidden } from './visibility';
-import { buildGraph } from '../Workspace/workspace';
+import { buildGraph } from '../Workspace/graphEvidence';
 import {
   assertGraphNodeBudget,
   MAX_GRAPH_ACTION_NODES,

@@ -4,21 +4,16 @@ import type { ScanResult, ScanRun } from './connectionScan';
 import { SCAN_LIMITS, scanPathHops, isScanNodeId } from './connectionScan';
 import { addGraphNodes } from '../Graph/graphMembership';
 import { indexPreviousOutputs, previousOutputsConflict } from '../Chain/prevouts';
-import type { Transaction, Workspace } from '../types';
+import type { ConnectionScanRecords, Transaction, Workspace } from '../types';
 import { outputNodeId } from '../types';
 import {
   buildGraph,
   clearContextProvenance,
   type GraphEvidenceWorkspace,
-} from '../Workspace/workspace';
+} from '../Workspace/graphEvidence';
 
 export const MAX_SCAN_EVIDENCE_TRANSACTIONS = 200;
 export const MAX_SCAN_RECORD_BYTES = 2 * 1024 * 1024;
-export interface ConnectionScanRecords {
-  /** Bounded results from retained scans, ordered by when each scan started. */
-  runs: ScanRun[];
-  evidence: Record<string, Transaction>;
-}
 
 /** Evidence needed to preview one retained scan path without subscribing to presentation state. */
 export type ScanPathWorkspace = GraphEvidenceWorkspace &

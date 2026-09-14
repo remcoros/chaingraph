@@ -172,3 +172,11 @@ export function mergeTransactionObservations(
     ? { ...incoming, vin }
     : incoming;
 }
+
+/** The single address a loaded output pays, when it has exactly one. */
+export function outputAddress(output: Transaction['vout'][number]) {
+  return (
+    output.scriptPubKey.address ??
+    (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined)
+  );
+}

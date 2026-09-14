@@ -152,18 +152,6 @@
           }
         ]
       }
-    },
-    {
-      "files": [
-        "src/Domain/Workspace/workspace.ts",
-        "src/Domain/ConnectionScan/connectionScan.ts",
-        "src/Domain/ConnectionScan/connectionScanContext.ts",
-        "src/Domain/ConnectionScan/connectionScanRecords.ts",
-        "src/Domain/Graph/graphMembership.ts"
-      ],
-      "rules": {
-        "import/no-cycle": "off"
-      }
     }
   ]
 }
