@@ -51,7 +51,7 @@ under `src/Domain/` and `src/Infra/`. Follow direct imports from the affected ar
 ## Validation
 
 - `npm run check` (portability, linting, build, domain and integration tests) is
-  the routine gate and must pass without lint warnings. Engine or data changes
+  the routine gate and must pass without lint errors. Engine or data changes
   need relevant behavioral tests; UI polish does not need new E2E coverage.
   Documentation-only edits need no test run.
 - Do not suppress a lint diagnostic merely to make the check pass. A suppression
