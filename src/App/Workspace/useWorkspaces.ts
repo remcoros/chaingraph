@@ -3,7 +3,7 @@ import {
   transactionScheduler,
 } from '../../Infra/Bitcoin/transactionScheduler';
 import { WalletPreparationCache } from './Workbenches/Wallet/walletPreparation';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { Transaction, Workspace } from '../../Domain/types';
 import { describeWorkspaceChange } from '../../Domain/Workspace/undoDescription';
 import {
@@ -793,15 +793,25 @@ export function useWorkspaces() {
   }, [store]);
   // Reaching one workspace and doing something to it are separate concerns: this
   // hook finds workspaces, and each unlocked one carries its own operations.
-  return {
-    ...state,
-    active: state.unlocked.find((s) => s.data.id === state.activeId),
-    getUnlocked: store.getUnlocked,
-    getSaved: store.getSaved,
-    setActiveId: store.setActiveId,
-    open: store.open,
-    unlock: store.unlock,
-    exportEncrypted: store.exportEncrypted,
-    removeSaved: store.removeSaved,
-  };
+  //
+  // Memoized on the store snapshot so callers can put the result, or anything
+  // read off it, in a dependency array. Without this the fresh object would make
+  // every such effect re-run on every render. React Compiler would infer the
+  // same memoization, but it does not run in unit tests and an effect's deps are
+  // still compared by React, so the stable identity is stated here rather than
+  // left to an optimization.
+  return useMemo(
+    () => ({
+      ...state,
+      active: state.unlocked.find((s) => s.data.id === state.activeId),
+      getUnlocked: store.getUnlocked,
+      getSaved: store.getSaved,
+      setActiveId: store.setActiveId,
+      open: store.open,
+      unlock: store.unlock,
+      exportEncrypted: store.exportEncrypted,
+      removeSaved: store.removeSaved,
+    }),
+    [state, store],
+  );
 }
