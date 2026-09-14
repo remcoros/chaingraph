@@ -1185,10 +1185,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     canQuery,
     operation,
     queryDisabledReason,
-    invalidateSelection,
     operationRef,
-    setSelectedWallet,
-    setSelectedId,
     setRightTab,
     dialogs,
     change,
@@ -1196,6 +1193,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     shownWorkbench,
     walletWorkspaceRef,
   } = workspace;
+  const { invalidate: invalidateSelection, setSelectedWallet, setSelectedId } = workspace.selection;
   const { openWalletRecord, analyzeFromWallet } = workspace.walletActions;
 
   if (!w) return null;

@@ -29,6 +29,8 @@ export interface ConnectionScanTargets {
 
 interface Inputs {
   workspaceId: string | undefined;
+  /** Installs the picking mode on selection while a draft is open. */
+  setPickHandler: (handler: ((id: string) => void) | undefined) => void;
   /** Whether the current view can accept picks, from the workbench and tab in view. */
   canPick: boolean;
   onSelectSource: (id: string) => void;
@@ -37,6 +39,7 @@ interface Inputs {
 
 export function useConnectionScanTargets({
   workspaceId,
+  setPickHandler,
   canPick,
   onSelectSource,
   onShowPanel,
@@ -61,6 +64,11 @@ export function useConnectionScanTargets({
           },
     );
   }, []);
+  // Selecting an entity picks a target instead while a draft is open.
+  useEffect(() => {
+    setPickHandler(picking ? toggle : undefined);
+    return () => setPickHandler(undefined);
+  }, [picking, toggle, setPickHandler]);
   const preview = useMemo(() => {
     if (!workspaceId || !draft || draft.workspaceId !== workspaceId) return {};
     try {

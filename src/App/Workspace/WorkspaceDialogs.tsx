@@ -142,8 +142,8 @@ export function WalletDialogs({ workspace }: Props) {
               ...current,
               wallets: [...current.wallets, newWallet],
             }));
-            workspace.setSelectedWallet(newWallet.id);
-            workspace.setSelectedId(undefined);
+            workspace.selection.setSelectedWallet(newWallet.id);
+            workspace.selection.setSelectedId(undefined);
             workspace.setRightTab('inspect');
             workspace.setMobilePanel('right');
             workspace.switchWorkbench('wallet', true);

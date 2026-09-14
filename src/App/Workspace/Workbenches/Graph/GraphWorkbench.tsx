@@ -38,17 +38,12 @@ const GraphView = lazy(() => import('./GraphView'));
 export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }) {
   const {
     w,
-    selectedId,
-    selection,
     change,
     setNotice,
-    select,
     canQuery,
     tx,
     canTrace,
     operation,
-    navigation,
-    preserveSelectionCamera,
     graphFilters,
     workbench,
     viewOwner,
@@ -71,6 +66,13 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphWorkspaceRef,
     shownMobilePanel,
   } = workspace;
+  const {
+    selectedId,
+    batch: selection,
+    select,
+    navigation,
+    preserveCamera: preserveSelectionCamera,
+  } = workspace.selection;
   const {
     graphFlowContext,
     canvasIds,

@@ -11,10 +11,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     walletUtxoObservation,
     setNotice,
     setNoticeSequence,
-    invalidateSelection,
     operationRef,
-    setSelectedWallet,
-    setSelectedId,
     setRightTab,
     setMobilePanel,
     annotations,
@@ -23,7 +20,6 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     operation,
     canTrace,
     queryDisabledReason,
-    select,
     entityRemoval,
     change,
     wallet,
@@ -33,6 +29,12 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     tourStep,
     shownRightTab,
   } = workspace;
+  const {
+    invalidate: invalidateSelection,
+    setSelectedWallet,
+    setSelectedId,
+    select,
+  } = workspace.selection;
   const { selected, walletMatches, graph } = workspace.graphProjection;
   const { addressBalance, expand, getTransaction, mergeTransactions, run, refreshAddressBalance } =
     workspace.evidence;

@@ -8,18 +8,12 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     connectionScanTargets,
     w,
     entityRemoval,
-    selection,
     annotations,
-    select,
     setMobilePanel,
     shownLeftTab,
     setLeftTab,
     wallet,
-    selectedId,
-    invalidateSelection,
     operationRef,
-    setSelectedWallet,
-    setSelectedId,
     setRightTab,
     dialogs,
     operation,
@@ -31,6 +25,14 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setEntityPanelFilters,
     change,
   } = workspace;
+  const {
+    batch: selection,
+    select,
+    selectedId,
+    invalidate: invalidateSelection,
+    setSelectedWallet,
+    setSelectedId,
+  } = workspace.selection;
   const {
     graph,
     selected,

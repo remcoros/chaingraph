@@ -26,8 +26,6 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   const {
     w,
     rightTab,
-    selectedId,
-    selectedWallet,
     shownRightTab,
     setRightTab,
     wallet,
@@ -40,12 +38,12 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     ws,
     change,
     setGraphFilters,
-    select,
     setFocusRequest,
     walletUtxos,
     operation,
     rightPanelRef,
   } = workspace;
+  const { selectedId, selectedWallet, select } = workspace.selection;
   const { visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =
     workspace.graphProjection;
   const { selectWalletRecord } = workspace.walletActions;

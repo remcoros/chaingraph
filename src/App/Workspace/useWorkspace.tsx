@@ -2,7 +2,6 @@ import { resolveWalletUtxoObservation } from '../../Domain/Wallet/walletUtxoObse
 import { useWalletUtxos } from './Workbenches/Wallet/useWalletUtxos';
 import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
 import { useFlowInputs } from './useFlowInputs';
-import { addGraphNodes } from '../../Domain/Graph/graphMembership';
 import {
   useCallback,
   useEffect,
@@ -13,7 +12,7 @@ import {
   useState,
 } from 'react';
 import { valueFilterError } from '../../Domain/Graph/graphFilters';
-import { useEntitySelection } from './Selection/useEntitySelection';
+import { useWorkspaceSelection } from './Selection/useWorkspaceSelection';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
@@ -80,36 +79,17 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const workspaceTransactions = w?.transactions;
 
   const dialogs = useDialogState(w);
-  const [selectedId, setSelectedId] = useState<string>();
   const [viewOwner, setViewOwner] = useState<string>();
-  const [selectedWallet, setSelectedWallet] = useState<string>();
-  const selectionGeneration = useRef(0);
-  const invalidateSelection = useCallback(() => {
-    selectionGeneration.current++;
-  }, []);
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
   const [entityFiltersLinked, setEntityFiltersLinked] = useState(true);
   const [entityPanelFilters, setEntityPanelFilters] = useState<GraphFilters>({});
-  const selection = useEntitySelection(w?.id);
-  const selectedBatchIds = selection.ids;
-  const removeSelectedBatchIds = selection.remove;
-  const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
-    ids: [],
-    index: -1,
-  });
   const [focusGraph, setFocusGraph] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{
     id: string;
     token: number;
     preserveZoom?: boolean;
   }>();
-  // Toolbar expansion can change selection without engaging Lock to selection.
-  // A normal selection, explicit Center, or Lock toggle resumes camera following.
-  const cameraPreservedSelection = useRef<string | undefined>(undefined);
-  const preserveSelectionCamera = useCallback((id: string | undefined) => {
-    cameraPreservedSelection.current = id;
-  }, []);
   const analysisSessions = useRef(new Map<string, AnalysisSession>());
   const [walletAnalysisRevision, setWalletAnalysisRevision] = useState(0);
   useEffect(() => {
@@ -172,6 +152,27 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     }
   }, [w?.id, workbench]);
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
+  const selection = useWorkspaceSelection({
+    workspaceId: w?.id,
+    currentRef: wRef,
+    sessions: ws,
+    setGraphFilters,
+    setRightTab,
+  });
+  const {
+    selectedId,
+    setSelectedId,
+    selectedWallet,
+    setSelectedWallet,
+    select,
+    navigation,
+    setNavigation,
+    prune,
+    generation: selectionGeneration,
+    invalidate: invalidateSelection,
+    preserveCamera: preserveSelectionCamera,
+    cameraPreserved: cameraPreservedSelection,
+  } = selection;
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [operation, setOperation] = useState('');
@@ -203,6 +204,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const shownFocusGraph = tourStep ? false : focusGraph;
   const connectionScanTargets = useConnectionScanTargets({
     workspaceId: w?.id,
+    setPickHandler: selection.setPickHandler,
     canPick:
       shownWorkbench === 'graph' && shownRightTab === 'scan' && !lockingWorkspace && !tourStep,
     onSelectSource: setSelectedId,
@@ -213,7 +215,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     new Map<string, { offset: number; unavailableTxids?: string[] }>(),
   );
   const operationRef = useRef<AbortController | undefined>(undefined);
-  const pendingSelectionRef = useRef<string | undefined>(undefined);
   const addressHistoryJobsRef = useRef(
     new Map<string, { workspaceId: string; controller: AbortController }>(),
   );
@@ -240,7 +241,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     graphFilters,
     fitToken,
     selectedId,
-    selection,
+    selection: selection.batch,
     scanTargetDraft: connectionScanTargets.draft,
     pickingScanTargets,
     entityPanelFilters,
@@ -258,59 +259,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selectedNodeIsVisible,
   } = graphProjection;
   useEffect(() => {
-    const available = recoveryNodesById;
-    setNavigation((current) => {
-      const ids = current.ids.filter((id) => available.has(id));
-      if (ids.length === current.ids.length) return current;
-      const index =
-        current.ids.slice(0, current.index + 1).filter((id) => available.has(id)).length - 1;
-      return { ids, index };
-    });
-    // Only entities that no longer exist leave the batch selection. Filtering or
-    // hiding an entity keeps it selected, with its scope reported in the toolbar.
-    const removed = selectedBatchIds.filter((id) => !available.has(id));
-    if (removed.length) removeSelectedBatchIds(removed);
-    if (selectedId && !available.has(selectedId)) {
-      if (pendingSelectionRef.current !== selectedId) setSelectedId(undefined);
-    } else if (pendingSelectionRef.current === selectedId) {
-      pendingSelectionRef.current = undefined;
-    }
-  }, [recoveryNodesById, selectedId, selectedBatchIds, removeSelectedBatchIds]);
+    prune(recoveryNodesById);
+  }, [recoveryNodesById, prune]);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
-  const select = useCallback(
-    (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => {
-      if (pickingScanTargets && options?.pickTarget !== false) {
-        connectionScanTargets.toggle(id);
-        return;
-      }
-      if (pendingSelectionRef.current && pendingSelectionRef.current !== id)
-        pendingSelectionRef.current = undefined;
-      selectionGeneration.current++;
-      cameraPreservedSelection.current = options?.preserveCamera ? id : undefined;
-      if (options?.preserveCamera) setFocusRequest(undefined);
-      const active = getWorkspaceSession(wRef.current?.id ?? '')?.data;
-      // A click admits exactly one entity, never its transaction's other branches.
-      if (active) updateWorkspace(active.id, (current) => addGraphNodes(current, [id]), false);
-      setSelectedId(id);
-      setGraphFilters((filters) =>
-        filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
-      );
-      setNavigation((current) =>
-        current.ids[current.index] === id
-          ? current
-          : {
-              ids: [...current.ids.slice(0, current.index + 1), id].slice(-100),
-              index: Math.min(99, current.index + 1),
-            },
-      );
-      setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
-    },
-    [updateWorkspace, getWorkspaceSession, pickingScanTargets, connectionScanTargets, wRef],
-  );
   const resetWorkspacePresentation = useEffectEvent(() => {
     operationRef.current?.abort();
-    cameraPreservedSelection.current = undefined;
+    preserveSelectionCamera(undefined);
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
@@ -493,6 +448,10 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     w,
     addressHistoryJobsRef,
     selected,
+    selectedId,
+    select,
+    selectionGeneration,
+    preserveSelectionCamera,
     addressHistoryLoads,
     fetchScope,
     operationRef,
@@ -506,17 +465,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     updateWorkspace,
     getWorkspaceSession,
     revealLookup,
-    selectionGeneration,
     setGraphFilters,
-    select,
     setFocusRequest,
     loadedLookupId: lookup.resolveLoaded,
     clearQuery: lookup.clear,
     prefetchDepth,
     recoveryGraph,
     canTrace,
-    preserveSelectionCamera,
-    selectedId,
     spendingOffsets,
   });
   const { getTransaction, run, mergeTransactions } = workspaceEvidence;
@@ -537,7 +492,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
   function revealLookup(id: string) {
     if (!w) return;
-    pendingSelectionRef.current = id;
+    selection.markPending(id);
     const address = id.startsWith('addr:') ? id.slice(5) : undefined;
     ws.update(w.id, (current) => ({
       ...setNodesHidden(current, [id], false),
@@ -588,6 +543,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selectionGeneration,
     invalidateSelection,
     preserveSelectionCamera,
+    select,
+    selectedId,
+    setSelectedId,
+    navigation,
+    cameraPreservedSelection,
     change,
     setFocusRequest,
     setNotice,
@@ -595,14 +555,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setError,
     setGraphFilters,
     requestMetadataEdit: annotations.edit.request,
-    select,
     setFocusGraph,
     setRightTab,
     setMobilePanel,
     workspaceId,
     viewOwner,
-    selectedId,
-    cameraPreservedSelection,
     hiddenIds,
     updateWorkspace,
     selectedNodeIsVisible,
@@ -610,9 +567,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     visibleGraph,
     graph,
     effectiveFilters,
-    navigation,
     setNavigation,
-    setSelectedId,
     setFitToken,
     graphFilters,
     setEntityPanelFilters,
@@ -644,17 +599,18 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   // The factory only creates event handlers; refs are read when an action runs, not during render.
   // oxlint-disable-next-line react/refs
   const walletActions = createWalletActions({
+    selectionGeneration,
+    select,
+    setSelectedId,
     w,
     wallet,
     shownRightTab,
     setNotice,
-    select,
     setGraphFilters,
     showOnGraph,
     setRightTab,
-    selection,
+    selection: selection.batch,
     ws,
-    selectionGeneration,
     loadGraphTransactions,
     wRef,
     mergeTransactions,
@@ -664,7 +620,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     switchWorkbench,
     setMobilePanel,
     recoveryGraph,
-    setSelectedId,
     graph,
     revealGraphNodes,
     updateFilters,
@@ -675,6 +630,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   // The factory only creates event handlers; refs are read when an action runs, not during render.
   // oxlint-disable-next-line react/refs
   const analysisActions = createAnalysisActions({
+    selectionGeneration,
     w,
     ws,
     recordHandoffInvoker,
@@ -683,7 +639,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     showOnGraph,
     canQuery,
     operationRef,
-    selectionGeneration,
     loadGraphTransactions,
     wRef,
     mergeTransactions,
@@ -692,23 +647,19 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    selection,
     annotations,
     history,
     dialogs,
     lookup,
     graphProjection,
     evidence: workspaceEvidence,
-    invalidateSelection,
-    preserveSelectionCamera,
     w,
     switchWorkbench,
     walletUtxoObservation,
     setNotice,
     setNoticeSequence,
-    selectionGeneration,
     operationRef,
-    setSelectedWallet,
-    setSelectedId,
     setRightTab,
     setMobilePanel,
     setLeftTab,
@@ -716,7 +667,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     operation,
     canTrace,
     queryDisabledReason,
-    select,
     change,
     wallet,
     canQuery,
@@ -724,8 +674,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     tourStep,
     shownRightTab,
     rightTab,
-    selectedId,
-    selectedWallet,
     fetchScope,
     connectionScanTargets,
     shownWorkbench,
@@ -736,14 +684,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setFocusRequest,
     walletUtxos,
     rightPanelRef,
-    selection,
     shownLeftTab,
     entityPanelFilters,
     graphFilters,
     entityFiltersLinked,
     setEntityPanelFilters,
-    navigation,
-    cameraPreservedSelection,
     workbench,
     viewOwner,
     flowInputs,

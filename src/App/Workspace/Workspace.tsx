@@ -18,7 +18,6 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     workbench,
     tourStep,
     w,
-    selection,
     history,
     annotations,
     setNotice,
@@ -28,6 +27,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     operationRef,
     pendingGraphWorkspace,
   } = workspace;
+  const { batch: selection } = workspace.selection;
   const { selectionOnCanvas, matchingScope, graphFiltering, visibleGraph } =
     workspace.graphProjection;
   const { backgroundAddressHistoryLoad } = workspace.evidence;
