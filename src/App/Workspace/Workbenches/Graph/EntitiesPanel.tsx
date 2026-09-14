@@ -19,12 +19,14 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     operation,
     walletDiscovery,
     canQuery,
-    entityPanelFilters,
-    graphFilters,
-    entityFiltersLinked,
-    setEntityPanelFilters,
     change,
   } = workspace;
+  const {
+    entityPanel: entityPanelFilters,
+    graph: graphFilters,
+    entityLinked: entityFiltersLinked,
+    setEntityPanel: setEntityPanelFilters,
+  } = workspace.filters;
   const {
     batch: selection,
     select,

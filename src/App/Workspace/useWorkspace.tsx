@@ -11,8 +11,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useWorkspaceSelection } from './Selection/useWorkspaceSelection';
+import { useWorkspaceFilters } from './Workbenches/Graph/Filters/useWorkspaceFilters';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
@@ -21,13 +21,12 @@ import { useAnnotations } from './Annotations/useAnnotations';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
-import { type GraphFilters, type Wallet, type Workspace } from '../../Domain/types';
+import { type Wallet, type Workspace } from '../../Domain/types';
 import { fetchTransaction } from '../../Infra/Bitcoin/api';
 import { WORKBENCH_TOUR, availableTourSteps } from '../Help/steps';
 import { useWalletTourExample } from '../Help/useWalletTourExample';
 import type { useAppState } from '../useAppState';
 import type { WorkbenchMode } from './workbenchTypes';
-import { entityPanelFiltersFromGraph } from './Workbenches/Graph/Filters/entityPanelFilters';
 import { download } from '../../Infra/Storage/download';
 import { isModalOpen } from '../../Shared/Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
@@ -38,7 +37,6 @@ import { useGraphActions } from './Workbenches/Graph/useGraphActions';
 import { createWalletActions } from './Workbenches/Wallet/walletActions';
 import { createAnalysisActions } from './Workbenches/Analysis/analysisActions';
 
-const EMPTY_GRAPH_FILTERS: GraphFilters = {};
 function resolveWalletUtxoObservationFromEvidence(
   input: WalletUtxoObservationInput | undefined,
   wallet: Pick<Wallet, 'addresses'> | undefined,
@@ -81,9 +79,15 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const dialogs = useDialogState(w);
   const [viewOwner, setViewOwner] = useState<string>();
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
-  const [graphFilters, setGraphFilters] = useState<GraphFilters>({});
-  const [entityFiltersLinked, setEntityFiltersLinked] = useState(true);
-  const [entityPanelFilters, setEntityPanelFilters] = useState<GraphFilters>({});
+  const filters = useWorkspaceFilters();
+  const {
+    graph: graphFilters,
+    setGraph: setGraphFilters,
+    entityPanel: entityPanelFilters,
+    setEntityPanel: setEntityPanelFilters,
+    entityLinked: entityFiltersLinked,
+    setEntityLinked: setEntityFiltersLinked,
+  } = filters;
   const [focusGraph, setFocusGraph] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{
     id: string;
@@ -299,10 +303,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     lookup.clear();
     lookup.setError('');
     setFocusRequest(undefined);
-    const savedGraphFilters = w?.view.filters ?? {};
-    setGraphFilters(savedGraphFilters);
-    setEntityPanelFilters(entityPanelFiltersFromGraph(savedGraphFilters));
-    setEntityFiltersLinked(true);
+    filters.hydrate(w?.view.filters);
     setNavigation(
       w?.view.selectionId ? { ids: [w.view.selectionId], index: 0 } : { ids: [], index: -1 },
     );
@@ -345,10 +346,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     }, false);
   // Hydration has its own owner so a workspace switch never writes the previous view
   // into the newly active workspace. Presentation does not consume annotation undo.
-  const savedGraphFilters = w?.view.filters;
-  const presentationFilters = valueFilterError(graphFilters)
-    ? (savedGraphFilters ?? EMPTY_GRAPH_FILTERS)
-    : graphFilters;
+  const presentationFilters = filters.persistable(w?.view.filters);
   useEffect(() => {
     if (!workspaceId || viewOwner !== workspaceId) return;
     const presentation = {
@@ -647,6 +645,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    filters,
     selection,
     annotations,
     history,
@@ -680,15 +679,10 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     lockingWorkspace,
     wRef,
     ws,
-    setGraphFilters,
     setFocusRequest,
     walletUtxos,
     rightPanelRef,
     shownLeftTab,
-    entityPanelFilters,
-    graphFilters,
-    entityFiltersLinked,
-    setEntityPanelFilters,
     workbench,
     viewOwner,
     flowInputs,

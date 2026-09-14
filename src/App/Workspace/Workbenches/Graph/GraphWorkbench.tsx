@@ -44,7 +44,6 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     tx,
     canTrace,
     operation,
-    graphFilters,
     workbench,
     viewOwner,
     walletUtxoObservation,
@@ -66,6 +65,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphWorkspaceRef,
     shownMobilePanel,
   } = workspace;
+  const { graph: graphFilters } = workspace.filters;
   const {
     selectedId,
     batch: selection,
