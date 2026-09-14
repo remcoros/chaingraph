@@ -46,7 +46,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     operationStatus: operation,
     workbench,
     viewOwner,
-    tourStep,
+    tour,
     workspaces,
     annotations,
     chainDataDisabledReason,
@@ -499,12 +499,12 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               walletUtxoObservation={walletUtxoObservation}
               key={activeWorkspace.id}
               state={
-                tourStep?.view?.flowOpen
+                tour.step?.view?.flowOpen
                   ? { ...activeWorkspace.view.transactionFlow, open: true }
                   : activeWorkspace.view.transactionFlow
               }
               onStateChange={(transactionFlow) =>
-                !tourStep &&
+                !tour.step &&
                 workspaces.active?.edit(
                   (current) => ({
                     ...current,

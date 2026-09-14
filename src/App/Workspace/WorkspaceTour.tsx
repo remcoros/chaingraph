@@ -2,21 +2,20 @@ import { GuidedTour } from '../Help/GuidedTour';
 import type { WorkspaceController } from './useWorkspace';
 
 export function WorkspaceTour({ workspace }: { workspace: WorkspaceController }) {
-  if (workspace.tour === undefined || !workspace.activeWorkspace) return null;
+  const { tour } = workspace;
+  if (tour.activeId === undefined || !workspace.activeWorkspace) return null;
   return (
     <GuidedTour
-      steps={workspace.tourSteps}
-      activeId={workspace.tour}
-      onStepChange={workspace.setTour}
-      previewLabel={
-        workspace.needsTourExample ? 'Public example · preview only (mainnet)' : undefined
-      }
+      steps={tour.steps}
+      activeId={tour.activeId}
+      onStepChange={tour.show}
+      previewLabel={tour.needsExample ? 'Public example · preview only (mainnet)' : undefined}
       previewStatus={
-        workspace.needsTourExample
+        tour.needsExample
           ? {
-              loading: workspace.walletTourExample.loading,
-              error: workspace.walletTourExample.error,
-              onRetry: workspace.walletTourExample.retry,
+              loading: tour.example.loading,
+              error: tour.example.error,
+              onRetry: tour.example.retry,
             }
           : undefined
       }

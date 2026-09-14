@@ -13,7 +13,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     lookup,
     shownWorkbench,
     workbench,
-    tourStep,
+    tour,
     activeWorkspace,
     history,
     annotations,
@@ -81,7 +81,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
       <WalletWorkbench workspace={workspace} />
       <AnalysisWorkbench workspace={workspace} />
       <SelectionToolbar
-        active={workbench === 'graph' && !tourStep && !connectionScanTargets.picking}
+        active={workbench === 'graph' && !tour.step && !connectionScanTargets.picking}
         workspace={activeWorkspace}
         selection={selection}
         visibleSelectedCount={selectionOnCanvas}

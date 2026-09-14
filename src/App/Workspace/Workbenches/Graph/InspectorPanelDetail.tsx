@@ -20,7 +20,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     edit,
     canLoadChainData,
     dialogs,
-    tourStep,
+    tour,
   } = workspace;
   const {
     setRightTab,
@@ -51,7 +51,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     shownRightTab === 'transactions' ||
     shownRightTab === 'utxos' ? null : wallet &&
     !selected &&
-    tourStep?.view?.rightTab !== 'inspect' ? (
+    tour.step?.view?.rightTab !== 'inspect' ? (
     <WalletInspector
       key={`wallet-inspector:${activeWorkspace.id}:${wallet.id}`}
       wallet={wallet}

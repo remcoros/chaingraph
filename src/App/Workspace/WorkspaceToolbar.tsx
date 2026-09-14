@@ -19,7 +19,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
   const {
     shownWorkbench,
     switchWorkbench,
-    tourStep,
+    tour,
     returnWorkbench,
     workbench,
     lookup,
@@ -109,7 +109,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
             {WORKBENCH_LABELS[mode]}
           </button>
         ))}
-        {!tourStep && returnWorkbench && returnWorkbench !== workbench && (
+        {!tour.step && returnWorkbench && returnWorkbench !== workbench && (
           <button
             className="workbench-return"
             onClick={() => switchWorkbench(returnWorkbench, true)}

@@ -1085,7 +1085,7 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
     lockingWorkspace,
     edit,
     activeWorkspaceRef,
-    tourStep,
+    tour,
   } = workspace;
   const { selected: wallet } = workspace.wallet;
   const analysis = workspace.analysis;
@@ -1106,7 +1106,7 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
         key={`${activeWorkspace.id}:${analysis.walletRevision}`}
         cache={analysis.sessions.current}
         workspace={activeWorkspace}
-        active={workbench === 'analysis' && !lockingWorkspace && !tourStep}
+        active={workbench === 'analysis' && !lockingWorkspace && !tour.step}
         selected={selected}
         wallet={wallet}
         onFindings={(findings) => edit((current) => ({ ...current, findings }))}

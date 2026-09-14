@@ -1173,8 +1173,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
   const {
     activeWorkspace,
     workspaces,
-    tourStep,
-    tourExample,
+    tour,
     viewOwner,
     workbench,
     lockingWorkspace,
@@ -1211,15 +1210,15 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         walletUtxos={walletUtxos}
         preparationCache={workspaces.getUnlocked(activeWorkspace.id)?.walletPreparation}
         tourPreview={
-          tourStep?.view?.workbench === 'wallet'
-            ? { tab: tourStep.view.walletTab ?? 'review', example: tourExample }
+          tour.step?.view?.workbench === 'wallet'
+            ? { tab: tour.step.view.walletTab ?? 'review', example: tour.example.snapshot }
             : undefined
         }
         active={
           viewOwner === activeWorkspace.id &&
           workbench === 'wallet' &&
           !lockingWorkspace &&
-          !tourStep
+          !tour.step
         }
         workspace={activeWorkspace}
         sessionAnalysis={analysis.sessions.current.get(activeWorkspace.id)?.scan}

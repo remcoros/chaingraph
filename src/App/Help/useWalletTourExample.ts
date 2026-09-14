@@ -2,8 +2,19 @@ import { useEffect, useState } from 'react';
 import type { Workspace } from '../../Domain/types';
 import { loadTemplateWorkspace } from '../Examples/templateWorkspace';
 
+/** A public example loaded for the tour, with the state its status strip shows. */
+export interface WalletTourExample {
+  snapshot: Workspace | undefined;
+  loading: boolean;
+  error: string;
+  retry: () => void;
+}
+
 /** A tour-owned snapshot, loaded only while its topics are visible and never stored. */
-export function useWalletTourExample(workspaceId: string | undefined, enabled: boolean) {
+export function useWalletTourExample(
+  workspaceId: string | undefined,
+  enabled: boolean,
+): WalletTourExample {
   const [result, setResult] = useState<{
     owner: string;
     workspace?: Workspace;

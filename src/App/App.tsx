@@ -7,7 +7,6 @@ import { HelpMenu } from './Help/HelpMenu';
 import { AboutDialog } from './Help/AboutDialog';
 import { WorkspaceHome } from './FrontPage/WorkspaceHome';
 
-import { WORKBENCH_TOUR } from './Help/steps';
 import { WORKSPACE_TEMPLATES } from '../Domain/Workspace/workspaceTemplates';
 import { MAX_ENCRYPTED_FILE_BYTES } from '../Infra/Storage/crypto';
 
@@ -114,9 +113,7 @@ export default function App() {
             {
               label: activeWorkspace ? 'Show guided tour' : 'Getting started',
               onSelect: () =>
-                activeWorkspace
-                  ? workspace.setTour(WORKBENCH_TOUR[0].id)
-                  : app.setAboutOpen('guide'),
+                activeWorkspace ? workspace.tour.start() : app.setAboutOpen('guide'),
             },
             {
               label: 'Example workspaces',
@@ -159,7 +156,7 @@ export default function App() {
         <AboutDialog
           initialTab={app.aboutOpen}
           onClose={() => app.setAboutOpen(false)}
-          onTour={activeWorkspace ? () => workspace.setTour(WORKBENCH_TOUR[0].id) : undefined}
+          onTour={activeWorkspace ? () => workspace.tour.start() : undefined}
           status={app.status}
           networks={app.networks}
           statuses={app.statuses}

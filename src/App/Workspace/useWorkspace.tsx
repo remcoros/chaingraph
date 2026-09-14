@@ -27,8 +27,7 @@ import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { useWorkspaceAnalysis } from './Workbenches/Analysis/useWorkspaceAnalysis';
 import { type Wallet, type Workspace } from '../../Domain/types';
 import { fetchTransaction } from '../../Infra/Bitcoin/api';
-import { WORKBENCH_TOUR, availableTourSteps } from '../Help/steps';
-import { useWalletTourExample } from '../Help/useWalletTourExample';
+import { useTour } from '../Help/useTour';
 import type { useAppState } from '../useAppState';
 import type { WorkbenchMode } from './workbenchTypes';
 import { download } from '../../Infra/Storage/download';
@@ -176,18 +175,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   } = selection;
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [operation, setOperation] = useState('');
-  const [tour, setTour] = useState<string>();
-  const tourSteps = availableTourSteps(WORKBENCH_TOUR, {
+  const tour = useTour({
+    workspaceId: activeWorkspace?.id,
+    hasWallets: !!activeWorkspace?.wallets.length,
     hasSelection: !!selectedId,
     hasTransactions: !!activeWorkspace && Object.keys(activeWorkspace.transactions).length > 0,
-    features: [],
   });
-  const tourStep =
-    tour === undefined ? undefined : (tourSteps.find((step) => step.id === tour) ?? tourSteps[0]);
-  const needsTourExample =
-    !!activeWorkspace && !activeWorkspace.wallets.length && !!tourStep?.requiresWallet;
-  const walletTourExample = useWalletTourExample(activeWorkspace?.id, needsTourExample);
-  const tourExample = walletTourExample.snapshot;
+  const tourStep = tour.step;
   // Tour previews never feed the persisted presentation effect or selection history.
   const shownWorkbench = tourStep ? (tourStep.view?.workbench ?? 'graph') : workbench;
   const shownPanels = graphPanelsInView(graphPanels.chosen, {
@@ -248,7 +242,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const resetWorkspacePresentation = useEffectEvent(() => {
     operationRef.current?.abort();
     preserveSelectionCamera(undefined);
-    setTour(undefined);
+    tour.show(undefined);
     setOperation('');
     setSelectedId(activeWorkspace?.view.selectionId);
     connectionScanTargets.reset();
@@ -290,18 +284,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
   useEffect(() => {
     resetWorkspacePresentation();
-  }, [workspaceId]);
-  useEffect(() => {
-    if (!workspaceId) return;
-    try {
-      if (!localStorage.getItem('chaingraph.tour.seen')) {
-        setTour(WORKBENCH_TOUR[0].id);
-        localStorage.setItem('chaingraph.tour.seen', '1');
-      }
-    } catch {
-      // A denied/full store must not crash an unlocked workspace or block export.
-      setTour(WORKBENCH_TOUR[0].id);
-    }
   }, [workspaceId]);
   const active = workspaces.active;
   const edit = useCallback(
@@ -601,7 +583,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     chainDataDisabledReason,
     edit,
     canLoadChainData,
-    tourStep,
     rightTab,
     fetchScope,
     shownWorkbench,
@@ -619,13 +600,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     exportWorkspace,
     setLockingWorkspace,
     setError,
-    tourExample,
-    setTour,
     entityRemoval,
     tour,
-    tourSteps,
-    needsTourExample,
-    walletTourExample,
   };
 }
 export type WorkspaceController = ReturnType<typeof useWorkspace>;
