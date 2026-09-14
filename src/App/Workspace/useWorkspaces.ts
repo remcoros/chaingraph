@@ -756,8 +756,22 @@ export class WorkspaceStore {
   };
 }
 
+/**
+ * One store for the page, rather than one per mount.
+ *
+ * Unlocked workspaces hold decrypted data and their password in memory only. A
+ * remount would drop them, silently returning the reader to the home screen with
+ * unsaved work gone, so the store's lifetime is the page's rather than a
+ * component's. Tests construct WorkspaceStore directly and never share this one.
+ */
+let pageStore: WorkspaceStore | undefined;
+function sharedStore() {
+  pageStore ??= new WorkspaceStore();
+  return pageStore;
+}
+
 export function useWorkspaces() {
-  const [store] = useState(() => new WorkspaceStore());
+  const [store] = useState(sharedStore);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   useEffect(() => {
     const ids = state.unlocked.filter((s) => s.revision !== s.savedRevision).map((s) => s.data.id);
