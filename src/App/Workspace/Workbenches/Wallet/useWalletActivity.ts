@@ -32,7 +32,7 @@ interface Inputs {
   w: AppState['w'];
   canQuery: boolean;
   setNotice: AppState['setNotice'];
-  setFitToken: Dispatch<SetStateAction<number>>;
+  fitAll: () => void;
   run: WorkspaceEvidence['run'];
   operationRef: RefObject<AbortController | undefined>;
   wRef: AppState['wRef'];
@@ -47,7 +47,7 @@ export function useWalletActivity({
   w,
   canQuery,
   setNotice,
-  setFitToken,
+  fitAll,
   run,
   operationRef,
   wRef,
@@ -109,7 +109,7 @@ export function useWalletActivity({
       );
       // Only the first discovery frames an empty canvas. Returning checks leave
       // the user's camera, selection, filters and annotations alone.
-      if (!Object.keys(w.transactions).length && result.added) setFitToken((token) => token + 1);
+      if (!Object.keys(w.transactions).length && result.added) fitAll();
     });
   }
   const pollWalletActivity = useEffectEvent(() => {

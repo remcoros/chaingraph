@@ -71,7 +71,7 @@ interface Inputs {
   navigation: { ids: string[]; index: number };
   setNavigation: Dispatch<SetStateAction<{ ids: string[]; index: number }>>;
   setSelectedId: Dispatch<SetStateAction<string | undefined>>;
-  setFitToken: Dispatch<SetStateAction<number>>;
+  fitAll: () => void;
   graphFilters: GraphFilters;
   setEntityPanelFilters: Dispatch<SetStateAction<GraphFilters>>;
   setEntityFiltersLinked: Dispatch<SetStateAction<boolean>>;
@@ -112,7 +112,7 @@ export function useGraphActions({
   navigation,
   setNavigation,
   setSelectedId,
-  setFitToken,
+  fitAll,
   graphFilters,
   setEntityPanelFilters,
   setEntityFiltersLinked,
@@ -248,7 +248,7 @@ export function useGraphActions({
   function updateFilters(filters: GraphFilters) {
     setFocusRequest(undefined);
     setGraphFilters(filters);
-    setFitToken((token) => token + 1);
+    fitAll();
   }
   function setEntityFilterLink(linked: boolean) {
     setEntityPanelFilters(entityPanelFiltersFromGraph(graphFilters));

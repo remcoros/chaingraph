@@ -34,10 +34,10 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     dialogs,
     annotations,
     operationRef,
-    flushActiveGraph,
     setLockingWorkspace,
     setError,
   } = workspace;
+  const { flushActive: flushActiveGraph } = workspace.graphCanvas;
   const { addQuery } = workspace.evidence;
   const workspaceMenu = useRef<HTMLDivElement>(null);
   const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);

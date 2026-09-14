@@ -54,17 +54,19 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     queryDisabledReason,
     shownFocusGraph,
     setFocusGraph,
-    changeGraphView,
     dialogs,
     connected,
-    setPendingGraphWorkspace,
-    registerGraphSnapshotFlush,
-    focusRequest,
     connectionScanTargets,
     shownWorkbench,
     graphWorkspaceRef,
     shownMobilePanel,
   } = workspace;
+  const {
+    changeView: changeGraphView,
+    setPendingWorkspaceId: setPendingGraphWorkspace,
+    registerSnapshotFlush: registerGraphSnapshotFlush,
+    focusRequest,
+  } = workspace.graphCanvas;
   const { graph: graphFilters } = workspace.filters;
   const {
     selectedId,

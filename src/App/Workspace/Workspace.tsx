@@ -25,8 +25,8 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     connectionScanTargets,
     operation,
     operationRef,
-    pendingGraphWorkspace,
   } = workspace;
+  const { pendingWorkspaceId: pendingGraphWorkspace } = workspace.graphCanvas;
   const { batch: selection } = workspace.selection;
   const { selectionOnCanvas, matchingScope, graphFiltering, visibleGraph } =
     workspace.graphProjection;

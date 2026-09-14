@@ -37,11 +37,11 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     wRef,
     ws,
     change,
-    setFocusRequest,
     walletUtxos,
     operation,
     rightPanelRef,
   } = workspace;
+  const { setFocusRequest } = workspace.graphCanvas;
   const { setGraph: setGraphFilters } = workspace.filters;
   const { selectedId, selectedWallet, select } = workspace.selection;
   const { visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =

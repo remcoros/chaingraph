@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { useWorkspaceSelection } from './Selection/useWorkspaceSelection';
 import { useWorkspaceFilters } from './Workbenches/Graph/Filters/useWorkspaceFilters';
+import { useGraphCanvas } from './Workbenches/Graph/useGraphCanvas';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
@@ -79,6 +80,16 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const dialogs = useDialogState(w);
   const [viewOwner, setViewOwner] = useState<string>();
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
+  const graphCanvas = useGraphCanvas({
+    workspaceId,
+    updateWorkspace,
+    registerSnapshotFlush: registerGraphSnapshotFlush,
+    flushActive: flushActiveGraph,
+    pendingWorkspaceId: pendingGraphWorkspace,
+    setPendingWorkspaceId: setPendingGraphWorkspace,
+  });
+  const { setFocusRequest, fitToken } = graphCanvas;
+  const fitAll = graphCanvas.fitAll;
   const filters = useWorkspaceFilters();
   const {
     graph: graphFilters,
@@ -89,11 +100,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setEntityLinked: setEntityFiltersLinked,
   } = filters;
   const [focusGraph, setFocusGraph] = useState(false);
-  const [focusRequest, setFocusRequest] = useState<{
-    id: string;
-    token: number;
-    preserveZoom?: boolean;
-  }>();
   const analysisSessions = useRef(new Map<string, AnalysisSession>());
   const [walletAnalysisRevision, setWalletAnalysisRevision] = useState(0);
   useEffect(() => {
@@ -183,7 +189,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
     Record<string, AddressHistoryLoadState>
   >({});
-  const [fitToken, setFitToken] = useState(0);
   const [tour, setTour] = useState<string>();
   const tourSteps = availableTourSteps(WORKBENCH_TOUR, {
     hasSelection: !!selectedId,
@@ -309,7 +314,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     );
     setFocusGraph(w?.view.focusGraph ?? false);
     spendingOffsets.current.clear();
-    if (!w?.view.graphSnapshot) setFitToken((t) => t + 1);
+    if (!w?.view.graphSnapshot) fitAll();
   });
   useEffect(() => {
     resetWorkspacePresentation();
@@ -339,11 +344,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setError,
     setNotice,
   });
-  const changeGraphView = (update: (view: Workspace['view']) => Workspace['view']) =>
-    change((current) => {
-      const view = update(current.view);
-      return view === current.view ? current : { ...current, view };
-    }, false);
   // Hydration has its own owner so a workspace switch never writes the previous view
   // into the newly active workspace. Presentation does not consume annotation undo.
   const presentationFilters = filters.persistable(w?.view.filters);
@@ -527,7 +527,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     w,
     canQuery,
     setNotice,
-    setFitToken,
+    fitAll,
     run,
     operationRef,
     wRef,
@@ -566,7 +566,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     graph,
     effectiveFilters,
     setNavigation,
-    setFitToken,
+    fitAll,
     graphFilters,
     setEntityPanelFilters,
     setEntityFiltersLinked,
@@ -645,6 +645,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    graphCanvas,
     filters,
     selection,
     annotations,
@@ -679,7 +680,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     lockingWorkspace,
     wRef,
     ws,
-    setFocusRequest,
     walletUtxos,
     rightPanelRef,
     shownLeftTab,
@@ -688,18 +688,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     flowInputs,
     shownFocusGraph,
     setFocusGraph,
-    changeGraphView,
     connected,
-    setPendingGraphWorkspace,
-    registerGraphSnapshotFlush,
-    focusRequest,
     graphWorkspaceRef,
     shownMobilePanel,
     returnWorkbench,
     prefetchDepth,
     setPrefetchDepth,
     exportWorkspace,
-    flushActiveGraph,
     setLockingWorkspace,
     setError,
     tourExample,
@@ -708,7 +703,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     walletWorkspaceRef,
     walletAnalysisRevision,
     analysisWorkspaceRef,
-    pendingGraphWorkspace,
     setTour,
     entityRemoval,
     tour,
