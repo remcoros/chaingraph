@@ -35,6 +35,7 @@ import type { useAppState } from '../useAppState';
 import type { WorkbenchMode } from './workbenchTypes';
 import { entityPanelFiltersFromGraph } from './Workbenches/Graph/Filters/entityPanelFilters';
 import { download } from '../../Infra/Storage/download';
+import { isModalOpen } from '../../Shared/Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
 import { useWorkspaceEvidence } from './ChainData/useWorkspaceEvidence';
 import type { AddressHistoryLoadState } from './ChainData/addressHistoryLoad';
@@ -318,11 +319,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         void persistWorkspace(current.id).catch((error) =>
           setError(error instanceof Error ? error.message : 'Encrypted save failed.'),
         );
-      } else if (
-        event.key.toLowerCase() === 'k' &&
-        current &&
-        !document.querySelector('[role="dialog"][aria-modal="true"]')
-      ) {
+      } else if (event.key.toLowerCase() === 'k' && current && !isModalOpen()) {
         event.preventDefault();
         searchInput.current?.focus();
       }

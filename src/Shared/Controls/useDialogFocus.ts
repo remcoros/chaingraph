@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
+let openFocusTraps = 0;
+
+/**
+ * Whether a focus-trapping dialog is currently mounted. Callers that own global
+ * keyboard shortcuts use this to stand down while a dialog has the keyboard.
+ */
+export function isModalOpen() {
+  return openFocusTraps > 0;
+}
+
 /**
  * Focus management for modal dialogs and nonmodal quick editors.
  *
@@ -17,6 +27,13 @@ export function useDialogFocus(
   const [previous] = useState(() => document.activeElement as HTMLElement | null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  useEffect(() => {
+    if (!trapFocus) return;
+    openFocusTraps += 1;
+    return () => {
+      openFocusTraps -= 1;
+    };
+  }, [trapFocus]);
   useEffect(() => {
     const el = ref.current;
     if (!el?.contains(document.activeElement))
