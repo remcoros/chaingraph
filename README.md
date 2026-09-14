@@ -1,77 +1,48 @@
 # Chaingraph
 
 Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to
-understand their own wallets and follow activity on chain. Import an extended
+understand their own wallets and follow activity on chain. 
+
+Import an extended
 public key, see where your coins came from and where they went, label and tag
-what you recognize, and explore transactions in an interactive 3D graph. It runs
+what you recognize, and explore transactions in an interactive 3D graph. 
+
+It runs
 against your own Bitcoin Core node and Electrum server, and everything you save
-stays encrypted in your browser, apart from the workspace name.
+stays encrypted in your browser.
 
 ![Chaingraph workbench](docs/screenshots/readme-graph.png)
 
-Chaingraph is not an explorer, a custodial wallet or a public service. It never
-touches private keys, cannot sign or spend, and does not identify people. Its
-analysis tools produce hypotheses with visible evidence, never proof of ownership.
+Chaingraph is not a custodial wallet or a public service. It never touches private keys, cannot sign or spend, and does not identify people. 
 
 ## What you can do
 
-**Review a wallet.** Add one or more watch-only wallets from an account-level
-extended public key (`xpub`, `ypub`, `zpub` on mainnet; `tpub`, `upub`, `vpub`
-on testnet4). Chaingraph derives receive and change addresses in the browser,
-scans their history through your node, and gives you a review queue of current
-UTXOs, used addresses, sources and destinations. Work through the queue, label
-what you recognize, mark items reviewed or defer them, and refresh later to see
-only what changed.
+- **Review wallets.** Import one or more watch-only wallets from an account-level
+  extended public key. Chaingraph derives addresses in the browser, scans their
+  activity through your node, and gives you a review queue for UTXOs, used
+  addresses, sources and destinations.
 
 ![Wallet review queue](docs/screenshots/readme-wallet.png)
 
-**Explore the graph.** Look up any transaction, address or output. Transactions,
-outputs and addresses appear as nodes in a 3D (or flat) graph you can orbit,
-filter and extend one step at a time. A compact input/output view shows the
-selected transaction, lets you follow an exact output to the transaction that
-spent it, and loads missing details on demand. Hover cards, an inspector and a
-searchable entity list give you the same actions with mouse, touch or keyboard.
-The entity list can unlink its filters from the graph for panel-only browsing;
-linking it again follows the graph's current filters and selection.
-Selecting an address also opens its bounded observed history. The address is
-admitted and selected immediately while history, transaction details and the
-balance load in the background with visible progress. The flow panel has
-Transactions and UTXOs tabs: history rows and observed unspent outputs can load
-their transaction when needed, add or show it in the graph, and open it in the
-transaction flow. Both tabs show clickable pending and confirmed totals with
-matching collapsible sections, with pending transactions or outputs first; each
-tab renders a bounded first page and offers **Show more** for larger observations.
-When an address is selected, the floating toolbar also offers **Show recent
-UTXOs (10)** and **Show recent transactions (10)**. These actions add or reveal
-up to ten recent cached or observed graph items without changing selection.
-Each confirmed row includes its observed block and transaction timestamp when that
-detail is loaded. When all input values and virtual size are observed, confirmed
-transactions also show their fee rate and total fee; otherwise fee evidence is
-unknown. Block timestamps use UTC `YYYY-MM-DD HH:mm:ss` without a
-timezone suffix. Other stored timestamps use the user's local time in the same
-format. Balance and last-checked times are shown when available;
-missing or partial observations remain explicit and do not prove ownership.
+- **Explore transactions.** Look up a transaction, address or output in a 3D or
+  flat graph. Filter the view, follow funding and spending links, and inspect
+  bounded address history.
 
-**Annotate.** Labels, notes, icons, bookmarks and colored tags attach to
-transactions, outputs and addresses. Edit one item or a whole selection at once.
-Undo and redo cover the current session. Labels can be exchanged with other
-wallets through plaintext BIP329 files.
+- **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
+  outputs and addresses. Undo and redo edits in the current session, or exchange
+  labels through plaintext BIP329 files.
 
-**Run analysis.** Seven local tools look for equal-output patterns, common-input
-ownership, address reuse, value flow and fees, consolidation and fan-out, script
-types, and overlap between imported wallets. Each finding states its scope,
-parameters, assumptions and coverage, links to its evidence, and can be shown on
-the graph or excluded.
+- **Run analysis.** Use seven local tools to find patterns in outputs, inputs,
+  address reuse, value flow, scripts and wallet overlap. Findings link to
+  evidence and remain hypotheses, not proof of ownership.
 
-**Scan for connections.** From a selected transaction or output, search nearby
-loaded nodes for funding or spending paths, shared ancestors and descendants,
-and loops. Results are bounded observations you can add to the graph one path at
-a time.
+- **Scan connections.** Search loaded graph data for funding and spending paths,
+  shared ancestors and descendants, and loops. Results are bounded observations
+  you can add to the graph.
 
-**Start from examples.** Nine example workspaces bundle real mainnet and
-testnet4 transactions with starter annotations: CoinJoins, a public demo wallet,
-an OP_RETURN message, large fan-outs and more. They open without any downloads
-and are only shown for networks your backend has configured.
+- **Start from examples.** Open nine bundled mainnet and testnet4 workspaces with
+  public transaction snapshots and starter annotations. They require no
+  downloads and appear only for configured networks.
 
 ## Requirements
 
@@ -177,5 +148,5 @@ automatically and can be exported as encrypted files for backup or transfer.
 
 ## License
 
-MIT. Third-party dependency notices are in
+[LICENSE.md](MIT). Third-party dependency notices are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
