@@ -135,7 +135,7 @@ export function WalletItemDetail({
   active,
   tourPreview,
   busy,
-  canQuery,
+  canLoadChainData,
   updateEvidence,
   onChange,
   onNotice,
@@ -149,7 +149,7 @@ export function WalletItemDetail({
   | 'active'
   | 'tourPreview'
   | 'busy'
-  | 'canQuery'
+  | 'canLoadChainData'
   | 'updateEvidence'
   | 'onChange'
   | 'onShowInGraph'
@@ -250,7 +250,7 @@ export function WalletItemDetail({
     selectionKey: row.key,
     transactionId: contextId,
     inputs: visible.transactionId === contextId ? visible.inputs : [],
-    enabled: active && canQuery && !busy && flowOpen && resolveInputs,
+    enabled: active && canLoadChainData && !busy && flowOpen && resolveInputs,
     fetch: fetchTransaction,
     update: updateEvidence,
   });
@@ -259,7 +259,7 @@ export function WalletItemDetail({
     row.kind === 'output' &&
     !row.address &&
     flowOpen &&
-    canQuery &&
+    canLoadChainData &&
     !flowInputs.error &&
     context?.inputs.some((input) => input.id === row.nodeId && input.missing);
   const relationship = walletRowRelationship(
@@ -570,7 +570,7 @@ export function WalletItemDetail({
                         <p>{flowInputs.error}</p>
                       </WalletHelp>
                       <button
-                        disabled={!active || !canQuery || busy || flowInputs.loading}
+                        disabled={!active || !canLoadChainData || busy || flowInputs.loading}
                         onClick={flowInputs.retry}
                       >
                         Retry inputs

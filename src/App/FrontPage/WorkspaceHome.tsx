@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { FolderOpen, LockKeyhole, Plus, ShieldCheck, Upload, Trash2 } from 'lucide-react';
 import type { Network } from '../../Domain/types';
 import { WorkspaceTemplateCards } from '../Examples/WorkspaceTemplateCards';
-import type { SavedWorkspace, Session } from '../Workspace/useWorkspaces';
+import type { SavedWorkspace, UnlockedWorkspace } from '../Workspace/useWorkspaces';
 import { formatLocalTimestamp } from '../../Domain/Chain/transactionTime';
 interface Props {
   saved: SavedWorkspace[];
-  sessions: Session[];
+  sessions: UnlockedWorkspace[];
   onCreate: () => void;
   onExamples: () => void;
   networks?: Network[];

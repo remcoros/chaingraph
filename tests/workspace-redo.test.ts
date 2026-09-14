@@ -13,7 +13,7 @@ import {
   parseWorkspace,
 } from '../src/Domain/Workspace/workspace';
 import { encryptWorkspace } from '../src/Infra/Storage/crypto';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 
 const password = 'public redo fixture passphrase';
 function setup(encrypt?: typeof encryptWorkspace) {
@@ -24,10 +24,10 @@ function setup(encrypt?: typeof encryptWorkspace) {
       raw = value;
     },
   };
-  const store = new WorkspaceSessionStore({ storage, encrypt });
+  const store = new WorkspaceStore({ storage, encrypt });
   const workspace = newWorkspace('Redo fixture', 'mainnet');
   store.open(workspace, password);
-  return { store, id: workspace.id, session: () => store.getSession(workspace.id)! };
+  return { store, id: workspace.id, session: () => store.getUnlocked(workspace.id)! };
 }
 const txid = (n: number) => n.toString(16).padStart(64, '0');
 const node = (n: number) => `tx:${txid(n)}`;
@@ -294,8 +294,8 @@ describe('workspace redo', () => {
     store.undo(other.id);
     store.redo(id);
     expect(session().data.name).toBe('First workspace edit');
-    expect(store.getSession(other.id)!.data.name).toBe('Other workspace');
-    expect(store.getSession(other.id)!.redoHistory).toHaveLength(1);
+    expect(store.getUnlocked(other.id)!.data.name).toBe('Other workspace');
+    expect(store.getUnlocked(other.id)!.redoHistory).toHaveLength(1);
     expect(session().data).not.toHaveProperty('history');
     expect(session().data).not.toHaveProperty('redoHistory');
   });
@@ -316,7 +316,7 @@ describe('workspace redo', () => {
     expect(session().data.name).toBe('Redo fixture');
     release();
     await locking;
-    expect(store.getSession(id)).toBeUndefined();
+    expect(store.getUnlocked(id)).toBeUndefined();
     store.redo(id);
     await store.unlock(store.getSaved(id)!, password);
     expect(session().data.name).toBe('Redo fixture');

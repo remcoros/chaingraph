@@ -10,7 +10,7 @@ import {
   tagBatchPlan,
 } from '../src/Domain/Metadata/batchEdits';
 import { outputNodeId, txNodeId, type Transaction, type Workspace } from '../src/Domain/types';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 
 const a = 'a'.repeat(64),
   b = 'b'.repeat(64);
@@ -179,14 +179,14 @@ describe('strict batch boundaries', () => {
 
 describe('batch undo ownership', () => {
   const session = () => {
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     const data = workspace();
     store.open(data, 'public batch undo fixture password');
     return { store, id: data.id };
   };
-  const head = (store: WorkspaceSessionStore, id: string) => store.getSession(id)!.undoRevision;
+  const head = (store: WorkspaceStore, id: string) => store.getUnlocked(id)!.undoRevision;
 
   it('advances the undo head for an applied batch and for later unrelated edits', () => {
     const { store, id } = session();
@@ -202,8 +202,8 @@ describe('batch undo ownership', () => {
     expect(head(store, id)).not.toBe(batch);
     // Undoing restores that later note only, and retires the older claim again.
     store.undo(id);
-    expect(store.getSession(id)!.data.annotations[third].note).toBe('');
-    expect(store.getSession(id)!.data.annotations[third].label).toBe('Batch reviewed');
+    expect(store.getUnlocked(id)!.data.annotations[third].note).toBe('');
+    expect(store.getUnlocked(id)!.data.annotations[third].label).toBe('Batch reviewed');
     expect(head(store, id)).not.toBe(batch);
   });
 

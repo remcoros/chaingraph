@@ -45,7 +45,7 @@ function HexField({
 interface ScriptInspectorProps {
   workspace: Workspace;
   selected: GraphNode;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   loadedSpends: ReadonlyMap<string, readonly Transaction[]>;
 }
 
@@ -74,7 +74,7 @@ export function ScriptInspector(props: ScriptInspectorProps) {
 function ScriptInspectorBody({
   workspace,
   selected,
-  canQuery,
+  canLoadChainData,
   related,
 }: ScriptInspectorProps & {
   related: ReturnType<typeof relatedTransactions>;
@@ -99,7 +99,7 @@ function ScriptInspectorBody({
     return () => request.current?.abort();
   }, [workspace.id, workspace.network, transaction, selected.id, selected.txid, selected.vout]);
   async function load() {
-    if (!transaction || !canQuery || workspace.demo) return;
+    if (!transaction || !canLoadChainData || workspace.demo) return;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -170,7 +170,7 @@ function ScriptInspectorBody({
           <div className="compact-controls">
             <button
               type="button"
-              disabled={loading || !canQuery || workspace.demo}
+              disabled={loading || !canLoadChainData || workspace.demo}
               onClick={() => void load()}
             >
               <Download size={14} />
@@ -180,7 +180,7 @@ function ScriptInspectorBody({
           <p className="small muted">
             {workspace.demo
               ? 'Legacy synthetic data: raw transaction and witness data are unavailable.'
-              : !canQuery
+              : !canLoadChainData
                 ? 'Connect to this workspace network to load raw data.'
                 : 'Loads scriptSig, witness, version, locktime and raw hex.'}
           </p>

@@ -23,13 +23,13 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     returnWorkbench,
     workbench,
     lookup,
-    w,
-    canQuery,
-    operation,
+    activeWorkspace,
+    canLoadChainData,
+    operationStatus: operation,
     prefetchDepth,
     setPrefetchDepth,
     history,
-    ws,
+    workspaces,
     exportWorkspace,
     dialogs,
     annotations,
@@ -43,8 +43,8 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
   const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);
   // Scoped to its workspace, so switching or locking one closes the menu.
   const [menuFor, setMenuFor] = useState<string>();
-  const menu = !!w && menuFor === w.id;
-  const workspaceIdForMenu = w?.id;
+  const menu = !!activeWorkspace && menuFor === activeWorkspace.id;
+  const workspaceIdForMenu = activeWorkspace?.id;
   const setMenu = useCallback(
     (next: boolean) => setMenuFor(next ? workspaceIdForMenu : undefined),
     [workspaceIdForMenu],
@@ -88,7 +88,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
       document.removeEventListener('keydown', key);
     };
   }, [menu, setMenu, workspaceMenu, workspaceMenuTrigger]);
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <div className={`workbench-toolbar mode-${shownWorkbench}`}>
       <nav className="workbench-nav" aria-label="Workbench">
@@ -122,8 +122,8 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
       <div className="lookup-controls" data-tour="chain-lookup">
         <LookupForm
           inputRef={lookup.inputRef}
-          network={w.network}
-          canQuery={canQuery}
+          network={activeWorkspace.network}
+          canLoadChainData={canLoadChainData}
           busy={!!operation}
           resetToken={lookup.resetToken}
           queryError={lookup.error}
@@ -131,7 +131,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
           resolveLoaded={lookup.resolveLoaded}
           onSubmit={addQuery}
         />
-        {!w.demo && (
+        {!activeWorkspace.demo && (
           <label
             className="lookup-prefetch"
             title="Previous transaction levels for transaction/output lookups. Up to 500 downloads per action."
@@ -209,7 +209,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                 disabled={!history.canUndo || !!operation}
                 onClick={() => {
                   setMenu(false);
-                  ws.undo(w.id);
+                  workspaces.undo(activeWorkspace.id);
                 }}
               >
                 <Undo2 size={15} /> Undo
@@ -221,7 +221,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                 disabled={!history.canRedo || !!operation}
                 onClick={() => {
                   setMenu(false);
-                  ws.redo(w.id);
+                  workspaces.redo(activeWorkspace.id);
                 }}
               >
                 <Redo2 size={15} /> Redo
@@ -267,8 +267,8 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                   operationRef.current?.abort();
                   flushActiveGraph();
                   setLockingWorkspace(true);
-                  void ws
-                    .lock(w.id)
+                  void workspaces
+                    .lock(activeWorkspace.id)
                     .catch((e) => setError(e.message))
                     .finally(() => setLockingWorkspace(false));
                 }}

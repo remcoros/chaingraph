@@ -19,15 +19,15 @@ export interface WorkspaceLookup {
   resolveLoaded: (text: string) => string | undefined;
 }
 
-export function useWorkspaceLookup(w: AppState['w']): WorkspaceLookup {
+export function useWorkspaceLookup(activeWorkspace: AppState['activeWorkspace']): WorkspaceLookup {
   const inputRef = useRef<HTMLInputElement>(null);
   // Stable so global shortcut listeners register once.
   const focus = useCallback(() => inputRef.current?.focus(), []);
   const [resetToken, setResetToken] = useState(0);
   const [error, setError] = useState('');
-  const transactions = w?.transactions;
-  const watchedAddresses = w?.watchedAddresses;
-  const inputContext = w?.inputContext;
+  const transactions = activeWorkspace?.transactions;
+  const watchedAddresses = activeWorkspace?.watchedAddresses;
+  const inputContext = activeWorkspace?.inputContext;
   const loadedIds = useMemo(() => {
     const ids = new Set((watchedAddresses ?? []).map(addressNodeId));
     for (const transaction of Object.values(transactions ?? {})) {

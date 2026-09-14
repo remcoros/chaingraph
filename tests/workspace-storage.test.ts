@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import { encryptWorkspace, decryptWorkspace } from '../src/Infra/Storage/crypto';
-import { STORAGE_KEY, WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { STORAGE_KEY, WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 
 const password = 'test workspace passphrase';
 function memoryStorage(initial: string | null = null) {
@@ -26,23 +26,23 @@ describe('workspace persistence state transitions', () => {
   it('starts a fresh undo group after locking and immediately reopening the same workspace', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
     try {
-      const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+      const store = new WorkspaceStore({ storage: memoryStorage() });
       const w = newWorkspace('Original', 'testnet4');
       store.open(w, password);
       store.update(w.id, (current) => ({ ...current, name: 'Before lock' }), true, 'name');
       await store.lock(w.id);
       await store.unlock(store.getSnapshot().saved[0], password);
       store.update(w.id, (current) => ({ ...current, name: 'After unlock' }), true, 'name');
-      expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+      expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
       store.undo(w.id);
-      expect(store.getSnapshot().sessions[0].data.name).toBe('Before lock');
+      expect(store.getSnapshot().unlocked[0].data.name).toBe('Before lock');
     } finally {
       clock.mockRestore();
     }
   });
 
   it('groups continuous typing without losing the latest view or merging across undo', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const w = newWorkspace('Typing', 'testnet4');
     store.open(w, password);
     const edit = (label: string) =>
@@ -66,35 +66,35 @@ describe('workspace persistence state transitions', () => {
       false,
     );
     edit('abc');
-    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.annotations.example).toBeUndefined();
-    expect(store.getSnapshot().sessions[0].data.view.glow).toBe(false);
+    expect(store.getSnapshot().unlocked[0].data.annotations.example).toBeUndefined();
+    expect(store.getSnapshot().unlocked[0].data.view.glow).toBe(false);
     edit('next');
-    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.annotations.example).toBeUndefined();
+    expect(store.getSnapshot().unlocked[0].data.annotations.example).toBeUndefined();
   });
 
   it('separates different annotation fields and intervening user actions in undo', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const w = newWorkspace('Fields', 'testnet4');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'First' }), true, 'name');
     store.update(w.id, (current) => ({ ...current, description: 'Note' }), true, 'description');
     store.update(w.id, (current) => ({ ...current, name: 'Second' }), true, 'name');
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data).toMatchObject({
+    expect(store.getSnapshot().unlocked[0].data).toMatchObject({
       name: 'First',
       description: 'Note',
     });
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.description).toBeUndefined();
+    expect(store.getSnapshot().unlocked[0].data.description).toBeUndefined();
   });
 
   it('stores the workspace name publicly while keeping its optional description encrypted', async () => {
     const storage = memoryStorage();
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     const w = {
       ...newWorkspace('Public project name', 'mainnet'),
       description: 'Private wallet provenance and research notes.',
@@ -109,9 +109,9 @@ describe('workspace persistence state transitions', () => {
       name: w.name,
       description: w.description,
     });
-    const reloaded = new WorkspaceSessionStore({ storage });
+    const reloaded = new WorkspaceStore({ storage });
     await reloaded.unlock(reloaded.getSnapshot().saved[0], password);
-    expect(reloaded.getSnapshot().sessions[0].data.description).toBe(w.description);
+    expect(reloaded.getSnapshot().unlocked[0].data.description).toBe(w.description);
   });
 
   it('loads legacy saved records and migrates their public name only after unlocking and saving', async () => {
@@ -120,11 +120,11 @@ describe('workspace persistence state transitions', () => {
     const storage = memoryStorage(
       JSON.stringify([{ id: w.id, savedAt: new Date().toISOString(), envelope }]),
     );
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     expect(store.getSnapshot().storageError).toBe('');
     expect(store.getSnapshot().saved[0].publicName).toBeUndefined();
     await store.unlock(store.getSnapshot().saved[0], password);
-    expect(store.getSnapshot().sessions[0].savedRevision).toBe(-1);
+    expect(store.getSnapshot().unlocked[0].savedRevision).toBe(-1);
     expect(JSON.parse(storage.raw()!)[0].publicName).toBeUndefined();
     await store.persist(w.id);
     expect(JSON.parse(storage.raw()!)[0].publicName).toBe('Legacy project');
@@ -138,7 +138,7 @@ describe('workspace persistence state transitions', () => {
         { id: w.id, publicName, savedAt: new Date().toISOString(), envelope },
       ]);
       const storage = memoryStorage(original);
-      const store = new WorkspaceSessionStore({ storage });
+      const store = new WorkspaceStore({ storage });
       expect(store.getSnapshot().storageError).toContain('malformed');
       store.open(w, password);
       await expect(store.persist(w.id)).rejects.toThrow('malformed');
@@ -157,11 +157,11 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('clears old undo snapshots after a chain refresh so undo cannot erase new transaction data', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const w = newWorkspace('Before label', 'mainnet');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Labeled investigation' }));
-    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
     const txid = '1'.repeat(64);
     store.update(
       w.id,
@@ -178,34 +178,34 @@ describe('workspace persistence state transitions', () => {
       }),
       false,
     );
-    expect(store.getSnapshot().sessions[0].history).toHaveLength(0);
+    expect(store.getSnapshot().unlocked[0].history).toHaveLength(0);
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.transactions[txid]).toBeDefined();
-    expect(store.getSnapshot().sessions[0].data.name).toBe('Labeled investigation');
+    expect(store.getSnapshot().unlocked[0].data.transactions[txid]).toBeDefined();
+    expect(store.getSnapshot().unlocked[0].data.name).toBe('Labeled investigation');
     store.update(w.id, (current) => ({ ...current, name: 'New edit' }));
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.transactions[txid]).toBeDefined();
-    expect(store.getSnapshot().sessions[0].data.name).toBe('Labeled investigation');
+    expect(store.getSnapshot().unlocked[0].data.transactions[txid]).toBeDefined();
+    expect(store.getSnapshot().unlocked[0].data.name).toBe('Labeled investigation');
   });
 
   it('ignores no-op updates without touching revision or undo history', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const w = newWorkspace('No-op refresh', 'mainnet');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Labeled investigation' }));
-    const before = store.getSnapshot().sessions[0];
+    const before = store.getSnapshot().unlocked[0];
     expect(before.history).toHaveLength(1);
     // A scan result for a wallet that no longer exists merges nothing at all.
     store.update(w.id, (current) => current, false);
-    const unchanged = store.getSnapshot().sessions[0];
+    const unchanged = store.getSnapshot().unlocked[0];
     expect(unchanged.revision).toBe(before.revision);
     expect(unchanged.history).toHaveLength(1);
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.name).toBe('No-op refresh');
+    expect(store.getSnapshot().unlocked[0].data.name).toBe('No-op refresh');
   });
 
   it('keeps the latest scan metadata through quiet checks while undo restores user edits', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
       name: 'Watch only',
@@ -242,11 +242,11 @@ describe('workspace persistence state transitions', () => {
       }),
       false,
     );
-    const quiet = store.getSnapshot().sessions[0];
+    const quiet = store.getSnapshot().unlocked[0];
     expect(quiet.history).toHaveLength(2);
     store.undo(w.id);
     store.undo(w.id);
-    const restored = store.getSnapshot().sessions[0];
+    const restored = store.getSnapshot().unlocked[0];
     expect(restored.data.name).toBe('Quiet refresh');
     expect(restored.data.description).toBeUndefined();
     expect(restored.data.wallets[0]).toMatchObject({
@@ -261,7 +261,7 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('does not unacknowledge reviewed activity when undoing an earlier user edit', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
       name: 'Watch only',
@@ -287,15 +287,15 @@ describe('workspace persistence state transitions', () => {
       }),
       false,
     );
-    expect(store.getSnapshot().sessions[0].history).toHaveLength(1);
+    expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
     store.undo(w.id);
-    const restored = store.getSnapshot().sessions[0];
+    const restored = store.getSnapshot().unlocked[0];
     expect(restored.data.name).toBe('Review activity');
     expect(restored.data.wallets[0].unreviewedTransactionIds).toEqual([]);
   });
 
   it('still invalidates undo history when a refresh changes chain evidence', () => {
-    const store = new WorkspaceSessionStore({ storage: memoryStorage() });
+    const store = new WorkspaceStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
       name: 'Watch only',
@@ -323,17 +323,17 @@ describe('workspace persistence state transitions', () => {
       }),
       false,
     );
-    expect(store.getSnapshot().sessions[0].history).toHaveLength(0);
+    expect(store.getSnapshot().unlocked[0].history).toHaveLength(0);
     store.undo(w.id);
-    expect(store.getSnapshot().sessions[0].data.name).toBe('Edited before refresh');
-    expect(store.getSnapshot().sessions[0].data.transactions[txid]).toBeDefined();
+    expect(store.getSnapshot().unlocked[0].data.name).toBe('Edited before refresh');
+    expect(store.getSnapshot().unlocked[0].data.transactions[txid]).toBeDefined();
   });
 
   it('saves same-turn edits before lock, blocks update and undo immediately, and unlocks the latest state', async () => {
     const storage = memoryStorage();
     const started = deferred(),
       release = deferred();
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage,
       encrypt: async (data, pw) => {
         started.resolve();
@@ -348,18 +348,18 @@ describe('workspace persistence state transitions', () => {
     store.update(w.id, (current) => ({ ...current, name: 'Should not be accepted' }));
     store.undo(w.id);
     await started.promise;
-    expect(store.getSnapshot().sessions[0].data.name).toBe('Latest edit before lock');
+    expect(store.getSnapshot().unlocked[0].data.name).toBe('Latest edit before lock');
     release.resolve();
     await locked;
-    expect(store.getSnapshot().sessions).toHaveLength(0);
+    expect(store.getSnapshot().unlocked).toHaveLength(0);
     expect(JSON.parse(storage.raw()!)[0].publicName).toBe('Latest edit before lock');
-    const restored = new WorkspaceSessionStore({ storage });
+    const restored = new WorkspaceStore({ storage });
     expect(restored.getSnapshot().storageError).toBe('');
     const saved = restored.getSnapshot().saved[0];
     await restored.unlock(saved, password);
-    expect(restored.getSnapshot().sessions[0].data.name).toBe('Latest edit before lock');
-    expect(restored.getSnapshot().sessions[0].savedRevision).toBe(
-      restored.getSnapshot().sessions[0].revision,
+    expect(restored.getSnapshot().unlocked[0].data.name).toBe('Latest edit before lock');
+    expect(restored.getSnapshot().unlocked[0].savedRevision).toBe(
+      restored.getSnapshot().unlocked[0].revision,
     );
   });
 
@@ -368,7 +368,7 @@ describe('workspace persistence state transitions', () => {
     const started = deferred(),
       release = deferred();
     let count = 0;
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage,
       encrypt: async (data, pw) => {
         if (++count === 1) {
@@ -390,13 +390,13 @@ describe('workspace persistence state transitions', () => {
     expect(await decryptWorkspace(store.getSnapshot().saved[0].envelope, password)).toMatchObject({
       name: 'Arrived during encryption',
     });
-    expect(store.getSnapshot().sessions).toHaveLength(0);
+    expect(store.getSnapshot().unlocked).toHaveLength(0);
   });
 
   it('retains the unlocked state and dirty revision after quota failure, allowing retry', async () => {
     const memory = memoryStorage();
     let fail = true;
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: {
         getItem: memory.getItem,
         setItem: (key, value) => {
@@ -408,12 +408,12 @@ describe('workspace persistence state transitions', () => {
     const w = newWorkspace('Unsaved data', 'mainnet');
     store.open(w, password);
     await expect(store.lock(w.id)).rejects.toThrow('Quota exceeded');
-    expect(store.getSnapshot().sessions[0].savedRevision).toBe(-1);
+    expect(store.getSnapshot().unlocked[0].savedRevision).toBe(-1);
     expect(store.getSnapshot().storageError).toContain('Export');
     store.update(w.id, (current) => ({ ...current, name: 'Still editable' }));
     fail = false;
     await store.lock(w.id);
-    expect(store.getSnapshot().sessions).toHaveLength(0);
+    expect(store.getSnapshot().unlocked).toHaveLength(0);
     expect(await decryptWorkspace(store.getSnapshot().saved[0].envelope, password)).toMatchObject({
       name: 'Still editable',
     });
@@ -422,12 +422,12 @@ describe('workspace persistence state transitions', () => {
   it('preserves malformed browser storage and refuses to replace it with a filtered empty index', async () => {
     for (const raw of ['broken JSON', '{}', '[{"id":"broken","envelope":{}}]']) {
       const storage = memoryStorage(raw);
-      const store = new WorkspaceSessionStore({ storage });
+      const store = new WorkspaceStore({ storage });
       const w = newWorkspace('New data', 'mainnet');
       store.open(w, password);
       await expect(store.persist(w.id)).rejects.toThrow('malformed');
       expect(storage.raw()).toBe(raw);
-      expect(store.getSnapshot().sessions).toHaveLength(1);
+      expect(store.getSnapshot().unlocked).toHaveLength(1);
     }
   });
 
@@ -435,7 +435,7 @@ describe('workspace persistence state transitions', () => {
     const storage = memoryStorage();
     const started = deferred(),
       release = deferred();
-    const first = new WorkspaceSessionStore({
+    const first = new WorkspaceStore({
       storage,
       encrypt: async (data, pw) => {
         started.resolve();
@@ -443,7 +443,7 @@ describe('workspace persistence state transitions', () => {
         return encryptWorkspace(data, pw);
       },
     });
-    const second = new WorkspaceSessionStore({ storage });
+    const second = new WorkspaceStore({ storage });
     const a = newWorkspace('First tab', 'mainnet'),
       b = newWorkspace('Second tab', 'mainnet');
     first.open(a, password);
@@ -455,13 +455,13 @@ describe('workspace persistence state transitions', () => {
     release.resolve();
     await expect(pending).rejects.toThrow('another tab');
     expect(storage.raw()).toBe(otherTabData);
-    expect(first.getSnapshot().sessions[0].data.name).toBe('First tab');
-    expect(first.getSnapshot().sessions[0].savedRevision).toBe(-1);
+    expect(first.getSnapshot().unlocked[0].data.name).toBe('First tab');
+    expect(first.getSnapshot().unlocked[0].savedRevision).toBe(-1);
   });
 
   it('serializes saves for different workspaces without losing index entries', async () => {
     const storage = memoryStorage();
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     const a = newWorkspace('A', 'mainnet'),
       b = newWorkspace('B', 'testnet4');
     store.open(a, password);
@@ -474,13 +474,13 @@ describe('workspace persistence state transitions', () => {
 
   it('does not lock a clean session if its stored backup has changed or disappeared', async () => {
     const storage = memoryStorage();
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     const w = newWorkspace('Already saved', 'mainnet');
     store.open(w, password);
     await store.persist(w.id);
     storage.setItem(STORAGE_KEY, '[]');
     await expect(store.lock(w.id)).rejects.toThrow('another tab');
-    expect(store.getSnapshot().sessions[0].data.name).toBe('Already saved');
+    expect(store.getSnapshot().unlocked[0].data.name).toBe('Already saved');
     expect(storage.raw()).toBe('[]');
   });
 });

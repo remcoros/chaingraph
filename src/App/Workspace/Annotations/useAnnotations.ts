@@ -34,8 +34,8 @@ export interface WorkspaceAnnotations {
 }
 
 interface Inputs {
-  current: AppState['w'];
-  sessions: AppState['ws'];
+  current: AppState['activeWorkspace'];
+  sessions: AppState['workspaces'];
   edit: (fn: (data: Workspace) => Workspace, undo?: boolean) => void;
   setError: AppState['setError'];
   setNotice: AppState['setNotice'];
@@ -68,7 +68,7 @@ export function useAnnotations({
     },
     applyBatch: (summary, update) => {
       if (!current) return undefined;
-      const before = sessions.getSession(current.id)?.undoRevision;
+      const before = sessions.getUnlocked(current.id)?.undoRevision;
       try {
         // A single workspace update keeps one Undo step for the whole batch.
         edit(update);
@@ -78,7 +78,7 @@ export function useAnnotations({
         );
         return undefined;
       }
-      const after = sessions.getSession(current.id)?.undoRevision;
+      const after = sessions.getUnlocked(current.id)?.undoRevision;
       setError('');
       if (after === undefined || after === before) {
         // Nothing changed, so no undo step exists and none is offered.

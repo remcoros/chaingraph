@@ -26,13 +26,13 @@ import { WorkspaceTour } from './Workspace/WorkspaceTour';
 export default function App() {
   const app = useAppState();
   const workspace = useWorkspace(app);
-  const { w, ws, fileInput, workspaceTabs } = app;
+  const { activeWorkspace, workspaces, fileInput, workspaceTabs } = app;
   return (
     <TransactionFetchShell scope={app.fetchScope}>
       <a
         className="skip-link"
         href={
-          workspace.workbench === 'graph' || !w
+          workspace.workbench === 'graph' || !activeWorkspace
             ? '#main-workspace'
             : `#${workspace.workbench}-workspace`
         }
@@ -45,7 +45,7 @@ export default function App() {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            if (w) app.activateWorkspace(undefined);
+            if (activeWorkspace) app.activateWorkspace(undefined);
           }}
           aria-label="Chaingraph home"
         >
@@ -62,18 +62,18 @@ export default function App() {
         >
           <button
             aria-label="Workspaces"
-            className={!w ? 'home-tab active' : 'home-tab'}
+            className={!activeWorkspace ? 'home-tab active' : 'home-tab'}
             onClick={() => app.activateWorkspace(undefined)}
           >
             <FolderOpen size={15} />
             <span>Workspaces</span>
           </button>
-          {ws.sessions.map((s) => (
+          {workspaces.unlocked.map((s) => (
             <button
-              className={`workspace-tab ${s.data.id === w?.id ? 'active' : ''}`}
+              className={`workspace-tab ${s.data.id === activeWorkspace?.id ? 'active' : ''}`}
               key={s.data.id}
               title={s.data.name}
-              aria-current={s.data.id === w?.id ? 'page' : undefined}
+              aria-current={s.data.id === activeWorkspace?.id ? 'page' : undefined}
               onClick={() => app.activateWorkspace(s.data.id)}
             >
               <span className="tab-network">{s.data.network === 'mainnet' ? 'M' : 'T'}</span>
@@ -112,9 +112,11 @@ export default function App() {
         <HelpMenu
           actions={[
             {
-              label: w ? 'Show guided tour' : 'Getting started',
+              label: activeWorkspace ? 'Show guided tour' : 'Getting started',
               onSelect: () =>
-                w ? workspace.setTour(WORKBENCH_TOUR[0].id) : app.setAboutOpen('guide'),
+                activeWorkspace
+                  ? workspace.setTour(WORKBENCH_TOUR[0].id)
+                  : app.setAboutOpen('guide'),
             },
             {
               label: 'Example workspaces',
@@ -126,10 +128,10 @@ export default function App() {
         />
       </header>
 
-      {!w ? (
+      {!activeWorkspace ? (
         <WorkspaceHome
-          saved={ws.saved}
-          sessions={ws.sessions}
+          saved={workspaces.saved}
+          sessions={workspaces.unlocked}
           onCreate={() => app.setCreate('empty')}
           networks={app.discoveryError ? undefined : app.networks}
           onTemplate={app.setCreate}
@@ -157,7 +159,7 @@ export default function App() {
         <AboutDialog
           initialTab={app.aboutOpen}
           onClose={() => app.setAboutOpen(false)}
-          onTour={w ? () => workspace.setTour(WORKBENCH_TOUR[0].id) : undefined}
+          onTour={activeWorkspace ? () => workspace.setTour(WORKBENCH_TOUR[0].id) : undefined}
           status={app.status}
           networks={app.networks}
           statuses={app.statuses}
@@ -177,7 +179,7 @@ export default function App() {
             <button
               className="danger"
               onClick={() =>
-                void ws
+                void workspaces
                   .removeSaved(app.deleteEntry!.id)
                   .then(() => {
                     app.setDeleteEntry(undefined);
@@ -191,20 +193,20 @@ export default function App() {
           </div>
         </Modal>
       )}
-      {(app.error || ws.storageError || app.notice) && (
+      {(app.error || workspaces.storageError || app.notice) && (
         <div
-          className={`toast ${app.error || ws.storageError ? 'error' : ''}`}
-          role={app.error || ws.storageError ? 'alert' : 'status'}
+          className={`toast ${app.error || workspaces.storageError ? 'error' : ''}`}
+          role={app.error || workspaces.storageError ? 'alert' : 'status'}
         >
-          <span>{app.error || ws.storageError || app.notice}</span>
+          <span>{app.error || workspaces.storageError || app.notice}</span>
           {!app.error &&
-            !ws.storageError &&
+            !workspaces.storageError &&
             app.notice === ADDRESS_DISPLAY_NOTICE &&
-            w &&
-            !w.view.showAddresses && (
+            activeWorkspace &&
+            !activeWorkspace.view.showAddresses && (
               <button
                 onClick={() => {
-                  workspace.change((current) => ({
+                  workspace.edit((current) => ({
                     ...current,
                     view: { ...current.view, showAddresses: true },
                   }));
@@ -214,7 +216,7 @@ export default function App() {
                 Enable address display
               </button>
             )}
-          {!ws.storageError && (
+          {!workspaces.storageError && (
             <button
               className="icon-button"
               aria-label="Dismiss message"
@@ -228,7 +230,7 @@ export default function App() {
           )}
         </div>
       )}
-      {w && !w.demo && !workspace.canQuery && (
+      {activeWorkspace && !activeWorkspace.demo && !workspace.canLoadChainData && (
         <div
           className="connection-banner"
           role={
@@ -237,7 +239,7 @@ export default function App() {
               : 'status'
           }
         >
-          {workspace.queryDisabledReason} Saved data remains available for offline analysis.
+          {workspace.chainDataDisabledReason} Saved data remains available for offline analysis.
         </div>
       )}
       <input
@@ -271,9 +273,9 @@ export default function App() {
           onUnlock={async (entry, password, signal) => {
             await app.saveBeforeLeaving();
             signal.throwIfAborted();
-            const current = ws.getSaved(entry.id);
+            const current = workspaces.getSaved(entry.id);
             if (!current) throw new Error('Saved workspace changed; reload before unlocking.');
-            return ws.unlock(current, password, signal);
+            return workspaces.unlock(current, password, signal);
           }}
           onClose={() => app.setUnlock(undefined)}
         />
@@ -284,8 +286,8 @@ export default function App() {
           file={app.fileDialog}
           onImport={(data, password) => {
             const existing =
-              ws.sessions.find((s) => s.data.id === data.id) ||
-              ws.saved.find((s) => s.id === data.id);
+              workspaces.unlocked.find((s) => s.data.id === data.id) ||
+              workspaces.saved.find((s) => s.id === data.id);
             if (existing)
               data = {
                 ...data,

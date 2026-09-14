@@ -6,7 +6,7 @@ import type { WorkspaceController } from '../../useWorkspace';
 export function EntitiesPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
     connectionScanTargets,
-    w,
+    activeWorkspace,
     entityRemoval,
     annotations,
     setMobilePanel,
@@ -15,9 +15,9 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     operationRef,
     setRightTab,
     dialogs,
-    operation,
-    canQuery,
-    change,
+    operationStatus: operation,
+    canLoadChainData,
+    edit,
   } = workspace;
   const { selected: wallet, discovery: walletDiscovery } = workspace.wallet;
   const {
@@ -57,18 +57,18 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
   } = workspace.graphActions;
   const { showWalletActivity } = workspace.wallet.actions;
 
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <WorkspacePanel
-      w={w}
-      transactions={w.transactions}
+      activeWorkspace={activeWorkspace}
+      transactions={activeWorkspace.transactions}
       removableNodeIds={entityRemoval.removableNodeIds}
       onRemoveNode={entityRemoval.request}
       selection={connectionScanTargets.picking ? undefined : selection}
       tagsPanel={
         <TagsPanel
-          key={w.id}
-          workspace={w}
+          key={activeWorkspace.id}
+          workspace={activeWorkspace}
           graph={graph}
           selected={selected}
           selectedIds={connectionScanTargets.picking ? undefined : selection.ids}
@@ -100,7 +100,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
         if (!connectionScanTargets.picking) setMobilePanel('right');
       }}
       onAddWallet={() => dialogs.openAddWallet()}
-      onEditWallet={(walletId) => dialogs.openWalletRename(w.id, walletId)}
+      onEditWallet={(walletId) => dialogs.openWalletRename(activeWorkspace.id, walletId)}
       busy={!!operation}
       onRefreshAll={() => void walletDiscovery.run()}
       onShowActivity={showWalletActivity}
@@ -110,7 +110,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       setAddressesPerBranch={walletDiscovery.setAddressesPerBranch}
       monitorActivity={walletDiscovery.monitorActivity}
       setMonitorActivity={walletDiscovery.setMonitorActivity}
-      canQuery={canQuery}
+      canLoadChainData={canLoadChainData}
       entityFilter={(entityFiltersLinked ? graphFilters : entityPanelFilters).query ?? ''}
       setEntityFilter={(query) =>
         entityFiltersLinked
@@ -145,11 +145,11 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       }
       contextNodeCount={entityFiltersLinked ? canvasFilterResult.availableContextNodeCount : 0}
       contextPreviewPending={entityFiltersLinked && graphFiltering}
-      hiddenNodeIds={w.view.hiddenNodeIds}
+      hiddenNodeIds={activeWorkspace.view.hiddenNodeIds}
       onSetHidden={setEntityHidden}
       visibility={entityVisibility}
       onVisibilityChange={(entityVisibility) =>
-        change((current) => ({ ...current, view: { ...current.view, entityVisibility } }), false)
+        edit((current) => ({ ...current, view: { ...current.view, entityVisibility } }), false)
       }
       hiddenCount={hiddenCount}
       onShowAllHidden={showAllHidden}

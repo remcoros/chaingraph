@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WalletPreparationCache } from '../src/App/Workspace/Workbenches/Wallet/walletPreparation';
 import { largeWalletFixture } from './fixtures/wallet-performance';
 import type { WalletUtxoView } from '../src/App/Workspace/Workbenches/Wallet/useWalletUtxos';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
@@ -21,7 +21,7 @@ describe('session wallet preparation', () => {
       wallet,
       preparationCache,
       active: true,
-      canQuery: false,
+      canLoadChainData: false,
       busy: false,
       walletUtxos: { loading: false, error: '', check: async () => {} },
       onSelectWallet: noop,
@@ -173,7 +173,7 @@ describe('session wallet preparation', () => {
 
   it('retains separate unlocked sessions, clears on lock, and survives a failed save', async () => {
     let failSave = true;
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: {
         getItem: () => null,
         setItem: () => {
@@ -184,24 +184,24 @@ describe('session wallet preparation', () => {
     const first = largeWalletFixture(1, 1);
     const second = largeWalletFixture(1, 1);
     store.open(first, 'public fixture password');
-    const session = store.getSession(first.id)!;
+    const session = store.getUnlocked(first.id)!;
     const prepared = session.walletPreparation.prepare(first, first.wallets[0]);
     store.open(second, 'public fixture password');
     store.setActiveId(first.id);
-    expect(store.getSession(first.id)?.walletPreparation.peek(first, first.wallets[0])).toBe(
+    expect(store.getUnlocked(first.id)?.walletPreparation.peek(first, first.wallets[0])).toBe(
       prepared,
     );
     expect(
-      store.getSession(second.id)?.walletPreparation.peek(second, second.wallets[0]),
+      store.getUnlocked(second.id)?.walletPreparation.peek(second, second.wallets[0]),
     ).toBeUndefined();
     await expect(store.lock(first.id)).rejects.toThrow();
     expect(session.walletPreparation.peek(first, first.wallets[0])).toBe(prepared);
     failSave = false;
     await store.lock(first.id);
-    expect(store.getSession(first.id)).toBeUndefined();
+    expect(store.getUnlocked(first.id)).toBeUndefined();
     expect(session.walletPreparation.peek(first, first.wallets[0])).toBeUndefined();
     expect(() => session.walletPreparation.prepare(first, first.wallets[0])).toThrow('closed');
     store.open(first, 'public fixture password');
-    expect(store.getSession(first.id)?.walletPreparation).not.toBe(session.walletPreparation);
+    expect(store.getUnlocked(first.id)?.walletPreparation).not.toBe(session.walletPreparation);
   });
 });

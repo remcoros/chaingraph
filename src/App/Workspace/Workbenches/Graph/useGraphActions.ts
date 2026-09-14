@@ -31,7 +31,7 @@ interface Inputs {
   selectionGeneration: Readonly<RefObject<number>>;
   invalidateSelection: () => void;
   preserveSelectionCamera: (id: string | undefined) => void;
-  change: (
+  edit: (
     fn: (data: Workspace) => Workspace,
     undo?: boolean,
     group?: string,
@@ -48,7 +48,7 @@ interface Inputs {
     >
   >;
   setNotice: AppState['setNotice'];
-  w: AppState['w'];
+  activeWorkspace: AppState['activeWorkspace'];
   setError: AppState['setError'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   requestMetadataEdit: (target: 'label' | 'tags' | 'icon') => void;
@@ -75,8 +75,8 @@ interface Inputs {
   graphFilters: GraphFilters;
   setEntityPanelFilters: Dispatch<SetStateAction<GraphFilters>>;
   setEntityFiltersLinked: Dispatch<SetStateAction<boolean>>;
-  wRef: AppState['wRef'];
-  ws: AppState['ws'];
+  activeWorkspaceRef: AppState['activeWorkspaceRef'];
+  workspaces: AppState['workspaces'];
   setOperation: Dispatch<SetStateAction<string>>;
   getTransaction: WorkspaceEvidence['getTransaction'];
   entityFiltersLinked: boolean;
@@ -86,10 +86,10 @@ export function useGraphActions({
   selectionGeneration,
   invalidateSelection,
   preserveSelectionCamera,
-  change,
+  edit,
   setFocusRequest,
   setNotice,
-  w,
+  activeWorkspace,
   setError,
   setGraphFilters,
   requestMetadataEdit,
@@ -116,8 +116,8 @@ export function useGraphActions({
   graphFilters,
   setEntityPanelFilters,
   setEntityFiltersLinked,
-  wRef,
-  ws,
+  activeWorkspaceRef,
+  workspaces,
   setOperation,
   getTransaction,
   entityFiltersLinked,
@@ -126,9 +126,13 @@ export function useGraphActions({
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
       if (hidden) invalidateSelection();
-      change((current) => (hidden ? hideGraphNodes(current, ids) : addGraphNodes(current, ids)));
+      edit((current) => (hidden ? hideGraphNodes(current, ids) : addGraphNodes(current, ids)));
       if (hidden) setFocusRequest(undefined);
-      if (!hidden && !w?.view.showAddresses && ids.some((id) => id.startsWith('addr:')))
+      if (
+        !hidden &&
+        !activeWorkspace?.view.showAddresses &&
+        ids.some((id) => id.startsWith('addr:'))
+      )
         setNotice(ADDRESS_DISPLAY_NOTICE);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Entity visibility could not be updated.');
@@ -136,7 +140,7 @@ export function useGraphActions({
   };
   const revealGraphNodes = (ids: string[]) => {
     if (!ids.length) return;
-    change((current) => {
+    edit((current) => {
       const revealed = addGraphNodes(current, ids);
       return {
         ...revealed,
@@ -153,9 +157,9 @@ export function useGraphActions({
   const removeFromGraph = (ids: string[]) => {
     invalidateSelection();
     setFocusRequest(undefined);
-    change((current) => removeGraphNodes(current, ids));
+    edit((current) => removeGraphNodes(current, ids));
   };
-  const showAllHidden = () => change(showAllNodes);
+  const showAllHidden = () => edit(showAllNodes);
   const editNode = (id: string, target: 'label' | 'tags' | 'icon' = 'label') => {
     setNotice('');
     cancelScanTargetPicking();
@@ -165,8 +169,8 @@ export function useGraphActions({
     setMobilePanel('right');
     requestMetadataEdit(target);
   };
-  const lockToSelection = w?.view.lockToSelection ?? false;
-  const showAddresses = w?.view.showAddresses ?? false;
+  const lockToSelection = activeWorkspace?.view.lockToSelection ?? false;
+  const showAddresses = activeWorkspace?.view.showAddresses ?? false;
   useEffect(() => {
     if (
       !workspaceId ||
@@ -210,17 +214,20 @@ export function useGraphActions({
       setNotice('This entity is hidden from the graph. Show it in the inspector to center it.');
       return;
     }
-    if (showHidden || !admittedIds.has(id)) change((current) => addGraphNodes(current, [id]));
+    if (showHidden || !admittedIds.has(id)) edit((current) => addGraphNodes(current, [id]));
     const rendered =
       filters || showHidden
         ? filterGraph(
             graph,
-            { ...(filters ?? effectiveFilters), showAddresses: w?.view.showAddresses },
-            w?.annotations,
+            {
+              ...(filters ?? effectiveFilters),
+              showAddresses: activeWorkspace?.view.showAddresses,
+            },
+            activeWorkspace?.annotations,
             {
               hiddenNodeIds: showHidden
-                ? w?.view.hiddenNodeIds?.filter((hidden) => hidden !== id)
-                : w?.view.hiddenNodeIds,
+                ? activeWorkspace?.view.hiddenNodeIds?.filter((hidden) => hidden !== id)
+                : activeWorkspace?.view.hiddenNodeIds,
               mode: 'visible',
             },
           )
@@ -228,7 +235,7 @@ export function useGraphActions({
     if (!rendered.nodes.some((node) => node.id === id)) {
       setGraphFilters({});
       if (id.startsWith('addr:'))
-        change((current) => ({ ...current, view: { ...current.view, showAddresses: true } }));
+        edit((current) => ({ ...current, view: { ...current.view, showAddresses: true } }));
     }
     setMobilePanel('graph');
     preserveSelectionCamera(undefined);
@@ -255,11 +262,11 @@ export function useGraphActions({
     setEntityFiltersLinked(linked);
   }
   function showOnGraph(ids: readonly string[], options: GraphNavigationOptions = {}) {
-    const current = ws.getSession(wRef.current?.id ?? '')?.data;
+    const current = workspaces.getUnlocked(activeWorkspaceRef.current?.id ?? '')?.data;
     if (!current) return false;
     const navigation = prepareGraphNavigation(current, ids, options);
     if (!navigation) return false;
-    ws.update(
+    workspaces.update(
       current.id,
       (latest) => prepareGraphNavigation(latest, ids, options)!.workspace,
       false,
@@ -275,7 +282,7 @@ export function useGraphActions({
     return true;
   }
   async function loadGraphTransactions(ids: readonly string[], signal: AbortSignal) {
-    const current = ws.getSession(w?.id ?? '')?.data;
+    const current = workspaces.getUnlocked(activeWorkspace?.id ?? '')?.data;
     if (!current) return [];
     const missing = graphNavigationTransactionIds(ids).filter((id) => !current.transactions[id]);
     if (missing.length > MAX_SCAN_TRANSACTIONS)
@@ -294,7 +301,7 @@ export function useGraphActions({
         }),
       ),
     ];
-    change((current) => {
+    edit((current) => {
       const admitted = addGraphNodes(promoteInputContext(current, transactionIds), ids);
       return {
         ...admitted,
@@ -309,7 +316,7 @@ export function useGraphActions({
   }
   function resetGraphFilters() {
     updateFilters({});
-    change(
+    edit(
       (current) => ({ ...current, view: { ...current.view, smallAmountThreshold: undefined } }),
       false,
     );
@@ -319,8 +326,8 @@ export function useGraphActions({
     else setEntityPanelFilters({});
   }
   async function updateAllGraphOutputs(action: 'hide' | 'show') {
-    if (!w) return;
-    const ownerId = w.id;
+    if (!activeWorkspace) return;
+    const ownerId = activeWorkspace.id;
     const generation = selectionGeneration.current;
     await run(async (signal) => {
       setOperation(
@@ -329,10 +336,11 @@ export function useGraphActions({
       // Give the busy state a paint before a potentially large membership update.
       await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
       signal.throwIfAborted();
-      if (wRef.current?.id !== ownerId || selectionGeneration.current !== generation) return;
+      if (activeWorkspaceRef.current?.id !== ownerId || selectionGeneration.current !== generation)
+        return;
       cameraPreservedSelection.current = selectedId;
       setFocusRequest(undefined);
-      ws.update(ownerId, (current) => {
+      workspaces.update(ownerId, (current) => {
         if (action === 'hide') {
           const evidence = fullGraphMembershipEvidence(current);
           const initialized = ensureGraphMembership(current);

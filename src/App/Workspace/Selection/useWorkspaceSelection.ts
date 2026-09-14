@@ -42,8 +42,8 @@ export interface WorkspaceSelection {
 
 interface Inputs {
   workspaceId: string | undefined;
-  currentRef: AppState['wRef'];
-  sessions: AppState['ws'];
+  currentRef: AppState['activeWorkspaceRef'];
+  sessions: AppState['workspaces'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
 }
@@ -80,7 +80,7 @@ export function useWorkspaceSelection({
   const markPending = useCallback((id: string | undefined) => {
     pending.current = id;
   }, []);
-  const { getSession, update } = sessions;
+  const { getUnlocked, update } = sessions;
   const select = useCallback(
     (id: string, options?: SelectOptions) => {
       if (pickHandler.current && options?.pickTarget !== false) {
@@ -90,7 +90,7 @@ export function useWorkspaceSelection({
       if (pending.current && pending.current !== id) pending.current = undefined;
       generation.current++;
       cameraPreserved.current = options?.preserveCamera ? id : undefined;
-      const active = getSession(currentRef.current?.id ?? '')?.data;
+      const active = getUnlocked(currentRef.current?.id ?? '')?.data;
       // A click admits exactly one entity, never its transaction's other branches.
       if (active) update(active.id, (workspace) => addGraphNodes(workspace, [id]), false);
       setSelectedId(id);
@@ -107,7 +107,7 @@ export function useWorkspaceSelection({
       );
       setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
-    [getSession, update, currentRef, setGraphFilters, setRightTab],
+    [getUnlocked, update, currentRef, setGraphFilters, setRightTab],
   );
   const batchIds = batch.ids;
   const removeBatchIds = batch.remove;

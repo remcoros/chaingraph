@@ -17,13 +17,13 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     shownWorkbench,
     workbench,
     tourStep,
-    w,
+    activeWorkspace,
     history,
     annotations,
     setNotice,
-    ws,
+    workspaces,
     connectionScanTargets,
-    operation,
+    operationStatus: operation,
     operationRef,
   } = workspace;
   const { pendingWorkspaceId: pendingGraphWorkspace } = workspace.graphCanvas;
@@ -33,7 +33,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   const { backgroundAddressHistoryLoad } = workspace.evidence;
   const { setEntityHidden, prepareIsolation, updateFilters } = workspace.graphActions;
 
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <>
       <WorkspaceToolbar workspace={workspace} />
@@ -80,7 +80,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
       <AnalysisWorkbench workspace={workspace} />
       <SelectionToolbar
         active={workbench === 'graph' && !tourStep && !connectionScanTargets.picking}
-        workspace={w}
+        workspace={activeWorkspace}
         selection={selection}
         visibleSelectedCount={selectionOnCanvas}
         hiddenSelectedCount={selection.count - selectionOnCanvas}
@@ -98,7 +98,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
             `Isolated ${ids.length.toLocaleString()} selected entities. The isolation chip restores the full canvas.`,
           );
         }}
-        onUndo={() => ws.undo(w.id)}
+        onUndo={() => workspaces.undo(activeWorkspace.id)}
       />
       {connectionScanTargets.picking && connectionScanTargets.draft && (
         <ConnectionScanTargetToolbar
@@ -136,20 +136,22 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
               <span className="status-separator">/</span>
               {visibleGraph.links.length.toLocaleString()} connections
               <span className="status-separator">/</span>
-              {Object.keys(w.transactions).length.toLocaleString()}{' '}
-              {Object.keys(w.transactions).length === 1 ? 'transaction' : 'transactions'}
+              {Object.keys(activeWorkspace.transactions).length.toLocaleString()}{' '}
+              {Object.keys(activeWorkspace.transactions).length === 1
+                ? 'transaction'
+                : 'transactions'}
             </>
           )}
         </span>
         <span className="save-status">
           <LockKeyhole size={12} />
-          {ws.storageError
+          {workspaces.storageError
             ? 'Save failed'
-            : pendingGraphWorkspace === w.id
+            : pendingGraphWorkspace === activeWorkspace.id
               ? 'View pending'
-              : ws.saving
+              : workspaces.saving
                 ? 'Encrypting…'
-                : ws.active?.revision === ws.active?.savedRevision
+                : workspaces.active?.revision === workspaces.active?.savedRevision
                   ? 'Encrypted · saved'
                   : 'Unsaved changes'}
         </span>

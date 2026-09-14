@@ -21,7 +21,7 @@ interface Options {
   inputs: readonly WalletReviewFlowEntry[];
   enabled: boolean;
   fetch: (network: Network, id: string, signal: AbortSignal) => Promise<Transaction>;
-  update: (id: string, change: (current: Workspace) => Workspace, undo?: boolean) => void;
+  update: (id: string, edit: (current: Workspace) => Workspace, undo?: boolean) => void;
 }
 
 function targetKey(options: Options) {

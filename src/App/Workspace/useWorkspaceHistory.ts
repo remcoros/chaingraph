@@ -14,25 +14,25 @@ export interface WorkspaceHistory {
 }
 
 interface Inputs {
-  w: AppState['w'];
-  ws: AppState['ws'];
+  activeWorkspace: AppState['activeWorkspace'];
+  workspaces: AppState['workspaces'];
 }
 
-export function useWorkspaceHistory({ w, ws }: Inputs) {
-  const undoDescription = ws.active?.history.at(-1)?.description;
-  const redoDescription = ws.active?.redoHistory.at(-1)?.description;
+export function useWorkspaceHistory({ activeWorkspace, workspaces }: Inputs) {
+  const undoDescription = workspaces.active?.history.at(-1)?.description;
+  const redoDescription = workspaces.active?.redoHistory.at(-1)?.description;
   return {
-    canUndo: !!ws.active?.history.length,
-    canRedo: !!ws.active?.redoHistory.length,
+    canUndo: !!workspaces.active?.history.length,
+    canRedo: !!workspaces.active?.redoHistory.length,
     undo: () => {
-      if (w) ws.undo(w.id);
+      if (activeWorkspace) workspaces.undo(activeWorkspace.id);
     },
     redo: () => {
-      if (w) ws.redo(w.id);
+      if (activeWorkspace) workspaces.redo(activeWorkspace.id);
     },
     undoLabel: undoDescription ? `Undo: ${undoDescription}` : 'Nothing to undo',
     redoLabel: redoDescription ? `Redo: ${redoDescription}` : 'Nothing to redo',
-    token: ws.getSession(w?.id ?? '')?.undoRevision ?? 0,
+    token: workspaces.getUnlocked(activeWorkspace?.id ?? '')?.undoRevision ?? 0,
     undoDescription,
   } satisfies WorkspaceHistory;
 }

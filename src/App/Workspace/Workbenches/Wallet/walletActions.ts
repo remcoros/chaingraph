@@ -16,7 +16,7 @@ import type { AppState } from '../../../useAppState';
 import type { GraphHandoff } from '../workbenchHandoff';
 import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
-  w: AppState['w'];
+  activeWorkspace: AppState['activeWorkspace'];
   wallet: Wallet | undefined;
   shownRightTab: NonNullable<Workspace['view']['rightTab']>;
   setNotice: AppState['setNotice'];
@@ -25,10 +25,10 @@ interface Inputs {
   showOnGraph: GraphHandoff['showOnGraph'];
   setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
   selection: ReturnType<typeof useEntitySelection>;
-  ws: AppState['ws'];
+  workspaces: AppState['workspaces'];
   selectionGeneration: RefObject<number>;
   loadGraphTransactions: GraphHandoff['loadGraphTransactions'];
-  wRef: AppState['wRef'];
+  activeWorkspaceRef: AppState['activeWorkspaceRef'];
   mergeTransactions: WorkspaceEvidence['mergeTransactions'];
   run: WorkspaceEvidence['run'];
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
@@ -41,7 +41,7 @@ interface Inputs {
   revealGraphNodes: GraphHandoff['revealGraphNodes'];
   updateFilters: GraphHandoff['updateFilters'];
   setLeftTab: Dispatch<SetStateAction<'wallets' | 'entities' | 'bookmarks' | 'tags'>>;
-  change: (
+  edit: (
     fn: (data: Workspace) => Workspace,
     undo?: boolean,
     group?: string,
@@ -49,7 +49,7 @@ interface Inputs {
   ) => void;
 }
 export function createWalletActions({
-  w,
+  activeWorkspace,
   wallet,
   shownRightTab,
   setNotice,
@@ -58,10 +58,10 @@ export function createWalletActions({
   showOnGraph,
   setRightTab,
   selection,
-  ws,
+  workspaces,
   selectionGeneration,
   loadGraphTransactions,
-  wRef,
+  activeWorkspaceRef,
   mergeTransactions,
   run,
   recordHandoffInvoker,
@@ -74,7 +74,7 @@ export function createWalletActions({
   revealGraphNodes,
   updateFilters,
   setLeftTab,
-  change,
+  edit,
 }: Inputs) {
   function selectWalletRecord(
     nodeId: string,
@@ -86,8 +86,8 @@ export function createWalletActions({
       selectionIds?: readonly string[];
     } = {},
   ) {
-    if (!w || !wallet) return;
-    const ownerId = w.id;
+    if (!activeWorkspace || !wallet) return;
+    const ownerId = activeWorkspace.id;
     const walletId = wallet.id;
     const tab = options.tab ?? shownRightTab;
     const center = options.center ?? true;
@@ -95,9 +95,9 @@ export function createWalletActions({
     const idSet = new Set(ids);
     const addresses = ids.filter((id) => id.startsWith('addr:')).map((id) => id.slice(5));
     if (addresses.length) {
-      const relationships = listWalletRelationships(w, wallet);
+      const relationships = listWalletRelationships(activeWorkspace, wallet);
       const known = new Set([
-        ...verifiedWalletAddresses(wallet, w.network).map((entry) => entry.address),
+        ...verifiedWalletAddresses(wallet, activeWorkspace.network).map((entry) => entry.address),
         ...relationships.sources.flatMap((entry) => (entry.address ? [entry.address] : [])),
         ...relationships.destinations.flatMap((entry) => (entry.address ? [entry.address] : [])),
       ]);
@@ -135,7 +135,7 @@ export function createWalletActions({
     };
     const transactionIds = graphNavigationTransactionIds(ids);
     if (!transactionIds.length) {
-      if (!center) ws.update(ownerId, reveal, false);
+      if (!center) workspaces.update(ownerId, reveal, false);
       finish();
       return;
     }
@@ -145,23 +145,23 @@ export function createWalletActions({
       const loaded = await loadGraphTransactions(ids, signal);
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation) return;
-      const current = ws.getSession(ownerId)?.data;
+      const current = workspaces.getUnlocked(ownerId)?.data;
       if (
         !current ||
         !current.wallets.some((item) => item.id === walletId) ||
-        wRef.current?.id !== ownerId
+        activeWorkspaceRef.current?.id !== ownerId
       )
         return;
       const transaction =
         current.transactions[transactionId] ?? loaded.find((tx) => tx.txid === transactionId);
-      if (utxo && (!transaction || !verifyWalletUtxo(utxo, transaction, w.network)))
+      if (utxo && (!transaction || !verifyWalletUtxo(utxo, transaction, activeWorkspace.network)))
         throw new Error(
           'The UTXO response does not match its transaction. Refresh the wallet UTXOs and retry.',
         );
       // Cached navigation promotes graph context without replacing chain evidence.
       // A new transaction still takes the normal history/findings invalidation path.
       mergeTransactions(ownerId, loaded, transactionIds);
-      if (!center) ws.update(ownerId, reveal, false);
+      if (!center) workspaces.update(ownerId, reveal, false);
       finish();
     });
   }
@@ -209,7 +209,7 @@ export function createWalletActions({
     });
     setLeftTab('entities');
     setMobilePanel('graph');
-    change(
+    edit(
       (current) => ({
         ...current,
         wallets: current.wallets.map((wallet) =>

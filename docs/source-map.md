@@ -8,7 +8,7 @@ src/
   main.tsx
   App/
     App.tsx                 app shell, home and dialogs
-    useAppState.ts          app sessions, navigation and feedback
+    useAppState.ts          workspace store, navigation and feedback
     Dialogs.tsx             create, unlock, import and edit dialogs
     FrontPage/              saved workspace list (WorkspaceHome)
     Examples/               example picker and creation worker
@@ -16,7 +16,7 @@ src/
     Workspace/
       Workspace.tsx         toolbar, workbenches and shared status surfaces
       useWorkspace.tsx      shared state, selection and workbench coordination
-      useWorkspaces.ts      sessions, undo/redo, autosave and locking
+      useWorkspaces.ts      saved and unlocked workspaces, undo/redo, autosave, locking
       WorkspaceToolbar.tsx  workbench navigation, lookup and workspace actions
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
       WorkspaceTour.tsx     guided tour and example preview wiring
@@ -103,6 +103,24 @@ tests live in `Domain/Wallet/wallet.test.ts` and `Infra/Storage/crypto.test.ts`;
 backend tests live beside the server modules. Test commands are in
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+## Workspace vocabulary
+
+`useWorkspaces` owns two collections: `saved`, the encrypted workspaces at rest
+whose names are deliberately public, and `unlocked`, the decrypted ones in memory
+with their password, undo stack and autosave tracking. One unlocked workspace is
+active at a time.
+
+| Name                | Means                                                    |
+| ------------------- | -------------------------------------------------------- |
+| `workspaces`        | the store holding both `saved` and `unlocked`            |
+| `UnlockedWorkspace` | one decrypted workspace and everything held alongside it |
+| `activeWorkspace`   | the workspace the workbench is showing                   |
+| `edit`              | the sanctioned mutation of the active workspace          |
+
+`edit` is not a setter. It refuses writes while that workspace is locking, treats
+an identical result as no edit, records an undo step unless the write is
+presentation-only, and can group rapid edits under one description.
+
 ## Scan, analysis and review vocabulary
 
 Four separate features once shared the word "scan". Each keeps its own words, and
@@ -128,7 +146,7 @@ storage are separate from the server. Global styles live in `App/styles.css`, wo
 styles in `App/Workspace/Workbenches/workbenches.css`, and design tokens live
 in the root `tokens.css`. Tool configuration stays at the repository root.
 
-`App/useAppState.ts` owns app sessions, navigation, connection status and feedback,
+`App/useAppState.ts` owns the workspace store, navigation, connection status and feedback,
 and exports them as the `AppState` contract. `App.tsx` reads these directly;
 Workspace consumes the app services it needs.
 `Workspace/useWorkspace.tsx` owns shared state, selection, presentation hydration

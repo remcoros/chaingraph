@@ -18,14 +18,16 @@ export interface WorkspaceAnalysis {
   sectionRef: React.RefObject<HTMLElement | null>;
 }
 
-export function useWorkspaceAnalysis(openSessions: AppState['ws']['sessions']): WorkspaceAnalysis {
+export function useWorkspaceAnalysis(
+  openWorkspaces: AppState['workspaces']['unlocked'],
+): WorkspaceAnalysis {
   const sessions = useRef(new Map<string, AnalysisSession>());
   const [walletRevision, setWalletRevision] = useState(0);
   const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    const unlocked = new Set(openSessions.map((session) => session.data.id));
+    const unlocked = new Set(openWorkspaces.map((entry) => entry.data.id));
     for (const id of sessions.current.keys()) if (!unlocked.has(id)) sessions.current.delete(id);
-  }, [openSessions]);
+  }, [openWorkspaces]);
   return {
     sessions,
     walletRevision,

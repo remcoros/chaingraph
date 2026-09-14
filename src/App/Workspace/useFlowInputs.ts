@@ -104,7 +104,7 @@ export function useFlowInputs(options: {
   selected?: GraphNode;
   enabled: boolean;
   fetch: (id: string, signal: AbortSignal) => Promise<Transaction>;
-  update: (id: string, change: (current: Workspace) => Workspace, undo?: boolean) => void;
+  update: (id: string, edit: (current: Workspace) => Workspace, undo?: boolean) => void;
 }) {
   const latest = useRef(options);
   useEffect(() => {

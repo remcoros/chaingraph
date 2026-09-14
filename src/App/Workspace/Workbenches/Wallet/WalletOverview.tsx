@@ -23,9 +23,9 @@ export function WalletOverview({
   coverage,
   utxos,
   utxoLoading,
-  canQuery,
+  canLoadChainData,
   busy,
-  queryDisabledReason,
+  chainDataDisabledReason,
   onSelectWallet,
   onEditWallet,
   onAddWallet,
@@ -40,9 +40,9 @@ export function WalletOverview({
   WalletWorkbenchContext,
   | 'workspace'
   | 'tourPreview'
-  | 'canQuery'
+  | 'canLoadChainData'
   | 'busy'
-  | 'queryDisabledReason'
+  | 'chainDataDisabledReason'
   | 'onSelectWallet'
   | 'onEditWallet'
   | 'onAddWallet'
@@ -106,15 +106,15 @@ export function WalletOverview({
           </button>
           <button
             aria-label="Refresh wallet"
-            disabled={!canQuery || busy}
-            title={queryDisabledReason ?? 'Check wallet history for new transactions'}
+            disabled={!canLoadChainData || busy}
+            title={chainDataDisabledReason ?? 'Check wallet history for new transactions'}
             onClick={onRefresh}
           >
             <RefreshCw size={14} /> Refresh
           </button>
           <button
             aria-label="Check current UTXOs"
-            disabled={!canQuery || utxoLoading}
+            disabled={!canLoadChainData || utxoLoading}
             title="Check unspent outputs at the discovered wallet addresses"
             onClick={() => onCheck()}
           >
@@ -129,7 +129,7 @@ export function WalletOverview({
             {coverage.utxoCount === undefined ? (
               tourPreview ? (
                 'Not checked in preview'
-              ) : canQuery ? (
+              ) : canLoadChainData ? (
                 'Not checked yet'
               ) : (
                 'Backend unavailable'
@@ -181,7 +181,7 @@ export function WalletOverview({
         )}
         {(missingHistory > 0 || coverage.pendingTransactions > 0) && (
           <span className="compact-controls">
-            <button disabled={!canQuery || busy} onClick={onRefresh}>
+            <button disabled={!canLoadChainData || busy} onClick={onRefresh}>
               {missingHistory ? <Download size={13} /> : <RefreshCw size={13} />}
               {missingHistory
                 ? `Load history (${missingHistory})`
@@ -191,7 +191,10 @@ export function WalletOverview({
         )}
         {utxos?.nextCursor !== undefined && (
           <span className="compact-controls">
-            <button disabled={!canQuery || utxoLoading} onClick={() => onCheck(utxos.nextCursor)}>
+            <button
+              disabled={!canLoadChainData || utxoLoading}
+              onClick={() => onCheck(utxos.nextCursor)}
+            >
               <ArrowRight size={13} /> Check next addresses
             </button>
           </span>
@@ -205,12 +208,12 @@ export function WalletOverview({
         )}
         {!!utxos?.failed && (
           <span className="compact-controls">
-            <button disabled={!canQuery || utxoLoading} onClick={() => onCheck()}>
+            <button disabled={!canLoadChainData || utxoLoading} onClick={() => onCheck()}>
               <RefreshCw size={13} /> Retry address checks ({utxos.failed})
             </button>
           </span>
         )}
-        {!canQuery && <span className="small muted">{queryDisabledReason}</span>}
+        {!canLoadChainData && <span className="small muted">{chainDataDisabledReason}</span>}
       </div>
     </>
   );

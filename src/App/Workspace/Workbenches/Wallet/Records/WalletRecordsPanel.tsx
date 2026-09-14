@@ -26,7 +26,7 @@ export function WalletRecordsPanel({
   wallet,
   walletUtxos,
   active,
-  canQuery,
+  canLoadChainData,
   busy,
   selectedId,
   onSelect,
@@ -35,7 +35,7 @@ export function WalletRecordsPanel({
   wallet: Wallet;
   walletUtxos: WalletUtxoController;
   active?: WalletRecordsTab;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   busy: boolean;
   selectedId?: string;
   onSelect: (nodeId: string, utxo?: WalletUtxoRecord) => void;
@@ -120,7 +120,7 @@ export function WalletRecordsPanel({
             className="icon-button"
             aria-label="Refresh wallet UTXOs"
             title="Check discovered addresses for current UTXOs"
-            disabled={!canQuery || loading || busy}
+            disabled={!canLoadChainData || loading || busy}
             onClick={() => void checkUtxos()}
           >
             <RefreshCw size={15} />
@@ -137,7 +137,7 @@ export function WalletRecordsPanel({
       )}
       {active === 'utxos' && (
         <>
-          {!canQuery && (
+          {!canLoadChainData && (
             <p role="status" className="small muted">
               Connect to your backend to check current UTXOs.
             </p>
@@ -168,7 +168,7 @@ export function WalletRecordsPanel({
           {utxos?.nextCursor !== undefined && (
             <button
               className="text-button"
-              disabled={!canQuery || loading || busy}
+              disabled={!canLoadChainData || loading || busy}
               onClick={() => void checkUtxos(utxos.nextCursor)}
             >
               Check next addresses
@@ -196,7 +196,7 @@ export function WalletRecordsPanel({
               className={`wallet-record-row ${row.id === selectedId ? 'selected' : ''}`}
               aria-label={`Select ${row.utxo ? 'wallet UTXO' : 'wallet transaction'} ${identifier}`}
               aria-pressed={row.id === selectedId}
-              disabled={busy || (!row.transaction && !canQuery)}
+              disabled={busy || (!row.transaction && !canLoadChainData)}
               title={`${identifier}${annotation?.note ? `\n${annotation.note}` : ''}`}
               onClick={() => onSelect(row.id, row.utxo)}
             >

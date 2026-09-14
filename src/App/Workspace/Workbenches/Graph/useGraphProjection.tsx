@@ -78,7 +78,7 @@ function membershipFilters(
 }
 import type { AppState } from '../../../useAppState';
 interface Inputs {
-  w: AppState['w'];
+  activeWorkspace: AppState['activeWorkspace'];
   graphFilters: GraphFilters;
   fitToken: number;
   selectedId: string | undefined;
@@ -95,7 +95,7 @@ interface Inputs {
   entityFiltersLinked: boolean;
 }
 export function useGraphProjection({
-  w,
+  activeWorkspace,
   graphFilters,
   fitToken,
   selectedId,
@@ -105,60 +105,62 @@ export function useGraphProjection({
   entityPanelFilters,
   entityFiltersLinked,
 }: Inputs) {
-  const workspaceNetwork = w?.network;
-  const workspaceTransactions = w?.transactions;
-  const workspaceFindings = w?.findings;
-  const workspaceAnnotations = w?.annotations;
-  const workspaceTags = w?.tags;
-  const workspaceWallets = w?.wallets;
-  const workspaceWatchedAddresses = w?.watchedAddresses;
-  const workspaceAddressBalances = w?.addressBalances;
+  const workspaceNetwork = activeWorkspace?.network;
+  const workspaceTransactions = activeWorkspace?.transactions;
+  const workspaceFindings = activeWorkspace?.findings;
+  const workspaceAnnotations = activeWorkspace?.annotations;
+  const workspaceTags = activeWorkspace?.tags;
+  const workspaceWallets = activeWorkspace?.wallets;
+  const workspaceWatchedAddresses = activeWorkspace?.watchedAddresses;
+  const workspaceAddressBalances = activeWorkspace?.addressBalances;
   // Controls commit first; expensive graph/list projection can yield to newer input.
   const graphRenderRequest = useMemo(
     () => ({
-      workspaceId: w?.id,
+      workspaceId: activeWorkspace?.id,
       filters: graphFilters,
       fitToken,
-      showAddresses: w?.view.showAddresses ?? false,
-      smallAmountThreshold: w?.view.smallAmountThreshold,
-      dimensions: w?.view.dimensions ?? 3,
-      sizeBy: w?.view.sizeBy ?? 'uniform',
-      glow: w?.view.glow ?? true,
-      showLabels: w?.view.showLabels ?? true,
-      showTags: w?.view.showTags ?? true,
-      showIcons: w?.view.showIcons ?? true,
-      highlightMode: w?.view.highlightMode ?? 'all',
+      showAddresses: activeWorkspace?.view.showAddresses ?? false,
+      smallAmountThreshold: activeWorkspace?.view.smallAmountThreshold,
+      dimensions: activeWorkspace?.view.dimensions ?? 3,
+      sizeBy: activeWorkspace?.view.sizeBy ?? 'uniform',
+      glow: activeWorkspace?.view.glow ?? true,
+      showLabels: activeWorkspace?.view.showLabels ?? true,
+      showTags: activeWorkspace?.view.showTags ?? true,
+      showIcons: activeWorkspace?.view.showIcons ?? true,
+      highlightMode: activeWorkspace?.view.highlightMode ?? 'all',
     }),
     [
-      w?.id,
+      activeWorkspace?.id,
       graphFilters,
       fitToken,
-      w?.view.showAddresses,
-      w?.view.smallAmountThreshold,
-      w?.view.dimensions,
-      w?.view.sizeBy,
-      w?.view.glow,
-      w?.view.showLabels,
-      w?.view.showTags,
-      w?.view.showIcons,
-      w?.view.highlightMode,
+      activeWorkspace?.view.showAddresses,
+      activeWorkspace?.view.smallAmountThreshold,
+      activeWorkspace?.view.dimensions,
+      activeWorkspace?.view.sizeBy,
+      activeWorkspace?.view.glow,
+      activeWorkspace?.view.showLabels,
+      activeWorkspace?.view.showTags,
+      activeWorkspace?.view.showIcons,
+      activeWorkspace?.view.highlightMode,
     ],
   );
   const deferredGraphRequest = useDeferredValue(graphRenderRequest);
   const appliedGraphRequest =
-    deferredGraphRequest.workspaceId === w?.id ? deferredGraphRequest : graphRenderRequest;
+    deferredGraphRequest.workspaceId === activeWorkspace?.id
+      ? deferredGraphRequest
+      : graphRenderRequest;
   const appliedGraphFilters = appliedGraphRequest.filters;
   const graphFiltering = appliedGraphRequest !== graphRenderRequest;
   // Selection drives the inspector and transaction flow immediately. The canvas can
   // retain its previous highlight briefly, so an expensive renderer update does not
   // hold those panels behind a large graph presentation pass.
   const graphSelectionRequest = useMemo(
-    () => ({ workspaceId: w?.id, selectedId }),
-    [w?.id, selectedId],
+    () => ({ workspaceId: activeWorkspace?.id, selectedId }),
+    [activeWorkspace?.id, selectedId],
   );
   const deferredGraphSelectionRequest = useDeferredValue(graphSelectionRequest);
   const graphSelectedId =
-    deferredGraphSelectionRequest.workspaceId === w?.id
+    deferredGraphSelectionRequest.workspaceId === activeWorkspace?.id
       ? deferredGraphSelectionRequest.selectedId
       : graphSelectionRequest.selectedId;
   // Topology and chain indexes do not depend on human labels, icons or bookmarks.
@@ -199,8 +201,8 @@ export function useGraphProjection({
     [graphWithoutAddresses],
   );
   const graphFlowContext = useMemo(
-    () => flowIndex.resolve(graphSelectedId, w?.view.transactionFlow?.transactionId),
-    [flowIndex, graphSelectedId, w?.view.transactionFlow?.transactionId],
+    () => flowIndex.resolve(graphSelectedId, activeWorkspace?.view.transactionFlow?.transactionId),
+    [flowIndex, graphSelectedId, activeWorkspace?.view.transactionFlow?.transactionId],
   );
   const walletMatchInput = useMemo<WalletMatchInput | undefined>(() => {
     if (!workspaceNetwork || !workspaceTransactions || !workspaceWallets) return undefined;
@@ -263,13 +265,16 @@ export function useGraphProjection({
   );
   const automaticContextIds = useMemo(
     () => [
-      ...new Set([...(w?.contextTransactionIds ?? []), ...Object.keys(w?.inputContext ?? {})]),
+      ...new Set([
+        ...(activeWorkspace?.contextTransactionIds ?? []),
+        ...Object.keys(activeWorkspace?.inputContext ?? {}),
+      ]),
     ],
-    [w?.contextTransactionIds, w?.inputContext],
+    [activeWorkspace?.contextTransactionIds, activeWorkspace?.inputContext],
   );
   const completeAdmittedGraph = useMemo(
-    () => projectGraphMembership(completeGraph, w?.view.graphNodeIds),
-    [completeGraph, w?.view.graphNodeIds],
+    () => projectGraphMembership(completeGraph, activeWorkspace?.view.graphNodeIds),
+    [completeGraph, activeWorkspace?.view.graphNodeIds],
   );
   const admittedWithoutAddresses = useMemo(
     () => projectGraphAddresses(completeAdmittedGraph, false),
@@ -305,13 +310,13 @@ export function useGraphProjection({
     appliedGraphFilters.query?.trim() ||
     (appliedGraphFilters.label && appliedGraphFilters.label !== 'all') ||
     appliedGraphFilters.bookmarkedOnly
-      ? w?.annotations
+      ? activeWorkspace?.annotations
       : EMPTY_GRAPH_ANNOTATIONS;
   const entityFilterAnnotations =
     entityFilterRequest.query?.trim() ||
     (entityFilterRequest.label && entityFilterRequest.label !== 'all') ||
     entityFilterRequest.bookmarkedOnly
-      ? w?.annotations
+      ? activeWorkspace?.annotations
       : EMPTY_GRAPH_ANNOTATIONS;
   const canvasFilterResult = useMemo(
     () =>
@@ -319,7 +324,7 @@ export function useGraphProjection({
         amountGraph,
         { ...effectiveFilters, showAddresses: canvasShowAddresses },
         filterAnnotations,
-        { hiddenNodeIds: w?.view.hiddenNodeIds, mode: 'visible' },
+        { hiddenNodeIds: activeWorkspace?.view.hiddenNodeIds, mode: 'visible' },
         { index: amountFilterIndex, previewContext: true },
       ),
     [
@@ -327,7 +332,7 @@ export function useGraphProjection({
       amountFilterIndex,
       effectiveFilters,
       canvasShowAddresses,
-      w?.view.hiddenNodeIds,
+      activeWorkspace?.view.hiddenNodeIds,
       filterAnnotations,
     ],
   );
@@ -343,11 +348,15 @@ export function useGraphProjection({
     appliedGraphRequest.smallAmountThreshold,
     graphSelectedId,
   ]);
-  const hiddenIds = useMemo(() => new Set(w?.view.hiddenNodeIds ?? []), [w?.view.hiddenNodeIds]);
+  const hiddenIds = useMemo(
+    () => new Set(activeWorkspace?.view.hiddenNodeIds ?? []),
+    [activeWorkspace?.view.hiddenNodeIds],
+  );
   const connectionGraph = completeGraph;
   const connectionMembers = useMemo(
-    () => new Set(w?.view.graphNodeIds ?? connectionGraph.nodes.map((node) => node.id)),
-    [w?.view.graphNodeIds, connectionGraph],
+    () =>
+      new Set(activeWorkspace?.view.graphNodeIds ?? connectionGraph.nodes.map((node) => node.id)),
+    [activeWorkspace?.view.graphNodeIds, connectionGraph],
   );
   const shownConnectionMembers = useMemo(
     () => new Set([...connectionMembers].filter((id) => !hiddenIds.has(id))),
@@ -382,7 +391,7 @@ export function useGraphProjection({
     () => admittedGraph.nodes.filter((node) => !hiddenIds.has(node.id)).length,
     [admittedGraph, hiddenIds],
   );
-  const entityVisibility = w?.view.entityVisibility ?? 'graph';
+  const entityVisibility = activeWorkspace?.view.entityVisibility ?? 'graph';
   const recoveryFilterIndex = useMemo(() => buildGraphFilterIndex(recoveryGraph), [recoveryGraph]);
   const entityGraph = useMemo(() => {
     if (entityFiltersLinked) {
@@ -398,7 +407,7 @@ export function useGraphProjection({
           showAddresses: entityVisibility === 'visible' ? canvasShowAddresses : true,
         },
         filterAnnotations,
-        { hiddenNodeIds: w?.view.hiddenNodeIds, mode: entityVisibility },
+        { hiddenNodeIds: activeWorkspace?.view.hiddenNodeIds, mode: entityVisibility },
         { index: source === recoveryGraph ? recoveryFilterIndex : undefined },
       );
     }
@@ -409,7 +418,7 @@ export function useGraphProjection({
       effectiveEntityFilters,
       entityFilterAnnotations,
       {
-        hiddenNodeIds: w?.view.hiddenNodeIds,
+        hiddenNodeIds: activeWorkspace?.view.hiddenNodeIds,
         mode:
           entityVisibility === 'hidden' ? 'hidden' : entityVisibility === 'all' ? 'all' : 'visible',
       },
@@ -427,7 +436,7 @@ export function useGraphProjection({
     appliedGraphRequest.smallAmountThreshold,
     filterAnnotations,
     canvasShowAddresses,
-    w?.view.hiddenNodeIds,
+    activeWorkspace?.view.hiddenNodeIds,
     entityVisibility,
     visibleGraph,
   ]);
@@ -442,7 +451,7 @@ export function useGraphProjection({
         <EntityBadges
           tags={tagIndex.get(id) ?? []}
           wallets={
-            w?.wallets
+            activeWorkspace?.wallets
               .filter((wallet) => match?.walletIds.includes(wallet.id))
               .map((wallet) => wallet.name) ?? []
           }
@@ -450,7 +459,7 @@ export function useGraphProjection({
         />
       );
     },
-    [walletMatches, tagIndex, w?.wallets],
+    [walletMatches, tagIndex, activeWorkspace?.wallets],
   );
   const selected = selectedId
     ? (graphMetadata.labeledNodes.get(selectedId) ?? recoveryNodesById.get(selectedId))

@@ -28,14 +28,14 @@ export interface WalletDiscovery {
 interface Inputs {
   setOperation: Dispatch<SetStateAction<string>>;
   fetchScope: AppState['fetchScope'];
-  ws: AppState['ws'];
-  w: AppState['w'];
-  canQuery: boolean;
+  workspaces: AppState['workspaces'];
+  activeWorkspace: AppState['activeWorkspace'];
+  canLoadChainData: boolean;
   setNotice: AppState['setNotice'];
   fitAll: () => void;
   run: WorkspaceEvidence['run'];
   operationRef: RefObject<AbortController | undefined>;
-  wRef: AppState['wRef'];
+  activeWorkspaceRef: AppState['activeWorkspaceRef'];
   mergeTransactions: WorkspaceEvidence['mergeTransactions'];
   updateWorkspace: AppState['updateWorkspace'];
   workspaceId: AppState['workspaceId'];
@@ -43,14 +43,14 @@ interface Inputs {
 export function useWalletActivity({
   setOperation,
   fetchScope,
-  ws,
-  w,
-  canQuery,
+  workspaces,
+  activeWorkspace,
+  canLoadChainData,
   setNotice,
   fitAll,
   run,
   operationRef,
-  wRef,
+  activeWorkspaceRef,
   mergeTransactions,
   updateWorkspace,
   workspaceId,
@@ -80,7 +80,7 @@ export function useWalletActivity({
         onProgress: (p) => setOperation(p.message),
       });
       signal.throwIfAborted();
-      ws.update(
+      workspaces.update(
         initial.id,
         (current) => applyWalletScan(current, result.wallet, result.transactions),
         false,
@@ -94,9 +94,13 @@ export function useWalletActivity({
     return { snapshot, added, refreshed, partial, missing };
   }
   async function scan(target?: Wallet) {
-    if (!w || !canQuery) return;
+    if (!activeWorkspace || !canLoadChainData) return;
     await run(async (signal) => {
-      const result = await refreshWallets(target ? [target] : w.wallets, w, signal);
+      const result = await refreshWallets(
+        target ? [target] : activeWorkspace.wallets,
+        activeWorkspace,
+        signal,
+      );
       const checkedWallets = result.snapshot.wallets.filter(
         (entry) => !target || entry.id === target.id,
       );
@@ -109,12 +113,12 @@ export function useWalletActivity({
       );
       // Only the first discovery frames an empty canvas. Returning checks leave
       // the user's camera, selection, filters and annotations alone.
-      if (!Object.keys(w.transactions).length && result.added) fitAll();
+      if (!Object.keys(activeWorkspace.transactions).length && result.added) fitAll();
     });
   }
   const pollWalletActivity = useEffectEvent(() => {
     if (operationRef.current) return;
-    const current = wRef.current;
+    const current = activeWorkspaceRef.current;
     if (!current) return;
     void run(async (signal) => {
       monitorOperationRef.current = operationRef.current;
@@ -173,7 +177,10 @@ export function useWalletActivity({
       }
       // Publish completed work as one immutable snapshot. If polling is cancelled,
       // preserve the addresses already checked before the abort as well.
-      if (wRef.current?.id === current.id && wRef.current.network === current.network) {
+      if (
+        activeWorkspaceRef.current?.id === current.id &&
+        activeWorkspaceRef.current.network === current.network
+      ) {
         mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
         if (Object.keys(refreshedHistories).length)
           updateWorkspace(
@@ -198,13 +205,13 @@ export function useWalletActivity({
   });
   // Poll from the client, only while this workspace is unlocked. Backend never owns scan state.
   useEffect(() => {
-    if (!monitorActivity || !canQuery || !workspaceId) return;
+    if (!monitorActivity || !canLoadChainData || !workspaceId) return;
     const timer = setInterval(pollWalletActivity, 30000);
     return () => {
       clearInterval(timer);
       monitorOperationRef.current?.abort();
     };
-  }, [monitorActivity, canQuery, workspaceId, gapLimit, addressesPerBranch]);
+  }, [monitorActivity, canLoadChainData, workspaceId, gapLimit, addressesPerBranch]);
   return {
     gapLimit,
     setGapLimit,

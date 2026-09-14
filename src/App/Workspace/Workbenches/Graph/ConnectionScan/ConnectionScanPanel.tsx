@@ -93,7 +93,7 @@ type Props = {
   loadedSpenders: ReadonlyMap<string, readonly string[]>;
   neighbours: ReadonlyMap<string, readonly string[]>;
   active: boolean;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   scope: TransactionFetchScope;
   isCurrent: () => boolean;
   onChange: (update: (workspace: Workspace) => Workspace, undo?: boolean) => void;
@@ -103,7 +103,7 @@ type Props = {
 
 /** A run owns its source and targets. Selection only supplies an explicit new run. */
 export function ConnectionScanPanel(props: Props) {
-  const { workspace, selectionId, active, scope, canQuery, onChange } = props;
+  const { workspace, selectionId, active, scope, canLoadChainData, onChange } = props;
   const [settings, setSettings] = useState<ScanSettings>(() => ({
     ...(workspace.connectionScans?.runs.at(-1)?.settings ?? DEFAULT_SCAN_SETTINGS),
   }));
@@ -279,7 +279,7 @@ export function ConnectionScanPanel(props: Props) {
         workspace: snapshot,
         missingTxids: plan.missingTxids,
         scope: owner.scope,
-        canQuery: owner.canQuery,
+        canLoadChainData: owner.canLoadChainData,
         signal: abort.signal,
         isCurrent: () => mounted.current && current.current.active && owner.isCurrent(),
       });
@@ -422,7 +422,7 @@ export function ConnectionScanPanel(props: Props) {
         ],
         scope,
         signal: abort.signal,
-        allowNetwork: canQuery,
+        allowNetwork: canLoadChainData,
         isCurrent: () => mounted.current && current.current.isCurrent(),
         onProgress: (progress, evidence) => {
           if (!mounted.current || controller.current !== abort || !current.current.isCurrent())
@@ -478,7 +478,7 @@ export function ConnectionScanPanel(props: Props) {
         transactions: { ...currentEvidence, ...workspace.transactions },
         scope,
         signal: abort.signal,
-        allowNetwork: canQuery,
+        allowNetwork: canLoadChainData,
         loadedSpenders: (id) => [
           ...new Set([
             ...(props.loadedSpenders.get(id) ?? []),
@@ -820,7 +820,7 @@ export function ConnectionScanPanel(props: Props) {
             </details>
           </>
         )}
-        {!canQuery && <p className="small muted">Offline: loaded evidence only.</p>}
+        {!canLoadChainData && <p className="small muted">Offline: loaded evidence only.</p>}
         {error && (
           <p className="connection-scan-error" role="alert">
             {error}

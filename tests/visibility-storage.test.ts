@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { setNodesHidden, showAllNodes } from '../src/Domain/Graph/visibility';
 import { addGraphNodes, removeGraphNodes } from '../src/Domain/Graph/graphMembership';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 
 const id = `out:${'1'.repeat(64)}:0`;
 describe('visibility undo and saved view interactions', () => {
   it('retains exact graph removal undo through camera and selection autosaves', () => {
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     const workspace = addGraphNodes(newWorkspace('Graph membership undo', 'mainnet'), [id]);
@@ -34,15 +34,15 @@ describe('visibility undo and saved view interactions', () => {
       }),
       false,
     );
-    expect(store.getSession(workspace.id)?.data.view.graphNodeIds).toEqual([]);
+    expect(store.getUnlocked(workspace.id)?.data.view.graphNodeIds).toEqual([]);
     store.undo(workspace.id);
-    const restored = store.getSession(workspace.id)!.data;
+    const restored = store.getUnlocked(workspace.id)!.data;
     expect(restored.view.graphNodeIds).toEqual([id]);
     expect(restored.view.selectionId).toBe(id);
     expect(restored.view.graphSnapshot?.camera.position.z).toBe(200);
   });
   it('retains hide and show-all undo through selection and filter autosave', () => {
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     const workspace = newWorkspace('Visibility undo', 'mainnet');
@@ -62,7 +62,7 @@ describe('visibility undo and saved view interactions', () => {
       false,
     );
     store.undo(workspace.id);
-    let current = store.getSnapshot().sessions[0].data;
+    let current = store.getSnapshot().unlocked[0].data;
     expect(current.view.hiddenNodeIds ?? []).toEqual([]);
     expect(current.view.selectionId).toBe(id);
     expect(current.view.entityVisibility).toBe('hidden');
@@ -75,7 +75,7 @@ describe('visibility undo and saved view interactions', () => {
       false,
     );
     store.undo(workspace.id);
-    current = store.getSnapshot().sessions[0].data;
+    current = store.getSnapshot().unlocked[0].data;
     expect(current.view.hiddenNodeIds).toEqual([id]);
     expect(current.view.entityVisibility).toBe('all');
     expect(current.view.filters).toEqual({});

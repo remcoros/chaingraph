@@ -8,7 +8,7 @@ export interface ScanActionEvidenceOptions {
   workspace: Workspace;
   missingTxids: readonly string[];
   scope: TransactionFetchScope;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   signal?: AbortSignal;
   isCurrent?: () => boolean;
 }
@@ -49,7 +49,7 @@ export async function loadScanActionEvidence(
       checkpoint();
       let value: unknown = workspace.transactions[id] ?? workspace.connectionScans?.evidence[id];
       if (!value) {
-        if (!options.canQuery)
+        if (!options.canLoadChainData)
           throw new Error('Connect to the backend to load these transactions.');
         let stop: (() => void) | undefined;
         try {

@@ -37,9 +37,9 @@ export interface EntityRemoval {
 }
 
 interface Inputs {
-  w: AppState['w'];
-  wRef: AppState['wRef'];
-  ws: AppState['ws'];
+  activeWorkspace: AppState['activeWorkspace'];
+  activeWorkspaceRef: AppState['activeWorkspaceRef'];
+  workspaces: AppState['workspaces'];
   workspaceId: string | undefined;
   selectedId: string | undefined;
   setSelectedId: (id: string | undefined) => void;
@@ -52,9 +52,9 @@ function planFor(input: RemovalInput | undefined, nodeId: string) {
 }
 
 export function useEntityRemoval({
-  w,
-  wRef,
-  ws,
+  activeWorkspace,
+  activeWorkspaceRef,
+  workspaces,
   workspaceId,
   selectedId,
   setSelectedId,
@@ -62,14 +62,14 @@ export function useEntityRemoval({
   setNotice,
 }: Inputs): EntityRemoval {
   const [pending, setPending] = useState<{ workspaceId: string; nodeId: string }>();
-  const network = w?.network;
-  const transactions = w?.transactions;
-  const inputContext = w?.inputContext;
-  const contextTransactionIds = w?.contextTransactionIds;
-  const annotations = w?.annotations;
-  const tags = w?.tags;
-  const wallets = w?.wallets;
-  const watchedAddresses = w?.watchedAddresses;
+  const network = activeWorkspace?.network;
+  const transactions = activeWorkspace?.transactions;
+  const inputContext = activeWorkspace?.inputContext;
+  const contextTransactionIds = activeWorkspace?.contextTransactionIds;
+  const annotations = activeWorkspace?.annotations;
+  const tags = activeWorkspace?.tags;
+  const wallets = activeWorkspace?.wallets;
+  const watchedAddresses = activeWorkspace?.watchedAddresses;
   const input = useMemo<RemovalInput | undefined>(() => {
     if (!network || !transactions || !annotations || !wallets || !watchedAddresses)
       return undefined;
@@ -115,7 +115,7 @@ export function useEntityRemoval({
     [transactions, watchedAddresses],
   );
   const confirm = (targetWorkspaceId: string, nodeId: string) => {
-    const current = wRef.current;
+    const current = activeWorkspaceRef.current;
     if (!current || current.id !== targetWorkspaceId) {
       setPending(undefined);
       return;
@@ -125,9 +125,9 @@ export function useEntityRemoval({
       setPending(undefined);
       return;
     }
-    ws.update(targetWorkspaceId, (latest) => removeWorkspaceEntity(latest, nodeId));
+    workspaces.update(targetWorkspaceId, (latest) => removeWorkspaceEntity(latest, nodeId));
     setPending(undefined);
-    const remaining = ws.getSession(targetWorkspaceId)?.data;
+    const remaining = workspaces.getUnlocked(targetWorkspaceId)?.data;
     if (
       resolved.kind === 'transaction' &&
       selectedId &&
@@ -150,7 +150,7 @@ export function useEntityRemoval({
     selectedPlan,
     removableNodeIds,
     request: (nodeId = selectedId) => {
-      const current = wRef.current;
+      const current = activeWorkspaceRef.current;
       if (!current || !nodeId) return;
       const resolved = planEntityRemoval(current, nodeId);
       if (!resolved) return;

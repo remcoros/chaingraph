@@ -7,7 +7,7 @@ export interface LookupFormProps {
   /** Owned by the parent so existing keyboard shortcuts can still focus the field. */
   inputRef: RefObject<HTMLInputElement | null>;
   network: Network;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   busy: boolean;
   /** Bumped by the parent to clear the field after a successful lookup or a workspace switch. */
   resetToken: number;
@@ -28,7 +28,7 @@ export interface LookupFormProps {
 export function LookupForm({
   inputRef,
   network,
-  canQuery,
+  canLoadChainData,
   busy,
   resetToken,
   queryError,
@@ -84,7 +84,7 @@ export function LookupForm({
         type="submit"
         className="search-go"
         aria-label="Add to graph"
-        disabled={(!canQuery && !resolveLoaded(trimmed)) || busy || !trimmed}
+        disabled={(!canLoadChainData && !resolveLoaded(trimmed)) || busy || !trimmed}
       >
         <span>Add to graph</span> <Plus size={14} />
       </button>

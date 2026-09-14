@@ -116,7 +116,7 @@ describe('shared wallet observations', () => {
         wallet,
         workspace: fixture,
         busy: false,
-        canQuery: false,
+        canLoadChainData: false,
         onScan() {},
         onShowActivity() {},
         onEdit() {},

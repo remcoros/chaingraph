@@ -11,7 +11,7 @@ import {
   decryptAndValidateWorkspace,
   validateAndEncryptWorkspace,
 } from '../src/Infra/Storage/workspaceEncryption';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { transactionScheduler } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const password = 'public format integration fixture';
@@ -90,9 +90,9 @@ describe('workspace format at persistence and import boundaries', () => {
     const { version: _version, ...legacy } = current;
     const original = savedIndex(current, legacyEnvelope(legacy));
     const storage = storageFixture(original);
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     await store.unlock(store.getSnapshot().saved[0], password);
-    expect(store.getSession(current.id)!.data).toEqual(current);
+    expect(store.getUnlocked(current.id)!.data).toEqual(current);
     expect(storage.getItem()).toBe(original);
     store.pauseAutosave(current.id, true);
     store.update(current.id, (w) => ({
@@ -106,7 +106,7 @@ describe('workspace format at persistence and import boundaries', () => {
       new Blob([JSON.stringify(backup.envelope)]),
       password,
     );
-    expect(imported).toEqual(store.getSession(current.id)!.data);
+    expect(imported).toEqual(store.getUnlocked(current.id)!.data);
     expect(storage.getItem()).toBe(original);
     await store.lock(current.id);
     expect(JSON.parse(storage.getItem()!)[0].envelope).toMatchObject({
@@ -114,7 +114,7 @@ describe('workspace format at persistence and import boundaries', () => {
       compression: 'gzip',
     });
     await store.unlock(store.getSnapshot().saved[0], password);
-    expect(store.getSession(current.id)!.data).toEqual(imported);
+    expect(store.getUnlocked(current.id)!.data).toEqual(imported);
   });
 
   it('preserves originals when future envelope or schema versions are encountered', async () => {
@@ -122,21 +122,21 @@ describe('workspace format at persistence and import boundaries', () => {
     const envelope = await encryptWorkspace({ ...workspace, version: 9 }, password);
     const raw = savedIndex(workspace, envelope);
     const storage = storageFixture(raw);
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     await expect(store.unlock(store.getSnapshot().saved[0], password)).rejects.toThrow(
       'Unsupported workspace schema',
     );
     await expect(
       decryptAndValidateWorkspace(new Blob([JSON.stringify(envelope)]), password),
     ).rejects.toThrow('Unsupported workspace schema');
-    expect(store.getSnapshot().sessions).toHaveLength(0);
+    expect(store.getSnapshot().unlocked).toHaveLength(0);
     expect(storage.getItem()).toBe(raw);
     const futureRaw = savedIndex(workspace, { ...envelope, version: 9 });
     const futureStorage = storageFixture(futureRaw);
-    const future = new WorkspaceSessionStore({ storage: futureStorage });
+    const future = new WorkspaceStore({ storage: futureStorage });
     expect(future.getSnapshot().storageError).toContain('Unsupported encrypted workspace');
     future.open(newWorkspace('Other fixture', 'mainnet'), password);
-    await expect(future.persist(future.getSnapshot().sessions[0].data.id)).rejects.toThrow(
+    await expect(future.persist(future.getSnapshot().unlocked[0].data.id)).rejects.toThrow(
       'will not be overwritten',
     );
     expect(futureStorage.getItem()).toBe(futureRaw);
@@ -145,12 +145,12 @@ describe('workspace format at persistence and import boundaries', () => {
   it('retains edits and the prior encrypted save through missing-codec and storage failures', async () => {
     const workspace = newWorkspace('Recovery fixture', 'mainnet');
     const storage = storageFixture();
-    const store = new WorkspaceSessionStore({ storage });
+    const store = new WorkspaceStore({ storage });
     store.open(workspace, password);
     await store.persist(workspace.id);
     const original = storage.getItem();
     store.update(workspace.id, (w) => ({ ...w, description: 'Unsaved note. '.repeat(500) }));
-    const scope = store.getSession(workspace.id)!.fetchScope;
+    const scope = store.getUnlocked(workspace.id)!.fetchScope;
     let fetchSignal: AbortSignal | undefined;
     const fetching = transactionScheduler.request(
       'mainnet',
@@ -169,18 +169,18 @@ describe('workspace format at persistence and import boundaries', () => {
     vi.stubGlobal('CompressionStream', undefined);
     await expect(store.lock(workspace.id)).rejects.toThrow('gzip support');
     expect(storage.getItem()).toBe(original);
-    expect(store.getSession(workspace.id)!.data.description).toContain('Unsaved note');
-    expect(store.getSession(workspace.id)!.fetchScope).toBe(scope);
+    expect(store.getUnlocked(workspace.id)!.data.description).toContain('Unsaved note');
+    expect(store.getUnlocked(workspace.id)!.fetchScope).toBe(scope);
     expect(scope.closed).toBe(false);
     expect(fetchSignal?.aborted).toBe(false);
     vi.unstubAllGlobals();
     storage.fail(true);
     await expect(store.lock(workspace.id)).rejects.toThrow('storage failure');
     expect(storage.getItem()).toBe(original);
-    expect(store.getSession(workspace.id)!.savedRevision).not.toBe(
-      store.getSession(workspace.id)!.revision,
+    expect(store.getUnlocked(workspace.id)!.savedRevision).not.toBe(
+      store.getUnlocked(workspace.id)!.revision,
     );
-    expect(store.getSession(workspace.id)!.fetchScope).toBe(scope);
+    expect(store.getUnlocked(workspace.id)!.fetchScope).toBe(scope);
     expect(scope.closed).toBe(false);
     expect(fetchSignal?.aborted).toBe(false);
     storage.fail(false);
@@ -188,11 +188,11 @@ describe('workspace format at persistence and import boundaries', () => {
     await cancelledFetch;
     expect(scope.closed).toBe(true);
     expect(fetchSignal?.aborted).toBe(true);
-    expect(store.getSession(workspace.id)).toBeUndefined();
+    expect(store.getUnlocked(workspace.id)).toBeUndefined();
     await store.unlock(store.getSnapshot().saved[0], password);
-    expect(store.getSession(workspace.id)!.data.description).toContain('Unsaved note');
-    expect(store.getSession(workspace.id)!.fetchScope).not.toBe(scope);
-    expect(store.getSession(workspace.id)!.fetchScope.closed).toBe(false);
+    expect(store.getUnlocked(workspace.id)!.data.description).toContain('Unsaved note');
+    expect(store.getUnlocked(workspace.id)!.fetchScope).not.toBe(scope);
+    expect(store.getUnlocked(workspace.id)!.fetchScope.closed).toBe(false);
     const backup = await store.exportEncrypted(workspace.id);
     const decoded = await decryptAndValidateWorkspace(backup.envelope, password);
     expect(decoded).not.toHaveProperty('fetchScope');
@@ -210,7 +210,7 @@ describe('workspace format at persistence and import boundaries', () => {
       release = resolve;
     });
     const storage = storageFixture(raw);
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage,
       decrypt: async () => {
         started();
@@ -225,7 +225,7 @@ describe('workspace format at persistence and import boundaries', () => {
     controller.abort();
     release();
     await rejected;
-    expect(store.getSnapshot().sessions).toHaveLength(0);
+    expect(store.getSnapshot().unlocked).toHaveLength(0);
     expect(storage.getItem()).toBe(raw);
   });
 

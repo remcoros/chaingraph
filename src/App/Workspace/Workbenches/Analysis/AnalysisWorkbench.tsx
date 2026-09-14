@@ -1078,13 +1078,14 @@ export { MemoizedAnalysisWorkbench as AnalysisWorkbenchView };
 
 /** Binds the workspace controller to the view Workspace mounts. */
 export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceController }) {
-  const { w, workbench, lockingWorkspace, change, wRef, tourStep } = workspace;
+  const { activeWorkspace, workbench, lockingWorkspace, edit, activeWorkspaceRef, tourStep } =
+    workspace;
   const { selected: wallet } = workspace.wallet;
   const analysis = workspace.analysis;
   const { selected } = workspace.graphProjection;
   const { showFindingOnGraph } = workspace.analysis.actions;
 
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <section
       className="workbench-page"
@@ -1095,29 +1096,29 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
       aria-label="Analysis workspace"
     >
       <AnalysisWorkbenchView
-        key={`${w.id}:${analysis.walletRevision}`}
+        key={`${activeWorkspace.id}:${analysis.walletRevision}`}
         cache={analysis.sessions.current}
-        workspace={w}
+        workspace={activeWorkspace}
         active={workbench === 'analysis' && !lockingWorkspace}
         selected={selected}
         wallet={wallet}
-        onFindings={(findings) => change((current) => ({ ...current, findings }))}
+        onFindings={(findings) => edit((current) => ({ ...current, findings }))}
         onRecovered={(before, next) => {
           if (
-            wRef.current?.id !== before.id ||
-            wRef.current.network !== before.network ||
+            activeWorkspaceRef.current?.id !== before.id ||
+            activeWorkspaceRef.current.network !== before.network ||
             lockingWorkspace
           )
             return;
           let applied = false;
-          change((current) => {
+          edit((current) => {
             if (current.transactions !== before.transactions) return current;
             applied = true;
             return { ...current, transactions: next.transactions };
           });
           // Evidence writes mark old findings stale. Install the rerun in the
           // same synchronous action, retaining the single data-enrichment Undo.
-          if (applied) change((current) => ({ ...current, findings: next.findings }), false);
+          if (applied) edit((current) => ({ ...current, findings: next.findings }), false);
         }}
         onGraph={showFindingOnGraph}
       />

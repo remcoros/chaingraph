@@ -31,7 +31,7 @@ export interface WalletCounterpartyOptions {
   active: boolean;
   enabled: boolean;
   fetch: (network: Network, id: string, signal: AbortSignal) => Promise<Transaction>;
-  update: (id: string, change: (current: Workspace) => Workspace, undo?: boolean) => void;
+  update: (id: string, edit: (current: Workspace) => Workspace, undo?: boolean) => void;
 }
 
 export type WalletCounterpartyConfiguration = Omit<

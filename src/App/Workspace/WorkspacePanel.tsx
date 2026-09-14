@@ -23,7 +23,7 @@ import type { EntitySelection } from './Selection/useEntitySelection';
 import EntityBrowser from './Entities/EntityBrowser';
 import { ResponsiveIdentifier } from '../../Shared/Display/ResponsiveIdentifier';
 interface Props {
-  w: Workspace;
+  activeWorkspace: Workspace;
   tagsPanel?: ReactNode;
   leftTab: 'wallets' | 'entities' | 'bookmarks' | 'tags';
   setLeftTab: (tab: 'wallets' | 'entities' | 'bookmarks' | 'tags') => void;
@@ -42,7 +42,7 @@ interface Props {
   setAddressesPerBranch: (limit: number) => void;
   monitorActivity: boolean;
   setMonitorActivity: (monitorActivity: boolean) => void;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   entityFilter: string;
   setEntityFilter: (filter: string) => void;
   entityKind: string;
@@ -72,7 +72,7 @@ interface Props {
   selection?: EntitySelection;
 }
 export function WorkspacePanel({
-  w,
+  activeWorkspace,
   tagsPanel,
   leftTab,
   setLeftTab,
@@ -91,7 +91,7 @@ export function WorkspacePanel({
   setAddressesPerBranch,
   monitorActivity,
   setMonitorActivity,
-  canQuery,
+  canLoadChainData,
   entityFilter,
   setEntityFilter,
   entityKind,
@@ -127,7 +127,7 @@ export function WorkspacePanel({
           className={leftTab === 'wallets' ? 'active' : ''}
           onClick={() => setLeftTab('wallets')}
         >
-          Wallets <span>{w.wallets.length}</span>
+          Wallets <span>{activeWorkspace.wallets.length}</span>
         </button>
         <button
           data-testid="panel-tab-entities"
@@ -159,7 +159,7 @@ export function WorkspacePanel({
       ) : leftTab === 'wallets' ? (
         <>
           <div className="panel-body wallet-list">
-            {w.wallets.map((item) => (
+            {activeWorkspace.wallets.map((item) => (
               <div className="wallet-card" key={item.id}>
                 <div className="wallet-card-heading">
                   <button
@@ -206,7 +206,7 @@ export function WorkspacePanel({
                 )}
               </div>
             ))}
-            {w.wallets.length === 0 && (
+            {activeWorkspace.wallets.length === 0 && (
               <div className="empty-panel">
                 <WalletIcon size={27} />
                 <h3>Wallets monitorActivity here</h3>
@@ -214,18 +214,18 @@ export function WorkspacePanel({
               </div>
             )}
             <div className="compact-controls">
-              <button className="add-wallet" onClick={onAddWallet} disabled={w.demo}>
+              <button className="add-wallet" onClick={onAddWallet} disabled={activeWorkspace.demo}>
                 <Plus size={13} />
                 Add wallet
               </button>
             </div>
           </div>
           <div className="scan-settings">
-            {!!w.wallets.length && (
+            {!!activeWorkspace.wallets.length && (
               <div className="compact-controls">
                 <button
                   className="refresh-wallets"
-                  disabled={busy || !canQuery}
+                  disabled={busy || !canLoadChainData}
                   onClick={onRefreshAll}
                 >
                   <RefreshCw size={13} /> Refresh all wallets
@@ -265,7 +265,7 @@ export function WorkspacePanel({
               <input
                 type="checkbox"
                 checked={monitorActivity}
-                disabled={!canQuery}
+                disabled={!canLoadChainData}
                 onChange={(e) => setMonitorActivity(e.target.checked)}
               />
               <span>Check activity every 30s</span>
@@ -281,15 +281,15 @@ export function WorkspacePanel({
         </>
       ) : leftTab === 'entities' ? (
         <EntityBrowser
-          key={w.id}
+          key={activeWorkspace.id}
           nodes={entityNodes}
           batchNodes={entityBatchNodes}
-          annotations={w.annotations}
+          annotations={activeWorkspace.annotations}
           filters={
             graphFilters ?? { query: entityFilter, kind: entityKind as GraphFilters['kind'] }
           }
           onResetFilters={onResetGraphFilters}
-          extraFiltersActive={entityFiltersLinked && !!w.view.smallAmountThreshold}
+          extraFiltersActive={entityFiltersLinked && !!activeWorkspace.view.smallAmountThreshold}
           filtersLinked={entityFiltersLinked}
           onFiltersLinkedChange={onEntityFiltersLinkedChange}
           onFiltersChange={
@@ -311,12 +311,12 @@ export function WorkspacePanel({
           onVisibilityChange={onVisibilityChange}
           hiddenCount={hiddenCount}
           onShowAllHidden={onShowAllHidden}
-          transactions={transactions ?? w.transactions}
-          workspace={w}
+          transactions={transactions ?? activeWorkspace.transactions}
+          workspace={activeWorkspace}
           removableNodeIds={removableNodeIds}
           onRemoveNode={onRemoveNode}
-          wallets={w.wallets}
-          tags={w.tags}
+          wallets={activeWorkspace.wallets}
+          tags={activeWorkspace.tags}
           selection={selection}
         />
       ) : (
@@ -337,7 +337,7 @@ export function WorkspacePanel({
       )}
       <div className="panel-bottom">
         <ShieldCheck size={14} />
-        {w.demo ? 'Synthetic data only' : 'Watch-only · your own node'}
+        {activeWorkspace.demo ? 'Synthetic data only' : 'Watch-only · your own node'}
       </div>
     </aside>
   );

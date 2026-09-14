@@ -6,13 +6,13 @@ import {
   promoteInputContext,
 } from '../src/Domain/Workspace/workspace';
 import { removeWorkspaceEntity } from '../src/Domain/Workspace/entityRemoval';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { applyWalletScan } from '../src/Domain/Wallet/walletActivity';
 
 const parent = 'a'.repeat(64),
   child = 'b'.repeat(64);
 function fixture() {
-  const store = new WorkspaceSessionStore({ storage: { getItem: () => null, setItem: () => {} } });
+  const store = new WorkspaceStore({ storage: { getItem: () => null, setItem: () => {} } });
   const workspace = newWorkspace('Context Undo fixture', 'mainnet');
   workspace.transactions = {
     [parent]: {
@@ -31,7 +31,7 @@ function fixture() {
   store.open(workspace, 'public context fixture password');
   return { store, id: workspace.id };
 }
-function annotate(store: WorkspaceSessionStore, id: string) {
+function annotate(store: WorkspaceStore, id: string) {
   store.update(id, (w) => ({
     ...w,
     annotations: {
@@ -46,7 +46,7 @@ describe('quiet context transitions across workspace Undo', () => {
     annotate(store, id);
     store.update(id, (w) => clearContextProvenance(w, [parent]), false);
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(restored.annotations[`tx:${child}`]).toBeUndefined();
     expect(restored.inputContext).toBeUndefined();
     expect(restored.contextTransactionIds).toBeUndefined();
@@ -58,7 +58,7 @@ describe('quiet context transitions across workspace Undo', () => {
     annotate(store, id);
     store.update(id, (w) => promoteInputContext(w, [parent]), false);
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(restored.inputContext).toBeUndefined();
     expect(restored.contextTransactionIds).toEqual([parent]);
     expect(removeWorkspaceEntity(restored, `tx:${child}`).transactions).toEqual({});
@@ -68,7 +68,7 @@ describe('quiet context transitions across workspace Undo', () => {
     store.update(id, (w) => removeWorkspaceEntity(w, `tx:${child}`));
     store.update(id, (w) => ({ ...w, view: { ...w.view, glow: false } }), false);
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(Object.keys(restored.transactions).sort()).toEqual([parent, child]);
     expect(restored.inputContext).toEqual({ [parent]: [0] });
     expect(restored.contextTransactionIds).toEqual([parent]);
@@ -93,9 +93,9 @@ describe('quiet context transitions across workspace Undo', () => {
       (w) => applyWalletScan(w, { ...wallet, scannedAt }, [w.transactions[parent]]),
       false,
     );
-    expect(store.getSession(id)!.history).toHaveLength(1);
+    expect(store.getUnlocked(id)!.history).toHaveLength(1);
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(restored.annotations[`tx:${child}`]).toBeUndefined();
     expect(restored.contextTransactionIds).toBeUndefined();
     expect(restored.inputContext).toBeUndefined();

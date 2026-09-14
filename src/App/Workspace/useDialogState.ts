@@ -20,7 +20,7 @@ export interface WorkspaceDialogState {
   closeAll: () => void;
 }
 
-export function useDialogState(w: AppState['w']): WorkspaceDialogState {
+export function useDialogState(w: AppState['activeWorkspace']): WorkspaceDialogState {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addWalletOpen, setAddWalletOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ workspaceId: string; walletId: string }>();

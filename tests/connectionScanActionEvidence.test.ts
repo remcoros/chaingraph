@@ -15,7 +15,7 @@ const fixture = () => ({
   workspace: newWorkspace('Public scan action fixture', 'mainnet'),
   missingTxids: [id(1)],
   scope: new TransactionFetchScope('mainnet'),
-  canQuery: true,
+  canLoadChainData: true,
   signal: new AbortController().signal,
 });
 
@@ -27,7 +27,7 @@ describe('explicit scan action evidence', () => {
     options.workspace.transactions[id(1)] = transaction(1);
     options.workspace.connectionScans = { runs: [], evidence: { [id(2)]: transaction(2) } };
     options.missingTxids = [id(1), id(2), id(1)];
-    options.canQuery = false;
+    options.canLoadChainData = false;
     const before = structuredClone(options.workspace);
     const fetch = vi.fn<typeof fetchTransaction>();
     expect(await loadScanActionEvidence(options, fetch)).toEqual({
@@ -95,7 +95,7 @@ describe('explicit scan action evidence', () => {
 
   it('rejects missing offline proof with actionable copy', async () => {
     const fetch = vi.fn<typeof fetchTransaction>();
-    await expect(loadScanActionEvidence({ ...fixture(), canQuery: false }, fetch)).rejects.toThrow(
+    await expect(loadScanActionEvidence({ ...fixture(), canLoadChainData: false }, fetch)).rejects.toThrow(
       'Connect to the backend',
     );
     expect(fetch).not.toHaveBeenCalled();

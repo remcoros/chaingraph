@@ -15,7 +15,7 @@ import {
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
 import type { Transaction, Workspace } from '../src/Domain/types';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { decryptWorkspace } from '../src/Infra/Storage/crypto';
 import {
   validateAndEncryptWorkspace,
@@ -356,19 +356,19 @@ describe('compact connection scan records', () => {
       hops: 1,
     };
     const saved = replaceScanRun(workspace, { ...run, results: [boundary] }, evidence);
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     store.open(saved, 'public fixture password');
     store.update(saved.id, (current) => addScanPath(current, boundary));
-    expect(store.getSession(saved.id)!.history).toHaveLength(1);
+    expect(store.getUnlocked(saved.id)!.history).toHaveLength(1);
     store.update(
       saved.id,
       (current) => ({ ...current, view: { ...current.view, glow: false } }),
       false,
     );
     store.undo(saved.id);
-    const restored = store.getSession(saved.id)!.data;
+    const restored = store.getUnlocked(saved.id)!.data;
     expect(restored.transactions).toEqual(saved.transactions);
     expect(restored.view.graphNodeIds).toEqual(saved.view.graphNodeIds);
     expect(restored.view.glow).toBe(false);
@@ -379,7 +379,7 @@ describe('compact connection scan records', () => {
   it('does not resurrect earlier results when undoing an annotation after replacement or clear', () => {
     const { workspace, run, evidence } = fixture();
     const saved = replaceScanRun(workspace, run, evidence);
-    const store = new WorkspaceSessionStore({
+    const store = new WorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     store.open(saved, 'public fixture password');
@@ -398,14 +398,14 @@ describe('compact connection scan records', () => {
       false,
     );
     store.undo(saved.id);
-    expect(store.getSession(saved.id)!.data.connectionScans?.runs.map((item) => item.id)).toEqual([
+    expect(store.getUnlocked(saved.id)!.data.connectionScans?.runs.map((item) => item.id)).toEqual([
       'latest',
     ]);
     edit('Second annotation');
     store.update(saved.id, clearScanRuns, false);
     store.undo(saved.id);
-    expect(store.getSession(saved.id)!.data.connectionScans).toBeUndefined();
-    expect(store.getSession(saved.id)!.data.view.graphNodeIds).toEqual(saved.view.graphNodeIds);
+    expect(store.getUnlocked(saved.id)!.data.connectionScans).toBeUndefined();
+    expect(store.getUnlocked(saved.id)!.data.view.graphNodeIds).toEqual(saved.view.graphNodeIds);
   });
 
   it('retains honest missing-evidence results but blocks adding an unverified path', () => {

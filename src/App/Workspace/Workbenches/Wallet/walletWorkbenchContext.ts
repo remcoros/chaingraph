@@ -14,9 +14,9 @@ export interface WalletWorkbenchContext {
   tourPreview?: { tab: 'review' | 'sources'; example?: Workspace };
   workspace: Workspace;
   wallet?: Wallet;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   busy: boolean;
-  queryDisabledReason?: string;
+  chainDataDisabledReason?: string;
   updateEvidence: (id: string, update: (current: Workspace) => Workspace, undo?: boolean) => void;
   onSelectWallet: (id: string) => void;
   onAddWallet: () => void;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import { decryptWorkspace, encryptWorkspace } from '../src/Infra/Storage/crypto';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/Domain/ConnectionScan/connectionScan';
 import {
   addScanPath,
@@ -14,7 +14,7 @@ import type { Transaction } from '../src/Domain/types';
 const password = 'public scheduling fixture password';
 function fixture(encrypt?: typeof encryptWorkspace) {
   let raw: string | null = null;
-  const store = new WorkspaceSessionStore({
+  const store = new WorkspaceStore({
     storage: {
       getItem: () => raw,
       setItem: (_key, value) => {
@@ -76,7 +76,7 @@ describe('encrypted save scheduling around graph interaction', () => {
     store.pauseAutosave(id, false);
     await pending;
     await store.persist(id);
-    const session = store.getSession(id)!;
+    const session = store.getUnlocked(id)!;
     expect(session.savedRevision).toBe(session.revision);
     expect(await decryptWorkspace(JSON.parse(raw()!)[0].envelope, password)).toMatchObject({
       description: 'Edit while prior save finishes',
@@ -85,12 +85,12 @@ describe('encrypted save scheduling around graph interaction', () => {
 
   it('explicit lock releases a paused save queue and stores the latest synchronous state', async () => {
     const { store, id, raw } = fixture();
-    const oldScope = store.getSession(id)!.fetchScope;
+    const oldScope = store.getUnlocked(id)!.fetchScope;
     store.pauseAutosave(id, true);
     void store.persist(id, true);
     store.update(id, (w) => ({ ...w, view: { ...w.view, glow: false } }), false);
     await store.lock(id);
-    expect(store.getSession(id)).toBeUndefined();
+    expect(store.getUnlocked(id)).toBeUndefined();
     expect(oldScope.closed).toBe(true);
     expect(oldScope.jobs.size).toBe(0);
     expect(await decryptWorkspace(JSON.parse(raw()!)[0].envelope, password)).toMatchObject({
@@ -100,7 +100,7 @@ describe('encrypted save scheduling around graph interaction', () => {
 
   it('exports the current session after synchronous view capture without marking it saved', async () => {
     const { store, id } = fixture();
-    const old = store.getSession(id)!;
+    const old = store.getUnlocked(id)!;
     store.pauseAutosave(id, true);
     store.update(
       id,
@@ -114,7 +114,7 @@ describe('encrypted save scheduling around graph interaction', () => {
       name: 'Latest export',
       view: { glow: false },
     });
-    expect(store.getSession(id)!.revision).not.toBe(store.getSession(id)!.savedRevision);
+    expect(store.getUnlocked(id)!.revision).not.toBe(store.getUnlocked(id)!.savedRevision);
   });
 });
 
@@ -168,14 +168,14 @@ describe('retained scan results across graph Undo', () => {
     const { store, id, run, evidence } = scanFixture();
     const result = run.results[0];
     store.update(id, (w) => addScanPath(w, result));
-    expect(store.getSession(id)!.data.connectionScans!.evidence).toEqual({});
+    expect(store.getUnlocked(id)!.data.connectionScans!.evidence).toEqual({});
     store.update(
       id,
       (w) => replaceScanRun(w, { ...run, results: [{ ...result, dismissed: true }] }, evidence),
       false,
     );
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(restored.transactions[txid(2)]).toBeUndefined();
     expect(restored.connectionScans!.runs[0].results[0].dismissed).toBe(true);
     expect(prepareScanPath(restored, result).missingTxids).toEqual([]);
@@ -230,7 +230,7 @@ describe('retained scan results across graph Undo', () => {
       false,
     );
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(restored.transactions[txid(1)]).toBeUndefined();
     expect(restored.connectionScans!.evidence[txid(1)]).toEqual(evidence[txid(1)]);
     expect(prepareScanPath(restored, run.results[0]).missingTxids).toEqual([]);
@@ -243,11 +243,11 @@ describe('retained scan results across graph Undo', () => {
     const latest = { ...run, id: 'latest-run', results: [] };
     store.update(id, (w) => replaceScanRun(w, latest), false);
     store.undo(id);
-    expect(store.getSession(id)!.data.connectionScans!.runs).toEqual([run, latest]);
+    expect(store.getUnlocked(id)!.data.connectionScans!.runs).toEqual([run, latest]);
     store.update(id, (w) => ({ ...w, description: 'Another public annotation' }));
     store.update(id, clearScanRuns, false);
     store.undo(id);
-    expect(store.getSession(id)!.data.connectionScans).toBeUndefined();
+    expect(store.getUnlocked(id)!.data.connectionScans).toBeUndefined();
   });
 
   it('bounds snapshot proof and reports missing evidence when the path pool is larger', () => {
@@ -284,7 +284,7 @@ describe('retained scan results across graph Undo', () => {
       false,
     );
     store.undo(id);
-    const restored = store.getSession(id)!.data;
+    const restored = store.getUnlocked(id)!.data;
     expect(Object.keys(restored.connectionScans!.evidence)).toHaveLength(200);
     expect(prepareScanPath(restored, results[0]).missingTxids).toEqual([]);
     expect(prepareScanPath(restored, results.at(-1)!).missingTxids.length).toBeGreaterThan(0);

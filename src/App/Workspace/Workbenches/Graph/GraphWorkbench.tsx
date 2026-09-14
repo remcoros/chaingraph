@@ -37,20 +37,20 @@ import { EntitiesPanel } from './EntitiesPanel';
 const GraphView = lazy(() => import('./GraphView'));
 export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }) {
   const {
-    w,
-    change,
+    activeWorkspace,
+    edit,
     setNotice,
-    canQuery,
-    tx,
-    canTrace,
-    operation,
+    canLoadChainData,
+    selectedTransaction: tx,
+    canTraceAncestry,
+    operationStatus: operation,
     workbench,
     viewOwner,
     tourStep,
-    ws,
+    workspaces,
     flowInputs,
     annotations,
-    queryDisabledReason,
+    chainDataDisabledReason,
     shownFocusGraph,
     setFocusGraph,
     dialogs,
@@ -126,7 +126,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     editNode,
   } = workspace.graphActions;
   const contextTransaction =
-    graphFlowContext && w?.transactions[graphFlowContext.transactionId.slice(3)];
+    graphFlowContext && activeWorkspace?.transactions[graphFlowContext.transactionId.slice(3)];
   const contextSideIds = useMemo(
     () =>
       contextTransaction
@@ -185,7 +185,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     if (selectedSpenderTxids.length === 1)
       select(txNodeId(selectedSpenderTxids[0]), { preserveCamera: true });
     else if (selectedSpenderTxids.length > 1) {
-      change(
+      edit(
         (current) => ({
           ...current,
           view: {
@@ -199,15 +199,19 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     } else void expand('spending', selectedId, { preserveCamera: true });
   };
   const selectedInputOutputAddress =
-    w && selected?.kind === 'output' ? selectedAddressForHistory(selected, w.network) : undefined;
+    activeWorkspace && selected?.kind === 'output'
+      ? selectedAddressForHistory(selected, activeWorkspace.network)
+      : undefined;
   const selectedAddressForToolbar =
-    w && selected?.kind === 'address' ? selectedAddressForHistory(selected, w.network) : undefined;
+    activeWorkspace && selected?.kind === 'address'
+      ? selectedAddressForHistory(selected, activeWorkspace.network)
+      : undefined;
   const recentUtxoCount = selectedAddressForToolbar
     ? addressUtxos
       ? recentAddressUtxoTargets.filter(
           (utxo) => !canvasIds.has(outputNodeId(utxo.txid, utxo.vout)),
         ).length
-      : canQuery
+      : canLoadChainData
         ? RECENT_ADDRESS_GRAPH_LIMIT
         : 0
     : 0;
@@ -216,12 +220,12 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     addressHistory.source === 'loaded transactions' ||
     addressHistory.entries.length === 0;
   const recentTransactionCount = selectedAddressForToolbar
-    ? recentTransactionNeedsFetch && canQuery
+    ? recentTransactionNeedsFetch && canLoadChainData
       ? RECENT_ADDRESS_GRAPH_LIMIT
       : recentAddressTransactionTargets.filter((entry) => !canvasIds.has(txNodeId(entry.txid)))
           .length
     : 0;
-  const graphContextToolbar = w ? (
+  const graphContextToolbar = activeWorkspace ? (
     <GraphContextToolbar
       contextTitle={
         graphFlowContext ? `Transaction ${graphFlowContext.transactionId.slice(3)}` : undefined
@@ -230,11 +234,11 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       selectedCount={toolbarSelection.length}
       canOpenAddressHistory={!!selectedInputOutputAddress}
       onOpenAddressHistory={openAddressHistory}
-      canShowRecentUtxos={!!selectedAddressForToolbar && (!!addressUtxos || canQuery)}
+      canShowRecentUtxos={!!selectedAddressForToolbar && (!!addressUtxos || canLoadChainData)}
       recentUtxoCount={recentUtxoCount}
       onShowRecentUtxos={showRecentAddressUtxos}
       canShowRecentTransactions={
-        !!selectedAddressForToolbar && (!!addressHistory?.entries.length || canQuery)
+        !!selectedAddressForToolbar && (!!addressHistory?.entries.length || canLoadChainData)
       }
       recentTransactionCount={recentTransactionCount}
       onShowRecentTransactions={showRecentAddressTransactions}
@@ -253,8 +257,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
           (contextSideIds?.[side] ?? []).filter((id) => unconnectedForRemoval.has(id)),
         )
       }
-      canOpenCreatingTx={!!tx || canTrace}
-      canOpenSpendingTx={selectedSpenderTxids.length > 0 || canTrace}
+      canOpenCreatingTx={!!tx || canTraceAncestry}
+      canOpenSpendingTx={selectedSpenderTxids.length > 0 || canTraceAncestry}
       onOpenCreatingTx={() => void expand('funding', selectedId, { preserveCamera: true })}
       onOpenSpendingTx={openSpendingFromToolbar}
       canShowSelection={toolbarSelection.some((id) => !canvasIds.has(id))}
@@ -287,7 +291,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       busy={!!operation}
     />
   ) : null;
-  const graphNavigation = w ? (
+  const graphNavigation = activeWorkspace ? (
     <div className="graph-navigation">
       <button
         aria-label="Previous selection"
@@ -317,11 +321,11 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       <button
         aria-label="Lock to selection"
         title="Keep selections centered without changing zoom"
-        aria-pressed={w.view.lockToSelection ?? false}
-        className={`graph-lock-selection ${w.view.lockToSelection ? 'active' : ''}`}
+        aria-pressed={activeWorkspace.view.lockToSelection ?? false}
+        className={`graph-lock-selection ${activeWorkspace.view.lockToSelection ? 'active' : ''}`}
         onClick={() => {
           preserveSelectionCamera(undefined);
-          change(
+          edit(
             (current) => ({
               ...current,
               view: { ...current.view, lockToSelection: !current.view.lockToSelection },
@@ -375,19 +379,19 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         </select>
       </label>
       <GraphWalletFilter
-        key={w.id}
+        key={activeWorkspace.id}
         active={workbench === 'graph'}
         filters={graphFilters}
-        wallets={w.wallets}
+        wallets={activeWorkspace.wallets}
         onChange={updateFilters}
       />
       <GraphFilterButton
         filters={graphFilters}
         onChange={updateFilters}
         onReset={resetGraphFilters}
-        extraFiltersActive={!!w.view.smallAmountThreshold}
-        wallets={w.wallets}
-        tags={w.tags}
+        extraFiltersActive={!!activeWorkspace.view.smallAmountThreshold}
+        wallets={activeWorkspace.wallets}
+        tags={activeWorkspace.tags}
       />
       <button
         className={`selection-mode-toggle ${selection.mode ? 'active' : ''}`}
@@ -406,9 +410,9 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     selected && !visibleGraph.nodes.some((node) => node.id === selected.id),
   );
   const graphNavigationStatus =
-    w &&
+    activeWorkspace &&
     (hasActiveFilters(graphFilters) ||
-      w.view.smallAmountThreshold ||
+      activeWorkspace.view.smallAmountThreshold ||
       hiddenCount > 0 ||
       selectionOffCanvas) ? (
       <>
@@ -416,26 +420,32 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
           filters={graphFilters}
           onChange={updateFilters}
           names={{
-            walletName: w.wallets.find((wallet) => wallet.id === graphFilters.walletId)?.name,
+            walletName: activeWorkspace.wallets.find(
+              (wallet) => wallet.id === graphFilters.walletId,
+            )?.name,
             walletNames: selectedWalletFilterIds(graphFilters).map(
-              (id) => w.wallets.find((wallet) => wallet.id === id)?.name ?? 'Removed wallet',
+              (id) =>
+                activeWorkspace.wallets.find((wallet) => wallet.id === id)?.name ??
+                'Removed wallet',
             ),
-            tagName: w.tags?.find((tag) => tag.id === graphFilters.tagId)?.name,
+            tagName: activeWorkspace.tags?.find((tag) => tag.id === graphFilters.tagId)?.name,
           }}
           hiddenCount={hiddenCount}
           onShowAllHidden={showAllHidden}
           onReset={resetGraphFilters}
-          extraFiltersActive={!!w.view.smallAmountThreshold}
+          extraFiltersActive={!!activeWorkspace.view.smallAmountThreshold}
         >
-          {!!w.view.smallAmountThreshold && (
+          {!!activeWorkspace.view.smallAmountThreshold && (
             <span className="filter-chip">
-              <span title={`Above ${formatBitcoinAmount(w.view.smallAmountThreshold)}`}>
-                Above <Amount value={w.view.smallAmountThreshold} />
+              <span
+                title={`Above ${formatBitcoinAmount(activeWorkspace.view.smallAmountThreshold)}`}
+              >
+                Above <Amount value={activeWorkspace.view.smallAmountThreshold} />
               </span>
               <button
                 aria-label="Remove graph amount filter"
                 onClick={() =>
-                  change(
+                  edit(
                     (current) => ({
                       ...current,
                       view: { ...current.view, smallAmountThreshold: undefined },
@@ -466,7 +476,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         )}
       </>
     ) : null;
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <main
       hidden={shownWorkbench !== 'graph'}
@@ -483,19 +493,19 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         tabIndex={-1}
       >
         <div className="graph-stage-content">
-          {viewOwner === w.id && (
+          {viewOwner === activeWorkspace.id && (
             <FlowPanel
               walletUtxoObservation={walletUtxoObservation}
-              key={w.id}
+              key={activeWorkspace.id}
               state={
                 tourStep?.view?.flowOpen
-                  ? { ...w.view.transactionFlow, open: true }
-                  : w.view.transactionFlow
+                  ? { ...activeWorkspace.view.transactionFlow, open: true }
+                  : activeWorkspace.view.transactionFlow
               }
               onStateChange={(transactionFlow) =>
                 !tourStep &&
-                ws.update(
-                  w.id,
+                workspaces.update(
+                  activeWorkspace.id,
                   (current) => ({
                     ...current,
                     view: { ...current.view, transactionFlow },
@@ -505,7 +515,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               }
               renderMetadata={renderEntityMetadata}
               onSmallAmountThresholdChange={(flowAmountThreshold) =>
-                change(
+                edit(
                   (current) => ({
                     ...current,
                     view: { ...current.view, flowAmountThreshold },
@@ -513,7 +523,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   false,
                 )
               }
-              workspace={w}
+              workspace={activeWorkspace}
               addressHistory={addressHistory}
               addressHistoryLoad={addressHistoryLoad}
               addressBalance={addressBalance}
@@ -523,19 +533,17 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               onOpenAddressHistoryTransaction={openAddressHistoryTransaction}
               selected={selected}
               selection={connectionScanTargets.picking ? undefined : selection}
-              hiddenNodeIds={w.view.hiddenNodeIds}
-              graphNodeIds={w.view.graphNodeIds}
+              hiddenNodeIds={activeWorkspace.view.hiddenNodeIds}
+              graphNodeIds={activeWorkspace.view.graphNodeIds}
               onSetHidden={setEntityHidden}
               {...flowInputs}
               onSelect={select}
               onEdit={editNode}
               onApplyTags={annotations.changeTags}
-              onSetIcon={(id, icon) =>
-                change((current) => applyBatchIcon(current, [id], icon, true))
-              }
+              onSetIcon={(id, icon) => edit((current) => applyBatchIcon(current, [id], icon, true))}
               onTrace={(direction, id) => void expand(direction, id)}
               disabledReason={
-                operation ? 'Wait for the current operation to finish.' : queryDisabledReason
+                operation ? 'Wait for the current operation to finish.' : chainDataDisabledReason
               }
             />
           )}
@@ -543,13 +551,13 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
             {!graph.nodes.length && (
               <GraphControls
                 smallAmountHiddenCount={amountGraph.hiddenCount}
-                view={w.view}
+                view={activeWorkspace.view}
                 focusGraph={shownFocusGraph}
                 onToggleFocus={() => setFocusGraph((value) => !value)}
                 onChange={changeGraphView}
               />
             )}
-            {graph.nodes.length && viewOwner === w.id ? (
+            {graph.nodes.length && viewOwner === activeWorkspace.id ? (
               <Suspense
                 fallback={
                   <div className="graph-empty">
@@ -560,20 +568,24 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               >
                 <GraphView
                   filtering={graphFiltering}
-                  key={w.id}
-                  snapshot={w.view.graphSnapshot}
+                  key={activeWorkspace.id}
+                  snapshot={activeWorkspace.view.graphSnapshot}
                   onActivity={(active) => {
-                    ws.pauseAutosave(w.id, active);
+                    workspaces.pauseAutosave(activeWorkspace.id, active);
                     setPendingGraphWorkspace((previous) =>
-                      active ? w.id : previous === w.id ? undefined : previous,
+                      active
+                        ? activeWorkspace.id
+                        : previous === activeWorkspace.id
+                          ? undefined
+                          : previous,
                     );
                   }}
                   onRegisterSnapshotFlush={(flush) => {
-                    registerGraphSnapshotFlush(w.id, flush);
+                    registerGraphSnapshotFlush(activeWorkspace.id, flush);
                   }}
                   onSnapshot={(snapshot) =>
-                    ws.update(
-                      w.id,
+                    workspaces.update(
+                      activeWorkspace.id,
                       (current) => ({
                         ...current,
                         view: { ...current.view, graphSnapshot: snapshot },
@@ -589,14 +601,14 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                       flowContext={graphFlowContext}
                       dimensions={appliedGraphRequest.dimensions}
                       showAddresses={appliedGraphRequest.showAddresses}
-                      demo={w.demo}
+                      demo={activeWorkspace.demo}
                     />
                   }
                   toolbar={({ motionToggle }) => (
                     <GraphControls
                       motionToggle={motionToggle}
                       smallAmountHiddenCount={amountGraph.hiddenCount}
-                      view={w.view}
+                      view={activeWorkspace.view}
                       focusGraph={shownFocusGraph}
                       onToggleFocus={() => setFocusGraph((value) => !value)}
                       onChange={changeGraphView}
@@ -616,8 +628,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   onToggleSelection={
                     connectionScanTargets.picking ? connectionScanTargets.toggle : selection.toggle
                   }
-                  hiddenNodeIds={w.view.hiddenNodeIds}
-                  graphNodeIds={w.view.graphNodeIds}
+                  hiddenNodeIds={activeWorkspace.view.hiddenNodeIds}
+                  graphNodeIds={activeWorkspace.view.graphNodeIds}
                   onSetHidden={setEntityHidden}
                   dimensions={appliedGraphRequest.dimensions}
                   sizeBy={appliedGraphRequest.sizeBy}
@@ -626,12 +638,12 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   showTags={appliedGraphRequest.showTags}
                   showIcons={appliedGraphRequest.showIcons}
                   fitToken={appliedGraphRequest.fitToken}
-                  transactions={w.transactions}
-                  workspace={w}
+                  transactions={activeWorkspace.transactions}
+                  workspace={activeWorkspace}
                   onTrace={(id) => void expand('funding', id)}
                   onEdit={editNode}
                   busy={!!operation}
-                  traceDisabledReason={queryDisabledReason}
+                  traceDisabledReason={chainDataDisabledReason}
                 />
               </Suspense>
             ) : (

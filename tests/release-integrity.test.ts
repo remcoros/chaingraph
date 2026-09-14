@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { newWorkspace, parseWorkspace, buildGraph } from '../src/Domain/Workspace/workspace';
 import { encryptWorkspace, decryptWorkspace } from '../src/Infra/Storage/crypto';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { deriveAddresses } from '../src/Domain/Wallet/wallet';
 import { PUBLIC_ZPUB } from './fixtures/bitcoin';
 import { applyWalletScan } from '../src/Domain/Wallet/walletActivity';
@@ -34,15 +34,15 @@ describe('release review data integrity fixes', () => {
     const encrypted = await encryptWorkspace(w, password);
     const restored = parseWorkspace(await decryptWorkspace(encrypted, password));
     expect(restored.wallets[0].name).toBe(w.wallets[0].name);
-    const store = new WorkspaceSessionStore({ storage: storage() });
+    const store = new WorkspaceStore({ storage: storage() });
     store.open(restored, password);
     await store.lock(w.id);
     await store.unlock(store.getSnapshot().saved[0], password);
-    expect(store.getSnapshot().sessions[0].data.wallets[0].name).toHaveLength(200);
+    expect(store.getSnapshot().unlocked[0].data.wallets[0].name).toHaveLength(200);
   });
   it('rejects an invalid updated wallet before replacing its good encrypted snapshot', async () => {
     const memory = storage();
-    const store = new WorkspaceSessionStore({ storage: memory });
+    const store = new WorkspaceStore({ storage: memory });
     const w = workspace();
     store.open(w, password);
     await store.persist(w.id);
@@ -53,7 +53,7 @@ describe('release review data integrity fixes', () => {
     }));
     await expect(store.persist(w.id)).rejects.toThrow();
     expect(memory.getItem()).toBe(before);
-    expect(store.getSnapshot().sessions).toHaveLength(1);
+    expect(store.getSnapshot().unlocked).toHaveLength(1);
   });
   it('rejects an imported address with a valid hash that does not belong at the recorded wallet index', () => {
     const w = workspace();
@@ -62,7 +62,7 @@ describe('release review data integrity fixes', () => {
     expect(() => parseWorkspace(w)).toThrow();
   });
   it('marks findings stale on chain updates and removes their graph coloring without deleting evidence', () => {
-    const store = new WorkspaceSessionStore({ storage: storage() });
+    const store = new WorkspaceStore({ storage: storage() });
     const w = newWorkspace('Stale test', 'mainnet');
     const id = 'a'.repeat(64);
     w.transactions[id] = {
@@ -87,12 +87,12 @@ describe('release review data integrity fixes', () => {
       (current) => ({ ...current, transactions: { ...current.transactions } }),
       false,
     );
-    const updated = store.getSnapshot().sessions[0].data;
+    const updated = store.getSnapshot().unlocked[0].data;
     expect(updated.findings[0].stale).toBe(true);
     expect(buildGraph(updated).nodes.every((node) => !node.cluster)).toBe(true);
   });
   it('keeps findings active when acknowledging wallet activity and invalidates changed wallet evidence', () => {
-    const store = new WorkspaceSessionStore({ storage: storage() });
+    const store = new WorkspaceStore({ storage: storage() });
     const w = workspace();
     w.findings = [
       {
@@ -122,7 +122,7 @@ describe('release review data integrity fixes', () => {
       }),
       false,
     );
-    expect(store.getSnapshot().sessions[0].data.findings[0].stale).not.toBe(true);
+    expect(store.getSnapshot().unlocked[0].data.findings[0].stale).not.toBe(true);
     store.update(
       w.id,
       (current) => ({
@@ -137,11 +137,11 @@ describe('release review data integrity fixes', () => {
       }),
       false,
     );
-    expect(store.getSnapshot().sessions[0].data.findings[0].stale).toBe(true);
+    expect(store.getSnapshot().unlocked[0].data.findings[0].stale).toBe(true);
   });
 
   it('keeps a quiet wallet refresh as the same evidence but invalidates changed confirmations', () => {
-    const store = new WorkspaceSessionStore({ storage: storage() });
+    const store = new WorkspaceStore({ storage: storage() });
     const w = workspace();
     const txid = 'a'.repeat(64);
     const transaction = {
@@ -171,7 +171,7 @@ describe('release review data integrity fixes', () => {
     };
     for (const downloaded of [[], [structuredClone(transaction)]]) {
       store.update(w.id, (current) => applyWalletScan(current, scanned, downloaded), false);
-      const current = store.getSnapshot().sessions[0].data;
+      const current = store.getSnapshot().unlocked[0].data;
       expect(current.transactions).toBe(w.transactions);
       expect(current.wallets[0].addresses).toBe(w.wallets[0].addresses);
       expect(current.findings[0].stale).not.toBe(true);
@@ -181,13 +181,13 @@ describe('release review data integrity fixes', () => {
       (current) => applyWalletScan(current, scanned, [{ ...transaction, confirmations: 1 }]),
       false,
     );
-    expect(store.getSnapshot().sessions[0].data.transactions[txid].confirmations).toBe(1);
-    expect(store.getSnapshot().sessions[0].data.findings[0].stale).toBe(true);
+    expect(store.getSnapshot().unlocked[0].data.transactions[txid].confirmations).toBe(1);
+    expect(store.getSnapshot().unlocked[0].data.findings[0].stale).toBe(true);
   });
 
   it('deletes only a locked saved copy and preserves another workspace', async () => {
     const memory = storage();
-    const store = new WorkspaceSessionStore({ storage: memory });
+    const store = new WorkspaceStore({ storage: memory });
     const one = newWorkspace('One', 'mainnet'),
       two = newWorkspace('Two', 'mainnet');
     store.open(one, password);

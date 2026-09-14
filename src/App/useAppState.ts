@@ -3,26 +3,32 @@ import { type Workspace } from '../Domain/types';
 import { useBackendNetworks } from './useBackendNetworks';
 import { useWorkspaces, type SavedWorkspace } from './Workspace/useWorkspaces';
 export function useAppState() {
-  const ws = useWorkspaces();
-  const w = ws.active?.data;
-  const fetchScope = ws.active?.fetchScope;
-  const updateWorkspace = ws.update;
-  const getWorkspaceSession = ws.getSession;
-  const persistWorkspace = ws.persist;
-  const workspaceId = w?.id;
+  const workspaces = useWorkspaces();
+  const activeWorkspace = workspaces.active?.data;
+  const fetchScope = workspaces.active?.fetchScope;
+  const updateWorkspace = workspaces.update;
+  const getUnlockedWorkspace = workspaces.getUnlocked;
+  const persistWorkspace = workspaces.persist;
+  const workspaceId = activeWorkspace?.id;
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [fileDialog, setFileDialog] = useState<File>();
   const [aboutOpen, setAboutOpen] = useState<false | 'guide' | 'about' | 'connection'>(false);
   const [connectionCheck, setConnectionCheck] = useState(0);
   const { networks, statuses, discoveryError } = useBackendNetworks(connectionCheck);
-  const displayNetwork = w?.network ?? networks?.[0];
+  const displayNetwork = activeWorkspace?.network ?? networks?.[0];
   const status = displayNetwork ? statuses[displayNetwork] : undefined;
   const unsupportedNetwork =
-    !!w && !w.demo && !!networks && !networks.includes(w.network) && !discoveryError;
+    !!activeWorkspace &&
+    !activeWorkspace.demo &&
+    !!networks &&
+    !networks.includes(activeWorkspace.network) &&
+    !discoveryError;
   const statusError =
     discoveryError ||
-    (unsupportedNetwork ? `Backend does not support ${w!.network}.` : (status?.error ?? ''));
+    (unsupportedNetwork
+      ? `Backend does not support ${activeWorkspace!.network}.`
+      : (status?.error ?? ''));
   const connected = !!status?.connected && !statusError;
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -51,8 +57,8 @@ export function useAppState() {
     const observer = new ResizeObserver(reveal);
     observer.observe(tabs);
     return () => observer.disconnect();
-  }, [w?.id, ws.sessions.length]);
-  const wRef = useRef(w);
+  }, [activeWorkspace?.id, workspaces.unlocked.length]);
+  const activeWorkspaceRef = useRef(activeWorkspace);
   // Latest-workspace ref for callbacks (guards of the form "is this still the
   // same workspace?"). Published from a layout effect rather than during render:
   // mutating a ref during render is unsafe under concurrent rendering because
@@ -61,7 +67,7 @@ export function useAppState() {
   // paint, so event handlers observe the same value they did before. Declared
   // ahead of every other effect that reads it.
   useLayoutEffect(() => {
-    wRef.current = w;
+    activeWorkspaceRef.current = activeWorkspace;
   });
   const graphFlush = useRef<{ workspaceId: string; flush: () => void } | undefined>(undefined);
   const registerGraphSnapshotFlush = useCallback(
@@ -72,7 +78,7 @@ export function useAppState() {
     [],
   );
   const flushActiveGraph = useCallback(() => {
-    const id = wRef.current?.id;
+    const id = activeWorkspaceRef.current?.id;
     if (id && graphFlush.current?.workspaceId === id) graphFlush.current.flush();
     return id;
   }, []);
@@ -81,17 +87,17 @@ export function useAppState() {
     return id ? persistWorkspace(id) : Promise.resolve();
   };
   const activateWorkspace = (id?: string) => {
-    if (id !== wRef.current?.id) void saveBeforeLeaving().catch(() => {});
-    ws.setActiveId(id);
+    if (id !== activeWorkspaceRef.current?.id) void saveBeforeLeaving().catch(() => {});
+    workspaces.setActiveId(id);
   };
   const openWorkspace = (data: Workspace, password: string) => {
     void saveBeforeLeaving().catch(() => {});
-    ws.open(data, password);
+    workspaces.open(data, password);
   };
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       const id = flushActiveGraph();
-      const session = id ? getWorkspaceSession(id) : undefined;
+      const session = id ? getUnlockedWorkspace(id) : undefined;
       if (session && session.revision !== session.savedRevision) {
         event.preventDefault();
         event.returnValue = '';
@@ -99,13 +105,13 @@ export function useAppState() {
     };
     window.addEventListener('beforeunload', beforeUnload);
     return () => window.removeEventListener('beforeunload', beforeUnload);
-  }, [flushActiveGraph, getWorkspaceSession]);
+  }, [flushActiveGraph, getUnlockedWorkspace]);
   return {
-    ws,
-    w,
+    workspaces,
+    activeWorkspace,
     fetchScope,
     updateWorkspace,
-    getWorkspaceSession,
+    getUnlockedWorkspace,
     persistWorkspace,
     workspaceId,
     create,
@@ -140,7 +146,7 @@ export function useAppState() {
     setPendingGraphWorkspace,
     fileInput,
     workspaceTabs,
-    wRef,
+    activeWorkspaceRef,
     registerGraphSnapshotFlush,
     flushActiveGraph,
     saveBeforeLeaving,

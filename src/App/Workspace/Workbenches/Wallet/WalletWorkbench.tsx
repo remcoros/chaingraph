@@ -247,11 +247,11 @@ export const WalletWorkbenchView = memo(
             workspace={previewWorkspace}
             wallet={previewWallet}
             sessionAnalysis={props.tourPreview.example ? undefined : props.sessionAnalysis}
-            canQuery={props.tourPreview.example ? false : props.canQuery}
-            queryDisabledReason={
+            canLoadChainData={props.tourPreview.example ? false : props.canLoadChainData}
+            chainDataDisabledReason={
               props.tourPreview.example
                 ? 'Public example · preview only'
-                : props.queryDisabledReason
+                : props.chainDataDisabledReason
             }
           />
         )}
@@ -267,7 +267,7 @@ export const WalletWorkbenchView = memo(
 );
 
 function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden?: boolean }) {
-  const { workspace, wallet, active, busy, canQuery, onChange } = props;
+  const { workspace, wallet, active, busy, canLoadChainData, onChange } = props;
   const [localPreparation] = useState(() => new WalletPreparationCache());
   const preparation = props.preparationCache ?? localPreparation;
   const walletAnalysis = useWalletAnalysis({
@@ -314,7 +314,7 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
     wallet,
     groups: relationships,
     active: active && tab === 'sources',
-    enabled: canQuery && !busy,
+    enabled: canLoadChainData && !busy,
     fetch: fetchTransaction,
     update: props.updateEvidence,
   });
@@ -466,7 +466,7 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
     filteredRows.length === 0 &&
     !selectedKey &&
     !previousRow.current &&
-    canQuery &&
+    canLoadChainData &&
     !utxos &&
     !utxoError;
   // Metadata edits can remove a row from the current filters. Keep its live
@@ -817,8 +817,8 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
                   <>
                     <span>{counterparties.failedCount} input lookups failed</span>
                     <button
-                      disabled={!canQuery || busy}
-                      title={props.queryDisabledReason}
+                      disabled={!canLoadChainData || busy}
+                      title={props.chainDataDisabledReason}
                       onClick={counterparties.retry}
                     >
                       Retry
@@ -832,10 +832,10 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
                       waiting
                     </span>
                     <button
-                      disabled={!canQuery || busy}
+                      disabled={!canLoadChainData || busy}
                       onClick={counterparties.loadMore}
                       title={
-                        props.queryDisabledReason ??
+                        props.chainDataDisabledReason ??
                         'Load the next batch of direct input transactions'
                       }
                     >
@@ -1171,20 +1171,20 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
 /** Binds the workspace controller to the view Workspace mounts. */
 export function WalletWorkbench({ workspace }: { workspace: WorkspaceController }) {
   const {
-    w,
-    ws,
+    activeWorkspace,
+    workspaces,
     tourStep,
     tourExample,
     viewOwner,
     workbench,
     lockingWorkspace,
-    canQuery,
-    operation,
-    queryDisabledReason,
+    canLoadChainData,
+    operationStatus: operation,
+    chainDataDisabledReason,
     operationRef,
     setRightTab,
     dialogs,
-    change,
+    edit,
     shownWorkbench,
   } = workspace;
   const {
@@ -1197,7 +1197,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
   const { invalidate: invalidateSelection, setSelectedWallet, setSelectedId } = workspace.selection;
   const { openWalletRecord, analyzeFromWallet } = workspace.wallet.actions;
 
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <section
       className="workbench-page"
@@ -1209,19 +1209,24 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     >
       <WalletWorkbenchView
         walletUtxos={walletUtxos}
-        preparationCache={ws.getSession(w.id)?.walletPreparation}
+        preparationCache={workspaces.getUnlocked(activeWorkspace.id)?.walletPreparation}
         tourPreview={
           tourStep?.view?.workbench === 'wallet'
             ? { tab: tourStep.view.walletTab ?? 'review', example: tourExample }
             : undefined
         }
-        active={viewOwner === w.id && workbench === 'wallet' && !lockingWorkspace && !tourStep}
-        workspace={w}
-        sessionAnalysis={analysis.sessions.current.get(w.id)?.scan}
-        updateEvidence={ws.update}
+        active={
+          viewOwner === activeWorkspace.id &&
+          workbench === 'wallet' &&
+          !lockingWorkspace &&
+          !tourStep
+        }
+        workspace={activeWorkspace}
+        sessionAnalysis={analysis.sessions.current.get(activeWorkspace.id)?.scan}
+        updateEvidence={workspaces.update}
         onAnalysisComplete={(scan) => {
-          analysis.sessions.current.set(w.id, {
-            scopeMode: analysis.sessions.current.get(w.id)?.scopeMode,
+          analysis.sessions.current.set(activeWorkspace.id, {
+            scopeMode: analysis.sessions.current.get(activeWorkspace.id)?.scopeMode,
             options: scan.options,
             scan,
             selectedId: scan.findings[0]?.id,
@@ -1230,10 +1235,10 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           });
           analysis.noteWalletAnalysis();
         }}
-        wallet={wallet ?? w.wallets[0]}
-        canQuery={canQuery}
+        wallet={wallet ?? activeWorkspace.wallets[0]}
+        canLoadChainData={canLoadChainData}
         busy={!!operation}
-        queryDisabledReason={queryDisabledReason}
+        chainDataDisabledReason={chainDataDisabledReason}
         onSelectWallet={(id) => {
           invalidateSelection();
           operationRef.current?.abort();
@@ -1242,9 +1247,9 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           setRightTab('inspect');
         }}
         onAddWallet={() => dialogs.openAddWallet()}
-        onChange={(update, group) => change(update, true, group)}
-        onEditWallet={(walletId) => dialogs.openWalletRename(w.id, walletId)}
-        onRefresh={() => void walletDiscovery.run(wallet ?? w.wallets[0])}
+        onChange={(update, group) => edit(update, true, group)}
+        onEditWallet={(walletId) => dialogs.openWalletRename(activeWorkspace.id, walletId)}
+        onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets[0])}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
         onShowSelection={(ids, isolate) => {

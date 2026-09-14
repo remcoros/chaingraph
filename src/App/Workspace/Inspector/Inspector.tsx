@@ -146,7 +146,7 @@ export function WalletInspector({
   wallet,
   workspace,
   busy,
-  canQuery,
+  canLoadChainData,
   onScan,
   onShowActivity,
   onShowWallet,
@@ -156,7 +156,7 @@ export function WalletInspector({
   wallet: Wallet;
   workspace: Workspace;
   busy: boolean;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   onScan: () => void;
   onShowActivity: () => void;
   onShowWallet?: () => void;
@@ -204,7 +204,7 @@ export function WalletInspector({
         </div>
         <p className="wallet-inspector-kind">Watch-only · {wallet.scriptType.toUpperCase()}</p>
         <div className="wallet-refresh-summary compact-controls">
-          <button className="primary" disabled={busy || !canQuery} onClick={onScan}>
+          <button className="primary" disabled={busy || !canLoadChainData} onClick={onScan}>
             <RefreshCw size={13} aria-hidden="true" />
             {wallet.scannedAt ? 'Refresh wallet' : 'Scan wallet'}
           </button>
@@ -377,14 +377,14 @@ interface NodeInspectorProps extends VisibilityProps {
   onNotify: (message: string) => void;
   walletUtxoObservation?: WalletUtxoObservation;
   addressBalance?: AddressBalanceObservation;
-  w: Workspace;
+  activeWorkspace: Workspace;
   selected: GraphNode;
   tx?: Transaction;
   graph: GraphData;
   busy: boolean;
-  canQuery: boolean;
+  canLoadChainData: boolean;
   annotationKey: string;
-  queryDisabledReason?: string;
+  chainDataDisabledReason?: string;
   editToken?: number;
   editTarget?: 'label' | 'icon';
   onEditHandled?: () => void;
@@ -405,14 +405,14 @@ export function NodeInspector({
   onNotify,
   walletUtxoObservation,
   addressBalance,
-  w,
+  activeWorkspace,
   selected,
   tx,
   graph,
   busy,
-  canQuery,
+  canLoadChainData,
   annotationKey,
-  queryDisabledReason,
+  chainDataDisabledReason,
   editToken,
   editTarget,
   onEditHandled,
@@ -430,7 +430,10 @@ export function NodeInspector({
   onSave,
 }: NodeInspectorProps) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
-  const loadedSpends = useMemo(() => indexLoadedSpends(w.transactions), [w.transactions]);
+  const loadedSpends = useMemo(
+    () => indexLoadedSpends(activeWorkspace.transactions),
+    [activeWorkspace.transactions],
+  );
   const spendingByNode = useMemo(() => {
     const creatingNodes = new Map(
       graph.nodes
@@ -453,17 +456,17 @@ export function NodeInspector({
   const spendingNodes = useMemo(
     () =>
       [...(spendingByNode.get(selected.id) ?? [])].filter(
-        (id) => id.startsWith('tx:') && !!w.transactions[id.slice(3)],
+        (id) => id.startsWith('tx:') && !!activeWorkspace.transactions[id.slice(3)],
       ),
-    [spendingByNode, selected.id, w.transactions],
+    [spendingByNode, selected.id, activeWorkspace.transactions],
   );
   const selectedHidden = hiddenNodeIds.includes(selected.id);
   const selectedNotOnGraph = graphNodeIds !== undefined && !graphNodeIds.includes(selected.id);
   const unavailable = busy
     ? 'Wait for the current operation to finish.'
-    : queryDisabledReason ||
-      (!canQuery
-        ? w.demo
+    : chainDataDisabledReason ||
+      (!canLoadChainData
+        ? activeWorkspace.demo
           ? 'Live lookups are disabled for this legacy synthetic workspace.'
           : 'Connect to a node on this workspace network to expand its paths.'
         : undefined);
@@ -479,15 +482,20 @@ export function NodeInspector({
     selected.kind === 'output' ? tx?.vout.find((output) => output.n === selected.vout) : undefined;
   const address = selected.address ?? (selectedOutput ? outputAddress(selectedOutput) : undefined);
   const utxo = useUtxoStatus(
-    w.id,
-    w.network,
+    activeWorkspace.id,
+    activeWorkspace.network,
     selected.kind === 'output' ? selected.txid : undefined,
     selected.kind === 'output' ? selected.vout : undefined,
     selectedOutput,
   );
   const walletObservation =
     selected.kind === 'output'
-      ? matchingWalletUtxoObservation(walletUtxoObservation, w, selected.txid, selected.vout)
+      ? matchingWalletUtxoObservation(
+          walletUtxoObservation,
+          activeWorkspace,
+          selected.txid,
+          selected.vout,
+        )
       : undefined;
   const showWalletObservation =
     !!walletObservation &&
@@ -522,7 +530,7 @@ export function NodeInspector({
   }
   const relatedNav = !!onSelectNode && spendingCount > 0;
   const hasEvidence = selected.kind === 'output' || !!tx || !!selected.address;
-  const showRefresh = !!selected.txid && !!tx && !w.demo;
+  const showRefresh = !!selected.txid && !!tx && !activeWorkspace.demo;
   const showRemove =
     selected.kind === 'transaction'
       ? !!tx && canRemove !== false
@@ -616,7 +624,9 @@ export function NodeInspector({
             )}
           </div>
         )}
-        {w.annotations[selected.id]?.label && <h2>{w.annotations[selected.id].label}</h2>}
+        {activeWorkspace.annotations[selected.id]?.label && (
+          <h2>{activeWorkspace.annotations[selected.id].label}</h2>
+        )}
         <dl className="selection-facts">
           <div>
             <dt>
@@ -698,7 +708,11 @@ export function NodeInspector({
             <div>
               <dt>Block</dt>
               <dd>
-                <TransactionBlockTime transaction={tx} workspace={w} showFee={false} />
+                <TransactionBlockTime
+                  transaction={tx}
+                  workspace={activeWorkspace}
+                  showFee={false}
+                />
               </dd>
             </div>
           )}
@@ -741,7 +755,7 @@ export function NodeInspector({
             <div>
               <dt>Fee</dt>
               <dd>
-                <TransactionFeeLabel transaction={tx} workspace={w} />
+                <TransactionFeeLabel transaction={tx} workspace={activeWorkspace} />
               </dd>
             </div>
           )}
@@ -806,7 +820,7 @@ export function NodeInspector({
       </div>
       <AnnotationEditor
         key={annotationKey}
-        annotation={w.annotations[selected.id] ?? emptyAnnotation}
+        annotation={activeWorkspace.annotations[selected.id] ?? emptyAnnotation}
         editToken={editToken}
         editTarget={editTarget}
         onEditHandled={onEditHandled}
@@ -829,7 +843,7 @@ export function NodeInspector({
               ? 'Matching input or output'
               : 'Address/script match'}
           </span>
-          {w.wallets
+          {activeWorkspace.wallets
             .filter((wallet) => walletMatch.walletIds.includes(wallet.id))
             .map((wallet) => (
               <button
@@ -939,11 +953,11 @@ export function NodeInspector({
         </details>
       )}
       <ScriptInspector
-        key={`scripts:${w.id}`}
-        workspace={w}
+        key={`scripts:${activeWorkspace.id}`}
+        workspace={activeWorkspace}
         selected={selected}
         loadedSpends={loadedSpends}
-        canQuery={canQuery && !busy}
+        canLoadChainData={canLoadChainData && !busy}
       />
       {(showRefresh || showRemove) && (
         <div className="panel-section selection-footer">

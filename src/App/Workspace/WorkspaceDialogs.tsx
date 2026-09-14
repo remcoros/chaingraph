@@ -5,15 +5,15 @@ import type { WorkspaceController } from './useWorkspace';
 type Props = { workspace: WorkspaceController };
 
 export function WorkspaceSettingsDialog({ workspace }: Props) {
-  const { w } = workspace;
-  if (!w || !workspace.dialogs.settingsOpen) return null;
+  const { activeWorkspace } = workspace;
+  if (!activeWorkspace || !workspace.dialogs.settingsOpen) return null;
   return (
     <WorkspaceDetailsDialog
-      key={w.id}
-      workspace={w}
+      key={activeWorkspace.id}
+      workspace={activeWorkspace}
       onClose={() => workspace.dialogs.closeSettings()}
       onSave={(name, description) =>
-        workspace.change(
+        workspace.edit(
           (current) =>
             current.name === name && current.description === description
               ? current
@@ -93,16 +93,16 @@ export function EntityRemovalDialog({ workspace }: Props) {
 }
 
 export function WalletDialogs({ workspace }: Props) {
-  const { w } = workspace;
+  const { activeWorkspace } = workspace;
   const { editingWallet } = workspace.dialogs;
   return (
     <>
-      {w && editingWallet && !workspace.lockingWorkspace && (
+      {activeWorkspace && editingWallet && !workspace.lockingWorkspace && (
         <WalletNameDialog
-          key={`${w.id}:${editingWallet.id}`}
+          key={`${activeWorkspace.id}:${editingWallet.id}`}
           wallet={editingWallet}
           onChange={(name) =>
-            workspace.change(
+            workspace.edit(
               (current) => {
                 const target = current.wallets.find((item) => item.id === editingWallet.id);
                 if (
@@ -125,12 +125,12 @@ export function WalletDialogs({ workspace }: Props) {
           onClose={() => workspace.dialogs.closeWalletRename()}
         />
       )}
-      {workspace.dialogs.addWalletOpen && w && (
+      {workspace.dialogs.addWalletOpen && activeWorkspace && (
         <WalletDialog
-          network={w.network}
+          network={activeWorkspace.network}
           onAdd={(newWallet) => {
             if (
-              w.wallets.some(
+              activeWorkspace.wallets.some(
                 (wallet) =>
                   wallet.key === newWallet.key && wallet.scriptType === newWallet.scriptType,
               )
@@ -138,7 +138,7 @@ export function WalletDialogs({ workspace }: Props) {
               workspace.setError('That wallet is already in this workspace.');
               return;
             }
-            workspace.change((current) => ({
+            workspace.edit((current) => ({
               ...current,
               wallets: [...current.wallets, newWallet],
             }));

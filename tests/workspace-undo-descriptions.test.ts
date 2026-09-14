@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
-import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 
 function setup() {
-  const store = new WorkspaceSessionStore({
+  const store = new WorkspaceStore({
     storage: { getItem: () => null, setItem: () => undefined },
   });
   const workspace = newWorkspace('Undo fixture', 'mainnet');
   store.open(workspace, 'public test passphrase');
-  return { store, id: workspace.id, session: () => store.getSession(workspace.id)! };
+  return { store, id: workspace.id, session: () => store.getUnlocked(workspace.id)! };
 }
 
 describe('undo entry descriptions', () => {
@@ -87,7 +87,7 @@ describe('undo entry descriptions', () => {
     store.update(id, (w) => ({ ...w, description: 'Path fixture' }), true, undefined, 'Add path');
     const other = newWorkspace('Other workspace', 'testnet4');
     store.open(other, 'public test passphrase');
-    expect(store.getSession(other.id)?.history).toEqual([]);
+    expect(store.getUnlocked(other.id)?.history).toEqual([]);
     expect(session().history.at(-1)?.description).toBe('Add path');
   });
 });

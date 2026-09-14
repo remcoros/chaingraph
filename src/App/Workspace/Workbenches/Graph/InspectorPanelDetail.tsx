@@ -6,7 +6,7 @@ import type { WorkspaceController } from '../../useWorkspace';
 
 export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceController }) {
   const {
-    w,
+    activeWorkspace,
     switchWorkbench,
     setNotice,
     setNoticeSequence,
@@ -15,13 +15,13 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     setMobilePanel,
     annotations,
     setLeftTab,
-    tx,
-    operation,
-    canTrace,
-    queryDisabledReason,
+    selectedTransaction: tx,
+    operationStatus: operation,
+    canTraceAncestry,
+    chainDataDisabledReason,
     entityRemoval,
-    change,
-    canQuery,
+    edit,
+    canLoadChainData,
     dialogs,
     tourStep,
     shownRightTab,
@@ -43,7 +43,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
   const { revealGraphNodes, centerNode, setEntityHidden, updateFilters } = workspace.graphActions;
   const { showWalletActivity } = workspace.wallet.actions;
 
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return shownRightTab === 'scan' ||
     shownRightTab === 'addresses' ||
     shownRightTab === 'transactions' ||
@@ -51,20 +51,20 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     !selected &&
     tourStep?.view?.rightTab !== 'inspect' ? (
     <WalletInspector
-      key={`wallet-inspector:${w.id}:${wallet.id}`}
+      key={`wallet-inspector:${activeWorkspace.id}:${wallet.id}`}
       wallet={wallet}
-      workspace={w}
+      workspace={activeWorkspace}
       busy={!!operation}
-      canQuery={canQuery}
+      canLoadChainData={canLoadChainData}
       onScan={() => void walletDiscovery.run(wallet)}
       onShowActivity={() => showWalletActivity(wallet)}
-      onEdit={() => dialogs.openWalletRename(w.id, wallet.id)}
+      onEdit={() => dialogs.openWalletRename(activeWorkspace.id, wallet.id)}
       onShowWallet={() => {
         updateFilters({ walletId: wallet.id, preserveContext: true });
         setMobilePanel('graph');
       }}
       onRemove={() => {
-        change((c) =>
+        edit((c) =>
           pruneWalletReviews({
             ...c,
             wallets: c.wallets.filter((x) => x.id !== wallet.id),
@@ -93,7 +93,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       tagsPanel={
         <SelectedTags
           key={selected.id}
-          workspace={w}
+          workspace={activeWorkspace}
           selected={selected}
           openToken={annotations.edit.target === 'tags' ? annotations.edit.token : 0}
           onOpenHandled={annotations.edit.acknowledge}
@@ -104,13 +104,13 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
           }}
         />
       }
-      w={w}
+      activeWorkspace={activeWorkspace}
       selected={selected}
       tx={tx}
       graph={graph}
       busy={!!operation}
-      canQuery={canTrace}
-      queryDisabledReason={queryDisabledReason}
+      canLoadChainData={canTraceAncestry}
+      chainDataDisabledReason={chainDataDisabledReason}
       editToken={annotations.edit.target === 'tags' ? undefined : annotations.edit.token}
       editTarget={annotations.edit.target === 'icon' ? 'icon' : 'label'}
       onEditHandled={annotations.edit.acknowledge}
@@ -120,23 +120,23 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       }}
       onCenter={() => centerNode()}
       onShowAndCenter={() => centerNode(selected.id, undefined, true)}
-      hiddenNodeIds={w.view.hiddenNodeIds}
-      graphNodeIds={w.view.graphNodeIds}
+      hiddenNodeIds={activeWorkspace.view.hiddenNodeIds}
+      graphNodeIds={activeWorkspace.view.graphNodeIds}
       onSetHidden={setEntityHidden}
-      annotationKey={`${w.id}:${selected.id}`}
+      annotationKey={`${activeWorkspace.id}:${selected.id}`}
       onExpand={(direction) => void expand(direction)}
       onRefresh={() =>
         void run(async (signal) => {
           const transaction = await getTransaction(selected.txid!, signal);
           signal.throwIfAborted();
-          mergeTransactions(w.id, [transaction]);
+          mergeTransactions(activeWorkspace.id, [transaction]);
         })
       }
       onRefreshAddressBalance={refreshAddressBalance}
       canRemove={!!entityRemoval.selectedPlan}
       onRemove={() => entityRemoval.request()}
       onSave={(annotation, group) => {
-        const previous = w.annotations[selected.id] ?? {
+        const previous = activeWorkspace.annotations[selected.id] ?? {
           label: '',
           note: '',
           icon: '',
@@ -146,7 +146,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
           (Object.keys(annotation) as (keyof typeof annotation)[]).find(
             (key) => annotation[key] !== previous?.[key],
           ) ?? 'label';
-        change(
+        edit(
           (current) => ({
             ...current,
             annotations: { ...current.annotations, [selected.id]: annotation },
@@ -160,7 +160,9 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     <div className="inspector-empty">
       <Eye size={29} />
       <h3>A closer look</h3>
-      {w.description && <p className="workspace-description">{w.description}</p>}
+      {activeWorkspace.description && (
+        <p className="workspace-description">{activeWorkspace.description}</p>
+      )}
       <p>
         Select a node in the graph or an item in Entities to inspect it, add labels and notes, and
         follow its paths.

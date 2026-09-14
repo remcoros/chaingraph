@@ -24,7 +24,7 @@ function withScanActionEvidence(
 }
 export function InspectorPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
-    w,
+    activeWorkspace,
     rightTab,
     shownRightTab,
     setRightTab,
@@ -32,11 +32,11 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     connectionScanTargets,
     shownWorkbench,
     lockingWorkspace,
-    canQuery,
-    wRef,
-    ws,
-    change,
-    operation,
+    canLoadChainData,
+    activeWorkspaceRef,
+    workspaces,
+    edit,
+    operationStatus: operation,
     rightPanelRef,
   } = workspace;
   const { selected: wallet, utxos: walletUtxos } = workspace.wallet;
@@ -49,12 +49,12 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   const inspectorScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
-  }, [w?.id, rightTab]);
+  }, [activeWorkspace?.id, rightTab]);
   useLayoutEffect(() => {
     // Scan results stay in place while their paths change the graph selection.
     if (rightTab !== 'scan' && inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
   }, [selectedId, selectedWallet, rightTab]);
-  if (!w) return null;
+  if (!activeWorkspace) return null;
   return (
     <aside className="right-panel" ref={rightPanelRef} tabIndex={-1} data-tour="analysis-panel">
       <div className={`panel-tabs ${wallet ? 'has-wallet-tabs' : ''}`}>
@@ -100,8 +100,8 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
       <div className="inspector-scroll" ref={inspectorScroll}>
         {fetchScope && (
           <ConnectionScanPanel
-            key={w.id}
-            workspace={w}
+            key={activeWorkspace.id}
+            workspace={activeWorkspace}
             selectionId={
               connectionScanTargets.picking ? connectionScanTargets.draft!.source : selectedId
             }
@@ -117,24 +117,24 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
             loadedSpenders={flowIndex.spenders}
             neighbours={connectionScanNeighbours}
             active={shownRightTab === 'scan' && shownWorkbench === 'graph' && !lockingWorkspace}
-            canQuery={canQuery}
+            canLoadChainData={canLoadChainData}
             scope={fetchScope}
             isCurrent={() =>
-              wRef.current?.id === w.id &&
-              ws.getSession(w.id)?.fetchScope === fetchScope &&
+              activeWorkspaceRef.current?.id === activeWorkspace.id &&
+              workspaces.getUnlocked(activeWorkspace.id)?.fetchScope === fetchScope &&
               !fetchScope.closed
             }
             onChange={(update, undo) => {
               if (
-                wRef.current?.id === w.id &&
-                ws.getSession(w.id)?.fetchScope === fetchScope &&
+                activeWorkspaceRef.current?.id === activeWorkspace.id &&
+                workspaces.getUnlocked(activeWorkspace.id)?.fetchScope === fetchScope &&
                 !fetchScope.closed
               )
-                ws.update(w.id, update, undo);
+                workspaces.update(activeWorkspace.id, update, undo);
             }}
             onSelect={(id, evidence) => {
               if (evidence) {
-                change(
+                edit(
                   (current) => addScanNodeAddition(withScanActionEvidence(current, evidence), id),
                   true,
                   undefined,
@@ -146,7 +146,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
               setRightTab('scan');
             }}
             onAdd={(result, prefixLength, evidence) => {
-              change(
+              edit(
                 (current) =>
                   addScanPathAddition(
                     withScanActionEvidence(current, evidence),
@@ -165,8 +165,8 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
         {wallet && (
           <WalletRecordsPanel
             walletUtxos={walletUtxos}
-            key={`wallet-records:${w.id}:${wallet.id}`}
-            workspace={w}
+            key={`wallet-records:${activeWorkspace.id}:${wallet.id}`}
+            workspace={activeWorkspace}
             wallet={wallet}
             active={
               shownRightTab === 'addresses' ||
@@ -175,7 +175,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
                 ? shownRightTab
                 : undefined
             }
-            canQuery={canQuery}
+            canLoadChainData={canLoadChainData}
             busy={!!operation}
             selectedId={selectedId}
             onSelect={selectWalletRecord}

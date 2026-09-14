@@ -79,7 +79,7 @@ export interface UndoEntry {
   workspace: Workspace;
   description: string;
 }
-export interface Session {
+export interface UnlockedWorkspace {
   fetchScope: TransactionFetchScope;
   walletPreparation: WalletPreparationCache;
   data: Workspace;
@@ -95,7 +95,7 @@ export interface Session {
 }
 interface StoreState {
   saved: SavedWorkspace[];
-  sessions: Session[];
+  unlocked: UnlockedWorkspace[];
   activeId?: string;
   storageError: string;
   saving: boolean;
@@ -167,10 +167,10 @@ function parseSaved(raw: string | null): SavedWorkspace[] {
 }
 
 /** Synchronous state transitions keep async encryption independent of React render timing. */
-export class WorkspaceSessionStore {
+export class WorkspaceStore {
   private state: StoreState = {
     saved: [],
-    sessions: [],
+    unlocked: [],
     storageError: '',
     saving: false,
   };
@@ -315,15 +315,15 @@ export class WorkspaceSessionStore {
   };
   private add(data: Workspace, password: string, alreadySaved: boolean) {
     if (this.locking.has(data.id)) throw new Error('This workspace is currently locking.');
-    if (this.state.sessions.some((s) => s.data.id === data.id)) {
+    if (this.state.unlocked.some((s) => s.data.id === data.id)) {
       this.setActiveId(data.id);
       return;
     }
     // Typing groups belong to one unlocked session, never a later reopen.
     this.editGroups.delete(data.id);
     this.patch({
-      sessions: [
-        ...this.state.sessions,
+      unlocked: [
+        ...this.state.unlocked,
         {
           data,
           fetchScope: new TransactionFetchScope(data.network),
@@ -395,7 +395,7 @@ export class WorkspaceSessionStore {
     description?: string,
   ) => {
     if (this.locking.has(id)) return;
-    const current = this.state.sessions.find((s) => s.data.id === id);
+    const current = this.state.unlocked.find((s) => s.data.id === id);
     if (!current) return;
     let data = fn(current.data);
     // An identical result (for example a scan for a deleted wallet) is not an
@@ -441,7 +441,7 @@ export class WorkspaceSessionStore {
     // evidence changed; a quiet check retains them, with the latest scan-owned
     // metadata carried in so undo restores user edits, never stale check state.
     this.patch({
-      sessions: this.state.sessions.map((s) =>
+      unlocked: this.state.unlocked.map((s) =>
         s !== current
           ? s
           : {
@@ -480,7 +480,7 @@ export class WorkspaceSessionStore {
     if (this.locking.has(id)) return;
     this.editGroups.delete(id);
     this.patch({
-      sessions: this.state.sessions.map((s) =>
+      unlocked: this.state.unlocked.map((s) =>
         s.data.id === id && s.history.length
           ? {
               ...s,
@@ -502,7 +502,7 @@ export class WorkspaceSessionStore {
     if (this.locking.has(id)) return;
     this.editGroups.delete(id);
     this.patch({
-      sessions: this.state.sessions.map((s) =>
+      unlocked: this.state.unlocked.map((s) =>
         s.data.id === id && s.redoHistory.length
           ? {
               ...s,
@@ -524,7 +524,7 @@ export class WorkspaceSessionStore {
   };
 
   getSaved = (id: string) => this.state.saved.find((entry) => entry.id === id);
-  getSession = (id: string) => this.state.sessions.find((session) => session.data.id === id);
+  getUnlocked = (id: string) => this.state.unlocked.find((session) => session.data.id === id);
   private resumeAutosave(id: string) {
     this.autosavePaused.delete(id);
     for (const resume of this.idleWaiters.get(id) ?? []) resume();
@@ -534,7 +534,7 @@ export class WorkspaceSessionStore {
     if (paused) this.autosavePaused.add(id);
     else {
       this.resumeAutosave(id);
-      const session = this.getSession(id);
+      const session = this.getUnlocked(id);
       if (session && session.revision !== session.savedRevision)
         void this.persist(id, true).catch(() => {});
     }
@@ -554,7 +554,7 @@ export class WorkspaceSessionStore {
   }
   exportEncrypted = async (id: string) => {
     this.resumeAutosave(id);
-    const session = this.getSession(id);
+    const session = this.getUnlocked(id);
     if (!session) throw new Error('This workspace is no longer unlocked.');
     return {
       name: session.data.name,
@@ -567,7 +567,7 @@ export class WorkspaceSessionStore {
       .catch(() => {})
       .then(async () => {
         if (automatic) await this.waitForIdle(id);
-        const session = this.state.sessions.find((s) => s.data.id === id);
+        const session = this.state.unlocked.find((s) => s.data.id === id);
         if (!session) return;
         this.patch({ saving: true });
         try {
@@ -610,7 +610,7 @@ export class WorkspaceSessionStore {
             saved = await this.publish(saved, hasWebLock);
             this.patch({
               saved,
-              sessions: this.state.sessions.map((s) =>
+              unlocked: this.state.unlocked.map((s) =>
                 s.data.id === id ? { ...s, savedRevision: session.revision } : s,
               ),
               storageError: '',
@@ -643,13 +643,13 @@ export class WorkspaceSessionStore {
       .then(async () => {
         const commit = async (hasWebLock: boolean) => {
           this.assertStorageUnchanged();
-          if (this.state.sessions.some((session) => session.data.id === id))
+          if (this.state.unlocked.some((session) => session.data.id === id))
             throw new Error('Lock this workspace before deleting its saved copy.');
           const previous = this.state.saved;
           const saved = this.state.saved.filter((entry) => entry.id !== id);
           const raw = JSON.stringify(saved);
           await this.commitIndex(raw, hasWebLock, () => {
-            if (this.state.sessions.some((session) => session.data.id === id))
+            if (this.state.unlocked.some((session) => session.data.id === id))
               throw new Error('Lock this workspace before deleting its saved copy.');
           });
           this.patch({ saved, storageError: '' });
@@ -670,7 +670,7 @@ export class WorkspaceSessionStore {
     const operation = Promise.resolve()
       .then(async () => {
         await this.persist(id);
-        const current = this.state.sessions.find((s) => s.data.id === id);
+        const current = this.state.unlocked.find((s) => s.data.id === id);
         if (current && current.revision !== current.savedRevision)
           throw new Error('Workspace changed while locking; keep it open and save again.');
         this.editGroups.delete(id);
@@ -679,7 +679,7 @@ export class WorkspaceSessionStore {
           current.walletPreparation.dispose();
         }
         this.patch({
-          sessions: this.state.sessions.filter((s) => s.data.id !== id),
+          unlocked: this.state.unlocked.filter((s) => s.data.id !== id),
           activeId: this.state.activeId === id ? undefined : this.state.activeId,
         });
       })
@@ -692,19 +692,19 @@ export class WorkspaceSessionStore {
 }
 
 export function useWorkspaces() {
-  const [store] = useState(() => new WorkspaceSessionStore());
+  const [store] = useState(() => new WorkspaceStore());
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   useEffect(() => {
-    const ids = state.sessions.filter((s) => s.revision !== s.savedRevision).map((s) => s.data.id);
+    const ids = state.unlocked.filter((s) => s.revision !== s.savedRevision).map((s) => s.data.id);
     if (!ids.length) return;
     const timer = setTimeout(() => {
       for (const id of ids) void store.persist(id, true).catch(() => {});
     }, 900);
     return () => clearTimeout(timer);
-  }, [state.sessions, store]);
+  }, [state.unlocked, store]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
-      if (store.getSnapshot().sessions.some((s) => s.revision !== s.savedRevision)) {
+      if (store.getSnapshot().unlocked.some((s) => s.revision !== s.savedRevision)) {
         event.preventDefault();
         event.returnValue = '';
       }
@@ -714,7 +714,7 @@ export function useWorkspaces() {
   }, [store]);
   return {
     ...state,
-    active: state.sessions.find((s) => s.data.id === state.activeId),
+    active: state.unlocked.find((s) => s.data.id === state.activeId),
     setActiveId: store.setActiveId,
     open: store.open,
     unlock: store.unlock,
@@ -723,7 +723,7 @@ export function useWorkspaces() {
     redo: store.redo,
     lock: store.lock,
     persist: store.persist,
-    getSession: store.getSession,
+    getUnlocked: store.getUnlocked,
     getSaved: store.getSaved,
     exportEncrypted: store.exportEncrypted,
     pauseAutosave: store.pauseAutosave,
