@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { useDialogFocus } from '../../App/Dialogs';
+import { useDialogFocus } from './useDialogFocus';
 import './anchored-popover.css';
 
 function readViewport() {

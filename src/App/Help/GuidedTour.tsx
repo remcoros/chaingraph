@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, List, Lightbulb } from 'lucide-react';
-import { useDialogFocus } from '../Dialogs';
+import { useDialogFocus } from '../../Shared/Controls/useDialogFocus';
 import type { TourStep } from './steps';
 
 /** A presentation-only tour. Feature adapters own step visibility and panel previews. */

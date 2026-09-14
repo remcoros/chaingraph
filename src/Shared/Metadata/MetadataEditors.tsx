@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Plus, X } from 'lucide-react';
-import { useDialogFocus } from '../../App/Dialogs';
+import { useDialogFocus } from '../Controls/useDialogFocus';
 import {
   applyEntityNote,
   applyBatchLabel,

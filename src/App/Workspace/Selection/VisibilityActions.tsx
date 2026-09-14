@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Eye, EyeOff, Layers, X } from 'lucide-react';
 import type { Transaction } from '../../../Domain/types';
 import { transactionNodeIds } from '../../../Domain/Graph/visibility';
-import { useDialogFocus } from '../../Dialogs';
+import { useDialogFocus } from '../../../Shared/Controls/useDialogFocus';
 import './visibility.css';
 
 export interface VisibilityProps {

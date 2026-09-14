@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import { useDialogFocus } from '../../App/Dialogs';
+import { useDialogFocus } from '../Controls/useDialogFocus';
 import { MetadataPopover } from './MetadataEditors';
 import './icon-picker.css';
 

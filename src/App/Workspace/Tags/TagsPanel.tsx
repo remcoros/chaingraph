@@ -23,7 +23,8 @@ import { DEFAULT_TAG_COLOR } from '../../../Domain/Metadata/tagColors';
 import './tags.css';
 import { applyBatchTag } from '../../../Domain/Metadata/batchMetadata';
 import { canonicalAddress } from '../../../Domain/Metadata/entityReferences';
-import { Modal, useDialogFocus } from '../../Dialogs';
+import { Modal } from '../../Dialogs';
+import { useDialogFocus } from '../../../Shared/Controls/useDialogFocus';
 import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
