@@ -9,8 +9,13 @@ import type { AnalysisSession } from './analysisSession';
  * workbench reads, so the revision is what tells Analysis to pick a new one up.
  */
 export interface WorkspaceAnalysis {
-  /** Retained session per workspace, dropped when that workspace locks. */
-  sessions: React.RefObject<Map<string, AnalysisSession>>;
+  /**
+   * Retained session per workspace, dropped when that workspace locks.
+   *
+   * One map for the life of the workspace controller, mutated in place. Held as
+   * state rather than a ref so reading it while rendering is not a ref read.
+   */
+  sessions: Map<string, AnalysisSession>;
   /** Changes when a wallet-run analysis produces a new session. */
   walletRevision: number;
   noteWalletAnalysis: () => void;
@@ -21,13 +26,13 @@ export interface WorkspaceAnalysis {
 export function useWorkspaceAnalysis(
   openWorkspaces: AppState['workspaces']['unlocked'],
 ): WorkspaceAnalysis {
-  const sessions = useRef(new Map<string, AnalysisSession>());
+  const [sessions] = useState(() => new Map<string, AnalysisSession>());
   const [walletRevision, setWalletRevision] = useState(0);
   const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const unlocked = new Set(openWorkspaces.map((entry) => entry.data.id));
-    for (const id of sessions.current.keys()) if (!unlocked.has(id)) sessions.current.delete(id);
-  }, [openWorkspaces]);
+    for (const id of sessions.keys()) if (!unlocked.has(id)) sessions.delete(id);
+  }, [openWorkspaces, sessions]);
   return {
     sessions,
     walletRevision,

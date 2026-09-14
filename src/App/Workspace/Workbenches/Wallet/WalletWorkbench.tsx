@@ -1231,11 +1231,11 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           !tour.step
         }
         workspace={activeWorkspace}
-        sessionAnalysis={analysis.sessions.current.get(activeWorkspace.id)?.scan}
+        sessionAnalysis={analysis.sessions.get(activeWorkspace.id)?.scan}
         updateEvidence={(id, update, undo) => workspaces.getUnlocked(id)?.edit(update, undo)}
         onAnalysisComplete={(scan) => {
-          analysis.sessions.current.set(activeWorkspace.id, {
-            scopeMode: analysis.sessions.current.get(activeWorkspace.id)?.scopeMode,
+          analysis.sessions.set(activeWorkspace.id, {
+            scopeMode: analysis.sessions.get(activeWorkspace.id)?.scopeMode,
             options: scan.options,
             scan,
             selectedId: scan.findings[0]?.id,

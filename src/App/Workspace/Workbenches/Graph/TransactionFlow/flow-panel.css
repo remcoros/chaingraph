@@ -769,6 +769,12 @@
   border-left: 1px solid var(--color-rule);
   border-radius: 8px 0 0 8px;
 }
+.transaction-rows > .transaction-row:first-child {
+  border-top: 1px solid var(--color-rule);
+}
+.transaction-rows > .transaction-row:last-child {
+  border-bottom: 1px solid var(--color-rule);
+}
 .transaction-row + .transaction-row {
   border-top: 1px solid var(--color-rule);
 }

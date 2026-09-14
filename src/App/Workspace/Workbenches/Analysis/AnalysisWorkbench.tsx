@@ -1092,19 +1092,20 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
   const { selected } = workspace.graph.projection;
   const { showFindingOnGraph } = workspace.analysis.actions;
 
+  const { sectionRef, sessions, walletRevision } = analysis;
   if (!activeWorkspace) return null;
   return (
     <section
       className="workbench-page"
       hidden={shownWorkbench !== 'analysis'}
-      ref={analysis.sectionRef}
+      ref={sectionRef}
       id="analysis-workspace"
       tabIndex={-1}
       aria-label="Analysis workspace"
     >
       <AnalysisWorkbenchView
-        key={`${activeWorkspace.id}:${analysis.walletRevision}`}
-        cache={analysis.sessions.current}
+        key={`${activeWorkspace.id}:${walletRevision}`}
+        cache={sessions}
         workspace={activeWorkspace}
         active={workbench === 'analysis' && !lockingWorkspace && !tour.step}
         selected={selected}
