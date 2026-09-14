@@ -1,5 +1,5 @@
 import { LookupForm } from './Entities/LookupForm';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Download,
@@ -19,10 +19,6 @@ import type { WorkspaceController } from './useWorkspace';
 
 export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController }) {
   const {
-    menu,
-    workspaceMenu,
-    setMenu,
-    workspaceMenuTrigger,
     shownWorkbench,
     switchWorkbench,
     tourStep,
@@ -45,6 +41,16 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     setError,
   } = workspace;
   const { addQuery } = workspace.evidence;
+  const workspaceMenu = useRef<HTMLDivElement>(null);
+  const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);
+  // Scoped to its workspace, so switching or locking one closes the menu.
+  const [menuFor, setMenuFor] = useState<string>();
+  const menu = !!w && menuFor === w.id;
+  const workspaceIdForMenu = w?.id;
+  const setMenu = useCallback(
+    (next: boolean) => setMenuFor(next ? workspaceIdForMenu : undefined),
+    [workspaceIdForMenu],
+  );
   useEffect(() => {
     if (!menu) return;
     const items = () =>

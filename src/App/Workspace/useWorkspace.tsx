@@ -80,9 +80,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const workspaceTransactions = w?.transactions;
 
   const dialogs = useDialogState(w);
-  const [menu, setMenu] = useState(false);
-  const workspaceMenu = useRef<HTMLDivElement>(null);
-  const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);
   const [selectedId, setSelectedId] = useState<string>();
   const [viewOwner, setViewOwner] = useState<string>();
   const [selectedWallet, setSelectedWallet] = useState<string>();
@@ -349,7 +346,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setEditToken(0);
     lookup.clear();
     lookup.setError('');
-    setMenu(false);
     setFocusRequest(undefined);
     const savedGraphFilters = w?.view.filters ?? {};
     setGraphFilters(savedGraphFilters);
@@ -772,10 +768,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     focusRequest,
     graphWorkspaceRef,
     shownMobilePanel,
-    menu,
-    workspaceMenu,
-    setMenu,
-    workspaceMenuTrigger,
     returnWorkbench,
     prefetchDepth,
     setPrefetchDepth,
