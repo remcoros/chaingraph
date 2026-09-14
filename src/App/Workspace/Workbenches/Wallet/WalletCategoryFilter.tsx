@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { ListFilter } from 'lucide-react';
 import { AnchoredPopover } from '../../../../Shared/Controls/AnchoredPopover';
 import { WalletHelp } from '../../../../Shared/Display/WalletHelp';
@@ -29,9 +29,9 @@ export function WalletCategoryFilter({
   const [open, setOpen] = useState(false);
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
-  useEffect(() => {
-    if (!active) setOpen(false);
-  }, [active]);
+  // Adjusting during render rather than in an effect: losing the control closes
+  // its popover in the same pass, with no extra render showing it still open.
+  if (open && !active) setOpen(false);
   return (
     <>
       <button

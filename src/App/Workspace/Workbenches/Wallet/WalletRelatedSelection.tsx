@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { CheckSquare, ChevronDown } from 'lucide-react';
 import { AnchoredPopover } from '../../../../Shared/Controls/AnchoredPopover';
 import { matchRelatedEntities } from '../../../../Domain/Wallet/walletReviewContext';
@@ -25,9 +25,9 @@ export function WalletRelatedSelection({
   const [open, setOpen] = useState(false);
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
-  useEffect(() => {
-    if (!active) setOpen(false);
-  }, [active]);
+  // Adjusting during render rather than in an effect: losing the control closes
+  // its popover in the same pass, with no extra render showing it still open.
+  if (open && !active) setOpen(false);
   const addresses = matchRelatedEntities(candidates, seeds, 'address');
   const transactions = matchRelatedEntities(candidates, seeds, 'transaction');
   if (!seeds.length || (!addresses.length && !transactions.length)) return null;

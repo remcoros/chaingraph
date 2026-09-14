@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export interface EntitySelection {
   /** Explicit multiple-selection mode; single click still inspects when off. */
@@ -35,11 +35,11 @@ function currentSelection(state: SelectionState, workspaceId: string | undefined
  */
 export function useEntitySelection(workspaceId: string | undefined): EntitySelection {
   const [state, setState] = useState<SelectionState>(() => emptySelection(workspaceId));
+  // Adjusting during render rather than in an effect: a different workspace owns
+  // a different selection, so it starts empty in the same pass.
+  if (state.workspaceId !== workspaceId) setState(emptySelection(workspaceId));
   const current = currentSelection(state, workspaceId);
   const { mode, ids } = current;
-  useEffect(() => {
-    if (state.workspaceId !== workspaceId) setState(emptySelection(workspaceId));
-  }, [state.workspaceId, workspaceId]);
   const selected = useMemo(() => new Set(ids), [ids]);
   const setMode = useCallback(
     (mode: boolean) =>

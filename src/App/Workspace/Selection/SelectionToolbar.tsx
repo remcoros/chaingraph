@@ -83,9 +83,9 @@ export function SelectionToolbar({
     setUndoable(token === undefined ? undefined : { summary, token, workspaceId: workspace.id });
     return token !== undefined || update(workspace) === workspace;
   };
-  useEffect(() => {
-    if (!active) setEditor(undefined);
-  }, [active]);
+  // Adjusting during render rather than in an effect: losing the toolbar closes
+  // its editor in the same pass, with no extra render showing it still open.
+  if (editor && !active) setEditor(undefined);
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
   useEffect(() => setEditor(undefined), [scopeKey]);
   if (!active || (!selection.mode && !count)) return null;

@@ -25,10 +25,10 @@ export function WalletHelp({
     cancelClose();
     timer.current = setTimeout(() => setOpen(false), 120);
   };
-  useEffect(() => {
-    if (!active) setOpen(false);
-    return cancelClose;
-  }, [active]);
+  // Adjusting during render rather than in an effect: losing the control closes
+  // its popover in the same pass, with no extra render showing it still open.
+  if (open && !active) setOpen(false);
+  useEffect(() => cancelClose, [active]);
   useLayoutEffect(() => {
     if (!open || !active) return;
     let frame = 0;

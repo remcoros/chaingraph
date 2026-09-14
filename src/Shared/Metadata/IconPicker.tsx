@@ -91,9 +91,9 @@ export function IconPicker({
     setOpen(true);
     handleOpenHandled();
   }, [openToken, disabled]);
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
+  // Adjusting during render rather than in an effect: being disabled closes the
+  // palette in the same pass, with no extra render showing it still open.
+  if (open && disabled) setOpen(false);
   const id = useId();
   const label = mixed
     ? 'Mixed'
