@@ -11,9 +11,6 @@ import { AnalysisWorkbench } from './Workbenches/Analysis/AnalysisWorkbench';
 export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   const {
     lookup,
-    shownMobilePanel,
-    setMobilePanel,
-    shownRightTab,
     shownWorkbench,
     workbench,
     tourStep,
@@ -22,16 +19,21 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     annotations,
     setNotice,
     workspaces,
-    connectionScanTargets,
     operationStatus: operation,
     operationRef,
   } = workspace;
-  const { pendingWorkspaceId: pendingGraphWorkspace } = workspace.graphCanvas;
+  const {
+    mobilePanel: shownMobilePanel,
+    setMobilePanel,
+    rightTab: shownRightTab,
+  } = workspace.graph.panels;
+  const { scanTargets: connectionScanTargets } = workspace.graph;
+  const { pendingWorkspaceId: pendingGraphWorkspace } = workspace.graph.canvas;
   const { batch: selection } = workspace.selection;
   const { selectionOnCanvas, matchingScope, graphFiltering, visibleGraph } =
-    workspace.graphProjection;
+    workspace.graph.projection;
   const { backgroundAddressHistoryLoad } = workspace.evidence;
-  const { setEntityHidden, prepareIsolation, updateFilters } = workspace.graphActions;
+  const { setEntityHidden, prepareIsolation, updateFilters } = workspace.graph.actions;
 
   if (!activeWorkspace) return null;
   return (

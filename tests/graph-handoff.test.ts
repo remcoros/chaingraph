@@ -7,7 +7,7 @@ import {
 import { analysisTools } from '../src/Domain/Analysis/analysis';
 import { filterGraph } from '../src/Domain/Graph/graphFilters';
 import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
-import { flowInputPlan, mergeFlowInputs } from '../src/App/Workspace/useFlowInputs';
+import { flowInputPlan, mergeFlowInputs } from '../src/Domain/Chain/flowInputs';
 import { buildGraph, newWorkspace } from '../src/Domain/Workspace/workspace';
 import { outputNodeId, txNodeId } from '../src/Domain/types';
 

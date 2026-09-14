@@ -23,7 +23,7 @@ interface Inputs {
   select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   showOnGraph: GraphHandoff['showOnGraph'];
-  setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
+  showRecordTab: GraphHandoff['showRecordTab'];
   selection: ReturnType<typeof useEntitySelection>;
   workspaces: AppState['workspaces'];
   selectionGeneration: RefObject<number>;
@@ -34,13 +34,13 @@ interface Inputs {
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
   switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
-  setMobilePanel: Dispatch<SetStateAction<'graph' | 'left' | 'right'>>;
+  showPanel: GraphHandoff['showPanel'];
   recoveryGraph: GraphHandoff['recoveryGraph'];
   setSelectedId: Dispatch<SetStateAction<string | undefined>>;
   graph: GraphHandoff['graph'];
   revealGraphNodes: GraphHandoff['revealGraphNodes'];
   updateFilters: GraphHandoff['updateFilters'];
-  setLeftTab: Dispatch<SetStateAction<'wallets' | 'entities' | 'bookmarks' | 'tags'>>;
+  revealEntities: GraphHandoff['revealEntities'];
   edit: (
     fn: (data: Workspace) => Workspace,
     undo?: boolean,
@@ -56,7 +56,7 @@ export function createWalletActions({
   select,
   setGraphFilters,
   showOnGraph,
-  setRightTab,
+  showRecordTab,
   selection,
   workspaces,
   selectionGeneration,
@@ -67,13 +67,13 @@ export function createWalletActions({
   recordHandoffInvoker,
   setReturnWorkbench,
   switchWorkbench,
-  setMobilePanel,
+  showPanel,
   recoveryGraph,
   setSelectedId,
   graph,
   revealGraphNodes,
   updateFilters,
-  setLeftTab,
+  revealEntities,
   edit,
 }: Inputs) {
   function selectWalletRecord(
@@ -127,7 +127,7 @@ export function createWalletActions({
         select(nodeId);
         setGraphFilters({});
       }
-      setRightTab(tab);
+      showRecordTab(tab);
       if (options.selectionIds) {
         selection.replace(ids.length > 1 ? ids : []);
         selection.setMode(ids.length > 1);
@@ -175,7 +175,7 @@ export function createWalletActions({
     recordHandoffInvoker('wallet');
     setReturnWorkbench('wallet');
     switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
-    setMobilePanel(mode === 'inspect' ? 'right' : 'graph');
+    showPanel(mode === 'inspect' ? 'right' : 'graph');
     selectWalletRecord(nodeId, utxo, {
       tab: 'inspect',
       center: mode !== 'inspect',
@@ -207,8 +207,8 @@ export function createWalletActions({
       includeIds: activityNodes,
       preserveContext: true,
     });
-    setLeftTab('entities');
-    setMobilePanel('graph');
+    revealEntities();
+    showPanel('graph');
     edit(
       (current) => ({
         ...current,

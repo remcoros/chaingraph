@@ -1182,11 +1182,11 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     operationStatus: operation,
     chainDataDisabledReason,
     operationRef,
-    setRightTab,
     dialogs,
     edit,
     shownWorkbench,
   } = workspace;
+  const { setRightTab } = workspace.graph.panels;
   const {
     utxos: walletUtxos,
     selected: wallet,

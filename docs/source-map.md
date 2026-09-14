@@ -44,6 +44,7 @@ src/
         Graph/              graph surface, controls and metadata projection
           GraphWorkbench.tsx graph canvas, navigation and panel composition
           useGraphCanvas.ts  camera, fit and saved-view writes
+          useGraphPanels.ts  which panels and tabs the workbench shows
           EntitiesPanel.tsx entity and wallet browsing controls
           InspectorPanel.tsx inspector, scan and wallet-record tabs
           InspectorPanelDetail.tsx selected node or wallet detail actions
@@ -54,6 +55,7 @@ src/
             FlowPanel.tsx   panel shell, summary and view composition
             FlowPanelTransactionView.tsx transaction lanes, navigation and metadata tools
             FlowPanelAddressView.tsx address history and UTXO tabs
+            useFlowInputs.ts loading the inputs a flow view needs
           ConnectionScan/   scan panel, runner, worker and bounded fetching
           Renderer/         adapter contract, Three.js, layout and picking
         Analysis/           analysis controls and reports
@@ -149,8 +151,16 @@ in the root `tokens.css`. Tool configuration stays at the repository root.
 `App/useAppState.ts` owns the workspace store, navigation, connection status and feedback,
 and exports them as the `AppState` contract. `App.tsx` reads these directly;
 Workspace consumes the app services it needs.
-`Workspace/useWorkspace.tsx` owns shared state, selection, presentation hydration
-and workbench switching/focus. Workbench action modules implement Graph, Wallet
+`Workspace/useWorkspace.tsx` composes the concepts a workspace needs and owns
+only the small core: the active workspace, editing it, notices and workbench
+switching. Each concept lives in its product area, so the controller reads as a
+map of them: `graph` (projection, canvas, panels, filters, actions, flow inputs,
+scan targets), `wallet`, `analysis`, plus the shared `selection`, `annotations`,
+`evidence`, `history`, `lookup` and `dialogs`.
+
+Panel state belongs to the workbench that shows it. Graph owns its tabs, and
+other workbenches reach them through `GraphHandoff` rather than writing them, so
+a wallet record opening in the inspector is a handoff rather than a tab write. Workbench action modules implement Graph, Wallet
 and Analysis behavior over that state. Wallet and Analysis reach Graph only
 through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`, never
 through Graph's own modules. Each workbench file binds the controller to its own

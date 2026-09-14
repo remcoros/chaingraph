@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { addGraphNodes } from '../../../Domain/Graph/graphMembership';
-import type { GraphFilters, Workspace } from '../../../Domain/types';
+import type { GraphFilters } from '../../../Domain/types';
 import type { AppState } from '../../useAppState';
 import { useEntitySelection, type EntitySelection } from './useEntitySelection';
 
@@ -45,7 +45,8 @@ interface Inputs {
   currentRef: AppState['activeWorkspaceRef'];
   sessions: AppState['workspaces'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
+  /** Shows a newly selected entity, supplied by the workbench that displays it. */
+  revealSelected: () => void;
 }
 
 export function useWorkspaceSelection({
@@ -53,7 +54,7 @@ export function useWorkspaceSelection({
   currentRef,
   sessions,
   setGraphFilters,
-  setRightTab,
+  revealSelected,
 }: Inputs): WorkspaceSelection {
   const batch = useEntitySelection(workspaceId);
   const [selectedId, setSelectedId] = useState<string>();
@@ -107,9 +108,9 @@ export function useWorkspaceSelection({
               index: Math.min(99, current.index + 1),
             },
       );
-      setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
+      revealSelected();
     },
-    [getUnlocked, currentRef, setGraphFilters, setRightTab],
+    [getUnlocked, currentRef, setGraphFilters, revealSelected],
   );
   const batchIds = batch.ids;
   const removeBatchIds = batch.remove;

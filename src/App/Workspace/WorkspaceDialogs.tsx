@@ -144,8 +144,8 @@ export function WalletDialogs({ workspace }: Props) {
             }));
             workspace.selection.setSelectedWallet(newWallet.id);
             workspace.selection.setSelectedId(undefined);
-            workspace.setRightTab('inspect');
-            workspace.setMobilePanel('right');
+            workspace.graph.panels.setRightTab('inspect');
+            workspace.graph.panels.setMobilePanel('right');
             workspace.switchWorkbench('wallet', true);
           }}
           onClose={() => workspace.dialogs.closeAddWallet()}

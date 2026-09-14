@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flowInputPlan, mergeFlowInputs } from '../src/App/Workspace/useFlowInputs';
+import { flowInputPlan, mergeFlowInputs } from '../src/Domain/Chain/flowInputs';
 import { newWorkspace, buildGraph, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import type { Transaction } from '../src/Domain/types';
 

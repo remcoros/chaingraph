@@ -11,7 +11,7 @@ import {
   validateTransactionAddresses,
 } from '../../../../../Domain/Workspace/workspace';
 import { mapLimit } from '../../../../../Infra/Bitcoin/api';
-import { mergeFlowInputs } from '../../../useFlowInputs';
+import { mergeFlowInputs } from '../../../../../Domain/Chain/flowInputs';
 
 export const WALLET_FLOW_INPUT_WAVE_LIMIT = 20;
 export const WALLET_FLOW_VISIBLE_INPUT_LIMIT = 100;

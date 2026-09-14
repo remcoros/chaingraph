@@ -11,10 +11,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     setNotice,
     setNoticeSequence,
     operationRef,
-    setRightTab,
-    setMobilePanel,
     annotations,
-    setLeftTab,
     selectedTransaction: tx,
     operationStatus: operation,
     canTraceAncestry,
@@ -24,8 +21,13 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     canLoadChainData,
     dialogs,
     tourStep,
-    shownRightTab,
   } = workspace;
+  const {
+    setRightTab,
+    setMobilePanel,
+    setLeftTab,
+    rightTab: shownRightTab,
+  } = workspace.graph.panels;
   const {
     utxoObservation: walletUtxoObservation,
     selected: wallet,
@@ -37,10 +39,10 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     setSelectedId,
     select,
   } = workspace.selection;
-  const { selected, walletMatches, graph } = workspace.graphProjection;
+  const { selected, walletMatches, graph } = workspace.graph.projection;
   const { addressBalance, expand, getTransaction, mergeTransactions, run, refreshAddressBalance } =
     workspace.evidence;
-  const { revealGraphNodes, centerNode, setEntityHidden, updateFilters } = workspace.graphActions;
+  const { revealGraphNodes, centerNode, setEntityHidden, updateFilters } = workspace.graph.actions;
   const { showWalletActivity } = workspace.wallet.actions;
 
   if (!activeWorkspace) return null;

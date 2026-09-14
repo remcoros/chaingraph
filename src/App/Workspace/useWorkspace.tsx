@@ -1,7 +1,7 @@
 import { resolveWalletUtxoObservation } from '../../Domain/Wallet/walletUtxoObservation';
 import { useWalletUtxos } from './Workbenches/Wallet/useWalletUtxos';
 import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
-import { useFlowInputs } from './useFlowInputs';
+import { useFlowInputs } from './Workbenches/Graph/TransactionFlow/useFlowInputs';
 import {
   useCallback,
   useEffect,
@@ -14,6 +14,7 @@ import {
 import { useWorkspaceSelection } from './Selection/useWorkspaceSelection';
 import { useWorkspaceFilters } from './Workbenches/Graph/Filters/useWorkspaceFilters';
 import { useGraphCanvas } from './Workbenches/Graph/useGraphCanvas';
+import { graphPanelsInView, useGraphPanels } from './Workbenches/Graph/useGraphPanels';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
@@ -77,7 +78,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
 
   const dialogs = useDialogState(activeWorkspace);
   const [viewOwner, setViewOwner] = useState<string>();
-  const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
+  const graphPanels = useGraphPanels();
+  const { setLeftTab, setRightTab, setMobilePanel, setFocusGraph } = graphPanels;
   const graphCanvas = useGraphCanvas({
     getUnlockedWorkspace,
     workspaceId,
@@ -97,7 +99,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     entityLinked: entityFiltersLinked,
     setEntityLinked: setEntityFiltersLinked,
   } = filters;
-  const [focusGraph, setFocusGraph] = useState(false);
   const analysis = useWorkspaceAnalysis(workspaces.unlocked);
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
   const [workbench, setWorkbench] = useState<WorkbenchMode>('graph');
@@ -157,13 +158,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       else section?.focus();
     }
   }, [activeWorkspace?.id, workbench, workbenchSection]);
-  const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const selection = useWorkspaceSelection({
     workspaceId: activeWorkspace?.id,
     currentRef: activeWorkspaceRef,
     sessions: workspaces,
     setGraphFilters,
-    setRightTab,
+    revealSelected: graphPanels.revealInspector,
   });
   const {
     selectedId,
@@ -179,7 +179,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     preserveCamera: preserveSelectionCamera,
     cameraPreserved: cameraPreservedSelection,
   } = selection;
-  const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [operation, setOperation] = useState('');
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
@@ -199,15 +198,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const tourExample = walletTourExample.snapshot;
   // Tour previews never feed the persisted presentation effect or selection history.
   const shownWorkbench = tourStep ? (tourStep.view?.workbench ?? 'graph') : workbench;
-  const shownLeftTab = tourStep?.view?.leftTab ?? leftTab;
-  const shownRightTab =
-    tourStep?.view?.rightTab ??
-    ((rightTab === 'addresses' || rightTab === 'transactions' || rightTab === 'utxos') &&
-    !activeWorkspace?.wallets.some((item) => item.id === selectedWallet)
-      ? 'inspect'
-      : rightTab);
-  const shownMobilePanel = tourStep?.view?.panel ?? mobilePanel;
-  const shownFocusGraph = tourStep ? false : focusGraph;
+  const shownPanels = graphPanelsInView(graphPanels.chosen, {
+    preview: tourStep?.view,
+    previewing: !!tourStep,
+    hasSelectedWallet: !!activeWorkspace?.wallets.some((item) => item.id === selectedWallet),
+  });
+  const { rightTab: shownRightTab } = shownPanels;
+  const { leftTab, rightTab, mobilePanel, focusGraph } = graphPanels.chosen;
   const connectionScanTargets = useConnectionScanTargets({
     workspaceId: activeWorkspace?.id,
     setPickHandler: selection.setPickHandler,
@@ -285,12 +282,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         ? activeWorkspace.view.selectedWallet
         : activeWorkspace?.wallets[0]?.id,
     );
-    setLeftTab(activeWorkspace?.view.leftTab ?? 'wallets');
-    setRightTab(
-      activeWorkspace?.view.rightTab === 'analysis'
-        ? 'inspect'
-        : (activeWorkspace?.view.rightTab ?? 'inspect'),
-    );
+    graphPanels.hydrate(activeWorkspace?.view);
     setWorkbench(
       activeWorkspace?.view.workbench === 'wallet' && activeWorkspace.wallets.length
         ? 'wallet'
@@ -303,7 +295,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workbenchInvokers.current = {};
     pendingWorkbenchFocus.current = undefined;
     setLockingWorkspace(false);
-    setMobilePanel(activeWorkspace?.view.mobilePanel ?? 'graph');
     setPrefetchDepth(activeWorkspace?.view.prefetchDepth ?? 0);
     setViewOwner(activeWorkspace?.id);
     setError('');
@@ -319,7 +310,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         ? { ids: [activeWorkspace.view.selectionId], index: 0 }
         : { ids: [], index: -1 },
     );
-    setFocusGraph(activeWorkspace?.view.focusGraph ?? false);
     spendingOffsets.current.clear();
     if (!activeWorkspace?.view.graphSnapshot) fitAll();
   });
@@ -615,7 +605,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setNotice,
     setGraphFilters,
     showOnGraph,
-    setRightTab,
+    showRecordTab: setRightTab,
     selection: selection.batch,
     workspaces,
     loadGraphTransactions,
@@ -625,12 +615,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     recordHandoffInvoker,
     setReturnWorkbench,
     switchWorkbench,
-    setMobilePanel,
+    showPanel: setMobilePanel,
     recoveryGraph,
     graph,
     revealGraphNodes,
     updateFilters,
-    setLeftTab,
+    revealEntities: graphPanels.revealEntities,
     edit,
   });
 
@@ -654,6 +644,15 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    graph: {
+      projection: graphProjection,
+      canvas: graphCanvas,
+      panels: { ...graphPanels, ...shownPanels },
+      filters,
+      actions: graphActions,
+      flowInputs,
+      scanTargets: connectionScanTargets,
+    },
     wallet: {
       selected: wallet,
       utxos: walletUtxos,
@@ -663,23 +662,17 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       actions: walletActions,
     },
     analysis: { ...analysis, actions: analysisActions },
-    graphCanvas,
-    filters,
     selection,
     annotations,
     history,
     dialogs,
     lookup,
-    graphProjection,
     evidence: workspaceEvidence,
     activeWorkspace,
     switchWorkbench,
     setNotice,
     setNoticeSequence,
     operationRef,
-    setRightTab,
-    setMobilePanel,
-    setLeftTab,
     selectedTransaction: tx,
     operationStatus: operation,
     canTraceAncestry,
@@ -687,24 +680,17 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     edit,
     canLoadChainData,
     tourStep,
-    shownRightTab,
     rightTab,
     fetchScope,
-    connectionScanTargets,
     shownWorkbench,
     lockingWorkspace,
     activeWorkspaceRef,
     workspaces,
     rightPanelRef,
-    shownLeftTab,
     workbench,
     viewOwner,
-    flowInputs,
-    shownFocusGraph,
-    setFocusGraph,
     connected,
     graphWorkspaceRef,
-    shownMobilePanel,
     returnWorkbench,
     prefetchDepth,
     setPrefetchDepth,
@@ -718,7 +704,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     tourSteps,
     needsTourExample,
     walletTourExample,
-    graphActions,
   };
 }
 export type WorkspaceController = ReturnType<typeof useWorkspace>;

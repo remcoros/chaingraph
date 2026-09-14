@@ -1,5 +1,5 @@
 import type { GraphNavigationOptions } from '../../../Domain/Graph/graphHandoff';
-import type { GraphData, GraphFilters, Transaction } from '../../../Domain/types';
+import type { GraphData, GraphFilters, Transaction, Workspace } from '../../../Domain/types';
 
 /**
  * Graph capabilities that Wallet and Analysis use to hand a selection over.
@@ -20,4 +20,10 @@ export interface GraphHandoff {
   graph: GraphData;
   /** Loaded graph including hidden nodes, used to resolve handoff targets. */
   recoveryGraph: GraphData;
+  /** Opens the graph's inspector on what was just handed over. */
+  showRecordTab: (tab: NonNullable<Workspace['view']['rightTab']>) => void;
+  /** Opens the entity browser, where handed-over activity is listed. */
+  revealEntities: () => void;
+  /** Chooses which panel a narrow viewport shows after the handoff. */
+  showPanel: (panel: 'graph' | 'left' | 'right') => void;
 }

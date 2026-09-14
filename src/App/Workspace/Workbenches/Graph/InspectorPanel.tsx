@@ -26,10 +26,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   const {
     activeWorkspace,
     rightTab,
-    shownRightTab,
-    setRightTab,
     fetchScope,
-    connectionScanTargets,
     shownWorkbench,
     lockingWorkspace,
     canLoadChainData,
@@ -39,12 +36,14 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     operationStatus: operation,
     rightPanelRef,
   } = workspace;
+  const { rightTab: shownRightTab, setRightTab } = workspace.graph.panels;
+  const { scanTargets: connectionScanTargets } = workspace.graph;
   const { selected: wallet, utxos: walletUtxos } = workspace.wallet;
-  const { setFocusRequest } = workspace.graphCanvas;
-  const { setGraph: setGraphFilters } = workspace.filters;
+  const { setFocusRequest } = workspace.graph.canvas;
+  const { setGraph: setGraphFilters } = workspace.graph.filters;
   const { selectedId, selectedWallet, select } = workspace.selection;
   const { visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =
-    workspace.graphProjection;
+    workspace.graph.projection;
   const { selectWalletRecord } = workspace.wallet.actions;
   const inspectorScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

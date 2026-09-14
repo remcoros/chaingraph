@@ -37,7 +37,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     setLockingWorkspace,
     setError,
   } = workspace;
-  const { flushActive: flushActiveGraph } = workspace.graphCanvas;
+  const { flushActive: flushActiveGraph } = workspace.graph.canvas;
   const { addQuery } = workspace.evidence;
   const workspaceMenu = useRef<HTMLDivElement>(null);
   const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);

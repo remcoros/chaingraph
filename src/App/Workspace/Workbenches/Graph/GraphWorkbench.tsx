@@ -48,26 +48,27 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     viewOwner,
     tourStep,
     workspaces,
-    flowInputs,
     annotations,
     chainDataDisabledReason,
-    shownFocusGraph,
-    setFocusGraph,
     dialogs,
     connected,
-    connectionScanTargets,
     shownWorkbench,
     graphWorkspaceRef,
-    shownMobilePanel,
   } = workspace;
+  const {
+    focusGraph: shownFocusGraph,
+    setFocusGraph,
+    mobilePanel: shownMobilePanel,
+  } = workspace.graph.panels;
+  const { flowInputs, scanTargets: connectionScanTargets } = workspace.graph;
   const { utxoObservation: walletUtxoObservation } = workspace.wallet;
   const {
     changeView: changeGraphView,
     setPendingWorkspaceId: setPendingGraphWorkspace,
     registerSnapshotFlush: registerGraphSnapshotFlush,
     focusRequest,
-  } = workspace.graphCanvas;
-  const { graph: graphFilters } = workspace.filters;
+  } = workspace.graph.canvas;
+  const { graph: graphFilters } = workspace.graph.filters;
   const {
     selectedId,
     batch: selection,
@@ -97,7 +98,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphSelectedId,
     highlightedSelection,
     admittedGraph,
-  } = workspace.graphProjection;
+  } = workspace.graph.projection;
   const {
     expand,
     recentAddressUtxoTargets,
@@ -124,7 +125,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     updateFilters,
     resetGraphFilters,
     editNode,
-  } = workspace.graphActions;
+  } = workspace.graph.actions;
   const contextTransaction =
     graphFlowContext && activeWorkspace?.transactions[graphFlowContext.transactionId.slice(3)];
   const contextSideIds = useMemo(

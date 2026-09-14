@@ -5,27 +5,24 @@ import type { WorkspaceController } from '../../useWorkspace';
 
 export function EntitiesPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
-    connectionScanTargets,
     activeWorkspace,
     entityRemoval,
     annotations,
-    setMobilePanel,
-    shownLeftTab,
-    setLeftTab,
     operationRef,
-    setRightTab,
     dialogs,
     operationStatus: operation,
     canLoadChainData,
     edit,
   } = workspace;
+  const { setMobilePanel, leftTab: shownLeftTab, setLeftTab, setRightTab } = workspace.graph.panels;
+  const { scanTargets: connectionScanTargets } = workspace.graph;
   const { selected: wallet, discovery: walletDiscovery } = workspace.wallet;
   const {
     entityPanel: entityPanelFilters,
     graph: graphFilters,
     entityLinked: entityFiltersLinked,
     setEntityPanel: setEntityPanelFilters,
-  } = workspace.filters;
+  } = workspace.graph.filters;
   const {
     batch: selection,
     select,
@@ -46,7 +43,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     graphFiltering,
     entityNodes,
     entityBatchNodes,
-  } = workspace.graphProjection;
+  } = workspace.graph.projection;
   const {
     updateFilters,
     resetEntityFilters,
@@ -54,7 +51,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setEntityFilterLink,
     setEntityHidden,
     showAllHidden,
-  } = workspace.graphActions;
+  } = workspace.graph.actions;
   const { showWalletActivity } = workspace.wallet.actions;
 
   if (!activeWorkspace) return null;

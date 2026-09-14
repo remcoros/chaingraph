@@ -11,7 +11,7 @@ import {
   parseTransaction,
   validateTransactionAddresses,
 } from '../../../../Domain/Workspace/workspace';
-import { mergeFlowInputs } from '../../useFlowInputs';
+import { mergeFlowInputs } from '../../../../Domain/Chain/flowInputs';
 import {
   loadWalletFlowInputWave,
   WALLET_FLOW_INPUT_WAVE_LIMIT,
