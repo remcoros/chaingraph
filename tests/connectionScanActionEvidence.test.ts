@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../src/domain/types';
-import { newWorkspace } from '../src/domain/workspace';
-import { fetchTransaction } from '../src/lib/api';
-import { loadScanActionEvidence } from '../src/lib/connectionScanActionEvidence';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
+import type { Transaction } from '../src/Domain/types';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { fetchTransaction } from '../src/Infra/Bitcoin/api';
+import { loadScanActionEvidence } from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanActionEvidence';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const transaction = (n: number): Transaction => ({

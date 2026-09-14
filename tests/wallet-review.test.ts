@@ -12,14 +12,18 @@ import {
   spendGuidance,
   walletOwnedOutputs,
   type WalletReviewItem,
-} from '../src/domain/walletReview';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { Transaction, Wallet, Workspace } from '../src/domain/types';
-import { addressToScriptHash } from '../src/lib/wallet';
-import type { WalletUtxoRecord } from '../src/domain/walletRecords';
-import { applyBatchIcon, applyBatchLabel, applyBatchTag } from '../src/domain/batchMetadata';
-import { walletReviewCategories } from '../src/domain/walletReviewCategories';
-import { groupWalletRelationships } from '../src/domain/walletRelationships';
+} from '../src/Domain/Wallet/walletReview';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction, Wallet, Workspace } from '../src/Domain/types';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
+import type { WalletUtxoRecord } from '../src/Domain/Wallet/walletRecords';
+import {
+  applyBatchIcon,
+  applyBatchLabel,
+  applyBatchTag,
+} from '../src/Domain/Metadata/batchMetadata';
+import { walletReviewCategories } from '../src/Domain/Wallet/walletReviewCategories';
+import { groupWalletRelationships } from '../src/Domain/Wallet/walletRelationships';
 
 const mine = (fill: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(fill), 0, 'bc');
 const MINE_A = mine(1);

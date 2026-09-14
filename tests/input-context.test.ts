@@ -4,8 +4,8 @@ import {
   newWorkspace,
   parseWorkspace,
   promoteInputContext,
-} from '../src/domain/workspace';
-import { outputNodeId, txNodeId, type Transaction } from '../src/domain/types';
+} from '../src/Domain/Workspace/workspace';
+import { outputNodeId, txNodeId, type Transaction } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const output = (n: number) => ({ n, value: 0.01, scriptPubKey: {} });

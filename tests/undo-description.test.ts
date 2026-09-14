@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { describeWorkspaceChange } from '../src/domain/undoDescription';
-import { newWorkspace } from '../src/domain/workspace';
-import type { AnalysisFinding, Annotation, Wallet, Workspace } from '../src/domain/types';
+import { describeWorkspaceChange } from '../src/Domain/Workspace/undoDescription';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { AnalysisFinding, Annotation, Wallet, Workspace } from '../src/Domain/types';
 
 const annotation: Annotation = { label: '', note: '', icon: '', bookmarked: false };
 const finding: AnalysisFinding = {

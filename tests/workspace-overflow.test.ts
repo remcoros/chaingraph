@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { newWorkspace } from '../src/domain/workspace';
-import { decryptWorkspace, encryptWorkspace, type EncryptedEnvelope } from '../src/lib/crypto';
-import type { EnvelopeStorage } from '../src/lib/envelopeStorage';
-import { INLINE_INDEX_LIMIT, WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import {
+  decryptWorkspace,
+  encryptWorkspace,
+  type EncryptedEnvelope,
+} from '../src/Infra/Storage/crypto';
+import type { EnvelopeStorage } from '../src/Infra/Storage/envelopeStorage';
+import { INLINE_INDEX_LIMIT, WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 
 const password = 'overflow storage password';
 function memoryStorage() {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { RenderNode } from '../src/components/graph/adapter';
-import { placeFlowCaptions, type FlowCaptionCandidate } from '../src/components/graph/flowCaptions';
+import type { RenderNode } from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
+import {
+  placeFlowCaptions,
+  type FlowCaptionCandidate,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/flowCaptions';
 
 const viewport = { width: 1800, height: 900, topInset: 30 };
 const empty = new Set<string>();

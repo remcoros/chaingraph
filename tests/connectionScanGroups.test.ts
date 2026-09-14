@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  type ScanResult,
+  type ScanRun,
+} from '../src/Domain/ConnectionScan/connectionScan';
 import {
   groupScanResults,
   groupScanRuns,
   mergeScanRunSnapshots,
   scanResultGroupKey,
-} from '../src/domain/connectionScanGroups';
+} from '../src/Domain/ConnectionScan/connectionScanGroups';
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
 const connection: ScanResult = {
   id: 'a',

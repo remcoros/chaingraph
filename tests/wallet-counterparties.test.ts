@@ -1,16 +1,19 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { Transaction, Wallet, Workspace } from '../src/domain/types';
-import { groupWalletRelationships, walletCounterparties } from '../src/domain/walletRelationships';
-import { newWorkspace } from '../src/domain/workspace';
-import { addressToScriptHash } from '../src/lib/wallet';
+import type { Transaction, Wallet, Workspace } from '../src/Domain/types';
+import {
+  groupWalletRelationships,
+  walletCounterparties,
+} from '../src/Domain/Wallet/walletRelationships';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 import {
   createWalletCounterpartyLoader,
   mergeWalletCounterpartyInputs,
   walletCounterpartyInputPlan,
   type WalletCounterpartyOptions,
-} from '../src/lib/walletCounterparties';
+} from '../src/App/Workspace/Workbenches/Wallet/walletCounterparties';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const mine = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');

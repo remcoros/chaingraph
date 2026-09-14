@@ -4,8 +4,8 @@ import {
   graphTransactionOutputIds,
   graphUnconnectedOutputIds,
   transactionGraphBranch,
-} from '../src/domain/graphBranch';
-import type { GraphData } from '../src/domain/types';
+} from '../src/Domain/Graph/graphBranch';
+import type { GraphData } from '../src/Domain/types';
 
 it('clears a transaction footprint while keeping shared outpoints and unrelated branches', () => {
   const graph: GraphData = {

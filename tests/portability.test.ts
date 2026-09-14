@@ -62,7 +62,7 @@ it('rejects a tracked environment file without reading it, and never follows ext
 it('accepts portable references and public attribution while leaving untracked local files alone', async () => {
   const directory = await repository({
     'notes.md':
-      'See src/domain/types.ts, use os.homedir(), or open http://127.0.0.1:3001.\nUpstream Author <author@example.org>\nKeyboard arrow/Home/End navigation.',
+      'See src/Domain/types.ts, use os.homedir(), or open http://127.0.0.1:3001.\nUpstream Author <author@example.org>\nKeyboard arrow/Home/End navigation.',
     '.env.example': 'BITCOIN_RPC_PASSWORD=replace-me',
   });
   await writeFile(join(directory, '.env.untracked'), 'LOCAL_FIXTURE_VALUE');

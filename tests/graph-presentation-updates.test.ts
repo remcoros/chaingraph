@@ -3,15 +3,15 @@ import type {
   GraphAdapter,
   GraphFrame,
   NodeAppearancePatch,
-} from '../src/components/graph/adapter';
-import { GraphPresentationUpdates } from '../src/components/graph/presentationUpdates';
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
+import { GraphPresentationUpdates } from '../src/App/Workspace/Workbenches/Graph/Renderer/presentationUpdates';
 import {
   buildGraphPresentationIndex,
   presentGraph,
   type GraphPalette,
   type GraphPresentationInput,
   type NodePresentation,
-} from '../src/components/graph/presentation';
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/presentation';
 
 const palette: GraphPalette = {
   transaction: '#112233',

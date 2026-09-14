@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/domain/connectionScan';
+import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/Domain/ConnectionScan/connectionScan';
 import {
   addScanPath,
   clearScanRuns,
   prepareScanPath,
   replaceScanRun,
-} from '../src/domain/connectionScanRecords';
-import type { Transaction } from '../src/domain/types';
-import { clearContextProvenance, newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { encryptWorkspace } from '../src/lib/crypto';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+} from '../src/Domain/ConnectionScan/connectionScanRecords';
+import type { Transaction } from '../src/Domain/types';
+import {
+  clearContextProvenance,
+  newWorkspace,
+  parseWorkspace,
+} from '../src/Domain/Workspace/workspace';
+import { encryptWorkspace } from '../src/Infra/Storage/crypto';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 
 const password = 'public redo fixture passphrase';
 function setup(encrypt?: typeof encryptWorkspace) {

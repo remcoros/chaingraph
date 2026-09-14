@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../src/domain/types';
-import { TransactionFetchScope, TransactionScheduler } from '../src/lib/transactionScheduler';
-import { fetchTransaction } from '../src/lib/api';
+import type { Transaction } from '../src/Domain/types';
+import {
+  TransactionFetchScope,
+  TransactionScheduler,
+} from '../src/Infra/Bitcoin/transactionScheduler';
+import { fetchTransaction } from '../src/Infra/Bitcoin/api';
 
 const tx: Transaction = {
   txid: 'a'.repeat(64),

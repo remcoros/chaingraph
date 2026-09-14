@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadSpending } from '../src/lib/api';
-import { newWorkspace } from '../src/domain/workspace';
-import type { Transaction } from '../src/domain/types';
+import { loadSpending } from '../src/Infra/Bitcoin/api';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const rootId = 'f'.repeat(64);

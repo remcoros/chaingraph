@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  type ScanResult,
+  type ScanRun,
+} from '../src/Domain/ConnectionScan/connectionScan';
 import {
   presentScanRun,
   scanStatus,
   scanStatusLabel,
   resultFinding,
   resultCategory,
-} from '../src/domain/connectionScanPresentation';
+} from '../src/Domain/ConnectionScan/connectionScanPresentation';
 
 const run: ScanRun = {
   id: 'public-run',

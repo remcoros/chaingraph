@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   applyBatchIcon,
   applyBatchLabel,
@@ -8,9 +8,9 @@ import {
   labelBatchPlan,
   MAX_BATCH_TARGETS,
   tagBatchPlan,
-} from '../src/domain/batchEdits';
-import { outputNodeId, txNodeId, type Transaction, type Workspace } from '../src/domain/types';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+} from '../src/Domain/Metadata/batchEdits';
+import { outputNodeId, txNodeId, type Transaction, type Workspace } from '../src/Domain/types';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 
 const a = 'a'.repeat(64),
   b = 'b'.repeat(64);

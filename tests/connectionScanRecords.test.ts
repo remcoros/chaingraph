@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  type ScanResult,
+  type ScanRun,
+} from '../src/Domain/ConnectionScan/connectionScan';
 import {
   addScanPath,
   replaceScanRun,
@@ -7,16 +11,16 @@ import {
   clearScanRuns,
   dismissScanResult,
   prepareScanPath,
-} from '../src/domain/connectionScanRecords';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { projectGraphMembership } from '../src/domain/graphMembership';
-import type { Transaction, Workspace } from '../src/domain/types';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
-import { decryptWorkspace } from '../src/lib/crypto';
+} from '../src/Domain/ConnectionScan/connectionScanRecords';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
+import type { Transaction, Workspace } from '../src/Domain/types';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { decryptWorkspace } from '../src/Infra/Storage/crypto';
 import {
   validateAndEncryptWorkspace,
   decryptAndValidateWorkspace,
-} from '../src/lib/workspaceEncryption';
+} from '../src/Infra/Storage/workspaceEncryption';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tn = (n: number) => `tx:${id(n)}`;

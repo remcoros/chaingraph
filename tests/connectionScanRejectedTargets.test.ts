@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, runConnectionScan } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  runConnectionScan,
+} from '../src/Domain/ConnectionScan/connectionScan';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
 const out = (n: number, vout = 0) => `out:${n.toString(16).padStart(64, '0')}:${vout}`;

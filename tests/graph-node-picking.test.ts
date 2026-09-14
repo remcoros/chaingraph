@@ -13,7 +13,7 @@ import {
   createNodePickMesh,
   intersectNodes,
   syncNodePickMesh,
-} from '../src/components/graph/nodePicking';
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/nodePicking';
 
 const ray = (x: number) => new Raycaster(new Vector3(x, 0, 10), new Vector3(0, 0, -1));
 

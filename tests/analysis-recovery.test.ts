@@ -4,11 +4,11 @@ import {
   recoverAnalysisData,
   recoveryLimits,
   automaticRecoveryLimits,
-} from '../src/domain/analysisRecovery';
-import { analysisTools } from '../src/domain/analysis';
-import { newWorkspace } from '../src/domain/workspace';
-import type { Transaction, Workspace } from '../src/domain/types';
-import { resolvePreviousOutput } from '../src/domain/prevouts';
+} from '../src/Domain/Analysis/analysisRecovery';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction, Workspace } from '../src/Domain/types';
+import { resolvePreviousOutput } from '../src/Domain/Chain/prevouts';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const output = { n: 0, value: 1, scriptPubKey: { hex: '00141111', type: 'witness_v0_keyhash' } };
 const spend = (n = 10, parents = [1]): Transaction => ({

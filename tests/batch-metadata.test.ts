@@ -9,9 +9,9 @@ import {
   planBatchIcon,
   planBatchLabel,
   planBatchTag,
-} from '../src/domain/batchMetadata';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { Workspace } from '../src/domain/types';
+} from '../src/Domain/Metadata/batchMetadata';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Workspace } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const OUT_A = `out:${id(1)}:0`;

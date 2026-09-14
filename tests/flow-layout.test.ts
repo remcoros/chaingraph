@@ -1,8 +1,14 @@
-import { inferredAxis } from '../src/components/graph/flowOrientation';
-import { compactLayout } from '../src/components/graph/compactLayout';
+import { inferredAxis } from '../src/App/Workspace/Workbenches/Graph/Renderer/flowOrientation';
+import { compactLayout } from '../src/App/Workspace/Workbenches/Graph/Renderer/compactLayout';
 import { describe, expect, it } from 'vitest';
-import type { LayoutRequest, Position } from '../src/components/graph/flowLayout';
-import { particleCollisions, type Particle } from '../src/components/graph/anchoredForces';
+import type {
+  LayoutRequest,
+  Position,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/flowLayout';
+import {
+  particleCollisions,
+  type Particle,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/anchoredForces';
 const fixture = (count = 1): LayoutRequest => ({
   revision: 1,
   previous: [],

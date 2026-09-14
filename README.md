@@ -166,6 +166,7 @@ automatically and can be exported as encrypted files for backup or transfer.
 - [User guide](docs/user-guide.md)
 - [Deployment and releases](docs/deployment.md)
 - [Architecture](docs/architecture.md)
+- [Source map](docs/source-map.md)
 - [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md)
 - [References and attribution](docs/references.md), plus notes on
   [encryption and storage](docs/encryption-and-storage.md),

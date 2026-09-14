@@ -1,8 +1,8 @@
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
-import { addressNodeId, outputNodeId, type Network, type Transaction } from '../src/domain/types';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import { addressNodeId, outputNodeId, type Network, type Transaction } from '../src/Domain/types';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 function fixture(network: Network = 'mainnet') {

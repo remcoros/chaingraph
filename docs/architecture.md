@@ -29,36 +29,31 @@ Three principles run through every module:
 
 ## Module map
 
-| Location                                                                                                                                              | Responsibility                                                                                               |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `src/domain/types.ts`, `workspace.ts`, `workspaceMigrations.ts`                                                                                       | Workspace contracts, schema validation, graph derivation, schema migrations                                  |
-| `src/domain/analysis.ts`, `analysis/`, `analysisScan.ts`                                                                                              | Analysis tool registry, parameter contracts, scoped runs and reports                                         |
-| `src/domain/connectionScan*.ts`                                                                                                                       | Bounded graph connection search, target scopes, records and path addition                                    |
-| `src/domain/graphFilters.ts`, `graphMembership.ts`, `graphBranch.ts`, `visibility.ts`, `entityRemoval.ts`                                             | Canvas membership, filtering, hiding, branch cleanup and removal planning                                    |
-| `src/domain/batchEdits.ts`, `batchMetadata.ts`, `tags.ts`, `tagColors.ts`                                                                             | Pure label/tag/icon edits over explicit identifiers; tag and wallet-match indexes                            |
-| `src/domain/walletReview*.ts`, `walletRecords.ts`, `walletRelationships.ts`, `walletSelectionIndex.ts`                                                | Wallet review queue, decisions, one-hop counterparties, record projections                                   |
-| `src/domain/prevouts.ts`, `observationContext.ts`, `smallAmounts.ts`, `transactionStatus.ts`, `addressHistory.ts`                                     | Previous-output evidence, ancestry provenance, amount filters, confirmation and address-history observations |
-| `src/domain/workspaceTemplates.ts`, `templateData/`                                                                                                   | Example workspace catalog and bundled real-chain snapshots                                                   |
-| `src/domain/amountFormat.ts`, `src/components/Amount.tsx`                                                                                             | The single BTC/satoshi display boundary                                                                      |
-| `src/lib/wallet.ts`                                                                                                                                   | Account-key validation, receive/change derivation, scripts, Electrum script hashes                           |
-| `src/lib/crypto.ts`, `workspaceEncryption*.ts`, `workspaceCompression.ts`, `envelopeStorage.ts`                                                       | Authenticated envelope, worker-based encryption, gzip, localStorage/IndexedDB persistence                    |
-| `src/lib/useWorkspaces.ts`                                                                                                                            | Unlocked sessions, undo/redo, autosave scheduling, locking                                                   |
-| `src/lib/api.ts`, `tracing.ts`, `transactionScheduler.ts`                                                                                             | Typed HTTP calls, bounded ancestry/spending expansion, prioritized fetch coordination                        |
-| `src/lib/connectionScan.worker.ts`, `connectionScanRunner.ts`, `connectionScanFetch.ts`                                                               | Connection scan execution off the UI thread                                                                  |
-| `src/lib/labels.ts`                                                                                                                                   | BIP329 label import/export                                                                                   |
-| `src/components/GraphView.tsx`, `graph/presentation.ts`, `graph/adapter.ts`                                                                           | Shared graph interaction surface and the renderer-neutral frame contract                                     |
-| `src/components/graph/FlowRenderer.ts`, `defaultAdapter.ts`, `*Layout*.ts`, `flowParticles.ts`                                                        | Default Three.js renderer, grouped layout worker, motion                                                     |
-| `src/components/graph/forceAdapter.ts`                                                                                                                | Earlier `3d-force-graph` adapter, retained as an unused alternative implementation of the adapter contract   |
-| `src/components/WalletWorkbench.tsx`, `AnalysisWorkbench.tsx`, `Inspector.tsx`, `TransactionView.tsx`, `EntityBrowser.tsx`, `ConnectionScanPanel.tsx` | Workbenches and panels consuming domain data and shared selection                                            |
-| `src/features/tour/`                                                                                                                                  | Guided tour steps and presentation                                                                           |
-| `server/app.ts`                                                                                                                                       | HTTP routes, Host/Origin checks, response limits, cancellation, static serving                               |
-| `server/rpc-schema.ts`                                                                                                                                | Explicit read-only RPC method and parameter allowlist                                                        |
-| `server/core.ts`, `server/electrum.ts`                                                                                                                | Upstream adapters and chain identity checks                                                                  |
-| `server/config.ts`, `server/limit.ts`                                                                                                                 | Per-network file parsing, shared HTTP settings, bounded concurrency and queues                               |
+See [source-map.md](source-map.md) for the directory tree, task entry points and
+test locations. Source is grouped by product ownership.
 
-`src/components/TraceWorkbench.tsx` and `src/domain/traceWorkbench.ts` are a
-dormant output-tracing workbench. They are not mounted or reachable; a saved
-`workbench: trace` opens Graph. They are kept for a later iteration.
+| Location                                                           | Responsibility                                                                     |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `src/App/App.tsx`, `src/App/useAppState.ts`                         | App shell, session navigation, home and dialogs                                   |
+| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`               | Shared state, selection, presentation and workbench switching/focus                |
+| `src/App/Workspace/ChainData/`                                     | Bounded address and transaction loading, cancellation and evidence updates        |
+| `src/App/Workspace/Workbenches/*Workbench.tsx`                      | Workbench composition and integration with shared Workspace state                 |
+| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs.tsx`          | Workspace entry, example creation, help and dialogs                                |
+| `src/App/Workspace/useWorkspaces.ts`                               | Unlocked sessions, undo/redo, autosave and locking                                 |
+| `src/App/Workspace/Entities/`, `Inspector/`, `Selection/`, `Tags/` | Workspace panels and shared selection                                              |
+| `src/App/Workspace/Workbenches/Wallet/`                            | Wallet overview, records, review UI, scan hooks and preparation cache              |
+| `src/App/Workspace/Workbenches/Graph/`                             | Graph surface, filters, transaction flow and metadata projection                   |
+| `src/App/Workspace/Workbenches/Graph/Renderer/`                    | Renderer-neutral contract, Three.js renderer, layout worker and picking            |
+| `src/App/Workspace/Workbenches/Graph/ConnectionScan/`              | Connection panel, worker bridge and bounded scan fetching                          |
+| `src/App/Workspace/Workbenches/Analysis/`                          | Analysis controls and reports                                                      |
+| `src/Shared/`                                                      | Reused controls, evidence display and metadata editors                             |
+| `src/Domain/types.ts`, `src/Domain/Workspace/`                     | Shared contracts, schema validation, migrations, removal and example snapshots     |
+| `src/Domain/Chain/`, `Wallet/`, `Graph/`                           | Chain evidence, key derivation, wallet projections, graph membership and filtering |
+| `src/Domain/Analysis/`, `ConnectionScan/`, `Metadata/`             | Heuristics, bounded connection search, pure annotation edits and BIP329 labels     |
+| `src/Infra/Bitcoin/`                                               | Typed HTTP calls, ancestry/spending requests and prioritized fetch coordination    |
+| `src/Infra/Storage/`                                               | Authenticated envelopes, encryption worker, compression and browser persistence    |
+| `server/app.ts`, `rpc-schema.ts`                                   | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist  |
+| `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`           | Upstream adapters, chain identity, network configuration and concurrency           |
 
 ## Browser-owned state
 
@@ -81,7 +76,7 @@ both stacks so an undo cannot discard downloaded data; presentation writes
 
 ### Encrypted envelope and storage
 
-`src/lib/crypto.ts` fixes AES-256-GCM with PBKDF2-SHA256 at 600,000 iterations,
+`src/Infra/Storage/crypto.ts` fixes AES-256-GCM with PBKDF2-SHA256 at 600,000 iterations,
 a fresh 16-byte salt and 12-byte IV per encryption. Imports cannot request
 different KDF work. The envelope's own `version` describes encryption and
 compression and is independent of the workspace schema version:
@@ -178,7 +173,7 @@ flow values, wallet matches, filters and analysis but creates no transaction
 node.
 
 Selecting an input loads only its creating transaction. **Previous** levels and
-**Load previous** use `lib/tracing.ts`: breadth-first, one or two levels, a
+**Load previous** use `src/Infra/Bitcoin/tracing.ts`: breadth-first, one or two levels, a
 shared 500-download budget, partial results on unavailable branches. The bulk
 **Load missing input details** action fetches only parents whose prevout is
 missing or conflicting, four at a time, up to 500. Automatically loaded parents
@@ -230,7 +225,7 @@ coordinates, never active-chain status. Sources are listed in
 
 ### Wallets and scanning
 
-`src/lib/wallet.ts` accepts depth-3 account keys (`xpub`/`ypub`/`zpub`,
+`src/Domain/Wallet/wallet.ts` accepts depth-3 account keys (`xpub`/`ypub`/`zpub`,
 `tpub`/`upub`/`vpub`), derives non-hardened receive (0) and change (1)
 branches, and builds P2PKH, P2SH-P2WPKH, P2WPKH or BIP86 P2TR scripts and their
 Electrum script hashes. Testnet4 shares testnet encodings, so a key cannot prove
@@ -247,7 +242,7 @@ evidence invalidates findings. Old annotated transactions are never removed
 because a new history omits them. The optional 30-second monitor runs only
 while unlocked.
 
-Wallet UTXO observations (`useWalletUtxos`) are transient App state keyed by
+Wallet UTXO observations (`useWalletUtxos`) are transient Workspace state keyed by
 workspace, network, wallet and discovery revision. They come from bounded
 Electrum `listunspent` queries over discovered scripts, require an exact
 amount/script match with loaded outputs, survive workbench navigation and clear
@@ -255,7 +250,7 @@ on wallet or workspace change and lock. They are never persisted.
 
 ### Request scheduling
 
-`lib/transactionScheduler.ts` coordinates transaction fetches: 12 physical jobs
+`src/Infra/Bitcoin/transactionScheduler.ts` coordinates transaction fetches: 12 physical jobs
 globally, 8 per network, at most 3 per network for background work so explicit
 navigation keeps capacity. Navigation precedes visible input evidence, which
 precedes refresh and counterparty lookups. The queue holds 128 jobs with the
@@ -287,7 +282,7 @@ annotations for confirmation; inputs and outputs are never deleted individually.
 
 ### Presentation and adapter contract
 
-`graph/presentation.ts` projects the visible domain graph into a `GraphFrame`:
+`src/App/Workspace/Workbenches/Graph/Renderer/presentation.ts` projects the visible domain graph into a `GraphFrame`:
 nodes with stable IDs, shapes (cube, sphere, octahedron), colors, radii,
 highlights, optional captions and coordinate hints; links with endpoints,
 colors, widths, arrows and a `directed`/`flowSide` hint. Callers supply
@@ -310,7 +305,7 @@ layout, edges, flow particles or camera persistence; pending layouts retain patc
 Topology, selection, sizing and other global changes still use complete frames,
 as do adapters without the patch method.
 
-`graph/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`,
+`Renderer/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`,
 optional `flushSnapshot`, `zoom`, `repack`, `setMotion`, and events for
 hover/select (`{ type, id }` plus pointer coordinates and modifiers), activity
 (pauses autosave), layout status and WebGL errors/recovery. Adapters own
@@ -323,7 +318,7 @@ bounded renderer-neutral snapshot inside the encrypted view.
 
 ### Flow renderer
 
-`graph/defaultAdapter.ts` selects `FlowRenderer`, a purpose-built Three.js
+`Renderer/defaultAdapter.ts` selects `FlowRenderer`, a purpose-built Three.js
 instanced renderer. Picking uses exact mesh hits first, then a 25% padded
 fallback shared by hover and tap.
 
@@ -408,7 +403,7 @@ semantics and pre-filter counts. Wallet **Analyze** reuses the Analysis registry
 and merge path; it is distinct from history refresh.
 
 Each unlocked session owns a `WalletPreparationCache` in
-`src/lib/walletPreparation.ts`. It shares one transaction index and script decoder
+`src/App/Workspace/Workbenches/Wallet/walletPreparation.ts`. It shares one transaction index and script decoder
 per current network/transaction snapshot and retains relationships and prepared
 review items per wallet. Immutable source references invalidate only dependent
 results; camera and workbench changes do not. Initial review and latest UTXO-check
@@ -420,7 +415,7 @@ separate wallet components mounted for every workspace or run analysis in the ba
 
 ## Analysis
 
-`analysisTools` in `src/domain/analysis.ts` is the extension point. A tool
+`analysisTools` in `src/Domain/Analysis/analysis.ts` is the extension point. A tool
 declares metadata, evidence category, source reference and typed parameters;
 `analyze(workspace, transactionIds?, options)` returns findings, scope,
 summary, coverage and a no-match explanation. Findings carry a stable identity,
@@ -435,14 +430,14 @@ color the graph, using the last active finding per node. See
 
 The workbench mode (`wallet`, `graph`, `analysis`) is an encrypted view field.
 Graph stays mounted while hidden so its adapter, camera and layout survive.
-Analysis controls and reports live in an App-owned map pruned on lock or close.
+Analysis controls and reports live in a Workspace-owned map pruned on lock or close.
 Handoffs (Show, Isolate, Back) record an origin and promote compact context
 before selecting; if an outpoint has no loaded creator, navigation opens a
 supporting transaction and says so rather than fetching.
 
 ## Connection scans
 
-`domain/connectionScan.ts` runs in `lib/connectionScan.worker.ts`. Automatic
+`src/Domain/ConnectionScan/connectionScan.ts` runs in `src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan.worker.ts`. Automatic
 scopes (`connectionScanNeighbours.ts`: breadth-first over loaded
 creates/spends links, up to 1,000 nearest nodes; visible; all added) and custom
 picks (`connectionScanTargets.ts`: exactly the picked transaction/outpoint IDs,
@@ -509,7 +504,7 @@ heuristic). Both are presentation inputs and do not touch annotations.
 
 **Transaction inspection.** `TransactionView` projects creating/spending
 relationships through `transactionInspection.ts`. `ScriptInspector` decodes
-saved scripts to opcodes; `lib/transactionInspection.ts` fetches raw bytes on
+saved scripts to opcodes; `src/App/Workspace/Inspector/transactionInspection.ts` fetches raw bytes on
 demand, verifies them against the ID and loaded observations with bitcoinjs,
 and keeps them in component memory only. Sources are in
 [references.md](references.md).
@@ -526,7 +521,7 @@ ordinary workspaces. A legacy `demo` flag only stops previously saved synthetic
 IDs from reaching upstreams. See
 [example-workspaces.md](example-workspaces.md).
 
-**Guided tour.** `src/features/tour/steps.ts` lists steps with stable IDs,
+**Guided tour.** `src/App/Help/steps.ts` lists steps with stable IDs,
 copy, target selectors, fallbacks and optional `when` predicates; order is the
 array order. `GuidedTour.tsx` overlays a measured spotlight and never launches
 scans or edits data. Add a `data-tour` anchor and a step; test direct jumps,

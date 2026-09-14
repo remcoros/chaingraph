@@ -4,6 +4,10 @@ Chaingraph is an MIT-licensed, self-hosted, watch-only Bitcoin workbench for
 personal wallets and on-chain investigation. Read `README.md`,
 `docs/architecture.md` and the module you are changing before editing it.
 `CONTRIBUTING.md` has the commands, worktree conventions and review expectations.
+Use `docs/source-map.md` to locate the product area and relevant tests before
+searching across the repository. UI and its owned helpers live under
+`src/App/Workspace/Workbenches/`; shared domain and infrastructure code live
+under `src/Domain/` and `src/Infra/`. Follow direct imports from the affected area.
 
 ## Product boundaries
 

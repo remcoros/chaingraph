@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../src/domain/types';
-import type { WalletReviewFlowEntry } from '../src/domain/walletReviewContext';
-import { indexPreviousOutputs } from '../src/domain/prevouts';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import type { Transaction } from '../src/Domain/types';
+import type { WalletReviewFlowEntry } from '../src/Domain/Wallet/walletReviewContext';
+import { indexPreviousOutputs } from '../src/Domain/Chain/prevouts';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   loadWalletFlowInputWave,
   mergeWalletFlowInputs,
   walletFlowInputPlan,
   walletFlowSourceKey,
-} from '../src/lib/walletFlowInputs';
+} from '../src/App/Workspace/Workbenches/Wallet/Review/walletFlowInputs';
 import { PUBLIC_ZPUB, transactions, TX_FUNDING } from './fixtures/bitcoin';
 
 const parent = 'a'.repeat(64);

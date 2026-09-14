@@ -1,14 +1,18 @@
 import { createCipheriv, pbkdf2Sync } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildGraph, newWorkspace } from '../src/domain/workspace';
-import type { Workspace } from '../src/domain/types';
-import { decryptWorkspace, encryptWorkspace, type EncryptedEnvelope } from '../src/lib/crypto';
+import { buildGraph, newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Workspace } from '../src/Domain/types';
+import {
+  decryptWorkspace,
+  encryptWorkspace,
+  type EncryptedEnvelope,
+} from '../src/Infra/Storage/crypto';
 import {
   decryptAndValidateWorkspace,
   validateAndEncryptWorkspace,
-} from '../src/lib/workspaceEncryption';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
-import { transactionScheduler } from '../src/lib/transactionScheduler';
+} from '../src/Infra/Storage/workspaceEncryption';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { transactionScheduler } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const password = 'public format integration fixture';
 // Independent pre-compression writer, including the exact legacy AAD order.
@@ -232,7 +236,7 @@ describe('workspace format at persistence and import boundaries', () => {
       postMessage: typeof postMessage;
     } = { onmessage: null, postMessage };
     vi.stubGlobal('self', workerScope);
-    await import('../src/lib/workspaceEncryption.worker');
+    await import('../src/Infra/Storage/workspaceEncryption.worker');
     const handle = workerScope.onmessage!;
     const workspace = newWorkspace('Worker import fixture', 'mainnet');
     const envelope = legacyEnvelope(workspace);

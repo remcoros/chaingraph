@@ -1,14 +1,14 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
-import { analysisTools } from '../src/domain/analysis';
-import type { AnalysisScan } from '../src/domain/analysisScan';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import type { AnalysisScan } from '../src/Domain/Analysis/analysisScan';
 import {
   matchesReviewCategories,
   walletReviewCategories,
   walletReviewCategoryScanState,
-} from '../src/domain/walletReviewCategories';
-import { REVIEW_REASONS, type WalletReviewItem } from '../src/domain/walletReview';
-import { newWorkspace } from '../src/domain/workspace';
+} from '../src/Domain/Wallet/walletReviewCategories';
+import { REVIEW_REASONS, type WalletReviewItem } from '../src/Domain/Wallet/walletReview';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');

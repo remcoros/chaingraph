@@ -1,7 +1,7 @@
-import { examplesForNetwork } from '../src/domain/examples';
-import { parseTransaction } from '../src/domain/workspace';
-import type { Network, Transaction } from '../src/domain/types';
-import { addressToScriptHash } from '../src/lib/wallet';
+import { examplesForNetwork } from '../src/Domain/Workspace/examples';
+import { parseTransaction } from '../src/Domain/Workspace/workspace';
+import type { Network, Transaction } from '../src/Domain/types';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 // Uses a running proxy only. Does not load environment files or print destinations.
 const base = process.env.CHAINGRAPH_PROXY_URL ?? 'http://127.0.0.1:4000';

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { analysisTools } from '../src/domain/analysis';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
 import {
   analysisScanScope,
   analysisScopeChoice,
   mergeScanFindings,
   scanAnalysis,
   scanDefaults,
-} from '../src/domain/analysisScan';
-import { newWorkspace } from '../src/domain/workspace';
-import { addressToScriptHash } from '../src/lib/wallet';
-import { type Transaction, type Wallet } from '../src/domain/types';
+} from '../src/Domain/Analysis/analysisScan';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
+import { type Transaction, type Wallet } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu';

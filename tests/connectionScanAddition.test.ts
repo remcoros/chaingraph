@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  type ScanResult,
+  type ScanRun,
+} from '../src/Domain/ConnectionScan/connectionScan';
 import {
   addScanNodeAddition,
   prepareScanNodeAddition,
   addScanPathAddition,
   prepareScanPathAddition,
-} from '../src/domain/connectionScanAddition';
-import { prepareScanPath, replaceScanRun } from '../src/domain/connectionScanRecords';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { projectGraphMembership } from '../src/domain/graphMembership';
-import type { Transaction } from '../src/domain/types';
+} from '../src/Domain/ConnectionScan/connectionScanAddition';
+import {
+  prepareScanPath,
+  replaceScanRun,
+} from '../src/Domain/ConnectionScan/connectionScanRecords';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
+import type { Transaction } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;

@@ -1,13 +1,13 @@
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
-import { createWalletOutputEvidenceResolver } from '../src/domain/walletOutputEvidence';
-import { buildWalletSelectionIndex } from '../src/domain/walletSelectionIndex';
-import { groupWalletRelationships } from '../src/domain/walletRelationships';
-import { buildWalletReview } from '../src/domain/walletReview';
-import { newWorkspace } from '../src/domain/workspace';
-import type { TxOutput, Wallet, Workspace } from '../src/domain/types';
-import { addressToScriptHash } from '../src/lib/wallet';
+import { createWalletOutputEvidenceResolver } from '../src/Domain/Wallet/walletOutputEvidence';
+import { buildWalletSelectionIndex } from '../src/Domain/Wallet/walletSelectionIndex';
+import { groupWalletRelationships } from '../src/Domain/Wallet/walletRelationships';
+import { buildWalletReview } from '../src/Domain/Wallet/walletReview';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { TxOutput, Wallet, Workspace } from '../src/Domain/types';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 import {
   RECEIVE_ADDRESS,
   SECOND_ADDRESS,

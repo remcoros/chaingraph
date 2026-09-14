@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../src/domain/types';
-import { ScanBudgetExceeded, type ScanBudget } from '../src/domain/connectionScan';
+import type { Transaction } from '../src/Domain/types';
+import { ScanBudgetExceeded, type ScanBudget } from '../src/Domain/ConnectionScan/connectionScan';
 import {
   createConnectionScanFetch,
   connectionScanTransport,
   type ConnectionScanFetchOptions,
-} from '../src/lib/connectionScanFetch';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number, parent?: number): Transaction => ({
@@ -251,13 +251,13 @@ describe('connection scan fetch adapter', () => {
 import {
   runConnectionScanInWorker,
   type ConnectionScanRunnerOptions,
-} from '../src/lib/connectionScanRunner';
-import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/domain/connectionScan';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRunner';
+import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/Domain/ConnectionScan/connectionScan';
 import type {
   ConnectionScanRequest,
   ScanWorkerInput,
   ScanWorkerOutput,
-} from '../src/lib/connectionScanProtocol';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanProtocol';
 
 class FakeScanWorker {
   onmessage: ((event: MessageEvent<ScanWorkerOutput>) => void) | null = null;

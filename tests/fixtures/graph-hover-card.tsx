@@ -1,13 +1,16 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../src/styles.css';
-import '../../src/components/tags.css';
-import GraphView from '../../src/components/GraphView';
-import { EntityBadges } from '../../src/components/EntityBadges';
-import { createDefaultAdapter } from '../../src/components/graph/defaultAdapter';
-import type { GraphAdapterEvents, GraphAdapterFactory } from '../../src/components/graph/adapter';
-import { buildGraph, newWorkspace } from '../../src/domain/workspace';
-import { txNodeId } from '../../src/domain/types';
+import '../../src/App/styles.css';
+import '../../src/App/Workspace/Tags/tags.css';
+import GraphView from '../../src/App/Workspace/Workbenches/Graph/GraphView';
+import { EntityBadges } from '../../src/Shared/Metadata/EntityBadges';
+import { createDefaultAdapter } from '../../src/App/Workspace/Workbenches/Graph/Renderer/defaultAdapter';
+import type {
+  GraphAdapterEvents,
+  GraphAdapterFactory,
+} from '../../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
+import { buildGraph, newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { txNodeId } from '../../src/Domain/types';
 
 // Synthetic observations stay in memory and never issue chain requests.
 const txid = '1234567' + 'a'.repeat(50) + 'abcdef0';

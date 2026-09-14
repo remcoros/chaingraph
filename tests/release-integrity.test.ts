@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { newWorkspace, parseWorkspace, buildGraph } from '../src/domain/workspace';
-import { encryptWorkspace, decryptWorkspace } from '../src/lib/crypto';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
-import { deriveAddresses } from '../src/lib/wallet';
+import { newWorkspace, parseWorkspace, buildGraph } from '../src/Domain/Workspace/workspace';
+import { encryptWorkspace, decryptWorkspace } from '../src/Infra/Storage/crypto';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
 import { PUBLIC_ZPUB } from './fixtures/bitcoin';
-import { applyWalletScan } from '../src/domain/walletActivity';
+import { applyWalletScan } from '../src/Domain/Wallet/walletActivity';
 const password = 'release-integrity-passphrase';
 function storage() {
   let raw: string | null = null;

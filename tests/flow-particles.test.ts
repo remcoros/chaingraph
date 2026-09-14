@@ -1,12 +1,15 @@
 import { InstancedBufferAttribute } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import type { RenderLink, RenderNode } from '../src/components/graph/adapter';
+import type {
+  RenderLink,
+  RenderNode,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
 import {
   FLOW_DOTS_PER_LINK,
   FLOW_PARTICLE_TARGET,
   makeFlowParticles,
-} from '../src/components/graph/flowParticles';
-import { makeEdgePickIndex } from '../src/components/graph/flowEdgePicking';
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/flowParticles';
+import { makeEdgePickIndex } from '../src/App/Workspace/Workbenches/Graph/Renderer/flowEdgePicking';
 const link = (
   id: string,
   source: string,

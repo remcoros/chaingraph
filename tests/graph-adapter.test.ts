@@ -1,6 +1,9 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { MOUSE, PerspectiveCamera, Raycaster, Scene, TOUCH, Vector3 } from 'three';
-import type { GraphFrame, GraphAdapterEvents } from '../src/components/graph/adapter';
+import type {
+  GraphFrame,
+  GraphAdapterEvents,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
 
 const harness = vi.hoisted(() => ({ graph: undefined as any }));
 vi.mock('3d-force-graph', () => ({
@@ -8,7 +11,7 @@ vi.mock('3d-force-graph', () => ({
     return harness.graph;
   },
 }));
-import { createForceAdapter } from '../src/components/graph/forceAdapter';
+import { createForceAdapter } from '../src/App/Workspace/Workbenches/Graph/Renderer/forceAdapter';
 
 function setup() {
   const canvas = new EventTarget();

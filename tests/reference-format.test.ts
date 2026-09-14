@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressNodeId, outputNodeId, short, txNodeId } from '../src/domain/types';
+import { addressNodeId, outputNodeId, short, txNodeId } from '../src/Domain/types';
 
 describe('consistent shortened references', () => {
   const txid = '1234567' + 'a'.repeat(50) + 'abcdefg';

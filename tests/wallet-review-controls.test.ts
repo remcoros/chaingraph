@@ -1,13 +1,16 @@
-import { formatSats } from '../src/domain/amountFormat';
+import { formatSats } from '../src/Domain/Chain/amountFormat';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { BatchMetadataBar } from '../src/components/BatchMetadataBar';
-import { IconPicker } from '../src/components/IconPicker';
-import { SelectionToolbar } from '../src/components/SelectionToolbar';
-import { WalletReviewFlow } from '../src/components/WalletReviewFlow';
-import type { WalletReviewContext, WalletReviewFlowEntry } from '../src/domain/walletReviewContext';
-import { newWorkspace } from '../src/domain/workspace';
+import { BatchMetadataBar } from '../src/App/Workspace/Workbenches/Wallet/Review/BatchMetadataBar';
+import { IconPicker } from '../src/Shared/Metadata/IconPicker';
+import { SelectionToolbar } from '../src/App/Workspace/Selection/SelectionToolbar';
+import { WalletReviewFlow } from '../src/App/Workspace/Workbenches/Wallet/Review/WalletReviewFlow';
+import type {
+  WalletReviewContext,
+  WalletReviewFlowEntry,
+} from '../src/Domain/Wallet/walletReviewContext';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 
 const txid = 'a'.repeat(64);
 const parentId = 'b'.repeat(64);

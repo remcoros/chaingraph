@@ -1,10 +1,10 @@
-import { formatBitcoinAmount } from '../src/domain/amountFormat';
+import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
 import { expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { analysisTools } from '../src/domain/analysis';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { AnalysisWorkbench } from '../src/components/AnalysisWorkbench';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { AnalysisWorkbench } from '../src/App/Workspace/Workbenches/Analysis/AnalysisWorkbench';
 
 function feeExample() {
   const w = newWorkspace('Public fee example', 'mainnet');

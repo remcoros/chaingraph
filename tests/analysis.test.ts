@@ -1,11 +1,11 @@
-import { formatBitcoinAmount } from '../src/domain/amountFormat';
+import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
 import { describe, expect, it } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { analysisTools } from '../src/domain/analysis';
-import { outputNodeId, type Transaction, type TxOutput, type Wallet } from '../src/domain/types';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { outputScriptHex } from '../src/domain/prevouts';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import { outputNodeId, type Transaction, type TxOutput, type Wallet } from '../src/Domain/types';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { outputScriptHex } from '../src/Domain/Chain/prevouts';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const addrA = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu';
 const addrB = 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g';

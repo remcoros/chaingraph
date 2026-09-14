@@ -3,8 +3,8 @@ import {
   graphSnapshotSchema,
   mergeGraphSnapshot,
   type GraphSnapshot,
-} from '../src/domain/graphSnapshot';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
+} from '../src/Domain/Graph/graphSnapshot';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 
 const snapshot: GraphSnapshot = {
   version: 1,

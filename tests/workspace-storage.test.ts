@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { encryptWorkspace, decryptWorkspace } from '../src/lib/crypto';
-import { STORAGE_KEY, WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { encryptWorkspace, decryptWorkspace } from '../src/Infra/Storage/crypto';
+import { STORAGE_KEY, WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 
 const password = 'test workspace passphrase';
 function memoryStorage(initial: string | null = null) {

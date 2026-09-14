@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { indexLoadedSpends, selectedFlowLeg } from '../src/domain/transactionFlow';
-import { outputNodeId, type Transaction } from '../src/domain/types';
+import { indexLoadedSpends, selectedFlowLeg } from '../src/Domain/Chain/transactionFlow';
+import { outputNodeId, type Transaction } from '../src/Domain/types';
 
 const creator: Transaction = {
   txid: 'a'.repeat(64),

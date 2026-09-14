@@ -5,15 +5,15 @@ import {
   indexPreviousOutputs,
   mergeTransactionObservations,
   resolvePreviousOutput,
-} from '../src/domain/prevouts';
+} from '../src/Domain/Chain/prevouts';
 import {
   buildGraph,
   newWorkspace,
   parseTransaction,
   parseWorkspace,
-} from '../src/domain/workspace';
-import { outputNodeId, type Transaction } from '../src/domain/types';
-import { flowInputPlan } from '../src/lib/useFlowInputs';
+} from '../src/Domain/Workspace/workspace';
+import { outputNodeId, type Transaction } from '../src/Domain/types';
+import { flowInputPlan } from '../src/App/Workspace/useFlowInputs';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');

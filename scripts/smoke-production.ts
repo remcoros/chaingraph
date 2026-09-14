@@ -3,8 +3,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
-import { newWorkspace } from '../src/domain/workspace';
+import { decryptWorkspace, encryptWorkspace } from '../src/Infra/Storage/crypto';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { transactions } from '../tests/fixtures/bitcoin';
 
 // Exercise browser runtime boundaries using only a fresh, synthetic workspace.

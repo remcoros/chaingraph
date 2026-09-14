@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { deriveAddresses } from '../src/lib/wallet';
-import type { Wallet } from '../src/domain/types';
-import { planEntityRemoval, removeWorkspaceEntity } from '../src/domain/entityRemoval';
-import { addGraphNodes, projectGraphMembership } from '../src/domain/graphMembership';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
+import type { Wallet } from '../src/Domain/types';
+import { planEntityRemoval, removeWorkspaceEntity } from '../src/Domain/Workspace/entityRemoval';
+import { addGraphNodes, projectGraphMembership } from '../src/Domain/Graph/graphMembership';
 import {
   buildGraph,
   newWorkspace,
@@ -10,7 +10,7 @@ import {
   promoteInputContext,
   markContextTransactions,
   clearContextProvenance,
-} from '../src/domain/workspace';
+} from '../src/Domain/Workspace/workspace';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 
 const parent = 'a'.repeat(64),

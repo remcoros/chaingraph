@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, runConnectionScan } from '../src/domain/connectionScan';
-import { prepareCustomScanTargets } from '../src/domain/connectionScanTargets';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  runConnectionScan,
+} from '../src/Domain/ConnectionScan/connectionScan';
+import { prepareCustomScanTargets } from '../src/Domain/ConnectionScan/connectionScanTargets';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;
 const out = (n: number, index = 0) => `out:${id(n)}:${index}`;

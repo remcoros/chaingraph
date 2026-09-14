@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { walletScanScope, walletScanSummary } from '../src/lib/useWalletScan';
-import { scanDefaults, type AnalysisScan } from '../src/domain/analysisScan';
-import { newWorkspace } from '../src/domain/workspace';
-import { deriveAddresses } from '../src/lib/wallet';
-import type { Wallet } from '../src/domain/types';
-import type { WalletRow } from '../src/domain/walletWorkbenchRows';
+import {
+  walletScanScope,
+  walletScanSummary,
+} from '../src/App/Workspace/Workbenches/Wallet/useWalletScan';
+import { scanDefaults, type AnalysisScan } from '../src/Domain/Analysis/analysisScan';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
+import type { Wallet } from '../src/Domain/types';
+import type { WalletRow } from '../src/Domain/Wallet/walletWorkbenchRows';
 import { PUBLIC_ZPUB, TX_FUNDING, TX_SPENDING, transactions } from './fixtures/bitcoin';
 
 function fixture() {

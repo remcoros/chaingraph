@@ -8,10 +8,10 @@ import {
   mapLimit,
   scanWallet,
   MAX_SCAN_TRANSACTIONS,
-} from '../src/lib/api';
-import { deriveAddresses } from '../src/lib/wallet';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { Network, Transaction, Wallet } from '../src/domain/types';
+} from '../src/Infra/Bitcoin/api';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Network, Transaction, Wallet } from '../src/Domain/types';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 
 const zpub =

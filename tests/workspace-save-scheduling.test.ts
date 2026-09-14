@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
-import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/domain/connectionScan';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { decryptWorkspace, encryptWorkspace } from '../src/Infra/Storage/crypto';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { DEFAULT_SCAN_SETTINGS, type ScanRun } from '../src/Domain/ConnectionScan/connectionScan';
 import {
   addScanPath,
   replaceScanRun,
   clearScanRuns,
   prepareScanPath,
-} from '../src/domain/connectionScanRecords';
-import type { Transaction } from '../src/domain/types';
+} from '../src/Domain/ConnectionScan/connectionScanRecords';
+import type { Transaction } from '../src/Domain/types';
 
 const password = 'public scheduling fixture password';
 function fixture(encrypt?: typeof encryptWorkspace) {

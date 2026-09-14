@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { transactionFee } from '../src/domain/transactionFee';
-import type { Transaction } from '../src/domain/types';
-import { newWorkspace } from '../src/domain/workspace';
+import { transactionFee } from '../src/Domain/Chain/transactionFee';
+import type { Transaction } from '../src/Domain/types';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
 

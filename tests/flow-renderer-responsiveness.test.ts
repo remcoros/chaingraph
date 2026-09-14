@@ -8,9 +8,18 @@ import {
   ShaderMaterial,
   Vector3,
 } from 'three';
-import type { GraphAdapterEvents, GraphFrame } from '../src/components/graph/adapter';
-import type { LayoutRequest, LayoutResult } from '../src/components/graph/flowLayout';
-import { cachedLayout, LayoutScheduler } from '../src/components/graph/layoutScheduler';
+import type {
+  GraphAdapterEvents,
+  GraphFrame,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
+import type {
+  LayoutRequest,
+  LayoutResult,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/flowLayout';
+import {
+  cachedLayout,
+  LayoutScheduler,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/layoutScheduler';
 
 const harness = vi.hoisted(() => ({ element: undefined as undefined | (() => unknown) }));
 vi.mock('three', async (original) => {
@@ -41,7 +50,7 @@ vi.mock('three/addons/controls/OrbitControls.js', () => ({
     listenToKeyEvents = vi.fn();
   },
 }));
-import { FlowRenderer } from '../src/components/graph/FlowRenderer';
+import { FlowRenderer } from '../src/App/Workspace/Workbenches/Graph/Renderer/FlowRenderer';
 
 class Element extends EventTarget {
   attributes = new Map<string, string>();

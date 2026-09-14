@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { filterGraph } from '../src/domain/graphFilters';
-import { canonicalEntityNodeId } from '../src/domain/entityReferences';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { filterGraph } from '../src/Domain/Graph/graphFilters';
+import { canonicalEntityNodeId } from '../src/Domain/Metadata/entityReferences';
 import {
   MAX_HIDDEN_NODES,
   parseHiddenNodeIds,
@@ -9,8 +9,8 @@ import {
   showAllNodes,
   transactionNodeIds,
   transactionVisibility,
-} from '../src/domain/visibility';
-import { outputNodeId, txNodeId, type Transaction } from '../src/domain/types';
+} from '../src/Domain/Graph/visibility';
+import { outputNodeId, txNodeId, type Transaction } from '../src/Domain/types';
 
 const a = 'a'.repeat(64),
   b = 'b'.repeat(64),

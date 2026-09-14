@@ -4,8 +4,8 @@ import {
   presentGraph,
   resolveGraphHit,
   type GraphPalette,
-} from '../src/components/graph/presentation';
-import type { GraphNode, GraphLink } from '../src/domain/types';
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/presentation';
+import type { GraphNode, GraphLink } from '../src/Domain/types';
 const nodes: GraphNode[] = [
   { id: 'tx', kind: 'transaction', label: 'Transaction', value: 10000 },
   { id: 'out', kind: 'output', label: 'Output', value: 10000, cluster: 'finding' },

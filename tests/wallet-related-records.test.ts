@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { walletRelatedRecords } from '../src/domain/walletRelatedRecords';
-import { newWorkspace } from '../src/domain/workspace';
-import type { WalletRow } from '../src/domain/walletWorkbenchRows';
+import { walletRelatedRecords } from '../src/Domain/Wallet/walletRelatedRecords';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { WalletRow } from '../src/Domain/Wallet/walletWorkbenchRows';
 import { transactions, TX_FUNDING, TX_SPENDING, RECEIVE_ADDRESS } from './fixtures/bitcoin';
 
 const row = (nodeId: string, kind: WalletRow['kind']): WalletRow => ({

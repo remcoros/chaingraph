@@ -3,7 +3,7 @@ import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
   type ScanNeighbors,
-} from '../src/domain/connectionScan';
+} from '../src/Domain/ConnectionScan/connectionScan';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${hash(n)}`;

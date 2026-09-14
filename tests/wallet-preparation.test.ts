@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { WalletPreparationCache } from '../src/lib/walletPreparation';
+import { WalletPreparationCache } from '../src/App/Workspace/Workbenches/Wallet/walletPreparation';
 import { largeWalletFixture } from './fixtures/wallet-performance';
-import type { WalletUtxoView } from '../src/lib/useWalletUtxos';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import type { WalletUtxoView } from '../src/App/Workspace/Workbenches/Wallet/useWalletUtxos';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { WalletWorkbench, type WalletWorkbenchProps } from '../src/components/WalletWorkbench';
+import {
+  WalletWorkbench,
+  type WalletWorkbenchProps,
+} from '../src/App/Workspace/Workbenches/Wallet/WalletWorkbench';
 
 describe('session wallet preparation', () => {
   it('renders a remounted warm wallet immediately, including after pagination', () => {

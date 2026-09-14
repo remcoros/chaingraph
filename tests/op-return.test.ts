@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { decodeOpReturn, OP_RETURN_DISPLAY_LIMIT } from '../src/domain/opReturn';
+import { decodeOpReturn, OP_RETURN_DISPLAY_LIMIT } from '../src/Domain/Chain/opReturn';
 
 const utf8 = (value: string) => bytesToHex(new TextEncoder().encode(value));
 function push(hex: string): string {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ancestryNotice, loadAncestors } from '../src/lib/tracing';
-import type { Transaction } from '../src/domain/types';
+import { ancestryNotice, loadAncestors } from '../src/Infra/Bitcoin/tracing';
+import type { Transaction } from '../src/Domain/types';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number, parents: number[] = []): Transaction => ({
   txid: id(n),

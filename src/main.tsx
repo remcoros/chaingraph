@@ -1,8 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
-import { applyAccentTheme, readAccentTheme } from './lib/accentTheme';
-import './styles.css';
+import App from './App/App';
+import { applyAccentTheme, readAccentTheme } from './App/accentTheme';
+import './App/styles.css';
 
 applyAccentTheme(readAccentTheme(), false);
 

@@ -9,10 +9,10 @@ import {
   recentAddressUtxos,
   RECENT_ADDRESS_GRAPH_LIMIT,
   shouldLoadAddressHistory,
-} from '../src/domain/addressHistory';
-import { addressToScriptHash } from '../src/lib/wallet';
-import { newWorkspace } from '../src/domain/workspace';
-import type { Transaction } from '../src/domain/types';
+} from '../src/Domain/Chain/addressHistory';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction } from '../src/Domain/types';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
 const address = (value: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(value), 0, 'bc');

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendNetworks, fetchIndexedSpenders, loadSpending } from '../src/lib/api';
-import { newWorkspace } from '../src/domain/workspace';
-import type { Network, Transaction } from '../src/domain/types';
+import { backendNetworks, fetchIndexedSpenders, loadSpending } from '../src/Infra/Bitcoin/api';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Network, Transaction } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const point = { txid: id(1), vout: 0 };

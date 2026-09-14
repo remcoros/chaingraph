@@ -2,7 +2,7 @@
 
 The nine bundled examples are real public transactions retrieved through
 Chaingraph's own read-only Core/Electrum proxy and stored as snapshots in
-`src/domain/templateData/`. Labels, notes, icons, bookmarks and tags are
+`src/Domain/Workspace/templateData/`. Labels, notes, icons, bookmarks and tags are
 original educational annotations. Tags describe observed amounts, script forms
 and exact spending links; none of them is an ownership or participant claim.
 
@@ -57,7 +57,7 @@ proof that an output is economically change.
 
 A snapshot holds `network`, `retrievedAt`, `roots` and `transactions`. Labels,
 notes, icons, bookmarks, tags and the opening view are built in code in
-`src/domain/workspaceTemplates.ts`, not stored in the JSON, so editing prose
+`src/Domain/Workspace/workspaceTemplates.ts`, not stored in the JSON, so editing prose
 never means refetching chain data.
 
 An input's funding output can be recorded two ways:

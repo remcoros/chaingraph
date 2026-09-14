@@ -3,9 +3,12 @@ import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
   type ConnectionScanOptions,
-} from '../src/domain/connectionScan';
-import { prepareScanContext, scanReconnectionKey } from '../src/domain/connectionScanContext';
-import { mergeScanRunSnapshots } from '../src/domain/connectionScanGroups';
+} from '../src/Domain/ConnectionScan/connectionScan';
+import {
+  prepareScanContext,
+  scanReconnectionKey,
+} from '../src/Domain/ConnectionScan/connectionScanContext';
+import { mergeScanRunSnapshots } from '../src/Domain/ConnectionScan/connectionScanGroups';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
 const out = (n: number, v = 0) => `out:${n.toString(16).padStart(64, '0')}:${v}`;

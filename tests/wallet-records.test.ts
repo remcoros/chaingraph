@@ -5,10 +5,10 @@ import {
   listWalletAddresses,
   listWalletTransactions,
   verifyWalletUtxo,
-} from '../src/domain/walletRecords';
-import { newWorkspace } from '../src/domain/workspace';
-import type { Transaction, Wallet } from '../src/domain/types';
-import { addressToScriptHash } from '../src/lib/wallet';
+} from '../src/Domain/Wallet/walletRecords';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction, Wallet } from '../src/Domain/types';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');
 const hash = addressToScriptHash(address, 'mainnet');

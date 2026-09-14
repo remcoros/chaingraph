@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 
 function setup() {
   const store = new WorkspaceSessionStore({

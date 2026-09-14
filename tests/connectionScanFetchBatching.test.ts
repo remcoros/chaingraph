@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ScanBudgetExceeded, type ScanBudget } from '../src/domain/connectionScan';
-import type { Transaction } from '../src/domain/types';
-import { connectionScanTransport, createConnectionScanFetch } from '../src/lib/connectionScanFetch';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
+import { ScanBudgetExceeded, type ScanBudget } from '../src/Domain/ConnectionScan/connectionScan';
+import type { Transaction } from '../src/Domain/types';
+import {
+  connectionScanTransport,
+  createConnectionScanFetch,
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const point = (vout: number) => ({ txid: id(1), vout });

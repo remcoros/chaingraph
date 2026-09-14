@@ -5,11 +5,11 @@ import {
   buildWalletReviewContext,
   matchRelatedEntities,
   orderWalletContextTransactions,
-} from '../src/domain/walletReviewContext';
-import { buildWalletReview, type WalletReviewItem } from '../src/domain/walletReview';
-import { newWorkspace } from '../src/domain/workspace';
-import { outputNodeId, type Transaction, type Wallet, type Workspace } from '../src/domain/types';
-import { addressToScriptHash } from '../src/lib/wallet';
+} from '../src/Domain/Wallet/walletReviewContext';
+import { buildWalletReview, type WalletReviewItem } from '../src/Domain/Wallet/walletReview';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { outputNodeId, type Transaction, type Wallet, type Workspace } from '../src/Domain/types';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = (n: number, prefix = 'bc') =>

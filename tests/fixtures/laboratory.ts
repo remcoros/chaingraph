@@ -1,5 +1,5 @@
-import { buildGraph, newWorkspace } from '../../src/domain/workspace';
-import type { Transaction, Workspace } from '../../src/domain/types';
+import { buildGraph, newWorkspace } from '../../src/Domain/Workspace/workspace';
+import type { Transaction, Workspace } from '../../src/Domain/types';
 // Deliberately synthetic, deterministic fixture; never presented as chain data.
 export function laboratoryWorkspace(): Workspace {
   const w = newWorkspace('Synthetic graph fixture', 'testnet4');

@@ -5,22 +5,22 @@ import {
   runConnectionScan,
   type ScanResult,
   type ScanSettings,
-} from '../src/domain/connectionScan';
-import { addScanPathAddition } from '../src/domain/connectionScanAddition';
-import { mergeScanRunSnapshots } from '../src/domain/connectionScanGroups';
+} from '../src/Domain/ConnectionScan/connectionScan';
+import { addScanPathAddition } from '../src/Domain/ConnectionScan/connectionScanAddition';
+import { mergeScanRunSnapshots } from '../src/Domain/ConnectionScan/connectionScanGroups';
 import {
   indexScanNeighbours,
   prepareNeighbourScanTargets,
-} from '../src/domain/connectionScanNeighbours';
-import { replaceScanRun } from '../src/domain/connectionScanRecords';
-import { projectGraphMembership } from '../src/domain/graphMembership';
-import type { Transaction, Workspace } from '../src/domain/types';
-import { buildGraph, newWorkspace } from '../src/domain/workspace';
+} from '../src/Domain/ConnectionScan/connectionScanNeighbours';
+import { replaceScanRun } from '../src/Domain/ConnectionScan/connectionScanRecords';
+import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
+import type { Transaction, Workspace } from '../src/Domain/types';
+import { buildGraph, newWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
-} from '../src/lib/connectionScanFetch';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${hash(n)}`;

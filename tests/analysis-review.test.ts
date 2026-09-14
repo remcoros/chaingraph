@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { analysisTools } from '../src/domain/analysis';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
 import {
   filterAnalysisFindings,
   findingReview,
   reviewPriorities,
-} from '../src/domain/analysisReview';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { AnalysisFinding, Transaction } from '../src/domain/types';
+} from '../src/Domain/Analysis/analysisReview';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { AnalysisFinding, Transaction } from '../src/Domain/types';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const finding = (
   algorithm: string,

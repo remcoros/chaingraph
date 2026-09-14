@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../src/domain/types';
-import { spendingNotice } from '../src/lib/spendingNotice';
+import type { Transaction } from '../src/Domain/types';
+import { spendingNotice } from '../src/App/Workspace/Workbenches/Graph/spendingNotice';
 
 const tx: Transaction = {
   txid: 'a'.repeat(64),

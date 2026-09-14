@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { indexGraphFlow } from '../src/components/graph/flowContext';
-import { presentGraph, type GraphPalette } from '../src/components/graph/presentation';
-import type { GraphData } from '../src/domain/types';
+import { indexGraphFlow } from '../src/App/Workspace/Workbenches/Graph/Renderer/flowContext';
+import {
+  presentGraph,
+  type GraphPalette,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/presentation';
+import type { GraphData } from '../src/Domain/types';
 
 const graph: GraphData = {
   nodes: [

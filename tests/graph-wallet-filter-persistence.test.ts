@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { selectedWalletFilterIds } from '../src/domain/graphFilters';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
+import { selectedWalletFilterIds } from '../src/Domain/Graph/graphFilters';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { decryptWorkspace, encryptWorkspace } from '../src/Infra/Storage/crypto';
 
 describe('saved graph wallet selections', () => {
   it('retains wallet selection together with the other filter dimensions after encryption', async () => {

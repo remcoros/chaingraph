@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { transactionStatus, withHistoryHeight } from '../src/domain/transactionStatus';
-import { parseTransaction } from '../src/domain/workspace';
-import type { Transaction } from '../src/domain/types';
-import { fetchTransaction } from '../src/lib/api';
+import { transactionStatus, withHistoryHeight } from '../src/Domain/Chain/transactionStatus';
+import { parseTransaction } from '../src/Domain/Workspace/workspace';
+import type { Transaction } from '../src/Domain/types';
+import { fetchTransaction } from '../src/Infra/Bitcoin/api';
 import { parseRpc } from '../server/rpc-schema';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');

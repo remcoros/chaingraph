@@ -6,6 +6,10 @@ Read [docs/architecture.md](docs/architecture.md) before changing a module
 boundary, and keep chain observations, user annotations and heuristic
 hypotheses separate.
 
+Use [docs/source-map.md](docs/source-map.md) to find a product area's UI, state,
+helpers and tests. The source tree follows App, FrontPage, Workspace and its
+workbenches, with shared UI, domain logic and browser infrastructure alongside.
+
 ## Set up
 
 Node 24+, npm and a WebGL-capable browser.

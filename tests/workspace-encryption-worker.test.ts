@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   decryptWorkspaceOffThread,
   encryptWorkspaceOffThread,
-} from '../src/lib/workspaceEncryptionClient';
-import type { EncryptedEnvelope } from '../src/lib/crypto';
+} from '../src/Infra/Storage/workspaceEncryptionClient';
+import type { EncryptedEnvelope } from '../src/Infra/Storage/crypto';
 
 const envelope: EncryptedEnvelope = {
   format: 'chaingraph-workspace',

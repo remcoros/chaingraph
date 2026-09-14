@@ -5,17 +5,17 @@ import {
   backendNetworks,
   fetchIndexedSpenders,
   fetchTransaction,
-} from '../src/lib/api';
-import { createConnectionScanFetch } from '../src/lib/connectionScanFetch';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
-import type { ScanBudget } from '../src/domain/connectionScan';
+} from '../src/Infra/Bitcoin/api';
+import { createConnectionScanFetch } from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
+import type { ScanBudget } from '../src/Domain/ConnectionScan/connectionScan';
 import {
   fetchScanUtxo,
   isProvablyUnspendable,
   isVerifiedCoinbase,
   scanLookupFailure,
-} from '../src/lib/connectionScanEvidence';
-import type { Transaction } from '../src/domain/types';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanEvidence';
+import type { Transaction } from '../src/Domain/types';
 
 const txid = 'a'.repeat(64);
 const output = { value: 0.00000546, scriptPubKey: { hex: '51' } };

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
-import { frameCamera, nodeBoundsRadius } from '../src/components/graph/cameraFraming';
-import type { RenderNode } from '../src/components/graph/adapter';
+import {
+  frameCamera,
+  nodeBoundsRadius,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/cameraFraming';
+import type { RenderNode } from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
 
 const node = (id: string, x: number, y: number, z: number, radius = 10): RenderNode => ({
   id,

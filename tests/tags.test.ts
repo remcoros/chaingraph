@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   buildWalletMatches,
   buildTagIndex,
@@ -10,10 +10,10 @@ import {
   parseWorkspaceTags,
   tagNodeIds,
   tagsFromLabels,
-} from '../src/domain/tags';
-import { addressNodeId, outputNodeId, txNodeId, type WorkspaceTag } from '../src/domain/types';
-import { deriveAddresses } from '../src/lib/wallet';
-import { decryptWorkspace, encryptWorkspace } from '../src/lib/crypto';
+} from '../src/Domain/Metadata/tags';
+import { addressNodeId, outputNodeId, txNodeId, type WorkspaceTag } from '../src/Domain/types';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
+import { decryptWorkspace, encryptWorkspace } from '../src/Infra/Storage/crypto';
 
 const txid = (n: number) => n.toString(16).padStart(64, '0');
 // Public BIP84 vector, CC0; existing source attribution: docs/references.md.

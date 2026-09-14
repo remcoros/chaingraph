@@ -9,7 +9,7 @@ import {
   type ConnectionScanOptions,
   type ScanDirection,
   type ScanObservation,
-} from '../src/domain/connectionScan';
+} from '../src/Domain/ConnectionScan/connectionScan';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
 const out = (n: number, index = 0) => `out:${n.toString(16).padStart(64, '0')}:${index}`;

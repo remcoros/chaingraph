@@ -6,9 +6,9 @@ import {
   parseTransaction,
   outputAddress,
   WorkspaceValidationError,
-} from '../src/domain/workspace';
-import { analysisTools } from '../src/domain/analysis';
-import { outputNodeId, txNodeId, type Transaction, type Wallet } from '../src/domain/types';
+} from '../src/Domain/Workspace/workspace';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import { outputNodeId, txNodeId, type Transaction, type Wallet } from '../src/Domain/types';
 import { laboratoryWorkspace } from './fixtures/laboratory';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');

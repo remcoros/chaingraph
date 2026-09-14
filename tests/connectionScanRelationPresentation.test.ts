@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
-import { presentScanRun, scanRelationPresentation } from '../src/domain/connectionScanPresentation';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  type ScanResult,
+  type ScanRun,
+} from '../src/Domain/ConnectionScan/connectionScan';
+import {
+  presentScanRun,
+  scanRelationPresentation,
+} from '../src/Domain/ConnectionScan/connectionScanPresentation';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
 const out = (n: number, vout = 0) => `out:${n.toString(16).padStart(64, '0')}:${vout}`;

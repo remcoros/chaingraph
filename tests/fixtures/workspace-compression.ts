@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { newWorkspace } from '../../src/domain/workspace';
-import type { Workspace } from '../../src/domain/types';
+import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import type { Workspace } from '../../src/Domain/types';
 import { largeWalletFixture } from './wallet-performance';
 
 /** Public BIP84 addresses, synthetic history, deterministic hash-like transaction IDs. */

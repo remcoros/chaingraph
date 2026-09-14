@@ -3,14 +3,14 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { WalletInspector } from '../src/components/Inspector';
+import { WalletInspector } from '../src/App/Workspace/Inspector/Inspector';
 import {
   matchingWalletUtxoObservation,
   resolveWalletUtxoObservation,
-} from '../src/domain/walletUtxoObservation';
-import { newWorkspace } from '../src/domain/workspace';
-import { outputNodeId, type Transaction, type Wallet } from '../src/domain/types';
-import { addressToScriptHash } from '../src/lib/wallet';
+} from '../src/Domain/Wallet/walletUtxoObservation';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { outputNodeId, type Transaction, type Wallet } from '../src/Domain/types';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');
 const scripthash = addressToScriptHash(address, 'mainnet');

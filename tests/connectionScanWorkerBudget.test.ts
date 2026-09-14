@@ -1,10 +1,13 @@
 import { expect, it, vi } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS } from '../src/domain/connectionScan';
-import type { Transaction } from '../src/domain/types';
-import { connectionScanTransport } from '../src/lib/connectionScanFetch';
-import type { ScanWorkerInput, ScanWorkerOutput } from '../src/lib/connectionScanProtocol';
-import { runConnectionScanInWorker } from '../src/lib/connectionScanRunner';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
+import { DEFAULT_SCAN_SETTINGS } from '../src/Domain/ConnectionScan/connectionScan';
+import type { Transaction } from '../src/Domain/types';
+import { connectionScanTransport } from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
+import type {
+  ScanWorkerInput,
+  ScanWorkerOutput,
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanProtocol';
+import { runConnectionScanInWorker } from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRunner';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');
 const out = (n: number) => `out:${hash(n)}:0`;
@@ -61,7 +64,7 @@ it('keeps admitted connections when concurrent roots compete with discovered evi
   const utxo = vi.spyOn(connectionScanTransport, 'fetchUtxo').mockResolvedValue(undefined);
   try {
     // Execute the real worker message handler, with an in-process message transport.
-    await import('../src/lib/connectionScan.worker');
+    await import('../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan.worker');
     const result = await runConnectionScanInWorker({
       request: {
         id: 'shared-budget',

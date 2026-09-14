@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { address, networks, payments } from 'bitcoinjs-lib';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
-import { fetchTransaction } from '../src/lib/api';
+import { fetchTransaction } from '../src/Infra/Bitcoin/api';
 import {
   newWorkspace,
   parseWorkspace,
   validateTransactionAddresses,
-} from '../src/domain/workspace';
-import type { Network, Transaction, TxOutput } from '../src/domain/types';
+} from '../src/Domain/Workspace/workspace';
+import type { Network, Transaction, TxOutput } from '../src/Domain/types';
 
 const txid = 'a'.repeat(64);
 const publicHash = Uint8Array.from({ length: 20 }, (_, index) => index + 1);

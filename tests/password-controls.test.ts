@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement, type KeyboardEvent } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import {
-  CreateDialog,
-  ImportDialog,
-  PasswordControls,
-  UnlockDialog,
-} from '../src/components/Dialogs';
+import { CreateDialog, ImportDialog, PasswordControls, UnlockDialog } from '../src/App/Dialogs';
 
 beforeEach(() => vi.stubGlobal('document', { activeElement: null }));
 afterEach(() => vi.unstubAllGlobals());

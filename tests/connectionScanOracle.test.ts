@@ -4,7 +4,7 @@ import {
   runConnectionScan,
   type ScanDirection,
   type ScanSettings,
-} from '../src/domain/connectionScan';
+} from '../src/Domain/ConnectionScan/connectionScan';
 
 type Edge = readonly [string, string];
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;

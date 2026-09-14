@@ -4,9 +4,9 @@ import {
   formatLocalTimestamp,
   transactionBlockTime,
   walletRecordBlockObservation,
-} from '../src/domain/transactionTime';
-import { transactionStatus } from '../src/domain/transactionStatus';
-import type { Transaction } from '../src/domain/types';
+} from '../src/Domain/Chain/transactionTime';
+import { transactionStatus } from '../src/Domain/Chain/transactionStatus';
+import type { Transaction } from '../src/Domain/types';
 
 const tx: Transaction = {
   txid: 'a'.repeat(64),

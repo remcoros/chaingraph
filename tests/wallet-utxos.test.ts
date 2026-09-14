@@ -1,8 +1,8 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Network, Wallet } from '../src/domain/types';
-import { fetchWalletUtxos } from '../src/lib/walletUtxos';
-import { addressToScriptHash } from '../src/lib/wallet';
+import type { Network, Wallet } from '../src/Domain/types';
+import { fetchWalletUtxos } from '../src/App/Workspace/Workbenches/Wallet/walletUtxos';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 function wallet(count = 1, network: Network = 'mainnet'): Wallet {

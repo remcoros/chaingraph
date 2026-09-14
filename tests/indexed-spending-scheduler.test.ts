@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Network, Transaction } from '../src/domain/types';
-import { newWorkspace } from '../src/domain/workspace';
+import type { Network, Transaction } from '../src/Domain/types';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   backendNetworks,
   fetchIndexedSpenders,
   fetchTransaction,
   loadSpending,
-} from '../src/lib/api';
-import { TransactionFetchScope, transactionScheduler } from '../src/lib/transactionScheduler';
+} from '../src/Infra/Bitcoin/api';
+import {
+  TransactionFetchScope,
+  transactionScheduler,
+} from '../src/Infra/Bitcoin/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const points = Array.from({ length: 4 }, (_, vout) => ({ txid: id(1), vout }));

@@ -1,8 +1,8 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import type { Wallet, Workspace } from '../../src/domain/types';
-import { newWorkspace } from '../../src/domain/workspace';
-import { deriveAddresses } from '../../src/lib/wallet';
+import type { Wallet, Workspace } from '../../src/Domain/types';
+import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { deriveAddresses } from '../../src/Domain/Wallet/wallet';
 import { PUBLIC_ZPUB } from './bitcoin';
 
 /** Synthetic loaded history using the public CC0 BIP84 account fixture. */

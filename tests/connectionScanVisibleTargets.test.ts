@@ -3,19 +3,19 @@ import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
   type ScanResult,
-} from '../src/domain/connectionScan';
+} from '../src/Domain/ConnectionScan/connectionScan';
 import {
   indexScanNeighbours,
   prepareNeighbourScanTargets,
-} from '../src/domain/connectionScanNeighbours';
-import { addScanPath, replaceScanRun } from '../src/domain/connectionScanRecords';
-import type { Transaction } from '../src/domain/types';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
+} from '../src/Domain/ConnectionScan/connectionScanNeighbours';
+import { addScanPath, replaceScanRun } from '../src/Domain/ConnectionScan/connectionScanRecords';
+import type { Transaction } from '../src/Domain/types';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
-} from '../src/lib/connectionScanFetch';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${hash(n)}`;

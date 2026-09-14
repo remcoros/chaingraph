@@ -3,13 +3,13 @@ import {
   graphNavigationTransactionIds,
   prepareGraphNavigation,
   resolveGraphHandoff,
-} from '../src/domain/graphHandoff';
-import { analysisTools } from '../src/domain/analysis';
-import { filterGraph } from '../src/domain/graphFilters';
-import { projectGraphMembership } from '../src/domain/graphMembership';
-import { flowInputPlan, mergeFlowInputs } from '../src/lib/useFlowInputs';
-import { buildGraph, newWorkspace } from '../src/domain/workspace';
-import { outputNodeId, txNodeId } from '../src/domain/types';
+} from '../src/Domain/Graph/graphHandoff';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import { filterGraph } from '../src/Domain/Graph/graphFilters';
+import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
+import { flowInputPlan, mergeFlowInputs } from '../src/App/Workspace/useFlowInputs';
+import { buildGraph, newWorkspace } from '../src/Domain/Workspace/workspace';
+import { outputNodeId, txNodeId } from '../src/Domain/types';
 
 const parent = '1'.repeat(64);
 const child = '2'.repeat(64);

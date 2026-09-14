@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { newWorkspace } from '../src/domain/workspace';
-import { deriveAddresses } from '../src/lib/wallet';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
 import {
   buildWalletRecordRows,
   matchesWalletStatus,
@@ -13,12 +13,12 @@ import {
   resolveWalletRow,
   reviewRow,
   walletSelectAll,
-} from '../src/domain/walletWorkbenchRows';
+} from '../src/Domain/Wallet/walletWorkbenchRows';
 import { PUBLIC_ZPUB } from './fixtures/bitcoin';
-import { addressNodeId, outputNodeId, type Wallet } from '../src/domain/types';
-import { buildWalletReview } from '../src/domain/walletReview';
-import { groupWalletRelationships } from '../src/domain/walletRelationships';
-import { matchRelatedEntities } from '../src/domain/walletReviewContext';
+import { addressNodeId, outputNodeId, type Wallet } from '../src/Domain/types';
+import { buildWalletReview } from '../src/Domain/Wallet/walletReview';
+import { groupWalletRelationships } from '../src/Domain/Wallet/walletRelationships';
+import { matchRelatedEntities } from '../src/Domain/Wallet/walletReviewContext';
 
 const A = 'a'.repeat(64),
   B = 'b'.repeat(64),

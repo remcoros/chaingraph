@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
-import { addressToScriptHash } from '../src/lib/wallet';
-import { type Transaction, type Wallet, type Workspace } from '../src/domain/types';
-import { buildWalletReviewContext } from '../src/domain/walletReviewContext';
-import { walletRelatedRecords } from '../src/domain/walletRelatedRecords';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
+import { type Transaction, type Wallet, type Workspace } from '../src/Domain/types';
+import { buildWalletReviewContext } from '../src/Domain/Wallet/walletReviewContext';
+import { walletRelatedRecords } from '../src/Domain/Wallet/walletRelatedRecords';
 import {
   walletRowRelationship,
   walletRowWithContext,
   type WalletRow,
-} from '../src/domain/walletWorkbenchRows';
+} from '../src/Domain/Wallet/walletWorkbenchRows';
 import {
   buildWalletSelectionAddresses,
   buildWalletSelectionIndex,
-} from '../src/domain/walletSelectionIndex';
+} from '../src/Domain/Wallet/walletSelectionIndex';
 import {
   RECEIVE_ADDRESS,
   SECOND_ADDRESS,

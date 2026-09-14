@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WORKSPACE_TEMPLATES, createTemplateWorkspace } from '../src/domain/workspaceTemplates';
-import { buildGraph, parseWorkspace } from '../src/domain/workspace';
-import { indexPreviousOutputs } from '../src/domain/prevouts';
-import { outputNodeId, sats, txNodeId } from '../src/domain/types';
-import { projectGraphMembership } from '../src/domain/graphMembership';
-import { transactionNodeIds } from '../src/domain/visibility';
-import { formatBitcoinAmount } from '../src/domain/amountFormat';
+import {
+  WORKSPACE_TEMPLATES,
+  createTemplateWorkspace,
+} from '../src/Domain/Workspace/workspaceTemplates';
+import { buildGraph, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { indexPreviousOutputs } from '../src/Domain/Chain/prevouts';
+import { outputNodeId, sats, txNodeId } from '../src/Domain/types';
+import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
+import { transactionNodeIds } from '../src/Domain/Graph/visibility';
+import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -13,7 +16,7 @@ describe('real annotated workspace templates', () => {
   it('keeps every bundled snapshot small enough to ship uncompressed', async () => {
     const { stat } = await import('node:fs/promises');
     for (const template of WORKSPACE_TEMPLATES) {
-      const { size } = await stat(`src/domain/templateData/${template.id}.json`);
+      const { size } = await stat(`src/Domain/Workspace/templateData/${template.id}.json`);
       // Snapshots record the outputs an example displays. Shipping whole parent
       // transactions for their inputs would reintroduce megabytes of unused data.
       expect({ id: template.id, kb: size <= 400_000 }).toEqual({ id: template.id, kb: true });

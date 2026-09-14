@@ -1,22 +1,25 @@
 import {
   validateAndEncryptWorkspace,
   decryptAndValidateWorkspace,
-} from '../src/lib/workspaceEncryption';
+} from '../src/Infra/Storage/workspaceEncryption';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
   SCAN_LIMITS,
   type ScanResult,
   type ScanRun,
-} from '../src/domain/connectionScan';
-import { addScanPathAddition, prepareScanPathAddition } from '../src/domain/connectionScanAddition';
+} from '../src/Domain/ConnectionScan/connectionScan';
+import {
+  addScanPathAddition,
+  prepareScanPathAddition,
+} from '../src/Domain/ConnectionScan/connectionScanAddition';
 import {
   prepareScanPath,
   replaceScanRun,
   scanResultEvidenceIds,
-} from '../src/domain/connectionScanRecords';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { Transaction } from '../src/domain/types';
+} from '../src/Domain/ConnectionScan/connectionScanRecords';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction } from '../src/Domain/types';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;

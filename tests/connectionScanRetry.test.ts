@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from '../src/domain/connectionScan';
-import { applyScanRecheck, retryConnectionScanResult } from '../src/lib/connectionScanRetry';
-import { TransactionFetchScope } from '../src/lib/transactionScheduler';
-import { newWorkspace } from '../src/domain/workspace';
-import { replaceScanRun } from '../src/domain/connectionScanRecords';
-import type { Transaction } from '../src/domain/types';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  type ScanResult,
+  type ScanRun,
+} from '../src/Domain/ConnectionScan/connectionScan';
+import {
+  applyScanRecheck,
+  retryConnectionScanResult,
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRetry';
+import { TransactionFetchScope } from '../src/Infra/Bitcoin/transactionScheduler';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { replaceScanRun } from '../src/Domain/ConnectionScan/connectionScanRecords';
+import type { Transaction } from '../src/Domain/types';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const source = `tx:${id(1)}`;
 const result: ScanResult = {

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { GraphMetadataProjection, EMPTY_GRAPH_ANNOTATIONS } from '../src/lib/graphMetadata';
-import { newWorkspace } from '../src/domain/workspace';
-import { fullGraphMembershipEvidence } from '../src/domain/graphMembership';
-import { buildTagIndex } from '../src/domain/tags';
-import { filterGraph, sortEntities } from '../src/domain/graphFilters';
-import type { Annotation, GraphData, Workspace } from '../src/domain/types';
+import {
+  GraphMetadataProjection,
+  EMPTY_GRAPH_ANNOTATIONS,
+} from '../src/App/Workspace/Workbenches/Graph/graphMetadata';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { fullGraphMembershipEvidence } from '../src/Domain/Graph/graphMembership';
+import { buildTagIndex } from '../src/Domain/Metadata/tags';
+import { filterGraph, sortEntities } from '../src/Domain/Graph/graphFilters';
+import type { Annotation, GraphData, Workspace } from '../src/Domain/types';
 
 const id = '1'.repeat(64);
 const transaction = `tx:${id}`;

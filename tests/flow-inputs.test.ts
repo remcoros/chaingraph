@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { flowInputPlan, mergeFlowInputs } from '../src/lib/useFlowInputs';
-import { newWorkspace, buildGraph, parseWorkspace } from '../src/domain/workspace';
-import type { Transaction } from '../src/domain/types';
+import { flowInputPlan, mergeFlowInputs } from '../src/App/Workspace/useFlowInputs';
+import { newWorkspace, buildGraph, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Transaction } from '../src/Domain/types';
 
 const grandparent = 'a'.repeat(64),
   parent = 'b'.repeat(64),

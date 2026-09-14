@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { exportLabels, importLabels } from '../src/lib/labels';
-import { isExtendedPublicKey } from '../src/lib/wallet';
-import { newWorkspace } from '../src/domain/workspace';
+import { exportLabels, importLabels } from '../src/Domain/Metadata/labels';
+import { isExtendedPublicKey } from '../src/Domain/Wallet/wallet';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
 
 // Public BIP32/BIP86 vectors (BSD-2-Clause) and BIP84 vectors (CC0).
 // Sources and attribution: docs/references.md.

@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { newWorkspace } from '../src/domain/workspace';
-import { deriveAddresses } from '../src/lib/wallet';
-import { addressNodeId, type Wallet } from '../src/domain/types';
-import { applyReviewDecisions, buildWalletReview, reviewKey } from '../src/domain/walletReview';
-import { walletReviewCategories } from '../src/domain/walletReviewCategories';
-import { matchesWalletStatus, reviewRow } from '../src/domain/walletWorkbenchRows';
-import { walletReviewGuidance, walletSubjectTitle } from '../src/domain/walletReviewGuidance';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { deriveAddresses } from '../src/Domain/Wallet/wallet';
+import { addressNodeId, type Wallet } from '../src/Domain/types';
+import {
+  applyReviewDecisions,
+  buildWalletReview,
+  reviewKey,
+} from '../src/Domain/Wallet/walletReview';
+import { walletReviewCategories } from '../src/Domain/Wallet/walletReviewCategories';
+import { matchesWalletStatus, reviewRow } from '../src/Domain/Wallet/walletWorkbenchRows';
+import {
+  walletReviewGuidance,
+  walletSubjectTitle,
+} from '../src/Domain/Wallet/walletReviewGuidance';
 import { PUBLIC_ZPUB, transactions, TX_FUNDING, TX_SPENDING } from './fixtures/bitcoin';
 
 function fixture() {

@@ -4,10 +4,10 @@ import {
   newWorkspace,
   parseWorkspace,
   promoteInputContext,
-} from '../src/domain/workspace';
-import { removeWorkspaceEntity } from '../src/domain/entityRemoval';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
-import { applyWalletScan } from '../src/domain/walletActivity';
+} from '../src/Domain/Workspace/workspace';
+import { removeWorkspaceEntity } from '../src/Domain/Workspace/entityRemoval';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
+import { applyWalletScan } from '../src/Domain/Wallet/walletActivity';
 
 const parent = 'a'.repeat(64),
   child = 'b'.repeat(64);

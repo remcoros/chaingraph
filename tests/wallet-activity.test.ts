@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applyWalletScan, walletCheckAge } from '../src/domain/walletActivity';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { Wallet } from '../src/domain/types';
+import { applyWalletScan, walletCheckAge } from '../src/Domain/Wallet/walletActivity';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Wallet } from '../src/Domain/types';
 
 const key =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';

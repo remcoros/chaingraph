@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { RenderLink } from '../src/components/graph/adapter';
-import type { Position } from '../src/components/graph/flowLayout';
-import { chooseFlowLinks, indexFlowLinks } from '../src/components/graph/flowSelection';
+import type { RenderLink } from '../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
+import type { Position } from '../src/App/Workspace/Workbenches/Graph/Renderer/flowLayout';
+import {
+  chooseFlowLinks,
+  indexFlowLinks,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/flowSelection';
 
 const edge = (
   id: string,

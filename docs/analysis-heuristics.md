@@ -1,7 +1,7 @@
 # Analysis heuristics
 
 What each analysis tool computes, what it can and cannot claim, and the research
-it rests on. Tools live in `src/domain/analysis/`, run locally over loaded
+it rests on. Tools live in `src/Domain/Analysis/tools/`, run locally over loaded
 workspace records and make no network requests. Wallet review reuses the same
 registry.
 
@@ -18,15 +18,15 @@ complete chain history.
 
 ## Tools
 
-| Tool | Method | Limits |
-| --- | --- | --- |
-| Equal-output detection | Group positive output amounts in integer satoshis; configurable minimum repeats and input count; highlight only group members | Excludes data outputs and coinbase. Repeated values do not identify a CoinJoin and are not a linkability calculation |
-| Common-input ownership | Union co-spent input identities across the scope, following known scripts or addresses; missing parents stay as outpoint references | A hypothesis. Transactions with three or more equal outputs are skipped by default (configurable) and reported; PayJoin and other collaborative spends are not detected |
-| Address reuse | Count outputs per decoded address in scope, optionally requiring separate transactions | Counts include spent outputs and are not balances; unaddressed scripts are reported as unavailable |
-| Value flow and fees | Sum known previous-output amounts minus outputs in integer satoshis; divide by a valid virtual size for sat/vB | Never substitutes zero for a missing parent or raw size for vsize; coinbase skipped; a fee threshold is a review filter, not a recommendation |
-| Consolidation and fan-out | Configurable input/output counts and ratio | Reports structure, not purpose; batching and collaborative spends share these shapes |
-| Script-type comparisons | Compare decoded input/output script types; optionally flag change-like patterns | Missing types stay unavailable; the tool does not guess change, wallet software or owners |
-| Imported-wallet intersections | Match inputs and outputs against addresses and script hashes already derived for imported wallets; optionally co-spent inputs only | Overlapping imports are distinguished from separate participants; coverage is bounded by derived addresses |
+| Tool                          | Method                                                                                                                              | Limits                                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Equal-output detection        | Group positive output amounts in integer satoshis; configurable minimum repeats and input count; highlight only group members       | Excludes data outputs and coinbase. Repeated values do not identify a CoinJoin and are not a linkability calculation                                                    |
+| Common-input ownership        | Union co-spent input identities across the scope, following known scripts or addresses; missing parents stay as outpoint references | A hypothesis. Transactions with three or more equal outputs are skipped by default (configurable) and reported; PayJoin and other collaborative spends are not detected |
+| Address reuse                 | Count outputs per decoded address in scope, optionally requiring separate transactions                                              | Counts include spent outputs and are not balances; unaddressed scripts are reported as unavailable                                                                      |
+| Value flow and fees           | Sum known previous-output amounts minus outputs in integer satoshis; divide by a valid virtual size for sat/vB                      | Never substitutes zero for a missing parent or raw size for vsize; coinbase skipped; a fee threshold is a review filter, not a recommendation                           |
+| Consolidation and fan-out     | Configurable input/output counts and ratio                                                                                          | Reports structure, not purpose; batching and collaborative spends share these shapes                                                                                    |
+| Script-type comparisons       | Compare decoded input/output script types; optionally flag change-like patterns                                                     | Missing types stay unavailable; the tool does not guess change, wallet software or owners                                                                               |
+| Imported-wallet intersections | Match inputs and outputs against addresses and script hashes already derived for imported wallets; optionally co-spent inputs only  | Overlapping imports are distinguished from separate participants; coverage is bounded by derived addresses                                                              |
 
 No tool identifies a person, proves that a wallet owns a transaction, or maps
 individual inputs to outputs. There is no Boltzmann solver, dust classification

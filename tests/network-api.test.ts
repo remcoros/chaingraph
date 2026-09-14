@@ -5,9 +5,9 @@ import {
   fetchTransaction,
   loadSpending,
   rpc,
-} from '../src/lib/api';
-import { newWorkspace } from '../src/domain/workspace';
-import type { Network, Transaction } from '../src/domain/types';
+} from '../src/Infra/Bitcoin/api';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { Network, Transaction } from '../src/Domain/types';
 
 const id = (number: number) => number.toString(16).padStart(64, '0');
 const transaction = (txid: string, value = 1): Transaction => ({

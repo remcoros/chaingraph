@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../src/domain/workspace';
-import { setNodesHidden, showAllNodes } from '../src/domain/visibility';
-import { addGraphNodes, removeGraphNodes } from '../src/domain/graphMembership';
-import { WorkspaceSessionStore } from '../src/lib/useWorkspaces';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import { setNodesHidden, showAllNodes } from '../src/Domain/Graph/visibility';
+import { addGraphNodes, removeGraphNodes } from '../src/Domain/Graph/graphMembership';
+import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 
 const id = `out:${'1'.repeat(64)}:0`;
 describe('visibility undo and saved view interactions', () => {

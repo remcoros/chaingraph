@@ -3,21 +3,33 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compactLayout } from '../src/components/graph/compactLayout';
-import type { LayoutRequest, Position } from '../src/components/graph/flowLayout';
+import { compactLayout } from '../src/App/Workspace/Workbenches/Graph/Renderer/compactLayout';
+import type {
+  LayoutRequest,
+  Position,
+} from '../src/App/Workspace/Workbenches/Graph/Renderer/flowLayout';
 const output = 'artifacts/flow-renderer-v2/compact';
 const baseline = process.argv
   .find((arg) => arg.startsWith('--baseline='))
   ?.slice('--baseline='.length);
+const rendererDirectory = 'src/App/Workspace/Workbenches/Graph/Renderer';
 await mkdir(output, { recursive: true });
 let layout = compactLayout;
 if (baseline) {
   const directory = path.join(output, 'benchmark-baseline');
   await mkdir(directory, { recursive: true });
+  // Historical baselines can predate the source relocation.
+  const baselineDirectory = execFileSync(
+    'git',
+    ['ls-tree', '--name-only', baseline, rendererDirectory],
+    { encoding: 'utf8' },
+  ).trim()
+    ? rendererDirectory
+    : 'src/components/graph';
   for (const file of ['compactLayout.ts', 'flowLayout.ts'])
     await writeFile(
       path.join(directory, file),
-      execFileSync('git', ['show', `${baseline}:src/components/graph/${file}`]),
+      execFileSync('git', ['show', `${baseline}:${baselineDirectory}/${file}`]),
     );
   layout = (await import(pathToFileURL(path.resolve(directory, 'compactLayout.ts')).href))
     .compactLayout;

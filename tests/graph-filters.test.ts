@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../src/domain/amountFormat';
+import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
 import { describe, expect, it } from 'vitest';
 import {
   activeFilterChips,
@@ -12,8 +12,8 @@ import {
   selectedWalletFilterIds,
   sortEntities,
   valueFilterError,
-} from '../src/domain/graphFilters';
-import type { Annotation, GraphData } from '../src/domain/types';
+} from '../src/Domain/Graph/graphFilters';
+import type { Annotation, GraphData } from '../src/Domain/types';
 
 const graph: GraphData = {
   nodes: [

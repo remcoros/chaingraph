@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import {
   CURRENT_WORKSPACE_VERSION,
   migrateWorkspace,
   WorkspaceSchemaVersionError,
-} from '../src/domain/workspaceMigrations';
+} from '../src/Domain/Workspace/workspaceMigrations';
 import { laboratoryWorkspace } from './fixtures/laboratory';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 

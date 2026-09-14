@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { analysisScriptType } from '../src/domain/analysis/scripts';
-import { analysisTools } from '../src/domain/analysis';
-import { recoverAnalysisData } from '../src/domain/analysisRecovery';
-import { newWorkspace } from '../src/domain/workspace';
-import type { TxOutput } from '../src/domain/types';
+import { analysisScriptType } from '../src/Domain/Analysis/tools/scripts';
+import { analysisTools } from '../src/Domain/Analysis/analysis';
+import { recoverAnalysisData } from '../src/Domain/Analysis/analysisRecovery';
+import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import type { TxOutput } from '../src/Domain/types';
 const output = (hex?: string, type?: string): TxOutput => ({
   n: 0,
   value: 1,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { filterSmallAmounts, omitAmountOrphans } from '../src/domain/smallAmounts';
-import { filterGraph } from '../src/domain/graphFilters';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import type { GraphData } from '../src/domain/types';
+import { filterSmallAmounts, omitAmountOrphans } from '../src/Domain/Graph/smallAmounts';
+import { filterGraph } from '../src/Domain/Graph/graphFilters';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import type { GraphData } from '../src/Domain/types';
 
 const graph: GraphData = {
   nodes: [

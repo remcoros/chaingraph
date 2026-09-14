@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, validateScanSettings } from '../src/domain/connectionScan';
+import {
+  DEFAULT_SCAN_SETTINGS,
+  validateScanSettings,
+} from '../src/Domain/ConnectionScan/connectionScan';
 import {
   indexScanNeighbours,
   prepareNeighbourScanTargets,
-} from '../src/domain/connectionScanNeighbours';
-import type { GraphData, GraphLink, GraphNode, Transaction } from '../src/domain/types';
-import { buildGraph, newWorkspace } from '../src/domain/workspace';
+} from '../src/Domain/ConnectionScan/connectionScanNeighbours';
+import type { GraphData, GraphLink, GraphNode, Transaction } from '../src/Domain/types';
+import { buildGraph, newWorkspace } from '../src/Domain/Workspace/workspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;

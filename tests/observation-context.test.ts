@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { carryObservationContext } from '../src/domain/observationContext';
-import { newWorkspace, parseWorkspace } from '../src/domain/workspace';
+import { carryObservationContext } from '../src/Domain/Chain/observationContext';
+import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 const a = 'a'.repeat(64),
   b = 'b'.repeat(64);
 function workspace() {

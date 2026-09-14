@@ -11,12 +11,12 @@ import {
   projectGraphMembership,
   removeGraphNodes,
   showAllGraphOutputs,
-} from '../src/domain/graphMembership';
-import { graphUnconnectedOutputIds } from '../src/domain/graphBranch';
-import { outputNodeId, txNodeId, type Transaction } from '../src/domain/types';
-import { buildGraph, newWorkspace, parseWorkspace } from '../src/domain/workspace';
-import { createTemplateWorkspace } from '../src/domain/workspaceTemplates';
-import { showAllNodes } from '../src/domain/visibility';
+} from '../src/Domain/Graph/graphMembership';
+import { graphUnconnectedOutputIds } from '../src/Domain/Graph/graphBranch';
+import { outputNodeId, txNodeId, type Transaction } from '../src/Domain/types';
+import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
+import { createTemplateWorkspace } from '../src/Domain/Workspace/workspaceTemplates';
+import { showAllNodes } from '../src/Domain/Graph/visibility';
 
 const a = 'a'.repeat(64);
 const b = 'b'.repeat(64);

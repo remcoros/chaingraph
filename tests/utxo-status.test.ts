@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchCurrentUtxo } from '../src/lib/utxoStatus';
+import { fetchCurrentUtxo } from '../src/Infra/Bitcoin/utxoStatus';
 
 const txid = 'a'.repeat(64);
 const output = { value: 0.00000546, scriptPubKey: { hex: '51' } };

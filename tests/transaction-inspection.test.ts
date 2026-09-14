@@ -4,9 +4,9 @@ import {
   decodeRawTransaction,
   inspectScript,
   relatedTransactions,
-} from '../src/domain/transactionInspection';
-import { fetchRawInspection } from '../src/lib/transactionInspection';
-import type { Transaction } from '../src/domain/types';
+} from '../src/Domain/Chain/transactionInspection';
+import { fetchRawInspection } from '../src/App/Workspace/Inspector/transactionInspection';
+import type { Transaction } from '../src/Domain/types';
 
 function fixture(witness = false) {
   const raw = new BitcoinTransaction();
