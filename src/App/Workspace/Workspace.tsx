@@ -1,4 +1,4 @@
-import { ScanTargetToolbar } from './Selection/ScanTargetToolbar';
+import { ConnectionScanTargetToolbar } from './Selection/ConnectionScanTargetToolbar';
 import { GitBranch, List, LoaderCircle, LockKeyhole, Wallet as WalletIcon } from 'lucide-react';
 import { SelectionToolbar } from './Selection/SelectionToolbar';
 
@@ -27,7 +27,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     undoDescription,
     setNotice,
     ws,
-    scanTargets,
+    connectionScanTargets,
     visibleGraph,
     backgroundAddressHistoryLoad,
     operation,
@@ -82,7 +82,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
       <WalletWorkbench workspace={workspace} />
       <AnalysisWorkbench workspace={workspace} />
       <SelectionToolbar
-        active={workbench === 'graph' && !tourStep && !scanTargets.picking}
+        active={workbench === 'graph' && !tourStep && !connectionScanTargets.picking}
         workspace={w}
         selection={selection}
         visibleSelectedCount={selectionOnCanvas}
@@ -103,13 +103,13 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
         }}
         onUndo={() => ws.undo(w.id)}
       />
-      {scanTargets.picking && scanTargets.draft && (
-        <ScanTargetToolbar
-          ids={scanTargets.draft.ids}
-          onRemove={scanTargets.toggle}
-          onDone={() => scanTargets.finish(true)}
-          onCancel={() => scanTargets.finish(false)}
-          {...scanTargets.preview}
+      {connectionScanTargets.picking && connectionScanTargets.draft && (
+        <ConnectionScanTargetToolbar
+          ids={connectionScanTargets.draft.ids}
+          onRemove={connectionScanTargets.toggle}
+          onDone={() => connectionScanTargets.finish(true)}
+          onCancel={() => connectionScanTargets.finish(false)}
+          {...connectionScanTargets.preview}
         />
       )}
       <footer className="statusbar">

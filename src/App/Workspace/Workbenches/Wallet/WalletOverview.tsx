@@ -32,10 +32,10 @@ export function WalletOverview({
   onRefresh,
   onCheck,
   active,
-  onScan,
-  scanLoading,
-  scanStatus,
-  scanIssues,
+  onAnalyze,
+  analyzing,
+  analysisStatus,
+  analysisIssues,
 }: Pick<
   WalletWorkbenchContext,
   | 'workspace'
@@ -54,10 +54,10 @@ export function WalletOverview({
   utxoLoading: boolean;
   onCheck: (cursor?: number) => void;
   active: boolean;
-  onScan: () => void;
-  scanLoading: boolean;
-  scanStatus: string;
-  scanIssues?: string;
+  onAnalyze: () => void;
+  analyzing: boolean;
+  analysisStatus: string;
+  analysisIssues?: string;
 }) {
   const discovery = walletDiscoveryStatus(wallet);
   const missingHistory = Math.max(0, coverage.knownTransactions - coverage.loadedTransactions);
@@ -98,11 +98,11 @@ export function WalletOverview({
         <div className="wallet-review-controls">
           <button
             className="primary"
-            disabled={!active || busy || scanLoading}
+            disabled={!active || busy || analyzing}
             title="Scan this wallet's loaded transactions for supported observations and hypotheses. No network requests"
-            onClick={onScan}
+            onClick={onAnalyze}
           >
-            <ScanSearch size={14} /> {scanLoading ? 'Analyzing…' : 'Analyze'}
+            <ScanSearch size={14} /> {analyzing ? 'Analyzing…' : 'Analyze'}
           </button>
           <button
             aria-label="Refresh wallet"
@@ -162,11 +162,11 @@ export function WalletOverview({
       </dl>
       <div className="wallet-coverage-actions">
         <span className="wallet-scan-status" role="status">
-          {scanStatus}
+          {analysisStatus}
         </span>
-        {scanIssues && (
+        {analysisIssues && (
           <WalletHelp title="Scan errors" active={active}>
-            {scanIssues}
+            {analysisIssues}
           </WalletHelp>
         )}
         {discovery && (

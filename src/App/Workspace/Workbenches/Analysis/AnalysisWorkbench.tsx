@@ -1080,7 +1080,7 @@ export { MemoizedAnalysisWorkbench as AnalysisWorkbenchView };
 export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceController }) {
   const {
     w,
-    walletScanRevision,
+    walletAnalysisRevision,
     analysisSessions,
     workbench,
     lockingWorkspace,
@@ -1104,7 +1104,7 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
       aria-label="Analysis workspace"
     >
       <AnalysisWorkbenchView
-        key={`${w.id}:${walletScanRevision}`}
+        key={`${w.id}:${walletAnalysisRevision}`}
         cache={analysisSessions.current}
         workspace={w}
         active={workbench === 'analysis' && !lockingWorkspace}

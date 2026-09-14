@@ -32,11 +32,11 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     setRightTab,
     wallet,
     fetchScope,
-    scanTargets,
+    connectionScanTargets,
     visibleGraph,
     connectionMembers,
     flowIndex,
-    scanNeighbours,
+    connectionScanNeighbours,
     shownWorkbench,
     lockingWorkspace,
     canQuery,
@@ -107,18 +107,20 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
           <ConnectionScanPanel
             key={w.id}
             workspace={w}
-            selectionId={scanTargets.picking ? scanTargets.draft!.source : selectedId}
-            customTargetIds={scanTargets.targets}
-            pickingTargets={scanTargets.picking}
+            selectionId={
+              connectionScanTargets.picking ? connectionScanTargets.draft!.source : selectedId
+            }
+            customTargetIds={connectionScanTargets.targets}
+            pickingTargets={connectionScanTargets.picking}
             onPickTargets={(invoker) => {
-              if (selectedId) scanTargets.beginPicking(selectedId, invoker);
+              if (selectedId) connectionScanTargets.beginPicking(selectedId, invoker);
             }}
-            onCancelPicking={scanTargets.cancelPicking}
-            onRemoveTarget={scanTargets.removeTarget}
+            onCancelPicking={connectionScanTargets.cancelPicking}
+            onRemoveTarget={connectionScanTargets.removeTarget}
             visibleNodeIds={visibleGraph.nodes.map((node) => node.id)}
             addedNodeIds={[...connectionMembers]}
             loadedSpenders={flowIndex.spenders}
-            neighbours={scanNeighbours}
+            neighbours={connectionScanNeighbours}
             active={shownRightTab === 'scan' && shownWorkbench === 'graph' && !lockingWorkspace}
             canQuery={canQuery}
             scope={fetchScope}

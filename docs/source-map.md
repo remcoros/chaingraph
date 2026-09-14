@@ -24,13 +24,15 @@ src/
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
       Inspector/            node, wallet and script inspection
-      Selection/            shared selection, scan-target and visibility actions
+      Selection/            shared selection, connection-scan targets and visibility
       Tags/                 workspace tag management
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
         Wallet/             wallet overview, scan and preparation state
           WalletWorkbench.tsx controller binding and the wallet workbench view
           walletWorkbenchContext.ts shared context for the wallet panels
+          useWalletActivity.ts address discovery settings and runs
+          useWalletAnalysis.ts wallet-scoped analysis runs
           Records/          address and UTXO panels
           Review/           review detail, flow and input loading
         Graph/              graph surface, controls and metadata projection
@@ -92,6 +94,24 @@ Paths in the task table are relative to `src/`. Primitive
 tests live in `Domain/Wallet/wallet.test.ts` and `Infra/Storage/crypto.test.ts`;
 backend tests live beside the server modules. Test commands are in
 [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Scan, analysis and review vocabulary
+
+Four separate features once shared the word "scan". Each keeps its own words, and
+names stay unambiguous at the scope where they are exposed:
+
+| Feature          | Means                                                                         | Entry point                             | Domain                     |
+| ---------------- | ----------------------------------------------------------------------------- | --------------------------------------- | -------------------------- |
+| Wallet discovery | Derive branches and pull their history. "Scan wallet" or "Refresh" in the UI. | `walletDiscovery` (`useWalletActivity`) | `Wallet/wallet.ts`         |
+| Wallet analysis  | Run the analysis tools over a wallet scope. "Analyze" in the UI.              | `useWalletAnalysis`                     | `Analysis/analysisScan.ts` |
+| Wallet review    | The queue of sources, destinations and activity to label.                     | `walletActions`, review panels          | `Wallet/walletReview.ts`   |
+| Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | `ConnectionScan/`          |
+
+Wallet analysis and the Analysis workbench are the same feature reached from two
+places, so they share `AnalysisScan` and write one `findings` store. Wallet review
+is separate and shares nothing with them. Inside `ConnectionScan/` the short names
+are fine; anything published on the workspace controller carries its feature
+prefix, because all four meet there.
 
 ## Shared responsibilities
 

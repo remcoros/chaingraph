@@ -36,12 +36,12 @@ interface Props {
   busy: boolean;
   onRefreshAll: () => void;
   onShowActivity: (wallet: Wallet) => void;
-  gap: number;
-  setGap: (gap: number) => void;
-  scanLimit: number;
-  setScanLimit: (limit: number) => void;
-  live: boolean;
-  setLive: (live: boolean) => void;
+  gapLimit: number;
+  setGapLimit: (gapLimit: number) => void;
+  addressesPerBranch: number;
+  setAddressesPerBranch: (limit: number) => void;
+  monitorActivity: boolean;
+  setMonitorActivity: (monitorActivity: boolean) => void;
   canQuery: boolean;
   entityFilter: string;
   setEntityFilter: (filter: string) => void;
@@ -85,12 +85,12 @@ export function WorkspacePanel({
   busy,
   onRefreshAll,
   onShowActivity,
-  gap,
-  setGap,
-  scanLimit,
-  setScanLimit,
-  live,
-  setLive,
+  gapLimit,
+  setGapLimit,
+  addressesPerBranch,
+  setAddressesPerBranch,
+  monitorActivity,
+  setMonitorActivity,
   canQuery,
   entityFilter,
   setEntityFilter,
@@ -209,7 +209,7 @@ export function WorkspacePanel({
             {w.wallets.length === 0 && (
               <div className="empty-panel">
                 <WalletIcon size={27} />
-                <h3>Wallets live here</h3>
+                <h3>Wallets monitorActivity here</h3>
                 <p>Add multiple wallets to trace how their histories connect.</p>
               </div>
             )}
@@ -243,16 +243,18 @@ export function WorkspacePanel({
                 type="number"
                 min={10}
                 max={100}
-                value={gap}
-                onChange={(e) => setGap(Math.max(10, Math.min(100, Number(e.target.value) || 20)))}
+                value={gapLimit}
+                onChange={(e) =>
+                  setGapLimit(Math.max(10, Math.min(100, Number(e.target.value) || 20)))
+                }
               />
             </label>
             <label>
               Addresses / branch
               <select
                 title="Maximum addresses checked on each receive/change branch per scan. Increase this if the scan is partial."
-                value={scanLimit}
-                onChange={(e) => setScanLimit(Number(e.target.value))}
+                value={addressesPerBranch}
+                onChange={(e) => setAddressesPerBranch(Number(e.target.value))}
               >
                 <option value={200}>200</option>
                 <option value={500}>500</option>
@@ -262,14 +264,16 @@ export function WorkspacePanel({
             <label className="switch-label">
               <input
                 type="checkbox"
-                checked={live}
+                checked={monitorActivity}
                 disabled={!canQuery}
-                onChange={(e) => setLive(e.target.checked)}
+                onChange={(e) => setMonitorActivity(e.target.checked)}
               />
               <span>Check activity every 30s</span>
             </label>
             <p className="small muted">
-              {live ? 'Monitoring while unlocked. ' : 'Refresh to check for new activity. '}
+              {monitorActivity
+                ? 'Monitoring while unlocked. '
+                : 'Refresh to check for new activity. '}
               Each check scans receive and change branches, downloading up to 500 transactions per
               wallet.
             </p>

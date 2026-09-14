@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  walletScanScope,
-  walletScanSummary,
-} from '../src/App/Workspace/Workbenches/Wallet/useWalletScan';
+  walletAnalysisScope,
+  walletAnalysisSummary,
+} from '../src/App/Workspace/Workbenches/Wallet/useWalletAnalysis';
 import { scanDefaults, type AnalysisScan } from '../src/Domain/Analysis/analysisScan';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { deriveAddresses } from '../src/Domain/Wallet/wallet';
@@ -34,7 +34,7 @@ describe('Wallet scan scope', () => {
   it('does not describe inapplicable tools as a permanently partial scan', () => {
     const { workspace, wallet } = fixture();
     const scan: AnalysisScan = {
-      scope: walletScanScope(workspace, wallet),
+      scope: walletAnalysisScope(workspace, wallet),
       options: scanDefaults(),
       findings: [],
       runAt: '2026-09-09T10:00:00Z',
@@ -42,13 +42,13 @@ describe('Wallet scan scope', () => {
         { toolId: 'wallet-intersections', status: 'skipped', message: 'Requires two wallets.' },
       ],
     };
-    expect(walletScanSummary(scan)).toBe('0 findings');
+    expect(walletAnalysisSummary(scan)).toBe('0 findings');
     scan.reports[0].status = 'error';
-    expect(walletScanSummary(scan)).toBe('0 findings · 1 tool failed');
+    expect(walletAnalysisSummary(scan)).toBe('0 findings · 1 tool failed');
   });
   it('scans loaded wallet transactions without unrelated workspace records', () => {
     const { workspace, wallet } = fixture();
-    const scope = walletScanScope(workspace, wallet);
+    const scope = walletAnalysisScope(workspace, wallet);
     expect(scope.kind).toBe('wallet');
     expect(scope.txids.sort()).toEqual([TX_FUNDING, TX_SPENDING].sort());
     expect(scope.txids).not.toContain('c'.repeat(64));
@@ -72,7 +72,7 @@ describe('Wallet scan scope', () => {
       status: 'open',
       changed: false,
     };
-    const scope = walletScanScope(workspace, wallet, row);
+    const scope = walletAnalysisScope(workspace, wallet, row);
     expect(scope.kind).toBe('address');
     expect(scope.txids).toEqual([TX_FUNDING]);
     expect(scope.txids).not.toContain(TX_SPENDING);

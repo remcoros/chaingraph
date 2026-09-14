@@ -10,7 +10,7 @@ import { walletEvidenceChanged } from '../../../../Domain/Wallet/walletActivity'
 import { short, type Wallet, type Workspace } from '../../../../Domain/types';
 import type { WalletRow } from '../../../../Domain/Wallet/walletWorkbenchRows';
 
-export function walletScanScope(workspace: Workspace, wallet: Wallet, row?: WalletRow) {
+export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: WalletRow) {
   if (row?.relationshipDirection)
     return {
       kind: row.kind,
@@ -34,12 +34,12 @@ export function walletScanScope(workspace: Workspace, wallet: Wallet, row?: Wall
   );
 }
 
-export function walletScanSummary(scan: AnalysisScan): string {
+export function walletAnalysisSummary(scan: AnalysisScan): string {
   const failed = scan.reports.filter((report) => report.status === 'error').length;
   return `${scan.findings.length} findings${failed ? ` · ${failed} tool${failed === 1 ? '' : 's'} failed` : ''}`;
 }
 
-interface WalletScanOptions {
+interface WalletAnalysisOptions {
   workspace: Workspace;
   wallet: Wallet;
   active: boolean;
@@ -47,9 +47,9 @@ interface WalletScanOptions {
   onComplete?: (scan: AnalysisScan) => void;
 }
 
-async function runWalletScanRequest(
+async function runWalletAnalysisRequest(
   row: WalletRow | undefined,
-  latest: { current: WalletScanOptions },
+  latest: { current: WalletAnalysisOptions },
   pending: { current: AbortController | undefined },
   setScan: (scan: AnalysisScan) => void,
   setLoading: (loading: boolean) => void,
@@ -61,7 +61,7 @@ async function runWalletScanRequest(
   pending.current = undefined;
   setLoading(false);
   const snapshot = latest.current;
-  const scope = walletScanScope(snapshot.workspace, snapshot.wallet, row);
+  const scope = walletAnalysisScope(snapshot.workspace, snapshot.wallet, row);
   setError('');
   if (!scope.txids.length) {
     setError('No loaded transactions in this scope. Load its context first.');
@@ -88,7 +88,7 @@ async function runWalletScanRequest(
       findings: mergeScanFindings(current.findings, result),
     }));
     setScan(result);
-    setMessage(walletScanSummary(result));
+    setMessage(walletAnalysisSummary(result));
     latest.current.onComplete?.(result);
   } catch (cause) {
     if (!controller.signal.aborted) {
@@ -107,7 +107,7 @@ async function runWalletScanRequest(
   }
 }
 
-export function useWalletScan(options: WalletScanOptions) {
+export function useWalletAnalysis(options: WalletAnalysisOptions) {
   const latest = useRef(options);
   useEffect(() => {
     latest.current = options;
@@ -138,7 +138,7 @@ export function useWalletScan(options: WalletScanOptions) {
   useEffect(() => () => pending.current?.abort(), []);
 
   async function run(row?: WalletRow) {
-    await runWalletScanRequest(row, latest, pending, setScan, setLoading, setMessage, setError);
+    await runWalletAnalysisRequest(row, latest, pending, setScan, setLoading, setMessage, setError);
   }
   return { run, scan, loading, message, error };
 }

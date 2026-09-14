@@ -1,4 +1,4 @@
-.scan-target-toolbar {
+.connection-scan-target-toolbar {
   position: fixed;
   left: 50%;
   bottom: 44px;
@@ -17,44 +17,44 @@
   color: var(--color-ink);
   font-size: 11px;
 }
-.scan-target-toolbar:focus-visible {
+.connection-scan-target-toolbar:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
-.scan-target-toolbar-header,
-.scan-target-toolbar-title,
-.scan-target-toolbar-actions {
+.connection-scan-target-toolbar-header,
+.connection-scan-target-toolbar-title,
+.connection-scan-target-toolbar-actions {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.scan-target-toolbar-header {
+.connection-scan-target-toolbar-header {
   flex-wrap: wrap;
 }
-.scan-target-toolbar-title {
+.connection-scan-target-toolbar-title {
   padding-left: 4px;
 }
-.scan-target-toolbar-title svg {
+.connection-scan-target-toolbar-title svg {
   flex-shrink: 0;
 }
-.scan-target-toolbar-count {
+.connection-scan-target-toolbar-count {
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
-.scan-target-toolbar-actions {
+.connection-scan-target-toolbar-actions {
   margin-left: auto;
 }
-.scan-target-toolbar button {
+.connection-scan-target-toolbar button {
   min-height: 30px;
   gap: 4px;
   padding: 4px 7px;
   font-size: 11px;
 }
-.scan-target-toolbar .scan-target-toolbar-cancel {
+.connection-scan-target-toolbar .connection-scan-target-toolbar-cancel {
   width: 30px;
   padding: 4px;
 }
-.scan-target-toolbar-targets {
+.connection-scan-target-toolbar-targets {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 8px;
@@ -65,44 +65,44 @@
   overscroll-behavior: contain;
   list-style: none;
 }
-.scan-target-toolbar .scan-target-toolbar-target {
+.connection-scan-target-toolbar .connection-scan-target-toolbar-target {
   padding: 3px 4px;
   color: var(--color-accent);
   background: transparent;
   border-color: transparent;
   font-family: var(--font-mono);
 }
-.scan-target-toolbar-target span {
+.connection-scan-target-toolbar-target span {
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
-.scan-target-toolbar .scan-target-toolbar-target:hover {
+.connection-scan-target-toolbar .connection-scan-target-toolbar-target:hover {
   background: var(--color-hover);
 }
-.scan-target-toolbar-target:hover span {
+.connection-scan-target-toolbar-target:hover span {
   text-decoration-color: currentColor;
 }
-.scan-target-toolbar-empty,
-.scan-target-toolbar-error {
+.connection-scan-target-toolbar-empty,
+.connection-scan-target-toolbar-error {
   padding: 2px 4px;
 }
-.scan-target-toolbar-empty {
+.connection-scan-target-toolbar-empty {
   color: var(--color-muted);
 }
-.scan-target-toolbar-error {
+.connection-scan-target-toolbar-error {
   color: var(--color-warning);
 }
 @media (max-width: 999px) {
-  .scan-target-toolbar {
+  .connection-scan-target-toolbar {
     bottom: 34px;
     max-width: calc(100vw - 16px);
     padding: 5px;
   }
-  .scan-target-toolbar button {
+  .connection-scan-target-toolbar button {
     min-height: 38px;
   }
-  .scan-target-toolbar .scan-target-toolbar-cancel {
+  .connection-scan-target-toolbar .connection-scan-target-toolbar-cancel {
     width: 38px;
   }
 }

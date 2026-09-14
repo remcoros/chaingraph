@@ -41,7 +41,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     change,
     wallet,
     canQuery,
-    scan,
+    walletDiscovery,
     setWalletNameDialog,
     tourStep,
     shownRightTab,
@@ -62,7 +62,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       workspace={w}
       busy={!!operation}
       canQuery={canQuery}
-      onScan={() => void scan(wallet)}
+      onScan={() => void walletDiscovery.run(wallet)}
       onShowActivity={() => showWalletActivity(wallet)}
       onEdit={() => setWalletNameDialog({ workspaceId: w.id, walletId: wallet.id })}
       onShowWallet={() => {

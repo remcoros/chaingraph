@@ -194,7 +194,7 @@ export function useGraphProjection({
   );
   const graph = appliedGraphRequest.showAddresses ? completeGraph : graphWithoutAddresses;
   const flowIndex = useMemo(() => indexGraphFlow(graphWithoutAddresses), [graphWithoutAddresses]);
-  const scanNeighbours = useMemo(
+  const connectionScanNeighbours = useMemo(
     () => indexScanNeighbours(graphWithoutAddresses),
     [graphWithoutAddresses],
   );
@@ -488,7 +488,7 @@ export function useGraphProjection({
     graphSelectedId,
     graph,
     flowIndex,
-    scanNeighbours,
+    connectionScanNeighbours,
     graphFlowContext,
     walletMatches,
     highlightedSelection,

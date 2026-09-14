@@ -3,16 +3,16 @@ import { isScanNodeId } from '../../../Domain/ConnectionScan/connectionScan';
 import { prepareCustomScanTargets } from '../../../Domain/ConnectionScan/connectionScanTargets';
 
 /** An in-progress pick, scoped to the workspace and source node it started from. */
-export interface ScanTargetDraft {
+export interface ConnectionScanTargetDraft {
   workspaceId: string;
   source: string;
   ids: string[];
 }
 
-export interface ScanTargets {
+export interface ConnectionScanTargets {
   /** Confirmed targets for the next scan. */
   targets: string[];
-  draft: ScanTargetDraft | undefined;
+  draft: ConnectionScanTargetDraft | undefined;
   /** True while the draft belongs to this workspace and the canvas can accept picks. */
   picking: boolean;
   /** Prepared target count, or the reason the draft cannot be prepared. */
@@ -35,14 +35,14 @@ interface Inputs {
   onShowPanel: (panel: 'graph' | 'right') => void;
 }
 
-export function useScanTargets({
+export function useConnectionScanTargets({
   workspaceId,
   canPick,
   onSelectSource,
   onShowPanel,
-}: Inputs): ScanTargets {
+}: Inputs): ConnectionScanTargets {
   const [targets, setTargets] = useState<string[]>([]);
-  const [draft, setDraft] = useState<ScanTargetDraft>();
+  const [draft, setDraft] = useState<ConnectionScanTargetDraft>();
   const invoker = useRef<HTMLElement | null>(null);
   const picking = !!draft && draft.workspaceId === workspaceId && canPick;
   useEffect(() => {

@@ -44,7 +44,7 @@ import { useRecordSelection } from './useRecordSelection';
 import type { WalletUtxoController } from './useWalletUtxos';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import type { WorkspaceController } from '../../useWorkspace';
-import { useWalletScan } from './useWalletScan';
+import { useWalletAnalysis } from './useWalletAnalysis';
 import { useWalletCounterparties } from './useWalletCounterparties';
 import { useTransactionFetch } from '../../useTransactionFetch';
 import { WALLET_FLOW_INPUT_WAVE_LIMIT } from './Review/walletFlowInputs';
@@ -71,8 +71,8 @@ import './wallet-workbench.css';
 export interface WalletWorkbenchViewProps extends WalletWorkbenchContext {
   walletUtxos: WalletUtxoController;
   preparationCache?: WalletPreparationCache;
-  analysisScan?: AnalysisScan;
-  onScanComplete?: (scan: AnalysisScan) => void;
+  sessionAnalysis?: AnalysisScan;
+  onAnalysisComplete?: (scan: AnalysisScan) => void;
 }
 
 const TABS = [
@@ -96,7 +96,7 @@ const noop = () => {};
 const PREVIEW_ACTIONS = {
   walletUtxos: { loading: false, error: '', check: async () => {} },
   updateEvidence: noop,
-  onScanComplete: noop,
+  onAnalysisComplete: noop,
   onSelectWallet: noop,
   onAddWallet: noop,
   onEditWallet: noop,
@@ -158,9 +158,9 @@ function buildWalletRowTagIndex(tags: Workspace['tags'], rows: readonly WalletRo
 
 function walletCategoryScanState(
   findings: Workspace['findings'],
-  currentScan: AnalysisScan | undefined,
+  currentAnalysis: AnalysisScan | undefined,
 ) {
-  return walletReviewCategoryScanState({ findings }, currentScan);
+  return walletReviewCategoryScanState({ findings }, currentAnalysis);
 }
 
 function walletCategories(
@@ -246,7 +246,7 @@ export const WalletWorkbenchView = memo(
             active={false}
             workspace={previewWorkspace}
             wallet={previewWallet}
-            analysisScan={props.tourPreview.example ? undefined : props.analysisScan}
+            sessionAnalysis={props.tourPreview.example ? undefined : props.sessionAnalysis}
             canQuery={props.tourPreview.example ? false : props.canQuery}
             queryDisabledReason={
               props.tourPreview.example
@@ -270,12 +270,12 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
   const { workspace, wallet, active, busy, canQuery, onChange } = props;
   const [localPreparation] = useState(() => new WalletPreparationCache());
   const preparation = props.preparationCache ?? localPreparation;
-  const walletScan = useWalletScan({
+  const walletAnalysis = useWalletAnalysis({
     workspace,
     wallet,
     active,
     onChange,
-    onComplete: props.onScanComplete,
+    onComplete: props.onAnalysisComplete,
   });
   const [tab, setTab] = useState<WalletTab>(props.tourPreview?.tab ?? 'review');
   const [status, setStatus] = useState<WalletStatusFilter>(
@@ -386,10 +386,10 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
     () => metadataFiltered.filter((row) => matchesWalletStatus(row, status)),
     [metadataFiltered, status],
   );
-  const currentScan = walletScan.scan ?? props.analysisScan;
+  const currentAnalysis = walletAnalysis.scan ?? props.sessionAnalysis;
   const scanState = useMemo(
-    () => walletCategoryScanState(workspace.findings, currentScan),
-    [workspace.findings, currentScan],
+    () => walletCategoryScanState(workspace.findings, currentAnalysis),
+    [workspace.findings, currentAnalysis],
   );
   const categories = useMemo(
     () =>
@@ -415,7 +415,7 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
                     ? 'The last scan skipped this check.'
                     : tool?.status === 'error'
                       ? 'The last scan could not finish this check. Choose Analyze to try again.'
-                      : `Last scan: ${currentScan?.scope.label ?? 'selection unavailable'}.`;
+                      : `Last scan: ${currentAnalysis?.scope.label ?? 'selection unavailable'}.`;
             return { ...category, note };
           }),
     [
@@ -426,7 +426,7 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
       workspace.walletReviews,
       statusFiltered,
       scanState,
-      currentScan,
+      currentAnalysis,
     ],
   );
   const selectedTypes = useMemo(
@@ -635,16 +635,16 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
         onCheck={(cursor) => {
           if (active) void check(cursor);
         }}
-        onScan={() => void walletScan.run()}
-        scanLoading={walletScan.loading}
-        scanStatus={
-          walletScan.message ||
-          (currentScan?.scope.kind === 'wallet' &&
-          currentScan.scope.label === `Wallet ${wallet.name}`
-            ? `${currentScan.findings.length} findings`
+        onAnalyze={() => void walletAnalysis.run()}
+        analyzing={walletAnalysis.loading}
+        analysisStatus={
+          walletAnalysis.message ||
+          (currentAnalysis?.scope.kind === 'wallet' &&
+          currentAnalysis.scope.label === `Wallet ${wallet.name}`
+            ? `${currentAnalysis.findings.length} findings`
             : '')
         }
-        scanIssues={currentScan?.reports
+        analysisIssues={currentAnalysis?.reports
           .filter((report) => report.status === 'error')
           .map((report) => `${report.toolId}: ${report.message}`)
           .join(' ')}
@@ -655,9 +655,9 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
             {utxoError}
           </p>
         )}
-        {walletScan.error && (
+        {walletAnalysis.error && (
           <p role="alert" className="small warning">
-            {walletScan.error}
+            {walletAnalysis.error}
           </p>
         )}
         {invalidCount > 0 && (
@@ -1180,7 +1180,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     workbench,
     lockingWorkspace,
     analysisSessions,
-    setWalletScanRevision,
+    setWalletAnalysisRevision,
     wallet,
     canQuery,
     operation,
@@ -1193,7 +1193,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     setWalletDialog,
     change,
     setWalletNameDialog,
-    scan,
+    walletDiscovery,
     shownWorkbench,
     walletWorkspaceRef,
   } = workspace;
@@ -1219,9 +1219,9 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         }
         active={viewOwner === w.id && workbench === 'wallet' && !lockingWorkspace && !tourStep}
         workspace={w}
-        analysisScan={analysisSessions.current.get(w.id)?.scan}
+        sessionAnalysis={analysisSessions.current.get(w.id)?.scan}
         updateEvidence={ws.update}
-        onScanComplete={(scan) => {
+        onAnalysisComplete={(scan) => {
           analysisSessions.current.set(w.id, {
             scopeMode: analysisSessions.current.get(w.id)?.scopeMode,
             options: scan.options,
@@ -1230,7 +1230,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
             kind: 'all',
             limit: 40,
           });
-          setWalletScanRevision((value) => value + 1);
+          setWalletAnalysisRevision((value) => value + 1);
         }}
         wallet={wallet ?? w.wallets[0]}
         canQuery={canQuery}
@@ -1246,7 +1246,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         onAddWallet={() => setWalletDialog(true)}
         onChange={(update, group) => change(update, true, group)}
         onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
-        onRefresh={() => void scan(wallet ?? w.wallets[0])}
+        onRefresh={() => void walletDiscovery.run(wallet ?? w.wallets[0])}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
         onShowSelection={(ids, isolate) => {

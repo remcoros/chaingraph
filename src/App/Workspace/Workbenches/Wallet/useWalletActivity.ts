@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { applyWalletScan, walletActivitySummary } from '../../../../Domain/Wallet/walletActivity';
 import { clearContextProvenance } from '../../../../Domain/Workspace/workspace';
 import { mergeTransactionObservations } from '../../../../Domain/Chain/prevouts';
@@ -8,10 +8,25 @@ import type { Dispatch, SetStateAction, RefObject } from 'react';
 
 import type { AppState } from '../../../useAppState';
 import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+/**
+ * Address discovery for wallets: derive branches, pull their history and
+ * optionally keep checking for new activity. Distinct from wallet analysis,
+ * which looks for findings in already loaded transactions.
+ */
+export interface WalletDiscovery {
+  /** Stop a branch after this many consecutive addresses with no history. */
+  gapLimit: number;
+  setGapLimit: (value: number) => void;
+  /** Maximum addresses derived on each receive/change branch per run. */
+  addressesPerBranch: number;
+  setAddressesPerBranch: (value: number) => void;
+  /** Re-check every unlocked wallet for new activity on a timer. */
+  monitorActivity: boolean;
+  setMonitorActivity: (value: boolean) => void;
+  run: (wallet?: Wallet) => Promise<void> | void;
+}
 interface Inputs {
   setOperation: Dispatch<SetStateAction<string>>;
-  gap: number;
-  scanLimit: number;
   fetchScope: AppState['fetchScope'];
   ws: AppState['ws'];
   w: AppState['w'];
@@ -23,13 +38,10 @@ interface Inputs {
   wRef: AppState['wRef'];
   mergeTransactions: WorkspaceEvidence['mergeTransactions'];
   updateWorkspace: AppState['updateWorkspace'];
-  live: boolean;
   workspaceId: AppState['workspaceId'];
 }
 export function useWalletActivity({
   setOperation,
-  gap,
-  scanLimit,
   fetchScope,
   ws,
   w,
@@ -41,9 +53,16 @@ export function useWalletActivity({
   wRef,
   mergeTransactions,
   updateWorkspace,
-  live,
   workspaceId,
-}: Inputs) {
+}: Inputs): WalletDiscovery {
+  const [gapLimit, setGapLimit] = useState(20);
+  const [addressesPerBranch, setAddressesPerBranch] = useState(200);
+  // Scoped to the workspace being monitored, so switching or locking one stops
+  // the timer without a reset step that could outlive its workspace.
+  const [monitoredWorkspaceId, setMonitoredWorkspaceId] = useState<string>();
+  const monitorActivity = !!workspaceId && monitoredWorkspaceId === workspaceId;
+  const setMonitorActivity = (value: boolean) =>
+    setMonitoredWorkspaceId(value ? workspaceId : undefined);
   const monitorOperationRef = useRef<AbortController | undefined>(undefined);
   async function refreshWallets(targets: Wallet[], initial: Workspace, signal: AbortSignal) {
     let snapshot = initial;
@@ -54,8 +73,8 @@ export function useWalletActivity({
     for (const target of targets) {
       setOperation(`${target.scannedAt ? 'Refreshing' : 'Scanning'} ${target.name}…`);
       const result = await scanWallet(target, snapshot.network, snapshot.transactions, {
-        gap,
-        maxIndex: scanLimit,
+        gap: gapLimit,
+        maxIndex: addressesPerBranch,
         signal,
         fetchHints: { scope: fetchScope },
         onProgress: (p) => setOperation(p.message),
@@ -86,7 +105,7 @@ export function useWalletActivity({
         0,
       );
       setNotice(
-        `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${pendingTransactions ? ` ${pendingTransactions} transactions waiting; Refresh again to continue.` : result.partial ? ` Address search reached its ${scanLimit}/branch limit. Increase Addresses / branch in Graph wallet controls to search further.` : ''}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
+        `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${pendingTransactions ? ` ${pendingTransactions} transactions waiting; Refresh again to continue.` : result.partial ? ` Address search reached its ${addressesPerBranch}/branch limit. Increase Addresses / branch in Graph wallet controls to search further.` : ''}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
       );
       // Only the first discovery frames an empty canvas. Returning checks leave
       // the user's camera, selection, filters and annotations alone.
@@ -179,12 +198,20 @@ export function useWalletActivity({
   });
   // Poll from the client, only while this workspace is unlocked. Backend never owns scan state.
   useEffect(() => {
-    if (!live || !canQuery || !workspaceId) return;
+    if (!monitorActivity || !canQuery || !workspaceId) return;
     const timer = setInterval(pollWalletActivity, 30000);
     return () => {
       clearInterval(timer);
       monitorOperationRef.current?.abort();
     };
-  }, [live, canQuery, workspaceId, gap, scanLimit]);
-  return { scan };
+  }, [monitorActivity, canQuery, workspaceId, gapLimit, addressesPerBranch]);
+  return {
+    gapLimit,
+    setGapLimit,
+    addressesPerBranch,
+    setAddressesPerBranch,
+    monitorActivity,
+    setMonitorActivity,
+    run: scan,
+  };
 }

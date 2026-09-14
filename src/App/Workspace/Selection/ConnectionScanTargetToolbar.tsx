@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef } from 'react';
 import { Check, Crosshair, X } from 'lucide-react';
 import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
-import './scan-target-toolbar.css';
+import './connection-scan-target-toolbar.css';
 
-export interface ScanTargetToolbarProps {
+export interface ConnectionScanTargetToolbarProps {
   ids: readonly string[];
   onRemove: (id: string) => void;
   onDone: () => void;
@@ -13,14 +13,14 @@ export interface ScanTargetToolbarProps {
 }
 
 /** Temporary graph-picking controls. The caller restores focus when picking ends. */
-export function ScanTargetToolbar({
+export function ConnectionScanTargetToolbar({
   ids,
   onRemove,
   onDone,
   onCancel,
   targetCount,
   error,
-}: ScanTargetToolbarProps) {
+}: ConnectionScanTargetToolbarProps) {
   const toolbar = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const errorId = useId();
@@ -41,19 +41,19 @@ export function ScanTargetToolbar({
   return (
     <div
       ref={toolbar}
-      className="scan-target-toolbar"
+      className="connection-scan-target-toolbar"
       role="group"
       tabIndex={-1}
       aria-labelledby={titleId}
       aria-describedby={error ? errorId : undefined}
     >
-      <div className="scan-target-toolbar-header">
-        <strong id={titleId} className="scan-target-toolbar-title">
+      <div className="connection-scan-target-toolbar-header">
+        <strong id={titleId} className="connection-scan-target-toolbar-title">
           <Crosshair size={14} aria-hidden="true" /> Pick targets
         </strong>
         {!error && (
           <span
-            className="scan-target-toolbar-count"
+            className="connection-scan-target-toolbar-count"
             role="status"
             title="Only picked nodes are scan targets."
           >
@@ -61,7 +61,7 @@ export function ScanTargetToolbar({
             {displayedTargetCount === 1 ? 'target' : 'targets'}
           </span>
         )}
-        <div className="scan-target-toolbar-actions">
+        <div className="connection-scan-target-toolbar-actions">
           <button
             type="button"
             className="primary"
@@ -72,7 +72,7 @@ export function ScanTargetToolbar({
           </button>
           <button
             type="button"
-            className="scan-target-toolbar-cancel"
+            className="connection-scan-target-toolbar-cancel"
             aria-label="Cancel picking targets"
             title="Cancel picking targets (Esc)"
             onClick={onCancel}
@@ -82,7 +82,7 @@ export function ScanTargetToolbar({
         </div>
       </div>
       {ids.length > 0 ? (
-        <ul className="scan-target-toolbar-targets" aria-label="Picked targets">
+        <ul className="connection-scan-target-toolbar-targets" aria-label="Picked targets">
           {ids.map((id) => {
             const reference = id.replace(/^(?:tx|out):/, '');
             const label = `Remove ${id.startsWith('tx:') ? 'transaction' : 'output'} ${reference}`;
@@ -90,7 +90,7 @@ export function ScanTargetToolbar({
               <li key={id}>
                 <button
                   type="button"
-                  className="scan-target-toolbar-target"
+                  className="connection-scan-target-toolbar-target"
                   aria-label={label}
                   title={label}
                   onClick={() => onRemove(id)}
@@ -105,12 +105,12 @@ export function ScanTargetToolbar({
           })}
         </ul>
       ) : (
-        <span className="scan-target-toolbar-empty">
+        <span className="connection-scan-target-toolbar-empty">
           Click transactions or outputs in the graph.
         </span>
       )}
       {error && (
-        <span id={errorId} className="scan-target-toolbar-error" role="alert">
+        <span id={errorId} className="connection-scan-target-toolbar-error" role="alert">
           {error}
         </span>
       )}

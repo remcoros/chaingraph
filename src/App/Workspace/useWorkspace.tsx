@@ -15,7 +15,7 @@ import {
 } from 'react';
 import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
-import { useScanTargets } from './Selection/useScanTargets';
+import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from '../../Domain/Workspace/entityRemoval';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
@@ -143,7 +143,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     cameraPreservedSelection.current = id;
   }, []);
   const analysisSessions = useRef(new Map<string, AnalysisSession>());
-  const [walletScanRevision, setWalletScanRevision] = useState(0);
+  const [walletAnalysisRevision, setWalletAnalysisRevision] = useState(0);
   useEffect(() => {
     const unlocked = new Set(ws.sessions.map((session) => session.data.id));
     for (const id of analysisSessions.current.keys())
@@ -241,17 +241,14 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       : rightTab);
   const shownMobilePanel = tourStep?.view?.panel ?? mobilePanel;
   const shownFocusGraph = tourStep ? false : focusGraph;
-  const scanTargets = useScanTargets({
+  const connectionScanTargets = useConnectionScanTargets({
     workspaceId: w?.id,
     canPick:
       shownWorkbench === 'graph' && shownRightTab === 'scan' && !lockingWorkspace && !tourStep,
     onSelectSource: setSelectedId,
     onShowPanel: setMobilePanel,
   });
-  const pickingScanTargets = scanTargets.picking;
-  const [live, setLive] = useState(false);
-  const [scanLimit, setScanLimit] = useState(200);
-  const [gap, setGap] = useState(20);
+  const pickingScanTargets = connectionScanTargets.picking;
   const spendingOffsets = useRef(
     new Map<string, { offset: number; unavailableTxids?: string[] }>(),
   );
@@ -286,7 +283,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     fitToken,
     selectedId,
     selection,
-    scanTargetDraft: scanTargets.draft,
+    scanTargetDraft: connectionScanTargets.draft,
     pickingScanTargets,
     entityPanelFilters,
     entityFiltersLinked,
@@ -297,7 +294,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     graphSelectedId,
     graph,
     flowIndex,
-    scanNeighbours,
+    connectionScanNeighbours,
     graphFlowContext,
     walletMatches,
     highlightedSelection,
@@ -355,7 +352,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const select = useCallback(
     (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => {
       if (pickingScanTargets && options?.pickTarget !== false) {
-        scanTargets.toggle(id);
+        connectionScanTargets.toggle(id);
         return;
       }
       if (pendingSelectionRef.current && pendingSelectionRef.current !== id)
@@ -380,7 +377,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       );
       setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
-    [updateWorkspace, getWorkspaceSession, pickingScanTargets, scanTargets, wRef],
+    [updateWorkspace, getWorkspaceSession, pickingScanTargets, connectionScanTargets, wRef],
   );
   const resetWorkspacePresentation = useEffectEvent(() => {
     operationRef.current?.abort();
@@ -388,7 +385,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
-    scanTargets.reset();
+    connectionScanTargets.reset();
     setSelectedWallet(
       w?.view.selectedWallet && w.wallets.some((item) => item.id === w.view.selectedWallet)
         ? w.view.selectedWallet
@@ -413,7 +410,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setViewOwner(w?.id);
     setError('');
     setNotice('');
-    setLive(false);
     setSettingsOpen(false);
     setWalletNameDialog(undefined);
     setExamplesOpen(false);
@@ -775,10 +771,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       setNotice('Encrypted workspace exported. Keep the file and password safe.');
     });
   }
-  const walletActivity = useWalletActivity({
+  const walletDiscovery = useWalletActivity({
     setOperation,
-    gap,
-    scanLimit,
     fetchScope,
     ws,
     w,
@@ -790,10 +784,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     wRef,
     mergeTransactions,
     updateWorkspace,
-    live,
     workspaceId,
   });
-  const { scan } = walletActivity;
   const undoToken = ws.getSession(w?.id ?? '')?.undoRevision ?? 0;
   const undoDescription = ws.active?.history.at(-1)?.description;
   const undoLabel = undoDescription ? `Undo: ${undoDescription}` : 'Nothing to undo';
@@ -821,7 +813,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   };
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   const graphActions = useGraphActions({
-    cancelScanTargetPicking: scanTargets.cancelPicking,
+    cancelScanTargetPicking: connectionScanTargets.cancelPicking,
     selectionGeneration,
     invalidateSelection,
     preserveSelectionCamera,
@@ -967,7 +959,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     change,
     wallet,
     canQuery,
-    scan,
+    walletDiscovery,
     setWalletNameDialog,
     tourStep,
     shownRightTab,
@@ -975,11 +967,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selectedId,
     selectedWallet,
     fetchScope,
-    scanTargets,
+    connectionScanTargets,
     visibleGraph,
     connectionMembers,
     flowIndex,
-    scanNeighbours,
+    connectionScanNeighbours,
     shownWorkbench,
     lockingWorkspace,
     wRef,
@@ -992,12 +984,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selection,
     shownLeftTab,
     setWalletDialog,
-    gap,
-    setGap,
-    scanLimit,
-    setScanLimit,
-    live,
-    setLive,
     entityPanelFilters,
     graphFilters,
     entityFiltersLinked,
@@ -1072,9 +1058,9 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setError,
     tourExample,
     analysisSessions,
-    setWalletScanRevision,
+    setWalletAnalysisRevision,
     walletWorkspaceRef,
-    walletScanRevision,
+    walletAnalysisRevision,
     analysisWorkspaceRef,
     selectionOnCanvas,
     matchingScope,

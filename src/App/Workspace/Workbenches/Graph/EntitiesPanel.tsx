@@ -5,7 +5,7 @@ import type { WorkspaceController } from '../../useWorkspace';
 
 export function EntitiesPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
-    scanTargets,
+    connectionScanTargets,
     w,
     removableNodeIds,
     requestEntityRemoval,
@@ -27,13 +27,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setWalletDialog,
     setWalletNameDialog,
     operation,
-    scan,
-    gap,
-    setGap,
-    scanLimit,
-    setScanLimit,
-    live,
-    setLive,
+    walletDiscovery,
     canQuery,
     entityPanelFilters,
     graphFilters,
@@ -68,18 +62,18 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       transactions={w.transactions}
       removableNodeIds={removableNodeIds}
       onRemoveNode={requestEntityRemoval}
-      selection={scanTargets.picking ? undefined : selection}
+      selection={connectionScanTargets.picking ? undefined : selection}
       tagsPanel={
         <TagsPanel
           key={w.id}
           workspace={w}
           graph={graph}
           selected={selected}
-          selectedIds={scanTargets.picking ? undefined : selection.ids}
+          selectedIds={connectionScanTargets.picking ? undefined : selection.ids}
           onChange={changeTags}
           onSelect={(id) => {
             select(id);
-            if (!scanTargets.picking) setMobilePanel('right');
+            if (!connectionScanTargets.picking) setMobilePanel('right');
           }}
           onShow={(tag) => {
             updateFilters({ tagId: tag.id, preserveContext: true });
@@ -101,19 +95,19 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       }}
       onSelectNode={(id) => {
         select(id);
-        if (!scanTargets.picking) setMobilePanel('right');
+        if (!connectionScanTargets.picking) setMobilePanel('right');
       }}
       onAddWallet={() => setWalletDialog(true)}
       onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
       busy={!!operation}
-      onRefreshAll={() => void scan()}
+      onRefreshAll={() => void walletDiscovery.run()}
       onShowActivity={showWalletActivity}
-      gap={gap}
-      setGap={setGap}
-      scanLimit={scanLimit}
-      setScanLimit={setScanLimit}
-      live={live}
-      setLive={setLive}
+      gapLimit={walletDiscovery.gapLimit}
+      setGapLimit={walletDiscovery.setGapLimit}
+      addressesPerBranch={walletDiscovery.addressesPerBranch}
+      setAddressesPerBranch={walletDiscovery.setAddressesPerBranch}
+      monitorActivity={walletDiscovery.monitorActivity}
+      setMonitorActivity={walletDiscovery.setMonitorActivity}
       canQuery={canQuery}
       entityFilter={(entityFiltersLinked ? graphFilters : entityPanelFilters).query ?? ''}
       setEntityFilter={(query) =>
