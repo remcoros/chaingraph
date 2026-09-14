@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import {
   ArrowRightFromLine,
   ArrowRightToLine,
@@ -13,56 +13,21 @@ import {
 import { Amount } from '../../../../../Shared/Display/Amount';
 import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
 import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
+import { addressBalanceSats } from '../../../../../Domain/Chain/addressHistory';
+import type { AddressBalanceObservation } from '../../../../../Domain/types';
+import { FlowPanelAddressView, type FlowPanelAddressViewProps } from './FlowPanelAddressView';
 import {
-  addressBalanceSats,
-  type AddressHistory,
-} from '../../../../../Domain/Chain/addressHistory';
-import type {
-  AddressBalanceObservation,
-  AddressUtxoObservation,
-  GraphNode,
-  TransactionFlowState,
-  Workspace,
-} from '../../../../../Domain/types';
-import type { WalletUtxoObservation } from '../../../../../Domain/Wallet/walletUtxoObservation';
-import type { VisibilityProps } from '../../../Selection/VisibilityActions';
-import type { EntitySelection } from '../../../Selection/useEntitySelection';
-import { FlowPanelAddressView } from './FlowPanelAddressView';
-import { FlowPanelTransactionView, useFlowPanelTransaction } from './FlowPanelTransactionView';
+  FlowPanelTransactionView,
+  useFlowPanelTransaction,
+  type FlowPanelTransactionViewProps,
+} from './FlowPanelTransactionView';
 import './transaction-view.css';
 
-export interface FlowPanelProps extends VisibilityProps {
-  workspace: Workspace;
-  walletUtxoObservation?: WalletUtxoObservation;
-  selected?: GraphNode;
-  onSelect: (id: string) => void;
-  onEdit: (id: string, target?: 'label' | 'tags' | 'icon') => void;
-  onApplyTags: (update: (workspace: Workspace) => Workspace) => void;
-  onSetIcon: (id: string, icon: string) => void;
-  onTrace: (direction: 'funding' | 'spending', id: string) => void;
-  disabledReason?: string;
-  inputLoading?: boolean;
-  inputError?: string;
-  onRetryInputs?: () => void;
+/** The shell composes both views, so its props are their contracts plus its own. */
+export interface FlowPanelProps extends FlowPanelAddressViewProps, FlowPanelTransactionViewProps {
   missingInputCount?: number;
   onLoadAllInputs?: () => void;
-  onSmallAmountThresholdChange?: (threshold: number) => void;
-  renderMetadata?: (nodeId: string) => ReactNode;
-  state?: TransactionFlowState;
-  onStateChange?: (state: TransactionFlowState) => void;
-  selection?: EntitySelection;
-  addressHistory?: AddressHistory;
-  addressHistoryLoad?: {
-    phase: 'history' | 'details' | 'balance';
-    done: number;
-    total: number;
-    error?: string;
-  };
   addressBalance?: AddressBalanceObservation;
-  addressUtxos?: AddressUtxoObservation;
-  onLoadAddressHistory?: (force?: boolean) => void;
-  onLoadAddressUtxos?: (force?: boolean) => void;
-  onOpenAddressHistoryTransaction?: (txid: string, height?: number, vout?: number) => void;
 }
 
 export function FlowPanel(props: FlowPanelProps) {

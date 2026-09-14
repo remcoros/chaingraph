@@ -9,8 +9,30 @@ import {
   type AddressHistory,
 } from '../../../../../Domain/Chain/addressHistory';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import { txNodeId, type AddressUtxoObservation } from '../../../../../Domain/types';
-import type { FlowPanelProps } from './FlowPanel';
+import {
+  txNodeId,
+  type AddressUtxoObservation,
+  type GraphNode,
+  type Workspace,
+} from '../../../../../Domain/types';
+
+export interface FlowPanelAddressViewProps {
+  workspace: Workspace;
+  selected?: GraphNode;
+  disabledReason?: string;
+  renderMetadata?: (nodeId: string) => ReactNode;
+  addressHistory?: AddressHistory;
+  addressHistoryLoad?: {
+    phase: 'history' | 'details' | 'balance';
+    done: number;
+    total: number;
+    error?: string;
+  };
+  addressUtxos?: AddressUtxoObservation;
+  onLoadAddressHistory?: (force?: boolean) => void;
+  onLoadAddressUtxos?: (force?: boolean) => void;
+  onOpenAddressHistoryTransaction?: (txid: string, height?: number, vout?: number) => void;
+}
 
 function checkedAtLabel(value?: string) {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Not checked';
@@ -61,7 +83,7 @@ function AddressHistorySection<T>({
   );
 }
 
-export function FlowPanelAddressView({ panel }: { panel: FlowPanelProps }) {
+export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewProps }) {
   const {
     workspace,
     selected,

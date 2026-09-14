@@ -46,7 +46,31 @@ import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveId
 import { BatchTagEditor, MetadataPopover } from '../../../../../Shared/Metadata/MetadataEditors';
 import { IconPalette } from '../../../../../Shared/Metadata/IconPicker';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import type { FlowPanelProps as Props } from './FlowPanel';
+import type { GraphNode, TransactionFlowState, Workspace } from '../../../../../Domain/types';
+import type { WalletUtxoObservation } from '../../../../../Domain/Wallet/walletUtxoObservation';
+import type { VisibilityProps } from '../../../Selection/VisibilityActions';
+import type { EntitySelection } from '../../../Selection/useEntitySelection';
+
+export interface FlowPanelTransactionViewProps extends VisibilityProps {
+  workspace: Workspace;
+  selected?: GraphNode;
+  walletUtxoObservation?: WalletUtxoObservation;
+  onSelect: (id: string) => void;
+  onEdit: (id: string, target?: 'label' | 'tags' | 'icon') => void;
+  onApplyTags: (update: (workspace: Workspace) => Workspace) => void;
+  onSetIcon: (id: string, icon: string) => void;
+  onTrace: (direction: 'funding' | 'spending', id: string) => void;
+  disabledReason?: string;
+  inputLoading?: boolean;
+  inputError?: string;
+  onRetryInputs?: () => void;
+  onSmallAmountThresholdChange?: (threshold: number) => void;
+  renderMetadata?: (nodeId: string) => ReactNode;
+  state?: TransactionFlowState;
+  onStateChange?: (state: TransactionFlowState) => void;
+  selection?: EntitySelection;
+}
+type Props = FlowPanelTransactionViewProps;
 
 interface Row {
   id?: string;
