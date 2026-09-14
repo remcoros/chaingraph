@@ -52,25 +52,41 @@
 }
 .transaction-view-footer {
   position: absolute;
-  bottom: 4px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
-  gap: 4px;
+  gap: 1px;
+  padding: 0;
+  border: 1px solid var(--color-rule);
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: color-mix(in srgb, var(--color-paper) 50%, transparent);
   pointer-events: none;
 }
-.transaction-view:not([open]) + .transaction-view-footer {
-  bottom: 3px;
-}
-.transaction-height-toggle {
+.icon-button.transaction-height-toggle {
   pointer-events: auto;
-  min-width: 26px;
-  min-height: 26px;
+  flex: 1 1 0;
+  min-width: 32px;
+  min-height: 28px;
   padding: 4px;
-  background: var(--color-paper);
-  border-color: var(--color-rule);
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--color-paper) 50%, transparent);
   color: var(--color-muted);
+}
+.icon-button.transaction-height-toggle:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-hover) 50%, transparent);
+}
+.icon-button.transaction-height-toggle:active:not(:disabled) {
+  background: color-mix(in srgb, var(--color-paper) 50%, transparent);
+}
+.transaction-height-toggle:first-child {
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+}
+.transaction-height-toggle:last-child {
+  border-top-right-radius: calc(var(--radius-md) - 1px);
 }
 .transaction-view > summary {
   display: flex;
