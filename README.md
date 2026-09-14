@@ -5,7 +5,7 @@ understand their own wallets and follow activity on chain. Import an extended
 public key, see where your coins came from and where they went, label and tag
 what you recognize, and explore transactions in an interactive 3D graph. It runs
 against your own Bitcoin Core node and Electrum server, and everything you save
-stays encrypted in your browser.
+stays encrypted in your browser, apart from the workspace name.
 
 ![Chaingraph workbench](docs/screenshots/readme-graph.png)
 
@@ -135,8 +135,10 @@ automatically and can be exported as encrypted files for backup or transfer.
 ## Data and trust
 
 - The backend is a read-only proxy to your Bitcoin Core RPC and Electrum server.
-  It stores nothing: no database, wallet, index or cache. The proxy and your
-  upstream services do see the script hashes and transaction IDs you look up.
+  It keeps no database, wallet, index, or cache of anything you look up. The
+  genesis hash of each configured network is held in memory to identify it. The
+  proxy and your upstream services do see the script hashes and transaction IDs
+  you look up.
 - Address derivation, scanning, analysis and encryption happen in the browser.
   Extended public keys are never sent to the backend as a wallet import.
 - Saved workspaces use AES-256-GCM with a PBKDF2-SHA256 derived key. Passwords

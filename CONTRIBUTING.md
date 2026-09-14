@@ -111,10 +111,9 @@ tag workflow.
 well as style. `Domain` may not import `App`, `Infra` or `Shared`; `Infra` and
 `Shared` may not import `App`; workspace-scope code under `ChainData` and
 `Selection` may not import a workbench; and Wallet and Analysis reach Graph only
-through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`. New
-import cycles are rejected, with a short list of pre-existing cycles in workspace
-persistence and scan records pinned as exceptions in `.oxlintrc.json`. Prefer a
-declared contract over widening one of these exceptions.
+through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`. Import
+cycles are rejected everywhere, with no exceptions. Prefer a declared contract,
+or move what both sides need into a module below them, over reintroducing one.
 
 ## Portable content
 

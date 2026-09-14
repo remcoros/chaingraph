@@ -136,10 +136,11 @@ names stay unambiguous at the scope where they are exposed:
 | Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | `ConnectionScan/`          |
 
 Wallet analysis and the Analysis workbench are the same feature reached from two
-places, so they share `AnalysisScan` and write one `findings` store. Wallet review
-is separate and shares nothing with them. Inside `ConnectionScan/` the short names
-are fine; anything published on the workspace controller carries its feature
-prefix, because all four meet there.
+places, so they share `AnalysisScan` and write one `findings` store. Wallet
+review keeps its own decisions in `walletReviews`, but reads that same `findings`
+store: a finding covering the wallet becomes a `link` item in its queue. Inside
+`ConnectionScan/` the short names are fine; anything published on the workspace
+controller carries its feature prefix, because all four meet there.
 
 ## Shared responsibilities
 
@@ -167,8 +168,10 @@ through Graph's own modules. Each workbench file binds the controller to its own
 view, which keeps a props-driven contract that tests render directly. Owned panels receive the Workspace
 controller; reusable controls keep focused props. Workspace dialog and tour
 components bind that controller to their UI without owning another copy of state.
-The shared evidence-loading
-and flow-input hooks and transaction-fetch context live at Workspace scope. The
-dialog module exports modal and focus helpers used by
-other areas. Graph filter controls are also used by the entity browser, and
-Wallet category controls are used by Analysis.
+Chain evidence lives at Workspace scope under `ChainData/`, split into fetching,
+the selected address's record and graph expansion. The flow-input hooks stay with
+the workbench that shows them, under `Graph/TransactionFlow/` and
+`Wallet/Review/`, and `useWorkspace` aggregates what other areas need. The dialog
+module exports modal and focus helpers used by other areas. Graph filter controls
+are also used by the entity browser, and Wallet category controls are used by
+Analysis.

@@ -34,10 +34,10 @@ test locations. Source is grouped by product ownership.
 
 | Location                                                           | Responsibility                                                                     |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `src/App/App.tsx`, `src/App/useAppState.ts`                         | App shell, session navigation, home and dialogs                                   |
-| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`               | Shared state, selection, presentation and workbench switching/focus                |
-| `src/App/Workspace/ChainData/`                                     | Bounded address and transaction loading, cancellation and evidence updates        |
-| `src/App/Workspace/Workbenches/*Workbench.tsx`                      | Workbench composition and integration with shared Workspace state                 |
+| `src/App/App.tsx`, `src/App/useAppState.ts`                        | App shell, session navigation, home and dialogs                                    |
+| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`              | Shared state, selection, presentation and workbench switching/focus                |
+| `src/App/Workspace/ChainData/`                                     | Bounded address and transaction loading, cancellation and evidence updates         |
+| `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/`     | Each workbench composes its own views and binds shared Workspace state             |
 | `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs.tsx`          | Workspace entry, example creation, help and dialogs                                |
 | `src/App/Workspace/useWorkspaces.ts`                               | Unlocked sessions, undo/redo, autosave and locking                                 |
 | `src/App/Workspace/Entities/`, `Inspector/`, `Selection/`, `Tags/` | Workspace panels and shared selection                                              |
@@ -502,10 +502,15 @@ outputs) and wallet-script matches (raw script over decoded address;
 transactions associated through matching outputs or loaded prevouts, never a
 heuristic). Both are presentation inputs and do not touch annotations.
 
-**Flow panel.** `FlowPanel` owns the panel shell and composes
-`FlowPanelTransactionView` and `FlowPanelAddressView`. Each view keeps its
-downstream components and helpers in its own file. Transaction choice and quick
-editors have panel lifetime; address tabs and pagination have address lifetime.
+**Flow panel.** `FlowPanelShell` is the frame: a collapsible surface and its
+height controls, taking a header and a body and knowing nothing about either.
+`FlowPanel` chooses the view for what is selected, through an exhaustive switch
+that fails to compile when a node kind has no view, and holds the height so
+changing view swaps only the body. `FlowPanelTransactionView`,
+`FlowPanelAddressView` and the wallet stub each supply their own title bar,
+status line and body, and keep their downstream components in their own file.
+Transaction choice and quick editors have panel lifetime; address tabs and
+pagination have address lifetime.
 The transaction view projects creating/spending relationships through
 `transactionInspection.ts`. `ScriptInspector` decodes
 saved scripts to opcodes; `src/App/Workspace/Inspector/transactionInspection.ts` fetches raw bytes on

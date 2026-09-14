@@ -13,7 +13,9 @@ under `src/Domain/` and `src/Infra/`. Follow direct imports from the affected ar
 
 - The browser owns derivation, scanning, loaded chain data, annotations,
   analysis and encrypted persistence. The backend is a bounded read-only
-  Core/Electrum proxy with no database, wallet storage, jobs, index or cache.
+  Core/Electrum proxy with no database, wallet storage, jobs, index, or cache of
+  anything looked up. It holds each network's genesis hash in memory to identify
+  it, and nothing else.
 - Mainnet and testnet4 are supported, each through an isolated Core/Electrum
   pair, possibly at the same time. Validate the network at every import and RPC
   boundary.
