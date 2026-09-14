@@ -1,4 +1,4 @@
-import { ScanTargetToolbar } from './Workbenches/Graph/ConnectionScan/ScanTargetToolbar';
+import { ScanTargetToolbar } from './Selection/ScanTargetToolbar';
 import { GitBranch, List, LoaderCircle, LockKeyhole, Wallet as WalletIcon } from 'lucide-react';
 import { SelectionToolbar } from './Selection/SelectionToolbar';
 

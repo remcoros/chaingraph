@@ -1,7 +1,7 @@
-import { isOpReturn } from '../../../../Domain/Chain/opReturn';
-import { short, type Network, type Transaction } from '../../../../Domain/types';
-import type { loadSpending } from '../../../../Infra/Bitcoin/api';
-import { fetchCurrentUtxo } from '../../../../Infra/Bitcoin/utxoStatus';
+import { isOpReturn } from '../../../Domain/Chain/opReturn';
+import { short, type Network, type Transaction } from '../../../Domain/types';
+import type { loadSpending } from '../../../Infra/Bitcoin/api';
+import { fetchCurrentUtxo } from '../../../Infra/Bitcoin/utxoStatus';
 
 /** Successful graph additions are their own feedback. Report only status or a next step. */
 export async function spendingNotice(

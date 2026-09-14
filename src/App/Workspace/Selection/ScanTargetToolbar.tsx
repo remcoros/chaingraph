@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { Check, Crosshair, X } from 'lucide-react';
-import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
+import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
 import './scan-target-toolbar.css';
 
 export interface ScanTargetToolbarProps {

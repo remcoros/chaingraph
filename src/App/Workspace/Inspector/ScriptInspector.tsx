@@ -12,7 +12,7 @@ import { fetchRawInspection } from './transactionInspection';
 import { CopyButton } from '../../../Shared/Controls/CopyButton';
 import { OpReturnData } from '../../../Shared/Display/OpReturnData';
 import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
-import '../Workbenches/Graph/TransactionFlow/transaction-view.css';
+import './script-inspector.css';
 
 function HexField({
   title,

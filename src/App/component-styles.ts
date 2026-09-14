@@ -1,7 +1,7 @@
 // Global selectors depend on this cascade order.
 import '../Shared/Display/responsive-identifier.css';
 import './Workspace/Workbenches/Graph/ConnectionScan/connection-scan.css';
-import './Workspace/Workbenches/Graph/ConnectionScan/scan-target-toolbar.css';
+import './Workspace/Selection/scan-target-toolbar.css';
 import '../Shared/Display/transaction-block-time.css';
 import './Workspace/Workbenches/Wallet/Records/wallet-records.css';
 import './dialogs.css';
@@ -10,6 +10,7 @@ import '../Shared/Metadata/metadata-editors.css';
 import './Workspace/Tags/tags.css';
 import '../Shared/Display/op-return-data.css';
 import './Workspace/Workbenches/Graph/TransactionFlow/transaction-view.css';
+import './Workspace/Inspector/script-inspector.css';
 import './Workspace/Selection/visibility.css';
 import '../Shared/Metadata/icon-picker.css';
 import './Workspace/Selection/selection-toolbar.css';

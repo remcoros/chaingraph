@@ -1,0 +1,41 @@
+.script-inspector > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.script-inspector-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+.script-inspector-body > p {
+  margin: 0;
+}
+.script-field {
+  min-width: 0;
+  margin: 8px 0;
+}
+.script-field h4 {
+  font-size: 11px;
+  margin: 0;
+}
+.script-field pre {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow: auto;
+  padding: 8px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: 4px;
+}
+.script-inspector-body details summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.witness-items {
+  max-height: 320px;
+  overflow: auto;
+}

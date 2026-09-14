@@ -1,4 +1,4 @@
-import { spendingNotice } from '../Workbenches/Graph/spendingNotice';
+import { spendingNotice } from './spendingNotice';
 import {
   indexAddressHistoryTransactions,
   listAddressHistory,
