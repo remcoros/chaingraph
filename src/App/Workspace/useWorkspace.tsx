@@ -34,7 +34,6 @@ import { download } from '../../Infra/Storage/download';
 import { isModalOpen } from '../../Shared/Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
 import { useWorkspaceEvidence } from './ChainData/useWorkspaceEvidence';
-import type { AddressHistoryLoadState } from './ChainData/addressHistoryLoad';
 import { useWalletActivity } from './Workbenches/Wallet/useWalletActivity';
 import { useGraphActions } from './Workbenches/Graph/useGraphActions';
 import { createWalletActions } from './Workbenches/Wallet/walletActions';
@@ -177,9 +176,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   } = selection;
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [operation, setOperation] = useState('');
-  const [addressHistoryLoads, setAddressHistoryLoads] = useState<
-    Record<string, AddressHistoryLoadState>
-  >({});
   const [tour, setTour] = useState<string>();
   const tourSteps = availableTourSteps(WORKBENCH_TOUR, {
     hasSelection: !!selectedId,
@@ -210,13 +206,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     onShowPanel: setMobilePanel,
   });
   const pickingScanTargets = connectionScanTargets.picking;
-  const spendingOffsets = useRef(
-    new Map<string, { offset: number; unavailableTxids?: string[] }>(),
-  );
   const operationRef = useRef<AbortController | undefined>(undefined);
-  const addressHistoryJobsRef = useRef(
-    new Map<string, { workspaceId: string; controller: AbortController }>(),
-  );
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
@@ -296,7 +286,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         ? { ids: [activeWorkspace.view.selectionId], index: 0 }
         : { ids: [], index: -1 },
     );
-    spendingOffsets.current.clear();
     if (!activeWorkspace?.view.graphSnapshot) fitAll();
   });
   useEffect(() => {
@@ -321,6 +310,16 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     },
     [active],
   );
+  const core: WorkspaceCore = {
+    activeWorkspace,
+    activeWorkspaceRef,
+    workspaceId,
+    workspaces,
+    edit,
+    setNotice,
+    setError,
+    setOperation,
+  };
   const annotations = useAnnotations({
     current: activeWorkspace,
     sessions: workspaces,
@@ -427,33 +426,19 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     ],
   );
   const workspaceEvidence = useWorkspaceEvidence({
-    activeWorkspace,
-    addressHistoryJobsRef,
-    selected,
-    selectedId,
-    select,
-    selectionGeneration,
-    preserveSelectionCamera,
-    addressHistoryLoads,
-    fetchScope,
-    operationRef,
-    activeWorkspaceRef,
-    setOperation,
-    setError,
-    setNotice,
-    workspaces,
-    canLoadChainData,
-    setAddressHistoryLoads,
-    getUnlockedWorkspace,
-    revealLookup,
+    core,
+    selection,
+    lookup,
     setGraphFilters,
     setFocusRequest,
-    loadedLookupId: lookup.resolveLoaded,
-    clearQuery: lookup.clear,
-    prefetchDepth,
+    selected,
     recoveryGraph,
+    fetchScope,
+    operationRef,
+    canLoadChainData,
     canTraceAncestry,
-    spendingOffsets,
+    prefetchDepth,
+    revealLookup,
   });
   const { run, mergeTransactions } = workspaceEvidence;
   const flowInputs = useFlowInputs({
@@ -519,16 +504,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspaceId,
   });
   const history = useWorkspaceHistory({ workspaces });
-  const core: WorkspaceCore = {
-    activeWorkspace,
-    activeWorkspaceRef,
-    workspaceId,
-    workspaces,
-    edit,
-    setNotice,
-    setError,
-    setOperation,
-  };
   const graphActions = useGraphActions({
     core,
     selection,

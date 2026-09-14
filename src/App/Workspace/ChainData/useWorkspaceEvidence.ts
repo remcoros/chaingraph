@@ -10,9 +10,12 @@ import {
   selectedAddress as selectedAddressForHistory,
 } from '../../../Domain/Chain/addressHistory';
 import { addGraphNodes, ensureGraphMembership } from '../../../Domain/Graph/graphMembership';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type GraphData, type GraphFilters, type GraphNode } from '../../../Domain/types';
 import type { AppState } from '../../useAppState';
+import type { WorkspaceCore } from '../workspaceCore';
+import type { WorkspaceSelection } from '../Selection/useWorkspaceSelection';
+import type { WorkspaceLookup } from '../useWorkspaceLookup';
 import { setNodesHidden } from '../../../Domain/Graph/visibility';
 import {
   buildGraph,
@@ -41,85 +44,73 @@ import type { Dispatch, SetStateAction, RefObject } from 'react';
 import type { AddressHistoryLoadState } from './addressHistoryLoad';
 import { addressHistoryLoadKey } from './addressHistoryLoad';
 interface Inputs {
-  activeWorkspace: AppState['activeWorkspace'];
-  addressHistoryJobsRef: RefObject<
-    Map<string, { workspaceId: string; controller: AbortController }>
+  core: WorkspaceCore;
+  selection: WorkspaceSelection;
+  lookup: WorkspaceLookup;
+  /** Plain callbacks, because evidence is shared and must not depend on a workbench. */
+  setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
+  setFocusRequest: Dispatch<
+    SetStateAction<{ id: string; token: number; preserveZoom?: boolean } | undefined>
   >;
+  /** Selected node and recovery graph, which the projection derives. */
   selected: GraphNode | undefined;
-  addressHistoryLoads: Record<string, AddressHistoryLoadState>;
+  recoveryGraph: GraphData;
   fetchScope: AppState['fetchScope'];
   operationRef: RefObject<AbortController | undefined>;
-  activeWorkspaceRef: AppState['activeWorkspaceRef'];
-  setOperation: Dispatch<SetStateAction<string>>;
-  setError: AppState['setError'];
-  setNotice: AppState['setNotice'];
-  workspaces: AppState['workspaces'];
   canLoadChainData: boolean;
-  setAddressHistoryLoads: Dispatch<SetStateAction<Record<string, AddressHistoryLoadState>>>;
-  getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
-  revealLookup: (id: string) => void;
-  selectionGeneration: RefObject<number>;
-  setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
-  setFocusRequest: Dispatch<
-    SetStateAction<
-      | {
-          id: string;
-          token: number;
-          preserveZoom?: boolean;
-        }
-      | undefined
-    >
-  >;
-  loadedLookupId: (text: string) => string | undefined;
-  clearQuery: () => void;
-  prefetchDepth: 0 | 1 | 2;
-  recoveryGraph: GraphData;
   canTraceAncestry: boolean;
-  preserveSelectionCamera: (id: string | undefined) => void;
-  selectedId: string | undefined;
-  spendingOffsets: RefObject<Map<string, { offset: number; unavailableTxids?: string[] }>>;
+  prefetchDepth: 0 | 1 | 2;
+  revealLookup: (id: string) => void;
 }
 export function useWorkspaceEvidence({
-  activeWorkspace,
-  addressHistoryJobsRef,
+  core,
+  selection,
+  lookup,
+  setGraphFilters,
+  setFocusRequest,
   selected,
-  addressHistoryLoads,
+  recoveryGraph,
   fetchScope,
   operationRef,
-  activeWorkspaceRef,
-  setOperation,
-  setError,
-  setNotice,
-  workspaces,
   canLoadChainData,
-  setAddressHistoryLoads,
-  getUnlockedWorkspace,
-  revealLookup,
-  selectionGeneration,
-  setGraphFilters,
-  select,
-  setFocusRequest,
-  loadedLookupId,
-  clearQuery,
-  prefetchDepth,
-  recoveryGraph,
   canTraceAncestry,
-  preserveSelectionCamera,
-  selectedId,
-  spendingOffsets,
+  prefetchDepth,
+  revealLookup,
 }: Inputs) {
+  const { activeWorkspace, activeWorkspaceRef, workspaces, setOperation, setError, setNotice } =
+    core;
+  const {
+    generation: selectionGeneration,
+    preserveCamera: preserveSelectionCamera,
+    select,
+    selectedId,
+  } = selection;
+  const { resolveLoaded: loadedLookupId, clear: clearQuery } = lookup;
+
+  const [addressHistoryLoads, setAddressHistoryLoads] = useState<
+    Record<string, AddressHistoryLoadState>
+  >({});
+  const addressHistoryJobsRef = useRef(
+    new Map<string, { workspaceId: string; controller: AbortController }>(),
+  );
+  const spendingOffsets = useRef(
+    new Map<string, { offset: number; unavailableTxids?: string[] }>(),
+  );
   useEffect(() => {
     const workspaceId = activeWorkspace?.id;
     const jobs = addressHistoryJobsRef.current;
+    const offsets = spendingOffsets.current;
     return () => {
       for (const [key, job] of jobs) {
         if (job.workspaceId !== workspaceId) continue;
         job.controller.abort();
         jobs.delete(key);
       }
+      // Spending offsets describe one workspace's search position, so leaving it
+      // discards them rather than resuming a later workspace mid-search.
+      offsets.clear();
     };
-  }, [activeWorkspace?.id, addressHistoryJobsRef]);
+  }, [activeWorkspace?.id, addressHistoryJobsRef, spendingOffsets]);
   const addressHistoryNetwork = activeWorkspace?.network;
   const addressHistoryTransactions = activeWorkspace?.transactions;
   const addressHistoryWallets = activeWorkspace?.wallets;
@@ -313,7 +304,7 @@ export function useWorkspaceEvidence({
         truncated,
       ) => {
         if (activeWorkspaceRef.current?.id !== ownerId) return;
-        getUnlockedWorkspace(ownerId)?.edit(
+        workspaces.getUnlocked(ownerId)?.edit(
           (latest) => ({
             ...latest,
             addressHistories: {
@@ -339,7 +330,7 @@ export function useWorkspaceEvidence({
         const batch = pendingTransactions;
         pendingTransactions = [];
         if (!batch.length || activeWorkspaceRef.current?.id !== ownerId) return;
-        getUnlockedWorkspace(ownerId)?.edit(
+        workspaces.getUnlocked(ownerId)?.edit(
           (latest) => ({
             ...clearContextProvenance(
               latest,
@@ -404,15 +395,17 @@ export function useWorkspaceEvidence({
           flushTransactions();
           controller.signal.throwIfAborted();
           if (result && activeWorkspaceRef.current?.id === ownerId)
-            getUnlockedWorkspace(ownerId)?.edit(
-              (latest) => clearContextProvenance(latest, result!.observedTransactionIds),
-              false,
-            );
+            workspaces
+              .getUnlocked(ownerId)
+              ?.edit(
+                (latest) => clearContextProvenance(latest, result!.observedTransactionIds),
+                false,
+              );
           if (needsBalance) updateProgress({ phase: 'balance' });
           const balance = await balancePromise;
           controller.signal.throwIfAborted();
           if (balance && activeWorkspaceRef.current?.id === ownerId)
-            getUnlockedWorkspace(ownerId)?.edit(
+            workspaces.getUnlocked(ownerId)?.edit(
               (latest) => ({
                 ...latest,
                 addressBalances: { ...latest.addressBalances, [address]: balance },
@@ -461,7 +454,7 @@ export function useWorkspaceEvidence({
     [
       canLoadChainData,
       fetchScope,
-      getUnlockedWorkspace,
+      workspaces,
       activeWorkspaceRef,
       addressHistoryJobsRef,
       setNotice,
@@ -474,18 +467,12 @@ export function useWorkspaceEvidence({
       : undefined;
   useEffect(() => {
     if (!activeWorkspace?.id || !canLoadChainData || !autoLoadAddress) return;
-    const current = getUnlockedWorkspace(activeWorkspace.id)?.data;
+    const current = workspaces.getUnlocked(activeWorkspace.id)?.data;
     if (!current || !shouldLoadAddressHistory(listAddressHistory(current, autoLoadAddress))) return;
     // Selection is the stable trigger. Do not depend on the observation itself:
     // an empty successful result must not start an endless refresh loop.
     startAddressHistoryLoad(autoLoadAddress);
-  }, [
-    autoLoadAddress,
-    canLoadChainData,
-    getUnlockedWorkspace,
-    startAddressHistoryLoad,
-    activeWorkspace?.id,
-  ]);
+  }, [autoLoadAddress, canLoadChainData, workspaces, startAddressHistoryLoad, activeWorkspace?.id]);
   function openAddressHistory(force = false) {
     if (!activeWorkspace || !selected) return;
     const address = selectedAddressForHistory(selected, activeWorkspace.network);
@@ -650,7 +637,7 @@ export function useWorkspaceEvidence({
   }
   function revealAddressGraphNodes(ownerId: string, ids: string[]) {
     if (!ids.length) return;
-    getUnlockedWorkspace(ownerId)?.edit((current) => {
+    workspaces.getUnlocked(ownerId)?.edit((current) => {
       const revealed = addGraphNodes(current, ids);
       return {
         ...revealed,
@@ -662,7 +649,7 @@ export function useWorkspaceEvidence({
   function showRecentAddressUtxos() {
     const action = selectedAddressGraphAction();
     if (!action) return;
-    const current = getUnlockedWorkspace(action.ownerId)?.data;
+    const current = workspaces.getUnlocked(action.ownerId)?.data;
     if (!current) return;
     const cached = current.addressUtxos?.[action.address];
     if (!cached && !canLoadChainData) return;
@@ -677,7 +664,7 @@ export function useWorkspaceEvidence({
       )
         return;
       if (!cached)
-        getUnlockedWorkspace(action.ownerId)?.edit(
+        workspaces.getUnlocked(action.ownerId)?.edit(
           (latest) => ({
             ...latest,
             addressUtxos: {
@@ -692,7 +679,7 @@ export function useWorkspaceEvidence({
         setNotice('No unspent outputs observed for this address.');
         return;
       }
-      const latestTransactions = (getUnlockedWorkspace(action.ownerId)?.data ?? current)
+      const latestTransactions = (workspaces.getUnlocked(action.ownerId)?.data ?? current)
         .transactions;
       const detailTargets = [
         ...new Map(
@@ -733,7 +720,7 @@ export function useWorkspaceEvidence({
         details.filter((transaction): transaction is Transaction => !!transaction),
         [...new Set(recent.map((utxo) => utxo.txid))],
       );
-      const latest = getUnlockedWorkspace(action.ownerId)?.data;
+      const latest = workspaces.getUnlocked(action.ownerId)?.data;
       if (!latest) return;
       const outpointIds = recent.flatMap((utxo) => {
         const transaction = latest.transactions[utxo.txid];
@@ -747,11 +734,11 @@ export function useWorkspaceEvidence({
   function showRecentAddressTransactions() {
     const action = selectedAddressGraphAction();
     if (!action) return;
-    const current = getUnlockedWorkspace(action.ownerId)?.data;
+    const current = workspaces.getUnlocked(action.ownerId)?.data;
     if (!current) return;
     const historyKey = addressHistoryLoadKey(action.ownerId, current.network, action.address);
     void run(async (signal) => {
-      let latest = getUnlockedWorkspace(action.ownerId)?.data ?? current;
+      let latest = workspaces.getUnlocked(action.ownerId)?.data ?? current;
       let history = listAddressHistory(latest, action.address);
       let historyLoadActive = addressHistoryJobsRef.current.has(historyKey);
       const needsObservedHistory =
@@ -769,7 +756,7 @@ export function useWorkspaceEvidence({
           activeWorkspaceRef.current?.id !== action.ownerId
         )
           return;
-        getUnlockedWorkspace(action.ownerId)?.edit(
+        workspaces.getUnlocked(action.ownerId)?.edit(
           (workspace) => ({
             ...workspace,
             addressHistories: {
@@ -783,7 +770,7 @@ export function useWorkspaceEvidence({
           }),
           false,
         );
-        latest = getUnlockedWorkspace(action.ownerId)?.data ?? latest;
+        latest = workspaces.getUnlocked(action.ownerId)?.data ?? latest;
         history = listAddressHistory(latest, action.address);
         historyLoadActive = addressHistoryJobsRef.current.has(historyKey);
       }
