@@ -46,8 +46,9 @@ describe('workspace persistence state transitions', () => {
     const store = new WorkspaceStore({
       storage: memoryStorage(),
       envelopes: {
-        get: async () => undefined,
-        put: async () => {
+        read: async () => undefined,
+        commitIndex: async (publish: () => void) => publish(),
+        write: async () => {
           await envelopes.promise;
         },
         remove: async () => {},

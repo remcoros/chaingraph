@@ -95,9 +95,9 @@ describe('explicit scan action evidence', () => {
 
   it('rejects missing offline proof with actionable copy', async () => {
     const fetch = vi.fn<typeof fetchTransaction>();
-    await expect(loadScanActionEvidence({ ...fixture(), canLoadChainData: false }, fetch)).rejects.toThrow(
-      'Connect to the backend',
-    );
+    await expect(
+      loadScanActionEvidence({ ...fixture(), canLoadChainData: false }, fetch),
+    ).rejects.toThrow('Connect to the backend');
     expect(fetch).not.toHaveBeenCalled();
   });
 

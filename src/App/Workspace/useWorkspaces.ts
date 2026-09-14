@@ -91,6 +91,10 @@ export interface UnlockedWorkspace {
   /** True while this workspace is being saved and closed. It accepts no edits,
    * undo or redo until that finishes. */
   locking: boolean;
+  /** Open typing group, so rapid edits under one key coalesce into one undo step. */
+  editGroup?: { key: string; at: number };
+  /** True while a graph gesture defers saving, so autosave waits for it to finish. */
+  autosavePaused: boolean;
   /** Increments whenever the undo head changes, so a caller can tell whether its
    * own edit is still the step that Undo would restore. Presentation-only writes
    * leave it untouched. */
@@ -180,12 +184,10 @@ export class WorkspaceStore {
   private listeners = new Set<() => void>();
   private writing: Promise<void> = Promise.resolve();
   private locking = new Map<string, Promise<void>>();
-  private editGroups = new Map<string, { key: string; at: number }>();
   private storedRaw: string | null = null;
   private storageInvalid = false;
   private options: StoreOptions;
   private envelopes?: EnvelopeStorage;
-  private autosavePaused = new Set<string>();
   private idleWaiters = new Map<string, Set<() => void>>();
 
   constructor(options: StoreOptions = {}) {
@@ -335,8 +337,6 @@ export class WorkspaceStore {
       this.setActiveId(data.id);
       return;
     }
-    // Typing groups belong to one unlocked session, never a later reopen.
-    this.editGroups.delete(data.id);
     this.patch({
       unlocked: [
         ...this.state.unlocked,
@@ -348,6 +348,7 @@ export class WorkspaceStore {
           revision: 0,
           savedRevision: alreadySaved ? 0 : -1,
           locking: false,
+          autosavePaused: false,
           history: [],
           redoHistory: [],
           undoRevision: 0,
@@ -432,11 +433,11 @@ export class WorkspaceStore {
     }
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
-    const previousGroup = this.editGroups.get(id);
+    const previousGroup = current.editGroup;
     const now = Date.now();
     const coalesce = undo && group && previousGroup?.key === group && now - previousGroup.at < 1500;
-    if (undo && group) this.editGroups.set(id, { key: group, at: now });
-    else if (undo || evidenceChanged) this.editGroups.delete(id);
+    const editGroup =
+      undo && group ? { key: group, at: now } : undo || evidenceChanged ? undefined : previousGroup;
     const carryPresentation = (entry: UndoEntry): UndoEntry => {
       const snapshot = entry.workspace;
       return {
@@ -467,6 +468,7 @@ export class WorkspaceStore {
           : {
               ...s,
               data,
+              editGroup,
               revision: s.revision + 1,
               undoRevision:
                 s.undoRevision + ((undo && !coalesce) || (!undo && evidenceChanged) ? 1 : 0),
@@ -498,12 +500,12 @@ export class WorkspaceStore {
   };
   undo = (id: string) => {
     if (this.isLocking(id)) return;
-    this.editGroups.delete(id);
     this.patch({
       unlocked: this.state.unlocked.map((s) =>
         s.data.id === id && s.history.length
           ? {
               ...s,
+              editGroup: undefined,
               data: s.history[s.history.length - 1].workspace,
               history: s.history.slice(0, -1),
               redoHistory: [
@@ -520,12 +522,12 @@ export class WorkspaceStore {
 
   redo = (id: string) => {
     if (this.isLocking(id)) return;
-    this.editGroups.delete(id);
     this.patch({
       unlocked: this.state.unlocked.map((s) =>
         s.data.id === id && s.redoHistory.length
           ? {
               ...s,
+              editGroup: undefined,
               data: s.redoHistory[s.redoHistory.length - 1].workspace,
               history: [
                 ...s.history,
@@ -546,12 +548,17 @@ export class WorkspaceStore {
   getSaved = (id: string) => this.state.saved.find((entry) => entry.id === id);
   getUnlocked = (id: string) => this.state.unlocked.find((session) => session.data.id === id);
   private resumeAutosave(id: string) {
-    this.autosavePaused.delete(id);
+    this.patchUnlocked(id, (entry) =>
+      entry.autosavePaused ? { ...entry, autosavePaused: false } : entry,
+    );
     for (const resume of this.idleWaiters.get(id) ?? []) resume();
     this.idleWaiters.delete(id);
   }
   pauseAutosave = (id: string, paused: boolean) => {
-    if (paused) this.autosavePaused.add(id);
+    if (paused)
+      this.patchUnlocked(id, (entry) =>
+        entry.autosavePaused ? entry : { ...entry, autosavePaused: true },
+      );
     else {
       this.resumeAutosave(id);
       const session = this.getUnlocked(id);
@@ -560,7 +567,7 @@ export class WorkspaceStore {
     }
   };
   private async waitForIdle(id: string) {
-    while (this.autosavePaused.has(id))
+    while (this.getUnlocked(id)?.autosavePaused)
       await new Promise<void>((resolve) => {
         const waiters = this.idleWaiters.get(id) ?? new Set();
         waiters.add(resolve);
@@ -694,7 +701,6 @@ export class WorkspaceStore {
         const current = this.state.unlocked.find((s) => s.data.id === id);
         if (current && current.revision !== current.savedRevision)
           throw new Error('Workspace changed while locking; keep it open and save again.');
-        this.editGroups.delete(id);
         if (current) {
           transactionScheduler.dispose(current.fetchScope);
           current.walletPreparation.dispose();
