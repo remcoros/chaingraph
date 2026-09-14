@@ -42,6 +42,7 @@ import {
 import type { AnalysisScan } from '../../../../Domain/Analysis/analysisScan';
 import { useRecordSelection } from './useRecordSelection';
 import type { WalletUtxoController } from './useWalletUtxos';
+import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import { useWalletScan } from './useWalletScan';
 import { useWalletCounterparties } from './useWalletCounterparties';
 import { useTransactionFetch } from '../../useTransactionFetch';
@@ -66,30 +67,11 @@ import { ResponsiveIdentifier } from '../../../../Shared/Display/ResponsiveIdent
 import { WalletPreparationCache } from './walletPreparation';
 import './wallet-workbench.css';
 
-export interface WalletWorkbenchProps {
-  active: boolean;
-  /** Disposable presentation using real loaded rows, with all background work inactive. */
-  tourPreview?: { tab: 'review' | 'sources'; example?: Workspace };
-  workspace: Workspace;
-  wallet?: Wallet;
+export interface WalletWorkbenchProps extends WalletWorkbenchContext {
   walletUtxos: WalletUtxoController;
   preparationCache?: WalletPreparationCache;
-  canQuery: boolean;
-  busy: boolean;
-  queryDisabledReason?: string;
   analysisScan?: AnalysisScan;
   onScanComplete?: (scan: AnalysisScan) => void;
-  updateEvidence: (id: string, update: (current: Workspace) => Workspace, undo?: boolean) => void;
-  onSelectWallet: (id: string) => void;
-  onAddWallet: () => void;
-  onEditWallet?: (id: string) => void;
-  onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
-  onRefresh: () => void;
-  onShowInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
-  onIsolateInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
-  onShowSelection: (ids: string[], isolate: boolean) => void;
-  onInspect: (nodeId: string, utxo?: WalletUtxoRecord) => void;
-  onAnalyze: (nodeId?: string) => void;
 }
 
 const TABS = [

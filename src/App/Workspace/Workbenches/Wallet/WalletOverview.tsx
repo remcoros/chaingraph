@@ -12,7 +12,7 @@ import { walletCheckAge } from '../../../../Domain/Wallet/walletActivity';
 import { formatLocalTimestamp } from '../../../../Domain/Chain/transactionTime';
 import type { WalletReviewCoverage } from '../../../../Domain/Wallet/walletReview';
 import type { WalletUtxoView } from './useWalletUtxos';
-import type { WalletWorkbenchProps } from './WalletWorkbench';
+import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import { WalletHelp } from '../../../../Shared/Display/WalletHelp';
 import { walletDiscoveryStatus } from '../../../../Domain/Wallet/walletCoverageStatus';
 
@@ -37,7 +37,7 @@ export function WalletOverview({
   scanStatus,
   scanIssues,
 }: Pick<
-  WalletWorkbenchProps,
+  WalletWorkbenchContext,
   | 'workspace'
   | 'tourPreview'
   | 'canQuery'
@@ -48,7 +48,7 @@ export function WalletOverview({
   | 'onAddWallet'
   | 'onRefresh'
 > & {
-  wallet: NonNullable<WalletWorkbenchProps['wallet']>;
+  wallet: NonNullable<WalletWorkbenchContext['wallet']>;
   coverage: WalletReviewCoverage;
   utxos?: WalletUtxoView;
   utxoLoading: boolean;

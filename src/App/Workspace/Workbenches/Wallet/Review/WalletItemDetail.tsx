@@ -34,7 +34,7 @@ import { CopyButton } from '../../../../../Shared/Controls/CopyButton';
 import { TransactionBlockTime } from '../../../../../Shared/Display/TransactionBlockTime';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import { WalletHelp } from '../../../../../Shared/Display/WalletHelp';
-import type { WalletWorkbenchProps } from '../WalletWorkbench';
+import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import type {
   WalletSelectionIndex,
   WalletSelectionAddresses,
@@ -145,7 +145,7 @@ export function WalletItemDetail({
   relatedSelection,
   resolveInputs = true,
 }: Pick<
-  WalletWorkbenchProps,
+  WalletWorkbenchContext,
   | 'active'
   | 'tourPreview'
   | 'busy'
