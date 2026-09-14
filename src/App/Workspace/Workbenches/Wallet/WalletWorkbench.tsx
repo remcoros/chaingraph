@@ -1171,7 +1171,6 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
 /** Binds the workspace controller to the view Workspace mounts. */
 export function WalletWorkbench({ workspace }: { workspace: WorkspaceController }) {
   const {
-    walletUtxos,
     w,
     ws,
     tourStep,
@@ -1179,9 +1178,6 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     viewOwner,
     workbench,
     lockingWorkspace,
-    analysisSessions,
-    setWalletAnalysisRevision,
-    wallet,
     canQuery,
     operation,
     queryDisabledReason,
@@ -1189,12 +1185,17 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     setRightTab,
     dialogs,
     change,
-    walletDiscovery,
     shownWorkbench,
-    walletWorkspaceRef,
   } = workspace;
+  const {
+    utxos: walletUtxos,
+    selected: wallet,
+    discovery: walletDiscovery,
+    sectionRef: walletWorkspaceRef,
+  } = workspace.wallet;
+  const analysis = workspace.analysis;
   const { invalidate: invalidateSelection, setSelectedWallet, setSelectedId } = workspace.selection;
-  const { openWalletRecord, analyzeFromWallet } = workspace.walletActions;
+  const { openWalletRecord, analyzeFromWallet } = workspace.wallet.actions;
 
   if (!w) return null;
   return (
@@ -1216,18 +1217,18 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         }
         active={viewOwner === w.id && workbench === 'wallet' && !lockingWorkspace && !tourStep}
         workspace={w}
-        sessionAnalysis={analysisSessions.current.get(w.id)?.scan}
+        sessionAnalysis={analysis.sessions.current.get(w.id)?.scan}
         updateEvidence={ws.update}
         onAnalysisComplete={(scan) => {
-          analysisSessions.current.set(w.id, {
-            scopeMode: analysisSessions.current.get(w.id)?.scopeMode,
+          analysis.sessions.current.set(w.id, {
+            scopeMode: analysis.sessions.current.get(w.id)?.scopeMode,
             options: scan.options,
             scan,
             selectedId: scan.findings[0]?.id,
             kind: 'all',
             limit: 40,
           });
-          setWalletAnalysisRevision((value) => value + 1);
+          analysis.noteWalletAnalysis();
         }}
         wallet={wallet ?? w.wallets[0]}
         canQuery={canQuery}

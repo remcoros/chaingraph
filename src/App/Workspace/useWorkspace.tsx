@@ -21,7 +21,7 @@ import { useWorkspaceHistory } from './useWorkspaceHistory';
 import { useAnnotations } from './Annotations/useAnnotations';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
-import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
+import { useWorkspaceAnalysis } from './Workbenches/Analysis/useWorkspaceAnalysis';
 import { type Wallet, type Workspace } from '../../Domain/types';
 import { fetchTransaction } from '../../Infra/Bitcoin/api';
 import { WORKBENCH_TOUR, availableTourSteps } from '../Help/steps';
@@ -100,18 +100,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setEntityLinked: setEntityFiltersLinked,
   } = filters;
   const [focusGraph, setFocusGraph] = useState(false);
-  const analysisSessions = useRef(new Map<string, AnalysisSession>());
-  const [walletAnalysisRevision, setWalletAnalysisRevision] = useState(0);
-  useEffect(() => {
-    const unlocked = new Set(ws.sessions.map((session) => session.data.id));
-    for (const id of analysisSessions.current.keys())
-      if (!unlocked.has(id)) analysisSessions.current.delete(id);
-  }, [ws.sessions]);
+  const analysis = useWorkspaceAnalysis(ws.sessions);
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
   const [workbench, setWorkbench] = useState<WorkbenchMode>('graph');
   const [returnWorkbench, setReturnWorkbench] = useState<WorkbenchMode>();
   const graphWorkspaceRef = useRef<HTMLElement>(null);
-  const analysisWorkspaceRef = useRef<HTMLElement>(null);
+  const analysisWorkspaceRef = analysis.sectionRef;
   const walletWorkspaceRef = useRef<HTMLElement>(null);
   // The control that started a handoff, per originating workbench.
   const workbenchInvokers = useRef<
@@ -121,12 +115,15 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     { workspaceId: string; mode: WorkbenchMode; destination?: 'inspector' } | undefined
   >(undefined);
   const rightPanelRef = useRef<HTMLElement>(null);
-  const workbenchSection = (mode: WorkbenchMode) =>
-    mode === 'graph'
-      ? graphWorkspaceRef.current
-      : mode === 'analysis'
-        ? analysisWorkspaceRef.current
-        : walletWorkspaceRef.current;
+  const workbenchSection = useCallback(
+    (mode: WorkbenchMode) =>
+      mode === 'graph'
+        ? graphWorkspaceRef.current
+        : mode === 'analysis'
+          ? analysisWorkspaceRef.current
+          : walletWorkspaceRef.current,
+    [graphWorkspaceRef, analysisWorkspaceRef, walletWorkspaceRef],
+  );
   // Transfer focus only for explicit cross-workbench actions, never during graph gestures.
   useLayoutEffect(() => {
     const pending = pendingWorkbenchFocus.current;
@@ -160,7 +157,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         element.focus();
       else section?.focus();
     }
-  }, [w?.id, workbench]);
+  }, [w?.id, workbench, workbenchSection]);
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const selection = useWorkspaceSelection({
     workspaceId: w?.id,
@@ -645,6 +642,15 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    wallet: {
+      selected: wallet,
+      utxos: walletUtxos,
+      utxoObservation: walletUtxoObservation,
+      discovery: walletDiscovery,
+      sectionRef: walletWorkspaceRef,
+      actions: walletActions,
+    },
+    analysis: { ...analysis, actions: analysisActions },
     graphCanvas,
     filters,
     selection,
@@ -656,7 +662,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     evidence: workspaceEvidence,
     w,
     switchWorkbench,
-    walletUtxoObservation,
     setNotice,
     setNoticeSequence,
     operationRef,
@@ -668,9 +673,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     canTrace,
     queryDisabledReason,
     change,
-    wallet,
     canQuery,
-    walletDiscovery,
     tourStep,
     shownRightTab,
     rightTab,
@@ -680,7 +683,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     lockingWorkspace,
     wRef,
     ws,
-    walletUtxos,
     rightPanelRef,
     shownLeftTab,
     workbench,
@@ -698,11 +700,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setLockingWorkspace,
     setError,
     tourExample,
-    analysisSessions,
-    setWalletAnalysisRevision,
-    walletWorkspaceRef,
-    walletAnalysisRevision,
-    analysisWorkspaceRef,
     setTour,
     entityRemoval,
     tour,
@@ -710,8 +707,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     needsTourExample,
     walletTourExample,
     graphActions,
-    walletActions,
-    analysisActions,
   };
 }
 export type WorkspaceController = ReturnType<typeof useWorkspace>;

@@ -28,7 +28,6 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     rightTab,
     shownRightTab,
     setRightTab,
-    wallet,
     fetchScope,
     connectionScanTargets,
     shownWorkbench,
@@ -37,16 +36,16 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     wRef,
     ws,
     change,
-    walletUtxos,
     operation,
     rightPanelRef,
   } = workspace;
+  const { selected: wallet, utxos: walletUtxos } = workspace.wallet;
   const { setFocusRequest } = workspace.graphCanvas;
   const { setGraph: setGraphFilters } = workspace.filters;
   const { selectedId, selectedWallet, select } = workspace.selection;
   const { visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =
     workspace.graphProjection;
-  const { selectWalletRecord } = workspace.walletActions;
+  const { selectWalletRecord } = workspace.wallet.actions;
   const inspectorScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;

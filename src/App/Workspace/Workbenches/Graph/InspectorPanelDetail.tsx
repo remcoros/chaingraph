@@ -8,7 +8,6 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
   const {
     w,
     switchWorkbench,
-    walletUtxoObservation,
     setNotice,
     setNoticeSequence,
     operationRef,
@@ -22,13 +21,16 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     queryDisabledReason,
     entityRemoval,
     change,
-    wallet,
     canQuery,
-    walletDiscovery,
     dialogs,
     tourStep,
     shownRightTab,
   } = workspace;
+  const {
+    utxoObservation: walletUtxoObservation,
+    selected: wallet,
+    discovery: walletDiscovery,
+  } = workspace.wallet;
   const {
     invalidate: invalidateSelection,
     setSelectedWallet,
@@ -39,7 +41,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
   const { addressBalance, expand, getTransaction, mergeTransactions, run, refreshAddressBalance } =
     workspace.evidence;
   const { revealGraphNodes, centerNode, setEntityHidden, updateFilters } = workspace.graphActions;
-  const { showWalletActivity } = workspace.walletActions;
+  const { showWalletActivity } = workspace.wallet.actions;
 
   if (!w) return null;
   return shownRightTab === 'scan' ||

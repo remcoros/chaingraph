@@ -12,15 +12,14 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setMobilePanel,
     shownLeftTab,
     setLeftTab,
-    wallet,
     operationRef,
     setRightTab,
     dialogs,
     operation,
-    walletDiscovery,
     canQuery,
     change,
   } = workspace;
+  const { selected: wallet, discovery: walletDiscovery } = workspace.wallet;
   const {
     entityPanel: entityPanelFilters,
     graph: graphFilters,
@@ -56,7 +55,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setEntityHidden,
     showAllHidden,
   } = workspace.graphActions;
-  const { showWalletActivity } = workspace.walletActions;
+  const { showWalletActivity } = workspace.wallet.actions;
 
   if (!w) return null;
   return (

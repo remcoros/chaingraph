@@ -46,7 +46,6 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     operation,
     workbench,
     viewOwner,
-    walletUtxoObservation,
     tourStep,
     ws,
     flowInputs,
@@ -61,6 +60,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphWorkspaceRef,
     shownMobilePanel,
   } = workspace;
+  const { utxoObservation: walletUtxoObservation } = workspace.wallet;
   const {
     changeView: changeGraphView,
     setPendingWorkspaceId: setPendingGraphWorkspace,

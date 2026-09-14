@@ -43,6 +43,7 @@ src/
           Review/           review detail, flow and input loading
         Graph/              graph surface, controls and metadata projection
           GraphWorkbench.tsx graph canvas, navigation and panel composition
+          useGraphCanvas.ts  camera, fit and saved-view writes
           EntitiesPanel.tsx entity and wallet browsing controls
           InspectorPanel.tsx inspector, scan and wallet-record tabs
           InspectorPanelDetail.tsx selected node or wallet detail actions
@@ -57,6 +58,7 @@ src/
           Renderer/         adapter contract, Three.js, layout and picking
         Analysis/           analysis controls and reports
           AnalysisWorkbench.tsx controller binding and the analysis workbench view
+          useWorkspaceAnalysis.ts retained sessions and the wallet-run revision
           analysisSession.ts  retained scan, scope and reader filters per workspace
   Shared/
     Controls/               reusable controls and popovers

@@ -1078,34 +1078,25 @@ export { MemoizedAnalysisWorkbench as AnalysisWorkbenchView };
 
 /** Binds the workspace controller to the view Workspace mounts. */
 export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceController }) {
-  const {
-    w,
-    walletAnalysisRevision,
-    analysisSessions,
-    workbench,
-    lockingWorkspace,
-    wallet,
-    change,
-    wRef,
-    tourStep,
-    analysisWorkspaceRef,
-  } = workspace;
+  const { w, workbench, lockingWorkspace, change, wRef, tourStep } = workspace;
+  const { selected: wallet } = workspace.wallet;
+  const analysis = workspace.analysis;
   const { selected } = workspace.graphProjection;
-  const { showFindingOnGraph } = workspace.analysisActions;
+  const { showFindingOnGraph } = workspace.analysis.actions;
 
   if (!w) return null;
   return (
     <section
       className="workbench-page"
       hidden={workbench !== 'analysis' || !!tourStep}
-      ref={analysisWorkspaceRef}
+      ref={analysis.sectionRef}
       id="analysis-workspace"
       tabIndex={-1}
       aria-label="Analysis workspace"
     >
       <AnalysisWorkbenchView
-        key={`${w.id}:${walletAnalysisRevision}`}
-        cache={analysisSessions.current}
+        key={`${w.id}:${analysis.walletRevision}`}
+        cache={analysis.sessions.current}
         workspace={w}
         active={workbench === 'analysis' && !lockingWorkspace}
         selected={selected}
