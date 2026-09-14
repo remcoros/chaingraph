@@ -5,7 +5,7 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 const source = process.env.CHAINGRAPH_SOURCE_URL ?? '';
 if (source && !/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/.test(source))
   throw new Error('CHAINGRAPH_SOURCE_URL must be an HTTPS GitHub repository URL.');
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [
     react({
       // React Compiler memoizes components and hooks automatically, which is the
@@ -66,8 +66,8 @@ export default defineConfig(({ command }) => ({
       /templateData\/.*\.json$/.test(filePath) ? false : undefined,
   },
   // `vite preview` does not inherit `server.proxy`. Mirror it so a production
-  // build, which is the only build React Compiler runs on, can be exercised
-  // against a local backend the same way the dev server is.
+  // build can be exercised against a local backend the same way the dev server
+  // is.
   preview: {
     proxy: {
       '/api': {
@@ -76,4 +76,4 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
-}));
+});
