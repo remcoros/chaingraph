@@ -17,8 +17,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     setSelectedId,
     setRightTab,
     setMobilePanel,
-    metadataEdit,
-    changeTags,
+    annotations,
     setLeftTab,
     tx,
     operation,
@@ -92,9 +91,9 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
           key={selected.id}
           workspace={w}
           selected={selected}
-          openToken={metadataEdit.target === 'tags' ? metadataEdit.token : 0}
-          onOpenHandled={metadataEdit.acknowledge}
-          onChange={changeTags}
+          openToken={annotations.edit.target === 'tags' ? annotations.edit.token : 0}
+          onOpenHandled={annotations.edit.acknowledge}
+          onChange={annotations.changeTags}
           onManage={() => {
             setLeftTab('tags');
             setMobilePanel('left');
@@ -108,9 +107,9 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       busy={!!operation}
       canQuery={canTrace}
       queryDisabledReason={queryDisabledReason}
-      editToken={metadataEdit.target === 'tags' ? undefined : metadataEdit.token}
-      editTarget={metadataEdit.target === 'icon' ? 'icon' : 'label'}
-      onEditHandled={metadataEdit.acknowledge}
+      editToken={annotations.edit.target === 'tags' ? undefined : annotations.edit.token}
+      editTarget={annotations.edit.target === 'icon' ? 'icon' : 'label'}
+      onEditHandled={annotations.edit.acknowledge}
       onSelectNode={(id) => {
         if (id.startsWith('addr:')) revealGraphNodes([id]);
         select(id);

@@ -43,6 +43,7 @@ import { outputAddress } from '../../../Domain/Workspace/workspace';
 import { walletCheckAge } from '../../../Domain/Wallet/walletActivity';
 import { CopyButton } from '../../../Shared/Controls/CopyButton';
 import { VisibilityActions, type VisibilityProps } from '../Selection/VisibilityActions';
+import { emptyAnnotation } from '../../../Domain/Metadata/annotations';
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from '../../../Shared/Metadata/IconPicker';
 import { OpReturnData } from '../../../Shared/Display/OpReturnData';
@@ -369,12 +370,6 @@ export function WalletInspector({
   );
 }
 
-export const emptyAnnotation: Annotation = {
-  label: '',
-  note: '',
-  icon: '',
-  bookmarked: false,
-};
 interface NodeInspectorProps extends VisibilityProps {
   tagsPanel?: ReactNode;
   walletMatch?: WalletMatch;

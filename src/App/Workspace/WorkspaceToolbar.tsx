@@ -12,9 +12,7 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
-import { exportLabels } from '../../Domain/Metadata/labels';
 import { WORKBENCH_LABELS } from './workbenchTypes';
-import { download } from '../../Infra/Storage/download';
 import type { WorkspaceController } from './useWorkspace';
 
 export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController }) {
@@ -34,7 +32,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     ws,
     exportWorkspace,
     dialogs,
-    setNotice,
+    annotations,
     operationRef,
     flushActiveGraph,
     setLockingWorkspace,
@@ -248,7 +246,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  dialogs.labelsInput.current?.click();
+                  annotations.chooseLabelFile();
                 }}
               >
                 <Upload size={15} />
@@ -257,10 +255,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  download('labels.jsonl', exportLabels(w), 'application/x-ndjson');
-                  setNotice(
-                    'BIP329 labels exported as unencrypted JSONL. Notes and graph layout use the encrypted workspace format.',
-                  );
+                  annotations.exportLabels();
                 }}
               >
                 <Download size={15} />

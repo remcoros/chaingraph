@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { Wallet } from '../../Domain/types';
 import type { AppState } from '../useAppState';
 
@@ -16,8 +16,6 @@ export interface WorkspaceDialogState {
   editingWallet: Wallet | undefined;
   openWalletRename: (workspaceId: string, walletId: string) => void;
   closeWalletRename: () => void;
-  /** Hidden label-import file input, triggered from the toolbar and rendered by the dialog. */
-  labelsInput: React.RefObject<HTMLInputElement | null>;
   /** Closes everything that should not survive a workspace switch or lock. */
   closeAll: () => void;
 }
@@ -26,7 +24,6 @@ export function useDialogState(w: AppState['w']): WorkspaceDialogState {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addWalletOpen, setAddWalletOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ workspaceId: string; walletId: string }>();
-  const labelsInput = useRef<HTMLInputElement>(null);
   const editingWallet =
     w?.id === renameTarget?.workspaceId
       ? w?.wallets.find((item) => item.id === renameTarget?.walletId)
@@ -42,7 +39,6 @@ export function useDialogState(w: AppState['w']): WorkspaceDialogState {
     editingWallet,
     openWalletRename: (workspaceId, walletId) => setRenameTarget({ workspaceId, walletId }),
     closeWalletRename: () => setRenameTarget(undefined),
-    labelsInput,
     closeAll: () => {
       setSettingsOpen(false);
       setRenameTarget(undefined);

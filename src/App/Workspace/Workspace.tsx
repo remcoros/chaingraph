@@ -20,6 +20,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     w,
     selection,
     history,
+    annotations,
     setNotice,
     ws,
     connectionScanTargets,
@@ -85,7 +86,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
         hiddenSelectedCount={selection.count - selectionOnCanvas}
         matching={matchingScope}
         matchingPending={graphFiltering}
-        onApply={history.applyBatch}
+        onApply={annotations.applyBatch}
         undoToken={history.token}
         undoDescription={history.undoDescription}
         onSetHidden={setEntityHidden}

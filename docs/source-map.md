@@ -25,11 +25,12 @@ src/
       useWorkspaceLookup.ts lookup field, reset signal and loaded-id resolution
       useWorkspaceHistory.ts undo, redo and single-step batch edits
       useDialogState.ts     which workspace dialog is open and its target
-      useMetadataEditRequest.ts request to open a label, tag or icon editor
+
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
       Inspector/            node, wallet and script inspection
       Selection/            shared selection, connection-scan targets and visibility
+      Annotations/          labels, tags, icons, bookmarks and BIP329 exchange
       Tags/                 workspace tag management
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to

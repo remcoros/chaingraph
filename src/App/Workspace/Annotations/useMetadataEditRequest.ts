@@ -16,16 +16,19 @@ export interface MetadataEditRequest {
   acknowledge: () => void;
 }
 
-export function useMetadataEditRequest(): MetadataEditRequest {
-  const [token, setToken] = useState(0);
+export function useMetadataEditRequest(workspaceId: string | undefined): MetadataEditRequest {
+  // Scoped to its workspace, so switching or locking one drops a pending request.
+  const [request, setRequest] = useState<{ workspaceId: string; token: number }>();
   const [target, setTarget] = useState<MetadataEditTarget>('label');
+  const token = workspaceId && request?.workspaceId === workspaceId ? request.token : 0;
   return {
     token,
     target,
     request: (next) => {
+      if (!workspaceId) return;
       setTarget(next);
-      setToken((current) => current + 1);
+      setRequest((current) => ({ workspaceId, token: (current?.token ?? 0) + 1 }));
     },
-    acknowledge: () => setToken(0),
+    acknowledge: () => setRequest(undefined),
   };
 }

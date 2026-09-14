@@ -56,7 +56,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     tourStep,
     ws,
     flowInputs,
-    changeTags,
+    annotations,
     queryDisabledReason,
     shownFocusGraph,
     setFocusGraph,
@@ -525,7 +525,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               {...flowInputs}
               onSelect={select}
               onEdit={editNode}
-              onApplyTags={changeTags}
+              onApplyTags={annotations.changeTags}
               onSetIcon={(id, icon) =>
                 change((current) => applyBatchIcon(current, [id], icon, true))
               }

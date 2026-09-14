@@ -9,7 +9,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     w,
     entityRemoval,
     selection,
-    changeTags,
+    annotations,
     select,
     setMobilePanel,
     shownLeftTab,
@@ -30,7 +30,6 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     entityFiltersLinked,
     setEntityPanelFilters,
     change,
-    bookmarks,
   } = workspace;
   const {
     graph,
@@ -70,7 +69,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
           graph={graph}
           selected={selected}
           selectedIds={connectionScanTargets.picking ? undefined : selection.ids}
-          onChange={changeTags}
+          onChange={annotations.changeTags}
           onSelect={(id) => {
             select(id);
             if (!connectionScanTargets.picking) setMobilePanel('right');
@@ -153,7 +152,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       onShowAllHidden={showAllHidden}
       entityNodes={entityNodes}
       entityBatchNodes={entityBatchNodes}
-      bookmarks={bookmarks}
+      bookmarks={annotations.bookmarks}
     />
   );
 }

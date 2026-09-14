@@ -1,7 +1,5 @@
 import { CopyButton } from '../../Shared/Controls/CopyButton';
-import { importLabels } from '../../Domain/Metadata/labels';
 import { Modal, WalletDialog, WalletNameDialog, WorkspaceDetailsDialog } from '../Dialogs';
-import { emptyAnnotation } from './Inspector/Inspector';
 import type { WorkspaceController } from './useWorkspace';
 
 type Props = { workspace: WorkspaceController };
@@ -29,8 +27,7 @@ export function WorkspaceSettingsDialog({ workspace }: Props) {
 }
 
 export function WorkspaceLabelImport({ workspace }: Props) {
-  const { w } = workspace;
-  const { labelsInput } = workspace.dialogs;
+  const { labelsInput, importLabelFile } = workspace.annotations;
   return (
     <input
       ref={labelsInput}
@@ -40,32 +37,7 @@ export function WorkspaceLabelImport({ workspace }: Props) {
       onChange={async (event) => {
         const file = event.target.files?.[0];
         event.target.value = '';
-        if (!file || !w) return;
-        try {
-          if (file.size > 5_000_000) throw new Error('Label file exceeds 5 MB.');
-          const result = importLabels(await file.text());
-          workspace.change((current) => {
-            const annotations = { ...current.annotations };
-            for (const [id, annotation] of Object.entries(result.annotations))
-              annotations[id] = {
-                ...(annotations[id] ?? emptyAnnotation),
-                label: annotation.label,
-              };
-            return {
-              ...current,
-              annotations,
-              wallets: current.wallets.map((wallet) => ({
-                ...wallet,
-                name: result.annotations[`xpub:${wallet.key}`]?.label.trim() || wallet.name,
-              })),
-            };
-          });
-          workspace.setNotice(
-            `Imported ${Object.keys(result.annotations).length} labels. ${result.skipped} records skipped (unsupported type or no label).`,
-          );
-        } catch (error) {
-          workspace.setError(error instanceof Error ? error.message : 'Label import failed.');
-        }
+        if (file) await importLabelFile(file);
       }}
     />
   );

@@ -3,7 +3,6 @@ import { useWalletUtxos } from './Workbenches/Wallet/useWalletUtxos';
 import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
 import { useFlowInputs } from './useFlowInputs';
 import { addGraphNodes } from '../../Domain/Graph/graphMembership';
-import { parseWorkspaceTags } from '../../Domain/Metadata/tags';
 import {
   useCallback,
   useEffect,
@@ -19,7 +18,7 @@ import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useDialogState } from './useDialogState';
 import { useWorkspaceHistory } from './useWorkspaceHistory';
-import { useMetadataEditRequest } from './useMetadataEditRequest';
+import { useAnnotations } from './Annotations/useAnnotations';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
@@ -175,7 +174,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [rightTab, setRightTab] = useState<NonNullable<Workspace['view']['rightTab']>>('inspect');
   const [mobilePanel, setMobilePanel] = useState<'graph' | 'left' | 'right'>('graph');
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
-  const metadataEdit = useMetadataEditRequest();
   const [operation, setOperation] = useState('');
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
     Record<string, AddressHistoryLoadState>
@@ -343,7 +341,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setNotice('');
     dialogs.closeAll();
     setExamplesOpen(false);
-    metadataEdit.acknowledge();
     lookup.clear();
     lookup.setError('');
     setFocusRequest(undefined);
@@ -379,6 +376,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     },
     [workspaceId, updateWorkspace],
   );
+  const annotations = useAnnotations({
+    current: w,
+    sessions: ws,
+    edit: change,
+    setError,
+    setNotice,
+  });
   const changeGraphView = (update: (view: Workspace['view']) => Workspace['view']) =>
     change((current) => {
       const view = update(current.view);
@@ -441,16 +445,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     clearFocusRequest: () => setFocusRequest(undefined),
     setNotice,
   });
-  const changeTags = (update: (workspace: Workspace) => Workspace) => {
-    try {
-      change((current) => {
-        const next = update(current);
-        return { ...next, tags: parseWorkspaceTags(next.tags ?? [], next.network) };
-      });
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Could not update tags.');
-    }
-  };
   const canQuery = connected && !!w && !!networks?.includes(w.network) && !w.demo;
   const queryDisabledReason = w?.demo
     ? 'Legacy synthetic workspace. Live lookups are disabled; create an example workspace to explore real transactions.'
@@ -588,8 +582,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     updateWorkspace,
     workspaceId,
   });
-  const history = useWorkspaceHistory({ w, ws, change, setError, setNotice });
-  const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
+  const history = useWorkspaceHistory({ w, ws });
   const graphActions = useGraphActions({
     cancelScanTargetPicking: connectionScanTargets.cancelPicking,
     selectionGeneration,
@@ -601,7 +594,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     w,
     setError,
     setGraphFilters,
-    requestMetadataEdit: metadataEdit.request,
+    requestMetadataEdit: annotations.edit.request,
     select,
     setFocusGraph,
     setRightTab,
@@ -699,7 +692,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
-    metadataEdit,
+    annotations,
     history,
     dialogs,
     lookup,
@@ -718,7 +711,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setSelectedId,
     setRightTab,
     setMobilePanel,
-    changeTags,
     setLeftTab,
     tx,
     operation,
@@ -750,7 +742,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     graphFilters,
     entityFiltersLinked,
     setEntityPanelFilters,
-    bookmarks,
     navigation,
     cameraPreservedSelection,
     workbench,

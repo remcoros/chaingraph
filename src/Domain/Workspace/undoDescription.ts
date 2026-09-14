@@ -1,7 +1,7 @@
 import type { Annotation, Workspace } from '../types';
 
 const fallback = 'Edit workspace';
-const emptyAnnotation: Annotation = { label: '', note: '', icon: '', bookmarked: false };
+import { emptyAnnotation } from '../Metadata/annotations';
 
 function changedKeys<T extends object>(before: T, after: T): Set<keyof T> {
   return new Set(
