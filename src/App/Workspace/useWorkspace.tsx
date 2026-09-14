@@ -1,5 +1,3 @@
-import { prepareCustomScanTargets } from '../../Domain/ConnectionScan/connectionScanTargets';
-import { isScanNodeId } from '../../Domain/ConnectionScan/connectionScan';
 import { resolveWalletUtxoObservation } from '../../Domain/Wallet/walletUtxoObservation';
 import { useWalletUtxos } from './Workbenches/Wallet/useWalletUtxos';
 import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
@@ -17,6 +15,7 @@ import {
 } from 'react';
 import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
+import { useScanTargets } from './Selection/useScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from '../../Domain/Workspace/entityRemoval';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
@@ -127,26 +126,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const selection = useEntitySelection(w?.id);
   const selectedBatchIds = selection.ids;
   const removeSelectedBatchIds = selection.remove;
-  const [scanTargets, setScanTargets] = useState<string[]>([]);
-  const [scanTargetDraft, setScanTargetDraft] = useState<{
-    workspaceId: string;
-    source: string;
-    ids: string[];
-  }>();
-  const scanTargetInvoker = useRef<HTMLElement | null>(null);
-  const toggleScanTarget = useCallback((id: string) => {
-    if (!isScanNodeId(id)) return;
-    setScanTargetDraft((draft) =>
-      !draft || id === draft.source
-        ? draft
-        : {
-            ...draft,
-            ids: draft.ids.includes(id)
-              ? draft.ids.filter((target) => target !== id)
-              : [...draft.ids, id],
-          },
-    );
-  }, []);
   const [navigation, setNavigation] = useState<{ ids: string[]; index: number }>({
     ids: [],
     index: -1,
@@ -162,9 +141,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const cameraPreservedSelection = useRef<string | undefined>(undefined);
   const preserveSelectionCamera = useCallback((id: string | undefined) => {
     cameraPreservedSelection.current = id;
-  }, []);
-  const setScanTargetInvoker = useCallback((element: HTMLElement) => {
-    scanTargetInvoker.current = element;
   }, []);
   const analysisSessions = useRef(new Map<string, AnalysisSession>());
   const [walletScanRevision, setWalletScanRevision] = useState(0);
@@ -265,38 +241,14 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       : rightTab);
   const shownMobilePanel = tourStep?.view?.panel ?? mobilePanel;
   const shownFocusGraph = tourStep ? false : focusGraph;
-  const pickingScanTargets =
-    !!scanTargetDraft &&
-    scanTargetDraft.workspaceId === w?.id &&
-    shownWorkbench === 'graph' &&
-    shownRightTab === 'scan' &&
-    !lockingWorkspace &&
-    !tourStep;
-  useEffect(() => {
-    if (!pickingScanTargets) setScanTargetDraft(undefined);
-  }, [pickingScanTargets]);
-  const finishScanTargetPicking = (apply: boolean) => {
-    if (apply && scanTargetDraft) setScanTargets(scanTargetDraft.ids);
-    if (scanTargetDraft) setSelectedId(scanTargetDraft.source);
-    setScanTargetDraft(undefined);
-    setMobilePanel('right');
-    requestAnimationFrame(() => scanTargetInvoker.current?.focus({ preventScroll: true }));
-  };
-  const activeWorkspaceId = w?.id;
-  const scanTargetPreview = useMemo(() => {
-    if (!activeWorkspaceId || !scanTargetDraft || scanTargetDraft.workspaceId !== activeWorkspaceId)
-      return {};
-    try {
-      return {
-        targetCount: prepareCustomScanTargets({
-          pickedNodeIds: scanTargetDraft.ids,
-          source: scanTargetDraft.source,
-        }).length,
-      };
-    } catch (cause) {
-      return { error: cause instanceof Error ? cause.message : 'Targets could not be prepared.' };
-    }
-  }, [scanTargetDraft, activeWorkspaceId]);
+  const scanTargets = useScanTargets({
+    workspaceId: w?.id,
+    canPick:
+      shownWorkbench === 'graph' && shownRightTab === 'scan' && !lockingWorkspace && !tourStep,
+    onSelectSource: setSelectedId,
+    onShowPanel: setMobilePanel,
+  });
+  const pickingScanTargets = scanTargets.picking;
   const [live, setLive] = useState(false);
   const [scanLimit, setScanLimit] = useState(200);
   const [gap, setGap] = useState(20);
@@ -334,7 +286,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     fitToken,
     selectedId,
     selection,
-    scanTargetDraft,
+    scanTargetDraft: scanTargets.draft,
     pickingScanTargets,
     entityPanelFilters,
     entityFiltersLinked,
@@ -403,7 +355,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const select = useCallback(
     (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => {
       if (pickingScanTargets && options?.pickTarget !== false) {
-        toggleScanTarget(id);
+        scanTargets.toggle(id);
         return;
       }
       if (pendingSelectionRef.current && pendingSelectionRef.current !== id)
@@ -428,7 +380,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       );
       setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
-    [updateWorkspace, getWorkspaceSession, pickingScanTargets, toggleScanTarget, wRef],
+    [updateWorkspace, getWorkspaceSession, pickingScanTargets, scanTargets, wRef],
   );
   const resetWorkspacePresentation = useEffectEvent(() => {
     operationRef.current?.abort();
@@ -436,8 +388,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setTour(undefined);
     setOperation('');
     setSelectedId(w?.view.selectionId);
-    setScanTargets([]);
-    setScanTargetDraft(undefined);
+    scanTargets.reset();
     setSelectedWallet(
       w?.view.selectedWallet && w.wallets.some((item) => item.id === w.view.selectedWallet)
         ? w.view.selectedWallet
@@ -870,6 +821,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   };
   const bookmarks = Object.entries(w?.annotations ?? {}).filter(([, a]) => a.bookmarked);
   const graphActions = useGraphActions({
+    cancelScanTargetPicking: scanTargets.cancelPicking,
     selectionGeneration,
     invalidateSelection,
     preserveSelectionCamera,
@@ -880,7 +832,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setError,
     setGraphFilters,
     setEditTarget,
-    setScanTargetDraft,
     select,
     setFocusGraph,
     setRightTab,
@@ -981,7 +932,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   return {
     invalidateSelection,
     preserveSelectionCamera,
-    setScanTargetInvoker,
     w,
     switchWorkbench,
     walletUtxoObservation,
@@ -1025,12 +975,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selectedId,
     selectedWallet,
     fetchScope,
-    scanTargetDraft,
-    pickingScanTargets,
     scanTargets,
-    scanTargetInvoker,
-    setScanTargetDraft,
-    setScanTargets,
     visibleGraph,
     connectionMembers,
     flowIndex,
@@ -1101,7 +1046,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     focusRequest,
     graphSelectedId,
     highlightedSelection,
-    toggleScanTarget,
     admittedGraph,
     graphWorkspaceRef,
     shownMobilePanel,
@@ -1137,8 +1081,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     applyBatch,
     undoToken,
     undoDescription,
-    finishScanTargetPicking,
-    scanTargetPreview,
     backgroundAddressHistoryLoad,
     pendingGraphWorkspace,
     setTour,

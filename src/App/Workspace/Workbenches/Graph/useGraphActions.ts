@@ -52,16 +52,7 @@ interface Inputs {
   setError: AppState['setError'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   setEditTarget: Dispatch<SetStateAction<'label' | 'tags' | 'icon'>>;
-  setScanTargetDraft: Dispatch<
-    SetStateAction<
-      | {
-          workspaceId: string;
-          source: string;
-          ids: string[];
-        }
-      | undefined
-    >
-  >;
+  cancelScanTargetPicking: () => void;
   select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
   setFocusGraph: Dispatch<SetStateAction<boolean>>;
   setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
@@ -103,7 +94,7 @@ export function useGraphActions({
   setError,
   setGraphFilters,
   setEditTarget,
-  setScanTargetDraft,
+  cancelScanTargetPicking,
   select,
   setFocusGraph,
   setRightTab,
@@ -170,7 +161,7 @@ export function useGraphActions({
   const editNode = (id: string, target: 'label' | 'tags' | 'icon' = 'label') => {
     setEditTarget(target);
     setNotice('');
-    setScanTargetDraft(undefined);
+    cancelScanTargetPicking();
     select(id, { pickTarget: false });
     setFocusGraph(false);
     setRightTab('inspect');

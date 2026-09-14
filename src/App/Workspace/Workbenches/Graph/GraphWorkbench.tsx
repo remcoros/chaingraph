@@ -70,7 +70,6 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphFilters,
     graph,
     workbench,
-    pickingScanTargets,
     visibleGraph,
     canvasFilterResult,
     graphFiltering,
@@ -99,7 +98,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     focusRequest,
     graphSelectedId,
     highlightedSelection,
-    toggleScanTarget,
+    scanTargets,
     admittedGraph,
     shownWorkbench,
     graphWorkspaceRef,
@@ -387,7 +386,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         aria-label="Selection mode"
         aria-pressed={selection.mode}
         title="Choose several entities for batch labels, tags and icons. Ctrl or Cmd click also toggles an entity."
-        disabled={pickingScanTargets}
+        disabled={scanTargets.picking}
         onClick={() => selection.setMode(!selection.mode)}
       >
         <CheckSquare size={14} />
@@ -515,7 +514,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               onLoadAddressUtxos={loadAddressUtxos}
               onOpenAddressHistoryTransaction={openAddressHistoryTransaction}
               selected={selected}
-              selection={pickingScanTargets ? undefined : selection}
+              selection={scanTargets.picking ? undefined : selection}
               hiddenNodeIds={w.view.hiddenNodeIds}
               graphNodeIds={w.view.graphNodeIds}
               onSetHidden={setEntityHidden}
@@ -603,10 +602,10 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   focusRequest={focusRequest}
                   selectedId={graphSelectedId}
                   onSelect={select}
-                  selectionMode={pickingScanTargets || selection.mode}
-                  selectionPurpose={pickingScanTargets ? 'scan-target' : 'batch'}
+                  selectionMode={scanTargets.picking || selection.mode}
+                  selectionPurpose={scanTargets.picking ? 'scan-target' : 'batch'}
                   batchSelectedIds={highlightedSelection}
-                  onToggleSelection={pickingScanTargets ? toggleScanTarget : selection.toggle}
+                  onToggleSelection={scanTargets.picking ? scanTargets.toggle : selection.toggle}
                   hiddenNodeIds={w.view.hiddenNodeIds}
                   graphNodeIds={w.view.graphNodeIds}
                   onSetHidden={setEntityHidden}

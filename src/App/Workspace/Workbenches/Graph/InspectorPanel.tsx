@@ -1,5 +1,4 @@
 import { ConnectionScanPanel } from './ConnectionScan/ConnectionScanPanel';
-import { isScanNodeId } from '../../../../Domain/ConnectionScan/connectionScan';
 import {
   addScanPathAddition,
   addScanNodeAddition,
@@ -33,13 +32,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     setRightTab,
     wallet,
     fetchScope,
-    scanTargetDraft,
-    pickingScanTargets,
     scanTargets,
-    setScanTargetInvoker,
-    setScanTargetDraft,
-    setMobilePanel,
-    setScanTargets,
     visibleGraph,
     connectionMembers,
     flowIndex,
@@ -114,21 +107,14 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
           <ConnectionScanPanel
             key={w.id}
             workspace={w}
-            selectionId={pickingScanTargets ? scanTargetDraft!.source : selectedId}
-            customTargetIds={scanTargets}
-            pickingTargets={pickingScanTargets}
+            selectionId={scanTargets.picking ? scanTargets.draft!.source : selectedId}
+            customTargetIds={scanTargets.targets}
+            pickingTargets={scanTargets.picking}
             onPickTargets={(invoker) => {
-              if (!selectedId || !isScanNodeId(selectedId)) return;
-              setScanTargetInvoker(invoker);
-              setScanTargetDraft({
-                workspaceId: w.id,
-                source: selectedId,
-                ids: scanTargets.filter((id) => id !== selectedId),
-              });
-              setMobilePanel('graph');
+              if (selectedId) scanTargets.beginPicking(selectedId, invoker);
             }}
-            onCancelPicking={() => setScanTargetDraft(undefined)}
-            onRemoveTarget={(id) => setScanTargets((ids) => ids.filter((target) => target !== id))}
+            onCancelPicking={scanTargets.cancelPicking}
+            onRemoveTarget={scanTargets.removeTarget}
             visibleNodeIds={visibleGraph.nodes.map((node) => node.id)}
             addedNodeIds={[...connectionMembers]}
             loadedSpenders={flowIndex.spenders}

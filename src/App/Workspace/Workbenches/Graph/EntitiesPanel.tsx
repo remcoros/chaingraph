@@ -5,11 +5,11 @@ import type { WorkspaceController } from '../../useWorkspace';
 
 export function EntitiesPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
+    scanTargets,
     w,
     removableNodeIds,
     requestEntityRemoval,
     selection,
-    pickingScanTargets,
     graph,
     selected,
     changeTags,
@@ -68,18 +68,18 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       transactions={w.transactions}
       removableNodeIds={removableNodeIds}
       onRemoveNode={requestEntityRemoval}
-      selection={pickingScanTargets ? undefined : selection}
+      selection={scanTargets.picking ? undefined : selection}
       tagsPanel={
         <TagsPanel
           key={w.id}
           workspace={w}
           graph={graph}
           selected={selected}
-          selectedIds={pickingScanTargets ? undefined : selection.ids}
+          selectedIds={scanTargets.picking ? undefined : selection.ids}
           onChange={changeTags}
           onSelect={(id) => {
             select(id);
-            if (!pickingScanTargets) setMobilePanel('right');
+            if (!scanTargets.picking) setMobilePanel('right');
           }}
           onShow={(tag) => {
             updateFilters({ tagId: tag.id, preserveContext: true });
@@ -101,7 +101,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       }}
       onSelectNode={(id) => {
         select(id);
-        if (!pickingScanTargets) setMobilePanel('right');
+        if (!scanTargets.picking) setMobilePanel('right');
       }}
       onAddWallet={() => setWalletDialog(true)}
       onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}

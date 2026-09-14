@@ -17,7 +17,6 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     shownWorkbench,
     workbench,
     tourStep,
-    pickingScanTargets,
     w,
     selection,
     selectionOnCanvas,
@@ -28,10 +27,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     undoDescription,
     setNotice,
     ws,
-    scanTargetDraft,
-    toggleScanTarget,
-    finishScanTargetPicking,
-    scanTargetPreview,
+    scanTargets,
     visibleGraph,
     backgroundAddressHistoryLoad,
     operation,
@@ -86,7 +82,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
       <WalletWorkbench workspace={workspace} />
       <AnalysisWorkbench workspace={workspace} />
       <SelectionToolbar
-        active={workbench === 'graph' && !tourStep && !pickingScanTargets}
+        active={workbench === 'graph' && !tourStep && !scanTargets.picking}
         workspace={w}
         selection={selection}
         visibleSelectedCount={selectionOnCanvas}
@@ -107,13 +103,13 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
         }}
         onUndo={() => ws.undo(w.id)}
       />
-      {pickingScanTargets && scanTargetDraft && (
+      {scanTargets.picking && scanTargets.draft && (
         <ScanTargetToolbar
-          ids={scanTargetDraft.ids}
-          onRemove={toggleScanTarget}
-          onDone={() => finishScanTargetPicking(true)}
-          onCancel={() => finishScanTargetPicking(false)}
-          {...scanTargetPreview}
+          ids={scanTargets.draft.ids}
+          onRemove={scanTargets.toggle}
+          onDone={() => scanTargets.finish(true)}
+          onCancel={() => scanTargets.finish(false)}
+          {...scanTargets.preview}
         />
       )}
       <footer className="statusbar">
