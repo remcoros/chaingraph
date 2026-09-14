@@ -18,6 +18,7 @@
     "react-hooks/set-state-in-render": "error",
     "react-hooks/exhaustive-deps": "error",
     "react/set-state-in-effect": "error",
+    "react/refs": "error",
     "react/preserve-manual-memoization": "error",
     "react/immutability": "error",
     "react/purity": "error",

@@ -122,7 +122,10 @@ export function ConnectionScanPanel(props: Props) {
   const dismissedGroups = useRef(new Set<string>());
   const controller = useRef<AbortController | undefined>(undefined);
   const mounted = useRef(true);
-  const dismissed = useRef(new Map<string, Set<string>>());
+  // One map for the life of the panel, mutated in place alongside the state
+  // change that re-renders. Held as state so reading it while deciding what to
+  // show is not a ref read.
+  const [dismissed] = useState(() => new Map<string, Set<string>>());
   const latestProgress = useRef<
     { run: ScanRun; evidence: Record<string, Transaction> } | undefined
   >(undefined);
@@ -132,7 +135,7 @@ export function ConnectionScanPanel(props: Props) {
   });
   const runs = workspace.connectionScans?.runs ?? [];
   const scanRuns = mergeScanRunSnapshots(runs, liveRuns).map((item) =>
-    presentScanRun(item, dismissed.current.get(item.id) ?? new Set()),
+    presentScanRun(item, dismissed.get(item.id) ?? new Set()),
   );
   const run = scanRuns.at(-1);
   const source = selectionId;
@@ -209,7 +212,7 @@ export function ConnectionScanPanel(props: Props) {
     setTransientEvidence(undefined);
     setError('');
     setFilter('findings');
-    dismissed.current.clear();
+    dismissed.clear();
     latestProgress.current = undefined;
     onChange(clearScanRuns, false);
   }
@@ -224,7 +227,7 @@ export function ConnectionScanPanel(props: Props) {
             : result,
         ),
       },
-      dismissed.current.get(incoming.id) ?? new Set(),
+      dismissed.get(incoming.id) ?? new Set(),
     );
   }
 
@@ -901,9 +904,9 @@ export function ConnectionScanPanel(props: Props) {
               onDismiss={() => {
                 actionController.current?.abort();
                 dismissedGroups.current.add(group.id);
-                const ids = dismissed.current.get(group.run.id) ?? new Set<string>();
+                const ids = dismissed.get(group.run.id) ?? new Set<string>();
                 for (const result of group.results) ids.add(result.id);
-                dismissed.current.set(group.run.id, ids);
+                dismissed.set(group.run.id, ids);
                 retainResult({
                   run:
                     latestProgress.current?.run.id === group.run.id
