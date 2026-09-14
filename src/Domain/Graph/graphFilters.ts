@@ -1,32 +1,6 @@
 import { formatBitcoinAmount } from '../Chain/amountFormat';
-import type { Annotation, GraphData, GraphNode } from '../types';
+import type { Annotation, GraphData, GraphFilters, GraphNode } from '../types';
 import type { EntityVisibility } from './visibility';
-
-export interface GraphFilters {
-  tagId?: string;
-  /** Any tag membership, independent of one chosen tag. */
-  tagState?: 'all' | 'tagged' | 'untagged';
-  /** Legacy single-wallet selection, retained for saved workspaces. */
-  walletId?: string;
-  /** Match any selected wallet; an empty list leaves wallet membership unrestricted. */
-  walletIds?: string[];
-  /** Derived wallet-address membership, never an ownership claim. */
-  walletMatch?: 'all' | 'matched' | 'unmatched';
-  query?: string;
-  kind?: 'all' | GraphNode['kind'];
-  label?: 'all' | 'labeled' | 'unlabeled';
-  bookmarkedOnly?: boolean;
-  minSats?: number;
-  maxSats?: number;
-  spend?: 'all' | 'observed' | 'unknown';
-  funding?: 'all' | 'missing' | 'loaded';
-  showAddresses?: boolean;
-  focus?: { id: string; hops: 1 | 2 };
-  preserveContext?: boolean;
-  includeIds?: string[];
-  /** Resolved membership exclusions; callers supply explicit identifiers only. */
-  excludeIds?: string[];
-}
 
 export interface FilteredGraph extends GraphData {
   matchedNodes: GraphNode[];

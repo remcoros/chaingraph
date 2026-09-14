@@ -11,7 +11,7 @@ import {
 } from '../../../Domain/Chain/addressHistory';
 import { addGraphNodes, ensureGraphMembership } from '../../../Domain/Graph/graphMembership';
 import { useCallback, useEffect, useMemo } from 'react';
-import { type GraphFilters } from '../../../Domain/Graph/graphFilters';
+import { type GraphFilters } from '../../../Domain/types';
 import { setNodesHidden } from '../../../Domain/Graph/visibility';
 import {
   buildGraph,

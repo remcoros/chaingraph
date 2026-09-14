@@ -19,8 +19,8 @@ import {
   buildGraphFilterIndex,
   intersectIds,
   matchingWalletFilterNodeIds,
-  type GraphFilters,
 } from '../../../../Domain/Graph/graphFilters';
+import type { GraphFilters } from '../../../../Domain/types';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
 import { type GraphEvidenceWorkspace } from '../../../../Domain/Workspace/workspace';
 import { filterSmallAmounts, omitAmountOrphans } from '../../../../Domain/Graph/smallAmounts';

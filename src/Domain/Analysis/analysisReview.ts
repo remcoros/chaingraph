@@ -3,7 +3,6 @@ import type { AnalysisFinding } from '../types';
 
 export const reviewPriorities = ['high', 'medium', 'low'] as const;
 export type ReviewPriority = (typeof reviewPriorities)[number];
-export type ReviewRule = 'fee-threshold' | 'repeated-address' | 'distinct-wallet-inputs';
 
 /** Review order, never confidence, ownership certainty or a security rating.
  * Legacy findings remain readable; a rerun supplies domain-specific rules.

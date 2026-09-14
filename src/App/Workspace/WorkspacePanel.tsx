@@ -18,7 +18,7 @@ import {
 } from '../../Domain/types';
 import { walletCheckAge } from '../../Domain/Wallet/walletActivity';
 import { formatLocalTimestamp } from '../../Domain/Chain/transactionTime';
-import type { GraphFilters } from '../../Domain/Graph/graphFilters';
+import type { GraphFilters } from '../../Domain/types';
 import type { EntitySelection } from './Selection/useEntitySelection';
 import EntityBrowser from './Entities/EntityBrowser';
 import { ResponsiveIdentifier } from '../../Shared/Display/ResponsiveIdentifier';

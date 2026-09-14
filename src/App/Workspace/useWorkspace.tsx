@@ -15,7 +15,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { valueFilterError, type GraphFilters } from '../../Domain/Graph/graphFilters';
+import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { planEntityRemoval, removeWorkspaceEntity } from '../../Domain/Workspace/entityRemoval';
@@ -25,6 +25,7 @@ import {
   outputNodeId,
   addressNodeId,
   txNodeId,
+  type GraphFilters,
   type Wallet,
   type Workspace,
 } from '../../Domain/types';

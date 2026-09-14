@@ -1,5 +1,5 @@
 import type { GraphSnapshot } from './Graph/graphSnapshot';
-import type { GraphFilters } from './Graph/graphFilters';
+import type { ConnectionScanRecords } from './ConnectionScan/connectionScanRecords';
 export type Network = 'mainnet' | 'testnet4';
 export type ScriptType = 'p2pkh' | 'p2sh-p2wpkh' | 'p2wpkh' | 'p2tr';
 export interface TxOutputDetails {
@@ -102,6 +102,8 @@ export interface WorkspaceTag {
   description?: string;
   nodeIds: string[];
 }
+/** Review ordering rule recorded on a finding, never a confidence or ownership claim. */
+export type ReviewRule = 'fee-threshold' | 'repeated-address' | 'distinct-wallet-inputs';
 export interface AnalysisFinding {
   id: string;
   algorithm: string;
@@ -116,7 +118,7 @@ export interface AnalysisFinding {
   kind?: 'observation' | 'hypothesis' | 'incomplete';
   scopeTxids?: string[];
   stale?: boolean;
-  reviewRule?: import('./Analysis/analysisReview').ReviewRule;
+  reviewRule?: ReviewRule;
 }
 export interface TransactionFlowState {
   transactionId?: string;
@@ -146,7 +148,7 @@ export interface Workspace {
     { status: 'reviewed' | 'unknown' | 'later'; at: string; evidence: string }
   >;
   /** Compact scan records and retained path evidence, encrypted with this workspace. */
-  connectionScans?: import('./ConnectionScan/connectionScanRecords').ConnectionScanRecords;
+  connectionScans?: ConnectionScanRecords;
   findings: AnalysisFinding[];
   watchedAddresses: string[];
   /** Bounded Electrum history observations for directly watched addresses. */
@@ -187,6 +189,32 @@ export interface Workspace {
     transactionFlow?: TransactionFlowState;
   };
 }
+export interface GraphFilters {
+  tagId?: string;
+  /** Any tag membership, independent of one chosen tag. */
+  tagState?: 'all' | 'tagged' | 'untagged';
+  /** Legacy single-wallet selection, retained for saved workspaces. */
+  walletId?: string;
+  /** Match any selected wallet; an empty list leaves wallet membership unrestricted. */
+  walletIds?: string[];
+  /** Derived wallet-address membership, never an ownership claim. */
+  walletMatch?: 'all' | 'matched' | 'unmatched';
+  query?: string;
+  kind?: 'all' | GraphNode['kind'];
+  label?: 'all' | 'labeled' | 'unlabeled';
+  bookmarkedOnly?: boolean;
+  minSats?: number;
+  maxSats?: number;
+  spend?: 'all' | 'observed' | 'unknown';
+  funding?: 'all' | 'missing' | 'loaded';
+  showAddresses?: boolean;
+  focus?: { id: string; hops: 1 | 2 };
+  preserveContext?: boolean;
+  includeIds?: string[];
+  /** Resolved membership exclusions; callers supply explicit identifiers only. */
+  excludeIds?: string[];
+}
+
 export interface GraphNode {
   id: string;
   kind: 'transaction' | 'output' | 'address';
@@ -224,4 +252,3 @@ export const short = (value: string) => {
   return `${abbreviated}${outpoint ? `:${outpoint[2]}` : ''}`;
 };
 export const sats = (btc: number) => Math.round(btc * 100_000_000);
-export { formatSats } from './Chain/amountFormat';

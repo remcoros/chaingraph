@@ -13,7 +13,8 @@ import {
   showAllGraphOutputs,
 } from '../../../../Domain/Graph/graphMembership';
 import { useEffect } from 'react';
-import { filterGraph, type GraphFilters } from '../../../../Domain/Graph/graphFilters';
+import { filterGraph } from '../../../../Domain/Graph/graphFilters';
+import { type GraphFilters } from '../../../../Domain/types';
 import { setNodesHidden, showAllNodes } from '../../../../Domain/Graph/visibility';
 import { promoteInputContext } from '../../../../Domain/Workspace/workspace';
 import { type Workspace } from '../../../../Domain/types';

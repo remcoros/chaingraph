@@ -1,5 +1,5 @@
 import type { Workspace } from '../types';
-import type { GraphFilters } from './graphFilters';
+import type { GraphFilters } from '../types';
 import { addGraphNodes } from './graphMembership';
 import { buildGraph, outputAddress, promoteInputContext } from '../Workspace/workspace';
 

@@ -6,7 +6,7 @@ import {
 } from '../../../../Domain/Wallet/walletRecords';
 import { listWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
 import { addGraphNodes } from '../../../../Domain/Graph/graphMembership';
-import { type GraphFilters } from '../../../../Domain/Graph/graphFilters';
+import { type GraphFilters } from '../../../../Domain/types';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
 import { type Wallet, type Workspace } from '../../../../Domain/types';
 import type { Dispatch, SetStateAction, RefObject } from 'react';

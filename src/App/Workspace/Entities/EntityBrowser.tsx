@@ -37,8 +37,8 @@ import {
   valueFilterError,
   hasActiveFilters,
   type EntitySort,
-  type GraphFilters,
 } from '../../../Domain/Graph/graphFilters';
+import type { GraphFilters } from '../../../Domain/types';
 import { transactionStatus } from '../../../Domain/Chain/transactionStatus';
 import type { Annotation, GraphNode, Transaction, Workspace } from '../../../Domain/types';
 import './entity-browser.css';
