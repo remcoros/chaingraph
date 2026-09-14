@@ -11,16 +11,26 @@ export default defineConfig(({ command }) => ({
       // React Compiler memoizes components and hooks automatically, which is the
       // safety net for a UI written with almost no hand-rolled useCallback/memo.
       //
-      // Build-only on purpose. With @vitejs/plugin-react 6.1.1, enabling the
-      // compiler also changes the Fast Refresh hook-signature instrumentation it
-      // emits ($RefreshSig$ registrations that are absent otherwise). In the dev
-      // server that remounts the workspace store and drops the unlocked session,
-      // so unlocking a workspace silently returns to the home screen. Verified by
-      // A/B on unmodified sources: dev + compiler fails the e2e smoke test, dev
-      // without it passes, and a production build with it passes. The breakage is
-      // not memoization: it reproduces with 'use no memo' on every source file.
-      // Revisit once the plugin's dev-mode refresh handling is fixed.
-      compiler: command === 'build' ? { logDiagnostics: true } : false,
+      // Scoped to where React actually lives. Enabling the compiler hands the
+      // TypeScript, JSX and Fast Refresh transforms to oxc-transform-react, and
+      // its refresh pass instruments every file it is given rather than only
+      // files containing JSX. A module with no JSX still gains $RefreshReg$
+      // registration for each capitalised export.
+      //
+      // Web workers have no Fast Refresh runtime, so any such module in a
+      // worker's import graph throws 'ReferenceError: $RefreshReg$ is not
+      // defined' and the worker dies on load. Unlocking a workspace then failed
+      // with "The workspace worker stopped" and returned to the home screen. In
+      // this project the encryption worker reached both a Domain module of
+      // colour constants and, through dependency prebundling, bitcoinjs-lib.
+      //
+      // Domain and Infra hold no React, which the import boundaries in
+      // .oxlintrc.json already enforce, so naming App and Shared states that
+      // rather than working around the transform. The filter must keep the
+      // extension test: include replaces the default one, and without it the
+      // plugin tries to parse imported CSS as JavaScript.
+      include: [/\/src\/(App|Shared)\/.*\.[jt]sx?$/],
+      compiler: { logDiagnostics: true },
     }),
   ],
   envDir: false,
