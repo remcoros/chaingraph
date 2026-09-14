@@ -22,6 +22,7 @@ src/
       WorkspaceTour.tsx     guided tour and example preview wiring
       ChainData/            bounded evidence loading, spending notices and cancellation
       useEntityRemoval.ts   removal plans, confirmation and applied removals
+      useWorkspaceLookup.ts lookup field, reset signal and loaded-id resolution
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
       Inspector/            node, wallet and script inspection

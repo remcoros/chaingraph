@@ -28,14 +28,10 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     tourStep,
     returnWorkbench,
     workbench,
-    searchInput,
+    lookup,
     w,
     canQuery,
     operation,
-    queryReset,
-    queryError,
-    setQueryError,
-    loadedLookupId,
     prefetchDepth,
     setPrefetchDepth,
     undoLabel,
@@ -123,14 +119,14 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
       </nav>
       <div className="lookup-controls" data-tour="chain-lookup">
         <LookupForm
-          inputRef={searchInput}
+          inputRef={lookup.inputRef}
           network={w.network}
           canQuery={canQuery}
           busy={!!operation}
-          resetToken={queryReset}
-          queryError={queryError}
-          onQueryError={setQueryError}
-          resolveLoaded={loadedLookupId}
+          resetToken={lookup.resetToken}
+          queryError={lookup.error}
+          onQueryError={lookup.setError}
+          resolveLoaded={lookup.resolveLoaded}
           onSubmit={addQuery}
         />
         {!w.demo && (

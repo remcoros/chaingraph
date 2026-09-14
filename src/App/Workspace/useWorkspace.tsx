@@ -16,18 +16,11 @@ import {
 import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
 import { useEntityRemoval } from './useEntityRemoval';
+import { useWorkspaceLookup } from './useWorkspaceLookup';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
-import { outputAddress } from '../../Domain/Workspace/workspace';
-import {
-  outputNodeId,
-  addressNodeId,
-  txNodeId,
-  type GraphFilters,
-  type Wallet,
-  type Workspace,
-} from '../../Domain/types';
+import { type GraphFilters, type Wallet, type Workspace } from '../../Domain/types';
 import { fetchTransaction } from '../../Infra/Bitcoin/api';
 import { WORKBENCH_TOUR, availableTourSteps } from '../Help/steps';
 import { useWalletTourExample } from '../Help/useWalletTourExample';
@@ -79,6 +72,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     registerGraphSnapshotFlush,
     flushActiveGraph,
   } = app;
+  const lookup = useWorkspaceLookup(w);
+  const focusLookup = lookup.focus;
   const workspaceNetwork = w?.network;
   const workspaceTransactions = w?.transactions;
 
@@ -187,11 +182,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [editToken, setEditToken] = useState(0);
   const [editTarget, setEditTarget] = useState<'label' | 'tags' | 'icon'>('label');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Only the reset signal stays lifted; the lookup text itself lives in
-  // LookupForm so typing does not re-render the whole workbench.
-  const [queryReset, setQueryReset] = useState(0);
-  const clearQuery = () => setQueryReset((token) => token + 1);
-  const [queryError, setQueryError] = useState('');
   const [operation, setOperation] = useState('');
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
     Record<string, AddressHistoryLoadState>
@@ -236,7 +226,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     new Map<string, { workspaceId: string; controller: AbortController }>(),
   );
   const labelsInput = useRef<HTMLInputElement>(null);
-  const searchInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
@@ -249,12 +238,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         );
       } else if (event.key.toLowerCase() === 'k' && current && !isModalOpen()) {
         event.preventDefault();
-        searchInput.current?.focus();
+        focusLookup();
       }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [persistWorkspace, flushActiveGraph, wRef, setError]);
+  }, [persistWorkspace, flushActiveGraph, wRef, setError, focusLookup]);
   const graphProjection = useGraphProjection({
     w,
     graphFilters,
@@ -367,8 +356,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setWalletNameDialog(undefined);
     setExamplesOpen(false);
     setEditToken(0);
-    clearQuery();
-    setQueryError('');
+    lookup.clear();
+    lookup.setError('');
     setMenu(false);
     setFocusRequest(undefined);
     const savedGraphFilters = w?.view.filters ?? {};
@@ -476,33 +465,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     }
   };
   const canQuery = connected && !!w && !!networks?.includes(w.network) && !w.demo;
-  const loadedLookupIds = useMemo(() => {
-    const ids = new Set((w?.watchedAddresses ?? []).map(addressNodeId));
-    for (const transaction of Object.values(w?.transactions ?? {})) {
-      ids.add(txNodeId(transaction.txid));
-      for (const output of transaction.vout) {
-        ids.add(outputNodeId(transaction.txid, output.n));
-        const address = outputAddress(output);
-        if (address) ids.add(addressNodeId(address));
-      }
-      for (const input of transaction.vin) {
-        if (!input.txid || input.vout === undefined) continue;
-        if (!w?.inputContext?.[transaction.txid]) ids.add(outputNodeId(input.txid, input.vout));
-        const address = input.prevout && outputAddress({ ...input.prevout, n: input.vout });
-        if (address) ids.add(addressNodeId(address));
-      }
-    }
-    return ids;
-  }, [w?.transactions, w?.watchedAddresses, w?.inputContext]);
-  function loadedLookupId(text: string) {
-    const match = /^([0-9a-f]{64})(?::(\d+))?$/i.exec(text);
-    const id = match
-      ? match[2] === undefined
-        ? txNodeId(match[1].toLowerCase())
-        : outputNodeId(match[1].toLowerCase(), Number(match[2]))
-      : addressNodeId(/^(bc1|tb1)/i.test(text) ? text.toLowerCase() : text);
-    return loadedLookupIds.has(id) ? id : undefined;
-  }
   const queryDisabledReason = w?.demo
     ? 'Legacy synthetic workspace. Live lookups are disabled; create an example workspace to explore real transactions.'
     : unsupportedNetwork
@@ -567,8 +529,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setGraphFilters,
     select,
     setFocusRequest,
-    loadedLookupId,
-    clearQuery,
+    loadedLookupId: lookup.resolveLoaded,
+    clearQuery: lookup.clear,
     prefetchDepth,
     recoveryGraph,
     canTrace,
@@ -775,6 +737,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    lookup,
     graphProjection,
     evidence: workspaceEvidence,
     invalidateSelection,
@@ -847,11 +810,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setMenu,
     workspaceMenuTrigger,
     returnWorkbench,
-    searchInput,
-    queryReset,
-    queryError,
-    setQueryError,
-    loadedLookupId,
     prefetchDepth,
     setPrefetchDepth,
     undoLabel,

@@ -10,7 +10,7 @@ import { AnalysisWorkbench } from './Workbenches/Analysis/AnalysisWorkbench';
 
 export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   const {
-    queryError,
+    lookup,
     shownMobilePanel,
     setMobilePanel,
     shownRightTab,
@@ -38,9 +38,9 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   return (
     <>
       <WorkspaceToolbar workspace={workspace} />
-      {queryError && (
+      {lookup.error && (
         <div className="lookup-error" id="lookup-error" role="alert">
-          {queryError}
+          {lookup.error}
         </div>
       )}
       <div className="mobile-switch" hidden={shownWorkbench !== 'graph'}>
