@@ -1,16 +1,18 @@
 import { useState, useRef, type ReactNode, type RefObject } from 'react';
-import { Box, Bookmark } from 'lucide-react';
+import { Box, Bookmark, Layers } from 'lucide-react';
 import { Amount } from '../../../../../Shared/Display/Amount';
 import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
 import { TransactionBlockTime } from '../../../../../Shared/Display/TransactionBlockTime';
 import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import {
+  addressBalanceSats,
   paginateAddressHistorySections,
   type AddressHistory,
 } from '../../../../../Domain/Chain/addressHistory';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
 import {
   txNodeId,
+  type AddressBalanceObservation,
   type AddressUtxoObservation,
   type GraphNode,
   type Workspace,
@@ -28,6 +30,7 @@ export interface FlowPanelAddressViewProps {
     total: number;
     error?: string;
   };
+  addressBalance?: AddressBalanceObservation;
   addressUtxos?: AddressUtxoObservation;
   onLoadAddressHistory?: (force?: boolean) => void;
   onLoadAddressUtxos?: (force?: boolean) => void;
@@ -80,6 +83,63 @@ function AddressHistorySection<T>({
         </div>
       )}
     </section>
+  );
+}
+
+/** The address view's title bar contribution. */
+/** The address view's title bar, which it owns end to end. */
+/** The address view's header, which it owns end to end. */
+export function AddressFlowHeader({
+  nodeId,
+  annotation,
+  addressHistory,
+  addressHistoryLoad: load,
+  addressBalance,
+}: Pick<FlowPanelAddressViewProps, 'addressHistory' | 'addressHistoryLoad' | 'addressBalance'> & {
+  nodeId: string;
+  annotation?: { icon?: string; bookmarked?: boolean };
+}) {
+  return (
+    <span className="flow-panel-header">
+      <span className="flow-panel-title">
+        <Layers size={16} aria-hidden="true" />
+        {annotation?.icon && (
+          <span
+            className="flow-panel-title-annotation"
+            role="img"
+            aria-label={`Annotation icon: ${annotation.icon}`}
+          >
+            {annotation.icon}
+          </span>
+        )}
+        {annotation?.bookmarked && (
+          <Bookmark size={14} className="flow-panel-title-bookmark" aria-label="Bookmarked" />
+        )}
+        <span>Address</span>
+        <code title={nodeId.replace(/^addr:/, '')}>
+          <ResponsiveIdentifier value={nodeId} preferFull />
+        </code>
+      </span>
+      <small>
+        {load?.error
+          ? 'Address history unavailable'
+          : load?.phase === 'history'
+            ? 'Checking address history…'
+            : load?.phase === 'details'
+              ? `Loading history ${load.done}/${load.total}`
+              : load?.phase === 'balance'
+                ? 'Checking address balance…'
+                : addressHistory
+                  ? `${addressHistory.knownCount} known transactions`
+                  : 'History not loaded'}
+        {addressHistory && (
+          <>
+            {' · Balance '}
+            <Amount value={addressBalanceSats(addressBalance)} unknown="Unknown" />
+          </>
+        )}
+      </small>
+    </span>
   );
 }
 
@@ -364,331 +424,337 @@ export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewPro
     );
   };
   return (
-    <div className="address-history-view" aria-label="Address history">
-      <div className="address-history-sticky">
-        <div className="address-history-header">
-          <div className="address-history-tabs" role="tablist" aria-label="Address details">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'transactions'}
-              className={tab === 'transactions' ? 'active' : undefined}
-              onClick={() => setTab('transactions')}
-            >
-              Transactions
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'utxos'}
-              className={tab === 'utxos' ? 'active' : undefined}
-              onClick={() => {
-                setTab('utxos');
-                if (!addressUtxos && canLoadUtxos) onLoadUtxos?.(false);
-              }}
-            >
-              UTXOs
-            </button>
-          </div>
-          <div className="address-history-header-actions">
-            {tab === 'transactions' && hasLoad && (
+    <div className="flow-panel-body">
+      <div className="address-history-view" aria-label="Address history">
+        <div className="address-history-sticky">
+          <div className="address-history-header">
+            <div className="address-history-tabs" role="tablist" aria-label="Address details">
               <button
                 type="button"
-                className="text-button"
-                disabled={!!disabledReason || isLoading}
-                onClick={() => onLoad?.(true)}
+                role="tab"
+                aria-selected={tab === 'transactions'}
+                className={tab === 'transactions' ? 'active' : undefined}
+                onClick={() => setTab('transactions')}
               >
-                Refresh
+                Transactions
               </button>
-            )}
-            {tab === 'utxos' && hasLoadUtxos && (
               <button
                 type="button"
-                className="text-button"
-                disabled={!!disabledReason}
-                onClick={() => onLoadUtxos?.(true)}
+                role="tab"
+                aria-selected={tab === 'utxos'}
+                className={tab === 'utxos' ? 'active' : undefined}
+                onClick={() => {
+                  setTab('utxos');
+                  if (!addressUtxos && canLoadUtxos) onLoadUtxos?.(false);
+                }}
               >
-                Refresh
+                UTXOs
               </button>
-            )}
-            {(tab === 'transactions' ? hasLoad : hasLoadUtxos) && <span aria-hidden="true">·</span>}
-            <span>
-              {tab === 'transactions'
-                ? checkedAtLabel(history.checkedAt)
-                : checkedAtLabel(addressUtxos?.checkedAt)}
-            </span>
-          </div>
-        </div>
-        {showCoverage && (
-          <div className="address-history-coverage">
-            {loading?.error && <span className="address-history-error">{loading.error}</span>}
-            {loading && !loading.error && (
-              <span className="address-history-loading">
-                {loading.phase === 'history'
-                  ? 'Checking address history…'
-                  : loading.phase === 'details'
-                    ? `Loading history details ${loading.done}/${loading.total}`
-                    : 'Checking address balance…'}
-              </span>
-            )}
-            {tab === 'transactions' &&
-              !history.complete &&
-              history.source !== 'loaded transactions' && (
-                <span className="address-history-partial">Coverage is partial</span>
+            </div>
+            <div className="address-history-header-actions">
+              {tab === 'transactions' && hasLoad && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!!disabledReason || isLoading}
+                  onClick={() => onLoad?.(true)}
+                >
+                  Refresh
+                </button>
               )}
-            {tab === 'transactions' && history.unloadedCount > 0 && (
+              {tab === 'utxos' && hasLoadUtxos && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!!disabledReason}
+                  onClick={() => onLoadUtxos?.(true)}
+                >
+                  Refresh
+                </button>
+              )}
+              {(tab === 'transactions' ? hasLoad : hasLoadUtxos) && (
+                <span aria-hidden="true">·</span>
+              )}
               <span>
-                {history.unloadedCount} detail{history.unloadedCount === 1 ? '' : 's'} not loaded
+                {tab === 'transactions'
+                  ? checkedAtLabel(history.checkedAt)
+                  : checkedAtLabel(addressUtxos?.checkedAt)}
               </span>
-            )}
-            {tab === 'transactions' &&
-              canLoad &&
-              (history.source === 'loaded transactions' || !history.complete) && (
-                <button
-                  type="button"
-                  className="text-button"
-                  title="Load the address history from the backend"
-                  onClick={() => onLoad?.(false)}
-                >
-                  Load address history
-                </button>
+            </div>
+          </div>
+          {showCoverage && (
+            <div className="address-history-coverage">
+              {loading?.error && <span className="address-history-error">{loading.error}</span>}
+              {loading && !loading.error && (
+                <span className="address-history-loading">
+                  {loading.phase === 'history'
+                    ? 'Checking address history…'
+                    : loading.phase === 'details'
+                      ? `Loading history details ${loading.done}/${loading.total}`
+                      : 'Checking address balance…'}
+                </span>
               )}
-          </div>
-        )}
-        {tab === 'transactions' && history.entries.length > 0 && (
-          <div className="address-history-section-summary" aria-live="polite">
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => jumpToTransactionSection('pending')}
-            >
-              {pendingTransactions.length} pending
-            </button>
-            <span className="address-history-section-summary-separator" aria-hidden="true">
-              |
-            </span>
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => jumpToTransactionSection('confirmed')}
-            >
-              {confirmedTransactions.length} confirmed
-            </button>
-            {!!unknownTransactions.length && (
-              <>
-                <span className="address-history-section-summary-separator" aria-hidden="true">
-                  |
+              {tab === 'transactions' &&
+                !history.complete &&
+                history.source !== 'loaded transactions' && (
+                  <span className="address-history-partial">Coverage is partial</span>
+                )}
+              {tab === 'transactions' && history.unloadedCount > 0 && (
+                <span>
+                  {history.unloadedCount} detail{history.unloadedCount === 1 ? '' : 's'} not loaded
                 </span>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => jumpToTransactionSection('unknown')}
-                >
-                  {unknownTransactions.length} unknown
-                </button>
-              </>
+              )}
+              {tab === 'transactions' &&
+                canLoad &&
+                (history.source === 'loaded transactions' || !history.complete) && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    title="Load the address history from the backend"
+                    onClick={() => onLoad?.(false)}
+                  >
+                    Load address history
+                  </button>
+                )}
+            </div>
+          )}
+          {tab === 'transactions' && history.entries.length > 0 && (
+            <div className="address-history-section-summary" aria-live="polite">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => jumpToTransactionSection('pending')}
+              >
+                {pendingTransactions.length} pending
+              </button>
+              <span className="address-history-section-summary-separator" aria-hidden="true">
+                |
+              </span>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => jumpToTransactionSection('confirmed')}
+              >
+                {confirmedTransactions.length} confirmed
+              </button>
+              {!!unknownTransactions.length && (
+                <>
+                  <span className="address-history-section-summary-separator" aria-hidden="true">
+                    |
+                  </span>
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => jumpToTransactionSection('unknown')}
+                  >
+                    {unknownTransactions.length} unknown
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {tab === 'utxos' && addressUtxos && (
+            <div className="address-history-section-summary" aria-live="polite">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => jumpToUtxoSection('pending')}
+              >
+                {pendingUtxos.length} pending
+              </button>
+              <span className="address-history-section-summary-separator" aria-hidden="true">
+                |
+              </span>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => jumpToUtxoSection('confirmed')}
+              >
+                {confirmedUtxos.length} confirmed
+              </button>
+              {unknownUtxos.length > 0 && (
+                <>
+                  <span className="address-history-section-summary-separator" aria-hidden="true">
+                    |
+                  </span>
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => jumpToUtxoSection('unknown')}
+                  >
+                    {unknownUtxos.length} unknown
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        {tab === 'transactions' &&
+          history.source === 'loaded transactions' &&
+          !canLoad &&
+          !history.entries.length && (
+            <p className="small muted">
+              No observed activity for this address in the loaded workspace.
+            </p>
+          )}
+        {tab === 'transactions' &&
+          history.source !== 'loaded transactions' &&
+          !history.entries.length && (
+            <p className="small muted">
+              {history.complete
+                ? 'No observed activity in this address history.'
+                : 'No history rows are currently available; coverage is partial.'}
+            </p>
+          )}
+        {tab === 'transactions' && !!history.entries.length && (
+          <div className="address-history-sections">
+            {pendingTransactions.length > 0 && (
+              <AddressHistorySection
+                idPrefix="address-history"
+                section="pending"
+                label="Pending"
+                items={pendingTransactions}
+                visibleItems={visiblePendingTransactions}
+                collapsed={collapsedTransactionSections.pending}
+                onToggle={() =>
+                  setCollapsedTransactionSections((current) => ({
+                    ...current,
+                    pending: !current.pending,
+                  }))
+                }
+                sectionRef={pendingTransactionsSection}
+                renderItem={renderHistoryEntry}
+              />
+            )}
+            {confirmedTransactions.length > 0 && (
+              <AddressHistorySection
+                idPrefix="address-history"
+                section="confirmed"
+                label="Confirmed"
+                items={confirmedTransactions}
+                visibleItems={visibleConfirmedTransactions}
+                collapsed={collapsedTransactionSections.confirmed}
+                onToggle={() =>
+                  setCollapsedTransactionSections((current) => ({
+                    ...current,
+                    confirmed: !current.confirmed,
+                  }))
+                }
+                sectionRef={confirmedTransactionsSection}
+                renderItem={renderHistoryEntry}
+              />
+            )}
+            {unknownTransactions.length > 0 && (
+              <AddressHistorySection
+                idPrefix="address-history"
+                section="unknown"
+                label="Unknown"
+                items={unknownTransactions}
+                visibleItems={visibleUnknownTransactions}
+                collapsed={collapsedTransactionSections.unknown}
+                onToggle={() =>
+                  setCollapsedTransactionSections((current) => ({
+                    ...current,
+                    unknown: !current.unknown,
+                  }))
+                }
+                sectionRef={unknownTransactionsSection}
+                renderItem={renderHistoryEntry}
+              />
             )}
           </div>
         )}
-        {tab === 'utxos' && addressUtxos && (
-          <div className="address-history-section-summary" aria-live="polite">
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => jumpToUtxoSection('pending')}
-            >
-              {pendingUtxos.length} pending
-            </button>
-            <span className="address-history-section-summary-separator" aria-hidden="true">
-              |
-            </span>
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => jumpToUtxoSection('confirmed')}
-            >
-              {confirmedUtxos.length} confirmed
-            </button>
+        {tab === 'transactions' && expandedTransactionCount > visibleTransactionCount && (
+          <button
+            type="button"
+            className="text-button address-history-more"
+            onClick={() => setLimit((value) => Math.min(expandedTransactionCount, value + 40))}
+          >
+            Show more transactions ({expandedTransactionCount - visibleTransactionCount} remaining)
+          </button>
+        )}
+        {tab === 'transactions' && history.entries.length > 0 && !history.complete && (
+          <p className="small muted address-history-note">
+            Missing rows or details remain unknown. This list does not establish ownership, balance,
+            or that an output is unspent.
+          </p>
+        )}
+        {tab === 'utxos' && !addressUtxos && (
+          <p className="small muted">UTXOs have not been checked for this address.</p>
+        )}
+        {tab === 'utxos' && addressUtxos && !addressUtxos.utxos.length && (
+          <p className="small muted">No unspent outputs observed at the last check.</p>
+        )}
+        {tab === 'utxos' && !!addressUtxos?.utxos.length && (
+          <div className="address-history-sections">
+            {pendingUtxos.length > 0 && (
+              <AddressHistorySection
+                idPrefix="address-utxos"
+                section="pending"
+                label="Pending"
+                items={pendingUtxos}
+                visibleItems={visiblePendingUtxos}
+                collapsed={collapsedUtxoSections.pending}
+                onToggle={() =>
+                  setCollapsedUtxoSections((current) => ({
+                    ...current,
+                    pending: !current.pending,
+                  }))
+                }
+                sectionRef={pendingUtxosSection}
+                renderItem={renderUtxo}
+              />
+            )}
+            {confirmedUtxos.length > 0 && (
+              <AddressHistorySection
+                idPrefix="address-utxos"
+                section="confirmed"
+                label="Confirmed"
+                items={confirmedUtxos}
+                visibleItems={visibleConfirmedUtxos}
+                collapsed={collapsedUtxoSections.confirmed}
+                onToggle={() =>
+                  setCollapsedUtxoSections((current) => ({
+                    ...current,
+                    confirmed: !current.confirmed,
+                  }))
+                }
+                sectionRef={confirmedUtxosSection}
+                renderItem={renderUtxo}
+              />
+            )}
             {unknownUtxos.length > 0 && (
-              <>
-                <span className="address-history-section-summary-separator" aria-hidden="true">
-                  |
-                </span>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => jumpToUtxoSection('unknown')}
-                >
-                  {unknownUtxos.length} unknown
-                </button>
-              </>
+              <AddressHistorySection
+                idPrefix="address-utxos"
+                section="unknown"
+                label="Unknown"
+                items={unknownUtxos}
+                visibleItems={visibleUnknownUtxos}
+                collapsed={collapsedUtxoSections.unknown}
+                onToggle={() =>
+                  setCollapsedUtxoSections((current) => ({
+                    ...current,
+                    unknown: !current.unknown,
+                  }))
+                }
+                sectionRef={unknownUtxosSection}
+                renderItem={renderUtxo}
+              />
             )}
           </div>
         )}
+        {tab === 'utxos' &&
+          !!addressUtxos?.utxos.length &&
+          expandedUtxoCount > visibleUtxoCount && (
+            <button
+              type="button"
+              className="text-button address-history-more"
+              onClick={() => setUtxoLimit((value) => Math.min(expandedUtxoCount, value + 40))}
+            >
+              Show more UTXOs ({expandedUtxoCount - visibleUtxoCount} remaining)
+            </button>
+          )}
       </div>
-      {tab === 'transactions' &&
-        history.source === 'loaded transactions' &&
-        !canLoad &&
-        !history.entries.length && (
-          <p className="small muted">
-            No observed activity for this address in the loaded workspace.
-          </p>
-        )}
-      {tab === 'transactions' &&
-        history.source !== 'loaded transactions' &&
-        !history.entries.length && (
-          <p className="small muted">
-            {history.complete
-              ? 'No observed activity in this address history.'
-              : 'No history rows are currently available; coverage is partial.'}
-          </p>
-        )}
-      {tab === 'transactions' && !!history.entries.length && (
-        <div className="address-history-sections">
-          {pendingTransactions.length > 0 && (
-            <AddressHistorySection
-              idPrefix="address-history"
-              section="pending"
-              label="Pending"
-              items={pendingTransactions}
-              visibleItems={visiblePendingTransactions}
-              collapsed={collapsedTransactionSections.pending}
-              onToggle={() =>
-                setCollapsedTransactionSections((current) => ({
-                  ...current,
-                  pending: !current.pending,
-                }))
-              }
-              sectionRef={pendingTransactionsSection}
-              renderItem={renderHistoryEntry}
-            />
-          )}
-          {confirmedTransactions.length > 0 && (
-            <AddressHistorySection
-              idPrefix="address-history"
-              section="confirmed"
-              label="Confirmed"
-              items={confirmedTransactions}
-              visibleItems={visibleConfirmedTransactions}
-              collapsed={collapsedTransactionSections.confirmed}
-              onToggle={() =>
-                setCollapsedTransactionSections((current) => ({
-                  ...current,
-                  confirmed: !current.confirmed,
-                }))
-              }
-              sectionRef={confirmedTransactionsSection}
-              renderItem={renderHistoryEntry}
-            />
-          )}
-          {unknownTransactions.length > 0 && (
-            <AddressHistorySection
-              idPrefix="address-history"
-              section="unknown"
-              label="Unknown"
-              items={unknownTransactions}
-              visibleItems={visibleUnknownTransactions}
-              collapsed={collapsedTransactionSections.unknown}
-              onToggle={() =>
-                setCollapsedTransactionSections((current) => ({
-                  ...current,
-                  unknown: !current.unknown,
-                }))
-              }
-              sectionRef={unknownTransactionsSection}
-              renderItem={renderHistoryEntry}
-            />
-          )}
-        </div>
-      )}
-      {tab === 'transactions' && expandedTransactionCount > visibleTransactionCount && (
-        <button
-          type="button"
-          className="text-button address-history-more"
-          onClick={() => setLimit((value) => Math.min(expandedTransactionCount, value + 40))}
-        >
-          Show more transactions ({expandedTransactionCount - visibleTransactionCount} remaining)
-        </button>
-      )}
-      {tab === 'transactions' && history.entries.length > 0 && !history.complete && (
-        <p className="small muted address-history-note">
-          Missing rows or details remain unknown. This list does not establish ownership, balance,
-          or that an output is unspent.
-        </p>
-      )}
-      {tab === 'utxos' && !addressUtxos && (
-        <p className="small muted">UTXOs have not been checked for this address.</p>
-      )}
-      {tab === 'utxos' && addressUtxos && !addressUtxos.utxos.length && (
-        <p className="small muted">No unspent outputs observed at the last check.</p>
-      )}
-      {tab === 'utxos' && !!addressUtxos?.utxos.length && (
-        <div className="address-history-sections">
-          {pendingUtxos.length > 0 && (
-            <AddressHistorySection
-              idPrefix="address-utxos"
-              section="pending"
-              label="Pending"
-              items={pendingUtxos}
-              visibleItems={visiblePendingUtxos}
-              collapsed={collapsedUtxoSections.pending}
-              onToggle={() =>
-                setCollapsedUtxoSections((current) => ({
-                  ...current,
-                  pending: !current.pending,
-                }))
-              }
-              sectionRef={pendingUtxosSection}
-              renderItem={renderUtxo}
-            />
-          )}
-          {confirmedUtxos.length > 0 && (
-            <AddressHistorySection
-              idPrefix="address-utxos"
-              section="confirmed"
-              label="Confirmed"
-              items={confirmedUtxos}
-              visibleItems={visibleConfirmedUtxos}
-              collapsed={collapsedUtxoSections.confirmed}
-              onToggle={() =>
-                setCollapsedUtxoSections((current) => ({
-                  ...current,
-                  confirmed: !current.confirmed,
-                }))
-              }
-              sectionRef={confirmedUtxosSection}
-              renderItem={renderUtxo}
-            />
-          )}
-          {unknownUtxos.length > 0 && (
-            <AddressHistorySection
-              idPrefix="address-utxos"
-              section="unknown"
-              label="Unknown"
-              items={unknownUtxos}
-              visibleItems={visibleUnknownUtxos}
-              collapsed={collapsedUtxoSections.unknown}
-              onToggle={() =>
-                setCollapsedUtxoSections((current) => ({
-                  ...current,
-                  unknown: !current.unknown,
-                }))
-              }
-              sectionRef={unknownUtxosSection}
-              renderItem={renderUtxo}
-            />
-          )}
-        </div>
-      )}
-      {tab === 'utxos' && !!addressUtxos?.utxos.length && expandedUtxoCount > visibleUtxoCount && (
-        <button
-          type="button"
-          className="text-button address-history-more"
-          onClick={() => setUtxoLimit((value) => Math.min(expandedUtxoCount, value + 40))}
-        >
-          Show more UTXOs ({expandedUtxoCount - visibleUtxoCount} remaining)
-        </button>
-      )}
     </div>
   );
 }

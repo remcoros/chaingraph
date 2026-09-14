@@ -17,15 +17,15 @@
 .graph-renderer-region .graph-controls {
   flex-wrap: wrap;
 }
-.transaction-view-slot {
+.flow-panel-slot {
   flex: 0 1 auto;
   min-height: 0;
 }
-.transaction-view-slot:has(.transaction-view[open]) {
+.flow-panel-slot:has(.flow-panel[open]) {
   /* Preserve the graph's space while the panel overlays it. */
   height: min(calc(50% - 20px), 320px);
 }
-.transaction-view-surface {
+.flow-panel-surface {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -34,13 +34,13 @@
   background: var(--color-paper);
   border-bottom: 1px solid var(--color-rule);
 }
-.transaction-view-surface.is-full-height:has(.transaction-view[open]) {
+.flow-panel-surface.is-full-height:has(.flow-panel[open]) {
   position: absolute;
   inset: 0;
   height: auto;
   z-index: 10;
 }
-.transaction-view {
+.flow-panel {
   position: relative;
   flex: 1;
   min-height: 0;
@@ -50,7 +50,7 @@
   background: var(--color-paper);
   font-size: 11px;
 }
-.transaction-view-footer {
+.flow-panel-footer {
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -65,7 +65,7 @@
   background: color-mix(in srgb, var(--color-paper) 50%, transparent);
   pointer-events: none;
 }
-.icon-button.transaction-height-toggle {
+.icon-button.flow-panel-height-toggle {
   pointer-events: auto;
   flex: 1 1 0;
   min-width: 32px;
@@ -76,19 +76,19 @@
   background: color-mix(in srgb, var(--color-paper) 50%, transparent);
   color: var(--color-muted);
 }
-.icon-button.transaction-height-toggle:hover:not(:disabled) {
+.icon-button.flow-panel-height-toggle:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-hover) 50%, transparent);
 }
-.icon-button.transaction-height-toggle:active:not(:disabled) {
+.icon-button.flow-panel-height-toggle:active:not(:disabled) {
   background: color-mix(in srgb, var(--color-paper) 50%, transparent);
 }
-.transaction-height-toggle:first-child {
+.flow-panel-height-toggle:first-child {
   border-top-left-radius: calc(var(--radius-md) - 1px);
 }
-.transaction-height-toggle:last-child {
+.flow-panel-height-toggle:last-child {
   border-top-right-radius: calc(var(--radius-md) - 1px);
 }
-.transaction-view > summary {
+.flow-panel > summary {
   display: flex;
   align-items: center;
   list-style: none;
@@ -100,53 +100,53 @@
   background: var(--color-paper);
   font-weight: 600;
 }
-.transaction-view > summary::-webkit-details-marker {
+.flow-panel > summary::-webkit-details-marker {
   display: none;
 }
-.transaction-view > summary[aria-disabled='true'] {
+.flow-panel > summary[aria-disabled='true'] {
   color: var(--color-muted);
   cursor: default;
 }
-.transaction-summary-title {
+.flow-panel-title {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 2px 8px;
   min-width: 0;
 }
-.transaction-summary-title > code {
+.flow-panel-title > code {
   color: var(--color-muted);
   font-size: 11px;
   font-weight: 400;
   overflow-wrap: anywhere;
 }
-.transaction-summary-annotation-icon {
+.flow-panel-title-annotation {
   flex: none;
   font-size: 15px;
   line-height: 1;
 }
-.transaction-summary-bookmark-icon {
+.flow-panel-title-bookmark {
   flex: none;
   color: var(--color-warning);
 }
-.transaction-summary-counts {
+.transaction-flow-counts {
   color: var(--color-muted);
   font-weight: 400;
   white-space: nowrap;
 }
-.transaction-view:not([open]) .transaction-summary-content {
+.flow-panel:not([open]) .flow-panel-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
 }
-.transaction-view:not([open]) .transaction-summary-content > small {
+.flow-panel:not([open]) .flow-panel-header > small {
   grid-column: 3;
 }
-.transaction-view > summary small {
+.flow-panel > summary small {
   float: right;
   color: var(--color-muted);
   font-weight: 400;
 }
-.transaction-view-body {
+.flow-panel-body {
   padding: 0 8px 7px;
 }
 .address-history-view {
@@ -558,7 +558,7 @@
   min-width: 0;
   max-width: 100%;
 }
-.transaction-view-identity {
+.flow-panel-identity {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -570,12 +570,12 @@
   text-align: center;
   box-shadow: 0 2px 5px #00000006;
 }
-.transaction-view-identity.is-selected {
+.flow-panel-identity.is-selected {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 11%, var(--color-paper));
 }
-.transaction-view-identity::before,
-.transaction-view-identity::after {
+.flow-panel-identity::before,
+.flow-panel-identity::after {
   content: '';
   position: absolute;
   top: 47px;
@@ -585,10 +585,10 @@
   opacity: 0.65;
   pointer-events: none;
 }
-.transaction-view-identity::before {
+.flow-panel-identity::before {
   right: 100%;
 }
-.transaction-view-identity::after {
+.flow-panel-identity::after {
   left: 100%;
 }
 .transaction-identity-select {
@@ -911,7 +911,7 @@
   margin: 0;
   padding: 2px 0;
 }
-.transaction-view-actions {
+.flow-panel-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -919,10 +919,10 @@
   flex-wrap: wrap;
   margin-top: 5px;
 }
-.transaction-view-actions:empty {
+.flow-panel-actions:empty {
   display: none;
 }
-.transaction-view-actions > button {
+.flow-panel-actions > button {
   font-size: 10px;
 }
 .transaction-coverage {
@@ -943,21 +943,21 @@
   padding: 1px 4px;
 }
 @media (max-width: 700px) {
-  .transaction-view-slot:has(.transaction-view[open]) {
+  .flow-panel-slot:has(.flow-panel[open]) {
     height: min(calc(46% - 20px), 320px);
   }
-  .transaction-view-body {
+  .flow-panel-body {
     padding: 0 5px 7px;
   }
   .transaction-flow {
     --transaction-flow-gap: 7px;
     grid-template-columns: minmax(200px, 1fr) 110px minmax(200px, 1fr);
   }
-  .transaction-view-identity::before,
-  .transaction-view-identity::after {
+  .flow-panel-identity::before,
+  .flow-panel-identity::after {
     width: 7px;
   }
-  .transaction-view-identity {
+  .flow-panel-identity {
     min-height: 0;
   }
   .transaction-identity-select {
@@ -1099,6 +1099,6 @@
 }
 .transaction-row-main > span,
 .transaction-row-main strong,
-.transaction-view {
+.flow-panel {
   font-size: 12px;
 }

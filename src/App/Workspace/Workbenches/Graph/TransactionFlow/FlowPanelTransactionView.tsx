@@ -12,6 +12,8 @@ import {
   Pencil,
   ArrowLeft,
   ArrowRight,
+  ArrowRightFromLine,
+  ArrowRightToLine,
   Box,
   Bookmark,
   Tags,
@@ -20,6 +22,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { Amount } from '../../../../../Shared/Display/Amount';
+import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import { matchingWalletUtxoObservation } from '../../../../../Domain/Wallet/walletUtxoObservation';
 import { SmallAmountControl } from '../SmallAmountControl';
 import { isSmallAmount } from '../../../../../Domain/Graph/smallAmounts';
@@ -69,6 +72,9 @@ export interface FlowPanelTransactionViewProps extends VisibilityProps {
   state?: TransactionFlowState;
   onStateChange?: (state: TransactionFlowState) => void;
   selection?: EntitySelection;
+  /** Parent transactions that would fill in missing input details. */
+  missingInputCount?: number;
+  onLoadAllInputs?: () => void;
 }
 type Props = FlowPanelTransactionViewProps;
 
@@ -380,20 +386,18 @@ function TransactionRows({
   };
   useLayoutEffect(() => {
     if (expandedInputs || expandedOutputs) return;
-    const panel = flow.current?.closest<HTMLDetailsElement>('.transaction-view');
+    const panel = flow.current?.closest<HTMLDetailsElement>('.flow-panel');
     // Return compact lists to their start. The selected outpoint stays pinned.
     if (panel) panel.scrollTop = 0;
   }, [expandedInputs, expandedOutputs]);
   useLayoutEffect(() => {
     const container = flow.current;
-    const panel = container?.closest<HTMLDetailsElement>('.transaction-view');
+    const panel = container?.closest<HTMLDetailsElement>('.flow-panel');
     if (!container || !panel) return;
     const summary = panel.querySelector<HTMLElement>(':scope > summary');
     const feedback = panel.querySelector<HTMLElement>('.transaction-input-feedback');
     const center = container.querySelector<HTMLElement>('.transaction-flow-center');
-    const actions = panel.querySelector<HTMLElement>(
-      '.transaction-view-body > .transaction-view-actions',
-    );
+    const actions = panel.querySelector<HTMLElement>('.flow-panel-body > .flow-panel-actions');
     const lanes = Array.from(container.querySelectorAll<HTMLElement>(':scope > section')).map(
       (section) => ({
         section,
@@ -667,12 +671,134 @@ export function useFlowPanelTransaction(props: Props) {
   };
 }
 
+/** Everything the transaction views share, computed once by the panel. */
+export type TransactionFlowModel = ReturnType<typeof useFlowPanelTransaction>;
+
+/** Where an output sits in the transaction being shown. */
+function outputRole(selected: GraphNode | undefined, leg: TransactionFlowModel['leg']) {
+  if (selected?.kind !== 'output') return 'transaction';
+  return leg?.direction === 'previous' ? 'input' : 'output';
+}
+
+/** The transaction view's title bar contribution, including its input/output counts. */
+/** The transaction view's header, which it owns end to end. */
+export function TransactionFlowHeader({
+  selected,
+  annotation,
+  model,
+}: {
+  selected: GraphNode;
+  annotation?: { icon?: string; bookmarked?: boolean };
+  model: TransactionFlowModel;
+}) {
+  const role = outputRole(selected, model.leg);
+  const current = model.current;
+  const Icon = role === 'input' ? ArrowRightToLine : role === 'output' ? ArrowRightFromLine : Box;
+  return (
+    <span className="flow-panel-header">
+      <span className="flow-panel-title">
+        <Icon size={16} aria-hidden="true" />
+        {annotation?.icon && (
+          <span
+            className="flow-panel-title-annotation"
+            role="img"
+            aria-label={`Annotation icon: ${annotation.icon}`}
+          >
+            {annotation.icon}
+          </span>
+        )}
+        {annotation?.bookmarked && (
+          <Bookmark size={14} className="flow-panel-title-bookmark" aria-label="Bookmarked" />
+        )}
+        <span>{role === 'input' ? 'Input' : role === 'output' ? 'Output' : 'Transaction'}</span>
+        <code title={selected.id.replace(/^(?:tx|out):/, '')}>
+          <ResponsiveIdentifier value={selected.id} preferFull />
+        </code>
+        {selected.kind === 'transaction' && current && (
+          <span
+            className="transaction-flow-counts"
+            title={`${current.tx.vin.length} inputs / ${current.tx.vout.length} outputs`}
+            aria-label={`${current.tx.vin.length} inputs / ${current.tx.vout.length} outputs`}
+          >
+            ({current.tx.vin.length}/{current.tx.vout.length})
+          </span>
+        )}
+      </span>
+      <small title={current ? transactionStatus(current.tx).title : undefined}>
+        {current ? transactionStatus(current.tx).label : 'Not loaded'}
+      </small>
+    </span>
+  );
+}
+
+/** Loading the parent transactions that supply missing input details. */
+export function TransactionFlowActions({
+  missingInputCount,
+  onLoadAllInputs,
+  disabledReason,
+  inputLoading,
+}: Pick<Props, 'disabledReason' | 'inputLoading'> & {
+  missingInputCount?: number;
+  onLoadAllInputs?: () => void;
+}) {
+  if (!missingInputCount || !onLoadAllInputs) return null;
+  return (
+    <button
+      type="button"
+      className="text-button"
+      disabled={!!disabledReason || inputLoading}
+      title={
+        disabledReason ||
+        `Fetch up to ${missingInputCount} parent transactions for missing input details. Up to 500 per action; other branches are not followed.`
+      }
+      onClick={onLoadAllInputs}
+    >
+      Load missing input details ({missingInputCount})
+    </button>
+  );
+}
+
+/** Progress and failure of the previous-output load, shown under the body. */
+export function TransactionFlowFeedback({
+  inputLoading,
+  inputError,
+  onRetryInputs,
+  disabledReason,
+}: Pick<Props, 'inputLoading' | 'inputError' | 'onRetryInputs' | 'disabledReason'>) {
+  if (!inputLoading && !inputError) return null;
+  return (
+    <div className="transaction-input-feedback">
+      {inputLoading && (
+        <small className="transaction-input-status" role="status">
+          Loading previous outputs…
+        </small>
+      )}
+      {inputError && (
+        <div className="transaction-input-error" role="alert">
+          <span>{inputError}</span>
+          {onRetryInputs && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={!!disabledReason || inputLoading}
+              title={disabledReason}
+              onClick={onRetryInputs}
+            >
+              Retry previous outputs
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FlowPanelTransactionView({
   panel: props,
   transaction,
 }: {
   panel: Props;
-  transaction: ReturnType<typeof useFlowPanelTransaction>;
+  transaction: TransactionFlowModel;
 }) {
   const {
     workspace,
@@ -822,8 +948,16 @@ export function FlowPanelTransactionView({
   if (!selected) return null;
   return (
     <>
-      {selected.kind !== 'address' &&
-        (current ? (
+      <div className="flow-panel-body">
+        <div className="flow-panel-actions">
+          <TransactionFlowActions
+            missingInputCount={props.missingInputCount}
+            onLoadAllInputs={props.onLoadAllInputs}
+            disabledReason={disabledReason}
+            inputLoading={inputLoading}
+          />
+        </div>
+        {current ? (
           <TransactionRows
             {...props}
             tx={current.tx}
@@ -853,7 +987,7 @@ export function FlowPanelTransactionView({
                   </div>
                 )}
                 <div
-                  className={`transaction-view-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
+                  className={`flow-panel-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
                 >
                   <button
                     type="button"
@@ -982,76 +1116,84 @@ export function FlowPanelTransactionView({
           <p className="small" role="status">
             {inputLoading ? 'Loading creating transaction…' : 'Creating transaction unavailable.'}
           </p>
-        ))}
-      {quickEditor?.kind === 'tags' && (
-        <MetadataPopover
-          anchor={quickEditor.anchor}
-          compact
-          point={quickEditor.point}
-          onClose={() => setQuickEditor(undefined)}
-        >
-          <BatchTagEditor
-            id={quickEditorId}
-            workspace={workspace}
-            ids={[quickEditor.nodeId]}
-            single
+        )}
+        {quickEditor?.kind === 'tags' && (
+          <MetadataPopover
+            anchor={quickEditor.anchor}
+            compact
+            point={quickEditor.point}
             onClose={() => setQuickEditor(undefined)}
-            onApply={(_summary, update) => props.onApplyTags(update)}
-          />
-        </MetadataPopover>
-      )}
-      {quickEditor?.kind === 'icon' && (
-        <MetadataPopover
-          anchor={quickEditor.anchor}
-          compact
-          point={quickEditor.point}
-          onClose={() => setQuickEditor(undefined)}
-        >
-          <IconPalette
-            id={quickEditorId}
-            value={workspace.annotations[quickEditor.nodeId]?.icon ?? ''}
-            onChange={(icon) => props.onSetIcon(quickEditor.nodeId, icon)}
+          >
+            <BatchTagEditor
+              id={quickEditorId}
+              workspace={workspace}
+              ids={[quickEditor.nodeId]}
+              single
+              onClose={() => setQuickEditor(undefined)}
+              onApply={(_summary, update) => props.onApplyTags(update)}
+            />
+          </MetadataPopover>
+        )}
+        {quickEditor?.kind === 'icon' && (
+          <MetadataPopover
+            anchor={quickEditor.anchor}
+            compact
+            point={quickEditor.point}
             onClose={() => setQuickEditor(undefined)}
-          />
-        </MetadataPopover>
-      )}
-      <div className="transaction-view-actions">
-        {selected.kind === 'output' &&
-          !missingCreating &&
-          !selectedUnspendable &&
-          !!(loadedSpenders.length || walletObservation) && (
-            <small
-              className="transaction-coverage"
-              title="Missing loaded spends do not establish that an output is unspent."
-            >
-              {loadedSpenders.length
-                ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
-                : 'No spending transaction loaded'}
-              {walletObservation && (
-                <span>
-                  {' · Unspent at wallet check · '}
-                  <time dateTime={walletObservation.checkedAt}>
-                    {formatLocalTimestamp(walletObservation.checkedAt) ?? 'Unknown time'}
-                  </time>
-                </span>
-              )}
-              {loadedSpenders.length > 0 && (
-                <button
-                  type="button"
-                  className="text-button"
-                  aria-label="Check this output for spends"
-                  disabled={!!disabledReason}
-                  title={
-                    disabledReason || 'Check this exact output for additional spending transactions'
-                  }
-                  onClick={() => onTrace('spending', selected.id)}
-                >
-                  Check again
-                </button>
-              )}
-            </small>
-          )}
+          >
+            <IconPalette
+              id={quickEditorId}
+              value={workspace.annotations[quickEditor.nodeId]?.icon ?? ''}
+              onChange={(icon) => props.onSetIcon(quickEditor.nodeId, icon)}
+              onClose={() => setQuickEditor(undefined)}
+            />
+          </MetadataPopover>
+        )}
+        <div className="flow-panel-actions">
+          {selected.kind === 'output' &&
+            !missingCreating &&
+            !selectedUnspendable &&
+            !!(loadedSpenders.length || walletObservation) && (
+              <small
+                className="transaction-coverage"
+                title="Missing loaded spends do not establish that an output is unspent."
+              >
+                {loadedSpenders.length
+                  ? `${loadedSpenders.length} loaded ${loadedSpenders.length === 1 ? 'spend' : 'spend alternatives'}`
+                  : 'No spending transaction loaded'}
+                {walletObservation && (
+                  <span>
+                    {' · Unspent at wallet check · '}
+                    <time dateTime={walletObservation.checkedAt}>
+                      {formatLocalTimestamp(walletObservation.checkedAt) ?? 'Unknown time'}
+                    </time>
+                  </span>
+                )}
+                {loadedSpenders.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    aria-label="Check this output for spends"
+                    disabled={!!disabledReason}
+                    title={
+                      disabledReason ||
+                      'Check this exact output for additional spending transactions'
+                    }
+                    onClick={() => onTrace('spending', selected.id)}
+                  >
+                    Check again
+                  </button>
+                )}
+              </small>
+            )}
+        </div>
       </div>
+      <TransactionFlowFeedback
+        inputLoading={inputLoading}
+        inputError={props.inputError}
+        onRetryInputs={onRetryInputs}
+        disabledReason={disabledReason}
+      />
     </>
   );
 }

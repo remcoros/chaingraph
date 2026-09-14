@@ -61,7 +61,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     mobilePanel: shownMobilePanel,
   } = workspace.graph.panels;
   const { flowInputs, scanTargets: connectionScanTargets } = workspace.graph;
-  const { utxoObservation: walletUtxoObservation } = workspace.wallet;
+  const { utxoObservation: walletUtxoObservation, selected: selectedWallet } = workspace.wallet;
   const {
     changeView: changeGraphView,
     setPendingWorkspaceId: setPendingGraphWorkspace,
@@ -524,6 +524,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                 )
               }
               workspace={activeWorkspace}
+              selectedWallet={selectedWallet}
               addressHistory={addressHistory}
               addressHistoryLoad={addressHistoryLoad}
               addressBalance={addressBalance}

@@ -1931,12 +1931,12 @@ small,
 .entity-browser .entity-chain-status {
   font-size: 11px;
 }
-.transaction-view > summary {
+.flow-panel > summary {
   min-height: 32px;
   padding-top: 3px;
   padding-bottom: 3px;
 }
-.transaction-summary-content {
+.flow-panel-header {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
@@ -1944,7 +1944,7 @@ small,
   width: 100%;
   vertical-align: middle;
 }
-.transaction-summary-content > small {
+.flow-panel-header > small {
   float: none;
   font-size: 11px;
   text-align: right;
@@ -2271,7 +2271,7 @@ small,
 }
 .entity-browser .entity-row small,
 .entity-browser .entity-chain-status,
-.transaction-summary-content > small {
+.flow-panel-header > small {
   font-size: 12px;
 }
 .graph-legend,
