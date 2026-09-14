@@ -1,8 +1,17 @@
 # Chaingraph agent guide
 
 Chaingraph is an MIT-licensed, self-hosted, watch-only Bitcoin workbench for
-personal wallets and on-chain investigation. Read `README.md`,
-`docs/architecture.md` and the module you are changing before editing it.
+personal wallets and on-chain investigation.
+
+Read `README.md` to establish basic project context before working on the
+repository.
+
+Do not read `docs/architecture.md` by default. Read it when the task requires
+or would materially benefit from architectural context, for example,
+implementation work involving multiple modules, refactoring, dependencies,
+data flow, module boundaries, or understanding broader system behavior.
+
+Read the specific module(s) relevant to the task before editing them.
 `CONTRIBUTING.md` has the commands, worktree conventions and review expectations.
 Use `docs/source-map.md` to locate the product area and relevant tests before
 searching across the repository. UI and its owned helpers live under
