@@ -76,8 +76,9 @@ function membershipFilters(
     ? { ...filters, includeIds, excludeIds: excludes.length ? excludes : undefined }
     : filters;
 }
+import type { AppState } from '../../../useAppState';
 interface Inputs {
-  w: ReturnType<typeof import('../../../useAppState').useAppState>['w'];
+  w: AppState['w'];
   graphFilters: GraphFilters;
   fitToken: number;
   selectedId: string | undefined;
@@ -518,3 +519,6 @@ export function useGraphProjection({
     selectedNodeIsVisible,
   };
 }
+
+/** Graph, entity and selection projections derived from the loaded workspace. */
+export type GraphProjection = ReturnType<typeof useGraphProjection>;

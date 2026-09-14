@@ -148,3 +148,6 @@ export function useAppState() {
     openWorkspace,
   };
 }
+
+/** App session, navigation, connection and feedback services Workspace consumes. */
+export type AppState = ReturnType<typeof useAppState>;

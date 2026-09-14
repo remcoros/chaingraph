@@ -24,6 +24,9 @@ import type { Dispatch, SetStateAction, RefObject } from 'react';
 import { entityPanelFiltersFromGraph } from './Filters/entityPanelFilters';
 import { ADDRESS_DISPLAY_NOTICE } from '../../workspaceNotices';
 
+import type { AppState } from '../../../useAppState';
+import type { GraphProjection } from './useGraphProjection';
+import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
   selectionGeneration: Readonly<RefObject<number>>;
   invalidateSelection: () => void;
@@ -44,9 +47,9 @@ interface Inputs {
       | undefined
     >
   >;
-  setNotice: ReturnType<typeof import('../../../useAppState').useAppState>['setNotice'];
-  w: ReturnType<typeof import('../../../useAppState').useAppState>['w'];
-  setError: ReturnType<typeof import('../../../useAppState').useAppState>['setError'];
+  setNotice: AppState['setNotice'];
+  w: AppState['w'];
+  setError: AppState['setError'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   setEditTarget: Dispatch<SetStateAction<'label' | 'tags' | 'icon'>>;
   setScanTargetDraft: Dispatch<
@@ -64,23 +67,17 @@ interface Inputs {
   setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
   setMobilePanel: Dispatch<SetStateAction<'graph' | 'left' | 'right'>>;
   setEditToken: Dispatch<SetStateAction<number>>;
-  workspaceId: ReturnType<typeof import('../../../useAppState').useAppState>['workspaceId'];
+  workspaceId: AppState['workspaceId'];
   viewOwner: string | undefined;
   selectedId: string | undefined;
   cameraPreservedSelection: RefObject<string | undefined>;
-  hiddenIds: ReturnType<typeof import('./useGraphProjection').useGraphProjection>['hiddenIds'];
-  updateWorkspace: ReturnType<typeof import('../../../useAppState').useAppState>['updateWorkspace'];
-  selectedNodeIsVisible: ReturnType<
-    typeof import('./useGraphProjection').useGraphProjection
-  >['selectedNodeIsVisible'];
-  admittedIds: ReturnType<typeof import('./useGraphProjection').useGraphProjection>['admittedIds'];
-  visibleGraph: ReturnType<
-    typeof import('./useGraphProjection').useGraphProjection
-  >['visibleGraph'];
-  graph: ReturnType<typeof import('./useGraphProjection').useGraphProjection>['graph'];
-  effectiveFilters: ReturnType<
-    typeof import('./useGraphProjection').useGraphProjection
-  >['effectiveFilters'];
+  hiddenIds: GraphProjection['hiddenIds'];
+  updateWorkspace: AppState['updateWorkspace'];
+  selectedNodeIsVisible: GraphProjection['selectedNodeIsVisible'];
+  admittedIds: GraphProjection['admittedIds'];
+  visibleGraph: GraphProjection['visibleGraph'];
+  graph: GraphProjection['graph'];
+  effectiveFilters: GraphProjection['effectiveFilters'];
   navigation: { ids: string[]; index: number };
   setNavigation: Dispatch<SetStateAction<{ ids: string[]; index: number }>>;
   setSelectedId: Dispatch<SetStateAction<string | undefined>>;
@@ -88,16 +85,12 @@ interface Inputs {
   graphFilters: GraphFilters;
   setEntityPanelFilters: Dispatch<SetStateAction<GraphFilters>>;
   setEntityFiltersLinked: Dispatch<SetStateAction<boolean>>;
-  wRef: ReturnType<typeof import('../../../useAppState').useAppState>['wRef'];
-  ws: ReturnType<typeof import('../../../useAppState').useAppState>['ws'];
+  wRef: AppState['wRef'];
+  ws: AppState['ws'];
   setOperation: Dispatch<SetStateAction<string>>;
-  getTransaction: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['getTransaction'];
+  getTransaction: WorkspaceEvidence['getTransaction'];
   entityFiltersLinked: boolean;
-  run: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['run'];
+  run: WorkspaceEvidence['run'];
 }
 export function useGraphActions({
   selectionGeneration,
@@ -389,3 +382,6 @@ export function useGraphActions({
     updateAllGraphOutputs,
   };
 }
+
+/** Graph navigation, visibility and filter behaviour. */
+export type GraphActions = ReturnType<typeof useGraphActions>;

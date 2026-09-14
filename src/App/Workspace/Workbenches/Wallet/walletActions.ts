@@ -6,50 +6,40 @@ import {
 } from '../../../../Domain/Wallet/walletRecords';
 import { listWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
 import { addGraphNodes } from '../../../../Domain/Graph/graphMembership';
-import { type GraphFilters } from '../../../../Domain/types';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
-import { type Wallet, type Workspace } from '../../../../Domain/types';
+import { type GraphFilters, type Wallet, type Workspace } from '../../../../Domain/types';
 import type { Dispatch, SetStateAction, RefObject } from 'react';
 
 import type { WorkbenchMode } from '../../workbenchTypes';
 
+import type { AppState } from '../../../useAppState';
+import type { GraphHandoff } from '../workbenchHandoff';
+import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
-  w: ReturnType<typeof import('../../../useAppState').useAppState>['w'];
+  w: AppState['w'];
   wallet: Wallet | undefined;
   shownRightTab: NonNullable<Workspace['view']['rightTab']>;
-  setNotice: ReturnType<typeof import('../../../useAppState').useAppState>['setNotice'];
+  setNotice: AppState['setNotice'];
   select: (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => void;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  showOnGraph: ReturnType<typeof import('../Graph/useGraphActions').useGraphActions>['showOnGraph'];
+  showOnGraph: GraphHandoff['showOnGraph'];
   setRightTab: Dispatch<SetStateAction<NonNullable<Workspace['view']['rightTab']>>>;
   selection: ReturnType<typeof useEntitySelection>;
-  ws: ReturnType<typeof import('../../../useAppState').useAppState>['ws'];
+  ws: AppState['ws'];
   selectionGeneration: RefObject<number>;
-  loadGraphTransactions: ReturnType<
-    typeof import('../Graph/useGraphActions').useGraphActions
-  >['loadGraphTransactions'];
-  wRef: ReturnType<typeof import('../../../useAppState').useAppState>['wRef'];
-  mergeTransactions: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['mergeTransactions'];
-  run: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['run'];
+  loadGraphTransactions: GraphHandoff['loadGraphTransactions'];
+  wRef: AppState['wRef'];
+  mergeTransactions: WorkspaceEvidence['mergeTransactions'];
+  run: WorkspaceEvidence['run'];
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
   switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
   setMobilePanel: Dispatch<SetStateAction<'graph' | 'left' | 'right'>>;
-  recoveryGraph: ReturnType<
-    typeof import('../Graph/useGraphProjection').useGraphProjection
-  >['recoveryGraph'];
+  recoveryGraph: GraphHandoff['recoveryGraph'];
   setSelectedId: Dispatch<SetStateAction<string | undefined>>;
-  graph: ReturnType<typeof import('../Graph/useGraphProjection').useGraphProjection>['graph'];
-  revealGraphNodes: ReturnType<
-    typeof import('../Graph/useGraphActions').useGraphActions
-  >['revealGraphNodes'];
-  updateFilters: ReturnType<
-    typeof import('../Graph/useGraphActions').useGraphActions
-  >['updateFilters'];
+  graph: GraphHandoff['graph'];
+  revealGraphNodes: GraphHandoff['revealGraphNodes'];
+  updateFilters: GraphHandoff['updateFilters'];
   setLeftTab: Dispatch<SetStateAction<'wallets' | 'entities' | 'bookmarks' | 'tags'>>;
   change: (
     fn: (data: Workspace) => Workspace,

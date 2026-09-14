@@ -7,27 +7,24 @@ import type { Dispatch, SetStateAction, RefObject } from 'react';
 
 import type { WorkbenchMode } from '../../workbenchTypes';
 
+import type { AppState } from '../../../useAppState';
+import type { GraphHandoff } from '../workbenchHandoff';
+import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
-  w: ReturnType<typeof import('../../../useAppState').useAppState>['w'];
-  ws: ReturnType<typeof import('../../../useAppState').useAppState>['ws'];
+  w: AppState['w'];
+  ws: AppState['ws'];
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
   switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
-  showOnGraph: ReturnType<typeof import('../Graph/useGraphActions').useGraphActions>['showOnGraph'];
+  showOnGraph: GraphHandoff['showOnGraph'];
   canQuery: boolean;
   operationRef: RefObject<AbortController | undefined>;
   selectionGeneration: RefObject<number>;
-  loadGraphTransactions: ReturnType<
-    typeof import('../Graph/useGraphActions').useGraphActions
-  >['loadGraphTransactions'];
-  wRef: ReturnType<typeof import('../../../useAppState').useAppState>['wRef'];
-  mergeTransactions: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['mergeTransactions'];
-  setNotice: ReturnType<typeof import('../../../useAppState').useAppState>['setNotice'];
-  run: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['run'];
+  loadGraphTransactions: GraphHandoff['loadGraphTransactions'];
+  wRef: AppState['wRef'];
+  mergeTransactions: WorkspaceEvidence['mergeTransactions'];
+  setNotice: AppState['setNotice'];
+  run: WorkspaceEvidence['run'];
 }
 export function createAnalysisActions({
   w,

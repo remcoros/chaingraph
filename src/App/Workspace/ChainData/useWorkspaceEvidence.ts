@@ -11,7 +11,8 @@ import {
 } from '../../../Domain/Chain/addressHistory';
 import { addGraphNodes, ensureGraphMembership } from '../../../Domain/Graph/graphMembership';
 import { useCallback, useEffect, useMemo } from 'react';
-import { type GraphFilters } from '../../../Domain/types';
+import { type GraphData, type GraphFilters, type GraphNode } from '../../../Domain/types';
+import type { AppState } from '../../useAppState';
 import { setNodesHidden } from '../../../Domain/Graph/visibility';
 import {
   buildGraph,
@@ -40,27 +41,23 @@ import type { Dispatch, SetStateAction, RefObject } from 'react';
 import type { AddressHistoryLoadState } from './addressHistoryLoad';
 import { addressHistoryLoadKey } from './addressHistoryLoad';
 interface Inputs {
-  w: ReturnType<typeof import('../../useAppState').useAppState>['w'];
+  w: AppState['w'];
   addressHistoryJobsRef: RefObject<
     Map<string, { workspaceId: string; controller: AbortController }>
   >;
-  selected: ReturnType<
-    typeof import('../Workbenches/Graph/useGraphProjection').useGraphProjection
-  >['selected'];
+  selected: GraphNode | undefined;
   addressHistoryLoads: Record<string, AddressHistoryLoadState>;
-  fetchScope: ReturnType<typeof import('../../useAppState').useAppState>['fetchScope'];
+  fetchScope: AppState['fetchScope'];
   operationRef: RefObject<AbortController | undefined>;
-  wRef: ReturnType<typeof import('../../useAppState').useAppState>['wRef'];
+  wRef: AppState['wRef'];
   setOperation: Dispatch<SetStateAction<string>>;
-  setError: ReturnType<typeof import('../../useAppState').useAppState>['setError'];
-  setNotice: ReturnType<typeof import('../../useAppState').useAppState>['setNotice'];
-  ws: ReturnType<typeof import('../../useAppState').useAppState>['ws'];
+  setError: AppState['setError'];
+  setNotice: AppState['setNotice'];
+  ws: AppState['ws'];
   canQuery: boolean;
   setAddressHistoryLoads: Dispatch<SetStateAction<Record<string, AddressHistoryLoadState>>>;
-  updateWorkspace: ReturnType<typeof import('../../useAppState').useAppState>['updateWorkspace'];
-  getWorkspaceSession: ReturnType<
-    typeof import('../../useAppState').useAppState
-  >['getWorkspaceSession'];
+  updateWorkspace: AppState['updateWorkspace'];
+  getWorkspaceSession: AppState['getWorkspaceSession'];
   revealLookup: (id: string) => void;
   selectionGeneration: RefObject<number>;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
@@ -78,9 +75,7 @@ interface Inputs {
   loadedLookupId: (text: string) => string | undefined;
   clearQuery: () => void;
   prefetchDepth: 0 | 1 | 2;
-  recoveryGraph: ReturnType<
-    typeof import('../Workbenches/Graph/useGraphProjection').useGraphProjection
-  >['recoveryGraph'];
+  recoveryGraph: GraphData;
   canTrace: boolean;
   preserveSelectionCamera: (id: string | undefined) => void;
   selectedId: string | undefined;
@@ -1141,3 +1136,6 @@ export function useWorkspaceEvidence({
     recentAddressTransactionTargets,
   };
 }
+
+/** Bounded evidence loading and cancellation shared across workbenches. */
+export type WorkspaceEvidence = ReturnType<typeof useWorkspaceEvidence>;

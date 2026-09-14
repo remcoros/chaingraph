@@ -6,27 +6,25 @@ import { type Transaction, type Wallet, type Workspace } from '../../../../Domai
 import { loadAddress, scanWallet } from '../../../../Infra/Bitcoin/api';
 import type { Dispatch, SetStateAction, RefObject } from 'react';
 
+import type { AppState } from '../../../useAppState';
+import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
 interface Inputs {
   setOperation: Dispatch<SetStateAction<string>>;
   gap: number;
   scanLimit: number;
-  fetchScope: ReturnType<typeof import('../../../useAppState').useAppState>['fetchScope'];
-  ws: ReturnType<typeof import('../../../useAppState').useAppState>['ws'];
-  w: ReturnType<typeof import('../../../useAppState').useAppState>['w'];
+  fetchScope: AppState['fetchScope'];
+  ws: AppState['ws'];
+  w: AppState['w'];
   canQuery: boolean;
-  setNotice: ReturnType<typeof import('../../../useAppState').useAppState>['setNotice'];
+  setNotice: AppState['setNotice'];
   setFitToken: Dispatch<SetStateAction<number>>;
-  run: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['run'];
+  run: WorkspaceEvidence['run'];
   operationRef: RefObject<AbortController | undefined>;
-  wRef: ReturnType<typeof import('../../../useAppState').useAppState>['wRef'];
-  mergeTransactions: ReturnType<
-    typeof import('../../ChainData/useWorkspaceEvidence').useWorkspaceEvidence
-  >['mergeTransactions'];
-  updateWorkspace: ReturnType<typeof import('../../../useAppState').useAppState>['updateWorkspace'];
+  wRef: AppState['wRef'];
+  mergeTransactions: WorkspaceEvidence['mergeTransactions'];
+  updateWorkspace: AppState['updateWorkspace'];
   live: boolean;
-  workspaceId: ReturnType<typeof import('../../../useAppState').useAppState>['workspaceId'];
+  workspaceId: AppState['workspaceId'];
 }
 export function useWalletActivity({
   setOperation,
