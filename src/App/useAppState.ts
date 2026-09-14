@@ -6,9 +6,7 @@ export function useAppState() {
   const workspaces = useWorkspaces();
   const activeWorkspace = workspaces.active?.data;
   const fetchScope = workspaces.active?.fetchScope;
-  const updateWorkspace = workspaces.update;
   const getUnlockedWorkspace = workspaces.getUnlocked;
-  const persistWorkspace = workspaces.persist;
   const workspaceId = activeWorkspace?.id;
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
@@ -84,7 +82,7 @@ export function useAppState() {
   }, []);
   const saveBeforeLeaving = () => {
     const id = flushActiveGraph();
-    return id ? persistWorkspace(id) : Promise.resolve();
+    return id ? (workspaces.getUnlocked(id)?.persist() ?? Promise.resolve()) : Promise.resolve();
   };
   const activateWorkspace = (id?: string) => {
     if (id !== activeWorkspaceRef.current?.id) void saveBeforeLeaving().catch(() => {});
@@ -110,9 +108,7 @@ export function useAppState() {
     workspaces,
     activeWorkspace,
     fetchScope,
-    updateWorkspace,
     getUnlockedWorkspace,
-    persistWorkspace,
     workspaceId,
     create,
     setCreate,

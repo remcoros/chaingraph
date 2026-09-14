@@ -52,9 +52,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspaces,
     activeWorkspace,
     fetchScope,
-    updateWorkspace,
     getUnlockedWorkspace,
-    persistWorkspace,
     workspaceId,
     networks,
     discoveryError,
@@ -81,8 +79,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [viewOwner, setViewOwner] = useState<string>();
   const [leftTab, setLeftTab] = useState<'wallets' | 'entities' | 'bookmarks' | 'tags'>('wallets');
   const graphCanvas = useGraphCanvas({
+    getUnlockedWorkspace,
     workspaceId,
-    updateWorkspace,
     registerSnapshotFlush: registerGraphSnapshotFlush,
     flushActive: flushActiveGraph,
     pendingWorkspaceId: pendingGraphWorkspace,
@@ -233,9 +231,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       if (event.key.toLowerCase() === 's' && current) {
         event.preventDefault();
         flushActiveGraph();
-        void persistWorkspace(current.id).catch((error) =>
-          setError(error instanceof Error ? error.message : 'Encrypted save failed.'),
-        );
+        void workspaces
+          .getUnlocked(current.id)
+          ?.persist()
+          .catch((error) =>
+            setError(error instanceof Error ? error.message : 'Encrypted save failed.'),
+          );
       } else if (event.key.toLowerCase() === 'k' && current && !isModalOpen()) {
         event.preventDefault();
         focusLookup();
@@ -243,7 +244,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [persistWorkspace, flushActiveGraph, activeWorkspaceRef, setError, focusLookup]);
+  }, [workspaces, flushActiveGraph, activeWorkspaceRef, setError, focusLookup]);
   const graphProjection = useGraphProjection({
     activeWorkspace,
     graphFilters,
@@ -337,11 +338,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       setTour(WORKBENCH_TOUR[0].id);
     }
   }, [workspaceId]);
+  const active = workspaces.active;
   const edit = useCallback(
     (fn: (data: Workspace) => Workspace, undo = true, group?: string, description?: string) => {
-      if (workspaceId) updateWorkspace(workspaceId, fn, undo, group, description);
+      active?.edit(fn, undo, group, description);
     },
-    [workspaceId, updateWorkspace],
+    [active],
   );
   const annotations = useAnnotations({
     current: activeWorkspace,
@@ -366,20 +368,16 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       focusGraph,
       prefetchDepth,
     };
-    updateWorkspace(
-      workspaceId,
-      (current) => {
-        // Compare only these UI settings, never the saved graph geometry or membership.
-        const unchanged = (Object.keys(presentation) as (keyof typeof presentation)[]).every(
-          (key) =>
-            current.view[key] === presentation[key] ||
-            (key === 'filters' &&
-              JSON.stringify(current.view.filters) === JSON.stringify(presentation.filters)),
-        );
-        return unchanged ? current : { ...current, view: { ...current.view, ...presentation } };
-      },
-      false,
-    );
+    getUnlockedWorkspace(workspaceId)?.edit((current) => {
+      // Compare only these UI settings, never the saved graph geometry or membership.
+      const unchanged = (Object.keys(presentation) as (keyof typeof presentation)[]).every(
+        (key) =>
+          current.view[key] === presentation[key] ||
+          (key === 'filters' &&
+            JSON.stringify(current.view.filters) === JSON.stringify(presentation.filters)),
+      );
+      return unchanged ? current : { ...current, view: { ...current.view, ...presentation } };
+    }, false);
   }, [
     workspaceId,
     viewOwner,
@@ -392,7 +390,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     mobilePanel,
     focusGraph,
     prefetchDepth,
-    updateWorkspace,
+    getUnlockedWorkspace,
   ]);
   const entityRemoval = useEntityRemoval({
     activeWorkspace,
@@ -470,7 +468,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspaces,
     canLoadChainData,
     setAddressHistoryLoads,
-    updateWorkspace,
     getUnlockedWorkspace,
     revealLookup,
     setGraphFilters,
@@ -496,13 +493,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
             priority: 'visible',
           });
     },
-    update: workspaces.update,
+    update: (id, fn, undo) => workspaces.getUnlocked(id)?.edit(fn, undo),
   });
   function revealLookup(id: string) {
     if (!activeWorkspace) return;
     selection.markPending(id);
     const address = id.startsWith('addr:') ? id.slice(5) : undefined;
-    workspaces.update(activeWorkspace.id, (current) => ({
+    active?.edit((current) => ({
       ...setNodesHidden(current, [id], false),
       watchedAddresses: address
         ? [...new Set([...current.watchedAddresses, address])]
@@ -531,6 +528,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     });
   }
   const walletDiscovery = useWalletActivity({
+    getUnlockedWorkspace,
     setOperation,
     fetchScope,
     workspaces,
@@ -542,11 +540,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     operationRef,
     activeWorkspaceRef,
     mergeTransactions,
-    updateWorkspace,
     workspaceId,
   });
-  const history = useWorkspaceHistory({ activeWorkspace, workspaces });
+  const history = useWorkspaceHistory({ workspaces });
   const graphActions = useGraphActions({
+    getUnlockedWorkspace,
     cancelScanTargetPicking: connectionScanTargets.cancelPicking,
     selectionGeneration,
     invalidateSelection,
@@ -569,7 +567,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspaceId,
     viewOwner,
     hiddenIds,
-    updateWorkspace,
     selectedNodeIsVisible,
     admittedIds,
     visibleGraph,

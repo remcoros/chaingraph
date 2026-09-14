@@ -98,7 +98,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
             `Isolated ${ids.length.toLocaleString()} selected entities. The isolation chip restores the full canvas.`,
           );
         }}
-        onUndo={() => workspaces.undo(activeWorkspace.id)}
+        onUndo={() => history.undo()}
       />
       {connectionScanTargets.picking && connectionScanTargets.draft && (
         <ConnectionScanTargetToolbar

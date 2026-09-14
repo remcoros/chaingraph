@@ -14,26 +14,22 @@ export interface WorkspaceHistory {
 }
 
 interface Inputs {
-  activeWorkspace: AppState['activeWorkspace'];
   workspaces: AppState['workspaces'];
 }
 
-export function useWorkspaceHistory({ activeWorkspace, workspaces }: Inputs) {
-  const undoDescription = workspaces.active?.history.at(-1)?.description;
-  const redoDescription = workspaces.active?.redoHistory.at(-1)?.description;
+export function useWorkspaceHistory({ workspaces }: Inputs) {
+  const active = workspaces.active;
+  const undoDescription = active?.history.at(-1)?.description;
+  const redoDescription = active?.redoHistory.at(-1)?.description;
   return {
     // A locking workspace accepts neither, so the buttons must not offer them.
-    canUndo: !!workspaces.active?.history.length && !workspaces.active.locking,
-    canRedo: !!workspaces.active?.redoHistory.length && !workspaces.active.locking,
-    undo: () => {
-      if (activeWorkspace) workspaces.undo(activeWorkspace.id);
-    },
-    redo: () => {
-      if (activeWorkspace) workspaces.redo(activeWorkspace.id);
-    },
+    canUndo: !!active?.history.length && !active.locking,
+    canRedo: !!active?.redoHistory.length && !active.locking,
+    undo: () => active?.undo(),
+    redo: () => active?.redo(),
     undoLabel: undoDescription ? `Undo: ${undoDescription}` : 'Nothing to undo',
     redoLabel: redoDescription ? `Redo: ${redoDescription}` : 'Nothing to redo',
-    token: workspaces.getUnlocked(activeWorkspace?.id ?? '')?.undoRevision ?? 0,
+    token: active?.undoRevision ?? 0,
     undoDescription,
   } satisfies WorkspaceHistory;
 }

@@ -56,7 +56,6 @@ interface Inputs {
   workspaces: AppState['workspaces'];
   canLoadChainData: boolean;
   setAddressHistoryLoads: Dispatch<SetStateAction<Record<string, AddressHistoryLoadState>>>;
-  updateWorkspace: AppState['updateWorkspace'];
   getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
   revealLookup: (id: string) => void;
   selectionGeneration: RefObject<number>;
@@ -95,7 +94,6 @@ export function useWorkspaceEvidence({
   workspaces,
   canLoadChainData,
   setAddressHistoryLoads,
-  updateWorkspace,
   getUnlockedWorkspace,
   revealLookup,
   selectionGeneration,
@@ -248,37 +246,33 @@ export function useWorkspaceEvidence({
       return !!current && (!requiredSourceId || traceSourceExists(current, requiredSourceId));
     }
     let accepted = false;
-    workspaces.update(
-      id,
-      (current) => {
-        if (requiredSourceId && !traceSourceExists(current, requiredSourceId)) return current;
-        accepted = true;
-        const initialized = ensureGraphMembership(current);
-        const promoted = contextIds
-          ? promoteInputContext(initialized, promotionIds)
-          : clearContextProvenance(initialized, promotionIds);
-        const merged = !transactions.length
-          ? promoted
-          : {
-              ...promoted,
-              transactions: {
-                ...current.transactions,
-                ...Object.fromEntries(
-                  transactions.map((transaction) => [
-                    transaction.txid,
-                    mergeTransactionObservations(
-                      current.transactions[transaction.txid],
-                      transaction,
-                      current.network,
-                    ),
-                  ]),
-                ),
-              },
-            };
-        return contextIds ? markContextTransactions(merged, contextIds) : merged;
-      },
-      false,
-    );
+    workspaces.getUnlocked(id)?.edit((current) => {
+      if (requiredSourceId && !traceSourceExists(current, requiredSourceId)) return current;
+      accepted = true;
+      const initialized = ensureGraphMembership(current);
+      const promoted = contextIds
+        ? promoteInputContext(initialized, promotionIds)
+        : clearContextProvenance(initialized, promotionIds);
+      const merged = !transactions.length
+        ? promoted
+        : {
+            ...promoted,
+            transactions: {
+              ...current.transactions,
+              ...Object.fromEntries(
+                transactions.map((transaction) => [
+                  transaction.txid,
+                  mergeTransactionObservations(
+                    current.transactions[transaction.txid],
+                    transaction,
+                    current.network,
+                  ),
+                ]),
+              ),
+            },
+          };
+      return contextIds ? markContextTransactions(merged, contextIds) : merged;
+    }, false);
     return accepted;
   };
   const startAddressHistoryLoad = useCallback(
@@ -319,8 +313,7 @@ export function useWorkspaceEvidence({
         truncated,
       ) => {
         if (activeWorkspaceRef.current?.id !== ownerId) return;
-        updateWorkspace(
-          ownerId,
+        getUnlockedWorkspace(ownerId)?.edit(
           (latest) => ({
             ...latest,
             addressHistories: {
@@ -346,8 +339,7 @@ export function useWorkspaceEvidence({
         const batch = pendingTransactions;
         pendingTransactions = [];
         if (!batch.length || activeWorkspaceRef.current?.id !== ownerId) return;
-        updateWorkspace(
-          ownerId,
+        getUnlockedWorkspace(ownerId)?.edit(
           (latest) => ({
             ...clearContextProvenance(
               latest,
@@ -412,8 +404,7 @@ export function useWorkspaceEvidence({
           flushTransactions();
           controller.signal.throwIfAborted();
           if (result && activeWorkspaceRef.current?.id === ownerId)
-            updateWorkspace(
-              ownerId,
+            getUnlockedWorkspace(ownerId)?.edit(
               (latest) => clearContextProvenance(latest, result!.observedTransactionIds),
               false,
             );
@@ -421,8 +412,7 @@ export function useWorkspaceEvidence({
           const balance = await balancePromise;
           controller.signal.throwIfAborted();
           if (balance && activeWorkspaceRef.current?.id === ownerId)
-            updateWorkspace(
-              ownerId,
+            getUnlockedWorkspace(ownerId)?.edit(
               (latest) => ({
                 ...latest,
                 addressBalances: { ...latest.addressBalances, [address]: balance },
@@ -471,7 +461,7 @@ export function useWorkspaceEvidence({
     [
       canLoadChainData,
       fetchScope,
-      updateWorkspace,
+      getUnlockedWorkspace,
       activeWorkspaceRef,
       addressHistoryJobsRef,
       setNotice,
@@ -522,8 +512,7 @@ export function useWorkspaceEvidence({
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation || activeWorkspaceRef.current?.id !== ownerId)
         return;
-      workspaces.update(
-        ownerId,
+      workspaces.getUnlocked(ownerId)?.edit(
         (latest) => ({
           ...latest,
           addressBalances: {
@@ -560,8 +549,7 @@ export function useWorkspaceEvidence({
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation || activeWorkspaceRef.current?.id !== ownerId)
         return;
-      workspaces.update(
-        ownerId,
+      workspaces.getUnlocked(ownerId)?.edit(
         (latest) => ({
           ...latest,
           addressUtxos: {
@@ -662,17 +650,13 @@ export function useWorkspaceEvidence({
   }
   function revealAddressGraphNodes(ownerId: string, ids: string[]) {
     if (!ids.length) return;
-    updateWorkspace(
-      ownerId,
-      (current) => {
-        const revealed = addGraphNodes(current, ids);
-        return {
-          ...revealed,
-          view: { ...revealed.view, smallAmountThreshold: undefined },
-        };
-      },
-      false,
-    );
+    getUnlockedWorkspace(ownerId)?.edit((current) => {
+      const revealed = addGraphNodes(current, ids);
+      return {
+        ...revealed,
+        view: { ...revealed.view, smallAmountThreshold: undefined },
+      };
+    }, false);
     setGraphFilters({});
   }
   function showRecentAddressUtxos() {
@@ -693,8 +677,7 @@ export function useWorkspaceEvidence({
       )
         return;
       if (!cached)
-        updateWorkspace(
-          action.ownerId,
+        getUnlockedWorkspace(action.ownerId)?.edit(
           (latest) => ({
             ...latest,
             addressUtxos: {
@@ -786,8 +769,7 @@ export function useWorkspaceEvidence({
           activeWorkspaceRef.current?.id !== action.ownerId
         )
           return;
-        updateWorkspace(
-          action.ownerId,
+        getUnlockedWorkspace(action.ownerId)?.edit(
           (workspace) => ({
             ...workspace,
             addressHistories: {
@@ -867,24 +849,20 @@ export function useWorkspaceEvidence({
       if (selectionGeneration.current !== generation || activeWorkspaceRef.current?.id !== ownerId)
         return;
       mergeTransactions(ownerId, cached ? [] : [transaction], [transaction.txid]);
-      workspaces.update(
-        ownerId,
-        (latest) => {
-          const admitted = addGraphNodes(latest, [txNodeId(transaction.txid)]);
-          return {
-            ...admitted,
-            view: {
-              ...admitted.view,
-              transactionFlow: {
-                ...latest.view.transactionFlow,
-                transactionId: transaction.txid,
-                open: true,
-              },
+      workspaces.getUnlocked(ownerId)?.edit((latest) => {
+        const admitted = addGraphNodes(latest, [txNodeId(transaction.txid)]);
+        return {
+          ...admitted,
+          view: {
+            ...admitted.view,
+            transactionFlow: {
+              ...latest.view.transactionFlow,
+              transactionId: transaction.txid,
+              open: true,
             },
-          };
-        },
-        false,
-      );
+          },
+        };
+      }, false);
       const selectedId =
         vout !== undefined && transaction.vout.some((output) => output.n === vout)
           ? outputNodeId(transaction.txid, vout)
@@ -1010,8 +988,7 @@ export function useWorkspaceEvidence({
         if (node.kind === 'output') {
           mergeTransactions(activeWorkspace.id, loaded ? [] : [transaction], [transaction.txid]);
           const id = txNodeId(transaction.txid);
-          workspaces.update(
-            activeWorkspace.id,
+          workspaces.active?.edit(
             (current) => ({
               ...setNodesHidden(current, [id], false),
               view: {
@@ -1055,7 +1032,7 @@ export function useWorkspaceEvidence({
             )
           ) {
             const parents = new Set(result.resolvedTransactionIds);
-            workspaces.update(activeWorkspace.id, (current) =>
+            workspaces.active?.edit((current) =>
               addGraphNodes(current, [
                 ...result.resolvedTransactionIds.map(txNodeId),
                 ...transaction.vin.flatMap((input) =>
@@ -1106,7 +1083,7 @@ export function useWorkspaceEvidence({
               : [],
           ),
         );
-        workspaces.update(activeWorkspace.id, (current) => {
+        workspaces.active?.edit((current) => {
           const admitted = addGraphNodes(current, [...spendingNodeIds, ...connectingOutputs]);
           return node.kind === 'output' && result.transactions.length === 1
             ? {

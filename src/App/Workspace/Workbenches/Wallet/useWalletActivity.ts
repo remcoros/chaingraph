@@ -37,7 +37,7 @@ interface Inputs {
   operationRef: RefObject<AbortController | undefined>;
   activeWorkspaceRef: AppState['activeWorkspaceRef'];
   mergeTransactions: WorkspaceEvidence['mergeTransactions'];
-  updateWorkspace: AppState['updateWorkspace'];
+  getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
   workspaceId: AppState['workspaceId'];
 }
 export function useWalletActivity({
@@ -52,7 +52,7 @@ export function useWalletActivity({
   operationRef,
   activeWorkspaceRef,
   mergeTransactions,
-  updateWorkspace,
+  getUnlockedWorkspace,
   workspaceId,
 }: Inputs): WalletDiscovery {
   const [gapLimit, setGapLimit] = useState(20);
@@ -80,11 +80,9 @@ export function useWalletActivity({
         onProgress: (p) => setOperation(p.message),
       });
       signal.throwIfAborted();
-      workspaces.update(
-        initial.id,
-        (current) => applyWalletScan(current, result.wallet, result.transactions),
-        false,
-      );
+      workspaces
+        .getUnlocked(initial.id)
+        ?.edit((current) => applyWalletScan(current, result.wallet, result.transactions), false);
       snapshot = applyWalletScan(snapshot, result.wallet, result.transactions);
       added += result.wallet.lastActivity?.newTransactionIds.length ?? 0;
       refreshed += result.wallet.lastActivity?.refreshedTransactionCount ?? 0;
@@ -183,8 +181,7 @@ export function useWalletActivity({
       ) {
         mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
         if (Object.keys(refreshedHistories).length)
-          updateWorkspace(
-            current.id,
+          getUnlockedWorkspace(current.id)?.edit(
             (latest) => ({
               ...latest,
               addressHistories: {

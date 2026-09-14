@@ -504,8 +504,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               }
               onStateChange={(transactionFlow) =>
                 !tourStep &&
-                workspaces.update(
-                  activeWorkspace.id,
+                workspaces.active?.edit(
                   (current) => ({
                     ...current,
                     view: { ...current.view, transactionFlow },
@@ -571,7 +570,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   key={activeWorkspace.id}
                   snapshot={activeWorkspace.view.graphSnapshot}
                   onActivity={(active) => {
-                    workspaces.pauseAutosave(activeWorkspace.id, active);
+                    workspaces.active?.pauseAutosave(active);
                     setPendingGraphWorkspace((previous) =>
                       active
                         ? activeWorkspace.id
@@ -584,8 +583,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                     registerGraphSnapshotFlush(activeWorkspace.id, flush);
                   }}
                   onSnapshot={(snapshot) =>
-                    workspaces.update(
-                      activeWorkspace.id,
+                    workspaces.active?.edit(
                       (current) => ({
                         ...current,
                         view: { ...current.view, graphSnapshot: snapshot },

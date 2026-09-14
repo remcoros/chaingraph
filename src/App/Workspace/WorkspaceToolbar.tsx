@@ -209,7 +209,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                 disabled={!history.canUndo || !!operation}
                 onClick={() => {
                   setMenu(false);
-                  workspaces.undo(activeWorkspace.id);
+                  history.undo();
                 }}
               >
                 <Undo2 size={15} /> Undo
@@ -221,7 +221,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                 disabled={!history.canRedo || !!operation}
                 onClick={() => {
                   setMenu(false);
-                  workspaces.redo(activeWorkspace.id);
+                  history.redo();
                 }}
               >
                 <Redo2 size={15} /> Redo
@@ -267,8 +267,8 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                   operationRef.current?.abort();
                   flushActiveGraph();
                   setLockingWorkspace(true);
-                  void workspaces
-                    .lock(activeWorkspace.id)
+                  void workspaces.active
+                    ?.lock()
                     .catch((e) => setError(e.message))
                     .finally(() => setLockingWorkspace(false));
                 }}

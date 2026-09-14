@@ -135,7 +135,7 @@ export function createWalletActions({
     };
     const transactionIds = graphNavigationTransactionIds(ids);
     if (!transactionIds.length) {
-      if (!center) workspaces.update(ownerId, reveal, false);
+      if (!center) workspaces.getUnlocked(ownerId)?.edit(reveal, false);
       finish();
       return;
     }
@@ -161,7 +161,7 @@ export function createWalletActions({
       // Cached navigation promotes graph context without replacing chain evidence.
       // A new transaction still takes the normal history/findings invalidation path.
       mergeTransactions(ownerId, loaded, transactionIds);
-      if (!center) workspaces.update(ownerId, reveal, false);
+      if (!center) workspaces.getUnlocked(ownerId)?.edit(reveal, false);
       finish();
     });
   }

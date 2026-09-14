@@ -130,7 +130,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
                 workspaces.getUnlocked(activeWorkspace.id)?.fetchScope === fetchScope &&
                 !fetchScope.closed
               )
-                workspaces.update(activeWorkspace.id, update, undo);
+                workspaces.active?.edit(update, undo);
             }}
             onSelect={(id, evidence) => {
               if (evidence) {

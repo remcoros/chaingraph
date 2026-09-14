@@ -62,7 +62,7 @@ interface Inputs {
   selectedId: string | undefined;
   cameraPreservedSelection: RefObject<string | undefined>;
   hiddenIds: GraphProjection['hiddenIds'];
-  updateWorkspace: AppState['updateWorkspace'];
+  getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
   selectedNodeIsVisible: GraphProjection['selectedNodeIsVisible'];
   admittedIds: GraphProjection['admittedIds'];
   visibleGraph: GraphProjection['visibleGraph'];
@@ -103,7 +103,7 @@ export function useGraphActions({
   selectedId,
   cameraPreservedSelection,
   hiddenIds,
-  updateWorkspace,
+  getUnlockedWorkspace,
   selectedNodeIsVisible,
   admittedIds,
   visibleGraph,
@@ -184,8 +184,7 @@ export function useGraphActions({
     if (!selectedNodeIsVisible) {
       setGraphFilters({});
       if (selectedId.startsWith('addr:') && !showAddresses)
-        updateWorkspace(
-          workspaceId,
+        getUnlockedWorkspace(workspaceId)?.edit(
           (current) => ({ ...current, view: { ...current.view, showAddresses: true } }),
           false,
         );
@@ -203,7 +202,7 @@ export function useGraphActions({
     hiddenIds,
     selectedNodeIsVisible,
     showAddresses,
-    updateWorkspace,
+    getUnlockedWorkspace,
     setFocusRequest,
     cameraPreservedSelection,
     setGraphFilters,
@@ -266,11 +265,9 @@ export function useGraphActions({
     if (!current) return false;
     const navigation = prepareGraphNavigation(current, ids, options);
     if (!navigation) return false;
-    workspaces.update(
-      current.id,
-      (latest) => prepareGraphNavigation(latest, ids, options)!.workspace,
-      false,
-    );
+    workspaces
+      .getUnlocked(current.id)
+      ?.edit((latest) => prepareGraphNavigation(latest, ids, options)!.workspace, false);
     // Explicit centering owns this camera move, not Lock or a deferred fit-all.
     select(navigation.selectedId, { preserveCamera: true, pickTarget: false });
     setGraphFilters(navigation.filters);
@@ -340,7 +337,7 @@ export function useGraphActions({
         return;
       cameraPreservedSelection.current = selectedId;
       setFocusRequest(undefined);
-      workspaces.update(ownerId, (current) => {
+      workspaces.getUnlocked(ownerId)?.edit((current) => {
         if (action === 'hide') {
           const evidence = fullGraphMembershipEvidence(current);
           const initialized = ensureGraphMembership(current);

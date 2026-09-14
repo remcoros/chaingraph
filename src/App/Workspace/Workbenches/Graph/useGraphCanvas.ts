@@ -33,7 +33,7 @@ export interface GraphCanvas {
 
 interface Inputs {
   workspaceId: string | undefined;
-  updateWorkspace: AppState['updateWorkspace'];
+  getUnlockedWorkspace: AppState['getUnlockedWorkspace'];
   registerSnapshotFlush: AppState['registerGraphSnapshotFlush'];
   flushActive: AppState['flushActiveGraph'];
   pendingWorkspaceId: AppState['pendingGraphWorkspace'];
@@ -42,7 +42,7 @@ interface Inputs {
 
 export function useGraphCanvas({
   workspaceId,
-  updateWorkspace,
+  getUnlockedWorkspace,
   registerSnapshotFlush,
   flushActive,
   pendingWorkspaceId,
@@ -58,14 +58,10 @@ export function useGraphCanvas({
     fitAll: () => setFitToken((token) => token + 1),
     changeView: (update) => {
       if (!workspaceId) return;
-      updateWorkspace(
-        workspaceId,
-        (workspace) => {
-          const view = update(workspace.view);
-          return view === workspace.view ? workspace : { ...workspace, view };
-        },
-        false,
-      );
+      getUnlockedWorkspace(workspaceId)?.edit((workspace) => {
+        const view = update(workspace.view);
+        return view === workspace.view ? workspace : { ...workspace, view };
+      }, false);
     },
     registerSnapshotFlush,
     flushActive,

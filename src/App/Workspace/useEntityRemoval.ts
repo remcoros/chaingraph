@@ -125,7 +125,9 @@ export function useEntityRemoval({
       setPending(undefined);
       return;
     }
-    workspaces.update(targetWorkspaceId, (latest) => removeWorkspaceEntity(latest, nodeId));
+    workspaces
+      .getUnlocked(targetWorkspaceId)
+      ?.edit((latest) => removeWorkspaceEntity(latest, nodeId));
     setPending(undefined);
     const remaining = workspaces.getUnlocked(targetWorkspaceId)?.data;
     if (

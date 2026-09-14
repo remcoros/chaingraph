@@ -80,7 +80,7 @@ export function useWorkspaceSelection({
   const markPending = useCallback((id: string | undefined) => {
     pending.current = id;
   }, []);
-  const { getUnlocked, update } = sessions;
+  const { getUnlocked } = sessions;
   const select = useCallback(
     (id: string, options?: SelectOptions) => {
       if (pickHandler.current && options?.pickTarget !== false) {
@@ -90,9 +90,11 @@ export function useWorkspaceSelection({
       if (pending.current && pending.current !== id) pending.current = undefined;
       generation.current++;
       cameraPreserved.current = options?.preserveCamera ? id : undefined;
-      const active = getUnlocked(currentRef.current?.id ?? '')?.data;
       // A click admits exactly one entity, never its transaction's other branches.
-      if (active) update(active.id, (workspace) => addGraphNodes(workspace, [id]), false);
+      getUnlocked(currentRef.current?.id ?? '')?.edit(
+        (workspace) => addGraphNodes(workspace, [id]),
+        false,
+      );
       setSelectedId(id);
       setGraphFilters((filters) =>
         filters.focus ? { ...filters, focus: { ...filters.focus, id } } : filters,
@@ -107,7 +109,7 @@ export function useWorkspaceSelection({
       );
       setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
     },
-    [getUnlocked, update, currentRef, setGraphFilters, setRightTab],
+    [getUnlocked, currentRef, setGraphFilters, setRightTab],
   );
   const batchIds = batch.ids;
   const removeBatchIds = batch.remove;

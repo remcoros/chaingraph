@@ -1223,7 +1223,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         }
         workspace={activeWorkspace}
         sessionAnalysis={analysis.sessions.current.get(activeWorkspace.id)?.scan}
-        updateEvidence={workspaces.update}
+        updateEvidence={(id, update, undo) => workspaces.getUnlocked(id)?.edit(update, undo)}
         onAnalysisComplete={(scan) => {
           analysis.sessions.current.set(activeWorkspace.id, {
             scopeMode: analysis.sessions.current.get(activeWorkspace.id)?.scopeMode,

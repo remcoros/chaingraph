@@ -51,7 +51,7 @@ export function createAnalysisActions({
       const latest = workspaces.getUnlocked(current.id)?.data;
       const resolved = latest && resolveGraphHandoff(latest, ids, supportingTxids);
       if (!resolved) return false;
-      workspaces.update(current.id, () => resolved.workspace, false);
+      workspaces.getUnlocked(current.id)?.edit(() => resolved.workspace, false);
       setReturnWorkbench('analysis');
       switchWorkbench('graph', true);
       return showOnGraph(resolved.ids, { isolate, selectedId: resolved.selectedId });

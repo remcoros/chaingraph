@@ -79,7 +79,24 @@ export interface UndoEntry {
   workspace: Workspace;
   description: string;
 }
-export interface UnlockedWorkspace {
+/** What can be done to one unlocked workspace. Stable across snapshots. */
+export interface WorkspaceOperations {
+  /** Applies an edit, recording an undo step unless the write is presentation-only. */
+  edit: (
+    fn: (workspace: Workspace) => Workspace,
+    undo?: boolean,
+    group?: string,
+    description?: string,
+  ) => void;
+  undo: () => void;
+  redo: () => void;
+  /** Saves and closes this workspace, dropping its decrypted data and password. */
+  lock: () => Promise<void>;
+  persist: () => Promise<void>;
+  /** Defers saving while a gesture is in progress. */
+  pauseAutosave: (paused: boolean) => void;
+}
+export interface UnlockedWorkspace extends WorkspaceOperations {
   fetchScope: TransactionFetchScope;
   walletPreparation: WalletPreparationCache;
   data: Workspace;
@@ -189,6 +206,7 @@ export class WorkspaceStore {
   private options: StoreOptions;
   private envelopes?: EnvelopeStorage;
   private idleWaiters = new Map<string, Set<() => void>>();
+  private operations = new Map<string, WorkspaceOperations>();
 
   constructor(options: StoreOptions = {}) {
     this.options = options;
@@ -222,6 +240,22 @@ export class WorkspaceStore {
       this.listeners.delete(listener);
     };
   };
+  /** One stable set of operations per unlocked workspace, so records can carry
+   * them without changing identity on every snapshot. */
+  private operationsFor(id: string): WorkspaceOperations {
+    const existing = this.operations.get(id);
+    if (existing) return existing;
+    const bound: WorkspaceOperations = {
+      edit: (fn, undo, group, description) => this.update(id, fn, undo, group, description),
+      undo: () => this.undo(id),
+      redo: () => this.redo(id),
+      lock: () => this.lock(id),
+      persist: () => this.persist(id),
+      pauseAutosave: (paused) => this.pauseAutosave(id, paused),
+    };
+    this.operations.set(id, bound);
+    return bound;
+  }
   private patch(update: Partial<StoreState>) {
     this.state = { ...this.state, ...update };
     for (const listener of this.listeners) listener();
@@ -341,6 +375,7 @@ export class WorkspaceStore {
       unlocked: [
         ...this.state.unlocked,
         {
+          ...this.operationsFor(data.id),
           data,
           fetchScope: new TransactionFetchScope(data.network),
           walletPreparation: new WalletPreparationCache(),
@@ -705,6 +740,7 @@ export class WorkspaceStore {
           transactionScheduler.dispose(current.fetchScope);
           current.walletPreparation.dispose();
         }
+        this.operations.delete(id);
         this.patch({
           unlocked: this.state.unlocked.filter((s) => s.data.id !== id),
           activeId: this.state.activeId === id ? undefined : this.state.activeId,
@@ -741,21 +777,17 @@ export function useWorkspaces() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [store]);
+  // Reaching one workspace and doing something to it are separate concerns: this
+  // hook finds workspaces, and each unlocked one carries its own operations.
   return {
     ...state,
     active: state.unlocked.find((s) => s.data.id === state.activeId),
+    getUnlocked: store.getUnlocked,
+    getSaved: store.getSaved,
     setActiveId: store.setActiveId,
     open: store.open,
     unlock: store.unlock,
-    update: store.update,
-    undo: store.undo,
-    redo: store.redo,
-    lock: store.lock,
-    persist: store.persist,
-    getUnlocked: store.getUnlocked,
-    getSaved: store.getSaved,
     exportEncrypted: store.exportEncrypted,
-    pauseAutosave: store.pauseAutosave,
     removeSaved: store.removeSaved,
   };
 }
