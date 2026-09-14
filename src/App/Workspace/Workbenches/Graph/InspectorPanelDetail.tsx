@@ -32,7 +32,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     wallet,
     canQuery,
     walletDiscovery,
-    setWalletNameDialog,
+    dialogs,
     tourStep,
     shownRightTab,
   } = workspace;
@@ -57,7 +57,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       canQuery={canQuery}
       onScan={() => void walletDiscovery.run(wallet)}
       onShowActivity={() => showWalletActivity(wallet)}
-      onEdit={() => setWalletNameDialog({ workspaceId: w.id, walletId: wallet.id })}
+      onEdit={() => dialogs.openWalletRename(w.id, wallet.id)}
       onShowWallet={() => {
         updateFilters({ walletId: wallet.id, preserveContext: true });
         setMobilePanel('graph');

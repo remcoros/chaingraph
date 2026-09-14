@@ -21,8 +21,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setSelectedWallet,
     setSelectedId,
     setRightTab,
-    setWalletDialog,
-    setWalletNameDialog,
+    dialogs,
     operation,
     walletDiscovery,
     canQuery,
@@ -98,8 +97,8 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
         select(id);
         if (!connectionScanTargets.picking) setMobilePanel('right');
       }}
-      onAddWallet={() => setWalletDialog(true)}
-      onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
+      onAddWallet={() => dialogs.openAddWallet()}
+      onEditWallet={(walletId) => dialogs.openWalletRename(w.id, walletId)}
       busy={!!operation}
       onRefreshAll={() => void walletDiscovery.run()}
       onShowActivity={showWalletActivity}

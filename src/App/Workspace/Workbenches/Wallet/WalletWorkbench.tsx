@@ -1190,9 +1190,8 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     setSelectedWallet,
     setSelectedId,
     setRightTab,
-    setWalletDialog,
+    dialogs,
     change,
-    setWalletNameDialog,
     walletDiscovery,
     shownWorkbench,
     walletWorkspaceRef,
@@ -1243,9 +1242,9 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           setSelectedId(undefined);
           setRightTab('inspect');
         }}
-        onAddWallet={() => setWalletDialog(true)}
+        onAddWallet={() => dialogs.openAddWallet()}
         onChange={(update, group) => change(update, true, group)}
-        onEditWallet={(walletId) => setWalletNameDialog({ workspaceId: w.id, walletId })}
+        onEditWallet={(walletId) => dialogs.openWalletRename(w.id, walletId)}
         onRefresh={() => void walletDiscovery.run(wallet ?? w.wallets[0])}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}

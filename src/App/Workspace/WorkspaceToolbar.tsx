@@ -38,8 +38,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     ws,
     redoLabel,
     exportWorkspace,
-    setSettingsOpen,
-    labelsInput,
+    dialogs,
     setNotice,
     operationRef,
     flushActiveGraph,
@@ -227,7 +226,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  setSettingsOpen(true);
+                  dialogs.openSettings();
                 }}
               >
                 Workspace details
@@ -244,7 +243,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  labelsInput.current?.click();
+                  dialogs.labelsInput.current?.click();
                 }}
               >
                 <Upload size={15} />

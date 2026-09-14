@@ -8,12 +8,12 @@ type Props = { workspace: WorkspaceController };
 
 export function WorkspaceSettingsDialog({ workspace }: Props) {
   const { w } = workspace;
-  if (!w || !workspace.settingsOpen) return null;
+  if (!w || !workspace.dialogs.settingsOpen) return null;
   return (
     <WorkspaceDetailsDialog
       key={w.id}
       workspace={w}
-      onClose={() => workspace.setSettingsOpen(false)}
+      onClose={() => workspace.dialogs.closeSettings()}
       onSave={(name, description) =>
         workspace.change(
           (current) =>
@@ -29,7 +29,8 @@ export function WorkspaceSettingsDialog({ workspace }: Props) {
 }
 
 export function WorkspaceLabelImport({ workspace }: Props) {
-  const { w, labelsInput } = workspace;
+  const { w } = workspace;
+  const { labelsInput } = workspace.dialogs;
   return (
     <input
       ref={labelsInput}
@@ -120,7 +121,8 @@ export function EntityRemovalDialog({ workspace }: Props) {
 }
 
 export function WalletDialogs({ workspace }: Props) {
-  const { w, editingWallet } = workspace;
+  const { w } = workspace;
+  const { editingWallet } = workspace.dialogs;
   return (
     <>
       {w && editingWallet && !workspace.lockingWorkspace && (
@@ -132,7 +134,7 @@ export function WalletDialogs({ workspace }: Props) {
               (current) => {
                 const target = current.wallets.find((item) => item.id === editingWallet.id);
                 if (
-                  current.id !== workspace.walletNameDialog?.workspaceId ||
+                  current.id !== workspace.dialogs.renameTarget?.workspaceId ||
                   !target ||
                   target.name === name
                 )
@@ -148,10 +150,10 @@ export function WalletDialogs({ workspace }: Props) {
               `wallet-name:${editingWallet.id}`,
             )
           }
-          onClose={() => workspace.setWalletNameDialog(undefined)}
+          onClose={() => workspace.dialogs.closeWalletRename()}
         />
       )}
-      {workspace.walletDialog && w && (
+      {workspace.dialogs.addWalletOpen && w && (
         <WalletDialog
           network={w.network}
           onAdd={(newWallet) => {
@@ -174,7 +176,7 @@ export function WalletDialogs({ workspace }: Props) {
             workspace.setMobilePanel('right');
             workspace.switchWorkbench('wallet', true);
           }}
-          onClose={() => workspace.setWalletDialog(false)}
+          onClose={() => workspace.dialogs.closeAddWallet()}
         />
       )}
     </>

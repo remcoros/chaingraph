@@ -17,6 +17,7 @@ import { valueFilterError } from '../../Domain/Graph/graphFilters';
 import { useEntitySelection } from './Selection/useEntitySelection';
 import { useEntityRemoval } from './useEntityRemoval';
 import { useWorkspaceLookup } from './useWorkspaceLookup';
+import { useDialogState } from './useDialogState';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from '../../Domain/Graph/visibility';
 import { type AnalysisSession } from './Workbenches/Analysis/analysisSession';
@@ -77,11 +78,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const workspaceNetwork = w?.network;
   const workspaceTransactions = w?.transactions;
 
-  const [walletDialog, setWalletDialog] = useState(false);
-  const [walletNameDialog, setWalletNameDialog] = useState<{
-    workspaceId: string;
-    walletId: string;
-  }>();
+  const dialogs = useDialogState(w);
   const [menu, setMenu] = useState(false);
   const workspaceMenu = useRef<HTMLDivElement>(null);
   const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);
@@ -181,7 +178,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [prefetchDepth, setPrefetchDepth] = useState<0 | 1 | 2>(0);
   const [editToken, setEditToken] = useState(0);
   const [editTarget, setEditTarget] = useState<'label' | 'tags' | 'icon'>('label');
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [operation, setOperation] = useState('');
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
     Record<string, AddressHistoryLoadState>
@@ -225,7 +221,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const addressHistoryJobsRef = useRef(
     new Map<string, { workspaceId: string; controller: AbortController }>(),
   );
-  const labelsInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
@@ -286,10 +281,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     }
   }, [recoveryNodesById, selectedId, selectedBatchIds, removeSelectedBatchIds]);
   const wallet = w?.wallets.find((x) => x.id === selectedWallet);
-  const editingWallet =
-    w?.id === walletNameDialog?.workspaceId
-      ? w?.wallets.find((item) => item.id === walletNameDialog?.walletId)
-      : undefined;
   const tx = selected?.txid ? w?.transactions[selected.txid] : undefined;
   const select = useCallback(
     (id: string, options?: { preserveCamera?: boolean; pickTarget?: boolean }) => {
@@ -352,8 +343,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setViewOwner(w?.id);
     setError('');
     setNotice('');
-    setSettingsOpen(false);
-    setWalletNameDialog(undefined);
+    dialogs.closeAll();
     setExamplesOpen(false);
     setEditToken(0);
     lookup.clear();
@@ -737,6 +727,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   });
 
   return {
+    dialogs,
     lookup,
     graphProjection,
     evidence: workspaceEvidence,
@@ -767,7 +758,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     wallet,
     canQuery,
     walletDiscovery,
-    setWalletNameDialog,
     tourStep,
     shownRightTab,
     rightTab,
@@ -785,7 +775,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     rightPanelRef,
     selection,
     shownLeftTab,
-    setWalletDialog,
     entityPanelFilters,
     graphFilters,
     entityFiltersLinked,
@@ -815,8 +804,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     undoLabel,
     redoLabel,
     exportWorkspace,
-    setSettingsOpen,
-    labelsInput,
     flushActiveGraph,
     setLockingWorkspace,
     setError,
@@ -831,11 +818,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     undoDescription,
     pendingGraphWorkspace,
     setTour,
-    settingsOpen,
     entityRemoval,
-    editingWallet,
-    walletNameDialog,
-    walletDialog,
     tour,
     tourSteps,
     needsTourExample,

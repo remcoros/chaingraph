@@ -61,7 +61,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     shownFocusGraph,
     setFocusGraph,
     changeGraphView,
-    setWalletDialog,
+    dialogs,
     connected,
     setPendingGraphWorkspace,
     registerGraphSnapshotFlush,
@@ -645,7 +645,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   Import a public key or paste a transaction, output, or address above. Expand only
                   the paths that matter to you.
                 </p>
-                <button onClick={() => setWalletDialog(true)} className="primary">
+                <button onClick={() => dialogs.openAddWallet()} className="primary">
                   <Plus size={16} />
                   Add your first wallet
                 </button>
