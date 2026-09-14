@@ -3,10 +3,10 @@ import { GitBranch, List, LoaderCircle, LockKeyhole, Wallet as WalletIcon } from
 import { SelectionToolbar } from './Selection/SelectionToolbar';
 
 import type { WorkspaceController } from './useWorkspace';
-import { GraphWorkbench } from './Workbenches/GraphWorkbench';
+import { GraphWorkbench } from './Workbenches/Graph/GraphWorkbench';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
-import { WalletWorkbench } from './Workbenches/WalletWorkbench';
-import { AnalysisWorkbench } from './Workbenches/AnalysisWorkbench';
+import { WalletWorkbench } from './Workbenches/Wallet/WalletWorkbench';
+import { AnalysisWorkbench } from './Workbenches/Analysis/AnalysisWorkbench';
 
 export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   const {

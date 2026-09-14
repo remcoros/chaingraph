@@ -1,3 +1,4 @@
+import type { WorkspaceController } from '../../useWorkspace';
 import { Amount } from '../../../../Shared/Display/Amount';
 import { TransactionBlockTime } from '../../../../Shared/Display/TransactionBlockTime';
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -90,7 +91,7 @@ function FindingGuidance({ guidance }: { guidance: NonNullable<AnalysisFinding['
   );
 }
 
-export interface AnalysisWorkbenchContentSession {
+export interface AnalysisWorkbenchViewSession {
   scopeMode?: string;
   options: ReturnType<typeof scanDefaults>;
   scan?: AnalysisScan;
@@ -103,9 +104,9 @@ export interface AnalysisWorkbenchContentSession {
   autoLoad?: boolean;
 }
 
-export interface AnalysisWorkbenchContentProps {
+export interface AnalysisWorkbenchViewProps {
   active: boolean;
-  cache?: Map<string, AnalysisWorkbenchContentSession>;
+  cache?: Map<string, AnalysisWorkbenchViewSession>;
   workspace: Workspace;
   selected?: GraphNode;
   wallet?: Wallet;
@@ -122,7 +123,7 @@ function EvidenceReference({
 }: {
   id: string;
   workspace: Workspace;
-  onGraph: AnalysisWorkbenchContentProps['onGraph'];
+  onGraph: AnalysisWorkbenchViewProps['onGraph'];
   prevouts: PreviousOutputIndex;
 }) {
   const [prefix, txid, index] = id.split(':');
@@ -177,7 +178,7 @@ function EvidenceReference({
   );
 }
 
-function AnalysisWorkbenchContent({
+function AnalysisWorkbenchView({
   workspace,
   selected,
   wallet,
@@ -186,7 +187,7 @@ function AnalysisWorkbenchContent({
   onGraph,
   active,
   cache,
-}: AnalysisWorkbenchContentProps) {
+}: AnalysisWorkbenchViewProps) {
   const fetchTransaction = useTransactionFetch('background');
   const saved = cache?.get(workspace.id);
   const [scopeMode, setScopeMode] = useState(saved?.scopeMode);
@@ -1076,7 +1077,7 @@ function AnalysisWorkbenchContent({
 // Deliver activation/deactivation and session changes immediately. Other parent
 // updates can wait while hidden; activation always supplies the latest props.
 const MemoizedAnalysisWorkbench = memo(
-  AnalysisWorkbenchContent,
+  AnalysisWorkbenchView,
   (before, after) =>
     !before.active &&
     !after.active &&
@@ -1085,4 +1086,62 @@ const MemoizedAnalysisWorkbench = memo(
     before.cache === after.cache,
 );
 
-export { MemoizedAnalysisWorkbench as AnalysisWorkbenchContent };
+export { MemoizedAnalysisWorkbench as AnalysisWorkbenchView };
+
+/** Binds the workspace controller to the view Workspace mounts. */
+export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceController }) {
+  const {
+    w,
+    walletScanRevision,
+    analysisSessions,
+    workbench,
+    lockingWorkspace,
+    selected,
+    wallet,
+    change,
+    wRef,
+    tourStep,
+    analysisWorkspaceRef,
+  } = workspace;
+  const { showFindingOnGraph } = workspace.analysisActions;
+
+  if (!w) return null;
+  return (
+    <section
+      className="workbench-page"
+      hidden={workbench !== 'analysis' || !!tourStep}
+      ref={analysisWorkspaceRef}
+      id="analysis-workspace"
+      tabIndex={-1}
+      aria-label="Analysis workspace"
+    >
+      <AnalysisWorkbenchView
+        key={`${w.id}:${walletScanRevision}`}
+        cache={analysisSessions.current}
+        workspace={w}
+        active={workbench === 'analysis' && !lockingWorkspace}
+        selected={selected}
+        wallet={wallet}
+        onFindings={(findings) => change((current) => ({ ...current, findings }))}
+        onRecovered={(before, next) => {
+          if (
+            wRef.current?.id !== before.id ||
+            wRef.current.network !== before.network ||
+            lockingWorkspace
+          )
+            return;
+          let applied = false;
+          change((current) => {
+            if (current.transactions !== before.transactions) return current;
+            applied = true;
+            return { ...current, transactions: next.transactions };
+          });
+          // Evidence writes mark old findings stale. Install the rerun in the
+          // same synchronous action, retaining the single data-enrichment Undo.
+          if (applied) change((current) => ({ ...current, findings: next.findings }), false);
+        }}
+        onGraph={showFindingOnGraph}
+      />
+    </section>
+  );
+}

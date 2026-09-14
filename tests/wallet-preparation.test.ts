@@ -6,9 +6,9 @@ import { WorkspaceSessionStore } from '../src/App/Workspace/useWorkspaces';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  WalletWorkbenchContent,
-  type WalletWorkbenchContentProps,
-} from '../src/App/Workspace/Workbenches/Wallet/WalletWorkbenchContent';
+  WalletWorkbenchView,
+  type WalletWorkbenchViewProps,
+} from '../src/App/Workspace/Workbenches/Wallet/WalletWorkbench';
 
 describe('session wallet preparation', () => {
   it('renders a remounted warm wallet immediately, including after pagination', () => {
@@ -16,7 +16,7 @@ describe('session wallet preparation', () => {
     const wallet = workspace.wallets[0];
     const preparationCache = new WalletPreparationCache();
     const noop = () => {};
-    const props: WalletWorkbenchContentProps = {
+    const props: WalletWorkbenchViewProps = {
       workspace,
       wallet,
       preparationCache,
@@ -35,11 +35,11 @@ describe('session wallet preparation', () => {
       onAnalyze: noop,
       updateEvidence: noop,
     };
-    expect(renderToStaticMarkup(createElement(WalletWorkbenchContent, props))).toContain(
+    expect(renderToStaticMarkup(createElement(WalletWorkbenchView, props))).toContain(
       'Preparing wallet',
     );
     preparationCache.prepare(workspace, wallet, undefined, 2);
-    const html = renderToStaticMarkup(createElement(WalletWorkbenchContent, props));
+    const html = renderToStaticMarkup(createElement(WalletWorkbenchView, props));
     expect(html).not.toContain('Preparing wallet');
     expect(html).toContain('aria-label="Wallet sections"');
   });

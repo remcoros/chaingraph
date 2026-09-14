@@ -20,20 +20,21 @@ src/
       WorkspaceToolbar.tsx  workbench navigation, lookup and workspace actions
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
       WorkspaceTour.tsx     guided tour and example preview wiring
-      ChainData/            bounded evidence loading and cancellation
+      ChainData/            bounded evidence loading, spending notices and cancellation
       WorkspacePanel.tsx    workspace sidebar
       Entities/             entity browser and lookup form
       Inspector/            node, wallet and script inspection
-      Selection/            shared selection and visibility actions
+      Selection/            shared selection, scan-target and visibility actions
       Tags/                 workspace tag management
       Workbenches/
-        WalletWorkbench.tsx wallet integration and cross-workbench actions
-        GraphWorkbench.tsx  graph canvas, navigation and panel composition
-        AnalysisWorkbench.tsx analysis integration and cross-workbench actions
+        workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
         Wallet/             wallet overview, scan and preparation state
+          WalletWorkbench.tsx controller binding and the wallet workbench view
+          walletWorkbenchContext.ts shared context for the wallet panels
           Records/          address and UTXO panels
           Review/           review detail, flow and input loading
         Graph/              graph surface, controls and metadata projection
+          GraphWorkbench.tsx graph canvas, navigation and panel composition
           EntitiesPanel.tsx entity and wallet browsing controls
           InspectorPanel.tsx inspector, scan and wallet-record tabs
           InspectorPanelDetail.tsx selected node or wallet detail actions
@@ -47,6 +48,7 @@ src/
           ConnectionScan/   scan panel, runner, worker and bounded fetching
           Renderer/         adapter contract, Three.js, layout and picking
         Analysis/           analysis controls and reports
+          AnalysisWorkbench.tsx controller binding and the analysis workbench view
   Shared/
     Controls/               reusable controls and popovers
     Display/                amounts, identifiers, timestamps and evidence help
@@ -97,16 +99,19 @@ storage are separate from the server. Global styles live in `App/styles.css`, wo
 styles in `App/Workspace/Workbenches/workbenches.css`, and design tokens live
 in the root `tokens.css`. Tool configuration stays at the repository root.
 
-`App/useAppState.ts` owns app sessions, navigation, connection status and feedback.
-`App.tsx` reads these directly; Workspace consumes the app services it needs.
+`App/useAppState.ts` owns app sessions, navigation, connection status and feedback,
+and exports them as the `AppState` contract. `App.tsx` reads these directly;
+Workspace consumes the app services it needs.
 `Workspace/useWorkspace.tsx` owns shared state, selection, presentation hydration
 and workbench switching/focus. Workbench action modules implement Graph, Wallet
-and Analysis behavior over that state. Owned panels receive the Workspace
+and Analysis behavior over that state. Wallet and Analysis reach Graph only
+through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`, never
+through Graph's own modules. Each workbench file binds the controller to its own
+view, which keeps a props-driven contract that tests render directly. Owned panels receive the Workspace
 controller; reusable controls keep focused props. Workspace dialog and tour
 components bind that controller to their UI without owning another copy of state.
 The shared evidence-loading
 and flow-input hooks and transaction-fetch context live at Workspace scope. The
 dialog module exports modal and focus helpers used by
 other areas. Graph filter controls are also used by the entity browser, and
-Wallet category controls are used by Analysis. The inspector shares the
-transaction-flow stylesheet.
+Wallet category controls are used by Analysis.

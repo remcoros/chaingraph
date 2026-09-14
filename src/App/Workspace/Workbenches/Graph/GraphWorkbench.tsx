@@ -1,12 +1,12 @@
-import { formatBitcoinAmount } from '../../../Domain/Chain/amountFormat';
-import { Amount } from '../../../Shared/Display/Amount';
+import { formatBitcoinAmount } from '../../../../Domain/Chain/amountFormat';
+import { Amount } from '../../../../Shared/Display/Amount';
 import {
   RECENT_ADDRESS_GRAPH_LIMIT,
   selectedAddress as selectedAddressForHistory,
-} from '../../../Domain/Chain/addressHistory';
-import { GraphLegend } from './Graph/GraphLegend';
-import { GraphContextToolbar, type GraphContextSideCounts } from './Graph/GraphContextToolbar';
-import { GraphControls } from './Graph/GraphControls';
+} from '../../../../Domain/Chain/addressHistory';
+import { GraphLegend } from './GraphLegend';
+import { GraphContextToolbar, type GraphContextSideCounts } from './GraphContextToolbar';
+import { GraphControls } from './GraphControls';
 import { lazy, Suspense, useMemo } from 'react';
 import {
   ArrowLeft,
@@ -20,21 +20,21 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { FlowPanel } from './Graph/TransactionFlow/FlowPanel';
-import { hasActiveFilters, selectedWalletFilterIds } from '../../../Domain/Graph/graphFilters';
-import { applyBatchIcon } from '../../../Domain/Metadata/batchMetadata';
+import { FlowPanel } from './TransactionFlow/FlowPanel';
+import { hasActiveFilters, selectedWalletFilterIds } from '../../../../Domain/Graph/graphFilters';
+import { applyBatchIcon } from '../../../../Domain/Metadata/batchMetadata';
 import {
   FilterChips,
   GraphConnectionsAction,
   GraphFilterButton,
-} from './Graph/Filters/GraphFilterControls';
-import { GraphWalletFilter } from './Graph/Filters/GraphWalletFilter';
-import { transactionNodeIds } from '../../../Domain/Graph/visibility';
-import { outputNodeId, txNodeId } from '../../../Domain/types';
-import type { WorkspaceController } from '../useWorkspace';
-import { InspectorPanel } from './Graph/InspectorPanel';
-import { EntitiesPanel } from './Graph/EntitiesPanel';
-const GraphView = lazy(() => import('./Graph/GraphView'));
+} from './Filters/GraphFilterControls';
+import { GraphWalletFilter } from './Filters/GraphWalletFilter';
+import { transactionNodeIds } from '../../../../Domain/Graph/visibility';
+import { outputNodeId, txNodeId } from '../../../../Domain/types';
+import type { WorkspaceController } from '../../useWorkspace';
+import { InspectorPanel } from './InspectorPanel';
+import { EntitiesPanel } from './EntitiesPanel';
+const GraphView = lazy(() => import('./GraphView'));
 export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }) {
   const {
     graphFlowContext,
