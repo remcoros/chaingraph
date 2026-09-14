@@ -1084,13 +1084,13 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
     analysisSessions,
     workbench,
     lockingWorkspace,
-    selected,
     wallet,
     change,
     wRef,
     tourStep,
     analysisWorkspaceRef,
   } = workspace;
+  const { selected } = workspace.graphProjection;
   const { showFindingOnGraph } = workspace.analysisActions;
 
   if (!w) return null;

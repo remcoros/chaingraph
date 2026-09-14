@@ -19,21 +19,19 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     tourStep,
     w,
     selection,
-    selectionOnCanvas,
-    matchingScope,
-    graphFiltering,
     applyBatch,
     undoToken,
     undoDescription,
     setNotice,
     ws,
     connectionScanTargets,
-    visibleGraph,
-    backgroundAddressHistoryLoad,
     operation,
     operationRef,
     pendingGraphWorkspace,
   } = workspace;
+  const { selectionOnCanvas, matchingScope, graphFiltering, visibleGraph } =
+    workspace.graphProjection;
+  const { backgroundAddressHistoryLoad } = workspace.evidence;
   const { setEntityHidden, prepareIsolation, updateFilters } = workspace.graphActions;
 
   if (!w) return null;

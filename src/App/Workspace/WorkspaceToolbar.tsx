@@ -36,7 +36,6 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     queryError,
     setQueryError,
     loadedLookupId,
-    addQuery,
     prefetchDepth,
     setPrefetchDepth,
     undoLabel,
@@ -51,6 +50,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     setLockingWorkspace,
     setError,
   } = workspace;
+  const { addQuery } = workspace.evidence;
   useEffect(() => {
     if (!menu) return;
     const items = () =>

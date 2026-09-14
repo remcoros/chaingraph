@@ -10,8 +10,6 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     removableNodeIds,
     requestEntityRemoval,
     selection,
-    graph,
-    selected,
     changeTags,
     select,
     setMobilePanel,
@@ -33,6 +31,12 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     graphFilters,
     entityFiltersLinked,
     setEntityPanelFilters,
+    change,
+    bookmarks,
+  } = workspace;
+  const {
+    graph,
+    selected,
     recoveryGraph,
     visibleEntityCount,
     entityVisibility,
@@ -40,11 +44,9 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     visibleGraph,
     canvasFilterResult,
     graphFiltering,
-    change,
     entityNodes,
     entityBatchNodes,
-    bookmarks,
-  } = workspace;
+  } = workspace.graphProjection;
   const {
     updateFilters,
     resetEntityFilters,

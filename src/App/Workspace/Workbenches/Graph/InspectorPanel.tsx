@@ -33,10 +33,6 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     wallet,
     fetchScope,
     connectionScanTargets,
-    visibleGraph,
-    connectionMembers,
-    flowIndex,
-    connectionScanNeighbours,
     shownWorkbench,
     lockingWorkspace,
     canQuery,
@@ -50,6 +46,8 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     operation,
     rightPanelRef,
   } = workspace;
+  const { visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =
+    workspace.graphProjection;
   const { selectWalletRecord } = workspace.walletActions;
   const inspectorScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

@@ -9,9 +9,6 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     w,
     switchWorkbench,
     walletUtxoObservation,
-    addressBalance,
-    selected,
-    walletMatches,
     setNotice,
     setNoticeSequence,
     invalidateSelection,
@@ -26,16 +23,10 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     changeTags,
     setLeftTab,
     tx,
-    graph,
     operation,
     canTrace,
     queryDisabledReason,
     select,
-    expand,
-    getTransaction,
-    mergeTransactions,
-    run,
-    refreshAddressBalance,
     selectedRemovalPlan,
     requestEntityRemoval,
     change,
@@ -46,6 +37,9 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     tourStep,
     shownRightTab,
   } = workspace;
+  const { selected, walletMatches, graph } = workspace.graphProjection;
+  const { addressBalance, expand, getTransaction, mergeTransactions, run, refreshAddressBalance } =
+    workspace.evidence;
   const { revealGraphNodes, centerNode, setEntityHidden, updateFilters } = workspace.graphActions;
   const { showWalletActivity } = workspace.walletActions;
 
