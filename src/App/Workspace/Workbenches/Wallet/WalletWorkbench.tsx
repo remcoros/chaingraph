@@ -291,8 +291,15 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
   const [typeIds, setTypeIds] = useState<string[]>();
   const [notice, setNotice] = useState('');
   const detailRef = useRef<HTMLElement>(null);
-  const previousRow = useRef<WalletRow | undefined>(undefined);
-  const previousFilterScope = useRef<string | undefined>(undefined);
+  // The row this workbench settled on and the filters it was chosen under.
+  // Recording it is what lets a row that a metadata edit pushed out of the
+  // current filters stay on screen until the user navigates, changes filters,
+  // or decides.
+  const [shown, setShown] = useState<{
+    row: WalletRow | undefined;
+    scope: string | undefined;
+    selectedKey: string | undefined;
+  }>({ row: undefined, scope: undefined, selectedKey: undefined });
   const filterScopeFor = (reviewStatus: WalletStatusFilter) =>
     JSON.stringify([
       workspace.id,
@@ -465,20 +472,17 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
     tab === 'review' &&
     filteredRows.length === 0 &&
     !selectedKey &&
-    !previousRow.current &&
+    !shown.row &&
     canLoadChainData &&
     !utxos &&
     !utxoError;
-  // Metadata edits can remove a row from the current filters. Keep its live
-  // details available until the user navigates, changes filters, or decides.
   const retainedRow =
-    previousFilterScope.current === filterScope &&
-    (!selectedKey || selectedKey === previousRow.current?.key)
-      ? rows.find((row) => row.key === previousRow.current?.key)
+    shown.scope === filterScope && (!selectedKey || selectedKey === shown.row?.key)
+      ? rows.find((row) => row.key === shown.row?.key)
       : undefined;
   const currentRow = initialReviewLoading
     ? undefined
-    : (retainedRow ?? resolveWalletRow(filteredRows, selectedKey, previousRow.current));
+    : (retainedRow ?? resolveWalletRow(filteredRows, selectedKey, shown.row));
   const selectedRow = useMemo(
     () =>
       currentRow
@@ -518,22 +522,27 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
   const hiddenSelected = selectedRows.filter((row) => !filteredKeys.has(row.key)).length;
   const missingSelected = selection.ids.filter((id) => !rowKeys.has(id)).length;
   const batching = selection.ids.length > 0;
-  useEffect(() => {
-    if (batching) return;
-    const previous = previousRow.current;
+  // Record what this render settled on. Doing it here rather than in an effect
+  // keeps the row React renders and the row it remembers in step: an effect
+  // records after the fact, so the next render reads commit history instead of
+  // the value this one actually used. The recorded selection is the one this
+  // render saw, so snapping it below re-runs this block once and then settles.
+  if (
+    !batching &&
+    (shown.row !== currentRow || shown.scope !== filterScope || shown.selectedKey !== selectedKey)
+  ) {
     if (
       currentRow &&
       ((selectedKey && selectedKey !== currentRow.key) ||
-        (previous?.kind === 'output' &&
-          !previous.address &&
+        (shown.row?.kind === 'output' &&
+          !shown.row.address &&
           currentRow.kind === 'address' &&
-          currentRow.outpointIds?.includes(previous.nodeId) &&
-          (!selectedKey || selectedKey === previous.key)))
+          currentRow.outpointIds?.includes(shown.row.nodeId) &&
+          (!selectedKey || selectedKey === shown.row.key)))
     )
       setSelectedKey(currentRow.key);
-    previousRow.current = currentRow;
-    previousFilterScope.current = filterScope;
-  }, [batching, currentRow, selectedKey, filterScope]);
+    setShown({ row: currentRow, scope: filterScope, selectedKey });
+  }
   const tabLabel = TABS.find((item) => item.id === tab)!.label;
   const statusTotals = useMemo(
     () =>
@@ -561,8 +570,7 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
     setTab(next);
     selection.clear();
     setSelectedKey(undefined);
-    previousRow.current = undefined;
-    previousFilterScope.current = undefined;
+    setShown({ row: undefined, scope: undefined, selectedKey: undefined });
     setQuery('');
     setLabelFilter('all');
     setTagFilter('all');
@@ -579,8 +587,11 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
       const reopened =
         tab === 'review' ? rows.find((row) => row.key === items[0]?.key) : selectedRow;
       setSelectedKey(reopened?.key);
-      previousRow.current = reopened;
-      previousFilterScope.current = filterScopeFor('open');
+      setShown({
+        row: reopened,
+        scope: filterScopeFor('open'),
+        selectedKey: reopened?.key,
+      });
     } else if (selectedRow) {
       const decided = new Set(items.map((item) => item.key));
       const index = filteredRows.findIndex((row) => row.key === selectedRow.key);
@@ -591,8 +602,7 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
       setSelectedKey(
         following.find((row) => !row.reviews.some((item) => decided.has(item.key)))?.key,
       );
-      previousRow.current = undefined;
-      previousFilterScope.current = undefined;
+      setShown({ row: undefined, scope: undefined, selectedKey: undefined });
     }
     setNotice(
       `${action === 'reopen' ? 'Reopened' : action === 'reviewed' ? 'Reviewed' : 'Set aside'} ${items.length} review item${items.length === 1 ? '' : 's'}.`,

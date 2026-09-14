@@ -16,6 +16,7 @@ import {
 } from '../src/Domain/Wallet/walletWorkbenchRows';
 import { PUBLIC_ZPUB } from './fixtures/bitcoin';
 import { addressNodeId, outputNodeId, type Wallet } from '../src/Domain/types';
+import type { WalletRow } from '../src/Domain/Wallet/walletWorkbenchRows';
 import { buildWalletReview } from '../src/Domain/Wallet/walletReview';
 import { groupWalletRelationships } from '../src/Domain/Wallet/walletRelationships';
 import { matchRelatedEntities } from '../src/Domain/Wallet/walletReviewContext';
@@ -126,6 +127,46 @@ describe('shared Wallet rows', () => {
     expect(resolveWalletRow([address, resolved], address.key, missing)).toBe(address);
     expect(resolveWalletRow([address], missing.key, missing)).toBe(address);
     expect(resolveWalletRow([resolved, address], undefined, address)).toBe(address);
+  });
+
+  it('settles on its own result, so the workbench stops re-resolving the row it shows', () => {
+    const { workspace, wallet } = fixture();
+    workspace.walletReviews = {
+      [`${wallet.id}|funding-source|${'9'.repeat(64)}:0`]: {
+        status: 'later',
+        at: '2026-09-09T00:00:00Z',
+        evidence: 'previously-saved',
+      },
+    };
+    const missing = reviewRow(
+      buildWalletReview(workspace, wallet).items.find(
+        (item) => item.reason === 'funding-source' && !item.address,
+      )!,
+    );
+    const [first, second] = buildWalletRecordRows(workspace, wallet, [], []).addresses;
+    const resolved = { ...first, key: 'resolved', outpointIds: [missing.nodeId] };
+    const rows = [first, second, resolved];
+    // The workbench records the row it settled on and resolves again from that
+    // record. Anything that did not settle would keep proposing a different row
+    // and never finish rendering, so every starting point must be a fixed point
+    // after one pass.
+    const starts: [string | undefined, WalletRow | undefined][] = [
+      [second.key, undefined],
+      [undefined, first],
+      ['no-longer-listed', missing],
+      [undefined, missing],
+      [undefined, undefined],
+    ];
+    for (const [key, previous] of starts) {
+      const settled = resolveWalletRow(rows, key, previous);
+      expect(settled).toBeDefined();
+      expect(resolveWalletRow(rows, key, settled)).toBe(settled);
+    }
+  });
+
+  it('has no row to offer while nothing is listed', () => {
+    expect(resolveWalletRow([], undefined, undefined)).toBeUndefined();
+    expect(resolveWalletRow([], 'no-longer-listed', undefined)).toBeUndefined();
   });
 
   it('toggles all matching rows without clearing hidden selections on unselect', () => {
