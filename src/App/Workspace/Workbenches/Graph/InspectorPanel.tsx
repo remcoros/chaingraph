@@ -5,6 +5,17 @@ import {
 } from '../../../../Domain/ConnectionScan/connectionScanAddition';
 import { WalletRecordsPanel } from '../Wallet/Records/WalletRecordsPanel';
 import { useLayoutEffect, useRef } from 'react';
+import {
+  ArrowLeftRight,
+  ArrowRightFromLine,
+  Box,
+  Coins,
+  Layers,
+  MapPin,
+  PanelRight,
+  ScanLine,
+  Wallet as WalletIcon,
+} from 'lucide-react';
 import { type Transaction, type Workspace } from '../../../../Domain/types';
 import type { WorkspaceController } from '../../useWorkspace';
 import { InspectorPanelDetail } from './InspectorPanelDetail';
@@ -42,9 +53,19 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   const { setFocusRequest } = workspace.graph.canvas;
   const { setGraph: setGraphFilters } = workspace.graph.filters;
   const { selectedId, selectedWallet, select } = workspace.selection;
-  const { visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =
+  const { selected, visibleGraph, connectionMembers, flowIndex, connectionScanNeighbours } =
     workspace.graph.projection;
   const { selectWalletRecord } = workspace.wallet.actions;
+  const inspectorTab = selected
+    ? selected.kind === 'transaction'
+      ? { label: 'Transaction', Icon: Box }
+      : selected.kind === 'output'
+        ? { label: 'Output', Icon: ArrowRightFromLine }
+        : { label: 'Address', Icon: Layers }
+    : wallet
+      ? { label: 'Wallet', Icon: WalletIcon }
+      : { label: 'No selection', Icon: PanelRight };
+  const InspectorTabIcon = inspectorTab.Icon;
   const inspectorScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
@@ -61,14 +82,14 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
           className={shownRightTab === 'inspect' ? 'active' : ''}
           onClick={() => setRightTab('inspect')}
         >
-          Inspector
+          <InspectorTabIcon size={15} aria-hidden="true" /> {inspectorTab.label}
         </button>
         <button
           className={shownRightTab === 'scan' ? 'active' : ''}
           aria-pressed={shownRightTab === 'scan'}
           onClick={() => setRightTab('scan')}
         >
-          Scan
+          <ScanLine size={15} aria-hidden="true" /> Scan
         </button>
         {wallet && (
           <>
@@ -77,21 +98,21 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
               aria-pressed={shownRightTab === 'addresses'}
               onClick={() => setRightTab('addresses')}
             >
-              Addresses
+              <MapPin size={15} aria-hidden="true" /> Addresses
             </button>
             <button
               className={shownRightTab === 'transactions' ? 'active' : ''}
               aria-pressed={shownRightTab === 'transactions'}
               onClick={() => setRightTab('transactions')}
             >
-              Transactions
+              <ArrowLeftRight size={15} aria-hidden="true" /> Transactions
             </button>
             <button
               className={shownRightTab === 'utxos' ? 'active' : ''}
               aria-pressed={shownRightTab === 'utxos'}
               onClick={() => setRightTab('utxos')}
             >
-              UTXOs
+              <Coins size={15} aria-hidden="true" /> UTXOs
             </button>
           </>
         )}

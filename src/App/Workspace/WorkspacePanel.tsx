@@ -6,6 +6,7 @@ import {
   Plus,
   Pencil,
   RefreshCw,
+  Shapes,
   ShieldCheck,
   Wallet as WalletIcon,
 } from 'lucide-react';
@@ -121,20 +122,30 @@ export function WorkspacePanel({
 }: Props) {
   return (
     <aside className="left-panel" data-tour="wallet-panel">
-      <div className="panel-tabs">
-        <button
-          data-testid="panel-tab-wallets"
-          className={leftTab === 'wallets' ? 'active' : ''}
-          onClick={() => setLeftTab('wallets')}
-        >
-          Wallets <span>{activeWorkspace.wallets.length}</span>
-        </button>
+      <div className="panel-tabs left-panel-tabs">
         <button
           data-testid="panel-tab-entities"
           className={leftTab === 'entities' ? 'active' : ''}
           onClick={() => setLeftTab('entities')}
         >
-          Entities
+          <Shapes size={15} aria-hidden="true" /> Entities
+        </button>
+        <button
+          data-testid="panel-tab-tags"
+          className={leftTab === 'tags' ? 'active' : ''}
+          onClick={() => setLeftTab('tags')}
+        >
+          <Tag size={15} aria-hidden="true" /> Tags
+        </button>
+        <button
+          data-testid="panel-tab-wallets"
+          className={leftTab === 'wallets' ? 'active icon-button' : 'icon-button'}
+          aria-label={`Wallets, ${activeWorkspace.wallets.length}`}
+          title="Wallets"
+          onClick={() => setLeftTab('wallets')}
+        >
+          <WalletIcon size={15} aria-hidden="true" />
+          <span>{activeWorkspace.wallets.length}</span>
         </button>
         <button
           data-testid="panel-tab-bookmarks"
@@ -143,15 +154,6 @@ export function WorkspacePanel({
           onClick={() => setLeftTab('bookmarks')}
         >
           <Bookmark size={15} />
-        </button>
-        <button
-          data-testid="panel-tab-tags"
-          className={leftTab === 'tags' ? 'active icon-button' : 'icon-button'}
-          aria-label="Tags"
-          title="Tags"
-          onClick={() => setLeftTab('tags')}
-        >
-          <Tag size={15} />
         </button>
       </div>
       {leftTab === 'tags' ? (
@@ -209,7 +211,7 @@ export function WorkspacePanel({
             {activeWorkspace.wallets.length === 0 && (
               <div className="empty-panel">
                 <WalletIcon size={27} />
-                <h3>Wallets monitorActivity here</h3>
+                <h3>Wallets monitor activity here</h3>
                 <p>Add multiple wallets to trace how their histories connect.</p>
               </div>
             )}
@@ -337,7 +339,7 @@ export function WorkspacePanel({
       )}
       <div className="panel-bottom">
         <ShieldCheck size={14} />
-        {activeWorkspace.demo ? 'Synthetic data only' : 'Watch-only · your own node'}
+        {activeWorkspace.demo ? 'Synthetic data only' : 'Watch-only · your node'}
       </div>
     </aside>
   );

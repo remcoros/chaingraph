@@ -1,7 +1,7 @@
 import './component-styles';
 import { TransactionFetchShell } from './Workspace/useTransactionFetch';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
-import { FolderOpen, Network as NetworkIcon, Plus, X } from 'lucide-react';
+import { BookOpen, FolderOpen, Info, Library, Network as NetworkIcon, Plus, X } from 'lucide-react';
 import { CreateDialog, ImportDialog, UnlockDialog, Modal } from './Dialogs';
 import { HelpMenu } from './Help/HelpMenu';
 import { AboutDialog } from './Help/AboutDialog';
@@ -112,15 +112,21 @@ export default function App() {
           actions={[
             {
               label: activeWorkspace ? 'Show guided tour' : 'Getting started',
+              icon: <BookOpen size={15} aria-hidden="true" />,
               onSelect: () =>
                 activeWorkspace ? workspace.tour.start() : app.setAboutOpen('guide'),
             },
             {
               label: 'Example workspaces',
+              icon: <Library size={15} aria-hidden="true" />,
               disabled: !!app.discoveryError || !app.networks?.length,
               onSelect: () => app.setExamplesOpen(true),
             },
-            { label: 'About Chaingraph', onSelect: () => app.setAboutOpen('about') },
+            {
+              label: 'About Chaingraph',
+              icon: <Info size={15} aria-hidden="true" />,
+              onSelect: () => app.setAboutOpen('about'),
+            },
           ]}
         />
       </header>

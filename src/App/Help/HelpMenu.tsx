@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CircleHelp } from 'lucide-react';
 import { ACCENT_THEMES, applyAccentTheme, readAccentTheme, type AccentTheme } from '../accentTheme';
 
@@ -12,6 +12,7 @@ const ACCENT_THEME_LABELS: Record<AccentTheme, string> = {
 
 export interface HelpAction {
   label: string;
+  icon?: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
 }
@@ -130,6 +131,7 @@ export function HelpMenu({ actions }: { actions: HelpAction[] }) {
                 action.onSelect();
               }}
             >
+              {action.icon}
               {action.label}
             </button>
           ))}

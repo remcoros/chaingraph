@@ -1,32 +1,25 @@
-# Chaingraph
+# Chaingraph 
 
-Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to
-understand their own wallets and follow activity on chain. 
+<div align="center"><img src="public/favicon.svg" width="80px" /></div>
 
-Import an extended
-public key, see where your coins came from and where they went, label and tag
-what you recognize, and explore transactions in an interactive 3D graph. 
+Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to understand their wallets and follow activity on chain. 
 
-It runs
-against your own Bitcoin Core node and Electrum server, and everything you save
-stays encrypted in your browser.
+It runs against your Bitcoin Core node and Electrum server, and everything you save stays encrypted in your browser.
 
-![Chaingraph workbench](docs/screenshots/readme-graph.png)
-
-Chaingraph is not a custodial wallet or a public service. It never touches private keys, cannot sign or spend, and does not identify people. 
+> Chaingraph is not a custodial wallet or a public service. It never touches private keys, cannot sign or spend, and does not identify people.
 
 ## What you can do
+
+- **Explore transactions.** Look up a transaction, address or output in a 3D or
+  flat graph. Filter the view, follow funding and spending links, and inspect
+  bounded address history.
+  <img src="docs/screenshots/readme-graph.png" />
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level
   extended public key. Chaingraph derives addresses in the browser, scans their
   activity through your node, and gives you a review queue for UTXOs, used
   addresses, sources and destinations.
-
-![Wallet review queue](docs/screenshots/readme-wallet.png)
-
-- **Explore transactions.** Look up a transaction, address or output in a 3D or
-  flat graph. Filter the view, follow funding and spending links, and inspect
-  bounded address history.
+  <img src="docs/screenshots/readme-wallet.png" />
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
   outputs and addresses. Undo and redo edits in the current session, or exchange
