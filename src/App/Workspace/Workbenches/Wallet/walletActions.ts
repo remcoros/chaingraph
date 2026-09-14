@@ -14,13 +14,13 @@ import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
 import type { GraphHandoff } from '../workbenchHandoff';
-import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+import type { ChainFetch } from '../../ChainData/useChainFetch';
 interface Inputs {
   core: WorkspaceCore;
   selection: WorkspaceSelection;
   /** Everything this workbench needs to hand a record over to Graph. */
   handoff: GraphHandoff;
-  evidence: WorkspaceEvidence;
+  fetch: ChainFetch;
   wallet: Wallet | undefined;
   shownRightTab: NonNullable<Workspace['view']['rightTab']>;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
@@ -32,7 +32,7 @@ export function createWalletActions({
   core,
   selection: workspaceSelection,
   handoff,
-  evidence,
+  fetch,
   wallet,
   shownRightTab,
   setGraphFilters,
@@ -58,7 +58,7 @@ export function createWalletActions({
     graph,
     recoveryGraph,
   } = handoff;
-  const { mergeTransactions, run } = evidence;
+  const { mergeTransactions, run } = fetch;
 
   function selectWalletRecord(
     nodeId: string,

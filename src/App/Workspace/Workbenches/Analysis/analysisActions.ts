@@ -10,12 +10,12 @@ import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
 import type { GraphHandoff } from '../workbenchHandoff';
-import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+import type { ChainFetch } from '../../ChainData/useChainFetch';
 interface Inputs {
   core: WorkspaceCore;
   selection: WorkspaceSelection;
   handoff: GraphHandoff;
-  evidence: WorkspaceEvidence;
+  fetch: ChainFetch;
   canLoadChainData: boolean;
   operationRef: RefObject<AbortController | undefined>;
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
@@ -26,7 +26,7 @@ export function createAnalysisActions({
   core,
   selection,
   handoff,
-  evidence,
+  fetch,
   canLoadChainData,
   operationRef,
   recordHandoffInvoker,
@@ -36,7 +36,7 @@ export function createAnalysisActions({
   const { activeWorkspace, activeWorkspaceRef, workspaces, setNotice } = core;
   const { generation: selectionGeneration } = selection;
   const { showOnGraph, loadGraphTransactions } = handoff;
-  const { mergeTransactions, run } = evidence;
+  const { mergeTransactions, run } = fetch;
 
   function showFindingOnGraph(ids: string[], isolate = false, supportingTxids: string[] = []) {
     const current = activeWorkspace && workspaces.getUnlocked(activeWorkspace.id)?.data;

@@ -7,7 +7,7 @@ import { loadAddress, scanWallet } from '../../../../Infra/Bitcoin/api';
 import type { RefObject } from 'react';
 
 import type { AppState } from '../../../useAppState';
-import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+import type { ChainFetch } from '../../ChainData/useChainFetch';
 import type { WorkspaceCore } from '../../workspaceCore';
 /**
  * Address discovery for wallets: derive branches, pull their history and
@@ -28,7 +28,7 @@ export interface WalletDiscovery {
 }
 interface Inputs {
   core: WorkspaceCore;
-  evidence: WorkspaceEvidence;
+  fetch: ChainFetch;
   fetchScope: AppState['fetchScope'];
   canLoadChainData: boolean;
   operationRef: RefObject<AbortController | undefined>;
@@ -37,7 +37,7 @@ interface Inputs {
 }
 export function useWalletActivity({
   core,
-  evidence,
+  fetch,
   fetchScope,
   canLoadChainData,
   operationRef,
@@ -45,7 +45,7 @@ export function useWalletActivity({
 }: Inputs): WalletDiscovery {
   const { activeWorkspace, activeWorkspaceRef, workspaceId, workspaces, setOperation, setNotice } =
     core;
-  const { run, mergeTransactions } = evidence;
+  const { run, mergeTransactions } = fetch;
 
   const [gapLimit, setGapLimit] = useState(20);
   const [addressesPerBranch, setAddressesPerBranch] = useState(200);

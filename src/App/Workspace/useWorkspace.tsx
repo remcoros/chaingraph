@@ -33,7 +33,9 @@ import type { WorkbenchMode } from './workbenchTypes';
 import { download } from '../../Infra/Storage/download';
 import { isModalOpen } from '../../Shared/Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
-import { useWorkspaceEvidence } from './ChainData/useWorkspaceEvidence';
+import { useChainFetch } from './ChainData/useChainFetch';
+import { useAddressRecord } from './ChainData/useAddressRecord';
+import { useGraphExpansion } from './ChainData/useGraphExpansion';
 import { useWalletActivity } from './Workbenches/Wallet/useWalletActivity';
 import { useGraphActions } from './Workbenches/Graph/useGraphActions';
 import { createWalletActions } from './Workbenches/Wallet/walletActions';
@@ -408,22 +410,34 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       selectedId,
     ],
   );
-  const workspaceEvidence = useWorkspaceEvidence({
+  const chainFetch = useChainFetch({ core, fetchScope, operationRef });
+  const addressRecord = useAddressRecord({
     core,
     selection,
     lookup,
+    fetch: chainFetch,
     setGraphFilters,
     setFocusRequest,
     selected,
-    recoveryGraph,
     fetchScope,
     operationRef,
     canLoadChainData,
-    canTraceAncestry,
     prefetchDepth,
     revealLookup,
   });
-  const { run } = workspaceEvidence;
+  const graphExpansion = useGraphExpansion({
+    core,
+    selection,
+    fetch: chainFetch,
+    setGraphFilters,
+    setFocusRequest,
+    recoveryGraph,
+    fetchScope,
+    canTraceAncestry,
+  });
+  // What the workbenches read as one chain-data surface.
+  const workspaceEvidence = { ...chainFetch, ...addressRecord, ...graphExpansion };
+  const { run } = chainFetch;
   const flowInputs = useFlowInputs({
     workspace: activeWorkspace,
     selected,
@@ -472,7 +486,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   }
   const walletDiscovery = useWalletActivity({
     core,
-    evidence: workspaceEvidence,
+    fetch: chainFetch,
     fetchScope,
     canLoadChainData,
     operationRef,
@@ -488,7 +502,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     canvas: graphCanvas,
     scanTargets: connectionScanTargets,
     annotations,
-    evidence: workspaceEvidence,
+    fetch: chainFetch,
     viewOwner,
   });
   function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {
@@ -525,7 +539,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     core,
     selection,
     handoff: graphHandoff,
-    evidence: workspaceEvidence,
+    fetch: chainFetch,
     wallet,
     shownRightTab,
     setGraphFilters,
@@ -540,7 +554,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     core,
     selection,
     handoff: graphHandoff,
-    evidence: workspaceEvidence,
+    fetch: chainFetch,
     canLoadChainData,
     operationRef,
     recordHandoffInvoker,
@@ -569,10 +583,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     analysis: { ...analysis, actions: analysisActions },
     selection,
     annotations,
+    evidence: workspaceEvidence,
     history,
     dialogs,
     lookup,
-    evidence: workspaceEvidence,
+    fetch: chainFetch,
     activeWorkspace,
     switchWorkbench,
     setNotice,

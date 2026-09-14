@@ -23,7 +23,7 @@ import { entityPanelFiltersFromGraph } from './Filters/entityPanelFilters';
 import { ADDRESS_DISPLAY_NOTICE } from '../../workspaceNotices';
 
 import type { GraphProjection } from './useGraphProjection';
-import type { WorkspaceEvidence } from '../../ChainData/useWorkspaceEvidence';
+import type { ChainFetch } from '../../ChainData/useChainFetch';
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 import type { ConnectionScanTargets } from '../../Selection/useConnectionScanTargets';
@@ -40,7 +40,7 @@ interface Inputs {
   canvas: GraphCanvas;
   scanTargets: ConnectionScanTargets;
   annotations: WorkspaceAnnotations;
-  evidence: WorkspaceEvidence;
+  fetch: ChainFetch;
   viewOwner: string | undefined;
 }
 export function useGraphActions({
@@ -52,7 +52,7 @@ export function useGraphActions({
   canvas,
   scanTargets,
   annotations,
-  evidence,
+  fetch,
   viewOwner,
 }: Inputs) {
   const {
@@ -90,7 +90,7 @@ export function useGraphActions({
   const { cancelPicking: cancelScanTargetPicking } = scanTargets;
   const { edit: metadataEdit } = annotations;
   const requestMetadataEdit = metadataEdit.request;
-  const { getTransaction, run } = evidence;
+  const { getTransaction, run } = fetch;
 
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
