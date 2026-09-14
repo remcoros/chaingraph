@@ -49,6 +49,7 @@ src/
           Renderer/         adapter contract, Three.js, layout and picking
         Analysis/           analysis controls and reports
           AnalysisWorkbench.tsx controller binding and the analysis workbench view
+          analysisSession.ts  retained scan, scope and reader filters per workspace
   Shared/
     Controls/               reusable controls and popovers
     Display/                amounts, identifiers, timestamps and evidence help

@@ -27,6 +27,7 @@ import {
   type AnalysisScopeWallet,
   type AnalysisScopeWorkspace,
 } from '../../../../Domain/Analysis/analysisScan';
+import type { AnalysisSession } from './analysisSession';
 import { formatLocalTimestamp } from '../../../../Domain/Chain/transactionTime';
 import {
   addressNodeId,
@@ -91,22 +92,9 @@ function FindingGuidance({ guidance }: { guidance: NonNullable<AnalysisFinding['
   );
 }
 
-export interface AnalysisWorkbenchViewSession {
-  scopeMode?: string;
-  options: ReturnType<typeof scanDefaults>;
-  scan?: AnalysisScan;
-  selectedId?: string;
-  kind: string;
-  types?: string[];
-  priorities?: ReviewPriority[];
-  notice?: string;
-  limit: number;
-  autoLoad?: boolean;
-}
-
 export interface AnalysisWorkbenchViewProps {
   active: boolean;
-  cache?: Map<string, AnalysisWorkbenchViewSession>;
+  cache?: Map<string, AnalysisSession>;
   workspace: Workspace;
   selected?: GraphNode;
   wallet?: Wallet;
