@@ -1,8 +1,8 @@
-import { SelectedTags } from '../../Tags/TagsPanel';
+import { SelectedTags } from '../../../Tags/TagsPanel';
 import { ChevronRight, Eye } from 'lucide-react';
-import { NodeInspector, WalletInspector } from '../../Inspector/Inspector';
-import { pruneWalletReviews } from '../../../../Domain/Wallet/walletReview';
-import type { WorkspaceController } from '../../useWorkspace';
+import { NodeInspector, WalletInspector } from './Inspector';
+import { pruneWalletReviews } from '../../../../../Domain/Wallet/walletReview';
+import type { WorkspaceController } from '../../../useWorkspace';
 
 export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceController }) {
   const {

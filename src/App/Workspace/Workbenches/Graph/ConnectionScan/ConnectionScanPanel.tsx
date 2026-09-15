@@ -57,9 +57,9 @@ import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
 import { prepareCustomScanTargets } from '../../../../../Domain/ConnectionScan/connectionScanTargets';
 import { prepareNeighbourScanTargets } from '../../../../../Domain/ConnectionScan/connectionScanNeighbours';
-import { WalletHelp } from '../../../../../Shared/Display/WalletHelp';
-import { CopyButton } from '../../../../../Shared/Controls/CopyButton';
-import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
+import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
+import { CopyButton } from '../../../../Controls/CopyButton';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './connection-scan.css';
 
 const titles: Record<ScanResultFinding, string> = {

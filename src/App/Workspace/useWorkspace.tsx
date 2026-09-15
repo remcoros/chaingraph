@@ -31,7 +31,7 @@ import { useTour } from '../Help/useTour';
 import type { useAppState } from '../useAppState';
 import type { WorkbenchMode } from './workbenchTypes';
 import { download } from '../../Infra/Storage/download';
-import { isModalOpen } from '../../Shared/Controls/useDialogFocus';
+import { isModalOpen } from '../Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
 import { useChainFetch } from './ChainData/useChainFetch';
 import { useAddressRecord } from './ChainData/useAddressRecord';

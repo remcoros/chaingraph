@@ -1,8 +1,8 @@
 import { useState, useRef, type ReactNode, type RefObject } from 'react';
 import { Box, Bookmark, Layers } from 'lucide-react';
-import { Amount } from '../../../../../Shared/Display/Amount';
-import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
-import { TransactionBlockTime } from '../../../../../Shared/Display/TransactionBlockTime';
+import { Amount } from '../../../../Controls/Display/Amount';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
+import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import {
   addressBalanceSats,

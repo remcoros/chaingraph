@@ -21,7 +21,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { Amount } from '../../../../../Shared/Display/Amount';
+import { Amount } from '../../../../Controls/Display/Amount';
 import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import { matchingWalletUtxoObservation } from '../../../../../Domain/Wallet/walletUtxoObservation';
 import { SmallAmountControl } from '../SmallAmountControl';
@@ -29,7 +29,7 @@ import { isSmallAmount } from '../../../../../Domain/Graph/smallAmounts';
 import {
   TransactionBlockTime,
   TransactionFeeLabel,
-} from '../../../../../Shared/Display/TransactionBlockTime';
+} from '../../../../Controls/Display/TransactionBlockTime';
 import {
   type Transaction,
   type TxOutput,
@@ -42,12 +42,12 @@ import { indexLoadedSpends, selectedFlowLeg } from '../../../../../Domain/Chain/
 import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../../Domain/Chain/prevouts';
 import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
 import { outputAddress } from '../../../../../Domain/Workspace/workspace';
-import { CopyButton } from '../../../../../Shared/Controls/CopyButton';
-import { OpReturnData } from '../../../../../Shared/Display/OpReturnData';
+import { CopyButton } from '../../../../Controls/CopyButton';
+import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { SelectionCheckbox } from '../../../Selection/SelectionToolbar';
-import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
-import { BatchTagEditor, MetadataPopover } from '../../../../../Shared/Metadata/MetadataEditors';
-import { IconPalette } from '../../../../../Shared/Metadata/IconPicker';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
+import { BatchTagEditor, MetadataPopover } from '../../../../Controls/Metadata/MetadataEditors';
+import { IconPalette } from '../../../../Controls/Metadata/IconPicker';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
 import type { GraphNode, TransactionFlowState, Workspace } from '../../../../../Domain/types';
 import type { WalletUtxoObservation } from '../../../../../Domain/Wallet/walletUtxoObservation';

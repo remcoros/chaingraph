@@ -9,7 +9,7 @@ import { decryptWorkspaceOffThread } from '../Infra/Storage/workspaceEncryptionC
 import { WorkspaceOperationError } from '../Infra/Storage/workspaceOperationError';
 import type { SavedWorkspace } from './Workspace/useWorkspaces';
 import { formatLocalTimestamp } from '../Domain/Chain/transactionTime';
-import { useDialogFocus } from '../Shared/Controls/useDialogFocus';
+import { useDialogFocus } from './Controls/useDialogFocus';
 import './dialogs.css';
 export function Modal({
   title,

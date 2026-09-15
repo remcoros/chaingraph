@@ -1,5 +1,5 @@
-import { Amount } from '../../../../../Shared/Display/Amount';
-import { TransactionBlockTime } from '../../../../../Shared/Display/TransactionBlockTime';
+import { Amount } from '../../../../Controls/Display/Amount';
+import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import {
   formatLocalTimestamp,
   walletRecordBlockObservation,
@@ -14,7 +14,7 @@ import {
   type WalletUtxoRecord,
 } from '../../../../../Domain/Wallet/walletRecords';
 import type { WalletUtxoController } from '../useWalletUtxos';
-import { ResponsiveIdentifier } from '../../../../../Shared/Display/ResponsiveIdentifier';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './wallet-records.css';
 
 export type WalletRecordsTab = 'addresses' | 'transactions' | 'utxos';

@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { BatchMetadataBar } from '../src/App/Workspace/Workbenches/Wallet/Review/BatchMetadataBar';
-import { IconPicker } from '../src/Shared/Metadata/IconPicker';
+import { IconPicker } from '../src/App/Controls/Metadata/IconPicker';
 import { SelectionToolbar } from '../src/App/Workspace/Selection/SelectionToolbar';
 import { WalletReviewFlow } from '../src/App/Workspace/Workbenches/Wallet/Review/WalletReviewFlow';
 import type {

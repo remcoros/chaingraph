@@ -18,14 +18,14 @@ import {
   BatchTagEditor,
   ColorPicker,
   MetadataPopover,
-} from '../../../Shared/Metadata/MetadataEditors';
+} from '../../Controls/Metadata/MetadataEditors';
 import { DEFAULT_TAG_COLOR } from '../../../Domain/Metadata/tagColors';
 import './tags.css';
 import { applyBatchTag } from '../../../Domain/Metadata/batchMetadata';
 import { canonicalAddress } from '../../../Domain/Metadata/entityReferences';
 import { Modal } from '../../Dialogs';
-import { useDialogFocus } from '../../../Shared/Controls/useDialogFocus';
-import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
+import { useDialogFocus } from '../../Controls/useDialogFocus';
+import { ResponsiveIdentifier } from '../../Controls/Display/ResponsiveIdentifier';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
 type TagValue = { name: string; color: string; description: string };

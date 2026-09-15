@@ -1,5 +1,5 @@
-import { Amount } from '../../../../Shared/Display/Amount';
-import { TransactionBlockTime } from '../../../../Shared/Display/TransactionBlockTime';
+import { Amount } from '../../../Controls/Display/Amount';
+import { TransactionBlockTime } from '../../../Controls/Display/TransactionBlockTime';
 import {
   ArrowLeftFromLine,
   CheckSquare,
@@ -21,7 +21,7 @@ import {
   type Transaction,
   type Workspace,
 } from '../../../../Domain/types';
-import { ResponsiveIdentifier } from '../../../../Shared/Display/ResponsiveIdentifier';
+import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './graph.css';
 import type { GraphFlowContext } from './Renderer/flowContext';
 import { VisibilityActions, type VisibilityProps } from '../../Selection/VisibilityActions';

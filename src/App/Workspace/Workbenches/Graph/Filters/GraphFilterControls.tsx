@@ -9,8 +9,8 @@ import {
   type FilterKey,
 } from '../../../../../Domain/Graph/graphFilters';
 import type { GraphFilters } from '../../../../../Domain/types';
-import { AnchoredPopover } from '../../../../../Shared/Controls/AnchoredPopover';
-import { Amount } from '../../../../../Shared/Display/Amount';
+import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
+import { Amount } from '../../../../Controls/Display/Amount';
 import { WalletFilterOptions } from './GraphWalletFilter';
 import './graph-filters.css';
 

@@ -7,8 +7,8 @@ import {
   BatchLabelEditor,
   BatchTagEditor,
   MetadataPopover,
-} from '../../../Shared/Metadata/MetadataEditors';
-import { IconPicker } from '../../../Shared/Metadata/IconPicker';
+} from '../../Controls/Metadata/MetadataEditors';
+import { IconPicker } from '../../Controls/Metadata/IconPicker';
 import type { EntitySelection } from './useEntitySelection';
 import './selection-toolbar.css';
 

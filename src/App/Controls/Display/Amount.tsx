@@ -1,4 +1,4 @@
-import { formatBitcoinAmount, formatSats } from '../../Domain/Chain/amountFormat';
+import { formatBitcoinAmount, formatSats } from '../../../Domain/Chain/amountFormat';
 
 /** Shared amount text and exact satoshi tooltip, without adding an interactive control. */
 export function Amount({

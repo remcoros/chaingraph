@@ -13,6 +13,9 @@ src/
     FrontPage/              saved workspace list (WorkspaceHome)
     Examples/               example picker and creation worker
     Help/                   help menu, about dialog and guided tour
+    Controls/               reusable App-owned controls, display and metadata UI
+      Display/              amounts, identifiers, timestamps and evidence help
+      Metadata/             annotation, icon and metadata editors
     Workspace/
       Workspace.tsx         toolbar, workbenches and shared status surfaces
       useWorkspace.tsx      shared state, selection and workbench coordination
@@ -26,9 +29,7 @@ src/
       useWorkspaceHistory.ts undo, redo and single-step batch edits
       useDialogState.ts     which workspace dialog is open and its target
 
-      WorkspacePanel.tsx    workspace sidebar
-      Entities/             entity browser and lookup form
-      Inspector/            node, wallet and script inspection
+      LookupForm.tsx        Workspace toolbar lookup form
       Selection/            shared selection, connection-scan targets and visibility
       Annotations/          labels, tags, icons, bookmarks and BIP329 exchange
       Tags/                 workspace tag management
@@ -41,13 +42,21 @@ src/
           useWalletAnalysis.ts wallet-scoped analysis runs
           Records/          address and UTXO panels
           Review/           review detail, flow and input loading
-        Graph/              graph surface, controls and metadata projection
+        Graph/              graph surface, controls, panels and metadata projection
           GraphWorkbench.tsx graph canvas, navigation and panel composition
           useGraphCanvas.ts  camera, fit and saved-view writes
           useGraphPanels.ts  which panels and tabs the workbench shows
-          EntitiesPanel.tsx entity and wallet browsing controls
-          InspectorPanel.tsx inspector, scan and wallet-record tabs
-          InspectorPanelDetail.tsx selected node or wallet detail actions
+          EntitiesPanel/    graph entity, wallet and tag side panel
+            EntitiesPanel.tsx panel controller binding
+            EntitiesPanelDetail.tsx panel view and tab composition
+            EntityBrowser.tsx entity filtering, listing and paging
+          InspectorPanel/   graph inspection, scan and wallet-record side panel
+            InspectorPanel.tsx panel controller binding and tab composition
+            InspectorPanelDetail.tsx selected node or wallet detail actions
+            Inspector.tsx node and wallet inspection views
+            ScriptInspector.tsx raw transaction and script inspection
+            transactionInspection.ts raw inspection fetch helper
+            useUtxoStatus.ts ephemeral selected-outpoint status hook
           useGraphActions.ts graph navigation, visibility and filter actions
           useGraphProjection.tsx graph, entity and selection projections
           Filters/          graph and wallet filter controls
@@ -62,10 +71,6 @@ src/
           AnalysisWorkbench.tsx controller binding and the analysis workbench view
           useWorkspaceAnalysis.ts retained sessions and the wallet-run revision
           analysisSession.ts  retained scan, scope and reader filters per workspace
-  Shared/
-    Controls/               reusable controls and popovers
-    Display/                amounts, identifiers, timestamps and evidence help
-    Metadata/               annotation, icon and metadata editors
   Domain/
     types.ts                shared Bitcoin and workspace contracts
     Chain/                  transaction, address and prevout evidence
@@ -97,7 +102,7 @@ scripts/                    development, validation and release tooling
 | Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/Selection/`, `Domain/Graph/` | `graph-filters.test.ts`, `graph-membership.test.ts`, `visibility.test.ts`                                         |
 | Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `Domain/ConnectionScan/`             | `connectionScan*.test.ts`                                                                                         |
 | Analysis tools or reports              | `App/Workspace/Workbenches/Analysis/`, `Domain/Analysis/`                               | `analysis*.test.ts`                                                                                               |
-| Labels, tags or icons                  | `Shared/Metadata/`, `App/Workspace/Tags/`, `Domain/Metadata/`                           | `batch-*.test.ts`, `tags.test.ts`, `labels.test.ts`                                                               |
+| Labels, tags or icons                  | `App/Controls/Metadata/`, `App/Workspace/Tags/`, `Domain/Metadata/`                     | `batch-*.test.ts`, `tags.test.ts`, `labels.test.ts`                                                               |
 | Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/useTransactionFetch.tsx`                               | `network-api.test.ts`, `transaction-scheduler.test.ts`, `scanner.test.ts`                                         |
 
 Paths in the task table are relative to `src/`. Primitive
@@ -142,7 +147,7 @@ store: a finding covering the wallet becomes a `link` item in its queue. Inside
 `ConnectionScan/` the short names are fine; anything published on the workspace
 controller carries its feature prefix, because all four meet there.
 
-## Shared responsibilities
+## Ownership and responsibilities
 
 UI, styles and area-specific hooks live together. Browser transport and encrypted
 storage are separate from the server. Global styles live in `App/styles.css`, workbench

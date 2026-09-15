@@ -1,4 +1,4 @@
-import { Amount } from '../../../../Shared/Display/Amount';
+import { Amount } from '../../../Controls/Display/Amount';
 import {
   ArrowRight,
   Download,
@@ -13,7 +13,7 @@ import { formatLocalTimestamp } from '../../../../Domain/Chain/transactionTime';
 import type { WalletReviewCoverage } from '../../../../Domain/Wallet/walletReview';
 import type { WalletUtxoView } from './useWalletUtxos';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
-import { WalletHelp } from '../../../../Shared/Display/WalletHelp';
+import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import { walletDiscoveryStatus } from '../../../../Domain/Wallet/walletCoverageStatus';
 
 export function WalletOverview({

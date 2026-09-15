@@ -1,4 +1,4 @@
-import { CopyButton } from '../../Shared/Controls/CopyButton';
+import { CopyButton } from '../Controls/CopyButton';
 import { Modal, WalletDialog, WalletNameDialog, WorkspaceDetailsDialog } from '../Dialogs';
 import type { WorkspaceController } from './useWorkspace';
 

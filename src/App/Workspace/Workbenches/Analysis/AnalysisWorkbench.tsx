@@ -1,6 +1,6 @@
 import type { WorkspaceController } from '../../useWorkspace';
-import { Amount } from '../../../../Shared/Display/Amount';
-import { TransactionBlockTime } from '../../../../Shared/Display/TransactionBlockTime';
+import { Amount } from '../../../Controls/Display/Amount';
+import { TransactionBlockTime } from '../../../Controls/Display/TransactionBlockTime';
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -46,7 +46,7 @@ import {
   type PreviousOutputIndex,
 } from '../../../../Domain/Chain/prevouts';
 import { WalletCategoryFilter } from '../Wallet/WalletCategoryFilter';
-import { WalletHelp } from '../../../../Shared/Display/WalletHelp';
+import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import {
   findingReview,
   findingToolId,
@@ -60,7 +60,7 @@ import {
   recoveryLimits,
 } from '../../../../Domain/Analysis/analysisRecovery';
 import { useTransactionFetch } from '../../useTransactionFetch';
-import { ResponsiveIdentifier } from '../../../../Shared/Display/ResponsiveIdentifier';
+import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';
 
 const allTypes = () => analysisTools.map((tool) => tool.id);

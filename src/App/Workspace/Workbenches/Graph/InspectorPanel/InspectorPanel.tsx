@@ -1,9 +1,9 @@
-import { ConnectionScanPanel } from './ConnectionScan/ConnectionScanPanel';
+import { ConnectionScanPanel } from '../ConnectionScan/ConnectionScanPanel';
 import {
   addScanPathAddition,
   addScanNodeAddition,
-} from '../../../../Domain/ConnectionScan/connectionScanAddition';
-import { WalletRecordsPanel } from '../Wallet/Records/WalletRecordsPanel';
+} from '../../../../../Domain/ConnectionScan/connectionScanAddition';
+import { WalletRecordsPanel } from '../../Wallet/Records/WalletRecordsPanel';
 import { useLayoutEffect, useRef } from 'react';
 import {
   ArrowLeftRight,
@@ -18,8 +18,8 @@ import {
   ScanLine,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import { type Transaction, type Workspace } from '../../../../Domain/types';
-import type { WorkspaceController } from '../../useWorkspace';
+import { type Transaction, type Workspace } from '../../../../../Domain/types';
+import type { WorkspaceController } from '../../../useWorkspace';
 import { InspectorPanelDetail } from './InspectorPanelDetail';
 function withScanActionEvidence(
   workspace: Workspace,

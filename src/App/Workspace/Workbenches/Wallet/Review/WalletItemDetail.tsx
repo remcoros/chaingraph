@@ -1,4 +1,4 @@
-import { Amount } from '../../../../../Shared/Display/Amount';
+import { Amount } from '../../../../Controls/Display/Amount';
 import { useCallback, useId, useMemo, useState, type ReactNode } from 'react';
 import {
   ChevronRight,
@@ -30,10 +30,10 @@ import { useTransactionFetch } from '../../../useTransactionFetch';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';
-import { CopyButton } from '../../../../../Shared/Controls/CopyButton';
-import { TransactionBlockTime } from '../../../../../Shared/Display/TransactionBlockTime';
+import { CopyButton } from '../../../../Controls/CopyButton';
+import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { WalletReviewFlow } from './WalletReviewFlow';
-import { WalletHelp } from '../../../../../Shared/Display/WalletHelp';
+import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import type {
   WalletSelectionIndex,

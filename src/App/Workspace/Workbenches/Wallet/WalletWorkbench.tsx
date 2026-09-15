@@ -1,4 +1,4 @@
-import { Amount } from '../../../../Shared/Display/Amount';
+import { Amount } from '../../../Controls/Display/Amount';
 import { memo, startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeftRight,
@@ -58,13 +58,13 @@ import {
 } from './Review/WalletItemDetail';
 import { WalletRelatedSelection } from './WalletRelatedSelection';
 import { matchRelatedEntities } from '../../../../Domain/Wallet/walletReviewContext';
-import { WalletHelp } from '../../../../Shared/Display/WalletHelp';
+import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import { WalletReference } from './WalletReference';
-import { TransactionBlockTime } from '../../../../Shared/Display/TransactionBlockTime';
+import { TransactionBlockTime } from '../../../Controls/Display/TransactionBlockTime';
 import { walletRecordBlockObservation } from '../../../../Domain/Chain/transactionTime';
-import { CopyButton } from '../../../../Shared/Controls/CopyButton';
+import { CopyButton } from '../../../Controls/CopyButton';
 import { buildTagIndex } from '../../../../Domain/Metadata/tags';
-import { ResponsiveIdentifier } from '../../../../Shared/Display/ResponsiveIdentifier';
+import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import { WalletPreparationCache } from './walletPreparation';
 import './wallet-workbench.css';
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type RefObject } from 'react';
 import { Search, Plus } from 'lucide-react';
-import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
-import type { Network } from '../../../Domain/types';
+import { addressToScriptHash } from '../../Domain/Wallet/wallet';
+import type { Network } from '../../Domain/types';
 
 export interface LookupFormProps {
   /** Owned by the parent so existing keyboard shortcuts can still focus the field. */

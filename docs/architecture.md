@@ -32,28 +32,28 @@ Three principles run through every module:
 See [source-map.md](source-map.md) for the directory tree, task entry points and
 test locations. Source is grouped by product ownership.
 
-| Location                                                           | Responsibility                                                                     |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `src/App/App.tsx`, `src/App/useAppState.ts`                        | App shell, session navigation, home and dialogs                                    |
-| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`              | Shared state, selection, presentation and workbench switching/focus                |
-| `src/App/Workspace/ChainData/`                                     | Bounded address and transaction loading, cancellation and evidence updates         |
-| `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/`     | Each workbench composes its own views and binds shared Workspace state             |
-| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs.tsx`          | Workspace entry, example creation, help and dialogs                                |
-| `src/App/Workspace/useWorkspaces.ts`                               | Unlocked sessions, undo/redo, autosave and locking                                 |
-| `src/App/Workspace/Entities/`, `Inspector/`, `Selection/`, `Tags/` | Workspace panels and shared selection                                              |
-| `src/App/Workspace/Workbenches/Wallet/`                            | Wallet overview, records, review UI, scan hooks and preparation cache              |
-| `src/App/Workspace/Workbenches/Graph/`                             | Graph surface, filters, transaction flow and metadata projection                   |
-| `src/App/Workspace/Workbenches/Graph/Renderer/`                    | Renderer-neutral contract, Three.js renderer, layout worker and picking            |
-| `src/App/Workspace/Workbenches/Graph/ConnectionScan/`              | Connection panel, worker bridge and bounded scan fetching                          |
-| `src/App/Workspace/Workbenches/Analysis/`                          | Analysis controls and reports                                                      |
-| `src/Shared/`                                                      | Reused controls, evidence display and metadata editors                             |
-| `src/Domain/types.ts`, `src/Domain/Workspace/`                     | Shared contracts, schema validation, migrations, removal and example snapshots     |
-| `src/Domain/Chain/`, `Wallet/`, `Graph/`                           | Chain evidence, key derivation, wallet projections, graph membership and filtering |
-| `src/Domain/Analysis/`, `ConnectionScan/`, `Metadata/`             | Heuristics, bounded connection search, pure annotation edits and BIP329 labels     |
-| `src/Infra/Bitcoin/`                                               | Typed HTTP calls, ancestry/spending requests and prioritized fetch coordination    |
-| `src/Infra/Storage/`                                               | Authenticated envelopes, encryption worker, compression and browser persistence    |
-| `server/app.ts`, `rpc-schema.ts`                                   | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist  |
-| `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`           | Upstream adapters, chain identity, network configuration and concurrency           |
+| Location                                                       | Responsibility                                                                     |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src/App/App.tsx`, `src/App/useAppState.ts`                    | App shell, session navigation, home and dialogs                                    |
+| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`          | Shared state, selection, presentation and workbench switching/focus                |
+| `src/App/Workspace/ChainData/`                                 | Bounded address and transaction loading, cancellation and evidence updates         |
+| `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/` | Each workbench composes its own views and binds shared Workspace state             |
+| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs.tsx`      | Workspace entry, example creation, help and dialogs                                |
+| `src/App/Workspace/useWorkspaces.ts`                           | Unlocked sessions, undo/redo, autosave and locking                                 |
+| `src/App/Workspace/Selection/`, `Tags/`                        | Shared selection and workspace tag management                                      |
+| `src/App/Workspace/Workbenches/Wallet/`                        | Wallet overview, records, review UI, scan hooks and preparation cache              |
+| `src/App/Workspace/Workbenches/Graph/`                         | Graph surface, side panels, filters, transaction flow and metadata projection      |
+| `src/App/Workspace/Workbenches/Graph/Renderer/`                | Renderer-neutral contract, Three.js renderer, layout worker and picking            |
+| `src/App/Workspace/Workbenches/Graph/ConnectionScan/`          | Connection panel, worker bridge and bounded scan fetching                          |
+| `src/App/Workspace/Workbenches/Analysis/`                      | Analysis controls and reports                                                      |
+| `src/App/Controls/`                                            | Reused App-owned controls, evidence display and metadata editors                   |
+| `src/Domain/types.ts`, `src/Domain/Workspace/`                 | Shared contracts, schema validation, migrations, removal and example snapshots     |
+| `src/Domain/Chain/`, `Wallet/`, `Graph/`                       | Chain evidence, key derivation, wallet projections, graph membership and filtering |
+| `src/Domain/Analysis/`, `ConnectionScan/`, `Metadata/`         | Heuristics, bounded connection search, pure annotation edits and BIP329 labels     |
+| `src/Infra/Bitcoin/`                                           | Typed HTTP calls, ancestry/spending requests and prioritized fetch coordination    |
+| `src/Infra/Storage/`                                           | Authenticated envelopes, encryption worker, compression and browser persistence    |
+| `server/app.ts`, `rpc-schema.ts`                               | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist  |
+| `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`       | Upstream adapters, chain identity, network configuration and concurrency           |
 
 ## Browser-owned state
 
@@ -517,7 +517,7 @@ Transaction choice and quick editors have panel lifetime; address tabs and
 pagination have address lifetime.
 The transaction view projects creating/spending relationships through
 `transactionInspection.ts`. `ScriptInspector` decodes
-saved scripts to opcodes; `src/App/Workspace/Inspector/transactionInspection.ts` fetches raw bytes on
+saved scripts to opcodes; `src/App/Workspace/Workbenches/Graph/InspectorPanel/transactionInspection.ts` fetches raw bytes on
 demand, verifies them against the ID and loaded observations with bitcoinjs,
 and keeps them in component memory only. Sources are in
 [references.md](references.md).

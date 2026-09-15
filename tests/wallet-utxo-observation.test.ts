@@ -3,7 +3,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { WalletInspector } from '../src/App/Workspace/Inspector/Inspector';
+import { WalletInspector } from '../src/App/Workspace/Workbenches/Graph/InspectorPanel/Inspector';
 import {
   matchingWalletUtxoObservation,
   resolveWalletUtxoObservation,

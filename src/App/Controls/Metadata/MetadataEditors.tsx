@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Plus, X } from 'lucide-react';
-import { useDialogFocus } from '../Controls/useDialogFocus';
+import { useDialogFocus } from '../useDialogFocus';
 import {
   applyEntityNote,
   applyBatchLabel,
@@ -9,10 +9,10 @@ import {
   createBatchTag,
   planBatchLabel,
   planBatchTag,
-} from '../../Domain/Metadata/batchMetadata';
-import { canonicalTagNodeId } from '../../Domain/Metadata/tags';
-import type { Workspace, WorkspaceTag } from '../../Domain/types';
-import { DEFAULT_TAG_COLOR, TAG_COLORS } from '../../Domain/Metadata/tagColors';
+} from '../../../Domain/Metadata/batchMetadata';
+import { canonicalTagNodeId } from '../../../Domain/Metadata/tags';
+import type { Workspace, WorkspaceTag } from '../../../Domain/types';
+import { DEFAULT_TAG_COLOR, TAG_COLORS } from '../../../Domain/Metadata/tagColors';
 import './metadata-editors.css';
 
 export interface MetadataEditorProps {

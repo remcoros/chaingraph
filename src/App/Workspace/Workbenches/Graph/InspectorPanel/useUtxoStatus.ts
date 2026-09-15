@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Network, TxOutput } from '../../../Domain/types';
-import { fetchCurrentUtxo, type UtxoObservation } from '../../../Infra/Bitcoin/utxoStatus';
+import type { Network, TxOutput } from '../../../../../Domain/types';
+import { fetchCurrentUtxo, type UtxoObservation } from '../../../../../Infra/Bitcoin/utxoStatus';
 
 interface CheckState {
   key: string;

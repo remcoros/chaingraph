@@ -10,7 +10,7 @@ import {
   projectGraphAddresses,
   fullGraphMembershipEvidence,
 } from '../../../../Domain/Graph/graphMembership';
-import { EntityBadges } from '../../../../Shared/Metadata/EntityBadges';
+import { EntityBadges } from '../../../Controls/Metadata/EntityBadges';
 import { buildWalletMatches, tagNodeIds, buildTagIndex } from '../../../../Domain/Metadata/tags';
 import { useCallback, useDeferredValue, useMemo } from 'react';
 import {

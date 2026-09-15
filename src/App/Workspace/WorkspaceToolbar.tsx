@@ -1,4 +1,4 @@
-import { LookupForm } from './Entities/LookupForm';
+import { LookupForm } from './LookupForm';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,

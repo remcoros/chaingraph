@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { ListFilter } from 'lucide-react';
-import { AnchoredPopover } from '../../../../Shared/Controls/AnchoredPopover';
-import { WalletHelp } from '../../../../Shared/Display/WalletHelp';
+import { AnchoredPopover } from '../../../Controls/AnchoredPopover';
+import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 
 export interface WalletCategoryOption {
   id: string;

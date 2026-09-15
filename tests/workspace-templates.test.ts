@@ -9,7 +9,7 @@ import { outputNodeId, sats, txNodeId } from '../src/Domain/types';
 import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
 import { transactionNodeIds } from '../src/Domain/Graph/visibility';
 import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
-import { ICON_PALETTE } from '../src/Shared/Metadata/iconOptions';
+import { ICON_PALETTE } from '../src/App/Controls/Metadata/iconOptions';
 
 afterEach(() => vi.restoreAllMocks());
 

@@ -1,5 +1,5 @@
-import { CopyButton } from '../../../../Shared/Controls/CopyButton';
-import { ResponsiveIdentifier } from '../../../../Shared/Display/ResponsiveIdentifier';
+import { CopyButton } from '../../../Controls/CopyButton';
+import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 
 export function WalletReference({
   value,

@@ -5,7 +5,7 @@ import {
   inspectScript,
   relatedTransactions,
 } from '../src/Domain/Chain/transactionInspection';
-import { fetchRawInspection } from '../src/App/Workspace/Inspector/transactionInspection';
+import { fetchRawInspection } from '../src/App/Workspace/Workbenches/Graph/InspectorPanel/transactionInspection';
 import type { Transaction } from '../src/Domain/types';
 
 function fixture(witness = false) {

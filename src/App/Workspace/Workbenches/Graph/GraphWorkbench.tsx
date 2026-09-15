@@ -1,5 +1,5 @@
 import { formatBitcoinAmount } from '../../../../Domain/Chain/amountFormat';
-import { Amount } from '../../../../Shared/Display/Amount';
+import { Amount } from '../../../Controls/Display/Amount';
 import {
   RECENT_ADDRESS_GRAPH_LIMIT,
   selectedAddress as selectedAddressForHistory,

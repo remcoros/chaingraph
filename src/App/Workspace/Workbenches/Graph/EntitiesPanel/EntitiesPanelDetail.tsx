@@ -18,13 +18,13 @@ import {
   type Wallet,
   type Workspace,
   type Transaction,
-} from '../../Domain/types';
-import { walletCheckAge } from '../../Domain/Wallet/walletActivity';
-import { formatLocalTimestamp } from '../../Domain/Chain/transactionTime';
-import type { GraphFilters } from '../../Domain/types';
-import type { EntitySelection } from './Selection/useEntitySelection';
-import EntityBrowser from './Entities/EntityBrowser';
-import { ResponsiveIdentifier } from '../../Shared/Display/ResponsiveIdentifier';
+} from '../../../../../Domain/types';
+import { walletCheckAge } from '../../../../../Domain/Wallet/walletActivity';
+import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
+import type { GraphFilters } from '../../../../../Domain/types';
+import type { EntitySelection } from '../../../Selection/useEntitySelection';
+import EntityBrowser from './EntityBrowser';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 interface Props {
   activeWorkspace: Workspace;
   tagsPanel?: ReactNode;
@@ -76,7 +76,7 @@ interface Props {
   onRemoveNode?: (id: string) => void;
   selection?: EntitySelection;
 }
-export function WorkspacePanel({
+export function EntitiesPanelDetail({
   activeWorkspace,
   tagsPanel,
   leftTab,

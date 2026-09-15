@@ -1,17 +1,17 @@
-import { TransactionBlockTime } from '../../../Shared/Display/TransactionBlockTime';
+import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { GraphNode, Transaction, Workspace } from '../../../Domain/types';
-import { short } from '../../../Domain/types';
+import type { GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
+import { short } from '../../../../../Domain/types';
 import {
   inspectScript,
   relatedTransactions,
   type RawInspection,
-} from '../../../Domain/Chain/transactionInspection';
+} from '../../../../../Domain/Chain/transactionInspection';
 import { fetchRawInspection } from './transactionInspection';
-import { CopyButton } from '../../../Shared/Controls/CopyButton';
-import { OpReturnData } from '../../../Shared/Display/OpReturnData';
-import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
+import { CopyButton } from '../../../../Controls/CopyButton';
+import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './script-inspector.css';
 
 function HexField({

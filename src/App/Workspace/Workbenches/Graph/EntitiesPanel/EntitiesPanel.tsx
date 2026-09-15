@@ -1,7 +1,7 @@
-import TagsPanel from '../../Tags/TagsPanel';
-import { type GraphFilters } from '../../../../Domain/types';
-import { WorkspacePanel } from '../../WorkspacePanel';
-import type { WorkspaceController } from '../../useWorkspace';
+import TagsPanel from '../../../Tags/TagsPanel';
+import { type GraphFilters } from '../../../../../Domain/types';
+import { EntitiesPanelDetail } from './EntitiesPanelDetail';
+import type { WorkspaceController } from '../../../useWorkspace';
 
 export function EntitiesPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
@@ -62,7 +62,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
 
   if (!activeWorkspace) return null;
   return (
-    <WorkspacePanel
+    <EntitiesPanelDetail
       activeWorkspace={activeWorkspace}
       transactions={activeWorkspace.transactions}
       removableNodeIds={entityRemoval.removableNodeIds}

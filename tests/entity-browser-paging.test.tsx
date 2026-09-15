@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import EntityBrowser from '../src/App/Workspace/Entities/EntityBrowser';
+import EntityBrowser from '../src/App/Workspace/Workbenches/Graph/EntitiesPanel/EntityBrowser';
 import { txNodeId, type GraphFilters, type GraphNode } from '../src/Domain/types';
 import { installDomStubs } from './domStubs';
 

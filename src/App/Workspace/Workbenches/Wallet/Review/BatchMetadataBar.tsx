@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Tag, TextCursorInput } from 'lucide-react';
-import { IconPicker } from '../../../../../Shared/Metadata/IconPicker';
+import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import {
   BatchLabelEditor,
   BatchTagEditor,
   EntityNoteEditor,
   MetadataPopover,
-} from '../../../../../Shared/Metadata/MetadataEditors';
+} from '../../../../Controls/Metadata/MetadataEditors';
 import { applyBatchIcon, planBatchIcon } from '../../../../../Domain/Metadata/batchMetadata';
 import type { Workspace } from '../../../../../Domain/types';
 

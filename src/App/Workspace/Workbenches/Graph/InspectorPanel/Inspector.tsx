@@ -1,16 +1,16 @@
-import { Amount } from '../../../Shared/Display/Amount';
-import { listWalletAddresses } from '../../../Domain/Wallet/walletRecords';
+import { Amount } from '../../../../Controls/Display/Amount';
+import { listWalletAddresses } from '../../../../../Domain/Wallet/walletRecords';
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
-} from '../../../Domain/Wallet/walletUtxoObservation';
+} from '../../../../../Domain/Wallet/walletUtxoObservation';
 import { useUtxoStatus } from './useUtxoStatus';
 import './utxo-status.css';
 import {
   TransactionBlockTime,
   TransactionFeeLabel,
-} from '../../../Shared/Display/TransactionBlockTime';
-import { transactionStatus } from '../../../Domain/Chain/transactionStatus';
+} from '../../../../Controls/Display/TransactionBlockTime';
+import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
@@ -35,23 +35,23 @@ import {
   type Transaction,
   type GraphNode,
   type GraphData,
-} from '../../../Domain/types';
-import { addressBalanceSats } from '../../../Domain/Chain/addressHistory';
-import { formatLocalTimestamp } from '../../../Domain/Chain/transactionTime';
-import { equalOutputCount } from '../../../Domain/Analysis/analysis';
-import { outputAddress } from '../../../Domain/Workspace/workspace';
-import { walletCheckAge } from '../../../Domain/Wallet/walletActivity';
-import { CopyButton } from '../../../Shared/Controls/CopyButton';
-import { VisibilityActions, type VisibilityProps } from '../Selection/VisibilityActions';
-import { emptyAnnotation } from '../../../Domain/Metadata/annotations';
+} from '../../../../../Domain/types';
+import { addressBalanceSats } from '../../../../../Domain/Chain/addressHistory';
+import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
+import { equalOutputCount } from '../../../../../Domain/Analysis/analysis';
+import { outputAddress } from '../../../../../Domain/Workspace/workspace';
+import { walletCheckAge } from '../../../../../Domain/Wallet/walletActivity';
+import { CopyButton } from '../../../../Controls/CopyButton';
+import { VisibilityActions, type VisibilityProps } from '../../../Selection/VisibilityActions';
+import { emptyAnnotation } from '../../../../../Domain/Metadata/annotations';
 import { ScriptInspector } from './ScriptInspector';
-import { IconPicker } from '../../../Shared/Metadata/IconPicker';
-import { OpReturnData } from '../../../Shared/Display/OpReturnData';
-import { decodeOpReturn } from '../../../Domain/Chain/opReturn';
-import { indexLoadedSpends } from '../../../Domain/Chain/transactionFlow';
-import type { WalletMatch } from '../../../Domain/Metadata/tags';
-import { WalletHelp } from '../../../Shared/Display/WalletHelp';
-import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
+import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
+import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
+import { decodeOpReturn } from '../../../../../Domain/Chain/opReturn';
+import { indexLoadedSpends } from '../../../../../Domain/Chain/transactionFlow';
+import type { WalletMatch } from '../../../../../Domain/Metadata/tags';
+import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 
 export function AnnotationEditor({
   annotation,

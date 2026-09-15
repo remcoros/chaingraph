@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '../../src/App/styles.css';
 import '../../src/App/Workspace/Tags/tags.css';
 import GraphView from '../../src/App/Workspace/Workbenches/Graph/GraphView';
-import { EntityBadges } from '../../src/Shared/Metadata/EntityBadges';
+import { EntityBadges } from '../../src/App/Controls/Metadata/EntityBadges';
 import { createDefaultAdapter } from '../../src/App/Workspace/Workbenches/Graph/Renderer/defaultAdapter';
 import type {
   GraphAdapterEvents,

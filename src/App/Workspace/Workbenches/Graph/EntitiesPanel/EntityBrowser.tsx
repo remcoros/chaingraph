@@ -1,8 +1,8 @@
-import { Amount } from '../../../Shared/Display/Amount';
+import { Amount } from '../../../../Controls/Display/Amount';
 import {
   TransactionBlockTime,
   TransactionFeeLabel,
-} from '../../../Shared/Display/TransactionBlockTime';
+} from '../../../../Controls/Display/TransactionBlockTime';
 import {
   memo,
   useLayoutEffect,
@@ -37,20 +37,17 @@ import {
   valueFilterError,
   hasActiveFilters,
   type EntitySort,
-} from '../../../Domain/Graph/graphFilters';
-import type { GraphFilters } from '../../../Domain/types';
-import { transactionStatus } from '../../../Domain/Chain/transactionStatus';
-import type { Annotation, GraphNode, Transaction, Workspace } from '../../../Domain/types';
+} from '../../../../../Domain/Graph/graphFilters';
+import type { GraphFilters } from '../../../../../Domain/types';
+import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
+import type { Annotation, GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
 import './entity-browser.css';
-import type { VisibilityProps } from '../Selection/VisibilityActions';
-import { AnchoredPopover } from '../../../Shared/Controls/AnchoredPopover';
-import {
-  GraphConnectionsAction,
-  GraphFilterButton,
-} from '../Workbenches/Graph/Filters/GraphFilterControls';
-import { SelectionCheckbox } from '../Selection/SelectionToolbar';
-import type { EntitySelection } from '../Selection/useEntitySelection';
-import { ResponsiveIdentifier } from '../../../Shared/Display/ResponsiveIdentifier';
+import type { VisibilityProps } from '../../../Selection/VisibilityActions';
+import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
+import { GraphConnectionsAction, GraphFilterButton } from '../Filters/GraphFilterControls';
+import { SelectionCheckbox } from '../../../Selection/SelectionToolbar';
+import type { EntitySelection } from '../../../Selection/useEntitySelection';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 
 /** Icons mirror the transaction flow block (Box), output side toolbar (ArrowRightFromLine)
  * and the graph's address-node toggle (Layers), so entities read the same way everywhere. */

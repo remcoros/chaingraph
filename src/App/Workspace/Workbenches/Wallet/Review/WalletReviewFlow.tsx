@@ -1,5 +1,5 @@
 import { formatBitcoinAmount } from '../../../../../Domain/Chain/amountFormat';
-import { Amount } from '../../../../../Shared/Display/Amount';
+import { Amount } from '../../../../Controls/Display/Amount';
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -21,10 +21,10 @@ import {
   isWalletFlowEditTarget,
   walletFlowVisibility,
 } from '../../../../../Domain/Wallet/walletFlowVisibility';
-import { TransactionBlockTime } from '../../../../../Shared/Display/TransactionBlockTime';
+import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
-import { OpReturnData } from '../../../../../Shared/Display/OpReturnData';
-import { WalletHelp } from '../../../../../Shared/Display/WalletHelp';
+import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
+import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
 import './wallet-review-flow.css';
 

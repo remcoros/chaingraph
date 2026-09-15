@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { decodeOpReturn } from '../../Domain/Chain/opReturn';
-import { CopyButton } from '../Controls/CopyButton';
+import { decodeOpReturn } from '../../../Domain/Chain/opReturn';
+import { CopyButton } from '../CopyButton';
 import './op-return-data.css';
 
 /** Use outside a row button: this provides its own keyboard-accessible disclosure. */
