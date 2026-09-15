@@ -505,8 +505,12 @@ heuristic). Both are presentation inputs and do not touch annotations.
 **Flow panel.** `FlowPanelShell` is the frame: a collapsible surface and its
 height controls, taking a header and a body and knowing nothing about either.
 `FlowPanel` chooses the view for what is selected, through an exhaustive switch
-that fails to compile when a node kind has no view, and holds the height so
-changing view swaps only the body. `FlowPanelTransactionView`,
+that fails to compile when a node kind has no view. The workspace persists the
+left and right tabs and collapse state, mobile panel choice, and flow height
+under `view.panels`; the toolbar's combined action changes only the two side
+panels. A selected unknown outpoint may hydrate its one missing creator while
+the flow panel stays collapsed; navigation never changes panel presentation to
+trigger data loading. `FlowPanelTransactionView`,
 `FlowPanelAddressView` and the wallet stub each supply their own title bar,
 status line and body, and keep their downstream components in their own file.
 Transaction choice and quick editors have panel lifetime; address tabs and

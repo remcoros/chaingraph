@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp } from 'lucide-react';
-
-export type FlowPanelHeight = 'collapsed' | 'expanded' | 'full';
+import type { FlowPanelHeight } from '../../../../../Domain/types';
 
 /** The height controls, owned above the views so they survive a change of view. */
 export interface FlowPanelHeightState {

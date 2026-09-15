@@ -85,7 +85,7 @@ export function useGraphActions({
     entityLinked: entityFiltersLinked,
     setEntityLinked: setEntityFiltersLinked,
   } = filters;
-  const { setFocusGraph, setRightTab, setMobilePanel } = panels;
+  const { setPanels, setRightTab, setMobilePanel } = panels;
   const { setFocusRequest, fitAll } = canvas;
   const { cancelPicking: cancelScanTargetPicking } = scanTargets;
   const { edit: metadataEdit } = annotations;
@@ -133,9 +133,11 @@ export function useGraphActions({
     setNotice('');
     cancelScanTargetPicking();
     select(id, { pickTarget: false });
-    setFocusGraph(false);
-    setRightTab('inspect');
-    setMobilePanel('right');
+    setPanels((current) => ({
+      ...current,
+      right: { tab: 'inspect', collapsed: false },
+      mobile: 'right',
+    }));
     requestMetadataEdit(target);
   };
   const lockToSelection = activeWorkspace?.view.lockToSelection ?? false;

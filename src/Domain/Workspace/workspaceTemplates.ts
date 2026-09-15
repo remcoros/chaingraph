@@ -743,10 +743,12 @@ export async function createTemplateWorkspace(
     showIcons: true,
     selectionId: selected,
     graphNodeIds: initialTemplateGraph(workspace, snapshot.roots, selected),
-    leftTab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks',
-    rightTab: 'inspect',
+    panels: {
+      left: { tab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks' },
+      right: { tab: 'inspect' },
+      flow: { transactionId: snapshot.roots[0], height: 'expanded' },
+    },
     prefetchDepth: 0,
-    transactionFlow: { transactionId: snapshot.roots[0], open: true },
   };
   // Validation also deep-copies the module-cached snapshot, so copies share no mutable data.
   return parseWorkspace(workspace);

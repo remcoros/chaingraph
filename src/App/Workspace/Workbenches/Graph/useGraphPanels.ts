@@ -1,117 +1,180 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
-import type { Workspace } from '../../../../Domain/types';
+import { useCallback, useMemo } from 'react';
+import type {
+  GraphLeftTab,
+  GraphMobilePanel,
+  GraphPanelsState,
+  GraphRightTab,
+  TransactionFlowState,
+  Workspace,
+} from '../../../../Domain/types';
+import { openFlowPanel } from '../../../../Domain/Workspace/panelState';
+import type { WorkspaceOperations } from '../../useWorkspaces';
 
-export type GraphLeftTab = 'wallets' | 'entities' | 'bookmarks' | 'tags';
-export type GraphRightTab = NonNullable<Workspace['view']['rightTab']>;
-export type GraphMobilePanel = 'graph' | 'left' | 'right';
+export type { GraphLeftTab, GraphMobilePanel, GraphRightTab };
 
 /** A tour step's view of the graph, which previews panels without changing them. */
 export interface GraphPanelPreview {
   panel?: GraphMobilePanel;
   leftTab?: GraphLeftTab;
-  rightTab?: 'inspect' | 'analysis';
+  rightTab?: 'inspect';
+  flowOpen?: boolean;
 }
 
-/**
- * Which panels the graph workbench shows.
- *
- * Each tab has a chosen value, which is what the workspace saves, and a shown
- * value, which is what the reader sees now. They differ while a tour previews a
- * step, and when a wallet-record tab outlives the wallet it belonged to.
- */
-export interface GraphPanelChoice {
-  leftTab: GraphLeftTab;
-  rightTab: GraphRightTab;
-  mobilePanel: GraphMobilePanel;
-  focusGraph: boolean;
+/** Fully resolved panel state used while a workspace is open. */
+export interface GraphPanelState {
+  left: { tab: GraphLeftTab; collapsed: boolean };
+  right: { tab: GraphRightTab; collapsed: boolean };
+  flow: TransactionFlowState;
+  mobile: GraphMobilePanel;
 }
 
-export interface GraphPanels extends GraphPanelChoice {
-  /** The reader's own choices, saved with the workspace. */
-  chosen: GraphPanelChoice;
-  setLeftTab: Dispatch<SetStateAction<GraphLeftTab>>;
-  setRightTab: Dispatch<SetStateAction<GraphRightTab>>;
-  setMobilePanel: Dispatch<SetStateAction<GraphMobilePanel>>;
-  setFocusGraph: Dispatch<SetStateAction<boolean>>;
-  leftPanelCollapsed: boolean;
-  rightPanelCollapsed: boolean;
-  setLeftPanelCollapsed: Dispatch<SetStateAction<boolean>>;
-  setRightPanelCollapsed: Dispatch<SetStateAction<boolean>>;
+type GraphPanelUpdate = (current: GraphPanelState) => GraphPanelState;
+
+export interface GraphPanels extends GraphPanelState {
+  /** Saved state before temporary tour and availability overrides. */
+  saved: GraphPanelState;
+  setPanels: (update: GraphPanelUpdate) => void;
+  setLeftTab: (tab: GraphLeftTab) => void;
+  setRightTab: (tab: GraphRightTab) => void;
+  setMobilePanel: (panel: GraphMobilePanel) => void;
+  setFlowPanel: (state: TransactionFlowState) => void;
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
+  toggleSidePanels: () => void;
   /** Shows a newly selected entity, without interrupting a scan in progress. */
   revealInspector: () => void;
   revealEntities: () => void;
   showPanel: (panel: GraphMobilePanel) => void;
-  hydrate: (view: Workspace['view'] | undefined) => void;
 }
 
 export interface GraphPanelView {
-  /** The step being previewed, when a tour is running. */
   preview: GraphPanelPreview | undefined;
   previewing: boolean;
   /** False once the wallet behind a record tab is gone, so that tab cannot stay. */
   hasSelectedWallet: boolean;
 }
 
+interface GraphPanelControllerOptions {
+  workspace: Workspace | undefined;
+  workspaceId: string | undefined;
+  getWorkspace: (id: string) => WorkspaceOperations | undefined;
+}
+
 const WALLET_RECORD_TABS = new Set<GraphRightTab>(['addresses', 'transactions', 'utxos']);
 
-/**
- * What the reader sees, given their choices and anything overriding them.
- *
- * Kept separate from the state so the panels can exist before a tour step does:
- * the tour depends on the selection, which in turn reveals panels.
- */
-export function graphPanelsInView(
-  chosen: GraphPanelChoice,
-  { preview, previewing, hasSelectedWallet }: GraphPanelView,
-): GraphPanelChoice {
+export function resolveGraphPanelState(panels: GraphPanelsState | undefined): GraphPanelState {
   return {
-    leftTab: preview?.leftTab ?? chosen.leftTab,
-    rightTab:
-      preview?.rightTab ??
-      (WALLET_RECORD_TABS.has(chosen.rightTab) && !hasSelectedWallet ? 'inspect' : chosen.rightTab),
-    mobilePanel: preview?.panel ?? chosen.mobilePanel,
-    // A tour previews the panels, so the canvas never takes the whole workbench.
-    focusGraph: previewing ? false : chosen.focusGraph,
+    left: {
+      tab: panels?.left?.tab ?? 'wallets',
+      collapsed: panels?.left?.collapsed ?? false,
+    },
+    right: {
+      tab: panels?.right?.tab ?? 'inspect',
+      collapsed: panels?.right?.collapsed ?? false,
+    },
+    flow: panels?.flow ?? {},
+    mobile: panels?.mobile ?? 'graph',
   };
 }
 
-export function useGraphPanels(): GraphPanels {
-  const [leftTab, setLeftTab] = useState<GraphLeftTab>('wallets');
-  const [rightTab, setRightTab] = useState<GraphRightTab>('inspect');
-  const [mobilePanel, setMobilePanel] = useState<GraphMobilePanel>('graph');
-  const [focusGraph, setFocusGraph] = useState(false);
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
-  const chosen = { leftTab, rightTab, mobilePanel, focusGraph };
+/** Returns the saved panel state with temporary presentation overrides applied. */
+export function graphPanelsInView(
+  saved: GraphPanelState,
+  { preview, previewing, hasSelectedWallet }: GraphPanelView,
+): GraphPanelState {
   return {
-    ...chosen,
-    chosen,
-    setLeftTab,
-    setRightTab,
-    setMobilePanel,
-    setFocusGraph,
-    leftPanelCollapsed,
-    rightPanelCollapsed,
-    setLeftPanelCollapsed,
-    setRightPanelCollapsed,
-    revealInspector: () => {
-      setRightPanelCollapsed(false);
-      setRightTab((current) => (current === 'scan' ? 'scan' : 'inspect'));
+    left: {
+      tab: preview?.leftTab ?? saved.left.tab,
+      collapsed: previewing ? false : saved.left.collapsed,
     },
-    revealEntities: () => {
-      setLeftPanelCollapsed(false);
-      setLeftTab('entities');
+    right: {
+      tab:
+        preview?.rightTab ??
+        (WALLET_RECORD_TABS.has(saved.right.tab) && !hasSelectedWallet
+          ? 'inspect'
+          : saved.right.tab),
+      collapsed: previewing ? false : saved.right.collapsed,
     },
-    showPanel: setMobilePanel,
-    hydrate: (view) => {
-      setLeftTab(view?.leftTab ?? 'wallets');
-      // A saved 'analysis' right tab predates the analysis workbench and is not
-      // one of this panel's tabs; the workbench choice carries that instead.
-      setRightTab(view?.rightTab === 'analysis' ? 'inspect' : (view?.rightTab ?? 'inspect'));
-      setMobilePanel(view?.mobilePanel ?? 'graph');
-      setFocusGraph(view?.focusGraph ?? false);
-      setLeftPanelCollapsed(false);
-      setRightPanelCollapsed(false);
+    flow: preview?.flowOpen ? openFlowPanel(saved.flow) : saved.flow,
+    mobile: preview?.panel ?? saved.mobile,
+  };
+}
+
+export function useGraphPanels({
+  workspace,
+  workspaceId,
+  getWorkspace,
+}: GraphPanelControllerOptions): GraphPanels {
+  const saved = resolveGraphPanelState(workspace?.view.panels);
+  const setPanels = useCallback(
+    (update: GraphPanelUpdate) => {
+      if (!workspaceId) return;
+      getWorkspace(workspaceId)?.edit((current) => {
+        const currentPanels = resolveGraphPanelState(current.view.panels);
+        const nextPanels = update(currentPanels);
+        return JSON.stringify(currentPanels) === JSON.stringify(nextPanels)
+          ? current
+          : {
+              ...current,
+              view: {
+                ...current.view,
+                panels: { ...current.view.panels, ...nextPanels },
+              },
+            };
+      }, false);
     },
+    [getWorkspace, workspaceId],
+  );
+  const actions = useMemo(
+    () => ({
+      setPanels,
+      setLeftTab: (tab: GraphLeftTab) =>
+        setPanels((current) => ({ ...current, left: { ...current.left, tab } })),
+      setRightTab: (tab: GraphRightTab) =>
+        setPanels((current) => ({ ...current, right: { ...current.right, tab } })),
+      setMobilePanel: (mobile: GraphMobilePanel) =>
+        setPanels((current) => ({ ...current, mobile })),
+      setFlowPanel: (flow: TransactionFlowState) => setPanels((current) => ({ ...current, flow })),
+      toggleLeftPanel: () =>
+        setPanels((current) => ({
+          ...current,
+          left: { ...current.left, collapsed: !current.left.collapsed },
+        })),
+      toggleRightPanel: () =>
+        setPanels((current) => ({
+          ...current,
+          right: { ...current.right, collapsed: !current.right.collapsed },
+        })),
+      toggleSidePanels: () =>
+        setPanels((current) => {
+          const collapsed = !(current.left.collapsed && current.right.collapsed);
+          return {
+            ...current,
+            left: { ...current.left, collapsed },
+            right: { ...current.right, collapsed },
+          };
+        }),
+      revealInspector: () =>
+        setPanels((current) => ({
+          ...current,
+          right: {
+            tab: current.right.tab === 'scan' ? 'scan' : 'inspect',
+            collapsed: false,
+          },
+        })),
+      revealEntities: () =>
+        setPanels((current) => ({
+          ...current,
+          left: { tab: 'entities', collapsed: false },
+        })),
+    }),
+    [setPanels],
+  );
+
+  return {
+    ...saved,
+    saved,
+    ...actions,
+    showPanel: actions.setMobilePanel,
   };
 }

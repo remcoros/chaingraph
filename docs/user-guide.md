@@ -167,7 +167,7 @@ your selection. **Show labels**, **Show tags** and **Show icons** control captio
 without touching annotations. **Size by** switches between uniform, value-based
 (logarithmic) and degree-based node sizes. Address nodes use their observed
 balance when one is available; unknown balances are not treated as zero. On
-desktop, **Hide panels** gives the canvas the full width.
+desktop, **Hide panels** collapses both side panels to give the canvas more room.
 
 Hover a node for a card with identifiers, value, and compact actions. Connection
 lines do not open cards. The Inspector and the entity list provide the same

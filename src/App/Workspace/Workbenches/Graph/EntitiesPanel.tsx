@@ -16,11 +16,10 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
   } = workspace;
   const {
     setMobilePanel,
-    leftTab: shownLeftTab,
+    left: { tab: shownLeftTab, collapsed: leftPanelCollapsed },
     setLeftTab,
-    setRightTab,
-    leftPanelCollapsed,
-    setLeftPanelCollapsed,
+    setPanels,
+    toggleLeftPanel,
   } = workspace.graph.panels;
   const { scanTargets: connectionScanTargets } = workspace.graph;
   const { selected: wallet, discovery: walletDiscovery } = workspace.wallet;
@@ -90,7 +89,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       leftTab={shownLeftTab}
       setLeftTab={setLeftTab}
       collapsed={leftPanelCollapsed}
-      onToggleCollapsed={() => setLeftPanelCollapsed((value) => !value)}
+      onToggleCollapsed={toggleLeftPanel}
       selectedWalletId={wallet?.id}
       selectedId={selectedId}
       onSelectWallet={(id) => {
@@ -98,8 +97,11 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
         operationRef.current?.abort();
         setSelectedWallet(id);
         setSelectedId(undefined);
-        setRightTab('inspect');
-        setMobilePanel('right');
+        setPanels((current) => ({
+          ...current,
+          right: { ...current.right, tab: 'inspect' },
+          mobile: 'right',
+        }));
       }}
       onSelectNode={(id) => {
         select(id);

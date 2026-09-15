@@ -108,11 +108,6 @@ export function prepareGraphNavigation(
         ...admitted.view,
         showAddresses: addresses.length > 0 || admitted.view.showAddresses,
         smallAmountThreshold: undefined,
-        // An outpoint link must expose its input/output row, even when the flow
-        // was collapsed. Missing creators use the existing bounded input loader.
-        transactionFlow: selectedId.startsWith('out:')
-          ? { ...admitted.view.transactionFlow, open: true }
-          : admitted.view.transactionFlow,
       },
     },
   };

@@ -23,6 +23,7 @@ import {
 import { FlowPanel } from './TransactionFlow/FlowPanel';
 import { hasActiveFilters, selectedWalletFilterIds } from '../../../../Domain/Graph/graphFilters';
 import { applyBatchIcon } from '../../../../Domain/Metadata/batchMetadata';
+import { openFlowPanel } from '../../../../Domain/Workspace/panelState';
 import {
   FilterChips,
   GraphConnectionsAction,
@@ -56,12 +57,15 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphWorkspaceRef,
   } = workspace;
   const {
-    focusGraph: shownFocusGraph,
-    setFocusGraph,
-    mobilePanel: shownMobilePanel,
-    leftPanelCollapsed,
-    rightPanelCollapsed,
+    mobile: shownMobilePanel,
+    left: { collapsed: leftPanelCollapsed },
+    right: { collapsed: rightPanelCollapsed },
+    flow: shownFlowPanel,
+    setPanels,
+    setFlowPanel,
+    toggleSidePanels,
   } = workspace.graph.panels;
+  const panelsCollapsed = leftPanelCollapsed && rightPanelCollapsed;
   const { flowInputs, scanTargets: connectionScanTargets } = workspace.graph;
   const { utxoObservation: walletUtxoObservation, selected: selectedWallet } = workspace.wallet;
   const {
@@ -188,16 +192,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     if (selectedSpenderTxids.length === 1)
       select(txNodeId(selectedSpenderTxids[0]), { preserveCamera: true });
     else if (selectedSpenderTxids.length > 1) {
-      edit(
-        (current) => ({
-          ...current,
-          view: {
-            ...current.view,
-            transactionFlow: { ...current.view.transactionFlow, open: true },
-          },
-        }),
-        false,
-      );
+      setPanels((current) => ({ ...current, flow: openFlowPanel(current.flow) }));
       setNotice('Choose a spending transaction in the transaction flow panel.');
     } else void expand('spending', selectedId, { preserveCamera: true });
   };
@@ -486,7 +481,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       ref={graphWorkspaceRef}
       id="main-workspace"
       tabIndex={-1}
-      className={`workbench show-${shownMobilePanel} ${shownFocusGraph ? 'focus-graph' : ''} ${leftPanelCollapsed ? 'left-panel-collapsed' : ''} ${rightPanelCollapsed ? 'right-panel-collapsed' : ''}`}
+      className={`workbench show-${shownMobilePanel} ${leftPanelCollapsed ? 'left-panel-collapsed' : ''} ${rightPanelCollapsed ? 'right-panel-collapsed' : ''}`}
     >
       <EntitiesPanel workspace={workspace} />
       <section
@@ -500,21 +495,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
             <FlowPanel
               walletUtxoObservation={walletUtxoObservation}
               key={activeWorkspace.id}
-              state={
-                tour.step?.view?.flowOpen
-                  ? { ...activeWorkspace.view.transactionFlow, open: true }
-                  : activeWorkspace.view.transactionFlow
-              }
-              onStateChange={(transactionFlow) =>
-                !tour.step &&
-                workspaces.active?.edit(
-                  (current) => ({
-                    ...current,
-                    view: { ...current.view, transactionFlow },
-                  }),
-                  false,
-                )
-              }
+              state={shownFlowPanel}
+              onStateChange={(transactionFlow) => !tour.step && setFlowPanel(transactionFlow)}
               renderMetadata={renderEntityMetadata}
               onSmallAmountThresholdChange={(flowAmountThreshold) =>
                 edit(
@@ -555,8 +537,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
               <GraphControls
                 smallAmountHiddenCount={amountGraph.hiddenCount}
                 view={activeWorkspace.view}
-                focusGraph={shownFocusGraph}
-                onToggleFocus={() => setFocusGraph((value) => !value)}
+                panelsCollapsed={panelsCollapsed}
+                onTogglePanels={toggleSidePanels}
                 onChange={changeGraphView}
               />
             )}
@@ -611,8 +593,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                       motionToggle={motionToggle}
                       smallAmountHiddenCount={amountGraph.hiddenCount}
                       view={activeWorkspace.view}
-                      focusGraph={shownFocusGraph}
-                      onToggleFocus={() => setFocusGraph((value) => !value)}
+                      panelsCollapsed={panelsCollapsed}
+                      onTogglePanels={toggleSidePanels}
                       onChange={changeGraphView}
                     />
                   )}

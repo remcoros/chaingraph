@@ -1472,8 +1472,7 @@ small,
   .workbench {
     --left-panel-width: 280px;
     --right-panel-width: 280px;
-    grid-template-columns:
-      var(--left-panel-width) minmax(0, 1fr) var(--right-panel-width);
+    grid-template-columns: var(--left-panel-width) minmax(0, 1fr) var(--right-panel-width);
   }
   .workbench.left-panel-collapsed {
     --left-panel-width: 24px;
@@ -1969,10 +1968,6 @@ small,
 @media (max-width: 760px) {
   .lookup-controls {
     gap: 5px;
-  }
-  .workbench.focus-graph.show-left > .left-panel,
-  .workbench.focus-graph.show-right > .right-panel {
-    display: flex;
   }
 }
 

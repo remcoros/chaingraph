@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   type Annotation,
+  type GraphLeftTab,
   type GraphNode,
   type Wallet,
   type Workspace,
@@ -27,8 +28,8 @@ import { ResponsiveIdentifier } from '../../Shared/Display/ResponsiveIdentifier'
 interface Props {
   activeWorkspace: Workspace;
   tagsPanel?: ReactNode;
-  leftTab: 'wallets' | 'entities' | 'bookmarks' | 'tags';
-  setLeftTab: (tab: 'wallets' | 'entities' | 'bookmarks' | 'tags') => void;
+  leftTab: GraphLeftTab;
+  setLeftTab: (tab: GraphLeftTab) => void;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   selectedWalletId?: string;
@@ -126,10 +127,7 @@ export function WorkspacePanel({
   selection,
 }: Props) {
   return (
-    <aside
-      className={`left-panel ${collapsed ? 'panel-collapsed' : ''}`}
-      data-tour="wallet-panel"
-    >
+    <aside className={`left-panel ${collapsed ? 'panel-collapsed' : ''}`} data-tour="wallet-panel">
       <div className="panel-tabs left-panel-tabs">
         <button
           data-testid="panel-tab-entities"

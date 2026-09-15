@@ -365,7 +365,7 @@
   padding-left: 5px;
   gap: 2px;
 }
-.graph-controls .graph-focus-toggle {
+.graph-controls .graph-panels-toggle {
   display: none;
   gap: 5px;
   width: auto;
@@ -406,7 +406,7 @@
 }
 /* Keep this breakpoint aligned with the desktop side panels in styles.css. */
 @media (min-width: 1000px) {
-  .graph-controls .graph-focus-toggle {
+  .graph-controls .graph-panels-toggle {
     display: inline-flex;
   }
 }

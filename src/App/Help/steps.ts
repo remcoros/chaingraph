@@ -12,6 +12,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { GraphLeftTab, GraphMobilePanel } from '../../Domain/types';
 
 export interface TourContext {
   hasSelection: boolean;
@@ -37,9 +38,9 @@ export interface TourStep {
   view?: {
     workbench?: 'graph' | 'wallet';
     walletTab?: 'review' | 'sources';
-    panel?: 'graph' | 'left' | 'right';
-    leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
-    rightTab?: 'inspect' | 'analysis';
+    panel?: GraphMobilePanel;
+    leftTab?: GraphLeftTab;
+    rightTab?: 'inspect';
     flowOpen?: boolean;
   };
 }
@@ -135,7 +136,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="graph-stage"]',
     view: { panel: 'graph' },
     text: 'Cubes are transactions, spheres are outputs, and arrows show which way the funds move. Drag empty space to orbit, scroll to zoom, and right-drag to pan. Switch to "Flat" for a 2D layout.',
-    tip: 'Hover a node to trace or edit it. Choose "Value" under "Size by" to compare amounts at a glance. "Fit" frames everything currently visible, and "Hide panels" gives you more room without moving the camera.',
+    tip: 'Hover a node to trace or edit it. Choose "Value" under "Size by" to compare amounts at a glance. "Fit" frames everything currently visible, and "Hide panels" collapses both side panels without moving the camera.',
   },
   {
     id: 'flow',

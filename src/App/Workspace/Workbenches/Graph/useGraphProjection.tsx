@@ -201,8 +201,8 @@ export function useGraphProjection({
     [graphWithoutAddresses],
   );
   const graphFlowContext = useMemo(
-    () => flowIndex.resolve(graphSelectedId, activeWorkspace?.view.transactionFlow?.transactionId),
-    [flowIndex, graphSelectedId, activeWorkspace?.view.transactionFlow?.transactionId],
+    () => flowIndex.resolve(graphSelectedId, activeWorkspace?.view.panels?.flow?.transactionId),
+    [flowIndex, graphSelectedId, activeWorkspace?.view.panels?.flow?.transactionId],
   );
   const walletMatchInput = useMemo<WalletMatchInput | undefined>(() => {
     if (!workspaceNetwork || !workspaceTransactions || !workspaceWallets) return undefined;

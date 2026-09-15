@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   AddressFlowHeader,
   FlowPanelAddressView,
@@ -11,7 +10,7 @@ import {
   type FlowPanelTransactionViewProps,
 } from './FlowPanelTransactionView';
 import { WalletFlowHeader, type FlowPanelWalletViewProps } from './FlowPanelWalletView';
-import { FlowPanelShell, type FlowPanelHeight } from './FlowPanelShell';
+import { FlowPanelShell } from './FlowPanelShell';
 import './flow-panel.css';
 
 export interface FlowPanelProps
@@ -28,16 +27,12 @@ export interface FlowPanelProps
 export function FlowPanel(props: FlowPanelProps) {
   const { workspace, selected, selectedWallet, state, onStateChange } = props;
   const transaction = useFlowPanelTransaction(props);
-  const [fullHeight, setFullHeight] = useState(false);
-  const [localOpen, setLocalOpen] = useState(true);
-  const open = state?.open ?? localOpen;
-  const onHeight = (height: FlowPanelHeight) => {
-    const nextOpen = height !== 'collapsed';
-    setFullHeight(height === 'full');
-    setLocalOpen(nextOpen);
-    if (nextOpen !== open) onStateChange?.({ ...state, open: nextOpen });
+  const panelHeight = state?.height ?? 'expanded';
+  const height = {
+    open: panelHeight !== 'collapsed',
+    fullHeight: panelHeight === 'full',
+    onHeight: (next: typeof panelHeight) => onStateChange?.({ ...state, height: next }),
   };
-  const height = { open, fullHeight, onHeight };
   const annotation = selected ? workspace.annotations[selected.id] : undefined;
 
   if (!selected)

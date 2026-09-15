@@ -202,7 +202,7 @@ describe('automatic ancestor cleanup after transaction removal', () => {
     const w = automaticBranch();
     w.view.hiddenNodeIds = [`out:${parent}:0`, `tx:${child}`];
     w.view.selectionId = `tx:${parent}`;
-    w.view.transactionFlow = { open: true, transactionId: parent };
+    w.view.panels = { flow: { height: 'expanded', transactionId: parent } };
     w.view.filters = {
       includeIds: [`tx:${child}`, `tx:${parent}`],
       focus: { id: `tx:${parent}`, hops: 1 },
@@ -217,7 +217,7 @@ describe('automatic ancestor cleanup after transaction removal', () => {
     expect(buildGraph(next)).toEqual({ nodes: [], links: [] });
     expect(next.view.hiddenNodeIds).toEqual([]);
     expect(next.view.selectionId).toBeUndefined();
-    expect(next.view.transactionFlow?.transactionId).toBeUndefined();
+    expect(next.view.panels?.flow?.transactionId).toBeUndefined();
     expect(next.view.filters).toMatchObject({ includeIds: [], focus: undefined });
     expect(Object.keys(w.transactions)).toHaveLength(3);
     expect(() => parseWorkspace(next)).not.toThrow();

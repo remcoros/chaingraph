@@ -298,11 +298,14 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
         workspace.view.selectionId && affected.has(workspace.view.selectionId)
           ? undefined
           : workspace.view.selectionId,
-      transactionFlow:
-        workspace.view.transactionFlow?.transactionId &&
-        removed.has(workspace.view.transactionFlow.transactionId)
-          ? { ...workspace.view.transactionFlow, transactionId: undefined }
-          : workspace.view.transactionFlow,
+      panels: {
+        ...workspace.view.panels,
+        flow:
+          workspace.view.panels?.flow?.transactionId &&
+          removed.has(workspace.view.panels.flow.transactionId)
+            ? { ...workspace.view.panels.flow, transactionId: undefined }
+            : workspace.view.panels?.flow,
+      },
     },
   });
 }

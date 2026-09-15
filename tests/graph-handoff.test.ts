@@ -92,7 +92,7 @@ describe('shared Show and Isolate preparation', () => {
     };
     workspace.transactions[parent].vout[0].scriptPubKey.type = 'witness_v0_keyhash';
     workspace.transactions[parent].vout[1].scriptPubKey.type = 'witness_v1_taproot';
-    workspace.view.transactionFlow = { open: false };
+    workspace.view.panels = { flow: { height: 'collapsed' } };
     const tool = analysisTools.find((entry) => entry.id === 'script-types')!;
     const finding = tool.run(workspace, [parent])[0];
     expect(finding.title).toBe('Mixed output script types');
@@ -109,7 +109,7 @@ describe('shared Show and Isolate preparation', () => {
     );
     expect(navigation.selectedId).toBe(requested);
     expect(shown.nodes.map((node) => node.id)).toContain(requested);
-    expect(navigation.workspace.view.transactionFlow?.open).toBe(true);
+    expect(navigation.workspace.view.panels?.flow?.height).toBe('collapsed');
     const selected = shown.nodes.find((node) => node.id === requested)!;
     const plan = flowInputPlan(navigation.workspace, selected);
     expect(plan).toEqual({ transactionId: parent, missing: [missing] });

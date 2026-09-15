@@ -357,23 +357,34 @@ const workspaceSchema = z.object({
         includeIds: z.array(z.string().max(300)).max(MAX_GRAPH_RECORDS).optional(),
       })
       .optional(),
-    leftTab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
     workbench: z.enum(['graph', 'analysis', 'trace', 'wallet']).optional(),
-    rightTab: z
-      .enum(['scan', 'inspect', 'analysis', 'addresses', 'transactions', 'utxos'])
-      .optional(),
-    focusGraph: z.boolean().optional(),
-    prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
-    selectedWallet: z.string().max(200).optional(),
-    mobilePanel: z.enum(['graph', 'left', 'right']).optional(),
-    transactionFlow: z
+    panels: z
       .object({
-        transactionId: txid.optional(),
-        expandedInputs: z.boolean().optional(),
-        expandedOutputs: z.boolean().optional(),
-        open: z.boolean().optional(),
+        left: z
+          .object({
+            tab: z.enum(['wallets', 'entities', 'bookmarks', 'tags']).optional(),
+            collapsed: z.boolean().optional(),
+          })
+          .optional(),
+        right: z
+          .object({
+            tab: z.enum(['scan', 'inspect', 'addresses', 'transactions', 'utxos']).optional(),
+            collapsed: z.boolean().optional(),
+          })
+          .optional(),
+        mobile: z.enum(['graph', 'left', 'right']).optional(),
+        flow: z
+          .object({
+            transactionId: txid.optional(),
+            expandedInputs: z.boolean().optional(),
+            expandedOutputs: z.boolean().optional(),
+            height: z.enum(['collapsed', 'expanded', 'full']).optional(),
+          })
+          .optional(),
       })
       .optional(),
+    prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+    selectedWallet: z.string().max(200).optional(),
   }),
 });
 

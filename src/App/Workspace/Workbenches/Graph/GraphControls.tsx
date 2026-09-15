@@ -5,8 +5,8 @@ import type { Workspace } from '../../../../Domain/types';
 export function GraphControls({
   view,
   onChange,
-  focusGraph,
-  onToggleFocus,
+  panelsCollapsed,
+  onTogglePanels,
   smallAmountHiddenCount,
   motionToggle,
 }: {
@@ -14,8 +14,8 @@ export function GraphControls({
   motionToggle?: ReactNode;
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
   smallAmountHiddenCount?: number;
-  focusGraph?: boolean;
-  onToggleFocus?: () => void;
+  panelsCollapsed?: boolean;
+  onTogglePanels?: () => void;
 }) {
   return (
     <div className="graph-controls">
@@ -41,18 +41,20 @@ export function GraphControls({
           Flat
         </button>
       </div>
-      {onToggleFocus && (
+      {onTogglePanels && (
         <button
-          className={`icon-button graph-focus-toggle ${focusGraph ? 'active' : ''}`}
-          aria-label={focusGraph ? 'Show panels' : 'Hide panels'}
+          className={`icon-button graph-panels-toggle ${panelsCollapsed ? 'active' : ''}`}
+          aria-label={panelsCollapsed ? 'Show panels' : 'Hide panels'}
           title={
-            focusGraph ? 'Show the side panels' : 'Hide side panels to give the graph more room'
+            panelsCollapsed
+              ? 'Show the side panels'
+              : 'Hide side panels to give the graph more room'
           }
-          aria-pressed={Boolean(focusGraph)}
-          onClick={onToggleFocus}
+          aria-pressed={Boolean(panelsCollapsed)}
+          onClick={onTogglePanels}
         >
-          {focusGraph ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          <span>{focusGraph ? 'Show panels' : 'Hide panels'}</span>
+          {panelsCollapsed ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          <span>{panelsCollapsed ? 'Show panels' : 'Hide panels'}</span>
         </button>
       )}
       <span className="size-control">

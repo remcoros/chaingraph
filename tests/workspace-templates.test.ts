@@ -69,7 +69,7 @@ describe('real annotated workspace templates', () => {
           (tx) => tx.vin.length <= (template.id === 'mainnet-wabisabi' ? 350 : 326),
         ),
       ).toBe(true);
-      const selected = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
+      const selected = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
       expect(selected).toBeDefined();
       // Every input resolves to known previous-output content, whether the parent is
       // loaded in full or the output is attached to the spending input.
@@ -149,7 +149,7 @@ describe('real annotated workspace templates', () => {
       ['testnet4-fan-out', 53],
     ] as const) {
       const workspace = await createTemplateWorkspace(id);
-      const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
+      const root = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
       const visible = new Set(workspace.view.graphNodeIds);
       expect(root.vout).toHaveLength(expected);
       for (const output of root.vout)
@@ -181,7 +181,7 @@ describe('real annotated workspace templates', () => {
         const firstIds = new Set(first.tags!.map((tag) => tag.id));
         expect(second.tags!.every((tag) => !firstIds.has(tag.id))).toBe(true);
         const expected = structuredClone(second);
-        const root = first.view.transactionFlow!.transactionId!;
+        const root = first.view.panels!.flow!.transactionId!;
         first.transactions[root].vout[0].value = 1;
         first.transactions[root].vout[0].scriptPubKey.hex = '6a';
         first.annotations[Object.keys(first.annotations)[0]].note = 'Edited';
@@ -189,7 +189,7 @@ describe('real annotated workspace templates', () => {
         const contextId = Object.keys(first.inputContext ?? {})[0];
         if (contextId) first.inputContext![contextId].length = 0;
         if (first.contextTransactionIds) first.contextTransactionIds.length = 0;
-        first.view.transactionFlow!.open = false;
+        first.view.panels!.flow!.height = 'collapsed';
         expect(second).toEqual(expected);
         const third = await createTemplateWorkspace(template.id);
         expect(third.transactions).toEqual(second.transactions);
@@ -290,7 +290,7 @@ describe('real annotated workspace templates', () => {
 
   it('keeps the 143-output case complete with truthful amount and script groups', async () => {
     const workspace = await createTemplateWorkspace('mainnet-batch-outputs');
-    const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
+    const root = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
     expect(root.vin).toHaveLength(1);
     expect(root.vout).toHaveLength(143);
     const small = workspace.tags!.find(
@@ -307,7 +307,7 @@ describe('real annotated workspace templates', () => {
 
   it('opens the large CoinJoin with complete inputs and amount groups without ownership findings', async () => {
     const workspace = await createTemplateWorkspace('mainnet-wabisabi');
-    const root = workspace.transactions[workspace.view.transactionFlow!.transactionId!];
+    const root = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
     expect(root.vin).toHaveLength(327);
     expect(root.vout).toHaveLength(279);
     // The snapshot carries the CoinJoin alone; each spend records the exact output it
@@ -357,7 +357,7 @@ describe('real annotated workspace templates', () => {
       ),
     );
     expect(walletOutputs.length).toBeGreaterThanOrEqual(2);
-    expect(workspace.view.leftTab).toBe('wallets');
+    expect(workspace.view.panels?.left?.tab).toBe('wallets');
     expect(workspace.view.highlightMode).toBe('wallets');
     expect(workspace.description).toContain('never send funds');
     expect(() =>

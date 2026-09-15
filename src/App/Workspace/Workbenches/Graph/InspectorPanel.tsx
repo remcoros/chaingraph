@@ -38,7 +38,6 @@ function withScanActionEvidence(
 export function InspectorPanel({ workspace }: { workspace: WorkspaceController }) {
   const {
     activeWorkspace,
-    rightTab,
     fetchScope,
     shownWorkbench,
     lockingWorkspace,
@@ -50,10 +49,12 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     rightPanelRef,
   } = workspace;
   const {
-    rightTab: shownRightTab,
+    right: { tab: shownRightTab, collapsed: rightPanelCollapsed },
+    saved: {
+      right: { tab: savedRightTab },
+    },
     setRightTab,
-    rightPanelCollapsed,
-    setRightPanelCollapsed,
+    toggleRightPanel,
   } = workspace.graph.panels;
   const { scanTargets: connectionScanTargets } = workspace.graph;
   const { selected: wallet, utxos: walletUtxos } = workspace.wallet;
@@ -76,11 +77,11 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   const inspectorScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
-  }, [activeWorkspace?.id, rightTab]);
+  }, [activeWorkspace?.id, savedRightTab]);
   useLayoutEffect(() => {
     // Scan results stay in place while their paths change the graph selection.
-    if (rightTab !== 'scan' && inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
-  }, [selectedId, selectedWallet, rightTab]);
+    if (savedRightTab !== 'scan' && inspectorScroll.current) inspectorScroll.current.scrollTop = 0;
+  }, [selectedId, selectedWallet, savedRightTab]);
   if (!activeWorkspace) return null;
   return (
     <aside
@@ -95,7 +96,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
           aria-label={rightPanelCollapsed ? 'Expand right panel' : 'Collapse right panel'}
           title={rightPanelCollapsed ? 'Expand right panel' : 'Collapse right panel'}
           aria-expanded={!rightPanelCollapsed}
-          onClick={() => setRightPanelCollapsed((value) => !value)}
+          onClick={toggleRightPanel}
         >
           {rightPanelCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>

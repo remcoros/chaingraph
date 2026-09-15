@@ -362,7 +362,7 @@ describe('explicit canvas membership', () => {
     'projects only the curated starting canvas for example %s',
     async (template) => {
       const w = await createTemplateWorkspace(template);
-      const root = txNodeId(w.view.transactionFlow!.transactionId!);
+      const root = txNodeId(w.view.panels!.flow!.transactionId!);
       const graph = projectGraphMembership(buildGraph(w), w.view.graphNodeIds);
       const visible = new Set(graph.nodes.map((node) => node.id));
       expect(visible).toEqual(new Set(w.view.graphNodeIds));

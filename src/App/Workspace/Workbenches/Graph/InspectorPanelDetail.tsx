@@ -23,10 +23,9 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     tour,
   } = workspace;
   const {
-    setRightTab,
     setMobilePanel,
-    setLeftTab,
-    rightTab: shownRightTab,
+    setPanels,
+    right: { tab: shownRightTab },
   } = workspace.graph.panels;
   const {
     utxoObservation: walletUtxoObservation,
@@ -89,8 +88,11 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
         operationRef.current?.abort();
         setSelectedWallet(id);
         setSelectedId(undefined);
-        setRightTab('inspect');
-        setMobilePanel('right');
+        setPanels((current) => ({
+          ...current,
+          right: { ...current.right, tab: 'inspect' },
+          mobile: 'right',
+        }));
       }}
       tagsPanel={
         <SelectedTags
@@ -101,8 +103,11 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
           onOpenHandled={annotations.edit.acknowledge}
           onChange={annotations.changeTags}
           onManage={() => {
-            setLeftTab('tags');
-            setMobilePanel('left');
+            setPanels((current) => ({
+              ...current,
+              left: { ...current.left, tab: 'tags' },
+              mobile: 'left',
+            }));
           }}
         />
       }

@@ -112,14 +112,6 @@ kbd {
     display: none;
   }
 }
-@media (min-width: 1000px) {
-  .workbench.focus-graph {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .workbench.focus-graph > aside {
-    display: none;
-  }
-}
 .skip-link {
   position: fixed;
   top: 8px;

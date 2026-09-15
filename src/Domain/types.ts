@@ -120,11 +120,21 @@ export interface AnalysisFinding {
   stale?: boolean;
   reviewRule?: ReviewRule;
 }
+export type GraphLeftTab = 'wallets' | 'entities' | 'bookmarks' | 'tags';
+export type GraphRightTab = 'scan' | 'inspect' | 'addresses' | 'transactions' | 'utxos';
+export type GraphMobilePanel = 'graph' | 'left' | 'right';
+export type FlowPanelHeight = 'collapsed' | 'expanded' | 'full';
 export interface TransactionFlowState {
   transactionId?: string;
   expandedInputs?: boolean;
   expandedOutputs?: boolean;
-  open?: boolean;
+  height?: FlowPanelHeight;
+}
+export interface GraphPanelsState {
+  left?: { tab?: GraphLeftTab; collapsed?: boolean };
+  right?: { tab?: GraphRightTab; collapsed?: boolean };
+  flow?: TransactionFlowState;
+  mobile?: GraphMobilePanel;
 }
 export interface Workspace {
   /** Decrypted data schema version, independent of the encrypted envelope format. */
@@ -179,14 +189,10 @@ export interface Workspace {
     graphSnapshot?: GraphSnapshot;
     selectionId?: string;
     filters?: GraphFilters;
-    leftTab?: 'wallets' | 'entities' | 'bookmarks' | 'tags';
     workbench?: 'graph' | 'analysis' | 'trace' | 'wallet';
-    rightTab?: 'scan' | 'inspect' | 'analysis' | 'addresses' | 'transactions' | 'utxos';
-    focusGraph?: boolean;
+    panels?: GraphPanelsState;
     prefetchDepth?: 0 | 1 | 2;
     selectedWallet?: string;
-    mobilePanel?: 'graph' | 'left' | 'right';
-    transactionFlow?: TransactionFlowState;
   };
 }
 export interface GraphFilters {

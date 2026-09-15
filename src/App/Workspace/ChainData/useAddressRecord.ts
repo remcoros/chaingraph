@@ -16,6 +16,7 @@ import type { WorkspaceCore } from '../workspaceCore';
 import type { WorkspaceSelection } from '../Selection/useWorkspaceSelection';
 import type { WorkspaceLookup } from '../useWorkspaceLookup';
 import { clearContextProvenance } from '../../../Domain/Workspace/workspace';
+import { openFlowPanel } from '../../../Domain/Workspace/panelState';
 import { mergeTransactionObservations } from '../../../Domain/Chain/prevouts';
 import { withHistoryHeight } from '../../../Domain/Chain/transactionStatus';
 import { outputNodeId, addressNodeId, txNodeId, type Transaction } from '../../../Domain/types';
@@ -745,10 +746,11 @@ export function useAddressRecord({
           ...admitted,
           view: {
             ...admitted.view,
-            transactionFlow: {
-              ...latest.view.transactionFlow,
-              transactionId: transaction.txid,
-              open: true,
+            panels: {
+              ...latest.view.panels,
+              flow: openFlowPanel(latest.view.panels?.flow, {
+                transactionId: transaction.txid,
+              }),
             },
           },
         };

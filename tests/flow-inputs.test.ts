@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { flowInputPlan, mergeFlowInputs } from '../src/Domain/Chain/flowInputs';
+import {
+  flowInputPlan,
+  mergeFlowInputs,
+  shouldLoadFlowInputs,
+} from '../src/Domain/Chain/flowInputs';
 import { newWorkspace, buildGraph, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import type { Transaction } from '../src/Domain/types';
 
@@ -12,15 +16,26 @@ const tx = (txid: string, source?: string): Transaction => ({
   vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
 });
 describe('displayed transaction input hydration scope', () => {
+  it('hydrates a selected unknown outpoint without expanding a collapsed flow panel', () => {
+    const w = newWorkspace('Collapsed flow', 'mainnet');
+    w.transactions[child] = tx(child, parent);
+    w.view.panels = { flow: { height: 'collapsed' } };
+    const selected = buildGraph(w).nodes.find((node) => node.id === `out:${parent}:0`)!;
+    const transaction = buildGraph(w).nodes.find((node) => node.id === `tx:${child}`)!;
+    expect(shouldLoadFlowInputs(w, selected)).toBe(true);
+    expect(shouldLoadFlowInputs(w, transaction)).toBe(false);
+    expect(w.view.panels.flow?.height).toBe('collapsed');
+  });
+
   it('loads direct inputs once and never walks all newly added parents recursively', () => {
     const w = newWorkspace('Public fixture', 'mainnet');
     w.transactions[child] = tx(child, parent);
     const selected = buildGraph(w).nodes.find((n) => n.id === `out:${parent}:0`)!;
     expect(flowInputPlan(w, selected)).toEqual({ transactionId: child, missing: [parent] });
-    w.view.transactionFlow = { transactionId: child };
+    w.view.panels = { flow: { transactionId: child } };
     w.transactions[parent] = tx(parent, grandparent);
     expect(flowInputPlan(w, selected)).toEqual({ transactionId: child, missing: [] });
-    w.view.transactionFlow.transactionId = parent;
+    w.view.panels.flow!.transactionId = parent;
     expect(flowInputPlan(w, selected)).toEqual({ transactionId: parent, missing: [] });
     expect(flowInputPlan(w, selected, true)).toEqual({
       transactionId: parent,

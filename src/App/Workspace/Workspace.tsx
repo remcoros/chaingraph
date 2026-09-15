@@ -23,9 +23,9 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     operationRef,
   } = workspace;
   const {
-    mobilePanel: shownMobilePanel,
+    mobile: shownMobilePanel,
     setMobilePanel,
-    rightTab: shownRightTab,
+    right: { tab: shownRightTab },
   } = workspace.graph.panels;
   const { scanTargets: connectionScanTargets } = workspace.graph;
   const { pendingWorkspaceId: pendingGraphWorkspace } = workspace.graph.canvas;
@@ -66,15 +66,13 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
           <List size={15} />
           {shownRightTab === 'scan'
             ? 'Scan'
-            : shownRightTab === 'analysis'
-              ? 'Inspector'
-              : shownRightTab === 'addresses'
-                ? 'Addresses'
-                : shownRightTab === 'transactions'
-                  ? 'Transactions'
-                  : shownRightTab === 'utxos'
-                    ? 'UTXOs'
-                    : 'Inspector'}
+            : shownRightTab === 'addresses'
+              ? 'Addresses'
+              : shownRightTab === 'transactions'
+                ? 'Transactions'
+                : shownRightTab === 'utxos'
+                  ? 'UTXOs'
+                  : 'Inspector'}
         </button>
       </div>
       <GraphWorkbench workspace={workspace} />

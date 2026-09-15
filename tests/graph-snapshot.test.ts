@@ -21,7 +21,7 @@ const snapshot: GraphSnapshot = {
 };
 
 describe('encrypted graph-view data validation', () => {
-  it('preserves optional view state through workspace validation and accepts old workspaces', () => {
+  it('preserves optional view state through workspace validation', () => {
     const workspace = newWorkspace('Saved view', 'testnet4');
     expect(parseWorkspace(workspace).view.graphSnapshot).toBeUndefined();
     workspace.view = {
@@ -29,13 +29,18 @@ describe('encrypted graph-view data validation', () => {
       graphSnapshot: snapshot,
       selectionId: 'a',
       filters: { query: 'Own coins', includeIds: ['a'], minSats: 10, focus: { id: 'a', hops: 2 } },
-      leftTab: 'tags',
-      rightTab: 'inspect',
-      mobilePanel: 'right',
+      panels: {
+        left: { tab: 'tags', collapsed: true },
+        right: { tab: 'inspect', collapsed: true },
+        mobile: 'right',
+        flow: {
+          transactionId: '1'.repeat(64),
+          expandedInputs: true,
+          height: 'collapsed',
+        },
+      },
       selectedWallet: 'wallet',
       prefetchDepth: 1,
-      focusGraph: true,
-      transactionFlow: { transactionId: '1'.repeat(64), expandedInputs: true, open: false },
     };
     expect(parseWorkspace(workspace).view).toEqual(workspace.view);
     workspace.view.selectionId = undefined;
@@ -92,7 +97,7 @@ describe('encrypted graph-view data validation', () => {
       { filters: { minSats: -1 } },
       { filters: { focus: { id: 'a', hops: 3 } } },
       { filters: { query: 'x'.repeat(10001) } },
-      { transactionFlow: { transactionId: 'not a txid' } },
+      { panels: { flow: { transactionId: 'not a txid' } } },
     ]) {
       expect(() =>
         parseWorkspace({ ...workspace, view: { ...workspace.view, ...patch } }),

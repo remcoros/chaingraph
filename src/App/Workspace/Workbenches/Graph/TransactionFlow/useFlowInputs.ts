@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   flowInputPlan,
   mergeFlowInputs,
+  shouldLoadFlowInputs,
   type FlowPlanWorkspace,
 } from '../../../../../Domain/Chain/flowInputs';
 import type { GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
@@ -27,11 +28,11 @@ export function useFlowInputs(options: {
   const transactions = workspace?.transactions;
   const network = workspace?.network;
   const selected = options.selected;
-  const flowState = workspace?.view.transactionFlow;
+  const flowState = workspace?.view.panels?.flow;
   const flowWorkspace = useMemo<FlowPlanWorkspace | undefined>(
     () =>
       transactions && network
-        ? { network, transactions, view: { transactionFlow: flowState } }
+        ? { network, transactions, view: { panels: { flow: flowState } } }
         : undefined,
     [transactions, network, flowState],
   );
@@ -65,7 +66,8 @@ export function useFlowInputs(options: {
     options.workspace && options.selected
       ? `${options.workspace.id}:${options.workspace.network}:${selectedPlan?.transactionId ?? ''}:${options.selected.id}`
       : '';
-  const enabled = options.enabled && options.workspace?.view.transactionFlow?.open !== false;
+  const enabled =
+    options.enabled && !!options.workspace && shouldLoadFlowInputs(options.workspace, selected);
   const [attempt, setAttempt] = useState(0);
   const [bulkTarget, setBulkTarget] = useState('');
   const allInputs = bulkTarget === target;
@@ -92,14 +94,17 @@ export function useFlowInputs(options: {
     // oxlint-disable-next-line react/set-state-in-effect -- Reports the outcome of fetching previous outputs.
     setState({ target, loading: true, error: '' });
     // Pin the displayed transaction before parent arrivals can change related-transaction ordering.
-    if (transactionId && workspace.view.transactionFlow?.transactionId !== transactionId)
+    if (transactionId && workspace.view.panels?.flow?.transactionId !== transactionId)
       update(
         workspace.id,
         (current) => ({
           ...current,
           view: {
             ...current.view,
-            transactionFlow: { ...current.view.transactionFlow, transactionId },
+            panels: {
+              ...current.view.panels,
+              flow: { ...current.view.panels?.flow, transactionId },
+            },
           },
         }),
         false,

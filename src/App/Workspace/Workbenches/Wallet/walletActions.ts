@@ -6,7 +6,12 @@ import {
 } from '../../../../Domain/Wallet/walletRecords';
 import { listWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
 import { addGraphNodes } from '../../../../Domain/Graph/graphMembership';
-import { type GraphFilters, type Wallet, type Workspace } from '../../../../Domain/types';
+import {
+  type GraphFilters,
+  type GraphRightTab,
+  type Wallet,
+  type Workspace,
+} from '../../../../Domain/types';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { WorkbenchMode } from '../../workbenchTypes';
@@ -22,7 +27,7 @@ interface Inputs {
   handoff: GraphHandoff;
   fetch: ChainFetch;
   wallet: Wallet | undefined;
-  shownRightTab: NonNullable<Workspace['view']['rightTab']>;
+  shownRightTab: GraphRightTab;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
@@ -64,7 +69,7 @@ export function createWalletActions({
     nodeId: string,
     utxo?: WalletUtxoRecord,
     options: {
-      tab?: NonNullable<Workspace['view']['rightTab']>;
+      tab?: GraphRightTab;
       center?: boolean;
       isolate?: boolean;
       selectionIds?: readonly string[];

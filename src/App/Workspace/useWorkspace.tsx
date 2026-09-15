@@ -80,8 +80,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
 
   const dialogs = useDialogState(activeWorkspace);
   const [viewOwner, setViewOwner] = useState<string>();
-  const graphPanels = useGraphPanels();
-  const { setLeftTab, setRightTab, setMobilePanel } = graphPanels;
+  const graphPanels = useGraphPanels({
+    workspace: activeWorkspace,
+    workspaceId,
+    getWorkspace: getUnlockedWorkspace,
+  });
+  const { setRightTab, setMobilePanel, setPanels } = graphPanels;
   const graphCanvas = useGraphCanvas({
     getUnlockedWorkspace,
     workspaceId,
@@ -184,15 +188,17 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     hasTransactions: !!activeWorkspace && Object.keys(activeWorkspace.transactions).length > 0,
   });
   const tourStep = tour.step;
-  // Tour previews never feed the persisted presentation effect or selection history.
+  // Tour previews never change saved workspace state or selection history.
   const shownWorkbench = tourStep ? (tourStep.view?.workbench ?? 'graph') : workbench;
-  const shownPanels = graphPanelsInView(graphPanels.chosen, {
+  const shownPanels = graphPanelsInView(graphPanels.saved, {
     preview: tourStep?.view,
     previewing: !!tourStep,
     hasSelectedWallet: !!activeWorkspace?.wallets.some((item) => item.id === selectedWallet),
   });
-  const { rightTab: shownRightTab } = shownPanels;
-  const { leftTab, rightTab, mobilePanel, focusGraph } = graphPanels.chosen;
+  const {
+    right: { tab: shownRightTab },
+  } = shownPanels;
+  const savedRightTab = graphPanels.saved.right.tab;
   const connectionScanTargets = useConnectionScanTargets({
     workspaceId: activeWorkspace?.id,
     setPickHandler: selection.setPickHandler,
@@ -254,12 +260,10 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
         ? activeWorkspace.view.selectedWallet
         : activeWorkspace?.wallets[0]?.id,
     );
-    graphPanels.hydrate(activeWorkspace?.view);
     setWorkbench(
       activeWorkspace?.view.workbench === 'wallet' && activeWorkspace.wallets.length
         ? 'wallet'
-        : activeWorkspace?.view.workbench === 'analysis' ||
-            (!activeWorkspace?.view.workbench && activeWorkspace?.view.rightTab === 'analysis')
+        : activeWorkspace?.view.workbench === 'analysis'
           ? 'analysis'
           : 'graph',
     );
@@ -312,29 +316,22 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setError,
     setNotice,
   });
-  // Hydration has its own owner so a workspace switch never writes the previous view
-  // into the newly active workspace. Presentation does not consume annotation undo.
+  // Hydration has its own owner so a workspace switch never writes the previous
+  // presentation into the newly active workspace. Presentation does not consume annotation undo.
   const presentationFilters = filters.persistable(activeWorkspace?.view.filters);
   useEffect(() => {
     if (!workspaceId || viewOwner !== workspaceId) return;
-    const presentation = {
-      selectionId: selectedId,
-      selectedWallet,
-      filters: presentationFilters,
-      leftTab,
-      rightTab,
-      workbench,
-      mobilePanel,
-      focusGraph,
-      prefetchDepth,
-    };
     getUnlockedWorkspace(workspaceId)?.edit((current) => {
+      const presentation = {
+        selectionId: selectedId,
+        selectedWallet,
+        filters: presentationFilters,
+        workbench,
+        prefetchDepth,
+      };
       // Compare only these UI settings, never the saved graph geometry or membership.
       const unchanged = (Object.keys(presentation) as (keyof typeof presentation)[]).every(
-        (key) =>
-          current.view[key] === presentation[key] ||
-          (key === 'filters' &&
-            JSON.stringify(current.view.filters) === JSON.stringify(presentation.filters)),
+        (key) => JSON.stringify(current.view[key]) === JSON.stringify(presentation[key]),
       );
       return unchanged ? current : { ...current, view: { ...current.view, ...presentation } };
     }, false);
@@ -344,11 +341,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selectedId,
     selectedWallet,
     presentationFilters,
-    leftTab,
-    rightTab,
     workbench,
-    mobilePanel,
-    focusGraph,
     prefetchDepth,
     getUnlockedWorkspace,
   ]);
@@ -389,7 +382,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       viewOwner === activeWorkspace?.id &&
       !lockingWorkspace &&
       !tourStep &&
-      (workbench === 'wallet' || (workbench === 'graph' && rightTab === 'utxos')),
+      (workbench === 'wallet' || (workbench === 'graph' && savedRightTab === 'utxos')),
   });
   const walletUtxoObservation = useMemo(
     () =>
@@ -470,8 +463,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     }));
     select(id);
     setGraphFilters({});
-    setLeftTab('entities');
-    setMobilePanel('graph');
+    setPanels((current) => ({
+      ...current,
+      left: { ...current.left, tab: 'entities' },
+      mobile: 'graph',
+    }));
     setFocusRequest((previous) => ({ id, token: (previous?.token ?? 0) + 1 }));
   }
   async function exportWorkspace() {
@@ -599,7 +595,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     chainDataDisabledReason,
     edit,
     canLoadChainData,
-    rightTab,
     fetchScope,
     shownWorkbench,
     lockingWorkspace,

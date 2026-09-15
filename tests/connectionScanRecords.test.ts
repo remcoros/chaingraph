@@ -93,13 +93,13 @@ describe('compact connection scan records', () => {
     run.status = 'running';
     run.deepestHop = 3;
     const next = replaceScanRun(workspace, run, evidence);
-    next.view.rightTab = 'scan';
+    next.view.panels = { right: { tab: 'scan' } };
     const encrypted = await validateAndEncryptWorkspace(next, 'public fixture password');
     expect(JSON.stringify(encrypted)).not.toContain(run.source);
     const restored = await decryptAndValidateWorkspace(encrypted, 'public fixture password');
     expect(restored.connectionScans?.runs[0].status).toBe('interrupted');
     expect(restored.connectionScans?.runs[0].deepestHop).toBe(3);
-    expect(restored.view.rightTab).toBe('scan');
+    expect(restored.view.panels?.right?.tab).toBe('scan');
     expect(next.connectionScans?.runs[0].status).toBe('running');
     expect(restored.connectionScans?.evidence).toEqual(evidence);
     expect(restored.transactions).toEqual(workspace.transactions);

@@ -7,6 +7,7 @@ import type { WorkspaceCore } from '../workspaceCore';
 import type { WorkspaceSelection } from '../Selection/useWorkspaceSelection';
 import { setNodesHidden } from '../../../Domain/Graph/visibility';
 import { buildGraph } from '../../../Domain/Workspace/workspace';
+import { openFlowPanel } from '../../../Domain/Workspace/panelState';
 import { outputNodeId, txNodeId } from '../../../Domain/types';
 import { loadSpending } from '../../../Infra/Bitcoin/api';
 import { ancestryNotice, loadAncestors, traceSourceExists } from '../../../Infra/Bitcoin/tracing';
@@ -106,10 +107,11 @@ export function useGraphExpansion({
               view: {
                 ...current.view,
                 hiddenNodeIds: current.view.hiddenNodeIds?.filter((hidden) => hidden !== id),
-                transactionFlow: {
-                  ...current.view.transactionFlow,
-                  transactionId: transaction.txid,
-                  open: true,
+                panels: {
+                  ...current.view.panels,
+                  flow: openFlowPanel(current.view.panels?.flow, {
+                    transactionId: transaction.txid,
+                  }),
                 },
               },
             }),
@@ -202,10 +204,11 @@ export function useGraphExpansion({
                 ...admitted,
                 view: {
                   ...admitted.view,
-                  transactionFlow: {
-                    ...admitted.view.transactionFlow,
-                    transactionId: result.transactions[0].txid,
-                    open: true,
+                  panels: {
+                    ...admitted.view.panels,
+                    flow: openFlowPanel(admitted.view.panels?.flow, {
+                      transactionId: result.transactions[0].txid,
+                    }),
                   },
                 },
               }
