@@ -145,8 +145,9 @@ export function WorkspaceHome({
         <div className="welcome-note">
           <ShieldCheck size={20} />
           <p>
-            Connect to your own Bitcoin and Fulcrum nodes. Wallet discovery happens in your browser;
-            your backend is a read-only bridge.
+            Connect to your own back-end and Bitcoin/Electrum node. Wallet discovery happens in your
+            browser; no xpub leaves the browser, but the backend still receives requests for
+            script-hash and transaction queries.
           </p>
         </div>
       </div>

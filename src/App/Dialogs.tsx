@@ -442,10 +442,7 @@ export function UnlockDialog({
   const read = useWorkspaceRead(onClose);
   return (
     <Modal title="Unlock workspace" onClose={read.close}>
-      <p className="muted">
-        Saved {formatLocalTimestamp(entry.savedAt) ?? 'Unknown time'}. Workspace names are public.
-        Descriptions, wallet names and contents stay encrypted until unlocked.
-      </p>
+      <p className="muted">Last saved: {formatLocalTimestamp(entry.savedAt) ?? 'Unknown'}</p>
       <PasswordControls
         label="Unlock workspace encryption"
         disabled={busy}
