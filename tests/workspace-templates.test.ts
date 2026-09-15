@@ -9,6 +9,7 @@ import { outputNodeId, sats, txNodeId } from '../src/Domain/types';
 import { projectGraphMembership } from '../src/Domain/Graph/graphMembership';
 import { transactionNodeIds } from '../src/Domain/Graph/visibility';
 import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
+import { ICON_PALETTE } from '../src/Shared/Metadata/iconOptions';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -34,6 +35,20 @@ describe('real annotated workspace templates', () => {
     for (const entry of WORKSPACE_TEMPLATES) {
       expect(entry.sources.length).toBeGreaterThan(0);
       expect(entry.sources.every((source) => new URL(source.url).protocol === 'https:')).toBe(true);
+    }
+  });
+
+  it('keeps every generated example annotation icon available in the picker palette', async () => {
+    const palette = new Set<string>(ICON_PALETTE.map(([symbol]) => symbol));
+    for (const template of WORKSPACE_TEMPLATES) {
+      const workspace = await createTemplateWorkspace(template.id);
+      const icons = new Set(
+        Object.values(workspace.annotations)
+          .map((annotation) => annotation.icon)
+          .filter(Boolean),
+      );
+      for (const icon of icons)
+        expect(palette.has(icon), `${template.id} uses icon ${icon}`).toBe(true);
     }
   });
 

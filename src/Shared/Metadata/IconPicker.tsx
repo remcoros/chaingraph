@@ -2,58 +2,8 @@ import { useEffect, useEffectEvent, useId, useRef, useState, type KeyboardEvent 
 import { X } from 'lucide-react';
 import { useDialogFocus } from '../Controls/useDialogFocus';
 import { MetadataPopover } from './MetadataEditors';
+import { ICON_PALETTE } from './iconOptions';
 import './icon-picker.css';
-
-const icons = [
-  ['★', 'Star'],
-  ['◇', 'Diamond'],
-  ['⚑', 'Flag'],
-  ['?', 'Question'],
-  ['✓', 'Verified'],
-  ['!', 'Attention'],
-  ['◎', 'Target'],
-  ['∞', 'Long term'],
-  ['₿', 'Bitcoin'],
-  ['👛', 'Wallet'],
-  ['🏦', 'Savings'],
-  ['❄️', 'Cold storage'],
-  ['🔑', 'Key'],
-  ['💸', 'Payment'],
-  ['📥', 'Income'],
-  ['📤', 'Spending'],
-  ['🔄', 'Swap'],
-  ['🤝', 'CoinJoin'],
-  ['⚡', 'Lightning'],
-  ['🛒', 'Merchant'],
-  ['🎁', 'Gift'],
-  ['⛏️', 'Mining'],
-  ['❤️', 'Donation'],
-  ['✈️', 'Travel'],
-  ['💼', 'Work'],
-  ['🏠', 'Home'],
-  ['👥', 'Family'],
-  ['🔬', 'Research'],
-  ['📝', 'Note'],
-  ['🔖', 'Bookmark'],
-  ['👁️', 'Watch'],
-  ['❔', 'Unknown'],
-  ['🔒', 'Lock'],
-  ['🔓', 'Unlock'],
-  ['⚠️', 'Warning'],
-  ['🛡️', 'Shield'],
-  ['🔥', 'High priority'],
-  ['⏳', 'Time'],
-  ['🎯', 'Goal'],
-  ['🔗', 'Link'],
-  ['⑂', 'Split'],
-  ['⑃', 'Merge'],
-  ['🌿', 'Branch'],
-  ['🌐', 'Globe'],
-  ['🏷️', 'Tag'],
-  ['🧩', 'Puzzle'],
-  ['📁', 'Folder'],
-  ['📍', 'Checkpoint'],
-] as const;
 
 interface Props {
   value: string;
@@ -98,7 +48,8 @@ export function IconPicker({
   const id = useId();
   const label = mixed
     ? 'Mixed'
-    : (icons.find(([symbol]) => symbol === value)?.[1] ?? (value ? 'Imported icon' : 'None'));
+    : (ICON_PALETTE.find(([symbol]) => symbol === value)?.[1] ??
+      (value ? 'Imported icon' : 'None'));
   const field = fieldLabel ?? 'Icon';
   const accessibleLabel = ariaLabel
     ? compact
@@ -155,9 +106,9 @@ export function IconPalette({
 }) {
   const ref = useDialogFocus(onClose, undefined, false);
   const options: readonly (readonly [string, string])[] =
-    value && !icons.some(([symbol]) => symbol === value)
-      ? [[value, 'Imported icon'], ...icons]
-      : icons;
+    value && !ICON_PALETTE.some(([symbol]) => symbol === value)
+      ? [[value, 'Imported icon'], ...ICON_PALETTE]
+      : ICON_PALETTE;
   const [active, setActive] = useState(
     Math.max(
       0,
