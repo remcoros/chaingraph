@@ -3,7 +3,7 @@ import { listWalletAddresses } from '../../../../../Domain/Wallet/walletRecords'
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
-} from '../../../../../Domain/Wallet/walletUtxoObservation';
+} from '../../../ChainData/WalletUtxos/walletUtxoObservation';
 import { useUtxoStatus } from './useUtxoStatus';
 import './utxo-status.css';
 import {

@@ -7,7 +7,7 @@ import { WalletInspector } from '../src/App/Workspace/Workbenches/Graph/Inspecto
 import {
   matchingWalletUtxoObservation,
   resolveWalletUtxoObservation,
-} from '../src/Domain/Wallet/walletUtxoObservation';
+} from '../src/App/Workspace/ChainData/WalletUtxos/walletUtxoObservation';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { outputNodeId, type Transaction, type Wallet } from '../src/Domain/types';
 import { addressToScriptHash } from '../src/Domain/Wallet/wallet';

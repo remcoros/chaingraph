@@ -1,5 +1,9 @@
-import { outputNodeId, type Network, type Wallet, type Workspace } from '../types';
-import { verifiedWalletAddresses, verifyWalletUtxo, type WalletUtxoRecord } from './walletRecords';
+import { outputNodeId, type Network, type Wallet, type Workspace } from '../../../../Domain/types';
+import {
+  verifiedWalletAddresses,
+  verifyWalletUtxo,
+  type WalletUtxoRecord,
+} from '../../../../Domain/Wallet/walletRecords';
 
 export interface WalletUtxoObservation {
   workspaceId: string;
