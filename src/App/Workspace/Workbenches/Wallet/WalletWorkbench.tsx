@@ -84,10 +84,10 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         onChange={(update, group) => edit(update, true, group)}
         onEditWallet={(walletId) => dialogs.openWalletRename(activeWorkspace.id, walletId)}
         onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets[0])}
-        onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'graph')}
+        onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'show')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
         onShowSelection={(ids, isolate) => {
-          if (ids.length) openWalletRecord(ids[0], undefined, isolate ? 'isolate' : 'graph', ids);
+          if (ids.length) openWalletRecord(ids[0], undefined, isolate ? 'isolate' : 'show', ids);
         }}
         onInspect={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'inspect')}
         onAnalyze={analyzeFromWallet}

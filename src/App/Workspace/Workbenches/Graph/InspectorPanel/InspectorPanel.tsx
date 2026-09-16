@@ -4,7 +4,7 @@ import {
   addScanNodeAddition,
 } from '../../../../../Domain/ConnectionScan/connectionScanAddition';
 import { WalletRecordsPanel } from './WalletRecordsPanel';
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import {
   ArrowLeftRight,
   ArrowRightFromLine,
@@ -35,7 +35,13 @@ function withScanActionEvidence(
       }
     : workspace;
 }
-export function InspectorPanel({ workspace }: { workspace: WorkspaceController }) {
+export function InspectorPanel({
+  workspace,
+  focusRef,
+}: {
+  workspace: WorkspaceController;
+  focusRef: RefObject<HTMLElement | null>;
+}) {
   const {
     activeWorkspace,
     fetchScope,
@@ -46,7 +52,6 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
     workspaces,
     edit,
     operationStatus: operation,
-    rightPanelRef,
   } = workspace;
   const {
     right: { tab: shownRightTab, collapsed: rightPanelCollapsed },
@@ -86,7 +91,7 @@ export function InspectorPanel({ workspace }: { workspace: WorkspaceController }
   return (
     <aside
       className={`right-panel ${rightPanelCollapsed ? 'panel-collapsed' : ''}`}
-      ref={rightPanelRef}
+      ref={focusRef}
       tabIndex={-1}
       data-tour="analysis-panel"
     >

@@ -3,9 +3,8 @@ import {
   resolveGraphHandoff,
 } from '../../../../Domain/Graph/graphHandoff';
 import { txNodeId, type Workspace } from '../../../../Domain/types';
-import type { Dispatch, SetStateAction } from 'react';
 
-import type { WorkbenchMode } from '../../workbenchTypes';
+import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
 import type { WorkspaceCore } from '../../workspaceCore';
 
 import type { GraphHandoff } from '../workbenchHandoff';
@@ -15,8 +14,7 @@ interface AnalysisActionRuntime {
   /** Captures the current selection generation and verifies it after asynchronous work. */
   captureCurrent: (workspaceId: string) => () => boolean;
   hasActiveOperation: () => boolean;
-  recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
-  switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
+  switchWorkbench: (next: WorkbenchMode, options?: WorkbenchSwitchOptions) => void;
 }
 
 interface Inputs {
@@ -26,7 +24,6 @@ interface Inputs {
   handoff: GraphHandoff;
   fetch: ChainFetch;
   canLoadChainData: boolean;
-  setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
 }
 export function createAnalysisActions({
   activeWorkspace,
@@ -35,7 +32,6 @@ export function createAnalysisActions({
   handoff,
   fetch,
   canLoadChainData,
-  setReturnWorkbench,
 }: Inputs) {
   const { showOnGraph, loadGraphTransactions } = handoff;
   const { mergeTransactions, run } = fetch;
@@ -49,15 +45,14 @@ export function createAnalysisActions({
     const current = activeWorkspace && workspaces.getUnlocked(activeWorkspace.id)?.data;
     if (!current) return false;
     const target = resolveGraphHandoff(current, ids, supportingTxids);
-    runtime.recordHandoffInvoker('analysis');
     const finish = () => {
       const latest = workspaces.getUnlocked(current.id)?.data;
       const resolved = latest && resolveGraphHandoff(latest, ids, supportingTxids);
       if (!resolved) return false;
       workspaces.getUnlocked(current.id)?.edit(() => resolved.workspace, false);
-      setReturnWorkbench('analysis');
-      runtime.switchWorkbench('graph', true);
-      return showOnGraph(resolved.ids, { isolate, selectedId: resolved.selectedId });
+      if (!showOnGraph(resolved.ids, { isolate, selectedId: resolved.selectedId })) return false;
+      runtime.switchWorkbench('graph', { interaction: 'handoff', focus: 'stage' });
+      return true;
     };
     const unresolved = ids.length
       ? ids.filter((id) => !target?.ids.includes(id))

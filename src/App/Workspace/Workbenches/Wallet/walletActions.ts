@@ -14,7 +14,7 @@ import {
 } from '../../../../Domain/types';
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { WorkbenchMode } from '../../workbenchTypes';
+import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
@@ -24,8 +24,7 @@ import type { ChainFetch } from '../../ChainData/useChainFetch';
 interface WalletActionRuntime {
   /** Captures the current selection generation and verifies it after asynchronous work. */
   captureCurrent: (workspaceId: string) => () => boolean;
-  recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
-  switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
+  switchWorkbench: (next: WorkbenchMode, options?: WorkbenchSwitchOptions) => void;
 }
 
 interface Inputs {
@@ -43,7 +42,6 @@ interface Inputs {
   wallet: Wallet | undefined;
   shownRightTab: GraphRightTab;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
 }
 export function createWalletActions({
   activeWorkspace,
@@ -59,7 +57,6 @@ export function createWalletActions({
   wallet,
   shownRightTab,
   setGraphFilters,
-  setReturnWorkbench,
 }: Inputs) {
   const {
     showOnGraph,
@@ -85,7 +82,7 @@ export function createWalletActions({
       selectionIds?: readonly string[];
     } = {},
   ) {
-    if (!activeWorkspace || !wallet) return;
+    if (!activeWorkspace || !wallet) return false;
     const ownerId = activeWorkspace.id;
     const walletId = wallet.id;
     const tab = options.tab ?? shownRightTab;
@@ -102,7 +99,7 @@ export function createWalletActions({
       ]);
       if (addresses.some((address) => !known.has(address))) {
         setNotice('An address is no longer in this wallet view.');
-        return;
+        return false;
       }
     }
     const reveal = (current: Workspace): Workspace => {
@@ -136,7 +133,7 @@ export function createWalletActions({
     if (!transactionIds.length) {
       if (!center) workspaces.getUnlocked(ownerId)?.edit(reveal, false);
       finish();
-      return;
+      return true;
     }
     const transactionId = nodeId.split(':')[1];
     const isCurrent = runtime.captureCurrent(ownerId);
@@ -158,29 +155,32 @@ export function createWalletActions({
       if (!center) workspaces.getUnlocked(ownerId)?.edit(reveal, false);
       finish();
     });
+    return true;
   }
   /** Wallet review keeps its context: Graph and Analysis both offer a way back. */
   function openWalletRecord(
     runtime: WalletActionRuntime,
     nodeId: string,
     utxo?: WalletUtxoRecord,
-    mode: 'graph' | 'inspect' | 'isolate' = 'graph',
+    presentation: 'show' | 'inspect' | 'isolate' = 'show',
     selectionIds?: readonly string[],
   ) {
-    runtime.recordHandoffInvoker('wallet');
-    setReturnWorkbench('wallet');
-    runtime.switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
-    showPanel(mode === 'inspect' ? 'right' : 'graph');
-    selectWalletRecord(runtime, nodeId, utxo, {
-      tab: 'inspect',
-      center: mode !== 'inspect',
-      isolate: mode === 'isolate',
-      selectionIds: selectionIds ?? [nodeId],
-    });
+    if (
+      selectWalletRecord(runtime, nodeId, utxo, {
+        tab: 'inspect',
+        center: presentation !== 'inspect',
+        isolate: presentation === 'isolate',
+        selectionIds: selectionIds ?? [nodeId],
+      })
+    ) {
+      showPanel(presentation === 'inspect' ? 'right' : 'graph');
+      runtime.switchWorkbench('graph', {
+        interaction: 'handoff',
+        focus: presentation === 'inspect' ? 'inspector' : 'stage',
+      });
+    }
   }
   function analyzeFromWallet(runtime: WalletActionRuntime, nodeId?: string) {
-    runtime.recordHandoffInvoker('wallet');
-    setReturnWorkbench('wallet');
     const node = nodeId ? recoveryGraph.nodes.find((item) => item.id === nodeId) : undefined;
     if (node) select(node.id);
     else {
@@ -190,7 +190,7 @@ export function createWalletActions({
           'This record is not loaded yet, so the scan uses the selected wallet. Open it in Graph to scan it directly.',
         );
     }
-    runtime.switchWorkbench('analysis', true);
+    runtime.switchWorkbench('analysis', { interaction: 'handoff', focus: 'workbench' });
   }
   function showWalletActivity(target: Wallet) {
     const ids = new Set(target.unreviewedTransactionIds ?? []);

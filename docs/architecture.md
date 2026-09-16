@@ -431,9 +431,13 @@ color the graph, using the last active finding per node. See
 The workbench mode (`wallet`, `graph`, `analysis`) is an encrypted view field.
 Graph stays mounted while hidden so its adapter, camera and layout survive.
 Analysis controls and reports live in a Workspace-owned map pruned on lock or close.
-Handoffs (Show, Isolate, Back) record an origin and promote compact context
-before selecting; if an outpoint has no loaded creator, navigation opens a
-supporting transaction and says so rather than fetching.
+Workspace navigation distinguishes a direct workbench switch from a contextual
+handoff and return. A handoff keeps one transient return point containing the
+origin workbench and focused control. The destination workbench resolves its own
+semantic entry target, such as Graph's stage or Inspector, without exposing its
+DOM to Workspace. Show and Isolate promote compact Graph context before
+selecting; if an outpoint has no loaded creator, navigation opens a supporting
+transaction and says so rather than fetching.
 
 ## Connection scans
 

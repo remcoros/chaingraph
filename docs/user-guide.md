@@ -306,7 +306,8 @@ Graph or **Isolate** to open it with only its connected context. **Select
 related** picks rows sharing the same address or transaction. Checkboxes,
 Ctrl/Cmd+click and Shift+click build a selection; **Select all (N)** takes the
 whole filtered list. Batch edits appear in the same detail panel and are one
-Undo step each.
+Undo step each. A contextual jump offers **Back to Wallet** and restores the
+originating control when it is still available.
 
 **Refresh** checks the wallet for new activity and keeps your selection, labels
 and camera; new transactions are flagged until you review them. **Analyze** runs
@@ -340,9 +341,10 @@ scanning.
 Findings open in review-priority order with their tips, affected entities and
 supporting transactions linked individually. **Show on graph** selects the
 evidence; **Isolate** additionally filters the graph to it, with a removable
-chip. **Exclude** removes a finding's overlay until you restore it. New wallet or
-transaction evidence marks old findings stale. Findings never rewrite the
-observed graph, and annotations stay independent of them.
+chip. Both offer **Back to Analysis**. **Exclude** removes a finding's overlay
+until you restore it. New wallet or transaction evidence marks old findings
+stale. Findings never rewrite the observed graph, and annotations stay
+independent of them.
 
 ## Connection scans
 

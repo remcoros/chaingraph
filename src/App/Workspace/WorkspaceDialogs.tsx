@@ -149,7 +149,7 @@ export function WalletDialogs({ workspace }: Props) {
               right: { ...current.right, tab: 'inspect' },
               mobile: 'right',
             }));
-            workspace.switchWorkbench('wallet', true);
+            workspace.switchWorkbench('wallet', { focus: 'workbench' });
           }}
           onClose={() => workspace.dialogs.closeAddWallet()}
         />

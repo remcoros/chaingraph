@@ -174,7 +174,10 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
         Select a node in the graph or an item in Entities to inspect it, add labels and notes, and
         follow its paths.
       </p>
-      <button className="text-button" onClick={() => switchWorkbench('analysis')}>
+      <button
+        className="text-button"
+        onClick={() => switchWorkbench('analysis', { interaction: 'handoff', focus: 'workbench' })}
+      >
         Scan loaded data <ChevronRight size={15} />
       </button>
     </div>

@@ -7,7 +7,7 @@ import {
 import { GraphLegend } from './GraphLegend';
 import { GraphContextToolbar, type GraphContextSideCounts } from './GraphContextToolbar';
 import { GraphControls } from './GraphControls';
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -55,7 +55,23 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     connected,
     shownWorkbench,
     graphWorkspaceRef,
+    workbenchEntry,
   } = workspace;
+  const graphStageRef = useRef<HTMLElement>(null);
+  const inspectorRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const entry = workbenchEntry;
+    if (
+      shownWorkbench !== 'graph' ||
+      !entry ||
+      entry.workspaceId !== activeWorkspace?.id ||
+      entry.workbench !== 'graph' ||
+      (entry.target !== 'stage' && entry.target !== 'inspector')
+    )
+      return;
+    const destination = entry.target === 'inspector' ? inspectorRef.current : graphStageRef.current;
+    destination?.focus({ preventScroll: true });
+  }, [activeWorkspace?.id, shownWorkbench, workbenchEntry]);
   const {
     mobile: shownMobilePanel,
     left: { collapsed: leftPanelCollapsed },
@@ -485,6 +501,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     >
       <EntitiesPanel workspace={workspace} />
       <section
+        ref={graphStageRef}
         className="graph-stage"
         data-tour="graph-stage"
         aria-label="Graph workspace"
@@ -677,7 +694,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
           </div>
         </div>
       </section>
-      <InspectorPanel workspace={workspace} />
+      <InspectorPanel workspace={workspace} focusRef={inspectorRef} />
     </main>
   );
 }

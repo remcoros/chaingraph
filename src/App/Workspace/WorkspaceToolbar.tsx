@@ -112,7 +112,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
         {!tour.step && returnWorkbench && returnWorkbench !== workbench && (
           <button
             className="workbench-return"
-            onClick={() => switchWorkbench(returnWorkbench, true)}
+            onClick={() => switchWorkbench(returnWorkbench, { interaction: 'return' })}
           >
             <ArrowLeft size={14} />
             Back to {WORKBENCH_LABELS[returnWorkbench]}

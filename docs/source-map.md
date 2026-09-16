@@ -103,7 +103,7 @@ scripts/                    development, validation and release tooling
 
 | Task                                   | Start here                                                                              | Relevant tests in `tests/`                                                                                        |
 | -------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs/`                                        | `password-controls.test.ts`, `workspace-storage.test.ts`                                                          |
+| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs/`                                       | `password-controls.test.ts`, `workspace-storage.test.ts`                                                          |
 | Autosave, lock or undo                 | `App/Workspace/useWorkspaces.ts`, `Infra/Storage/`                                      | `workspace-save-scheduling.test.ts`, `workspace-encryption-worker.test.ts`, `workspace-undo-descriptions.test.ts` |
 | Wallet review or records               | `App/Workspace/Workbenches/Wallet/`, `Graph/InspectorPanel/`, `Domain/Wallet/`          | `wallet-review*.test.ts`, `wallet-records.test.ts`, `wallet-preparation.test.ts`                                  |
 | Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `Domain/Chain/`                     | `transactionFlow.test.ts`, `address-history.test.ts`, `flow-inputs.test.ts`                                       |
@@ -172,6 +172,10 @@ switching. Each concept lives in its product area, so the controller reads as a
 map of them: `graph` (projection, canvas, panels, filters, actions, flow inputs,
 scan targets), `wallet`, `analysis`, plus the shared `selection`, `annotations`,
 `evidence`, `history`, `lookup` and `dialogs`.
+
+Workspace navigation owns direct switches, contextual handoffs and their single
+transient return point. A destination workbench owns how semantic entry focus is
+resolved inside its UI; Workspace does not query another workbench's DOM.
 
 Panel state belongs to the workbench that shows it. Graph owns its tabs, and
 other workbenches reach them through `GraphHandoff` rather than writing them, so

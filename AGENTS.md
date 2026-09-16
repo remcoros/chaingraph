@@ -59,6 +59,39 @@ under `src/Domain/` and `src/Infra/`. Follow direct imports from the affected ar
   ignored `docs/research/`, `docs/reviews/` and `docs/experiments/` folders are
   personal working notes and are not part of the published repository.
 
+## Architecture-first changes
+
+For a change that crosses module boundaries, changes an exported interface,
+adds shared state, or alters data flow to satisfy a diagnostic, establish the
+following before editing:
+
+- the user-level operation;
+- its current owner and public entry point;
+- all relevant call sites and behavior tests;
+- the existing interface that can be deepened;
+- the observable behavior that must remain;
+- the public concepts the change adds and removes.
+
+Prefer extending the existing owner over introducing a parallel coordinator,
+runtime, registry, or protocol. A UI caller should express one intention and
+must not coordinate an ordered sequence of setters or lifecycle methods.
+
+A new exported concept must explain why the existing owner cannot absorb the
+responsibility and which previous concepts or call paths it replaces. Do not
+layer a new path beside the old one unless an explicit migration requires it.
+
+Compiler and lint cleanup is subordinate to ownership and interface quality. If
+removing a diagnostic would duplicate ownership, widen an interface, expose
+lifecycle sequencing, or create a parallel protocol, leave it in the baseline
+and report it.
+
+After editing, report:
+
+- exported concepts added and removed;
+- sources of truth added and removed;
+- searches performed to verify the old protocol is gone;
+- behavior tests that preserve the existing UX.
+
 ## Validation
 
 - `npm run check` (portability, linting, build, domain and integration tests) is

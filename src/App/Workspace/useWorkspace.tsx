@@ -1,4 +1,4 @@
-import { resolveWalletUtxoObservation } from '../../Domain/Wallet/walletUtxoObservation';
+import { resolveWalletUtxoObservation } from './ChainData/WalletUtxos/walletUtxoObservation';
 import { useWalletUtxos } from './ChainData/WalletUtxos';
 import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
 import { useFlowInputs } from './Workbenches/Graph/TransactionFlow/useFlowInputs';
@@ -29,7 +29,7 @@ import { type Wallet, type Workspace } from '../../Domain/types';
 import { fetchTransaction } from '../../Infra/Bitcoin/api';
 import { useTour } from '../Help/useTour';
 import type { useAppState } from '../useAppState';
-import type { WorkbenchMode } from './workbenchTypes';
+import type { WorkbenchEntryTarget, WorkbenchMode, WorkbenchSwitchOptions } from './workbenchTypes';
 import { download } from '../../Infra/Storage/download';
 import { isModalOpen } from '../Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
@@ -51,6 +51,17 @@ function resolveWalletUtxoObservationFromEvidence(
 }
 type WalletUtxoObservationInput = Pick<Workspace, 'id' | 'network' | 'transactions'>;
 type Tail<T extends unknown[]> = T extends [unknown, ...infer Rest] ? Rest : never;
+type WorkbenchReturnPoint = {
+  workspaceId: string;
+  workbench: WorkbenchMode;
+  element?: HTMLElement;
+};
+type WorkbenchEntryRequest = {
+  workspaceId: string;
+  workbench: WorkbenchMode;
+  interaction: NonNullable<WorkbenchSwitchOptions['interaction']>;
+  target: WorkbenchEntryTarget;
+};
 
 export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const {
@@ -112,14 +123,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const graphWorkspaceRef = useRef<HTMLElement>(null);
   const analysisWorkspaceRef = useRef<HTMLElement>(null);
   const walletWorkspaceRef = useRef<HTMLElement>(null);
-  // The control that started a handoff, per originating workbench.
-  const workbenchInvokers = useRef<
-    Partial<Record<'analysis' | 'wallet', { workspaceId: string; element: HTMLElement }>>
-  >({});
-  const pendingWorkbenchFocus = useRef<
-    { workspaceId: string; mode: WorkbenchMode; destination?: 'inspector' } | undefined
-  >(undefined);
-  const rightPanelRef = useRef<HTMLElement>(null);
+  const returnPoint = useRef<WorkbenchReturnPoint | undefined>(undefined);
+  const [workbenchEntry, setWorkbenchEntry] = useState<WorkbenchEntryRequest>();
   const workbenchSection = useCallback(
     (mode: WorkbenchMode) =>
       mode === 'graph'
@@ -129,41 +134,31 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
           : walletWorkspaceRef.current,
     [graphWorkspaceRef, analysisWorkspaceRef, walletWorkspaceRef],
   );
-  // Transfer focus only for explicit cross-workbench actions, never during graph gestures.
+  // Workspace restores a returning control or focuses a workbench root. Graph resolves
+  // its own stage and Inspector entry targets without exposing its DOM to Workspace.
   useLayoutEffect(() => {
-    const pending = pendingWorkbenchFocus.current;
-    pendingWorkbenchFocus.current = undefined;
-    if (!pending || pending.workspaceId !== activeWorkspace?.id || pending.mode !== workbench)
+    if (
+      !workbenchEntry ||
+      workbenchEntry.workspaceId !== activeWorkspace?.id ||
+      workbenchEntry.workbench !== workbench ||
+      workbenchEntry.target === 'stage' ||
+      workbenchEntry.target === 'inspector'
+    )
       return;
-    if (workbench === 'graph') {
-      // A handoff that reveals the Inspector must land there; the canvas can be
-      // hidden behind the mobile panel switch and would drop focus to the body.
-      const destination =
-        pending.destination === 'inspector'
-          ? (rightPanelRef.current ?? graphWorkspaceRef.current)
-          : (graphWorkspaceRef.current?.querySelector<HTMLElement>(
-              '.graph-canvas:not([aria-hidden="true"]) canvas',
-            ) ??
-            // The lazy renderer may still be loading. Land within Graph without
-            // moving focus again when its canvas eventually becomes available.
-            graphWorkspaceRef.current?.querySelector<HTMLElement>('.graph-stage') ??
-            graphWorkspaceRef.current);
-      destination?.focus({ preventScroll: true });
-    } else {
-      const section = workbenchSection(workbench);
-      const invoker = workbenchInvokers.current[workbench];
-      const element = invoker?.element;
-      if (
-        invoker?.workspaceId === activeWorkspace?.id &&
-        element?.isConnected &&
-        section?.contains(element) &&
-        !element.matches(':disabled') &&
-        element.getClientRects().length
-      )
-        element.focus();
-      else section?.focus();
-    }
-  }, [activeWorkspace?.id, workbench, workbenchSection]);
+    const section = workbenchSection(workbench);
+    const element =
+      workbenchEntry.interaction === 'return' ? returnPoint.current?.element : undefined;
+    if (
+      returnPoint.current?.workspaceId === activeWorkspace.id &&
+      returnPoint.current.workbench === workbench &&
+      element?.isConnected &&
+      section?.contains(element) &&
+      !element.matches(':disabled') &&
+      element.getClientRects().length
+    )
+      element.focus({ preventScroll: true });
+    else section?.focus({ preventScroll: true });
+  }, [activeWorkspace?.id, workbench, workbenchEntry, workbenchSection]);
   const selection = useWorkspaceSelection({
     workspaceId: activeWorkspace?.id,
     currentRef: activeWorkspaceRef,
@@ -270,8 +265,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
           : 'graph',
     );
     setReturnWorkbench(undefined);
-    workbenchInvokers.current = {};
-    pendingWorkbenchFocus.current = undefined;
+    returnPoint.current = undefined;
+    setWorkbenchEntry(undefined);
     setLockingWorkspace(false);
     setPrefetchDepth(activeWorkspace?.view.prefetchDepth ?? 0);
     setViewOwner(activeWorkspace?.id);
@@ -503,23 +498,64 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     fetch: chainFetch,
     viewOwner,
   });
-  function switchWorkbench(next: WorkbenchMode, handoffFocus = false, destination?: 'inspector') {
-    pendingWorkbenchFocus.current =
-      handoffFocus && activeWorkspace
-        ? { workspaceId: activeWorkspace.id, mode: next, destination }
-        : undefined;
+  function captureReturnPoint(origin: WorkbenchMode): WorkbenchReturnPoint | undefined {
+    if (!activeWorkspace) return;
+    const section = workbenchSection(origin);
+    const activeElement = document.activeElement;
+    return {
+      workspaceId: activeWorkspace.id,
+      workbench: origin,
+      element:
+        activeElement instanceof HTMLElement && section?.contains(activeElement)
+          ? activeElement
+          : undefined,
+    };
+  }
+  function changeWorkbench(
+    next: WorkbenchMode,
+    options: WorkbenchSwitchOptions = {},
+    capturedOrigin?: WorkbenchReturnPoint,
+  ) {
+    const interaction = options.interaction ?? 'switch';
+    if (interaction === 'handoff' && activeWorkspace) {
+      const origin =
+        capturedOrigin?.workspaceId === activeWorkspace.id
+          ? capturedOrigin
+          : captureReturnPoint(workbench);
+      if (origin && origin.workbench !== next) {
+        returnPoint.current = origin;
+        setReturnWorkbench(origin.workbench);
+      }
+    }
+    const target =
+      options.focus ??
+      (interaction === 'handoff'
+        ? next === 'graph'
+          ? 'stage'
+          : 'workbench'
+        : interaction === 'return'
+          ? 'workbench'
+          : undefined);
+    setWorkbenchEntry(
+      target && activeWorkspace
+        ? {
+            workspaceId: activeWorkspace.id,
+            workbench: next,
+            interaction,
+            target,
+          }
+        : undefined,
+    );
     flushActiveGraph();
     setWorkbench(next);
   }
-  /** Remember the control that started a handoff so the return restores focus. */
-  function recordHandoffInvoker(origin: 'analysis' | 'wallet') {
-    const invoker = document.activeElement;
-    const section =
-      origin === 'analysis' ? analysisWorkspaceRef.current : walletWorkspaceRef.current;
-    workbenchInvokers.current[origin] =
-      activeWorkspace && invoker instanceof HTMLElement && section?.contains(invoker)
-        ? { workspaceId: activeWorkspace.id, element: invoker }
-        : undefined;
+  function switchWorkbench(next: WorkbenchMode, options?: WorkbenchSwitchOptions) {
+    changeWorkbench(next, options);
+  }
+  function workbenchActionSwitch(origin: WorkbenchMode) {
+    const capturedOrigin = captureReturnPoint(origin);
+    return (next: WorkbenchMode, options?: WorkbenchSwitchOptions) =>
+      changeWorkbench(next, options, capturedOrigin);
   }
   // The factory only creates event handlers; refs are read when an action runs, not during render.
   // oxlint-disable-next-line react/refs
@@ -546,7 +582,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     wallet,
     shownRightTab,
     setGraphFilters,
-    setReturnWorkbench,
   });
 
   const analysisCommands = createAnalysisActions({
@@ -556,7 +591,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     handoff: graphHandoff,
     fetch: chainFetch,
     canLoadChainData,
-    setReturnWorkbench,
   });
 
   function captureCurrent(workspaceId: string) {
@@ -565,14 +599,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       activeWorkspaceRef.current?.id === workspaceId && selection.generation.current === generation;
   }
   function walletActionRuntime() {
-    return { captureCurrent, recordHandoffInvoker, switchWorkbench };
+    return { captureCurrent, switchWorkbench: workbenchActionSwitch('wallet') };
   }
   function analysisActionRuntime() {
     return {
       captureCurrent,
       hasActiveOperation: () => operationRef.current !== undefined,
-      recordHandoffInvoker,
-      switchWorkbench,
+      switchWorkbench: workbenchActionSwitch('analysis'),
     };
   }
   const walletActions = {
@@ -637,8 +670,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     lockingWorkspace,
     activeWorkspaceRef,
     workspaces,
-    rightPanelRef,
     workbench,
+    workbenchEntry,
     viewOwner,
     connected,
     graphWorkspaceRef,
