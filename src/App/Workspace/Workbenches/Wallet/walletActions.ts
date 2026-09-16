@@ -20,38 +20,47 @@ import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
 import type { GraphHandoff } from '../workbenchHandoff';
 import type { ChainFetch } from '../../ChainData/useChainFetch';
+
+interface WalletActionRuntime {
+  /** Captures the current selection generation and verifies it after asynchronous work. */
+  captureCurrent: (workspaceId: string) => () => boolean;
+  recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
+  switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
+}
+
 interface Inputs {
-  core: WorkspaceCore;
-  selection: WorkspaceSelection;
+  activeWorkspace: Workspace | undefined;
+  workspaces: WorkspaceCore['workspaces'];
+  edit: WorkspaceCore['edit'];
+  setNotice: WorkspaceCore['setNotice'];
+  select: WorkspaceSelection['select'];
+  setSelectedId: WorkspaceSelection['setSelectedId'];
+  replaceSelection: WorkspaceSelection['batch']['replace'];
+  setSelectionMode: WorkspaceSelection['batch']['setMode'];
   /** Everything this workbench needs to hand a record over to Graph. */
   handoff: GraphHandoff;
   fetch: ChainFetch;
   wallet: Wallet | undefined;
   shownRightTab: GraphRightTab;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  recordHandoffInvoker: (origin: 'analysis' | 'wallet') => void;
   setReturnWorkbench: Dispatch<SetStateAction<WorkbenchMode | undefined>>;
-  switchWorkbench: (next: WorkbenchMode, handoffFocus?: boolean, destination?: 'inspector') => void;
 }
 export function createWalletActions({
-  core,
-  selection: workspaceSelection,
+  activeWorkspace,
+  workspaces,
+  edit,
+  setNotice,
+  select,
+  setSelectedId,
+  replaceSelection,
+  setSelectionMode,
   handoff,
   fetch,
   wallet,
   shownRightTab,
   setGraphFilters,
-  recordHandoffInvoker,
   setReturnWorkbench,
-  switchWorkbench,
 }: Inputs) {
-  const { activeWorkspace, activeWorkspaceRef, workspaces, setNotice, edit } = core;
-  const {
-    batch: selection,
-    generation: selectionGeneration,
-    select,
-    setSelectedId,
-  } = workspaceSelection;
   const {
     showOnGraph,
     showRecordTab,
@@ -66,6 +75,7 @@ export function createWalletActions({
   const { mergeTransactions, run } = fetch;
 
   function selectWalletRecord(
+    runtime: WalletActionRuntime,
     nodeId: string,
     utxo?: WalletUtxoRecord,
     options: {
@@ -118,8 +128,8 @@ export function createWalletActions({
       }
       showRecordTab(tab);
       if (options.selectionIds) {
-        selection.replace(ids.length > 1 ? ids : []);
-        selection.setMode(ids.length > 1);
+        replaceSelection(ids.length > 1 ? ids : []);
+        setSelectionMode(ids.length > 1);
       }
     };
     const transactionIds = graphNavigationTransactionIds(ids);
@@ -129,18 +139,13 @@ export function createWalletActions({
       return;
     }
     const transactionId = nodeId.split(':')[1];
-    const generation = selectionGeneration.current;
+    const isCurrent = runtime.captureCurrent(ownerId);
     void run(async (signal) => {
       const loaded = await loadGraphTransactions(ids, signal);
       signal.throwIfAborted();
-      if (selectionGeneration.current !== generation) return;
+      if (!isCurrent()) return;
       const current = workspaces.getUnlocked(ownerId)?.data;
-      if (
-        !current ||
-        !current.wallets.some((item) => item.id === walletId) ||
-        activeWorkspaceRef.current?.id !== ownerId
-      )
-        return;
+      if (!current || !current.wallets.some((item) => item.id === walletId)) return;
       const transaction =
         current.transactions[transactionId] ?? loaded.find((tx) => tx.txid === transactionId);
       if (utxo && (!transaction || !verifyWalletUtxo(utxo, transaction, activeWorkspace.network)))
@@ -156,24 +161,25 @@ export function createWalletActions({
   }
   /** Wallet review keeps its context: Graph and Analysis both offer a way back. */
   function openWalletRecord(
+    runtime: WalletActionRuntime,
     nodeId: string,
     utxo?: WalletUtxoRecord,
     mode: 'graph' | 'inspect' | 'isolate' = 'graph',
     selectionIds?: readonly string[],
   ) {
-    recordHandoffInvoker('wallet');
+    runtime.recordHandoffInvoker('wallet');
     setReturnWorkbench('wallet');
-    switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
+    runtime.switchWorkbench('graph', true, mode === 'inspect' ? 'inspector' : undefined);
     showPanel(mode === 'inspect' ? 'right' : 'graph');
-    selectWalletRecord(nodeId, utxo, {
+    selectWalletRecord(runtime, nodeId, utxo, {
       tab: 'inspect',
       center: mode !== 'inspect',
       isolate: mode === 'isolate',
       selectionIds: selectionIds ?? [nodeId],
     });
   }
-  function analyzeFromWallet(nodeId?: string) {
-    recordHandoffInvoker('wallet');
+  function analyzeFromWallet(runtime: WalletActionRuntime, nodeId?: string) {
+    runtime.recordHandoffInvoker('wallet');
     setReturnWorkbench('wallet');
     const node = nodeId ? recoveryGraph.nodes.find((item) => item.id === nodeId) : undefined;
     if (node) select(node.id);
@@ -184,7 +190,7 @@ export function createWalletActions({
           'This record is not loaded yet, so the scan uses the selected wallet. Open it in Graph to scan it directly.',
         );
     }
-    switchWorkbench('analysis', true);
+    runtime.switchWorkbench('analysis', true);
   }
   function showWalletActivity(target: Wallet) {
     const ids = new Set(target.unreviewedTransactionIds ?? []);

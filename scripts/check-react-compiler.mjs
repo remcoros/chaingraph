@@ -20,9 +20,7 @@ const budget = maxIndex === -1 ? undefined : Number(process.argv[maxIndex + 1]);
 // Every known bailout is listed explicitly so fixes ratchet the baseline down.
 // Do not add an entry without reviewing why the affected component or hook is
 // safe to leave uncompiled.
-const bailoutBaseline = new Map([
-  ['src/App/Workspace/useWorkspace.tsx', new Map([['Cannot access refs during render', 2]])],
-]);
+const bailoutBaseline = new Map();
 
 function* sources(dir) {
   for (const entry of readdirSync(dir)) {

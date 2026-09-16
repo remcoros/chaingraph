@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AppState } from '../../../useAppState';
 import type { AnalysisSession } from './analysisSession';
 
@@ -19,8 +19,6 @@ export interface WorkspaceAnalysis {
   /** Changes when a wallet-run analysis produces a new session. */
   walletRevision: number;
   noteWalletAnalysis: () => void;
-  /** The analysis workbench section, for focus moves and handoff returns. */
-  sectionRef: React.RefObject<HTMLElement | null>;
 }
 
 export function useWorkspaceAnalysis(
@@ -28,7 +26,6 @@ export function useWorkspaceAnalysis(
 ): WorkspaceAnalysis {
   const [sessions] = useState(() => new Map<string, AnalysisSession>());
   const [walletRevision, setWalletRevision] = useState(0);
-  const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const unlocked = new Set(openWorkspaces.map((entry) => entry.data.id));
     for (const id of sessions.keys()) if (!unlocked.has(id)) sessions.delete(id);
@@ -37,6 +34,5 @@ export function useWorkspaceAnalysis(
     sessions,
     walletRevision,
     noteWalletAnalysis: () => setWalletRevision((revision) => revision + 1),
-    sectionRef,
   };
 }

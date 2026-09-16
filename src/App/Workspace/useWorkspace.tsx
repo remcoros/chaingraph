@@ -50,6 +50,8 @@ function resolveWalletUtxoObservationFromEvidence(
   return resolveWalletUtxoObservation(input, wallet, view, selectedId);
 }
 type WalletUtxoObservationInput = Pick<Workspace, 'id' | 'network' | 'transactions'>;
+type Tail<T extends unknown[]> = T extends [unknown, ...infer Rest] ? Rest : never;
+
 export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const {
     workspaces,
@@ -108,7 +110,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const [workbench, setWorkbench] = useState<WorkbenchMode>('graph');
   const [returnWorkbench, setReturnWorkbench] = useState<WorkbenchMode>();
   const graphWorkspaceRef = useRef<HTMLElement>(null);
-  const analysisWorkspaceRef = analysis.sectionRef;
+  const analysisWorkspaceRef = useRef<HTMLElement>(null);
   const walletWorkspaceRef = useRef<HTMLElement>(null);
   // The control that started a handoff, per originating workbench.
   const workbenchInvokers = useRef<
@@ -530,33 +532,62 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     showPanel: setMobilePanel,
     revealEntities: graphPanels.revealEntities,
   };
-  // oxlint-disable-next-line react/refs -- The factory only creates event handlers; refs are read when an action runs, not during render.
-  const walletActions = createWalletActions({
-    core,
-    selection,
+  const walletCommands = createWalletActions({
+    activeWorkspace,
+    workspaces,
+    edit,
+    setNotice,
+    select,
+    setSelectedId,
+    replaceSelection: selection.batch.replace,
+    setSelectionMode: selection.batch.setMode,
     handoff: graphHandoff,
     fetch: chainFetch,
     wallet,
     shownRightTab,
     setGraphFilters,
-    recordHandoffInvoker,
     setReturnWorkbench,
-    switchWorkbench,
   });
 
-  // The factory only creates event handlers; refs are read when an action runs, not during render.
-  // oxlint-disable-next-line react/refs
-  const analysisActions = createAnalysisActions({
-    core,
-    selection,
+  const analysisCommands = createAnalysisActions({
+    activeWorkspace,
+    workspaces,
+    setNotice,
     handoff: graphHandoff,
     fetch: chainFetch,
     canLoadChainData,
-    operationRef,
-    recordHandoffInvoker,
     setReturnWorkbench,
-    switchWorkbench,
   });
+
+  function captureCurrent(workspaceId: string) {
+    const generation = selection.generation.current;
+    return () =>
+      activeWorkspaceRef.current?.id === workspaceId && selection.generation.current === generation;
+  }
+  function walletActionRuntime() {
+    return { captureCurrent, recordHandoffInvoker, switchWorkbench };
+  }
+  function analysisActionRuntime() {
+    return {
+      captureCurrent,
+      hasActiveOperation: () => operationRef.current !== undefined,
+      recordHandoffInvoker,
+      switchWorkbench,
+    };
+  }
+  const walletActions = {
+    selectWalletRecord: (...args: Tail<Parameters<typeof walletCommands.selectWalletRecord>>) =>
+      walletCommands.selectWalletRecord(walletActionRuntime(), ...args),
+    openWalletRecord: (...args: Tail<Parameters<typeof walletCommands.openWalletRecord>>) =>
+      walletCommands.openWalletRecord(walletActionRuntime(), ...args),
+    analyzeFromWallet: (...args: Tail<Parameters<typeof walletCommands.analyzeFromWallet>>) =>
+      walletCommands.analyzeFromWallet(walletActionRuntime(), ...args),
+    showWalletActivity: walletCommands.showWalletActivity,
+  };
+  const analysisActions = {
+    showFindingOnGraph: (...args: Tail<Parameters<typeof analysisCommands.showFindingOnGraph>>) =>
+      analysisCommands.showFindingOnGraph(analysisActionRuntime(), ...args),
+  };
 
   return {
     graph: {
@@ -576,7 +607,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       sectionRef: walletWorkspaceRef,
       actions: walletActions,
     },
-    analysis: { ...analysis, actions: analysisActions },
+    analysis: {
+      sessions: analysis.sessions,
+      walletRevision: analysis.walletRevision,
+      noteWalletAnalysis: analysis.noteWalletAnalysis,
+      sectionRef: analysisWorkspaceRef,
+      actions: analysisActions,
+    },
     selection,
     annotations,
     evidence: workspaceEvidence,
