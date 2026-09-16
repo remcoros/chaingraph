@@ -40,11 +40,12 @@ src/
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
         Wallet/             wallet overview, scan and preparation state
-          WalletWorkbench.tsx controller binding and the wallet workbench view
+          WalletWorkbench.tsx controller binding for the wallet workbench view
           walletWorkbenchContext.ts shared context for the wallet panels
           useWalletActivity.ts address discovery settings and runs
           useWalletAnalysis.ts wallet-scoped analysis runs
-          Review/           review detail, flow and input loading
+          Review/           wallet review panel, detail, flow and input loading
+            WalletReviewPanel.tsx wallet review view, state, filtering and list composition
         Graph/              graph surface, controls, panels and metadata projection
           GraphWorkbench.tsx graph canvas, navigation and panel composition
           useGraphCanvas.ts  camera, fit and saved-view writes
