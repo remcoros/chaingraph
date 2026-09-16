@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../src/App/styles.css';
-import '../../src/App/Workspace/Tags/tags.css';
+import '../../src/App/Workspace/Workbenches/Graph/TagsPanel/tags.css';
 import GraphView from '../../src/App/Workspace/Workbenches/Graph/GraphView';
 import { EntityBadges } from '../../src/App/Controls/Metadata/EntityBadges';
 import { createDefaultAdapter } from '../../src/App/Workspace/Workbenches/Graph/Renderer/defaultAdapter';

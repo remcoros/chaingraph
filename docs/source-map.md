@@ -37,7 +37,6 @@ src/
       LookupForm.tsx        Workspace toolbar lookup form
       Selection/            shared selection, connection-scan targets and visibility
       Annotations/          labels, tags, icons, bookmarks and BIP329 exchange
-      Tags/                 workspace tag management
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
         Wallet/             wallet overview, scan and preparation state
@@ -50,6 +49,9 @@ src/
           GraphWorkbench.tsx graph canvas, navigation and panel composition
           useGraphCanvas.ts  camera, fit and saved-view writes
           useGraphPanels.ts  which panels and tabs the workbench shows
+          TagsPanel/        graph tag manager and selected-node tag UI
+            index.ts         narrow tag-panel public entry
+            TagsPanel.tsx    tag manager and selected tag controls
           EntitiesPanel/    graph entity, wallet and tag side panel
             EntitiesPanel.tsx panel controller binding
             EntitiesPanelDetail.tsx panel view and tab composition
@@ -108,7 +110,7 @@ scripts/                    development, validation and release tooling
 | Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/Selection/`, `Domain/Graph/` | `graph-filters.test.ts`, `graph-membership.test.ts`, `visibility.test.ts`                                         |
 | Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `Domain/ConnectionScan/`             | `connectionScan*.test.ts`                                                                                         |
 | Analysis tools or reports              | `App/Workspace/Workbenches/Analysis/`, `Domain/Analysis/`                               | `analysis*.test.ts`                                                                                               |
-| Labels, tags or icons                  | `App/Controls/Metadata/`, `App/Workspace/Tags/`, `Domain/Metadata/`                     | `batch-*.test.ts`, `tags.test.ts`, `labels.test.ts`                                                               |
+| Labels, tags or icons                  | `App/Controls/Metadata/`, `Graph/TagsPanel/`, `Domain/Metadata/`                        | `batch-*.test.ts`, `tags.test.ts`, `labels.test.ts`                                                               |
 | Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/useTransactionFetch.tsx`                               | `network-api.test.ts`, `transaction-scheduler.test.ts`, `scanner.test.ts`                                         |
 
 Paths in the task table are relative to `src/`. Primitive

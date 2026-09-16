@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { SelectedTags } from '../src/App/Workspace/Tags/TagsPanel';
+import { SelectedTags } from '../src/App/Workspace/Workbenches/Graph/TagsPanel';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { txNodeId, type GraphNode, type Workspace } from '../src/Domain/types';
 import { installDomStubs } from './domStubs';

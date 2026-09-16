@@ -7,7 +7,7 @@ import './Workspace/Workbenches/Graph/InspectorPanel/wallet-records.css';
 import './dialogs.css';
 import './Workspace/Workbenches/Graph/graph-context-toolbar.css';
 import './Controls/Metadata/metadata-editors.css';
-import './Workspace/Tags/tags.css';
+import './Workspace/Workbenches/Graph/TagsPanel/tags.css';
 import './Controls/Display/op-return-data.css';
 import './Workspace/Workbenches/Graph/TransactionFlow/flow-panel.css';
 import './Workspace/Workbenches/Graph/InspectorPanel/script-inspector.css';

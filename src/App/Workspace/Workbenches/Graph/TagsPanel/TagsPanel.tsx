@@ -6,26 +6,26 @@ import {
   type GraphNode,
   type Workspace,
   type WorkspaceTag,
-} from '../../../Domain/types';
+} from '../../../../../Domain/types';
 import {
   listTagsForNode,
   tagNodeIds,
   tagsFromLabels,
   MAX_TAG_MEMBERS,
   MAX_WORKSPACE_TAGS,
-} from '../../../Domain/Metadata/tags';
+} from '../../../../../Domain/Metadata/tags';
 import {
   BatchTagEditor,
   ColorPicker,
   MetadataPopover,
-} from '../../Controls/Metadata/MetadataEditors';
-import { DEFAULT_TAG_COLOR } from '../../../Domain/Metadata/tagColors';
+} from '../../../../Controls/Metadata/MetadataEditors';
+import { DEFAULT_TAG_COLOR } from '../../../../../Domain/Metadata/tagColors';
 import './tags.css';
-import { applyBatchTag } from '../../../Domain/Metadata/batchMetadata';
-import { canonicalAddress } from '../../../Domain/Metadata/entityReferences';
-import { Modal } from '../../Dialogs';
-import { useDialogFocus } from '../../Controls/useDialogFocus';
-import { ResponsiveIdentifier } from '../../Controls/Display/ResponsiveIdentifier';
+import { applyBatchTag } from '../../../../../Domain/Metadata/batchMetadata';
+import { canonicalAddress } from '../../../../../Domain/Metadata/entityReferences';
+import { Modal } from '../../../../Dialogs';
+import { useDialogFocus } from '../../../../Controls/useDialogFocus';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 
 type Change = (update: (workspace: Workspace) => Workspace) => void;
 type TagValue = { name: string; color: string; description: string };

@@ -1,4 +1,4 @@
-import { SelectedTags } from '../../../Tags/TagsPanel';
+import { SelectedTags } from '../TagsPanel';
 import { ChevronRight, Eye } from 'lucide-react';
 import { NodeInspector, WalletInspector } from './Inspector';
 import { pruneWalletReviews } from '../../../../../Domain/Wallet/walletReview';
