@@ -7,23 +7,30 @@ import {
   type TxOutput,
   type Wallet,
   type Workspace,
-} from '../types';
-import { listTagsForNode } from '../Metadata/tags';
-import { isOpReturn } from '../Chain/opReturn';
-import { addressToScriptHash } from './wallet';
-import type { WalletSelectionAddresses, WalletSelectionIndex } from './walletSelectionIndex';
+} from '../../../../Domain/types';
+import { listTagsForNode } from '../../../../Domain/Metadata/tags';
+import { isOpReturn } from '../../../../Domain/Chain/opReturn';
+import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
+import type {
+  WalletSelectionAddresses,
+  WalletSelectionIndex,
+} from '../../../../Domain/Wallet/walletSelectionIndex';
 import {
   verifiedWalletAddresses,
   listWalletAddresses,
   listWalletTransactions,
   type WalletUtxoRecord,
-} from './walletRecords';
-import { isCompletedReview, reviewKey, type WalletReviewItem } from './walletReview';
+} from '../../../../Domain/Wallet/walletRecords';
+import {
+  isCompletedReview,
+  reviewKey,
+  type WalletReviewItem,
+} from '../../../../Domain/Wallet/walletReview';
 import {
   listLoadedAddressTransactionIds,
   walletCounterparties,
   type WalletAddressRelationships,
-} from './walletRelationships';
+} from '../../../../Domain/Wallet/walletRelationships';
 
 export type WalletTab =
   'review' | 'utxos' | 'transactions' | 'addresses' | 'sources' | 'destinations';

@@ -9,7 +9,7 @@ import { WalletReviewFlow } from '../src/App/Workspace/Workbenches/Wallet/Review
 import type {
   WalletReviewContext,
   WalletReviewFlowEntry,
-} from '../src/Domain/Wallet/walletReviewContext';
+} from '../src/App/Workspace/Workbenches/Wallet/walletReviewContext';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 
 const txid = 'a'.repeat(64);

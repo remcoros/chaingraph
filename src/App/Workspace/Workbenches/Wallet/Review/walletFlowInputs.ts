@@ -1,6 +1,6 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
 import type { Network, Transaction, Workspace } from '../../../../../Domain/types';
-import type { WalletReviewFlowEntry } from '../../../../../Domain/Wallet/walletReviewContext';
+import type { WalletReviewFlowEntry } from '../walletReviewContext';
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,

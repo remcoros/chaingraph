@@ -14,7 +14,7 @@ import type { WalletReviewCoverage } from '../../../../Domain/Wallet/walletRevie
 import type { WalletUtxoView } from '../../ChainData/WalletUtxos';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import { WalletHelp } from '../../../Controls/Display/WalletHelp';
-import { walletDiscoveryStatus } from '../../../../Domain/Wallet/walletCoverageStatus';
+import { walletDiscoveryStatus } from './walletDiscoveryStatus';
 
 export function WalletOverview({
   workspace,

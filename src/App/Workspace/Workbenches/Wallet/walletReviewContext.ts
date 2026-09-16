@@ -1,17 +1,20 @@
-import { canonicalEntityNodeId } from '../Metadata/entityReferences';
+import { canonicalEntityNodeId } from '../../../../Domain/Metadata/entityReferences';
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,
   type PreviousOutputResolution,
-} from '../Chain/prevouts';
-import { verifiedWalletAddresses } from './walletRecords';
-import type { WalletSelectionAddresses, WalletSelectionIndex } from './walletSelectionIndex';
+} from '../../../../Domain/Chain/prevouts';
+import { verifiedWalletAddresses } from '../../../../Domain/Wallet/walletRecords';
+import type {
+  WalletSelectionAddresses,
+  WalletSelectionIndex,
+} from '../../../../Domain/Wallet/walletSelectionIndex';
 import {
   canonicalTransactionId,
   loadedWalletTransactions,
   validOutputIndex,
   walletOutputEvidence,
-} from './walletRelationships';
+} from '../../../../Domain/Wallet/walletRelationships';
 import {
   outputNodeId,
   sats,
@@ -20,7 +23,7 @@ import {
   type TxOutput,
   type Wallet,
   type Workspace,
-} from '../types';
+} from '../../../../Domain/types';
 
 export interface WalletReviewFlowEntry {
   /** Canonical entity reference; a coinbase entry refers to its transaction. */
@@ -238,36 +241,4 @@ export function buildWalletReviewContext(
           : 'unknown-output',
     missingPrevouts: inputs.filter((input) => input.missing && !input.coinbase).length,
   };
-}
-
-export interface RelatedEntity {
-  id: string;
-  address?: string;
-  txid?: string;
-  transactionIds?: readonly string[];
-}
-
-/** Explicit relation within a supplied candidate set. No expansion, inferred
- * common ownership, case folding, partial matching or label-based identity. */
-export function matchRelatedEntities(
-  candidates: readonly RelatedEntity[],
-  seeds: readonly RelatedEntity[],
-  relation: 'address' | 'transaction',
-): string[] {
-  const valuesFor = (entity: RelatedEntity): readonly string[] =>
-    relation === 'address'
-      ? entity.address
-        ? [entity.address]
-        : []
-      : entity.txid
-        ? [entity.txid]
-        : (entity.transactionIds ?? []);
-  const values = new Set(seeds.flatMap((seed) => [...valuesFor(seed)]));
-  return [
-    ...new Set(
-      candidates
-        .filter((candidate) => valuesFor(candidate).some((value) => values.has(value)))
-        .map((candidate) => candidate.id),
-    ),
-  ];
 }

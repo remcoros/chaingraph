@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { CheckSquare, ChevronDown } from 'lucide-react';
 import { AnchoredPopover } from '../../../Controls/AnchoredPopover';
-import { matchRelatedEntities } from '../../../../Domain/Wallet/walletReviewContext';
+import { matchRelatedEntities } from './walletRelatedSelection';
 
 type Candidate = {
   id: string;

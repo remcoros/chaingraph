@@ -13,14 +13,8 @@ import {
 } from 'lucide-react';
 import type { Annotation, GraphNode, Workspace } from '../../../../../Domain/types';
 import { listTagsForNode } from '../../../../../Domain/Metadata/tags';
-import type {
-  WalletReviewContext,
-  WalletReviewFlowEntry,
-} from '../../../../../Domain/Wallet/walletReviewContext';
-import {
-  isWalletFlowEditTarget,
-  walletFlowVisibility,
-} from '../../../../../Domain/Wallet/walletFlowVisibility';
+import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
+import { isWalletFlowEditTarget, walletFlowVisibility } from './walletFlowVisibility';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';

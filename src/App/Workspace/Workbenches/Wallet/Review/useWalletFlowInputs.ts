@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { PreviousOutputIndex } from '../../../../../Domain/Chain/prevouts';
 import type { Network, Transaction, Workspace } from '../../../../../Domain/types';
-import type { WalletReviewFlowEntry } from '../../../../../Domain/Wallet/walletReviewContext';
+import type { WalletReviewFlowEntry } from '../walletReviewContext';
 import {
   loadWalletFlowInputWave,
   mergeWalletFlowInputs,

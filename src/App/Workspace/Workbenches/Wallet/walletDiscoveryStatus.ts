@@ -1,4 +1,4 @@
-import type { Wallet } from '../types';
+import type { Wallet } from '../../../../Domain/types';
 
 export function walletDiscoveryStatus(wallet: Wallet): { text: string; hint?: string } | undefined {
   if (!wallet.scannedAt || wallet.scanComplete === true) return;

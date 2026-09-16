@@ -1,4 +1,4 @@
-import type { WalletReviewFlowEntry } from './walletReviewContext';
+import type { WalletReviewFlowEntry } from '../walletReviewContext';
 
 export function isWalletFlowEditTarget(entry: WalletReviewFlowEntry, editingId?: string) {
   return (

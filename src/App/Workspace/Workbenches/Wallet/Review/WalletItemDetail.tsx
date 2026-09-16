@@ -20,12 +20,8 @@ import {
   buildWalletReviewContext,
   orderWalletContextTransactions,
   type WalletReviewFlowEntry,
-} from '../../../../../Domain/Wallet/walletReviewContext';
-import {
-  walletRowFinding,
-  walletRowRelationship,
-  type WalletRow,
-} from '../../../../../Domain/Wallet/walletWorkbenchRows';
+} from '../walletReviewContext';
+import { walletRowFinding, walletRowRelationship, type WalletRow } from '../walletRows';
 import { useTransactionFetch } from '../../../ChainData/TransactionFetch';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
@@ -39,14 +35,8 @@ import type {
   WalletSelectionIndex,
   WalletSelectionAddresses,
 } from '../../../../../Domain/Wallet/walletSelectionIndex';
-import {
-  walletRelatedRecords,
-  walletRelatedDescription,
-} from '../../../../../Domain/Wallet/walletRelatedRecords';
-import {
-  walletReviewGuidance,
-  walletSubjectTitle,
-} from '../../../../../Domain/Wallet/walletReviewGuidance';
+import { walletRelatedRecords, walletRelatedDescription } from './walletRelatedRecords';
+import { walletReviewGuidance, walletSubjectTitle } from './walletReviewGuidance';
 
 export type WalletDecisionAction = 'reviewed' | 'later' | 'reopen';
 

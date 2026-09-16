@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 import { type Transaction, type Wallet, type Workspace } from '../src/Domain/types';
-import { buildWalletReviewContext } from '../src/Domain/Wallet/walletReviewContext';
-import { walletRelatedRecords } from '../src/Domain/Wallet/walletRelatedRecords';
+import { buildWalletReviewContext } from '../src/App/Workspace/Workbenches/Wallet/walletReviewContext';
+import { walletRelatedRecords } from '../src/App/Workspace/Workbenches/Wallet/Review/walletRelatedRecords';
 import {
   walletRowRelationship,
   walletRowWithContext,
   type WalletRow,
-} from '../src/Domain/Wallet/walletWorkbenchRows';
+} from '../src/App/Workspace/Workbenches/Wallet/walletRows';
 import {
   buildWalletSelectionAddresses,
   buildWalletSelectionIndex,

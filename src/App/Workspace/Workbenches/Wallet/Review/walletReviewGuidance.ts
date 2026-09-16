@@ -1,5 +1,5 @@
-import type { AnalysisFinding } from '../types';
-import type { WalletRow } from './walletWorkbenchRows';
+import type { AnalysisFinding } from '../../../../../Domain/types';
+import type { WalletRow } from '../walletRows';
 
 export function walletSubjectTitle(row: WalletRow): string {
   if (row.relationshipDirection === 'source') return 'Source address';

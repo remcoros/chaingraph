@@ -9,12 +9,12 @@ import {
   buildWalletReview,
   reviewKey,
 } from '../src/Domain/Wallet/walletReview';
-import { walletReviewCategories } from '../src/Domain/Wallet/walletReviewCategories';
-import { matchesWalletStatus, reviewRow } from '../src/Domain/Wallet/walletWorkbenchRows';
+import { walletReviewCategories } from '../src/App/Workspace/Workbenches/Wallet/Review/reviewCategories';
+import { matchesWalletStatus, reviewRow } from '../src/App/Workspace/Workbenches/Wallet/walletRows';
 import {
   walletReviewGuidance,
   walletSubjectTitle,
-} from '../src/Domain/Wallet/walletReviewGuidance';
+} from '../src/App/Workspace/Workbenches/Wallet/Review/walletReviewGuidance';
 import { PUBLIC_ZPUB, transactions, TX_FUNDING, TX_SPENDING } from './fixtures/bitcoin';
 
 function fixture() {

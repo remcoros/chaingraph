@@ -3,9 +3,9 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import {
   buildWalletReviewContext,
-  matchRelatedEntities,
   orderWalletContextTransactions,
-} from '../src/Domain/Wallet/walletReviewContext';
+} from '../src/App/Workspace/Workbenches/Wallet/walletReviewContext';
+import { matchRelatedEntities } from '../src/App/Workspace/Workbenches/Wallet/walletRelatedSelection';
 import { buildWalletReview, type WalletReviewItem } from '../src/Domain/Wallet/walletReview';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { outputNodeId, type Transaction, type Wallet, type Workspace } from '../src/Domain/types';

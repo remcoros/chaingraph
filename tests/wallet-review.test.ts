@@ -22,7 +22,7 @@ import {
   applyBatchLabel,
   applyBatchTag,
 } from '../src/Domain/Metadata/batchMetadata';
-import { walletReviewCategories } from '../src/Domain/Wallet/walletReviewCategories';
+import { walletReviewCategories } from '../src/App/Workspace/Workbenches/Wallet/Review/reviewCategories';
 import { groupWalletRelationships } from '../src/Domain/Wallet/walletRelationships';
 
 const mine = (fill: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(fill), 0, 'bc');

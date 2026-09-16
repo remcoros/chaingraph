@@ -6,7 +6,7 @@ import {
   matchesReviewCategories,
   walletReviewCategories,
   walletReviewCategoryScanState,
-} from '../src/Domain/Wallet/walletReviewCategories';
+} from '../src/App/Workspace/Workbenches/Wallet/Review/reviewCategories';
 import { REVIEW_REASONS, type WalletReviewItem } from '../src/Domain/Wallet/walletReview';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 

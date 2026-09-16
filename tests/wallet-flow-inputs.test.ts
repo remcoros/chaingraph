@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Transaction } from '../src/Domain/types';
-import type { WalletReviewFlowEntry } from '../src/Domain/Wallet/walletReviewContext';
+import type { WalletReviewFlowEntry } from '../src/App/Workspace/Workbenches/Wallet/walletReviewContext';
 import { indexPreviousOutputs } from '../src/Domain/Chain/prevouts';
 import { buildGraph, newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import {

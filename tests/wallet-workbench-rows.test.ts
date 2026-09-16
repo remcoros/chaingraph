@@ -13,13 +13,13 @@ import {
   resolveWalletRow,
   reviewRow,
   walletSelectAll,
-} from '../src/Domain/Wallet/walletWorkbenchRows';
+} from '../src/App/Workspace/Workbenches/Wallet/walletRows';
 import { PUBLIC_ZPUB } from './fixtures/bitcoin';
 import { addressNodeId, outputNodeId, type Wallet } from '../src/Domain/types';
-import type { WalletRow } from '../src/Domain/Wallet/walletWorkbenchRows';
+import type { WalletRow } from '../src/App/Workspace/Workbenches/Wallet/walletRows';
 import { buildWalletReview } from '../src/Domain/Wallet/walletReview';
 import { groupWalletRelationships } from '../src/Domain/Wallet/walletRelationships';
-import { matchRelatedEntities } from '../src/Domain/Wallet/walletReviewContext';
+import { matchRelatedEntities } from '../src/App/Workspace/Workbenches/Wallet/walletRelatedSelection';
 
 const A = 'a'.repeat(64),
   B = 'b'.repeat(64),

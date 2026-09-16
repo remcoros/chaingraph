@@ -7,7 +7,7 @@ import { scanDefaults, type AnalysisScan } from '../src/Domain/Analysis/analysis
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { deriveAddresses } from '../src/Domain/Wallet/wallet';
 import type { Wallet } from '../src/Domain/types';
-import type { WalletRow } from '../src/Domain/Wallet/walletWorkbenchRows';
+import type { WalletRow } from '../src/App/Workspace/Workbenches/Wallet/walletRows';
 import { PUBLIC_ZPUB, TX_FUNDING, TX_SPENDING, transactions } from './fixtures/bitcoin';
 
 function fixture() {

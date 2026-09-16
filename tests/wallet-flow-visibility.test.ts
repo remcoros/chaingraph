@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { walletFlowVisibility } from '../src/Domain/Wallet/walletFlowVisibility';
-import type { WalletReviewFlowEntry } from '../src/Domain/Wallet/walletReviewContext';
+import { walletFlowVisibility } from '../src/App/Workspace/Workbenches/Wallet/Review/walletFlowVisibility';
+import type { WalletReviewFlowEntry } from '../src/App/Workspace/Workbenches/Wallet/walletReviewContext';
 
 const rows = (count: number): WalletReviewFlowEntry[] =>
   Array.from({ length: count }, (_, n) => ({

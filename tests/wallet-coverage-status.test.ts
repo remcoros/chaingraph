@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { walletDiscoveryStatus } from '../src/Domain/Wallet/walletCoverageStatus';
+import { walletDiscoveryStatus } from '../src/App/Workspace/Workbenches/Wallet/walletDiscoveryStatus';
 import { deriveAddresses } from '../src/Domain/Wallet/wallet';
 import type { Wallet } from '../src/Domain/types';
 import { PUBLIC_ZPUB } from './fixtures/bitcoin';

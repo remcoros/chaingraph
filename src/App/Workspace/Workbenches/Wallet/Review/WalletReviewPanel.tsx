@@ -32,13 +32,13 @@ import {
   type WalletRow,
   type WalletStatusFilter,
   type WalletTab,
-} from '../../../../../Domain/Wallet/walletWorkbenchRows';
+} from '../walletRows';
 import {
   walletReviewCategories,
   matchesReviewCategories,
   walletReviewCategoryScanState,
   type WalletReviewCategoryWorkspace,
-} from '../../../../../Domain/Wallet/walletReviewCategories';
+} from './reviewCategories';
 import type { AnalysisScan } from '../../../../../Domain/Analysis/analysisScan';
 import { useRecordSelection } from '../useRecordSelection';
 import type { WalletUtxoController } from '../../../ChainData/WalletUtxos';
@@ -56,7 +56,7 @@ import {
   type WalletDecisionAction,
 } from './WalletItemDetail';
 import { WalletRelatedSelection } from '../WalletRelatedSelection';
-import { matchRelatedEntities } from '../../../../../Domain/Wallet/walletReviewContext';
+import { matchRelatedEntities } from '../walletRelatedSelection';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';

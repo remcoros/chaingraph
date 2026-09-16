@@ -8,7 +8,7 @@ import {
 } from '../../../../Domain/Analysis/analysisScan';
 import { walletEvidenceChanged } from '../../../../Domain/Wallet/walletActivity';
 import { short, type Wallet, type Workspace } from '../../../../Domain/types';
-import type { WalletRow } from '../../../../Domain/Wallet/walletWorkbenchRows';
+import type { WalletRow } from './walletRows';
 
 export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: WalletRow) {
   if (row?.relationshipDirection)
