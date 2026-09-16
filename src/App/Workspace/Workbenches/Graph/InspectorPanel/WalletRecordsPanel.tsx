@@ -13,7 +13,7 @@ import {
   verifyWalletUtxo,
   type WalletUtxoRecord,
 } from '../../../../../Domain/Wallet/walletRecords';
-import type { WalletUtxoController } from '../useWalletUtxos';
+import type { WalletUtxoController } from '../../walletUtxoContract';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './wallet-records.css';
 

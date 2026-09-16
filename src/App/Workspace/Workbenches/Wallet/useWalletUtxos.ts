@@ -1,23 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { Wallet, Workspace } from '../../../../Domain/types';
-import type { WalletUtxoRecord } from '../../../../Domain/Wallet/walletRecords';
+import type { WalletUtxoController, WalletUtxoView } from '../walletUtxoContract';
 import { fetchWalletUtxos } from './walletUtxos';
-
-export interface WalletUtxoView {
-  records: WalletUtxoRecord[];
-  checkedAt: string;
-  checkedAddresses: number;
-  totalAddresses: number;
-  nextCursor?: number;
-  failed: number;
-}
-
-export interface WalletUtxoController {
-  utxos?: WalletUtxoView;
-  loading: boolean;
-  error: string;
-  check: (cursor?: number) => Promise<void>;
-}
 
 async function runWalletUtxoRequest({
   workspace,

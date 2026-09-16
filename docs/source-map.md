@@ -14,6 +14,7 @@ src/
     Examples/               example picker and creation worker
     Help/                   help menu, about dialog and guided tour
     Controls/               reusable App-owned controls, display and metadata UI
+      MultiSelectFilter.tsx reusable multi-select checklist filter
       Display/              amounts, identifiers, timestamps and evidence help
       Metadata/             annotation, icon and metadata editors
     Workspace/
@@ -35,12 +36,12 @@ src/
       Tags/                 workspace tag management
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
+        walletUtxoContract.ts transient UTXO observation contract for Wallet and Graph Inspector
         Wallet/             wallet overview, scan and preparation state
           WalletWorkbench.tsx controller binding and the wallet workbench view
           walletWorkbenchContext.ts shared context for the wallet panels
           useWalletActivity.ts address discovery settings and runs
           useWalletAnalysis.ts wallet-scoped analysis runs
-          Records/          address and UTXO panels
           Review/           review detail, flow and input loading
         Graph/              graph surface, controls, panels and metadata projection
           GraphWorkbench.tsx graph canvas, navigation and panel composition
@@ -54,6 +55,8 @@ src/
             InspectorPanel.tsx panel controller binding and tab composition
             InspectorPanelDetail.tsx selected node or wallet detail actions
             Inspector.tsx node and wallet inspection views
+            WalletRecordsPanel.tsx wallet address, transaction and UTXO tabs
+            WalletAddressesPanel.tsx wallet address tab contents
             ScriptInspector.tsx raw transaction and script inspection
             transactionInspection.ts raw inspection fetch helper
             useUtxoStatus.ts ephemeral selected-outpoint status hook
@@ -96,7 +99,7 @@ scripts/                    development, validation and release tooling
 | -------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs.tsx`                                    | `password-controls.test.ts`, `workspace-storage.test.ts`                                                          |
 | Autosave, lock or undo                 | `App/Workspace/useWorkspaces.ts`, `Infra/Storage/`                                      | `workspace-save-scheduling.test.ts`, `workspace-encryption-worker.test.ts`, `workspace-undo-descriptions.test.ts` |
-| Wallet review or records               | `App/Workspace/Workbenches/Wallet/`, `Domain/Wallet/`                                   | `wallet-review*.test.ts`, `wallet-records.test.ts`, `wallet-preparation.test.ts`                                  |
+| Wallet review or records               | `App/Workspace/Workbenches/Wallet/`, `Graph/InspectorPanel/`, `Domain/Wallet/`          | `wallet-review*.test.ts`, `wallet-records.test.ts`, `wallet-preparation.test.ts`                                  |
 | Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `Domain/Chain/`                     | `transactionFlow.test.ts`, `address-history.test.ts`, `flow-inputs.test.ts`                                       |
 | Canvas rendering or layout             | `App/Workspace/Workbenches/Graph/Renderer/`                                             | `flow-layout.test.ts`, `graph-presentation.test.ts`, `flow-renderer-responsiveness.test.ts`                       |
 | Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/Selection/`, `Domain/Graph/` | `graph-filters.test.ts`, `graph-membership.test.ts`, `visibility.test.ts`                                         |
@@ -166,7 +169,7 @@ scan targets), `wallet`, `analysis`, plus the shared `selection`, `annotations`,
 
 Panel state belongs to the workbench that shows it. Graph owns its tabs, and
 other workbenches reach them through `GraphHandoff` rather than writing them, so
-a wallet record opening in the inspector is a handoff rather than a tab write. Workbench action modules implement Graph, Wallet
+a wallet record opening in the inspector is a handoff rather than a tab write. Workbench implementation modules do not import sibling workbenches; shared transient UTXO observations use the Workbenches-root `walletUtxoContract.ts` contract. Workbench action modules implement Graph, Wallet
 and Analysis behavior over that state. Wallet and Analysis reach Graph only
 through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`, never
 through Graph's own modules. Each workbench file binds the controller to its own
@@ -178,5 +181,5 @@ the selected address's record and graph expansion. The flow-input hooks stay wit
 the workbench that shows them, under `Graph/TransactionFlow/` and
 `Wallet/Review/`, and `useWorkspace` aggregates what other areas need. The dialog
 module exports modal and focus helpers used by other areas. Graph filter controls
-are also used by the entity browser, and Wallet category controls are used by
-Analysis.
+are also used by the entity browser, and `MultiSelectFilter` is shared by Wallet
+and Analysis.

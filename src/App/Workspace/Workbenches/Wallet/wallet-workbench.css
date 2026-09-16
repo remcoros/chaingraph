@@ -1041,60 +1041,6 @@
 .wallet-review-evidence > div {
   min-width: 0;
 }
-.wallet-category-options {
-  border: 0;
-  padding: 0;
-  margin: 10px 0 0;
-}
-.wallet-category-legend {
-  font-size: 11px;
-  color: var(--color-muted);
-}
-.anchored-popover .wallet-category-option {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 0;
-  border-top: 1px solid var(--color-rule);
-}
-.anchored-popover .wallet-category-option > label {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  gap: 7px;
-  margin: 0;
-}
-.wallet-category-option input {
-  flex-shrink: 0;
-  margin: 0;
-  width: 16px;
-  height: 16px;
-}
-.wallet-category-option label > span:not(.wallet-count) {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-}
-.wallet-category-name {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-.wallet-category-option small {
-  display: block;
-  color: var(--color-muted);
-  font-size: 11px;
-  line-height: 1.5;
-  margin-top: 3px;
-}
 .wallet-relationship-coverage {
   border-left: 2px solid var(--color-rule);
   padding-left: 10px;
@@ -1183,10 +1129,6 @@
 }
 .wallet-evidence-outpoint code {
   overflow-wrap: anywhere;
-}
-.wallet-category-tools {
-  align-items: center;
-  gap: 6px;
 }
 .wallet-input-status {
   display: flex;

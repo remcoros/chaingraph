@@ -1,0 +1,72 @@
+.multi-select-filter-count {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: var(--color-raised);
+  font-size: 10px;
+  text-align: center;
+}
+.multi-select-filter-options {
+  border: 0;
+  padding: 0;
+  margin: 10px 0 0;
+}
+.multi-select-filter-legend {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.anchored-popover .multi-select-filter-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  border-top: 1px solid var(--color-rule);
+}
+.anchored-popover .multi-select-filter-option > label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 7px;
+  margin: 0;
+}
+.multi-select-filter-option input {
+  flex-shrink: 0;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+.multi-select-filter-option label > span:not(.multi-select-filter-count) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.multi-select-filter-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.multi-select-filter-option small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 3px;
+}
+.multi-select-filter-tools {
+  align-items: center;
+  gap: 6px;
+}
+@media (pointer: coarse) {
+  .multi-select-filter-option label,
+  .multi-select-filter-option > span[role='img'] {
+    min-height: 32px;
+  }
+}

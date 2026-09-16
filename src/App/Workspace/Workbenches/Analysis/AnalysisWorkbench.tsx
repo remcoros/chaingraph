@@ -45,7 +45,7 @@ import {
   resolvePreviousOutput,
   type PreviousOutputIndex,
 } from '../../../../Domain/Chain/prevouts';
-import { WalletCategoryFilter } from '../Wallet/WalletCategoryFilter';
+import { MultiSelectFilter } from '../../../Controls/MultiSelectFilter';
 import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import {
   findingReview,
@@ -855,16 +855,24 @@ function AnalysisWorkbenchView({
           </div>
         )}
         <div className="scan-results-heading">
-          <WalletCategoryFilter
+          <MultiSelectFilter
             active={active}
-            title="Analysis finding types"
-            categories={categories}
-            selected={types.filter((id) => categories.some((category) => category.id === id))}
+            options={categories}
+            selectedIds={types.filter((id) => categories.some((category) => category.id === id))}
             onChange={(ids) => {
               setTypes(ids);
               setLimit(40);
             }}
-            countHelp="Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status."
+            labels={{
+              trigger: 'Finding types',
+              title: 'Analysis finding types',
+              optionNoun: 'types',
+              reset: 'All types',
+              clear: 'Clear types',
+              countHelpTitle: 'Finding type counts',
+              countHelp:
+                'Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status.',
+            }}
           />
           <div className="scan-priorities" aria-label="Review priority filters">
             {reviewPriorities.map((priority) => (

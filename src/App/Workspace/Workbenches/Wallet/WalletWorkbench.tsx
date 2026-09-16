@@ -41,7 +41,7 @@ import {
 } from '../../../../Domain/Wallet/walletReviewCategories';
 import type { AnalysisScan } from '../../../../Domain/Analysis/analysisScan';
 import { useRecordSelection } from './useRecordSelection';
-import type { WalletUtxoController } from './useWalletUtxos';
+import type { WalletUtxoController } from '../walletUtxoContract';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import type { WorkspaceController } from '../../useWorkspace';
 import { useWalletAnalysis } from './useWalletAnalysis';
@@ -50,7 +50,7 @@ import { useTransactionFetch } from '../../useTransactionFetch';
 import { WALLET_FLOW_INPUT_WAVE_LIMIT } from './Review/walletFlowInputs';
 import { BatchMetadataBar } from './Review/BatchMetadataBar';
 import { WalletOverview } from './WalletOverview';
-import { WalletCategoryFilter } from './WalletCategoryFilter';
+import { MultiSelectFilter } from '../../../Controls/MultiSelectFilter';
 import {
   WalletItemDetail,
   WalletDecisionButtons,
@@ -746,13 +746,23 @@ function WalletReview(props: WalletWorkbenchViewProps & { wallet: Wallet; hidden
             </select>
           </label>
           {tab === 'review' && (
-            <WalletCategoryFilter
+            <MultiSelectFilter
               active={active}
-              categories={categories}
-              selected={selectedTypes}
+              options={categories}
+              selectedIds={selectedTypes}
               onChange={(ids) => {
                 setLimit(PAGE);
                 setTypeIds(ids);
+              }}
+              labels={{
+                trigger: 'Finding types',
+                title: 'Wallet finding types',
+                optionNoun: 'types',
+                reset: 'All types',
+                clear: 'Clear types',
+                countHelpTitle: 'Finding type counts',
+                countHelp:
+                  'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyze to look for new findings.',
               }}
             />
           )}

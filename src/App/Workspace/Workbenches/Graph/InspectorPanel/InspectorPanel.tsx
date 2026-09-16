@@ -3,7 +3,7 @@ import {
   addScanPathAddition,
   addScanNodeAddition,
 } from '../../../../../Domain/ConnectionScan/connectionScanAddition';
-import { WalletRecordsPanel } from '../../Wallet/Records/WalletRecordsPanel';
+import { WalletRecordsPanel } from './WalletRecordsPanel';
 import { useLayoutEffect, useRef } from 'react';
 import {
   ArrowLeftRight,

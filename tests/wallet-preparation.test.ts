@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WalletPreparationCache } from '../src/App/Workspace/Workbenches/Wallet/walletPreparation';
 import { largeWalletFixture } from './fixtures/wallet-performance';
-import type { WalletUtxoView } from '../src/App/Workspace/Workbenches/Wallet/useWalletUtxos';
+import type { WalletUtxoView } from '../src/App/Workspace/Workbenches/walletUtxoContract';
 import { WorkspaceStore } from '../src/App/Workspace/useWorkspaces';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

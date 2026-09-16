@@ -454,9 +454,7 @@
   font-size: 11px;
 }
 @media (pointer: coarse) {
-  .analysis-workbench button:not(:where(.compact-controls button)),
-  .wallet-category-option label,
-  .wallet-category-option .wallet-help {
+  .analysis-workbench button:not(:where(.compact-controls button)) {
     min-height: 32px;
   }
 }

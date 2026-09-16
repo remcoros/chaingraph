@@ -66,15 +66,56 @@
       }
     },
     {
-      "files": [
-        "src/App/Workspace/Workbenches/Wallet/**",
-        "src/App/Workspace/Workbenches/Analysis/**"
-      ],
+      "files": ["src/App/Workspace/Workbenches/Analysis/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["**/Workbenches/Wallet/**", "../Wallet/**"],
+                "message": "Analysis must not import Wallet workbench internals. Share App controls or a Workbenches-root contract instead."
+              },
+              {
+                "group": ["**/Workbenches/Graph/**", "../Graph/**", "../../Graph/**"],
+                "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/App/Workspace/Workbenches/Graph/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/Workbenches/Wallet/**", "../Wallet/**", "../../Wallet/**"],
+                "message": "Graph must not import Wallet workbench internals. Share a Workbenches-root contract instead."
+              },
+              {
+                "group": ["**/Workbenches/Analysis/**", "../Analysis/**", "../../Analysis/**"],
+                "message": "Graph must not import Analysis workbench internals. Share a Workbenches-root contract instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/App/Workspace/Workbenches/Wallet/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/Workbenches/Analysis/**", "../Analysis/**", "../../Analysis/**"],
+                "message": "Wallet must not import Analysis workbench internals. Share a Workbenches-root contract instead."
+              },
               {
                 "group": ["**/Workbenches/Graph/**", "../Graph/**", "../../Graph/**"],
                 "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
