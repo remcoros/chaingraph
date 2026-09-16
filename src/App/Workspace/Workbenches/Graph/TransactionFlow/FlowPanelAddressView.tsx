@@ -6,9 +6,9 @@ import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBl
 import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import {
   addressBalanceSats,
-  paginateAddressHistorySections,
   type AddressHistory,
 } from '../../../../../Domain/Chain/addressHistory';
+import { paginateAddressHistorySections } from './addressHistorySections';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
 import {
   txNodeId,

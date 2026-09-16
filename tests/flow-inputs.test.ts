@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   flowInputPlan,
-  mergeFlowInputs,
   shouldLoadFlowInputs,
-} from '../src/Domain/Chain/flowInputs';
+} from '../src/App/Workspace/Workbenches/Graph/TransactionFlow/flowInputPlan';
+import { mergeFlowInputs } from '../src/Domain/Chain/flowInputs';
 import { newWorkspace, buildGraph, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import type { Transaction } from '../src/Domain/types';
 

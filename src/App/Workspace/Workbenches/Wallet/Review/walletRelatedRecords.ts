@@ -1,5 +1,5 @@
 import { outputNodeId, txNodeId, type Workspace } from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/transactionInspection';
+import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
 import { walletOutputEvidence } from '../../../../../Domain/Wallet/walletRelationships';
 import { walletRowFinding, type WalletRow } from '../walletRows';
 import type { WalletSelectionIndex } from '../../../../../Domain/Wallet/walletSelectionIndex';

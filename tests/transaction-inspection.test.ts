@@ -3,9 +3,9 @@ import { Transaction as BitcoinTransaction } from 'bitcoinjs-lib';
 import {
   decodeRawTransaction,
   inspectScript,
-  relatedTransactions,
-} from '../src/Domain/Chain/transactionInspection';
-import { fetchRawInspection } from '../src/App/Workspace/Workbenches/Graph/InspectorPanel/transactionInspection';
+  fetchRawInspection,
+} from '../src/App/Workspace/Workbenches/Graph/InspectorPanel/transactionInspection';
+import { relatedTransactions } from '../src/Domain/Chain/relatedTransactions';
 import type { Transaction } from '../src/Domain/types';
 
 function fixture(witness = false) {

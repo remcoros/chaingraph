@@ -13,7 +13,7 @@ import {
   parseWorkspace,
 } from '../src/Domain/Workspace/workspace';
 import { outputNodeId, type Transaction } from '../src/Domain/types';
-import { flowInputPlan } from '../src/Domain/Chain/flowInputs';
+import { flowInputPlan } from '../src/App/Workspace/Workbenches/Graph/TransactionFlow/flowInputPlan';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');

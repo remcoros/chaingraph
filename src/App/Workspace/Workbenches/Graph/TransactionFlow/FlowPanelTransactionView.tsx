@@ -37,7 +37,7 @@ import {
   txNodeId,
   sats,
 } from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/transactionInspection';
+import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
 import { indexLoadedSpends, selectedFlowLeg } from '../../../../../Domain/Chain/transactionFlow';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../../Domain/Chain/prevouts';
 import { isOpReturn } from '../../../../../Domain/Chain/opReturn';

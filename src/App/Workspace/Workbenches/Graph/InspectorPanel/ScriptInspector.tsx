@@ -3,12 +3,8 @@ import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
 import { short } from '../../../../../Domain/types';
-import {
-  inspectScript,
-  relatedTransactions,
-  type RawInspection,
-} from '../../../../../Domain/Chain/transactionInspection';
-import { fetchRawInspection } from './transactionInspection';
+import { inspectScript, type RawInspection, fetchRawInspection } from './transactionInspection';
+import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';

@@ -1,13 +1,9 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  flowInputPlan,
-  mergeFlowInputs,
-  shouldLoadFlowInputs,
-  type FlowPlanWorkspace,
-} from '../../../../../Domain/Chain/flowInputs';
+import { flowInputPlan, shouldLoadFlowInputs, type FlowPlanWorkspace } from './flowInputPlan';
+import { mergeFlowInputs } from '../../../../../Domain/Chain/flowInputs';
 import type { GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/transactionInspection';
+import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
 import { indexPreviousOutputs } from '../../../../../Domain/Chain/prevouts';
 import { indexLoadedSpends } from '../../../../../Domain/Chain/transactionFlow';
 import { mapLimit } from '../../../../../Infra/Bitcoin/api';

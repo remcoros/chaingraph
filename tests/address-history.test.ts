@@ -4,12 +4,12 @@ import {
   addressBalanceSats,
   indexAddressHistoryTransactions,
   listAddressHistory,
-  paginateAddressHistorySections,
   recentAddressHistoryEntries,
   recentAddressUtxos,
   RECENT_ADDRESS_GRAPH_LIMIT,
   shouldLoadAddressHistory,
 } from '../src/Domain/Chain/addressHistory';
+import { paginateAddressHistorySections } from '../src/App/Workspace/Workbenches/Graph/TransactionFlow/addressHistorySections';
 import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import type { Transaction } from '../src/Domain/types';
