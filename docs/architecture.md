@@ -38,7 +38,7 @@ test locations. Source is grouped by product ownership.
 | `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`          | Shared state, selection, presentation and workbench switching/focus                |
 | `src/App/Workspace/ChainData/`                                 | Bounded address and transaction loading, cancellation and evidence updates         |
 | `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/` | Each workbench composes its own views and binds shared Workspace state             |
-| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs.tsx`      | Workspace entry, example creation, help and dialogs                                |
+| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs/`         | Workspace entry, example creation, help and dialogs                                |
 | `src/App/Workspace/useWorkspaces.ts`                           | Unlocked sessions, undo/redo, autosave and locking                                 |
 | `src/App/Workspace/Selection/`, `Tags/`                        | Shared selection and workspace tag management                                      |
 | `src/App/Workspace/Workbenches/Wallet/`                        | Wallet overview, records, review UI, scan hooks and preparation cache              |

@@ -9,7 +9,7 @@ src/
   App/
     App.tsx                 app shell, home and dialogs
     useAppState.ts          workspace store, navigation and feedback
-    Dialogs.tsx             create, unlock, import and edit dialogs
+    Dialogs/                public dialog module and private dialog components
     FrontPage/              saved workspace list (WorkspaceHome)
     Examples/               example picker and creation worker
     Help/                   help menu, about dialog, guided tour and its Workspace adapter
@@ -102,7 +102,7 @@ scripts/                    development, validation and release tooling
 
 | Task                                   | Start here                                                                              | Relevant tests in `tests/`                                                                                        |
 | -------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs.tsx`                                    | `password-controls.test.ts`, `workspace-storage.test.ts`                                                          |
+| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs/`                                        | `password-controls.test.ts`, `workspace-storage.test.ts`                                                          |
 | Autosave, lock or undo                 | `App/Workspace/useWorkspaces.ts`, `Infra/Storage/`                                      | `workspace-save-scheduling.test.ts`, `workspace-encryption-worker.test.ts`, `workspace-undo-descriptions.test.ts` |
 | Wallet review or records               | `App/Workspace/Workbenches/Wallet/`, `Graph/InspectorPanel/`, `Domain/Wallet/`          | `wallet-review*.test.ts`, `wallet-records.test.ts`, `wallet-preparation.test.ts`                                  |
 | Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `Domain/Chain/`                     | `transactionFlow.test.ts`, `address-history.test.ts`, `flow-inputs.test.ts`                                       |
