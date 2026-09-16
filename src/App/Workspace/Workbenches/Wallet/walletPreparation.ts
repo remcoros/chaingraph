@@ -7,7 +7,7 @@ import {
   buildWalletSelectionIndex,
 } from '../../../../Domain/Wallet/walletSelectionIndex';
 import { createWalletOutputEvidenceResolver } from '../../../../Domain/Wallet/walletOutputEvidence';
-import type { WalletUtxoView } from '../walletUtxoContract';
+import type { WalletUtxoView } from '../../ChainData/WalletUtxos';
 
 type Dependencies = readonly unknown[];
 const same = (a: Dependencies, b: Dependencies) =>

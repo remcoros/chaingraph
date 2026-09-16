@@ -25,6 +25,10 @@ src/
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
       WorkspaceTour.tsx     guided tour and example preview wiring
       ChainData/            bounded evidence loading, spending notices and cancellation
+        WalletUtxos/        transient wallet UTXO loading shared by Wallet and Graph Inspector
+          index.ts           public UTXO controller and view contract
+          useWalletUtxos.ts  scoped UTXO lifecycle, cancellation and pagination state
+          fetchWalletUtxos.ts bounded Electrum listunspent requests
       useEntityRemoval.ts   removal plans, confirmation and applied removals
       useWorkspaceLookup.ts lookup field, reset signal and loaded-id resolution
       useWorkspaceHistory.ts undo, redo and single-step batch edits
@@ -36,7 +40,6 @@ src/
       Tags/                 workspace tag management
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
-        walletUtxoContract.ts transient UTXO observation contract for Wallet and Graph Inspector
         Wallet/             wallet overview, scan and preparation state
           WalletWorkbench.tsx controller binding and the wallet workbench view
           walletWorkbenchContext.ts shared context for the wallet panels
@@ -169,7 +172,7 @@ scan targets), `wallet`, `analysis`, plus the shared `selection`, `annotations`,
 
 Panel state belongs to the workbench that shows it. Graph owns its tabs, and
 other workbenches reach them through `GraphHandoff` rather than writing them, so
-a wallet record opening in the inspector is a handoff rather than a tab write. Workbench implementation modules do not import sibling workbenches; shared transient UTXO observations use the Workbenches-root `walletUtxoContract.ts` contract. Workbench action modules implement Graph, Wallet
+a wallet record opening in the inspector is a handoff rather than a tab write. Workbench implementation modules do not import sibling workbenches; shared transient UTXO observations live in `ChainData/WalletUtxos/`. Workbench action modules implement Graph, Wallet
 and Analysis behavior over that state. Wallet and Analysis reach Graph only
 through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`, never
 through Graph's own modules. Each workbench file binds the controller to its own

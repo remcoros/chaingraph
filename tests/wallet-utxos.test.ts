@@ -1,7 +1,7 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Network, Wallet } from '../src/Domain/types';
-import { fetchWalletUtxos } from '../src/App/Workspace/Workbenches/Wallet/walletUtxos';
+import { fetchWalletUtxos } from '../src/App/Workspace/ChainData/WalletUtxos/fetchWalletUtxos';
 import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');

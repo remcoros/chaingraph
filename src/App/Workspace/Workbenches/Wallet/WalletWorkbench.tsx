@@ -41,7 +41,7 @@ import {
 } from '../../../../Domain/Wallet/walletReviewCategories';
 import type { AnalysisScan } from '../../../../Domain/Analysis/analysisScan';
 import { useRecordSelection } from './useRecordSelection';
-import type { WalletUtxoController } from '../walletUtxoContract';
+import type { WalletUtxoController } from '../../ChainData/WalletUtxos';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import type { WorkspaceController } from '../../useWorkspace';
 import { useWalletAnalysis } from './useWalletAnalysis';

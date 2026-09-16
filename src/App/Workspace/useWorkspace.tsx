@@ -1,5 +1,5 @@
 import { resolveWalletUtxoObservation } from '../../Domain/Wallet/walletUtxoObservation';
-import { useWalletUtxos } from './Workbenches/Wallet/useWalletUtxos';
+import { useWalletUtxos } from './ChainData/WalletUtxos';
 import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
 import { useFlowInputs } from './Workbenches/Graph/TransactionFlow/useFlowInputs';
 import {
