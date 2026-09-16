@@ -25,6 +25,7 @@ src/
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
       WorkspaceTour.tsx     guided tour and example preview wiring
       ChainData/            bounded evidence loading, spending notices and cancellation
+        TransactionFetch.tsx session-scoped transaction fetch context and provider
         WalletUtxos/        transient wallet UTXO loading shared by Wallet and Graph Inspector
           index.ts           public UTXO controller and view contract
           useWalletUtxos.ts  scoped UTXO lifecycle, cancellation and pagination state
@@ -111,7 +112,7 @@ scripts/                    development, validation and release tooling
 | Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `Domain/ConnectionScan/`             | `connectionScan*.test.ts`                                                                                         |
 | Analysis tools or reports              | `App/Workspace/Workbenches/Analysis/`, `Domain/Analysis/`                               | `analysis*.test.ts`                                                                                               |
 | Labels, tags or icons                  | `App/Controls/Metadata/`, `Graph/TagsPanel/`, `Domain/Metadata/`                        | `batch-*.test.ts`, `tags.test.ts`, `labels.test.ts`                                                               |
-| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/useTransactionFetch.tsx`                               | `network-api.test.ts`, `transaction-scheduler.test.ts`, `scanner.test.ts`                                         |
+| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/ChainData/TransactionFetch.tsx`                        | `network-api.test.ts`, `transaction-scheduler.test.ts`, `scanner.test.ts`                                         |
 
 Paths in the task table are relative to `src/`. Primitive
 tests live in `Domain/Wallet/wallet.test.ts` and `Infra/Storage/crypto.test.ts`;

@@ -59,7 +59,7 @@ import {
   recoverAnalysisData,
   recoveryLimits,
 } from '../../../../Domain/Analysis/analysisRecovery';
-import { useTransactionFetch } from '../../useTransactionFetch';
+import { useTransactionFetch } from '../../ChainData/TransactionFetch';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';
 

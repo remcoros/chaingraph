@@ -46,7 +46,7 @@ import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import type { WorkspaceController } from '../../useWorkspace';
 import { useWalletAnalysis } from './useWalletAnalysis';
 import { useWalletCounterparties } from './useWalletCounterparties';
-import { useTransactionFetch } from '../../useTransactionFetch';
+import { useTransactionFetch } from '../../ChainData/TransactionFetch';
 import { WALLET_FLOW_INPUT_WAVE_LIMIT } from './Review/walletFlowInputs';
 import { BatchMetadataBar } from './Review/BatchMetadataBar';
 import { WalletOverview } from './WalletOverview';

@@ -1,5 +1,5 @@
 import './component-styles';
-import { TransactionFetchShell } from './Workspace/useTransactionFetch';
+import { TransactionFetchShell } from './Workspace/ChainData/TransactionFetch';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
 import { BookOpen, FolderOpen, Info, Library, Plus, X } from 'lucide-react';
 import { CreateDialog, ImportDialog, UnlockDialog, Modal } from './Dialogs';

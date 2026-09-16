@@ -26,7 +26,7 @@ import {
   walletRowRelationship,
   type WalletRow,
 } from '../../../../../Domain/Wallet/walletWorkbenchRows';
-import { useTransactionFetch } from '../../../useTransactionFetch';
+import { useTransactionFetch } from '../../../ChainData/TransactionFetch';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';

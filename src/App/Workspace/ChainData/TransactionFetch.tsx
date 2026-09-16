@@ -1,10 +1,10 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { fetchTransaction } from '../../Infra/Bitcoin/api';
-import type { Network } from '../../Domain/types';
+import { fetchTransaction } from '../../../Infra/Bitcoin/api';
+import type { Network } from '../../../Domain/types';
 import type {
   FetchPriority,
   TransactionFetchScope,
-} from '../../Infra/Bitcoin/transactionScheduler';
+} from '../../../Infra/Bitcoin/transactionScheduler';
 
 export const TransactionFetchContext = createContext<TransactionFetchScope | undefined>(undefined);
 
