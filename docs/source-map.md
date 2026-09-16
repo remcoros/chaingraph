@@ -12,7 +12,7 @@ src/
     Dialogs.tsx             create, unlock, import and edit dialogs
     FrontPage/              saved workspace list (WorkspaceHome)
     Examples/               example picker and creation worker
-    Help/                   help menu, about dialog and guided tour
+    Help/                   help menu, about dialog, guided tour and its Workspace adapter
     Controls/               reusable App-owned controls, display and metadata UI
       MultiSelectFilter.tsx reusable multi-select checklist filter
       Display/              amounts, identifiers, timestamps and evidence help
@@ -23,7 +23,6 @@ src/
       useWorkspaces.ts      saved and unlocked workspaces, undo/redo, autosave, locking
       WorkspaceToolbar.tsx  workbench navigation, lookup and workspace actions
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
-      WorkspaceTour.tsx     guided tour and example preview wiring
       ChainData/            bounded evidence loading, spending notices and cancellation
         TransactionFetch.tsx session-scoped transaction fetch context and provider
         WalletUtxos/        transient wallet UTXO loading shared by Wallet and Graph Inspector

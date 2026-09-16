@@ -20,7 +20,7 @@ import {
   WorkspaceLabelImport,
   WorkspaceSettingsDialog,
 } from './Workspace/WorkspaceDialogs';
-import { WorkspaceTour } from './Workspace/WorkspaceTour';
+import { WorkspaceTour } from './Help/WorkspaceTour';
 
 export default function App() {
   const app = useAppState();

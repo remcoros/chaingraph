@@ -1,5 +1,5 @@
-import { GuidedTour } from '../Help/GuidedTour';
-import type { WorkspaceController } from './useWorkspace';
+import { GuidedTour } from './GuidedTour';
+import type { WorkspaceController } from '../Workspace/useWorkspace';
 
 export function WorkspaceTour({ workspace }: { workspace: WorkspaceController }) {
   const { tour } = workspace;
