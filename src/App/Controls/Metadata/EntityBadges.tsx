@@ -1,4 +1,4 @@
-import type { WorkspaceTag } from '../../../Domain/Workspace/annotationTypes';
+import type { WorkspaceTag } from '../../Workspace/Annotations/workspaceTags';
 /** Shared non-interactive metadata for transaction rows, graph cards and lists. */
 export function EntityBadges({
   tags,

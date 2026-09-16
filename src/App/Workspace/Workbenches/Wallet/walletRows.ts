@@ -7,7 +7,7 @@ import { short } from '../../../Controls/Display/referenceFormat';
 import type { Network } from '../../../../Domain/Chain/network';
 import type { TxOutput } from '../../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { listTagsForNode } from '../../Annotations/tagProjection';
 import { isOpReturn } from '../../../../Domain/Chain/opReturn';
 import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';

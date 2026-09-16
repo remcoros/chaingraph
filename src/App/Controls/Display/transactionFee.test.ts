@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { transactionFee } from './transactionFee';
 import type { Transaction } from '../../../Domain/Chain/transaction';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../Workspace/createWorkspace';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
 
 function fixture() {
-  const workspace = newWorkspace('Transaction fee fixture', 'mainnet');
+  const workspace = createWorkspace('Transaction fee fixture', 'mainnet');
   const parent: Transaction = {
     txid: id(1),
     vin: [],

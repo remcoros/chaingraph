@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { newWorkspace } from '../../src/Domain/Workspace/workspace';
-import type { Workspace } from '../../src/Domain/Workspace/workspaceTypes';
+import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
+import type { Workspace } from '../../src/App/Workspace/workspace';
 import { largeWalletFixture } from './wallet-performance';
 
 /** Public BIP84 addresses, synthetic history, deterministic hash-like transaction IDs. */
@@ -61,7 +61,7 @@ export function compressionWalletFixture(
 }
 
 export function tinyCompressionFixture(): Workspace {
-  const workspace = newWorkspace('Tiny public fixture', 'mainnet');
+  const workspace = createWorkspace('Tiny public fixture', 'mainnet');
   workspace.id = '50000000-0000-4000-8000-000000000005';
   workspace.createdAt = '2026-09-10T00:00:00.000Z';
   return workspace;

@@ -6,7 +6,8 @@ import { analysisTools } from './analysis';
 import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
 import type { Transaction, TxOutput } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import { newWorkspace, parseWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
+import { parseWorkspace } from '../Persistence/Format';
 import { outputScriptHex } from '../../../Domain/Chain/prevouts';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const addrA = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu';
@@ -29,7 +30,7 @@ const transaction = (
   vsize: 100,
 });
 function workspace(...transactions: Transaction[]) {
-  const w = newWorkspace('Analysis fixture', 'mainnet');
+  const w = createWorkspace('Analysis fixture', 'mainnet');
   w.transactions = Object.fromEntries(transactions.map((tx) => [tx.txid, tx]));
   return w;
 }

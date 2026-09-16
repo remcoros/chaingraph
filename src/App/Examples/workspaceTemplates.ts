@@ -9,14 +9,16 @@ import testnet4FanOutUrl from './templateData/testnet4-fan-out.json?url';
 import testnet4MixedPathUrl from './templateData/testnet4-mixed-path.json?url';
 import testnet4SpentOutputUrl from './templateData/testnet4-spent-output.json?url';
 import { TAG_COLOR, type TagColor } from '../Controls/Metadata/tagColors';
-import type { Annotation, WorkspaceTag } from '../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../Workspace/Annotations/annotation';
+import type { WorkspaceTag } from '../Workspace/Annotations/workspaceTags';
 import type { Network } from '../../Domain/Chain/network';
 import type { Transaction } from '../../Domain/Chain/transaction';
 import type { Wallet } from '../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../Workspace/workspace';
 import { outputNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
 import { sats } from '../../Domain/Chain/transaction';
-import { newWorkspace, parseWorkspace } from '../../Domain/Workspace/workspace';
+import { createWorkspace } from '../Workspace/createWorkspace';
+import { parseWorkspace } from '../Workspace/Persistence/Format';
 import { transactionNodeIds } from '../Workspace/GraphState/visibility';
 
 export interface WorkspaceTemplate {
@@ -284,7 +286,7 @@ export async function createTemplateWorkspace(
   if (!template) throw new Error('Unknown workspace template.');
   const snapshot = await loadSnapshot(id);
   if (snapshot.network !== template.network) throw new Error('Template network mismatch.');
-  const workspace = newWorkspace(name ?? template.name, template.network);
+  const workspace = createWorkspace(name ?? template.name, template.network);
   workspace.description = description ?? template.description;
   workspace.transactions = snapshot.transactions;
 

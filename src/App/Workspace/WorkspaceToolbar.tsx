@@ -1,4 +1,4 @@
-import { LookupForm } from './LookupForm';
+import { GraphLookupForm } from './Workbenches/Graph/Navigation/GraphLookupForm';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -22,10 +22,9 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     tour,
     returnWorkbench,
     workbench,
-    lookup,
     activeWorkspace,
     canLoadChainData,
-    operationStatus: operation,
+    operation: workspaceOperation,
     prefetchDepth,
     setPrefetchDepth,
     history,
@@ -33,12 +32,12 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
     exportWorkspace,
     dialogs,
     annotations,
-    operationRef,
     setLockingWorkspace,
     setError,
   } = workspace;
+  const operation = workspaceOperation.status;
+  const lookup = workspace.graph.lookup;
   const { flushActive: flushActiveGraph } = workspace.graph.canvas;
-  const { addQuery } = workspace.evidence;
   const workspaceMenu = useRef<HTMLDivElement>(null);
   const workspaceMenuTrigger = useRef<HTMLButtonElement>(null);
   // Scoped to its workspace, so switching or locking one closes the menu.
@@ -120,7 +119,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
         )}
       </nav>
       <div className="lookup-controls" data-tour="chain-lookup">
-        <LookupForm
+        <GraphLookupForm
           inputRef={lookup.inputRef}
           network={activeWorkspace.network}
           canLoadChainData={canLoadChainData}
@@ -129,7 +128,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
           queryError={lookup.error}
           onQueryError={lookup.setError}
           resolveLoaded={lookup.resolveLoaded}
-          onSubmit={addQuery}
+          onSubmit={lookup.submit}
         />
         {!activeWorkspace.demo && (
           <label
@@ -264,7 +263,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  operationRef.current?.abort();
+                  workspaceOperation.cancel();
                   flushActiveGraph();
                   setLockingWorkspace(true);
                   void workspaces.active

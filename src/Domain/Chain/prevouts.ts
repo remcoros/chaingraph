@@ -4,7 +4,11 @@ import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinj
 import { outputNodeId } from '../Metadata/entityReferences';
 import { sats, type Transaction, type TxInput, type TxOutput } from './transaction';
 import type { Network } from './network';
-import type { Workspace } from '../Workspace/workspaceTypes';
+
+export interface TransactionObservations {
+  network: Network;
+  transactions: Record<string, Transaction>;
+}
 
 export type PreviousOutputResolution =
   { status: 'loaded' | 'attached'; output: TxOutput } | { status: 'missing' | 'conflict' };
@@ -68,7 +72,7 @@ export function previousOutputsConflict(
 }
 
 /** Index output facts without inventing their creating transactions. */
-export function indexPreviousOutputs(workspace: Pick<Workspace, 'network' | 'transactions'>) {
+export function indexPreviousOutputs(workspace: TransactionObservations) {
   const result = new Map<string, PreviousOutputResolution>();
   const transactions = Object.entries(workspace.transactions).flatMap(([key, transaction]) => {
     const txid = canonicalTxid(transaction.txid);
@@ -124,7 +128,7 @@ export function indexPreviousOutputs(workspace: Pick<Workspace, 'network' | 'tra
 }
 
 export function resolvePreviousOutput(
-  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  workspace: TransactionObservations,
   point: Pick<TxInput, 'txid' | 'vout'>,
   index: PreviousOutputIndex = indexPreviousOutputs(workspace),
 ): PreviousOutputResolution {

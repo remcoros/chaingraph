@@ -10,7 +10,8 @@ import {
   clearScanRuns,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 import { createConnectionScanFetch } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
 import { TransactionFetchScope } from '../../../src/Infra/Bitcoin/transactionScheduler';
@@ -45,7 +46,7 @@ describe('connection scan module integration', () => {
           transaction(9),
         ].map((tx) => [tx.txid, tx]),
       );
-      const workspace = newWorkspace('Public scan integration fixture', 'testnet4');
+      const workspace = createWorkspace('Public scan integration fixture', 'testnet4');
       workspace.transactions = { [id(source)]: pool[id(source)], [id(target)]: pool[id(target)] };
       workspace.view.graphNodeIds = [node(source), node(target)];
       const loadedIndex = indexGraphFlow(buildGraph({ ...workspace, transactions: pool }));

@@ -10,11 +10,12 @@ import {
   spendGuidance,
   type WalletReviewItem,
 } from '../../../src/App/Workspace/Wallet/walletReview';
-import { MAX_WALLET_REVIEWS } from '../../../src/Domain/Workspace/walletReviewStorage';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { MAX_WALLET_REVIEWS } from '../../../src/App/Workspace/Wallet/walletReviewRecords';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 import type { Wallet } from '../../../src/Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../src/Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../src/App/Workspace/workspace';
 import { addressToScriptHash } from '../../../src/Domain/Wallet/wallet';
 import type { WalletUtxoRecord } from '../../../src/App/Workspace/Wallet/walletRecords';
 import {
@@ -77,7 +78,7 @@ const utxo: WalletUtxoRecord = {
 
 function fixture(overrides: Partial<Workspace> = {}): Workspace {
   return {
-    ...newWorkspace('Review fixture', 'mainnet'),
+    ...createWorkspace('Review fixture', 'mainnet'),
     wallets: [wallet],
     transactions: { [receipt.txid]: receipt, [spend.txid]: spend },
     ...overrides,

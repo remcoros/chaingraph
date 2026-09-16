@@ -7,11 +7,9 @@ import {
   resolvePreviousOutput,
 } from '../../../src/Domain/Chain/prevouts';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import {
-  newWorkspace,
-  parseTransaction,
-  parseWorkspace,
-} from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import { parseTransaction } from '../../../src/Domain/Chain/transactionValidation';
 import { outputNodeId } from '../../../src/Domain/Metadata/entityReferences';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 import { flowInputPlan } from '../../../src/App/Workspace/Workbenches/Graph/TransactionFlow/flowInputPlan';
@@ -32,7 +30,7 @@ const spend = (details = prevout()): Transaction => ({
 
 describe('previous-output observations', () => {
   it('keeps enriched input details without fabricating a creating transaction', () => {
-    const workspace = newWorkspace('Enriched', 'mainnet');
+    const workspace = createWorkspace('Enriched', 'mainnet');
     workspace.transactions[id(2)] = spend();
     const parsed = parseWorkspace(structuredClone(workspace));
     const resolution = resolvePreviousOutput(
@@ -62,7 +60,7 @@ describe('previous-output observations', () => {
     const old = spend();
     delete old.vin[0].prevout;
     expect(parseTransaction(old)).toEqual(old);
-    const workspace = newWorkspace('Old import', 'mainnet');
+    const workspace = createWorkspace('Old import', 'mainnet');
     workspace.transactions[old.txid] = old;
     expect(resolvePreviousOutput(workspace, old.vin[0]).status).toBe('missing');
     expect(
@@ -81,7 +79,7 @@ describe('previous-output observations', () => {
       expect(() => parseTransaction({ ...valid, vin: [input] })).toThrow();
 
     const testnetAddress = bitcoinAddress.toBech32(new Uint8Array(20).fill(2), 0, 'tb');
-    const workspace = newWorkspace('Wrong network', 'mainnet');
+    const workspace = createWorkspace('Wrong network', 'mainnet');
     workspace.transactions[valid.txid] = {
       ...valid,
       vin: [
@@ -106,7 +104,7 @@ describe('previous-output observations', () => {
   });
 
   it('rejects imported conflicts and reports runtime conflicts as unknown', () => {
-    const workspace = newWorkspace('Conflict', 'mainnet');
+    const workspace = createWorkspace('Conflict', 'mainnet');
     const first = spend(prevout(1));
     const second = { ...spend(prevout(2)), txid: id(3) };
     workspace.transactions = { [first.txid]: first, [second.txid]: second };
@@ -151,7 +149,7 @@ describe('previous-output observations', () => {
   });
 
   it('skips enriched parents during bulk hydration but keeps selected-input navigation', () => {
-    const workspace = newWorkspace('Flow', 'mainnet');
+    const workspace = createWorkspace('Flow', 'mainnet');
     workspace.transactions[id(2)] = spend();
     const txNode = buildGraph(workspace).nodes.find((node) => node.id === `tx:${id(2)}`)!;
     const inputNode = buildGraph(workspace).nodes.find(

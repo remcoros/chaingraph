@@ -6,11 +6,11 @@ import {
   listLoadedAddressTransactionIds,
   listWalletRelationships,
 } from './walletRelationships';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -189,7 +189,7 @@ const spending: Transaction = {
 };
 function fixture(transactions: Transaction[] = [funding, receipt, spending]): Workspace {
   return {
-    ...newWorkspace('Relationships', 'mainnet'),
+    ...createWorkspace('Relationships', 'mainnet'),
     wallets: [wallet],
     transactions: Object.fromEntries(
       transactions.map((transaction) => [transaction.txid, transaction]),

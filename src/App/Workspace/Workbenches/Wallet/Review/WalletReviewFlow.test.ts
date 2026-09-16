@@ -7,7 +7,7 @@ import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import { SelectionToolbar } from '../../../Selection/SelectionToolbar';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 
 const txid = 'a'.repeat(64);
 const parentId = 'b'.repeat(64);
@@ -33,7 +33,7 @@ const renderFlow = (flow: WalletReviewContext, editedNodeId?: string) =>
   renderToStaticMarkup(
     createElement(WalletReviewFlow, {
       context: flow,
-      workspace: newWorkspace('Flow controls test', 'mainnet'),
+      workspace: createWorkspace('Flow controls test', 'mainnet'),
       walletName: 'Test wallet',
       editedNodeId,
       onShowInGraph: vi.fn(),
@@ -140,7 +140,7 @@ describe('Compact metadata icon controls', () => {
   });
 
   it('shows the common batch icon, distinguishes mixed and empty values, and honors inactivity', () => {
-    const workspace = newWorkspace('Batch controls test', 'mainnet');
+    const workspace = createWorkspace('Batch controls test', 'mainnet');
     const ids = [`out:${txid}:0`, `out:${txid}:1`];
     for (const id of ids)
       workspace.annotations[id] = { icon: '★', label: '', note: '', bookmarked: false };
@@ -172,7 +172,7 @@ describe('Compact metadata icon controls', () => {
   });
 
   it('shows a common or mixed icon in the graph selection toolbar with its explicit scope', () => {
-    const workspace = newWorkspace('Graph selection test', 'mainnet');
+    const workspace = createWorkspace('Graph selection test', 'mainnet');
     const ids = [`out:${txid}:0`, `out:${txid}:1`];
     for (const id of ids)
       workspace.annotations[id] = { icon: '★', label: '', note: '', bookmarked: false };

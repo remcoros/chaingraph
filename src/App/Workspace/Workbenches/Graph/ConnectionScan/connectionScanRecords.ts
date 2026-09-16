@@ -6,14 +6,14 @@ import {
   scanResultEvidenceIds,
   scanRunSchema,
   validateConnectionScanRecords,
-} from '../../../../../Domain/Workspace/connectionScanStorage';
+} from '../../../ConnectionScan/records';
 import { addGraphNodes } from '../../../GraphState/graphMembership';
 import { previousOutputsConflict } from '../../../../../Domain/Chain/prevouts';
 import { outputNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import { buildGraph, type GraphEvidenceWorkspace } from '../../../GraphState/graphEvidence';
-import { clearContextProvenance } from '../../../ChainData/observationContext';
+import { clearContextProvenance } from '../../../Evidence/InputContext';
 
 export type ScanPathWorkspace = GraphEvidenceWorkspace &
   Pick<Workspace, 'connectionScans'> & {

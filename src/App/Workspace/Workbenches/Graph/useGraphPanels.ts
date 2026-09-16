@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import {
   openFlowPanel,
   type GraphLeftTab,
@@ -7,10 +7,10 @@ import {
   type GraphPanelsState,
   type GraphRightTab,
   type TransactionFlowState,
-} from '../../graphViewState';
-import type { WorkspaceOperations } from '../../useWorkspaces';
+} from '../../GraphState/panelState';
+import type { WorkspaceOperations } from '../../Store/WorkspaceStore';
 
-export type { GraphLeftTab, GraphMobilePanel, GraphRightTab } from '../../graphViewState';
+export type { GraphLeftTab, GraphMobilePanel, GraphRightTab } from '../../GraphState/panelState';
 
 /** A tour step's view of the graph, which previews panels without changing them. */
 export interface GraphPanelPreview {

@@ -11,8 +11,8 @@ import {
   planBatchTag,
 } from '../../Workspace/Annotations/batchMetadata';
 import { canonicalTagNodeId } from '../../Workspace/Annotations/tagProjection';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
-import type { WorkspaceTag } from '../../../Domain/Workspace/annotationTypes';
+import type { Workspace } from '../../Workspace/workspace';
+import type { WorkspaceTag } from '../../Workspace/Annotations/workspaceTags';
 import { DEFAULT_TAG_COLOR, TAG_COLORS } from './tagColors';
 import './metadata-editors.css';
 

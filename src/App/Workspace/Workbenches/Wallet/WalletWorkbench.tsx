@@ -13,13 +13,13 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     workbench,
     lockingWorkspace,
     canLoadChainData,
-    operationStatus: operation,
+    operation: workspaceOperation,
     chainDataDisabledReason,
-    operationRef,
     dialogs,
     edit,
     shownWorkbench,
   } = workspace;
+  const operation = workspaceOperation.status;
   const { setRightTab } = workspace.graph.panels;
   const {
     utxos: walletUtxos,
@@ -75,7 +75,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         chainDataDisabledReason={chainDataDisabledReason}
         onSelectWallet={(id) => {
           invalidateSelection();
-          operationRef.current?.abort();
+          workspaceOperation.cancel();
           setSelectedWallet(id);
           setSelectedId(undefined);
           setRightTab('inspect');

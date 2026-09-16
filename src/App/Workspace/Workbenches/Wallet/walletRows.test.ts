@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { newWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
 import { deriveAddresses } from '../../../../Domain/Wallet/wallet';
 import {
   buildWalletRecordRows,
@@ -26,7 +26,7 @@ const A = 'a'.repeat(64),
   B = 'b'.repeat(64),
   C = 'c'.repeat(64);
 function fixture() {
-  const workspace = newWorkspace('Public row fixture', 'mainnet');
+  const workspace = createWorkspace('Public row fixture', 'mainnet');
   const addresses = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 2);
   const wallet: Wallet = {
     id: '30000000-0000-4000-8000-000000000001',

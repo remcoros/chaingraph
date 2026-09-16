@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import { filterGraph } from '../../../src/App/Workspace/Workbenches/Graph/Filters/graphFilters';
 import { canonicalEntityNodeId } from '../../../src/Domain/Metadata/entityReferences';
 import {
   MAX_HIDDEN_NODES,
   parseHiddenNodeIds,
-} from '../../../src/Domain/Workspace/visibilityStorage';
+} from '../../../src/App/Workspace/GraphState/visibility';
 import {
   setNodesHidden,
   showAllNodes,
@@ -30,7 +31,7 @@ const spending: Transaction = {
   vout: [{ n: 0, value: 0.9, scriptPubKey: {} }],
 };
 function workspace() {
-  const w = newWorkspace('Visibility fixture', 'mainnet');
+  const w = createWorkspace('Visibility fixture', 'mainnet');
   w.transactions = { [a]: structuredClone(funding), [b]: structuredClone(spending) };
   w.annotations[outputNodeId(a, 0)] = {
     label: 'Personal savings',

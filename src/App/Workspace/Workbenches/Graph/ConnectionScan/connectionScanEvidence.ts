@@ -4,7 +4,7 @@ import type { ScanNeighbors, ScanObservation } from './connectionScan';
 import {
   parseTransaction,
   validateTransactionAddresses,
-} from '../../../../../Domain/Workspace/workspace';
+} from '../../../../../Domain/Chain/transactionValidation';
 import { classifyRpcFailure } from '../../../../../Infra/Bitcoin/api';
 import { fetchCurrentUtxo, UtxoObservationError } from '../../../../../Infra/Bitcoin/utxoStatus';
 

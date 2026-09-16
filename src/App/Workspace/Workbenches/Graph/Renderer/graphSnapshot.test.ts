@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-  graphSnapshotSchema,
-  type GraphSnapshot,
-} from '../../../../../Domain/Workspace/graphSnapshotStorage';
+import { graphSnapshotSchema, type GraphSnapshot } from '../../../GraphState/graphSnapshot';
 import { mergeGraphSnapshot } from './graphSnapshot';
-import { newWorkspace, parseWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
+import { parseWorkspace } from '../../../Persistence/Format';
 
 const snapshot: GraphSnapshot = {
   version: 1,
@@ -22,7 +20,7 @@ const snapshot: GraphSnapshot = {
 
 describe('encrypted graph-view data validation', () => {
   it('preserves optional view state through workspace validation', () => {
-    const workspace = newWorkspace('Saved view', 'testnet4');
+    const workspace = createWorkspace('Saved view', 'testnet4');
     expect(parseWorkspace(workspace).view.graphSnapshot).toBeUndefined();
     workspace.view = {
       ...workspace.view,
@@ -92,7 +90,7 @@ describe('encrypted graph-view data validation', () => {
     expect(mergeGraphSnapshot(snapshot, { ...next, dimensions: 2 }).nodes).toEqual(next.nodes);
   });
   it('rejects unbounded view filters and invalid transaction-flow references', () => {
-    const workspace = newWorkspace('Invalid view', 'testnet4');
+    const workspace = createWorkspace('Invalid view', 'testnet4');
     for (const patch of [
       { filters: { minSats: -1 } },
       { filters: { focus: { id: 'a', hops: 3 } } },

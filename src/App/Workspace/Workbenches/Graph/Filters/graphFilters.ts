@@ -1,6 +1,6 @@
-import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../../Annotations/annotation';
 import type { GraphData, GraphNode } from '../../../GraphState/types';
-import type { GraphFilters } from '../../../graphViewState';
+import type { GraphFilters } from '../../../GraphState/filters';
 
 type EntityVisibility = 'visible' | 'hidden' | 'all';
 

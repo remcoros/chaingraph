@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { describeWorkspaceChange } from './undoDescription';
-import { newWorkspace } from '../../Domain/Workspace/workspace';
-import type { AnalysisFinding } from '../../Domain/Workspace/analysisFinding';
-import type { Annotation } from '../../Domain/Workspace/annotationTypes';
+import { createWorkspace } from './createWorkspace';
+import type { AnalysisFinding } from './Analysis/analysisFinding';
+import type { Annotation } from './Annotations/annotation';
 import type { Wallet } from '../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from './workspace';
 
 const annotation: Annotation = { label: '', note: '', icon: '', bookmarked: false };
 const finding: AnalysisFinding = {
@@ -25,7 +25,7 @@ const wallet: Wallet = {
   addresses: [],
 };
 function workspace(): Workspace {
-  return newWorkspace('Undo fixture', 'mainnet');
+  return createWorkspace('Undo fixture', 'mainnet');
 }
 
 describe('undo action descriptions', () => {

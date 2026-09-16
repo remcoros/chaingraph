@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 import { fetchTransaction } from '../../../../../Infra/Bitcoin/api';
 import { loadScanActionEvidence } from './connectionScanActionEvidence';
 import { TransactionFetchScope } from '../../../../../Infra/Bitcoin/transactionScheduler';
@@ -12,7 +12,7 @@ const transaction = (n: number): Transaction => ({
   vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
 });
 const fixture = () => ({
-  workspace: newWorkspace('Public scan action fixture', 'mainnet'),
+  workspace: createWorkspace('Public scan action fixture', 'mainnet'),
   missingTxids: [id(1)],
   scope: new TransactionFetchScope('mainnet'),
   canLoadChainData: true,

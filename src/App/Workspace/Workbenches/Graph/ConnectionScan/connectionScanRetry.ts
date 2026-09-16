@@ -7,7 +7,7 @@ import {
   type ScanRun,
 } from './connectionScan';
 import { scanResultGroupKey } from './connectionScanGroups';
-import { scanResultEvidenceIds } from '../../../../../Domain/Workspace/connectionScanStorage';
+import { scanResultEvidenceIds } from '../../../ConnectionScan/records';
 import { createConnectionScanFetch, type ConnectionScanFetchOptions } from './connectionScanFetch';
 
 type Options = Omit<ConnectionScanFetchOptions, 'signal'> & {

@@ -17,12 +17,12 @@ import {
   matchingWalletFilterNodeIds,
 } from './Filters/graphFilters';
 import { describeMatchScope } from './Filters/filterPresentation';
-import type { GraphFilters } from '../../graphViewState';
+import type { GraphFilters } from '../../GraphState/filters';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
 import type { GraphEvidenceWorkspace } from '../../GraphState/graphEvidence';
 import { filterSmallAmounts, omitAmountOrphans } from './smallAmounts';
 import type { GraphData } from '../../GraphState/types';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 
 const EMPTY_WALLETS: Workspace['wallets'] = [];
 type GraphEvidenceInput = Omit<GraphEvidenceWorkspace, 'inputContext' | 'annotations' | 'view'>;

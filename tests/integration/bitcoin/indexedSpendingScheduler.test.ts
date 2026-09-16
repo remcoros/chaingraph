@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Network } from '../../../src/Domain/Chain/network';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { newWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
 import {
   backendNetworks,
   fetchIndexedSpenders,
@@ -26,7 +26,7 @@ const candidate = (txid: string): Transaction => ({
   vout: [root.vout[0]],
 });
 const workspace = () => ({
-  ...newWorkspace('Public scheduling fixture', 'testnet4'),
+  ...createWorkspace('Public scheduling fixture', 'testnet4'),
   transactions: { [root.txid]: root },
 });
 type Call = { network: Network; target: string; method: string; params: unknown[] };

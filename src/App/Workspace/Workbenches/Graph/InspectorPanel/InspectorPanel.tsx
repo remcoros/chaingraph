@@ -16,7 +16,7 @@ import {
   Wallet as WalletIcon,
 } from 'lucide-react';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import type { WorkspaceController } from '../../../useWorkspace';
 import { InspectorPanelDetail } from './InspectorPanelDetail';
 function withScanActionEvidence(
@@ -49,8 +49,9 @@ export function InspectorPanel({
     activeWorkspaceRef,
     workspaces,
     edit,
-    operationStatus: operation,
+    operation: workspaceOperation,
   } = workspace;
+  const operation = workspaceOperation.status;
   const {
     right: { tab: shownRightTab, collapsed: rightPanelCollapsed },
     saved: {

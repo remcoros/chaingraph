@@ -21,10 +21,10 @@ export default defineConfig({
       // worker's import graph throws 'ReferenceError: $RefreshReg$ is not
       // defined' and the worker dies on load. Unlocking a workspace then failed
       // with "The workspace worker stopped" and returned to the home screen. In
-      // this project the encryption worker reached both a Domain module of
-      // colour constants and, through dependency prebundling, bitcoinjs-lib.
+      // this project the encryption worker reached the persisted workspace
+      // format and, through its Domain dependencies, bitcoinjs-lib.
       //
-      // Domain and Infra hold no React, which the import boundaries in
+      // Domain, persistence and Infra hold no React, which the import boundaries in
       // .oxlintrc.json already enforce, so naming App and Shared states that
       // rather than working around the transform. The filter must keep the
       // extension test: include replaces the default one, and without it the

@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { encryptWorkspace, decryptWorkspace } from '../../../src/Infra/Storage/crypto';
-import { WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
+import {
+  encryptWorkspace,
+  decryptWorkspace,
+} from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import { createBrowserWorkspaceStore } from '../../../src/App/createWorkspaceStore';
 import { deriveAddresses } from '../../../src/Domain/Wallet/wallet';
 import { PUBLIC_ZPUB } from '../../fixtures/bitcoin';
 import { applyWalletScan } from '../../../src/App/Workspace/Wallet/walletActivity';
@@ -17,7 +21,7 @@ function storage() {
   };
 }
 function workspace() {
-  const w = newWorkspace('Public workspace', 'mainnet');
+  const w = createWorkspace('Public workspace', 'mainnet');
   w.wallets.push({
     id: crypto.randomUUID(),
     name: 'Wallet',
@@ -35,7 +39,7 @@ describe('release review data integrity fixes', () => {
     const encrypted = await encryptWorkspace(w, password);
     const restored = parseWorkspace(await decryptWorkspace(encrypted, password));
     expect(restored.wallets[0].name).toBe(w.wallets[0].name);
-    const store = new WorkspaceStore({ storage: storage() });
+    const store = createBrowserWorkspaceStore({ storage: storage() });
     store.open(restored, password);
     await store.lock(w.id);
     await store.unlock(store.getSnapshot().saved[0], password);
@@ -43,7 +47,7 @@ describe('release review data integrity fixes', () => {
   });
   it('rejects an invalid updated wallet before replacing its good encrypted snapshot', async () => {
     const memory = storage();
-    const store = new WorkspaceStore({ storage: memory });
+    const store = createBrowserWorkspaceStore({ storage: memory });
     const w = workspace();
     store.open(w, password);
     await store.persist(w.id);
@@ -63,8 +67,8 @@ describe('release review data integrity fixes', () => {
     expect(() => parseWorkspace(w)).toThrow();
   });
   it('marks findings stale on chain updates and removes their graph coloring without deleting evidence', () => {
-    const store = new WorkspaceStore({ storage: storage() });
-    const w = newWorkspace('Stale test', 'mainnet');
+    const store = createBrowserWorkspaceStore({ storage: storage() });
+    const w = createWorkspace('Stale test', 'mainnet');
     const id = 'a'.repeat(64);
     w.transactions[id] = {
       txid: id,
@@ -93,7 +97,7 @@ describe('release review data integrity fixes', () => {
     expect(buildGraph(updated).nodes.every((node) => !node.cluster)).toBe(true);
   });
   it('keeps findings active when acknowledging wallet activity and invalidates changed wallet evidence', () => {
-    const store = new WorkspaceStore({ storage: storage() });
+    const store = createBrowserWorkspaceStore({ storage: storage() });
     const w = workspace();
     w.findings = [
       {
@@ -142,7 +146,7 @@ describe('release review data integrity fixes', () => {
   });
 
   it('keeps a quiet wallet refresh as the same evidence but invalidates changed confirmations', () => {
-    const store = new WorkspaceStore({ storage: storage() });
+    const store = createBrowserWorkspaceStore({ storage: storage() });
     const w = workspace();
     const txid = 'a'.repeat(64);
     const transaction = {
@@ -188,9 +192,9 @@ describe('release review data integrity fixes', () => {
 
   it('deletes only a locked saved copy and preserves another workspace', async () => {
     const memory = storage();
-    const store = new WorkspaceStore({ storage: memory });
-    const one = newWorkspace('One', 'mainnet'),
-      two = newWorkspace('Two', 'mainnet');
+    const store = createBrowserWorkspaceStore({ storage: memory });
+    const one = createWorkspace('One', 'mainnet'),
+      two = createWorkspace('Two', 'mainnet');
     store.open(one, password);
     await store.persist(one.id);
     await expect(store.removeSaved(one.id)).rejects.toThrow('Lock');

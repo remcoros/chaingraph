@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WORKSPACE_TEMPLATES, createTemplateWorkspace } from './workspaceTemplates';
 import { buildGraph } from '../Workspace/GraphState/graphEvidence';
-import { parseWorkspace } from '../../Domain/Workspace/workspace';
+import { parseWorkspace } from '../Workspace/Persistence/Format';
 import { indexPreviousOutputs } from '../../Domain/Chain/prevouts';
 import { outputNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
 import { sats } from '../../Domain/Chain/transaction';

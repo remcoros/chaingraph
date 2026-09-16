@@ -18,7 +18,7 @@ import {
 import { outputNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
 import { sats, type Transaction, type TxOutput } from '../../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 
 export interface WalletReviewFlowEntry {
   /** Canonical entity reference; a coinbase entry refers to its transaction. */

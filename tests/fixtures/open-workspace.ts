@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { Workspace } from '../../src/Domain/Workspace/workspaceTypes';
-import { encryptWorkspace } from '../../src/Infra/Storage/crypto';
+import type { Workspace } from '../../src/App/Workspace/workspace';
+import { encryptWorkspace } from '../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
 import { laboratoryWorkspace } from './laboratory';
 
 /** Seed encrypted public test data, then exercise the ordinary unlock flow. */

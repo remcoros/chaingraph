@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { planEntityRemoval, removeWorkspaceEntity, type EntityRemovalPlan } from './entityRemoval';
 import { addressNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from './workspace';
 import { buildGraph } from './GraphState/graphEvidence';
 import type { AppState } from '../useAppState';
 

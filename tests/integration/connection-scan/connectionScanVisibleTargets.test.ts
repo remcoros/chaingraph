@@ -14,7 +14,8 @@ import {
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
@@ -63,7 +64,7 @@ const displayed = [
 const hiddenPath = [out(8, 150), tx(8), out(8, 50), tx(5), out(5, 1)];
 
 async function scan(source: string, maxHops = 7, direction: 'upstream' | 'both' = 'upstream') {
-  const workspace = newWorkspace('Synthetic visible-target regression', 'mainnet');
+  const workspace = createWorkspace('Synthetic visible-target regression', 'mainnet');
   workspace.transactions = { [selected.txid]: selected };
   workspace.view.graphNodeIds = [...displayed];
   const pool = Object.fromEntries([selected, creator, intermediate].map((t) => [t.txid, t]));
@@ -153,7 +154,7 @@ describe('default neighbour scan from a transaction-only graph', () => {
     ['only the selected input', out(8, 150), [out(8, 150)]],
     ['the selected input and its spending transaction context', out(8, 150), displayed],
   ] as const)('streams the deeper loop with %s displayed', async (_label, source, graphNodeIds) => {
-    const workspace = newWorkspace('Synthetic transaction-only regression', 'mainnet');
+    const workspace = createWorkspace('Synthetic transaction-only regression', 'mainnet');
     workspace.transactions = { [selected.txid]: selected };
     workspace.view.graphNodeIds = [...graphNodeIds];
     const graph = buildGraph(workspace);

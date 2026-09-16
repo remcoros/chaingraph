@@ -1,4 +1,4 @@
-import type { Annotation } from '../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from './annotation';
 
 /** An entity with no human annotation yet. */
 export const emptyAnnotation: Annotation = {

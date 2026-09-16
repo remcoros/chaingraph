@@ -1,7 +1,7 @@
 import { analysisTools } from '../../../Analysis/analysis';
 import type { AnalysisScan } from '../../../Analysis/analysisScan';
 import { listTagsForNode } from '../../../Annotations/tagProjection';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import {
   REVIEW_REASONS,
   REASON_LABELS,

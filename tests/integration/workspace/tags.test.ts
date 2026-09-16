@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import {
   buildWalletMatches,
   buildTagIndex,
@@ -11,15 +12,18 @@ import {
   tagNodeIds,
   tagsFromLabels,
 } from '../../../src/App/Workspace/Annotations/tagProjection';
-import { parseWorkspaceTags } from '../../../src/Domain/Workspace/tagStorage';
+import { parseWorkspaceTags } from '../../../src/App/Workspace/Annotations/workspaceTags';
 import {
   addressNodeId,
   outputNodeId,
   txNodeId,
 } from '../../../src/Domain/Metadata/entityReferences';
-import type { WorkspaceTag } from '../../../src/Domain/Workspace/annotationTypes';
+import type { WorkspaceTag } from '../../../src/App/Workspace/Annotations/workspaceTags';
 import { deriveAddresses } from '../../../src/Domain/Wallet/wallet';
-import { decryptWorkspace, encryptWorkspace } from '../../../src/Infra/Storage/crypto';
+import {
+  decryptWorkspace,
+  encryptWorkspace,
+} from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
 
 const txid = (n: number) => n.toString(16).padStart(64, '0');
 // Public BIP84 vector, CC0; existing source attribution: docs/references.md.
@@ -34,7 +38,7 @@ const tag = (nodeIds: string[] = []): WorkspaceTag => ({
   nodeIds,
 });
 function fixture() {
-  const workspace = newWorkspace('Public wallet fixture', 'mainnet');
+  const workspace = createWorkspace('Public wallet fixture', 'mainnet');
   workspace.view.showAddresses = true;
   workspace.wallets = [
     {
@@ -69,7 +73,7 @@ function fixture() {
 
 describe('workspace tag import boundary', () => {
   it('keeps old workspaces compatible and preserves empty tags and view settings', () => {
-    const workspace = newWorkspace('Older workspace', 'mainnet');
+    const workspace = createWorkspace('Older workspace', 'mainnet');
     expect(parseWorkspace(workspace)).toEqual(workspace);
     expect(
       parseWorkspace({
@@ -91,7 +95,7 @@ describe('workspace tag import boundary', () => {
       addressNodeId(address.address.toUpperCase()),
       addressNodeId(address.address),
     ]);
-    const workspace = newWorkspace('Tags', 'mainnet');
+    const workspace = createWorkspace('Tags', 'mainnet');
     const parsed = parseWorkspace({ ...workspace, tags: [{ ...source, name: ' Exchange ' }] });
     expect(parsed.tags?.[0]).toMatchObject({
       name: 'Exchange',
@@ -138,7 +142,7 @@ describe('workspace tag import boundary', () => {
   });
 
   it('bounds aggregate memberships before deduplication and total tag count', () => {
-    const workspace = newWorkspace('Over budget', 'mainnet');
+    const workspace = createWorkspace('Over budget', 'mainnet');
     expect(() =>
       parseWorkspace({
         ...workspace,

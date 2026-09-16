@@ -1,10 +1,10 @@
 import { useRef } from 'react';
-import type { Annotation } from '../../../Domain/Workspace/annotationTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Annotation } from './annotation';
+import type { Workspace } from '../workspace';
 import { emptyAnnotation } from './emptyAnnotation';
 import { exportLabels, importLabels } from './labels';
-import { parseWorkspaceTags } from '../../../Domain/Workspace/tagStorage';
-import { download } from '../../../Infra/Storage/download';
+import { parseWorkspaceTags } from './workspaceTags';
+import { download } from '../../../Infra/Browser/download';
 import type { AppState } from '../../useAppState';
 import { useMetadataEditRequest, type MetadataEditRequest } from './useMetadataEditRequest';
 

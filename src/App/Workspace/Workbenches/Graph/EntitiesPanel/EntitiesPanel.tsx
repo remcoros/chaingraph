@@ -1,5 +1,5 @@
 import TagsPanel from '../TagsPanel';
-import type { GraphFilters } from '../../../graphViewState';
+import type { GraphFilters } from '../../../GraphState/filters';
 import { EntitiesPanelDetail } from './EntitiesPanelDetail';
 import type { WorkspaceController } from '../../../useWorkspace';
 
@@ -8,12 +8,12 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     activeWorkspace,
     entityRemoval,
     annotations,
-    operationRef,
+    operation: workspaceOperation,
     dialogs,
-    operationStatus: operation,
     canLoadChainData,
     edit,
   } = workspace;
+  const operation = workspaceOperation.status;
   const {
     setMobilePanel,
     left: { tab: shownLeftTab, collapsed: leftPanelCollapsed },
@@ -94,7 +94,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       selectedId={selectedId}
       onSelectWallet={(id) => {
         invalidateSelection();
-        operationRef.current?.abort();
+        workspaceOperation.cancel();
         setSelectedWallet(id);
         setSelectedId(undefined);
         setPanels((current) => ({

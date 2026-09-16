@@ -11,15 +11,15 @@ import {
   ShieldCheck,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../../Annotations/annotation';
 import type { GraphNode } from '../../../GraphState/types';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { GraphLeftTab } from '../../../graphViewState';
+import type { GraphLeftTab } from '../../../GraphState/panelState';
 import { walletCheckAge } from '../../../Wallet/walletActivity';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
-import type { GraphFilters } from '../../../graphViewState';
+import type { GraphFilters } from '../../../GraphState/filters';
 import type { EntitySelection } from '../../../Selection/useEntitySelection';
 import EntityBrowser from './EntityBrowser';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';

@@ -12,7 +12,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { GraphLeftTab, GraphMobilePanel } from '../Workspace/graphViewState';
+import type { GraphLeftTab, GraphMobilePanel } from '../Workspace/GraphState/panelState';
 
 export interface TourContext {
   hasSelection: boolean;

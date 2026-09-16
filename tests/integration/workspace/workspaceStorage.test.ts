@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
-import { encryptWorkspace, decryptWorkspace } from '../../../src/Infra/Storage/crypto';
-import { STORAGE_KEY, WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import {
+  encryptWorkspace,
+  decryptWorkspace,
+} from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import { createBrowserWorkspaceStore } from '../../../src/App/createWorkspaceStore';
+import { STORAGE_KEY } from '../../../src/App/Workspace/Persistence/Browser/BrowserWorkspacePersistence';
 
 const password = 'test workspace passphrase';
 function memoryStorage(initial: string | null = null) {
@@ -26,8 +31,8 @@ describe('workspace persistence state transitions', () => {
   it('starts a fresh undo group after locking and immediately reopening the same workspace', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
     try {
-      const store = new WorkspaceStore({ storage: memoryStorage() });
-      const w = newWorkspace('Original', 'testnet4');
+      const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
+      const w = createWorkspace('Original', 'testnet4');
       store.open(w, password);
       store.update(w.id, (current) => ({ ...current, name: 'Before lock' }), true, 'name');
       await store.lock(w.id);
@@ -43,7 +48,7 @@ describe('workspace persistence state transitions', () => {
 
   it('reports a locking workspace as accepting no edits, undo or redo', async () => {
     const envelopes = deferred();
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: memoryStorage(),
       envelopes: {
         read: async () => undefined,
@@ -54,7 +59,7 @@ describe('workspace persistence state transitions', () => {
         remove: async () => {},
       },
     });
-    const w = newWorkspace('Locking', 'testnet4');
+    const w = createWorkspace('Locking', 'testnet4');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Edited' }), true, 'name');
     const locking = store.lock(w.id);
@@ -71,8 +76,8 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('groups continuous typing without losing the latest view or merging across undo', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
-    const w = newWorkspace('Typing', 'testnet4');
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
+    const w = createWorkspace('Typing', 'testnet4');
     store.open(w, password);
     const edit = (label: string) =>
       store.update(
@@ -106,8 +111,8 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('separates different annotation fields and intervening user actions in undo', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
-    const w = newWorkspace('Fields', 'testnet4');
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
+    const w = createWorkspace('Fields', 'testnet4');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'First' }), true, 'name');
     store.update(w.id, (current) => ({ ...current, description: 'Note' }), true, 'description');
@@ -123,14 +128,19 @@ describe('workspace persistence state transitions', () => {
 
   it('stores the workspace name publicly while keeping its optional description encrypted', async () => {
     const storage = memoryStorage();
-    const store = new WorkspaceStore({ storage });
+    const store = createBrowserWorkspaceStore({ storage });
     const w = {
-      ...newWorkspace('Public project name', 'mainnet'),
+      ...createWorkspace('Public project name', 'mainnet'),
       description: 'Private wallet provenance and research notes.',
     };
     store.open(w, password);
     await store.persist(w.id);
     const [entry] = JSON.parse(storage.raw()!);
+    expect(store.getSnapshot().saved[0]).toEqual({
+      id: w.id,
+      publicName: w.name,
+      savedAt: expect.any(String),
+    });
     expect(entry.publicName).toBe(w.name);
     expect(storage.raw()).toContain(w.name);
     expect(storage.raw()).not.toContain(w.description);
@@ -138,18 +148,18 @@ describe('workspace persistence state transitions', () => {
       name: w.name,
       description: w.description,
     });
-    const reloaded = new WorkspaceStore({ storage });
+    const reloaded = createBrowserWorkspaceStore({ storage });
     await reloaded.unlock(reloaded.getSnapshot().saved[0], password);
     expect(reloaded.getSnapshot().unlocked[0].data.description).toBe(w.description);
   });
 
   it('loads legacy saved records and migrates their public name only after unlocking and saving', async () => {
-    const w = newWorkspace('Legacy project', 'mainnet');
+    const w = createWorkspace('Legacy project', 'mainnet');
     const envelope = await encryptWorkspace(w, password);
     const storage = memoryStorage(
       JSON.stringify([{ id: w.id, savedAt: new Date().toISOString(), envelope }]),
     );
-    const store = new WorkspaceStore({ storage });
+    const store = createBrowserWorkspaceStore({ storage });
     expect(store.getSnapshot().storageError).toBe('');
     expect(store.getSnapshot().saved[0].publicName).toBeUndefined();
     await store.unlock(store.getSnapshot().saved[0], password);
@@ -160,14 +170,14 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('rejects malformed public names without discarding the original saved storage', async () => {
-    const w = newWorkspace('Valid name', 'mainnet');
+    const w = createWorkspace('Valid name', 'mainnet');
     const envelope = await encryptWorkspace(w, password);
     for (const publicName of [null, 123, {}, '', '   ', 'x'.repeat(101)]) {
       const original = JSON.stringify([
         { id: w.id, publicName, savedAt: new Date().toISOString(), envelope },
       ]);
       const storage = memoryStorage(original);
-      const store = new WorkspaceStore({ storage });
+      const store = createBrowserWorkspaceStore({ storage });
       expect(store.getSnapshot().storageError).toContain('malformed');
       store.open(w, password);
       await expect(store.persist(w.id)).rejects.toThrow('malformed');
@@ -176,7 +186,7 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('validates optional description size without requiring it in legacy workspaces', () => {
-    const w = newWorkspace('Description limits', 'testnet4');
+    const w = createWorkspace('Description limits', 'testnet4');
     expect(parseWorkspace(w).description).toBeUndefined();
     expect(parseWorkspace({ ...w, description: 'x'.repeat(10000) }).description).toHaveLength(
       10000,
@@ -186,8 +196,8 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('clears old undo snapshots after a chain refresh so undo cannot erase new transaction data', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
-    const w = newWorkspace('Before label', 'mainnet');
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
+    const w = createWorkspace('Before label', 'mainnet');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Labeled investigation' }));
     expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
@@ -218,8 +228,8 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('ignores no-op updates without touching revision or undo history', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
-    const w = newWorkspace('No-op refresh', 'mainnet');
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
+    const w = createWorkspace('No-op refresh', 'mainnet');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Labeled investigation' }));
     const before = store.getSnapshot().unlocked[0];
@@ -234,7 +244,7 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('keeps the latest scan metadata through quiet checks while undo restores user edits', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
       name: 'Watch only',
@@ -243,7 +253,7 @@ describe('workspace persistence state transitions', () => {
       color: '#aabbcc',
       addresses: [],
     };
-    const w = { ...newWorkspace('Quiet refresh', 'mainnet'), wallets: [wallet] };
+    const w = { ...createWorkspace('Quiet refresh', 'mainnet'), wallets: [wallet] };
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'First edit' }));
     store.update(w.id, (current) => ({ ...current, description: 'Second edit' }));
@@ -290,7 +300,7 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('does not unacknowledge reviewed activity when undoing an earlier user edit', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
       name: 'Watch only',
@@ -300,7 +310,7 @@ describe('workspace persistence state transitions', () => {
       addresses: [],
       unreviewedTransactionIds: ['c'.repeat(64)],
     };
-    const w = { ...newWorkspace('Review activity', 'mainnet'), wallets: [wallet] };
+    const w = { ...createWorkspace('Review activity', 'mainnet'), wallets: [wallet] };
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Renamed investigation' }));
     // Reviewing new activity is a non-undoable acknowledgment.
@@ -324,7 +334,7 @@ describe('workspace persistence state transitions', () => {
   });
 
   it('still invalidates undo history when a refresh changes chain evidence', () => {
-    const store = new WorkspaceStore({ storage: memoryStorage() });
+    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
     const wallet = {
       id: crypto.randomUUID(),
       name: 'Watch only',
@@ -333,7 +343,7 @@ describe('workspace persistence state transitions', () => {
       color: '#aabbcc',
       addresses: [],
     };
-    const w = { ...newWorkspace('Evidence refresh', 'mainnet'), wallets: [wallet] };
+    const w = { ...createWorkspace('Evidence refresh', 'mainnet'), wallets: [wallet] };
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Edited before refresh' }));
     const txid = '5'.repeat(64);
@@ -362,7 +372,7 @@ describe('workspace persistence state transitions', () => {
     const storage = memoryStorage();
     const started = deferred(),
       release = deferred();
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage,
       encrypt: async (data, pw) => {
         started.resolve();
@@ -370,7 +380,7 @@ describe('workspace persistence state transitions', () => {
         return encryptWorkspace(data, pw);
       },
     });
-    const w = newWorkspace('Initial', 'mainnet');
+    const w = createWorkspace('Initial', 'mainnet');
     store.open(w, password);
     store.update(w.id, (current) => ({ ...current, name: 'Latest edit before lock' }));
     const locked = store.lock(w.id);
@@ -382,7 +392,7 @@ describe('workspace persistence state transitions', () => {
     await locked;
     expect(store.getSnapshot().unlocked).toHaveLength(0);
     expect(JSON.parse(storage.raw()!)[0].publicName).toBe('Latest edit before lock');
-    const restored = new WorkspaceStore({ storage });
+    const restored = createBrowserWorkspaceStore({ storage });
     expect(restored.getSnapshot().storageError).toBe('');
     const saved = restored.getSnapshot().saved[0];
     await restored.unlock(saved, password);
@@ -397,7 +407,7 @@ describe('workspace persistence state transitions', () => {
     const started = deferred(),
       release = deferred();
     let count = 0;
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage,
       encrypt: async (data, pw) => {
         if (++count === 1) {
@@ -407,7 +417,7 @@ describe('workspace persistence state transitions', () => {
         return encryptWorkspace(data, pw);
       },
     });
-    const w = newWorkspace('Earlier snapshot', 'mainnet');
+    const w = createWorkspace('Earlier snapshot', 'mainnet');
     store.open(w, password);
     const saving = store.persist(w.id);
     await started.promise;
@@ -416,7 +426,7 @@ describe('workspace persistence state transitions', () => {
     release.resolve();
     await Promise.all([saving, locking]);
     expect(count).toBe(2);
-    expect(await decryptWorkspace(store.getSnapshot().saved[0].envelope, password)).toMatchObject({
+    expect(await decryptWorkspace(JSON.parse(storage.raw()!)[0].envelope, password)).toMatchObject({
       name: 'Arrived during encryption',
     });
     expect(store.getSnapshot().unlocked).toHaveLength(0);
@@ -425,7 +435,7 @@ describe('workspace persistence state transitions', () => {
   it('retains the unlocked state and dirty revision after quota failure, allowing retry', async () => {
     const memory = memoryStorage();
     let fail = true;
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: {
         getItem: memory.getItem,
         setItem: (key, value) => {
@@ -434,7 +444,7 @@ describe('workspace persistence state transitions', () => {
         },
       },
     });
-    const w = newWorkspace('Unsaved data', 'mainnet');
+    const w = createWorkspace('Unsaved data', 'mainnet');
     store.open(w, password);
     await expect(store.lock(w.id)).rejects.toThrow('Quota exceeded');
     expect(store.getSnapshot().unlocked[0].savedRevision).toBe(-1);
@@ -443,7 +453,7 @@ describe('workspace persistence state transitions', () => {
     fail = false;
     await store.lock(w.id);
     expect(store.getSnapshot().unlocked).toHaveLength(0);
-    expect(await decryptWorkspace(store.getSnapshot().saved[0].envelope, password)).toMatchObject({
+    expect(await decryptWorkspace(JSON.parse(memory.raw()!)[0].envelope, password)).toMatchObject({
       name: 'Still editable',
     });
   });
@@ -451,8 +461,8 @@ describe('workspace persistence state transitions', () => {
   it('preserves malformed browser storage and refuses to replace it with a filtered empty index', async () => {
     for (const raw of ['broken JSON', '{}', '[{"id":"broken","envelope":{}}]']) {
       const storage = memoryStorage(raw);
-      const store = new WorkspaceStore({ storage });
-      const w = newWorkspace('New data', 'mainnet');
+      const store = createBrowserWorkspaceStore({ storage });
+      const w = createWorkspace('New data', 'mainnet');
       store.open(w, password);
       await expect(store.persist(w.id)).rejects.toThrow('malformed');
       expect(storage.raw()).toBe(raw);
@@ -464,7 +474,7 @@ describe('workspace persistence state transitions', () => {
     const storage = memoryStorage();
     const started = deferred(),
       release = deferred();
-    const first = new WorkspaceStore({
+    const first = createBrowserWorkspaceStore({
       storage,
       encrypt: async (data, pw) => {
         started.resolve();
@@ -472,9 +482,9 @@ describe('workspace persistence state transitions', () => {
         return encryptWorkspace(data, pw);
       },
     });
-    const second = new WorkspaceStore({ storage });
-    const a = newWorkspace('First tab', 'mainnet'),
-      b = newWorkspace('Second tab', 'mainnet');
+    const second = createBrowserWorkspaceStore({ storage });
+    const a = createWorkspace('First tab', 'mainnet'),
+      b = createWorkspace('Second tab', 'mainnet');
     first.open(a, password);
     second.open(b, password);
     const pending = first.persist(a.id);
@@ -490,9 +500,9 @@ describe('workspace persistence state transitions', () => {
 
   it('serializes saves for different workspaces without losing index entries', async () => {
     const storage = memoryStorage();
-    const store = new WorkspaceStore({ storage });
-    const a = newWorkspace('A', 'mainnet'),
-      b = newWorkspace('B', 'testnet4');
+    const store = createBrowserWorkspaceStore({ storage });
+    const a = createWorkspace('A', 'mainnet'),
+      b = createWorkspace('B', 'testnet4');
     store.open(a, password);
     store.open(b, password);
     await Promise.all([store.persist(a.id), store.persist(b.id)]);
@@ -503,8 +513,8 @@ describe('workspace persistence state transitions', () => {
 
   it('does not lock a clean session if its stored backup has changed or disappeared', async () => {
     const storage = memoryStorage();
-    const store = new WorkspaceStore({ storage });
-    const w = newWorkspace('Already saved', 'mainnet');
+    const store = createBrowserWorkspaceStore({ storage });
+    const w = createWorkspace('Already saved', 'mainnet');
     store.open(w, password);
     await store.persist(w.id);
     storage.setItem(STORAGE_KEY, '[]');

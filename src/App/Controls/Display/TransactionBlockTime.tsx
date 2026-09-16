@@ -1,5 +1,5 @@
 import type { Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../Workspace/workspace';
 import { transactionStatus } from './transactionStatus';
 import { transactionBlockTime } from './transactionTime';
 import { transactionFee } from './transactionFee';

@@ -1,5 +1,8 @@
 import { CopyButton } from '../Controls/CopyButton';
-import { Modal, WalletDialog, WalletNameDialog, WorkspaceDetailsDialog } from '../Dialogs';
+import { Modal } from '../Dialogs/Modal';
+import { WorkspaceDetailsDialog } from './Dialogs/WorkspaceDetailsDialog';
+import { WalletDialog } from './Wallet/Dialogs/WalletDialog';
+import { WalletNameDialog } from './Wallet/Dialogs/WalletNameDialog';
 import type { WorkspaceController } from './useWorkspace';
 
 type Props = { workspace: WorkspaceController };

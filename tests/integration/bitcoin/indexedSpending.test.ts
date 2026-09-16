@@ -4,7 +4,7 @@ import {
   fetchIndexedSpenders,
   loadSpending,
 } from '../../../src/Infra/Bitcoin/api';
-import { newWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
 import type { Network } from '../../../src/Domain/Chain/network';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 
@@ -17,7 +17,7 @@ const root: Transaction = {
 };
 const spender: Transaction = { txid: id(2), vin: [point], vout: [root.vout[0]] };
 const workspace = () => ({
-  ...newWorkspace('Public index fixture', 'testnet4'),
+  ...createWorkspace('Public index fixture', 'testnet4'),
   transactions: { [root.txid]: root },
 });
 type Call = { network: Network; target: string; method: string; params: any[] };

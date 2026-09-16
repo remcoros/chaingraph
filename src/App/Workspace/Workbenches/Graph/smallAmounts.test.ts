@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { filterSmallAmounts, omitAmountOrphans } from './smallAmounts';
 import { filterGraph } from './Filters/graphFilters';
-import { newWorkspace, parseWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
+import { parseWorkspace } from '../../Persistence/Format';
 import type { GraphData } from '../../GraphState/types';
 
 const graph: GraphData = {
@@ -101,7 +102,7 @@ describe('small amount presentation', () => {
   it.each(['smallAmountThreshold', 'flowAmountThreshold'] as const)(
     'persists and validates independent %s values',
     (field) => {
-      const workspace = newWorkspace('Amount filter', 'mainnet');
+      const workspace = createWorkspace('Amount filter', 'mainnet');
       expect(parseWorkspace(workspace).view[field]).toBeUndefined();
       for (const value of [0, 546, 1000, 10000, 100000, 1234]) {
         expect(

@@ -1,13 +1,13 @@
 import type { ScanResult } from './connectionScan';
 import { addScanPath, prepareScanPath, type ScanPathWorkspace } from './connectionScanRecords';
-import { scanContextPath } from '../../../../../Domain/Workspace/connectionScanStorage';
+import { scanContextPath } from '../../../ConnectionScan/records';
 import { ensureGraphMembership } from '../../../GraphState/graphMembership';
 import {
   indexPreviousOutputs,
   type PreviousOutputIndex,
 } from '../../../../../Domain/Chain/prevouts';
 import { outputNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 
 function additionResult(result: ScanResult, nodeIds: string[], creatorId: string): ScanResult {
   return {

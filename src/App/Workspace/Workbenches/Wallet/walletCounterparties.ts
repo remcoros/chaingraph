@@ -1,7 +1,7 @@
 import type { Network } from '../../../../Domain/Chain/network';
 import type { Transaction } from '../../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../Domain/Chain/prevouts';
 import {
   canonicalTransactionId,
@@ -13,8 +13,8 @@ import { verifiedWalletAddresses } from '../../Wallet/walletRecords';
 import {
   parseTransaction,
   validateTransactionAddresses,
-} from '../../../../Domain/Workspace/workspace';
-import { mergeFlowInputs } from '../../ChainData/flowInputs';
+} from '../../../../Domain/Chain/transactionValidation';
+import { mergeFlowInputs } from '../../Evidence/InputContext';
 import {
   loadWalletFlowInputWave,
   WALLET_FLOW_INPUT_WAVE_LIMIT,
@@ -224,7 +224,7 @@ export function mergeWalletCounterpartyInputs(
       merged = mergeFlowInputs(
         merged,
         ref.transactionId,
-        { ...ref, kind: 'output', label: '' },
+        { txid: ref.txid, vout: ref.vout },
         index === 0 ? [transaction] : [],
       );
   }

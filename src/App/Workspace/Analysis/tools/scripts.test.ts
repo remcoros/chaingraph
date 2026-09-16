@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { analysisScriptType } from './scripts';
 import { analysisTools } from '../analysis';
 import { recoverAnalysisData } from '../analysisRecovery';
-import { newWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
 import type { TxOutput } from '../../../../Domain/Chain/transaction';
 const output = (hex?: string, type?: string): TxOutput => ({
   n: 0,
@@ -34,7 +34,7 @@ it('does not identify unsupported scripts, hidden P2SH contents, or contradictor
   expect(analysisScriptType(output(undefined, 'multisig'))).toBe('bare multisig');
 });
 it('compares available script bytes without unnecessary recovery requests or change/owner assignments', async () => {
-  const w = newWorkspace('Public script fixture', 'mainnet');
+  const w = createWorkspace('Public script fixture', 'mainnet');
   const txid = 'a'.repeat(64);
   w.transactions[txid] = {
     txid,
@@ -54,7 +54,7 @@ it('compares available script bytes without unnecessary recovery requests or cha
   expect(fetch).not.toHaveBeenCalled();
 });
 it('does not request complete script bytes again when the comparison cannot recognize their type', async () => {
-  const w = newWorkspace('Public unsupported script fixture', 'mainnet');
+  const w = createWorkspace('Public unsupported script fixture', 'mainnet');
   const txid = 'a'.repeat(64);
   w.transactions[txid] = {
     txid,

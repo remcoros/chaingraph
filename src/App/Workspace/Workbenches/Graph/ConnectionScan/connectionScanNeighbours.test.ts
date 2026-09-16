@@ -4,7 +4,7 @@ import { indexScanNeighbours, prepareNeighbourScanTargets } from './connectionSc
 import type { GraphData, GraphLink, GraphNode } from '../../../GraphState/types';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
 import { buildGraph } from '../../../GraphState/graphEvidence';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;
@@ -30,7 +30,7 @@ const transaction = (n: number, inputs: [number, number][] = []): Transaction =>
 
 describe('nearest loaded scan targets', () => {
   it('includes sibling inputs and both sides of the source using only observed links', () => {
-    const workspace = newWorkspace('Public neighbours fixture', 'mainnet');
+    const workspace = createWorkspace('Public neighbours fixture', 'mainnet');
     workspace.transactions = {
       [id(1)]: transaction(1),
       [id(2)]: transaction(2),
@@ -52,7 +52,7 @@ describe('nearest loaded scan targets', () => {
   });
 
   it('does not let canvas membership or visibility remove loaded neighbours', () => {
-    const workspace = newWorkspace('Public neighbours fixture', 'mainnet');
+    const workspace = createWorkspace('Public neighbours fixture', 'mainnet');
     workspace.transactions = { [id(1)]: transaction(1), [id(2)]: transaction(2, [[1, 0]]) };
     const expected = targets(buildGraph(workspace), tx(1));
     workspace.view.graphNodeIds = [tx(1)];
@@ -78,7 +78,7 @@ describe('nearest loaded scan targets', () => {
   });
 
   it('keeps exact loaded prevouts connected without inventing an absent creating transaction', () => {
-    const workspace = newWorkspace('Public neighbours fixture', 'mainnet');
+    const workspace = createWorkspace('Public neighbours fixture', 'mainnet');
     workspace.transactions = {
       [id(3)]: transaction(3, [
         [1, 50],
@@ -91,7 +91,7 @@ describe('nearest loaded scan targets', () => {
   });
 
   it('visits reconverging branches once even when loaded links form an undirected loop', () => {
-    const workspace = newWorkspace('Public neighbours fixture', 'mainnet');
+    const workspace = createWorkspace('Public neighbours fixture', 'mainnet');
     workspace.transactions = {
       [id(1)]: transaction(1),
       [id(2)]: transaction(2, [

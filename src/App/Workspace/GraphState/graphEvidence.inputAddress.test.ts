@@ -5,7 +5,8 @@ import { addressNodeId, outputNodeId } from '../../../Domain/Metadata/entityRefe
 import type { Network } from '../../../Domain/Chain/network';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import { buildGraph } from './graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
+import { parseWorkspace } from '../Persistence/Format';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 function fixture(network: Network = 'mainnet') {
@@ -26,7 +27,7 @@ function fixture(network: Network = 'mainnet') {
     vin: [{ txid: id(1), vout: 0, prevout }],
     vout: [{ n: 0, value: 0.99, scriptPubKey: { hex: '51' } }],
   };
-  const workspace = newWorkspace('Public attached address fixture', network);
+  const workspace = createWorkspace('Public attached address fixture', network);
   workspace.transactions = { [spender.txid]: spender };
   workspace.view.showAddresses = true;
   return { workspace, address, spender, prevout };

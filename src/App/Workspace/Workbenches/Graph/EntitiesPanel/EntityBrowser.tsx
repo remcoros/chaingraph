@@ -35,12 +35,12 @@ import {
 import { valueFilterError } from '../Filters/graphFilters';
 import { sortEntities, type EntitySort } from './entitySort';
 import { hasActiveFilters } from '../Filters/filterPresentation';
-import type { GraphFilters } from '../../../graphViewState';
+import type { GraphFilters } from '../../../GraphState/filters';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
-import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../../Annotations/annotation';
 import type { GraphNode } from '../../../GraphState/types';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import './entity-browser.css';
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';

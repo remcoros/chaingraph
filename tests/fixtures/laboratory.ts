@@ -1,10 +1,10 @@
 import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
 import type { Transaction } from '../../src/Domain/Chain/transaction';
-import type { Workspace } from '../../src/Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../src/App/Workspace/workspace';
 // Deliberately synthetic, deterministic fixture; never presented as chain data.
 export function laboratoryWorkspace(): Workspace {
-  const w = newWorkspace('Synthetic graph fixture', 'testnet4');
+  const w = createWorkspace('Synthetic graph fixture', 'testnet4');
   w.demo = false;
   const id = (n: number) => n.toString(16).padStart(64, '0');
   for (let group = 0; group < 3; group++) {

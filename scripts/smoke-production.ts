@@ -3,8 +3,11 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { decryptWorkspace, encryptWorkspace } from '../src/Infra/Storage/crypto';
-import { newWorkspace } from '../src/Domain/Workspace/workspace';
+import {
+  decryptWorkspace,
+  encryptWorkspace,
+} from '../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import { createWorkspace } from '../src/App/Workspace/createWorkspace';
 import { transactions } from '../tests/fixtures/bitcoin';
 
 // Exercise browser runtime boundaries using only a fresh, synthetic workspace.
@@ -15,7 +18,7 @@ const description = 'Public fixture standing in for encrypted private workspace 
 const workspaceName = 'Production smoke';
 const storageKey = 'chaingraph.encrypted-workspaces.v1';
 const artifacts = path.resolve('artifacts/production-smoke');
-const workspace = newWorkspace(workspaceName, 'mainnet');
+const workspace = createWorkspace(workspaceName, 'mainnet');
 workspace.transactions = transactions;
 const fixture = JSON.stringify([
   {

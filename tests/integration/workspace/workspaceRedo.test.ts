@@ -10,10 +10,11 @@ import {
   replaceScanRun,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { clearContextProvenance } from '../../../src/App/Workspace/ChainData/observationContext';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
-import { encryptWorkspace } from '../../../src/Infra/Storage/crypto';
-import { WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
+import { clearContextProvenance } from '../../../src/App/Workspace/Evidence/InputContext';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import { encryptWorkspace } from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import { createBrowserWorkspaceStore } from '../../../src/App/createWorkspaceStore';
 
 const password = 'public redo fixture passphrase';
 function setup(encrypt?: typeof encryptWorkspace) {
@@ -24,8 +25,8 @@ function setup(encrypt?: typeof encryptWorkspace) {
       raw = value;
     },
   };
-  const store = new WorkspaceStore({ storage, encrypt });
-  const workspace = newWorkspace('Redo fixture', 'mainnet');
+  const store = createBrowserWorkspaceStore({ storage, encrypt });
+  const workspace = createWorkspace('Redo fixture', 'mainnet');
   store.open(workspace, password);
   return { store, id: workspace.id, session: () => store.getUnlocked(workspace.id)! };
 }
@@ -288,7 +289,7 @@ describe('workspace redo', () => {
     const { store, id, session } = setup();
     store.update(id, (w) => ({ ...w, name: 'First workspace edit' }));
     store.undo(id);
-    const other = newWorkspace('Other workspace', 'testnet4');
+    const other = createWorkspace('Other workspace', 'testnet4');
     store.open(other, password);
     store.update(other.id, (w) => ({ ...w, name: 'Other edit' }));
     store.undo(other.id);

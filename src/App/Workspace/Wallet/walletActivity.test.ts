@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyWalletScan, walletCheckAge } from './walletActivity';
-import { newWorkspace, parseWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
+import { parseWorkspace } from '../Persistence/Format';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
 
 const key =
@@ -18,7 +19,7 @@ const txid = 'a'.repeat(64);
 describe('wallet refresh merging', () => {
   it('merges into current edits and never resurrects a removed wallet', () => {
     const current = {
-      ...newWorkspace('Refresh', 'mainnet'),
+      ...createWorkspace('Refresh', 'mainnet'),
       wallets: [{ ...wallet, name: 'Renamed during refresh' }],
       annotations: {
         [`tx:${txid}`]: {
@@ -60,7 +61,7 @@ describe('wallet refresh merging', () => {
       vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: { hex: '51' } })),
     };
     const current = {
-      ...newWorkspace('Wallet discovery', 'mainnet'),
+      ...createWorkspace('Wallet discovery', 'mainnet'),
       wallets: [wallet],
       transactions: { [txid]: tx },
       inputContext: { [txid]: [0] },
@@ -82,7 +83,7 @@ describe('wallet refresh merging', () => {
       vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: {} })),
     };
     const current = {
-      ...newWorkspace('Quiet wallet scan', 'mainnet'),
+      ...createWorkspace('Quiet wallet scan', 'mainnet'),
       wallets: [wallet],
       transactions: { [txid]: tx, [other]: { ...tx, txid: other } },
       inputContext: { [txid]: [0], [other]: [0] },
@@ -111,7 +112,7 @@ describe('wallet refresh merging', () => {
 
   it('retains unreviewed activity across quiet checks and respects acknowledgment during I/O', () => {
     const current = {
-      ...newWorkspace('Activity', 'mainnet'),
+      ...createWorkspace('Activity', 'mainnet'),
       wallets: [{ ...wallet, unreviewedTransactionIds: [txid] }],
     };
     const scanned = {
@@ -143,7 +144,7 @@ describe('wallet refresh merging', () => {
   });
 
   it('bounds imported activity records and supports older wallets', () => {
-    const workspace = { ...newWorkspace('Import', 'mainnet'), wallets: [wallet] };
+    const workspace = { ...createWorkspace('Import', 'mainnet'), wallets: [wallet] };
     expect(parseWorkspace(workspace).wallets[0].lastActivity).toBeUndefined();
     const activity = {
       newTransactionIds: [txid],

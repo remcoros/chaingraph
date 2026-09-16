@@ -1,7 +1,7 @@
 import { canonicalEntityNodeId } from '../../../Domain/Metadata/entityReferences';
-import { MAX_TAG_MEMBERS, MAX_WORKSPACE_TAGS } from '../../../Domain/Workspace/tagStorage';
-import type { Annotation } from '../../../Domain/Workspace/annotationTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import { MAX_TAG_MEMBERS, MAX_WORKSPACE_TAGS } from './workspaceTags';
+import type { Annotation } from './annotation';
+import type { Workspace } from '../workspace';
 
 /** Explicit batch edits over supplied entity identifiers.
  * Nothing here reads the canvas, infers membership or touches chain observations.

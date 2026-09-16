@@ -10,18 +10,19 @@ import {
   clearScanRuns,
   prepareScanPath,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
-import { assertConnectionScanBudget } from '../../../src/Domain/Workspace/connectionScanStorage';
+import { assertConnectionScanBudget } from '../../../src/App/Workspace/ConnectionScan/records';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import { projectGraphMembership } from '../../../src/App/Workspace/GraphState/graphMembership';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import type { Workspace } from '../../../src/Domain/Workspace/workspaceTypes';
-import { WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
-import { decryptWorkspace } from '../../../src/Infra/Storage/crypto';
+import type { Workspace } from '../../../src/App/Workspace/workspace';
+import { createBrowserWorkspaceStore } from '../../../src/App/createWorkspaceStore';
+import { decryptWorkspace } from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
 import {
   validateAndEncryptWorkspace,
   decryptAndValidateWorkspace,
-} from '../../../src/Infra/Storage/workspaceEncryption';
+} from '../../../src/App/Workspace/Persistence/Encryption/workspaceEncryption';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tn = (n: number) => `tx:${id(n)}`;
@@ -32,7 +33,7 @@ const transaction = (n: number, parent?: number): Transaction => ({
   vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: { hex: '51' } })),
 });
 function fixture() {
-  const workspace = newWorkspace('Public scan fixture', 'mainnet');
+  const workspace = createWorkspace('Public scan fixture', 'mainnet');
   workspace.transactions = { [id(1)]: transaction(1) };
   workspace.view.graphNodeIds = [tn(1), tn(3)];
   const result: ScanResult = {
@@ -342,7 +343,7 @@ describe('compact connection scan records', () => {
       hops: 1,
     };
     const saved = replaceScanRun(workspace, { ...run, results: [boundary] }, evidence);
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     store.open(saved, 'public fixture password');
@@ -365,7 +366,7 @@ describe('compact connection scan records', () => {
   it('does not resurrect earlier results when undoing an annotation after replacement or clear', () => {
     const { workspace, run, evidence } = fixture();
     const saved = replaceScanRun(workspace, run, evidence);
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     store.open(saved, 'public fixture password');

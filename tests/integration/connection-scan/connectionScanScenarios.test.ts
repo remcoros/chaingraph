@@ -15,9 +15,9 @@ import {
 import { replaceScanRun } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
 import { projectGraphMembership } from '../../../src/App/Workspace/GraphState/graphMembership';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import type { Workspace } from '../../../src/Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../src/App/Workspace/workspace';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
@@ -140,7 +140,7 @@ function whirlpool() {
     ],
     5,
   );
-  const workspace = newWorkspace('Public five-input scenario', 'mainnet');
+  const workspace = createWorkspace('Public five-input scenario', 'mainnet');
   workspace.transactions = { [selected.txid]: selected };
   workspace.view.graphNodeIds = [tx(30)];
   return { workspace, pool: poolOf([selected, creator, intermediate]) };
@@ -236,7 +236,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
     'omits ordinary already loaded ancestry in %s even with only the root on canvas',
     async (direction) => {
       const pool = poolOf([transaction(1), transaction(2, [[1, 0]]), transaction(3, [[2, 0]])]);
-      const workspace = newWorkspace('Public loaded ancestry scenario', 'mainnet');
+      const workspace = createWorkspace('Public loaded ancestry scenario', 'mainnet');
       workspace.transactions = pool;
       workspace.view.graphNodeIds = [tx(3)];
       const { run } = await scanScenario(workspace, pool, tx(3), { settings: { direction } });
@@ -248,7 +248,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
     'does not report direct creation or a return to the same creator in %s',
     async (direction) => {
       const selected = transaction(2, [[1, 0]], 1);
-      const workspace = newWorkspace('Public direct I/O scenario', 'mainnet');
+      const workspace = createWorkspace('Public direct I/O scenario', 'mainnet');
       workspace.transactions = { [selected.txid]: selected };
       workspace.view.graphNodeIds = [tx(2)];
       const { run } = await scanScenario(workspace, poolOf([selected, transaction(1)]), tx(2), {
@@ -260,7 +260,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
 
   it('omits a shared creator already identified by sibling prevouts on disconnected transaction anchors', async () => {
     const pool = poolOf([transaction(1), transaction(2, [[1, 0]]), transaction(3, [[1, 1]])]);
-    const workspace = newWorkspace('Public implicit creator scenario', 'mainnet');
+    const workspace = createWorkspace('Public implicit creator scenario', 'mainnet');
     workspace.transactions = { [hash(2)]: pool[hash(2)], [hash(3)]: pool[hash(3)] };
     workspace.view.graphNodeIds = [tx(2), tx(3)];
     const { run } = await scanScenario(workspace, pool, tx(2), {
@@ -278,7 +278,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
       transaction(2, [[1, 0]]),
       transaction(3, [[5, 0]]),
     ]);
-    const workspace = newWorkspace('Public disconnected ancestor scenario', 'mainnet');
+    const workspace = createWorkspace('Public disconnected ancestor scenario', 'mainnet');
     workspace.transactions = { [hash(2)]: pool[hash(2)], [hash(3)]: pool[hash(3)] };
     workspace.view.graphNodeIds = [tx(2), tx(3)];
     const { run } = await scanScenario(workspace, pool, tx(2), {
@@ -302,7 +302,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
         [2, 0],
       ]),
     ]);
-    const workspace = newWorkspace('Public disconnected spender scenario', 'mainnet');
+    const workspace = createWorkspace('Public disconnected spender scenario', 'mainnet');
     workspace.transactions = { [hash(1)]: pool[hash(1)], [hash(2)]: pool[hash(2)] };
     for (const graphNodeIds of [[out(1)], [out(1), out(2)]]) {
       workspace.view = { ...workspace.view, graphNodeIds };

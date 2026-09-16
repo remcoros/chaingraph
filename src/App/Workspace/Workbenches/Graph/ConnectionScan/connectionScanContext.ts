@@ -4,7 +4,7 @@ import {
   scanPathHops,
   type ScanDirection,
   type ScanRoute,
-} from './connectionScanPaths';
+} from '../../../ConnectionScan/scanPath';
 
 export const scanEdgeKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
 

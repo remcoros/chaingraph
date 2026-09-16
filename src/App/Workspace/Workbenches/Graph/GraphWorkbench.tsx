@@ -3,7 +3,7 @@ import { Amount } from '../../../Controls/Display/Amount';
 import {
   RECENT_ADDRESS_GRAPH_LIMIT,
   selectedAddress as selectedAddressForHistory,
-} from '../../ChainData/addressHistory';
+} from './Address/addressHistory';
 import { GraphLegend } from './GraphLegend';
 import { GraphContextToolbar, type GraphContextSideCounts } from './GraphContextToolbar';
 import { GraphControls } from './GraphControls';
@@ -24,7 +24,7 @@ import { FlowPanel } from './TransactionFlow/FlowPanel';
 import { selectedWalletFilterIds } from './Filters/graphFilters';
 import { hasActiveFilters } from './Filters/filterPresentation';
 import { applyBatchIcon } from '../../Annotations/batchMetadata';
-import { openFlowPanel } from '../../graphViewState';
+import { openFlowPanel } from '../../GraphState/panelState';
 import {
   FilterChips,
   GraphConnectionsAction,
@@ -45,7 +45,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     canLoadChainData,
     selectedTransaction: tx,
     canTraceAncestry,
-    operationStatus: operation,
+    operation: workspaceOperation,
     workbench,
     viewOwner,
     tour,
@@ -58,6 +58,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     graphWorkspaceRef,
     workbenchEntry,
   } = workspace;
+  const operation = workspaceOperation.status;
   const graphStageRef = useRef<HTMLElement>(null);
   const inspectorRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -123,19 +124,21 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     admittedGraph,
   } = workspace.graph.projection;
   const {
-    expand,
-    recentAddressUtxoTargets,
-    addressUtxos,
-    addressHistory,
-    recentAddressTransactionTargets,
-    openAddressHistory,
-    showRecentAddressUtxos,
-    showRecentAddressTransactions,
-    addressHistoryLoad,
-    addressBalance,
-    loadAddressUtxos,
-    openAddressHistoryTransaction,
-  } = workspace.evidence;
+    history: addressHistory,
+    balance: addressBalance,
+    utxos: addressUtxos,
+    historyLoad: addressHistoryLoad,
+    recentUtxoTargets: recentAddressUtxoTargets,
+    recentTransactionTargets: recentAddressTransactionTargets,
+    actions: {
+      openHistory: openAddressHistory,
+      loadUtxos: loadAddressUtxos,
+      showRecentUtxos: showRecentAddressUtxos,
+      showRecentTransactions: showRecentAddressTransactions,
+      openHistoryTransaction: openAddressHistoryTransaction,
+    },
+  } = workspace.graph.address;
+  const { expand } = workspace.graph.navigation;
   const {
     revealGraphNodes,
     setEntityHidden,

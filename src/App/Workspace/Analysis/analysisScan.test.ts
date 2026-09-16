@@ -7,7 +7,7 @@ import {
   scanAnalysis,
   scanDefaults,
 } from './analysisScan';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
@@ -23,7 +23,7 @@ function tx(n: number, parent?: number, vout = 0): Transaction {
   };
 }
 function fixture() {
-  const workspace = newWorkspace('Public analysis fixture', 'mainnet');
+  const workspace = createWorkspace('Public analysis fixture', 'mainnet');
   workspace.transactions = Object.fromEntries(
     [tx(1), tx(2, 1), tx(3, 1, 1), tx(4, 2)].map((item) => [item.txid, item]),
   );
@@ -249,7 +249,7 @@ describe('scan-all registry orchestration', () => {
     expect(workspace.findings).toEqual([]);
   });
   it('explains every unavailable tool in an empty scope', async () => {
-    const workspace = newWorkspace('Empty fixture', 'testnet4');
+    const workspace = createWorkspace('Empty fixture', 'testnet4');
     const scan = await scanAnalysis(workspace, analysisScanScope(workspace));
     expect(scan.findings).toEqual([]);
     expect(scan.reports).toHaveLength(analysisTools.length);

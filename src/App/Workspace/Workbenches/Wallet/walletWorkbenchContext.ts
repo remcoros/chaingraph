@@ -1,5 +1,5 @@
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import type { WalletUtxoRecord } from '../../Wallet/walletRecords';
 
 /**

@@ -10,7 +10,7 @@ import type {
   GraphAdapterFactory,
 } from '../../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
 import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
 import { txNodeId } from '../../src/Domain/Metadata/entityReferences';
 
 // Synthetic observations stay in memory and never issue chain requests.
@@ -38,7 +38,7 @@ function Fixture() {
   const [action, setAction] = useState('none');
   const [fit, setFit] = useState(0);
   const workspace = useMemo(() => {
-    const next = newWorkspace('Synthetic hover layout', 'testnet4');
+    const next = createWorkspace('Synthetic hover layout', 'testnet4');
     next.transactions[txid] = {
       txid,
       vin: [{ coinbase: '00' }],

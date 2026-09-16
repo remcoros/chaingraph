@@ -1,15 +1,15 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { applyWalletScan, walletActivitySummary } from '../../Wallet/walletActivity';
-import { clearContextProvenance } from '../../ChainData/observationContext';
+import { clearContextProvenance } from '../../Evidence/InputContext';
 import { mergeTransactionObservations } from '../../../../Domain/Chain/prevouts';
 import type { Transaction } from '../../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { loadAddress, scanWallet } from '../../../../Infra/Bitcoin/api';
-import type { RefObject } from 'react';
 
 import type { AppState } from '../../../useAppState';
-import type { ChainFetch } from '../../ChainData/useChainFetch';
+import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 import type { WorkspaceCore } from '../../workspaceCore';
 /**
  * Address discovery for wallets: derive branches, pull their history and
@@ -30,24 +30,25 @@ export interface WalletDiscovery {
 }
 interface Inputs {
   core: WorkspaceCore;
-  fetch: ChainFetch;
+  transactions: TransactionEvidence;
+  operation: WorkspaceOperation;
   fetchScope: AppState['fetchScope'];
   canLoadChainData: boolean;
-  operationRef: RefObject<AbortController | undefined>;
   /** Fits the graph once a first scan brings a wallet's transactions in. */
   fitAll: () => void;
 }
 export function useWalletActivity({
   core,
-  fetch,
+  transactions,
+  operation,
   fetchScope,
   canLoadChainData,
-  operationRef,
   fitAll,
 }: Inputs): WalletDiscovery {
   const { activeWorkspace, activeWorkspaceRef, workspaceId, workspaces, setOperation, setNotice } =
     core;
-  const { run, mergeTransactions } = fetch;
+  const { recordTransactions } = transactions;
+  const { run, cancel, isActive } = operation;
 
   const [gapLimit, setGapLimit] = useState(20);
   const [addressesPerBranch, setAddressesPerBranch] = useState(200);
@@ -57,7 +58,7 @@ export function useWalletActivity({
   const monitorActivity = !!workspaceId && monitoredWorkspaceId === workspaceId;
   const setMonitorActivity = (value: boolean) =>
     setMonitoredWorkspaceId(value ? workspaceId : undefined);
-  const monitorOperationRef = useRef<AbortController | undefined>(undefined);
+  const monitorOperationSignal = useRef<AbortSignal | undefined>(undefined);
   async function refreshWallets(targets: Wallet[], initial: Workspace, signal: AbortSignal) {
     let snapshot = initial;
     let added = 0;
@@ -109,11 +110,11 @@ export function useWalletActivity({
     });
   }
   const pollWalletActivity = useEffectEvent(() => {
-    if (operationRef.current) return;
+    if (isActive()) return;
     const current = activeWorkspaceRef.current;
     if (!current) return;
     void run(async (signal) => {
-      monitorOperationRef.current = operationRef.current;
+      monitorOperationSignal.current = signal;
       setOperation('Checking watched activity…');
       const checked = await refreshWallets(current.wallets, current, signal);
       let added = checked.added;
@@ -173,7 +174,9 @@ export function useWalletActivity({
         activeWorkspaceRef.current?.id === current.id &&
         activeWorkspaceRef.current.network === current.network
       ) {
-        mergeTransactions(current.id, polledTransactions, [...polledObservedTransactionIds]);
+        recordTransactions(current.id, polledTransactions, {
+          promotionIds: [...polledObservedTransactionIds],
+        });
         if (Object.keys(refreshedHistories).length)
           workspaces.getUnlocked(current.id)?.edit(
             (latest) => ({
@@ -191,7 +194,7 @@ export function useWalletActivity({
         `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
       );
     }).finally(() => {
-      monitorOperationRef.current = undefined;
+      monitorOperationSignal.current = undefined;
     });
   });
   // Poll from the client, only while this workspace is unlocked. Backend never owns scan state.
@@ -200,9 +203,9 @@ export function useWalletActivity({
     const timer = setInterval(pollWalletActivity, 30000);
     return () => {
       clearInterval(timer);
-      monitorOperationRef.current?.abort();
+      cancel(monitorOperationSignal.current);
     };
-  }, [monitorActivity, canLoadChainData, workspaceId, gapLimit, addressesPerBranch]);
+  }, [monitorActivity, canLoadChainData, workspaceId, gapLimit, addressesPerBranch, cancel]);
   return {
     gapLimit,
     setGapLimit,

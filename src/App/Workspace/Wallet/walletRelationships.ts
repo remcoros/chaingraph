@@ -14,7 +14,7 @@ import { verifiedWalletAddresses } from './walletRecords';
 import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
 import { sats, type Transaction, type TxOutput } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 
 export interface WalletRelationshipContext {
   transactionId: string;

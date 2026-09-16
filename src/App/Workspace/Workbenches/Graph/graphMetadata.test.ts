@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { GraphMetadataProjection, EMPTY_GRAPH_ANNOTATIONS } from './graphMetadata';
-import { newWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
 import { fullGraphMembershipEvidence } from '../../GraphState/graphMembership';
 import { buildTagIndex } from '../../Annotations/tagProjection';
 import { filterGraph } from './Filters/graphFilters';
 import { sortEntities } from './EntitiesPanel/entitySort';
-import type { Annotation } from '../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../Annotations/annotation';
 import type { GraphData } from '../../GraphState/types';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 
 const id = '1'.repeat(64);
 const transaction = `tx:${id}`;
@@ -16,7 +16,7 @@ const address = 'bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el';
 const blank: Annotation = { label: '', icon: '', note: '', bookmarked: false };
 const matches = new Map();
 function setup() {
-  const workspace = newWorkspace('Metadata fixture', 'mainnet');
+  const workspace = createWorkspace('Metadata fixture', 'mainnet');
   workspace.transactions[id] = {
     txid: id,
     vin: [{ coinbase: '00' }],

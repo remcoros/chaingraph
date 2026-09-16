@@ -1,7 +1,7 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
 import type { Network } from '../../../../../Domain/Chain/network';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import type { WalletReviewFlowEntry } from '../walletReviewContext';
 import {
   indexPreviousOutputs,
@@ -11,9 +11,9 @@ import {
 import {
   parseTransaction,
   validateTransactionAddresses,
-} from '../../../../../Domain/Workspace/workspace';
+} from '../../../../../Domain/Chain/transactionValidation';
 import { mapLimit } from '../../../../../Infra/Bitcoin/api';
-import { mergeFlowInputs } from '../../../ChainData/flowInputs';
+import { mergeFlowInputs } from '../../../Evidence/InputContext';
 
 export const WALLET_FLOW_INPUT_WAVE_LIMIT = 20;
 export const WALLET_FLOW_VISIBLE_INPUT_LIMIT = 100;
@@ -126,7 +126,7 @@ export function mergeWalletFlowInputs(
         merged = mergeFlowInputs(
           merged,
           transactionId,
-          { ...ref, kind: 'output', label: '' },
+          { txid: ref.txid, vout: ref.vout },
           index === 0 ? [transaction] : [],
         );
     } catch {

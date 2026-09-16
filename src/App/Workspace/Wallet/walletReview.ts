@@ -8,9 +8,9 @@ import { verifiedWalletAddresses, verifyWalletUtxo, type WalletUtxoRecord } from
 import { listTagsForNode } from '../Annotations/tagProjection';
 import { outputNodeId, txNodeId } from '../../../Domain/Metadata/entityReferences';
 import { short } from '../../Controls/Display/referenceFormat';
-import type { AnalysisFinding } from '../../../Domain/Workspace/analysisFinding';
+import type { AnalysisFinding } from '../Analysis/analysisFinding';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 import {
   canonicalTransactionId,
@@ -26,7 +26,7 @@ import {
   resolvePreviousOutput,
   type PreviousOutputIndex,
 } from '../../../Domain/Chain/prevouts';
-import { MAX_WALLET_REVIEWS } from '../../../Domain/Workspace/walletReviewStorage';
+import { MAX_WALLET_REVIEWS } from './walletReviewRecords';
 
 export const REVIEW_REASONS = [
   'current-utxo',

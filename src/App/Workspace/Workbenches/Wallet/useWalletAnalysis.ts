@@ -9,7 +9,7 @@ import {
 import { walletEvidenceChanged } from '../../Wallet/walletActivity';
 import { short } from '../../../Controls/Display/referenceFormat';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import type { WalletRow } from './walletRows';
 
 export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: WalletRow) {

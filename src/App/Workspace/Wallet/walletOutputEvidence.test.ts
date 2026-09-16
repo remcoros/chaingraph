@@ -5,10 +5,10 @@ import { createWalletOutputEvidenceResolver } from './walletOutputEvidence';
 import { buildWalletSelectionIndex } from './walletSelectionIndex';
 import { groupWalletRelationships } from './walletRelationships';
 import { buildWalletReview } from './walletReview';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import type { TxOutput } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 import {
   RECEIVE_ADDRESS,
@@ -99,7 +99,7 @@ describe('snapshot-scoped wallet output evidence', () => {
       ],
     };
     const workspace: Workspace = {
-      ...newWorkspace('Public evidence fixture', 'mainnet'),
+      ...createWorkspace('Public evidence fixture', 'mainnet'),
       wallets: [wallet],
       transactions: structuredClone(transactions),
     };

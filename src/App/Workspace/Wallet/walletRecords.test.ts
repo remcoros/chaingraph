@@ -2,7 +2,7 @@ import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { listWalletAddresses, listWalletTransactions, verifyWalletUtxo } from './walletRecords';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
@@ -36,7 +36,7 @@ describe('wallet address records', () => {
     };
     const another = transaction(3);
     const workspace = {
-      ...newWorkspace('Addresses', 'mainnet'),
+      ...createWorkspace('Addresses', 'mainnet'),
       transactions: Object.fromEntries([parent, spend, another].map((tx) => [tx.txid, tx])),
     };
     const withHistory = {
@@ -47,7 +47,7 @@ describe('wallet address records', () => {
       { ...withHistory.addresses[0], loadedOutputCount: 3 },
     ]);
     expect(
-      listWalletAddresses(newWorkspace('Empty', 'mainnet'), withHistory)[0].loadedOutputCount,
+      listWalletAddresses(createWorkspace('Empty', 'mainnet'), withHistory)[0].loadedOutputCount,
     ).toBe(0);
     expect(wallet.addresses[0]).not.toHaveProperty('loadedOutputCount');
   });
@@ -59,7 +59,7 @@ describe('wallet address records', () => {
       { n: 2, value: 1, scriptPubKey: { address } },
     ];
     const workspace = {
-      ...newWorkspace('Addresses', 'mainnet'),
+      ...createWorkspace('Addresses', 'mainnet'),
       transactions: { [id(1)]: { ...transaction(1), vout: outputs } },
     };
     expect(listWalletAddresses(workspace, wallet)[0].loadedOutputCount).toBe(1);
@@ -87,7 +87,7 @@ describe('wallet address records', () => {
         path: `account/${entry.branch}/${entry.index}`,
       };
     });
-    const records = listWalletAddresses(newWorkspace('Addresses', 'mainnet'), {
+    const records = listWalletAddresses(createWorkspace('Addresses', 'mainnet'), {
       ...wallet,
       addresses: [...entries, entries[1]],
     });
@@ -115,7 +115,7 @@ describe('wallet transaction history', () => {
     };
     const unrelated = { ...spend, txid: id(4), vin: [{ txid: id(1), vout: 1 }] };
     const workspace = {
-      ...newWorkspace('Records', 'mainnet'),
+      ...createWorkspace('Records', 'mainnet'),
       transactions: Object.fromEntries(
         [parent, spend, spoof, unrelated].map((tx) => [tx.txid, tx]),
       ),
@@ -140,7 +140,7 @@ describe('wallet transaction history', () => {
       { tx_hash: id(1), height: 20 },
     ];
     const workspace = {
-      ...newWorkspace('Ordering', 'mainnet'),
+      ...createWorkspace('Ordering', 'mainnet'),
       transactions: { [id(2)]: { ...transaction(2), blocktime: 100 } },
     };
     const records = listWalletTransactions(workspace, {
@@ -154,7 +154,7 @@ describe('wallet transaction history', () => {
   });
   it('does not use malformed or wrong-network address claims or conflicting history heights', () => {
     const workspace = {
-      ...newWorkspace('Records', 'mainnet'),
+      ...createWorkspace('Records', 'mainnet'),
       transactions: { [id(1)]: transaction(1) },
     };
     expect(

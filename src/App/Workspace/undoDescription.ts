@@ -1,5 +1,5 @@
-import type { Annotation } from '../../Domain/Workspace/annotationTypes';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import type { Annotation } from './Annotations/annotation';
+import type { Workspace } from './workspace';
 
 const fallback = 'Edit workspace';
 import { emptyAnnotation } from './Annotations/emptyAnnotation';

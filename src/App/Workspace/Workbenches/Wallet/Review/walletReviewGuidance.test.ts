@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 import { deriveAddresses } from '../../../../../Domain/Wallet/wallet';
 import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
@@ -17,7 +17,7 @@ import {
 } from '../../../../../../tests/fixtures/bitcoin';
 
 function fixture() {
-  const workspace = newWorkspace('Public review guidance', 'mainnet');
+  const workspace = createWorkspace('Public review guidance', 'mainnet');
   const addresses = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 3);
   const wallet: Wallet = {
     id: '30000000-0000-4000-8000-000000000001',

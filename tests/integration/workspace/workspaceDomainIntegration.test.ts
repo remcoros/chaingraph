@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import {
-  newWorkspace,
-  parseWorkspace,
-  parseTransaction,
-} from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import { parseTransaction } from '../../../src/Domain/Chain/transactionValidation';
 import { outputAddress } from '../../../src/Domain/Chain/prevouts';
 import { analysisTools } from '../../../src/App/Workspace/Analysis/analysis';
 import { outputNodeId, txNodeId } from '../../../src/Domain/Metadata/entityReferences';
@@ -34,7 +32,7 @@ const findTool = (name: string) => analysisTools.find((tool) => tool.id === name
 
 describe('workspace graph and analysis', () => {
   it('connects funding and spending outputs, preserving unknown funding nodes and annotations', () => {
-    const w = newWorkspace('Investigation', 'mainnet');
+    const w = createWorkspace('Investigation', 'mainnet');
     const funding = tx(1, [], [{ address: addrA, value: 1 }]);
     const spending = tx(
       2,
@@ -74,7 +72,7 @@ describe('workspace graph and analysis', () => {
   });
 
   it('builds a 150-input/output transaction without losing outpoints or spending edges', () => {
-    const w = newWorkspace('Large transaction', 'mainnet');
+    const w = createWorkspace('Large transaction', 'mainnet');
     const big = tx(
       999,
       Array.from({ length: 150 }, (_, n) => ({ txid: id(n + 1), vout: 0 })),
@@ -89,7 +87,7 @@ describe('workspace graph and analysis', () => {
   });
 
   it('treats common inputs as removable hypotheses and excludes equal-output candidates', () => {
-    const w = newWorkspace('Hypotheses', 'mainnet');
+    const w = createWorkspace('Hypotheses', 'mainnet');
     const funding = tx(
       1,
       [],
@@ -120,7 +118,7 @@ describe('workspace graph and analysis', () => {
   });
 
   it('reports address reuse only within loaded outputs and keeps labels on roundtrip', () => {
-    const w = newWorkspace('Labeled wallet', 'mainnet');
+    const w = createWorkspace('Labeled wallet', 'mainnet');
     w.transactions[id(1)] = tx(
       1,
       [],
@@ -150,7 +148,7 @@ describe('workspace graph and analysis', () => {
   });
 
   it('rejects malformed workspace versions, network names and mismatched transaction keys', () => {
-    const w = newWorkspace('Import boundary', 'mainnet');
+    const w = createWorkspace('Import boundary', 'mainnet');
     expect(() => parseWorkspace({ ...w, version: 5 })).toThrow();
     expect(() => parseWorkspace({ ...w, network: 'testnet' })).toThrow();
     expect(() =>
@@ -165,7 +163,7 @@ describe('workspace graph and analysis', () => {
     const output = { n: 0, value: 1, scriptPubKey: { addresses: [addrA, addrB] } };
     expect(outputAddress(output)).toBeUndefined();
     expect(outputAddress({ ...output, scriptPubKey: { addresses: [addrA] } })).toBe(addrA);
-    const w = newWorkspace('Legacy script', 'mainnet');
+    const w = createWorkspace('Legacy script', 'mainnet');
     w.view.showAddresses = true;
     w.transactions[id(1)] = { ...tx(1, [], []), vout: [output] };
     expect(buildGraph(w).nodes.some((node) => node.kind === 'address')).toBe(false);
@@ -280,7 +278,7 @@ describe('wallet and aggregate workspace import bounds', () => {
     ],
   };
   const workspace = () => ({
-    ...newWorkspace('Wallet import', 'mainnet'),
+    ...createWorkspace('Wallet import', 'mainnet'),
     wallets: [structuredClone(wallet)],
   });
 
@@ -316,7 +314,7 @@ describe('wallet and aggregate workspace import bounds', () => {
   });
 
   it('rejects an aggregate graph over budget before deeply parsing every transaction', () => {
-    const w = newWorkspace('Oversized import', 'mainnet');
+    const w = createWorkspace('Oversized import', 'mainnet');
     const outputs = Array.from({ length: 9000 }, (_, n) => ({ n, value: 0, scriptPubKey: {} }));
     for (let n = 1; n <= 6; n++)
       w.transactions[id(n)] = { txid: id(n), vin: [{ coinbase: '00' }], vout: outputs };

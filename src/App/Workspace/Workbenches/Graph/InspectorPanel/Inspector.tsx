@@ -3,7 +3,7 @@ import { listWalletAddresses } from '../../../Wallet/walletRecords';
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
-} from '../../../ChainData/WalletUtxos/walletUtxoObservation';
+} from '../../../Wallet/WalletUtxos/walletUtxoObservation';
 import { useUtxoStatus } from './useUtxoStatus';
 import './utxo-status.css';
 import {
@@ -27,12 +27,12 @@ import {
 import { short } from '../../../../Controls/Display/referenceFormat';
 import { txNodeId, addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { AddressBalanceObservation } from '../../../../../Domain/Chain/observations';
-import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../../Annotations/annotation';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
 import type { GraphNode, GraphData } from '../../../GraphState/types';
-import { addressBalanceSats } from '../../../ChainData/addressHistory';
+import { addressBalanceSats } from '../Address/addressHistory';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { equalOutputCount } from '../../../Analysis/analysis';
 import { outputAddress } from '../../../../../Domain/Chain/prevouts';

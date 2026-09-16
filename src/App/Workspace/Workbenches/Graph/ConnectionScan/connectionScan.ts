@@ -10,16 +10,16 @@ import {
   scanPathHops,
   type ScanDirection,
   type ScanRoute,
-} from './connectionScanPaths';
-import type { ConnectionScanRecords } from '../../../../../Domain/Workspace/connectionScanTypes';
+} from '../../../ConnectionScan/scanPath';
 import type {
-  ScanFinding,
-  ScanObservation,
-  ScanResult,
-  ScanRun,
-  ScanSettings,
-  ScanStopReason,
-} from './types';
+  ConnectionScanRecords,
+  StoredScanFinding as ScanFinding,
+  StoredScanObservation as ScanObservation,
+  StoredScanResult as ScanResult,
+  StoredScanRun as ScanRun,
+  StoredScanSettings as ScanSettings,
+  StoredScanStopReason as ScanStopReason,
+} from '../../../ConnectionScan/types';
 /** Bounded observed-edge search. Exploration and its budgets are deliberately transient. */
 export { SCAN_LIMITS, isScanNodeId, scanPathHops };
 export type { ScanDirection, ScanRoute };

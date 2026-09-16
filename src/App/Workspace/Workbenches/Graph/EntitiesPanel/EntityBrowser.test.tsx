@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import EntityBrowser from './EntityBrowser';
 import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { GraphFilters } from '../../../graphViewState';
+import type { GraphFilters } from '../../../GraphState/filters';
 import type { GraphNode } from '../../../GraphState/types';
 import { installDomStubs } from '../../../../../../tests/domStubs';
 

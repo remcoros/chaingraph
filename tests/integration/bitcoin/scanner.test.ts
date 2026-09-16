@@ -10,7 +10,8 @@ import {
   MAX_SCAN_TRANSACTIONS,
 } from '../../../src/Infra/Bitcoin/api';
 import { deriveAddresses } from '../../../src/Domain/Wallet/wallet';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import type { Network } from '../../../src/Domain/Chain/network';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 import type { Wallet } from '../../../src/Domain/Wallet/walletTypes';
@@ -192,7 +193,7 @@ describe('browser-side wallet scanner', () => {
     expect(result.truncated).toBe(true);
     const saved = parseWorkspace(
       JSON.parse(
-        JSON.stringify({ ...newWorkspace('Continuation', 'mainnet'), wallets: [result.wallet] }),
+        JSON.stringify({ ...createWorkspace('Continuation', 'mainnet'), wallets: [result.wallet] }),
       ),
     );
     const updated = {
@@ -285,7 +286,7 @@ describe('browser-side wallet scanner', () => {
 
   it('validates persisted continuation IDs and their queue bound', () => {
     const base = {
-      ...newWorkspace('Queue validation', 'mainnet'),
+      ...createWorkspace('Queue validation', 'mainnet'),
       wallets: [{ ...wallet, pendingTransactionIds: [txid(1)] }],
     };
     expect(parseWorkspace(base).wallets[0].pendingTransactionIds).toEqual([txid(1)]);

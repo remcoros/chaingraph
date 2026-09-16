@@ -8,7 +8,7 @@ import {
   MetadataPopover,
 } from '../../../../Controls/Metadata/MetadataEditors';
 import { applyBatchIcon, planBatchIcon } from '../../../Annotations/batchMetadata';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 
 export interface BatchMetadataBarProps {
   workspace: Workspace;

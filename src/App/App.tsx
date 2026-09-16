@@ -1,14 +1,19 @@
 import './component-styles';
-import { TransactionFetchShell } from './Workspace/ChainData/TransactionFetch';
+import { TransactionFetchShell } from './Workspace/Evidence/Transactions';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
 import { BookOpen, FolderOpen, Info, Library, Plus, X } from 'lucide-react';
-import { CreateDialog, ImportDialog, UnlockDialog, Modal } from './Dialogs';
+import { Modal } from './Dialogs';
+import { CreateWorkspaceDialog } from './Workspace/Dialogs/CreateWorkspaceDialog';
+import { ImportWorkspaceDialog } from './Workspace/Dialogs/ImportWorkspaceDialog';
+import { UnlockWorkspaceDialog } from './Workspace/Dialogs/UnlockWorkspaceDialog';
 import { HelpMenu } from './Help/HelpMenu';
 import { AboutDialog } from './Help/AboutDialog';
 import { WorkspaceHome } from './FrontPage/WorkspaceHome';
 
 import { WORKSPACE_TEMPLATES } from './Examples/workspaceTemplates';
-import { MAX_ENCRYPTED_FILE_BYTES } from '../Infra/Storage/crypto';
+import { loadTemplateWorkspace } from './Examples/templateWorkspace';
+import { MAX_ENCRYPTED_FILE_BYTES } from './Workspace/Persistence/Encryption';
+import { createWorkspace } from './Workspace/createWorkspace';
 
 import { ADDRESS_DISPLAY_NOTICE } from './Workspace/workspaceNotices';
 import { Workspace } from './Workspace/Workspace';
@@ -262,16 +267,34 @@ export default function App() {
       <WorkspaceLabelImport workspace={workspace} />
       <EntityRemovalDialog workspace={workspace} />
       {app.create && (
-        <CreateDialog
+        <CreateWorkspaceDialog
           networks={app.discoveryError ? undefined : app.networks}
           key={app.create}
           template={WORKSPACE_TEMPLATES.find((template) => template.id === app.create)}
-          onCreate={app.openWorkspace}
+          onCreate={async (request, signal) => {
+            const data = request.templateId
+              ? await loadTemplateWorkspace(
+                  request.templateId,
+                  request.name,
+                  request.description,
+                  signal,
+                )
+              : {
+                  ...createWorkspace(request.name, request.network),
+                  description: request.description,
+                };
+            signal.throwIfAborted();
+            if (!app.networks?.includes(data.network))
+              throw new Error(
+                `Backend does not support ${data.network}. Check the backend connection.`,
+              );
+            app.openWorkspace(data, request.password);
+          }}
           onClose={() => app.setCreate(undefined)}
         />
       )}
       {app.unlock && (
-        <UnlockDialog
+        <UnlockWorkspaceDialog
           entry={app.unlock}
           onUnlock={async (entry, password, signal) => {
             await app.saveBeforeLeaving();
@@ -285,7 +308,7 @@ export default function App() {
       )}
       <WalletDialogs workspace={workspace} />
       {app.fileDialog && (
-        <ImportDialog
+        <ImportWorkspaceDialog
           file={app.fileDialog}
           onImport={(data, password) => {
             const existing =

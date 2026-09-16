@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { address, networks, payments } from 'bitcoinjs-lib';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
 import { fetchTransaction } from '../../../src/Infra/Bitcoin/api';
-import {
-  newWorkspace,
-  parseWorkspace,
-  validateTransactionAddresses,
-} from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import { validateTransactionAddresses } from '../../../src/Domain/Chain/transactionValidation';
 import type { Network } from '../../../src/Domain/Chain/network';
 import type { Transaction, TxOutput } from '../../../src/Domain/Chain/transaction';
 
@@ -21,7 +19,7 @@ const transaction = (scriptPubKey: TxOutput['scriptPubKey']): Transaction => ({
 const payment = (network: Network, hash = publicHash) =>
   payments.p2wpkh({ hash, network: network === 'mainnet' ? networks.bitcoin : networks.testnet });
 const workspace = (network: Network, tx: Transaction) => {
-  const value = newWorkspace('Public address validation fixture', network);
+  const value = createWorkspace('Public address validation fixture', network);
   value.transactions[tx.txid] = tx;
   return value;
 };

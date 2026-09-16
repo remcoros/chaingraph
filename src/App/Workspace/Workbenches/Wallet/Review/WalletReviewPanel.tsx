@@ -13,7 +13,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import type { WalletUtxoRecord } from '../../../Wallet/walletRecords';
 import {
   applyReviewDecisions,
@@ -42,11 +42,11 @@ import {
 } from './reviewCategories';
 import type { AnalysisScan } from '../../../Analysis/analysisScan';
 import { useRecordSelection } from '../useRecordSelection';
-import type { WalletUtxoController } from '../../../ChainData/WalletUtxos';
+import type { WalletUtxoController } from '../../../Wallet/WalletUtxos';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import { useWalletAnalysis } from '../useWalletAnalysis';
 import { useWalletCounterparties } from '../useWalletCounterparties';
-import { useTransactionFetch } from '../../../ChainData/TransactionFetch';
+import { useTransactionFetch } from '../../../Evidence/Transactions';
 import { WALLET_FLOW_INPUT_WAVE_LIMIT } from './walletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletOverview } from '../WalletOverview';
@@ -65,7 +65,7 @@ import { walletRecordBlockObservation } from '../../../Wallet/walletRecordBlockO
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { buildTagIndex } from '../../../Annotations/tagProjection';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
-import { WalletPreparationCache } from '../walletPreparation';
+import { WalletPreparationCache } from '../../../Wallet/walletPreparation';
 import '../wallet-workbench.css';
 
 export interface WalletWorkbenchViewProps extends WalletWorkbenchContext {

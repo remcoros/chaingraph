@@ -1,12 +1,13 @@
 import { graphNavigationTransactionIds, resolveGraphHandoff } from '../graphHandoffNavigation';
 import { txNodeId } from '../../../../Domain/Metadata/entityReferences';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
 import type { WorkspaceCore } from '../../workspaceCore';
 
 import type { GraphHandoff } from '../workbenchHandoff';
-import type { ChainFetch } from '../../ChainData/useChainFetch';
+import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 
 interface AnalysisActionRuntime {
   /** Captures the current selection generation and verifies it after asynchronous work. */
@@ -20,7 +21,8 @@ interface Inputs {
   workspaces: WorkspaceCore['workspaces'];
   setNotice: WorkspaceCore['setNotice'];
   handoff: GraphHandoff;
-  fetch: ChainFetch;
+  transactions: TransactionEvidence;
+  operation: WorkspaceOperation;
   canLoadChainData: boolean;
 }
 export function createAnalysisActions({
@@ -28,11 +30,13 @@ export function createAnalysisActions({
   workspaces,
   setNotice,
   handoff,
-  fetch,
+  transactions,
+  operation,
   canLoadChainData,
 }: Inputs) {
   const { showOnGraph, loadGraphTransactions } = handoff;
-  const { mergeTransactions, run } = fetch;
+  const { recordTransactions } = transactions;
+  const { run } = operation;
 
   function showFindingOnGraph(
     runtime: AnalysisActionRuntime,
@@ -67,7 +71,7 @@ export function createAnalysisActions({
       const loaded = await loadGraphTransactions(unresolved, signal);
       signal.throwIfAborted();
       if (!isCurrent()) return;
-      mergeTransactions(current.id, loaded, missing);
+      recordTransactions(current.id, loaded, { promotionIds: missing });
       if (!finish()) setNotice('The requested entity is not present in its transaction.');
     });
     return true;

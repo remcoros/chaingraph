@@ -2,18 +2,18 @@
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { base64 } from '@scure/base';
-import { parseWorkspace } from '../src/Domain/Workspace/workspace';
-import type { Workspace } from '../src/Domain/Workspace/workspaceTypes';
+import { parseWorkspace } from '../src/App/Workspace/Persistence/Format';
+import type { Workspace } from '../src/App/Workspace/workspace';
 import {
   decryptWorkspace,
   encryptWorkspace,
   type WorkspaceCryptoTimings,
-} from '../src/Infra/Storage/crypto';
+} from '../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
 import {
   compressWorkspaceBytes,
   readBoundedStream,
   MAX_WORKSPACE_BYTES,
-} from '../src/Infra/Storage/workspaceCompression';
+} from '../src/App/Workspace/Persistence/Encryption/workspaceCompression';
 import {
   compressionWalletFixture,
   tinyCompressionFixture,

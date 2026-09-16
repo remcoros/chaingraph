@@ -2,7 +2,7 @@ import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 import type { Network } from '../../../Domain/Chain/network';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { Wallet, WalletAddress } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
 import { sats } from '../../../Domain/Chain/transaction';
 import { indexPreviousOutputs, outputScriptHash } from '../../../Domain/Chain/prevouts';

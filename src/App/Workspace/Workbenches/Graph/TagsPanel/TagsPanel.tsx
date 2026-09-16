@@ -2,10 +2,10 @@ import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'rea
 import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
 import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { GraphData, GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
-import type { WorkspaceTag } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Workspace } from '../../../workspace';
+import type { WorkspaceTag } from '../../../Annotations/workspaceTags';
 import { listTagsForNode, tagNodeIds, tagsFromLabels } from '../../../Annotations/tagProjection';
-import { MAX_TAG_MEMBERS, MAX_WORKSPACE_TAGS } from '../../../../../Domain/Workspace/tagStorage';
+import { MAX_TAG_MEMBERS, MAX_WORKSPACE_TAGS } from '../../../Annotations/workspaceTags';
 import {
   BatchTagEditor,
   ColorPicker,

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { walletRelatedRecords } from './walletRelatedRecords';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 import type { WalletRow } from '../walletRows';
 import {
   transactions,
@@ -23,7 +23,7 @@ const row = (nodeId: string, kind: WalletRow['kind']): WalletRow => ({
   changed: false,
 });
 const fixture = () => {
-  const workspace = newWorkspace('Public related records', 'mainnet');
+  const workspace = createWorkspace('Public related records', 'mainnet');
   workspace.transactions = structuredClone(transactions);
   return workspace;
 };

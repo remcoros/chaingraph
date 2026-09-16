@@ -4,7 +4,7 @@ import { Amount } from '../../../../Controls/Display/Amount';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
-import { addressBalanceSats, type AddressHistory } from '../../../ChainData/addressHistory';
+import { addressBalanceSats, type AddressHistory } from '../Address/addressHistory';
 import { paginateAddressHistorySections } from './addressHistorySections';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
@@ -13,7 +13,7 @@ import type {
   AddressUtxoObservation,
 } from '../../../../../Domain/Chain/observations';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 
 export interface FlowPanelAddressViewProps {
   workspace: Workspace;

@@ -31,10 +31,10 @@ import type { AnalysisSession } from './analysisSession';
 import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
 import { addressNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
 import { sats } from '../../../../Domain/Chain/transaction';
-import type { AnalysisFinding } from '../../../../Domain/Workspace/analysisFinding';
+import type { AnalysisFinding } from '../../Analysis/analysisFinding';
 import type { GraphNode } from '../../GraphState/types';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { walletEvidenceChanged } from '../../Wallet/walletActivity';
 import { outputAddress } from '../../../../Domain/Chain/prevouts';
 import {
@@ -56,7 +56,7 @@ import {
   recoverAnalysisData,
   recoveryLimits,
 } from '../../Analysis/analysisRecovery';
-import { useTransactionFetch } from '../../ChainData/TransactionFetch';
+import { useTransactionFetch } from '../../Evidence/Transactions';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';
 

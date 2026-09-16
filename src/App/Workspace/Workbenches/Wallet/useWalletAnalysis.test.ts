@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { walletAnalysisScope, walletAnalysisSummary } from './useWalletAnalysis';
 import { scanDefaults, type AnalysisScan } from '../../Analysis/analysisScan';
-import { newWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
 import { deriveAddresses } from '../../../../Domain/Wallet/wallet';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
 import type { WalletRow } from './walletRows';
@@ -13,7 +13,7 @@ import {
 } from '../../../../../tests/fixtures/bitcoin';
 
 function fixture() {
-  const workspace = newWorkspace('Public scan fixture', 'mainnet');
+  const workspace = createWorkspace('Public scan fixture', 'mainnet');
   const wallet: Wallet = {
     id: '30000000-0000-4000-8000-000000000001',
     name: 'Public scan wallet',

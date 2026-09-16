@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import { listWalletAddresses } from '../../../Wallet/walletRecords';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 

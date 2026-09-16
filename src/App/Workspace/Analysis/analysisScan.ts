@@ -4,10 +4,10 @@ import {
   type AnalysisOptions,
   type AnalysisRunReport,
 } from './analysis';
-import type { AnalysisFinding } from '../../../Domain/Workspace/analysisFinding';
+import type { AnalysisFinding } from './analysisFinding';
 import type { GraphNode } from '../GraphState/types';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { short } from '../../Controls/Display/referenceFormat';
 import { listWalletTransactions } from '../Wallet/walletRecords';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadSpending } from '../../../src/Infra/Bitcoin/api';
-import { newWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -13,7 +13,7 @@ const root: Transaction = {
   vout: [output(0), output(1, '52')],
 };
 const workspace = () => ({
-  ...newWorkspace('Spending regression', 'testnet4'),
+  ...createWorkspace('Spending regression', 'testnet4'),
   transactions: { [rootId]: root },
 });
 const candidate = (txid: string, vin: Transaction['vin'] = [{ coinbase: '00' }]): Transaction => ({

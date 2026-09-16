@@ -1,6 +1,6 @@
 import type { Network } from '../../../Domain/Chain/network';
 import type { Transaction, TxInput } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import {
   indexPreviousOutputs,
   mergeTransactionObservations,

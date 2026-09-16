@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
-import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
 import { openFixtureWorkspace } from '../fixtures/open-workspace';
 
 // A tiny, deliberately minimal fixture: one funding and one spending transaction.
 // Smoke tests only need to confirm the app renders and wires together; keep this cheap.
 function smokeWorkspace() {
-  const w = newWorkspace('Smoke fixture', 'testnet4');
+  const w = createWorkspace('Smoke fixture', 'testnet4');
   w.demo = false;
   const funding = 'a'.repeat(64);
   const spending = 'b'.repeat(64);

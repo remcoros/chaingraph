@@ -3,9 +3,9 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it, vi } from 'vitest';
 import type { Transaction } from '../../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { groupWalletRelationships, walletCounterparties } from '../../Wallet/walletRelationships';
-import { newWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
 import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
 import {
   createWalletCounterpartyLoader,
@@ -44,7 +44,7 @@ const wallet: Wallet = {
   ],
 };
 const fixture = (count = 1): Workspace => ({
-  ...newWorkspace('Counterparty inputs', 'mainnet'),
+  ...createWorkspace('Counterparty inputs', 'mainnet'),
   wallets: [wallet],
   transactions: {
     [id(1)]: {

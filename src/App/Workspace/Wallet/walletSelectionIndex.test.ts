@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { buildWalletReviewContext } from '../Workbenches/Wallet/walletReviewContext';
 import { walletRelatedRecords } from '../Workbenches/Wallet/Review/walletRelatedRecords';
 import {
@@ -37,7 +37,7 @@ function fixture(): Workspace {
     })),
   };
   return {
-    ...newWorkspace('Public selection fixture', 'mainnet'),
+    ...createWorkspace('Public selection fixture', 'mainnet'),
     wallets: [wallet],
     transactions: structuredClone(transactions),
   };

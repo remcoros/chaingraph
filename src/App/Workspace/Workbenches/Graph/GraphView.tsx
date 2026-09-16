@@ -17,15 +17,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { short } from '../../../Controls/Display/referenceFormat';
 import type { GraphLink, GraphNode } from '../../GraphState/types';
 import type { Transaction } from '../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './graph.css';
 import type { GraphFlowContext } from './Renderer/flowContext';
 import { VisibilityActions, type VisibilityProps } from '../../Selection/VisibilityActions';
-import {
-  graphSnapshotSchema,
-  type GraphSnapshot,
-} from '../../../../Domain/Workspace/graphSnapshotStorage';
+import { graphSnapshotSchema, type GraphSnapshot } from '../../GraphState/graphSnapshot';
 import { mergeGraphSnapshot } from './Renderer/graphSnapshot';
 import type { GraphAdapter, GraphAdapterFactory } from './Renderer/adapter';
 import { createDefaultAdapter } from './Renderer/defaultAdapter';

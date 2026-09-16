@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { transactionStatus } from '../../../src/App/Controls/Display/transactionStatus';
 import { withHistoryHeight } from '../../../src/Domain/Chain/transactionStatus';
-import { parseTransaction } from '../../../src/Domain/Workspace/workspace';
+import { parseTransaction } from '../../../src/Domain/Chain/transactionValidation';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 import { fetchTransaction } from '../../../src/Infra/Bitcoin/api';
 import { parseRpc } from '../../../server/rpc-schema';

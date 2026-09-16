@@ -6,18 +6,19 @@ import {
 } from '../../Wallet/walletRecords';
 import { listWalletRelationships } from '../../Wallet/walletRelationships';
 import { addGraphNodes } from '../../GraphState/graphMembership';
-import type { GraphFilters } from '../../graphViewState';
+import type { GraphFilters } from '../../GraphState/filters';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
-import type { GraphRightTab } from '../../graphViewState';
+import type { GraphRightTab } from '../../GraphState/panelState';
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
 import type { GraphHandoff } from '../workbenchHandoff';
-import type { ChainFetch } from '../../ChainData/useChainFetch';
+import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 
 interface WalletActionRuntime {
   /** Captures the current selection generation and verifies it after asynchronous work. */
@@ -36,7 +37,8 @@ interface Inputs {
   setSelectionMode: WorkspaceSelection['batch']['setMode'];
   /** Everything this workbench needs to hand a record over to Graph. */
   handoff: GraphHandoff;
-  fetch: ChainFetch;
+  transactions: TransactionEvidence;
+  operation: WorkspaceOperation;
   wallet: Wallet | undefined;
   shownRightTab: GraphRightTab;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
@@ -51,7 +53,8 @@ export function createWalletActions({
   replaceSelection,
   setSelectionMode,
   handoff,
-  fetch,
+  transactions,
+  operation,
   wallet,
   shownRightTab,
   setGraphFilters,
@@ -67,7 +70,8 @@ export function createWalletActions({
     graph,
     recoveryGraph,
   } = handoff;
-  const { mergeTransactions, run } = fetch;
+  const { recordTransactions } = transactions;
+  const { run } = operation;
 
   function selectWalletRecord(
     runtime: WalletActionRuntime,
@@ -149,7 +153,7 @@ export function createWalletActions({
         );
       // Cached navigation promotes graph context without replacing chain evidence.
       // A new transaction still takes the normal history/findings invalidation path.
-      mergeTransactions(ownerId, loaded, transactionIds);
+      recordTransactions(ownerId, loaded, { promotionIds: transactionIds });
       if (!center) workspaces.getUnlocked(ownerId)?.edit(reveal, false);
       finish();
     });

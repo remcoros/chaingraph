@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { selectedWalletFilterIds } from '../../../src/App/Workspace/Workbenches/Graph/Filters/graphFilters';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
-import { decryptWorkspace, encryptWorkspace } from '../../../src/Infra/Storage/crypto';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import {
+  decryptWorkspace,
+  encryptWorkspace,
+} from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
 
 describe('saved graph wallet selections', () => {
   it('retains wallet selection together with the other filter dimensions after encryption', async () => {
-    const workspace = newWorkspace('Public wallet filter fixture', 'mainnet');
+    const workspace = createWorkspace('Public wallet filter fixture', 'mainnet');
     workspace.view.filters = {
       walletIds: ['savings', 'spending'],
       walletMatch: 'matched',
@@ -31,7 +35,7 @@ describe('saved graph wallet selections', () => {
   ])(
     'restores encrypted selections without discarding the filter: $filters',
     async ({ filters, expected }) => {
-      const workspace = newWorkspace('Public wallet filter fixture', 'mainnet');
+      const workspace = createWorkspace('Public wallet filter fixture', 'mainnet');
       workspace.view.filters = filters;
       const password = 'public fixture password';
       const encrypted = await encryptWorkspace(workspace, password);
@@ -43,7 +47,7 @@ describe('saved graph wallet selections', () => {
   );
 
   it('bounds imported selections by the supported wallet count and identifier size', () => {
-    const workspace = newWorkspace('Public wallet filter fixture', 'mainnet');
+    const workspace = createWorkspace('Public wallet filter fixture', 'mainnet');
     const parse = (walletIds: unknown) =>
       parseWorkspace({ ...workspace, view: { ...workspace.view, filters: { walletIds } } });
     expect(

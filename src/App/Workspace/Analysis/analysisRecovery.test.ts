@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { analysisDataGaps, recoverAnalysisData, recoveryLimits } from './analysisRecovery';
 import { analysisTools } from './analysis';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import type { Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 import { resolvePreviousOutput } from '../../../Domain/Chain/prevouts';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const output = { n: 0, value: 1, scriptPubKey: { hex: '00141111', type: 'witness_v0_keyhash' } };
@@ -15,7 +15,7 @@ const spend = (n = 10, parents = [1]): Transaction => ({
 });
 const parent = (n = 1): Transaction => ({ txid: id(n), vin: [{ coinbase: '00' }], vout: [output] });
 function workspace(...txs: Transaction[]) {
-  const w = newWorkspace('Public fixture', 'mainnet');
+  const w = createWorkspace('Public fixture', 'mainnet');
   w.transactions = Object.fromEntries(txs.map((tx) => [tx.txid, tx]));
   return w;
 }

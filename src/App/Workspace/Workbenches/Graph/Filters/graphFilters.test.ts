@@ -15,7 +15,7 @@ import {
   hasActiveFilters,
 } from './filterPresentation';
 import { sortEntities } from '../EntitiesPanel/entitySort';
-import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../../Annotations/annotation';
 import type { GraphData } from '../../../GraphState/types';
 
 const graph: GraphData = {

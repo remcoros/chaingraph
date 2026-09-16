@@ -38,24 +38,36 @@ test locations. Source is grouped by product ownership.
 | `src/App/App.tsx`, `src/App/useAppState.ts`                    | App shell, session navigation, home and dialogs                                   |
 | `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`          | Shared state, selection, presentation and workbench switching/focus               |
 | `src/App/Workspace/Analysis/`, `Annotations/`, `GraphState/`   | Shared analysis, metadata and graph-state operations used by workbenches          |
-| `src/App/Workspace/ChainData/`, `Wallet/`, `Selection/`        | Shared evidence loading, wallet projections and selection operations              |
+| `src/App/Workspace/Evidence/`, `Wallet/`, `Selection/`         | Shared transaction/input evidence, wallet projections and selection operations    |
 | `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/` | Each workbench composes its own views and binds shared Workspace state            |
-| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs/`         | Workspace entry, example creation, help and dialogs                               |
-| `src/App/Workspace/useWorkspaces.ts`                           | Unlocked sessions, undo/redo, autosave and locking                                |
+| `src/App/FrontPage/`, `Examples/`, `Help/`                     | Workspace entry, example creation and help                                        |
+| `src/App/Workspace/Dialogs/`, `Wallet/Dialogs/`                | Workspace lifecycle and wallet dialogs                                            |
+| `src/App/Workspace/Store/`                                     | Unlocked sessions, undo/redo, autosave and the persistence port                   |
+| `src/App/Workspace/Persistence/Format/`                        | Workspace schema validation and deterministic migrations                          |
+| `src/App/Workspace/Persistence/Encryption/`                    | Authenticated envelope, compression and encryption worker                         |
+| `src/App/Workspace/Persistence/Browser/`                       | Public browser index, IndexedDB envelopes and cross-tab publication               |
 | `src/App/Workspace/Workbenches/Wallet/`                        | Wallet overview, records, review UI, scan hooks and preparation cache             |
 | `src/App/Workspace/Workbenches/Graph/`                         | Graph surface, side panels, filters, transaction flow and metadata projection     |
 | `src/App/Workspace/Workbenches/Graph/Renderer/`                | Renderer-neutral contract, Three.js renderer, layout worker and picking           |
 | `src/App/Workspace/Workbenches/Graph/ConnectionScan/`          | Connection panel, worker bridge and bounded scan fetching                         |
 | `src/App/Workspace/Workbenches/Analysis/`                      | Analysis controls and reports                                                     |
 | `src/App/Controls/`                                            | Reused App-owned controls, evidence display and metadata editors                  |
-| `src/Domain/Workspace/`                                        | Persisted workspace contracts, schemas, limits and migrations                     |
 | `src/Domain/Chain/`, `Wallet/`, `Metadata/`                    | Chain contracts, watch-only key derivation and canonical entity references        |
 | `src/Infra/Bitcoin/`                                           | Typed HTTP calls, ancestry/spending requests and prioritized fetch coordination   |
-| `src/Infra/Storage/`                                           | Authenticated envelopes, encryption worker, compression and browser persistence   |
+| `src/Infra/Browser/`                                           | Generic browser mechanisms not owned by workspace persistence                     |
 | `server/app.ts`, `rpc-schema.ts`                               | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist |
 | `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`       | Upstream adapters, chain identity, network configuration and concurrency          |
 
 ## Browser-owned state
+
+The canonical decrypted `Workspace` model and its creation factory live at the
+Workspace root, not inside persistence. `WorkspaceStore` consumes the narrow
+`WorkspacePersistence` port that it owns. `BrowserWorkspacePersistence`
+implements that port, and `App/createWorkspaceStore.ts` is the composition root
+that connects them. The store therefore has no dependency on browser storage,
+encryption or file-format implementations. Persistence may depend inward on the
+Workspace model and concept-owned validation, but it cannot import React views,
+workbenches or the concrete store.
 
 ### Sessions, undo and autosave
 
@@ -76,7 +88,7 @@ both stacks so an undo cannot discard downloaded data; presentation writes
 
 ### Encrypted envelope and storage
 
-`src/Infra/Storage/crypto.ts` fixes AES-256-GCM with PBKDF2-SHA256 at 600,000 iterations,
+`src/App/Workspace/Persistence/Encryption/encryptedEnvelope.ts` fixes AES-256-GCM with PBKDF2-SHA256 at 600,000 iterations,
 a fresh 16-byte salt and 12-byte IV per encryption. Imports cannot request
 different KDF work. The envelope's own `version` describes encryption and
 compression and is independent of the workspace schema version:

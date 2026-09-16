@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import { short } from '../../../../Controls/Display/referenceFormat';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
-import type { WorkspaceTag } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Workspace } from '../../../workspace';
+import type { WorkspaceTag } from '../../../Annotations/workspaceTags';
 import { isCompletedReview, type WalletReviewItem } from '../../../Wallet/walletReview';
 import {
   buildWalletReviewContext,
@@ -22,7 +22,7 @@ import {
   type WalletReviewFlowEntry,
 } from '../walletReviewContext';
 import { walletRowFinding, walletRowRelationship, type WalletRow } from '../walletRows';
-import { useTransactionFetch } from '../../../ChainData/TransactionFetch';
+import { useTransactionFetch } from '../../../Evidence/Transactions';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';

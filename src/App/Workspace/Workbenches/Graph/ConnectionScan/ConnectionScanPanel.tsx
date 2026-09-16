@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { short } from '../../../../Controls/Display/referenceFormat';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import {
   DEFAULT_SCAN_SETTINGS,
   SCAN_LIMITS,

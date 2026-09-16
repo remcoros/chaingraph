@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { buildWalletReviewContext, orderWalletContextTransactions } from './walletReviewContext';
 import { matchRelatedEntities } from './walletRelatedSelection';
 import { buildWalletReview, type WalletReviewItem } from '../../Wallet/walletReview';
-import { newWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
 import { outputNodeId } from '../../../../Domain/Metadata/entityReferences';
 import type { Transaction } from '../../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -62,7 +62,7 @@ const shared: Transaction = {
 };
 function fixture(): Workspace {
   return {
-    ...newWorkspace('Public review fixture', 'mainnet'),
+    ...createWorkspace('Public review fixture', 'mainnet'),
     wallets: [wallet],
     transactions: { [parent.txid]: parent, [shared.txid]: shared },
   };

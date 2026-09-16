@@ -10,10 +10,9 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     switchWorkbench,
     setNotice,
     setNoticeSequence,
-    operationRef,
+    operation: workspaceOperation,
     annotations,
     selectedTransaction: tx,
-    operationStatus: operation,
     canTraceAncestry,
     chainDataDisabledReason,
     entityRemoval,
@@ -22,6 +21,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     dialogs,
     tour,
   } = workspace;
+  const operation = workspaceOperation.status;
   const {
     setMobilePanel,
     setPanels,
@@ -39,9 +39,11 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
     select,
   } = workspace.selection;
   const { selected, walletMatches, graph } = workspace.graph.projection;
-  const { addressBalance, expand, getTransaction, mergeTransactions, run, refreshAddressBalance } =
-    workspace.evidence;
-  const { revealGraphNodes, centerNode, setEntityHidden, updateFilters } = workspace.graph.actions;
+  const { balance: addressBalance } = workspace.graph.address;
+  const { refreshBalance: refreshAddressBalance } = workspace.graph.address.actions;
+  const { expand } = workspace.graph.navigation;
+  const { revealGraphNodes, centerNode, setEntityHidden, updateFilters, refreshTransaction } =
+    workspace.graph.actions;
   const { showWalletActivity } = workspace.wallet.actions;
 
   if (!activeWorkspace) return null;
@@ -85,7 +87,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       }}
       onSelectWallet={(id) => {
         invalidateSelection();
-        operationRef.current?.abort();
+        workspaceOperation.cancel();
         setSelectedWallet(id);
         setSelectedId(undefined);
         setPanels((current) => ({
@@ -132,13 +134,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       onSetHidden={setEntityHidden}
       annotationKey={`${activeWorkspace.id}:${selected.id}`}
       onExpand={(direction) => void expand(direction)}
-      onRefresh={() =>
-        void run(async (signal) => {
-          const transaction = await getTransaction(selected.txid!, signal);
-          signal.throwIfAborted();
-          mergeTransactions(activeWorkspace.id, [transaction]);
-        })
-      }
+      onRefresh={() => refreshTransaction(selected.txid)}
       onRefreshAddressBalance={refreshAddressBalance}
       canRemove={!!entityRemoval.selectedPlan}
       onRemove={() => entityRemoval.request()}

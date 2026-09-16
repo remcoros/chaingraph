@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import {
   applyBatchIcon,
   applyBatchLabel,
@@ -9,8 +9,8 @@ import {
 } from './batchEdits';
 import { outputNodeId, txNodeId } from '../../../Domain/Metadata/entityReferences';
 import type { Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
-import { WorkspaceStore } from '../useWorkspaces';
+import type { Workspace } from '../workspace';
+import { createBrowserWorkspaceStore, type WorkspaceStore } from '../../createWorkspaceStore';
 
 const a = 'a'.repeat(64),
   b = 'b'.repeat(64);
@@ -30,7 +30,7 @@ const first = outputNodeId(a, 0),
   third = outputNodeId(a, 2);
 
 function workspace(): Workspace {
-  const w = newWorkspace('Batch fixture', 'mainnet');
+  const w = createWorkspace('Batch fixture', 'mainnet');
   w.transactions = { [a]: structuredClone(funding), [b]: structuredClone(spending) };
   w.annotations = {
     [first]: { label: 'Salary', note: 'January invoice', icon: '★', bookmarked: true },
@@ -173,7 +173,7 @@ describe('strict batch boundaries', () => {
 
 describe('batch undo ownership', () => {
   const session = () => {
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: { getItem: () => null, setItem: () => {} },
     });
     const data = workspace();

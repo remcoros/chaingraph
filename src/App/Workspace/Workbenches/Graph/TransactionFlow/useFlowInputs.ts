@@ -1,14 +1,20 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flowInputPlan, shouldLoadFlowInputs, type FlowPlanWorkspace } from './flowInputPlan';
-import { mergeFlowInputs } from '../../../ChainData/flowInputs';
+import { mergeFlowInputs, type FlowInputTarget } from '../../../Evidence/InputContext';
 import type { GraphNode } from '../../../GraphState/types';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { indexPreviousOutputs } from '../../../../../Domain/Chain/prevouts';
 import { indexLoadedSpends } from './transactionFlow';
 import { mapLimit } from '../../../../../Infra/Bitcoin/api';
+
+function flowInputTarget(selected: GraphNode | undefined): FlowInputTarget | undefined {
+  return selected?.kind === 'output' && selected.txid && selected.vout !== undefined
+    ? { txid: selected.txid, vout: selected.vout }
+    : undefined;
+}
 
 /** Default navigation resolves only the selected outpoint. Bulk input details are explicit. */
 export function useFlowInputs(options: {
@@ -84,7 +90,7 @@ export function useFlowInputs(options: {
     const { transactionId, missing } = activePlan;
     update(
       workspace.id,
-      (current) => mergeFlowInputs(current, transactionId, selected, [], allInputs),
+      (current) => mergeFlowInputs(current, transactionId, flowInputTarget(selected), [], allInputs),
       false,
     );
     if (!missing.length) return;
@@ -136,7 +142,8 @@ export function useFlowInputs(options: {
       if (loaded.length)
         update(
           workspace.id,
-          (current) => mergeFlowInputs(current, transactionId, selected, loaded, allInputs),
+          (current) =>
+            mergeFlowInputs(current, transactionId, flowInputTarget(selected), loaded, allInputs),
           false,
         );
       setState({

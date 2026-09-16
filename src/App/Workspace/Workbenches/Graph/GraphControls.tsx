@@ -1,7 +1,7 @@
 import { SmallAmountControl } from './SmallAmountControl';
 import { Layers, Maximize2, Minimize2, Smile, Sparkles, Tags, Type } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 export function GraphControls({
   view,
   onChange,

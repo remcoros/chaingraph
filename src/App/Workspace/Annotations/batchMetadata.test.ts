@@ -10,8 +10,9 @@ import {
   planBatchLabel,
   planBatchTag,
 } from './batchMetadata';
-import { newWorkspace, parseWorkspace } from '../../../Domain/Workspace/workspace';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import { createWorkspace } from '../createWorkspace';
+import { parseWorkspace } from '../Persistence/Format';
+import type { Workspace } from '../workspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const OUT_A = `out:${id(1)}:0`;
@@ -21,7 +22,7 @@ const ADDRESS = bitcoinAddress.toBech32(new Uint8Array(20).fill(3), 0, 'bc');
 
 function fixture(): Workspace {
   return {
-    ...newWorkspace('Batch fixture', 'mainnet'),
+    ...createWorkspace('Batch fixture', 'mainnet'),
     annotations: {
       [OUT_A]: { label: 'Kept label', note: 'A note', icon: '★', bookmarked: true },
     },

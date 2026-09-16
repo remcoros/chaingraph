@@ -108,12 +108,17 @@ tag workflow.
 ## Layer boundaries
 
 `npm run lint` (part of `npm run check`) enforces the dependency direction as
-well as style. `Domain` may not import `App`, `Infra` or `Shared`; `Infra` and
-`Shared` may not import `App`; workspace-scope code under `ChainData` and
-`Selection` may not import a workbench; and Wallet and Analysis reach Graph only
-through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`. Import
-cycles are rejected everywhere, with no exceptions. Prefer a declared contract,
-or move what both sides need into a module below them, over reintroducing one.
+well as style. `Domain` and `Infra` may not import `App`. Workspace persistence
+lives under `App/Workspace/Persistence`: it may depend on the canonical Workspace
+model and the store-owned persistence port, but never React views, workbenches or
+the concrete session store. The session store may depend on that port and other
+Workspace-owned concepts, never persistence adapters or workbench implementations.
+Workspace-scope code under `Evidence`, `Selection` and `Wallet/WalletUtxos` may not
+import a workbench. Graph-owned address evidence, lookup and expansion live with the
+Graph workbench. Wallet and Analysis reach Graph only through the `GraphHandoff`
+contract in `Workbenches/workbenchHandoff.ts`. Import cycles are rejected everywhere,
+with no exceptions. Prefer a declared contract, or move what both sides need into a
+module below them, over reintroducing one.
 
 ## Portable content
 

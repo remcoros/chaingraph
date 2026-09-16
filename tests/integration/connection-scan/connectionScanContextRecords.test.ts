@@ -1,7 +1,7 @@
 import {
   validateAndEncryptWorkspace,
   decryptAndValidateWorkspace,
-} from '../../../src/Infra/Storage/workspaceEncryption';
+} from '../../../src/App/Workspace/Persistence/Encryption/workspaceEncryption';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
@@ -17,8 +17,9 @@ import {
   prepareScanPath,
   replaceScanRun,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
-import { scanResultEvidenceIds } from '../../../src/Domain/Workspace/connectionScanStorage';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { scanResultEvidenceIds } from '../../../src/App/Workspace/ConnectionScan/records';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -32,7 +33,7 @@ const transaction = (n: number, parents: number[] = []): Transaction => ({
   vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: { hex: '51' } })),
 });
 function fixture() {
-  const workspace = newWorkspace('Public cycle fixture', 'mainnet');
+  const workspace = createWorkspace('Public cycle fixture', 'mainnet');
   workspace.transactions = { [id(3)]: transaction(3, [4, 5]) };
   workspace.view.graphNodeIds = [tx(3)];
   const result: ScanResult = {

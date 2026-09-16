@@ -7,13 +7,13 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
 import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import {
   listWalletTransactions,
   verifyWalletUtxo,
   type WalletUtxoRecord,
 } from '../../../Wallet/walletRecords';
-import type { WalletUtxoController } from '../../../ChainData/WalletUtxos';
+import type { WalletUtxoController } from '../../../Wallet/WalletUtxos';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './wallet-records.css';
 

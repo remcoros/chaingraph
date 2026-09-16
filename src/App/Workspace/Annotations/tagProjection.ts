@@ -2,11 +2,11 @@ import { TAG_COLORS } from '../../Controls/Metadata/tagColors';
 import { addressToScriptHash } from '../../../Domain/Wallet/wallet';
 import { canonicalAddress, canonicalEntityNodeId } from '../../../Domain/Metadata/entityReferences';
 import type { GraphData, GraphNode } from '../GraphState/types';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
-import type { WorkspaceTag } from '../../../Domain/Workspace/annotationTypes';
+import type { Workspace } from '../workspace';
+import type { WorkspaceTag } from './workspaceTags';
 import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
 import { indexPreviousOutputs, outputScriptHash } from '../../../Domain/Chain/prevouts';
-import { assertTagBudget } from '../../../Domain/Workspace/tagStorage';
+import { assertTagBudget } from './workspaceTags';
 
 /** Kept as a named tag boundary for existing callers. */
 export const canonicalTagNodeId = canonicalEntityNodeId;

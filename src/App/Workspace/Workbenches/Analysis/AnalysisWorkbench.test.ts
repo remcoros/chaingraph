@@ -3,11 +3,12 @@ import { expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { analysisTools } from '../../Analysis/analysis';
-import { newWorkspace, parseWorkspace } from '../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../createWorkspace';
+import { parseWorkspace } from '../../Persistence/Format';
 import { AnalysisWorkbenchView } from './AnalysisWorkbench';
 
 function feeExample() {
-  const w = newWorkspace('Public fee example', 'mainnet');
+  const w = createWorkspace('Public fee example', 'mainnet');
   const txid = 'a'.repeat(64);
   w.transactions[txid] = {
     txid,

@@ -1,9 +1,9 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { outputNodeId } from '../../../../Domain/Metadata/entityReferences';
-import type { AnalysisFinding } from '../../../../Domain/Workspace/analysisFinding';
+import type { AnalysisFinding } from '../analysisFinding';
 import type { Transaction, TxOutput } from '../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../workspace';
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,

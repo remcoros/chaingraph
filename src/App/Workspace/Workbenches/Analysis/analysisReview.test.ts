@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { analysisTools } from '../../Analysis/analysis';
 import { filterAnalysisFindings, findingReview, reviewPriorities } from './analysisReview';
-import { newWorkspace, parseWorkspace } from '../../../../Domain/Workspace/workspace';
-import type { AnalysisFinding } from '../../../../Domain/Workspace/analysisFinding';
+import { createWorkspace } from '../../createWorkspace';
+import { parseWorkspace } from '../../Persistence/Format';
+import type { AnalysisFinding } from '../../Analysis/analysisFinding';
 import type { Transaction } from '../../../../Domain/Chain/transaction';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const finding = (
@@ -23,7 +24,7 @@ const finding = (
 
 describe('Analysis review priority and faceted results', () => {
   it('uses a calculated per-finding fee threshold, not an algorithm-wide priority', () => {
-    const w = newWorkspace('Fixture', 'mainnet');
+    const w = createWorkspace('Fixture', 'mainnet');
     const transaction = (n: number, value: number): Transaction => ({
       txid: id(n),
       vin: [

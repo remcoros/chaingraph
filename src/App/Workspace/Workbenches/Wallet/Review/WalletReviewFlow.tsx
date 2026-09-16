@@ -11,9 +11,9 @@ import {
   TriangleAlert,
   FileCode,
 } from 'lucide-react';
-import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Annotation } from '../../../Annotations/annotation';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import { listTagsForNode } from '../../../Annotations/tagProjection';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from './walletFlowVisibility';

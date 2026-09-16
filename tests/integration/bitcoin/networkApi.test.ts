@@ -6,7 +6,7 @@ import {
   loadSpending,
   rpc,
 } from '../../../src/Infra/Bitcoin/api';
-import { newWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
 import type { Network } from '../../../src/Domain/Chain/network';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
 
@@ -201,7 +201,7 @@ describe('explicit Bitcoin network transport', () => {
     );
     const funding = transaction(id(1));
     const scan = (network: Network) => {
-      const workspace = newWorkspace(`Public ${network} fixture`, network);
+      const workspace = createWorkspace(`Public ${network} fixture`, network);
       workspace.transactions[funding.txid] = funding;
       return loadSpending(funding, workspace, 0);
     };

@@ -9,7 +9,7 @@ src/
   App/
     App.tsx                 app shell, home and dialogs
     useAppState.ts          workspace store, navigation and feedback
-    Dialogs/                public dialog module and private dialog components
+    Dialogs/                generic modal shell
     FrontPage/              saved workspace list (WorkspaceHome)
     Examples/               example picker and creation worker
     Help/                   help menu, about dialog, guided tour and its Workspace adapter
@@ -18,29 +18,41 @@ src/
       Display/              amounts, identifiers, timestamps and evidence help
       Metadata/             annotation, icon and metadata editors
     Workspace/
+      workspace.ts          canonical decrypted Workspace model
+      createWorkspace.ts    new-workspace factory, independent of persistence
       Workspace.tsx         toolbar, workbenches and shared status surfaces
       useWorkspace.tsx      shared state, selection and workbench coordination
-      useWorkspaces.ts      saved and unlocked workspaces, undo/redo, autosave, locking
       WorkspaceToolbar.tsx  workbench navigation, lookup and workspace actions
       WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
-      ChainData/            bounded evidence loading, spending notices and cancellation
-        TransactionFetch.tsx session-scoped transaction fetch context and provider
+      Dialogs/              create, import, unlock and workspace-details dialogs
+      Store/                sessions, undo/redo, autosave and persistence port
+        WorkspaceStore.ts   framework-independent unlocked-session lifecycle
+        useWorkspaces.ts    React subscription and autosave timer
+        WorkspacePersistence.ts adapter contract consumed by WorkspaceStore
+      Persistence/          encrypted Workspace save/load capability
+        Format/             schema validation, migrations and format entry point
+        Encryption/         authenticated envelope, compression and worker client
+        Browser/            public index, IndexedDB blobs and cross-tab publication
+      Evidence/             shared transaction and input-context evidence
+        Transactions/       transaction fetch context, caching and observation merge
+        InputContext/       partial-input evidence and undo preservation
+      useWorkspaceOperation.ts cancellable workspace operation lifecycle and feedback
+      Wallet/
         WalletUtxos/        transient wallet UTXO loading shared by Wallet and Graph Inspector
           index.ts           public UTXO controller and view contract
           useWalletUtxos.ts  scoped UTXO lifecycle, cancellation and pagination state
           fetchWalletUtxos.ts bounded Electrum listunspent requests
       useEntityRemoval.ts   removal plans, confirmation and applied removals
-      useWorkspaceLookup.ts lookup field, reset signal and loaded-id resolution
       useWorkspaceHistory.ts undo, redo and single-step batch edits
       useDialogState.ts     which workspace dialog is open and its target
 
-      LookupForm.tsx        Workspace toolbar lookup form
       Analysis/             analysis registry, tools, scans and bounded recovery
       Annotations/          labels, tags and metadata mutations
       Selection/            shared selection, connection-scan targets and visibility
       ConnectionScan/       scan-node vocabulary shared by Selection and Graph
       GraphState/           graph evidence, membership and manual visibility
-      Wallet/               wallet evidence, records, relationships and review model
+      Wallet/               wallet evidence, records, relationships, preparation and review model
+        Dialogs/            add-wallet and wallet-name dialogs
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
         Wallet/             wallet overview, scan and preparation state
@@ -54,6 +66,8 @@ src/
           GraphWorkbench.tsx graph canvas, navigation and panel composition
           useGraphCanvas.ts  camera, fit and saved-view writes
           useGraphPanels.ts  which panels and tabs the workbench shows
+          Address/          address projection, evidence loading and Graph actions
+          Navigation/       lookup form/state/resolution and graph expansion
           TagsPanel/        graph tag manager and selected-node tag UI
             index.ts         narrow tag-panel public entry
             TagsPanel.tsx    tag manager and selected tag controls
@@ -88,10 +102,9 @@ src/
     Chain/                  network, transaction and observed prevout contracts
     Wallet/                 watch-only key derivation and persisted wallet contracts
     Metadata/               canonical entity references
-    Workspace/              persisted contracts, schemas, limits and migrations
   Infra/
     Bitcoin/                HTTP API, scheduling, ancestry and UTXO requests
-    Storage/                encryption worker, compression and envelope storage
+    Browser/                generic browser mechanisms such as file downloads
 server/                     bounded read-only Core/Electrum proxy
 tests/
   integration/             tests that intentionally cross module or layer boundaries
@@ -104,16 +117,16 @@ scripts/                    development, validation and release tooling
 
 | Task                                   | Start here                                                                            | Test location                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs/`                                     | Dialog tests beside their owners; cross-storage cases in `tests/integration/workspace/`        |
-| Autosave, lock or undo                 | `App/Workspace/useWorkspaces.ts`, `Infra/Storage/`                                    | Colocated unit tests and `tests/integration/workspace/`                                        |
+| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Workspace/Dialogs/`                           | Dialog tests beside their owners; cross-storage cases in `tests/integration/workspace/`        |
+| Autosave, lock or undo                 | `App/Workspace/Store/`, `App/Workspace/Persistence/Browser/`                          | Colocated unit tests and `tests/integration/workspace/`                                        |
 | Wallet review or records               | `App/Workspace/Wallet/`, `Workbenches/Wallet/`, `Graph/InspectorPanel/`               | Colocated Wallet tests and `tests/integration/wallet/`                                         |
-| Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `App/Workspace/ChainData/`        | Tests beside those modules; mixed cases in `tests/integration/chain/`                          |
+| Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `Graph/Address/`                  | Tests beside those modules                                                                     |
 | Canvas rendering or layout             | `App/Workspace/Workbenches/Graph/Renderer/`                                           | Colocated renderer tests                                                                       |
 | Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/GraphState/`, `Selection/` | Tests beside those modules; persistence cases under `tests/integration/graph/` or `workspace/` |
 | Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `App/Workspace/ConnectionScan/`    | Colocated algorithm tests and `tests/integration/connection-scan/`                             |
 | Analysis tools or reports              | `App/Workspace/Analysis/`, `App/Workspace/Workbenches/Analysis/`                      | Colocated analysis and workbench tests                                                         |
 | Labels, tags or icons                  | `App/Workspace/Annotations/`, `App/Controls/Metadata/`, `Graph/TagsPanel/`            | Colocated annotation tests and `tests/integration/workspace/tags.test.ts`                      |
-| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/ChainData/TransactionFetch.tsx`                      | Colocated scheduler tests and `tests/integration/bitcoin/`                                     |
+| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/Evidence/Transactions/`, `useWorkspaceOperation.ts`  | Colocated scheduler/operation tests and `tests/integration/bitcoin/`                           |
 
 Paths in the task table are relative to `src/`. Focused tests live beside their
 production owner as `*.test.ts` or `*.test.tsx`. Cross-module tests live under
@@ -123,10 +136,10 @@ live beside the server modules. Test commands are in
 
 ## Workspace vocabulary
 
-`useWorkspaces` owns two collections: `saved`, the encrypted workspaces at rest
-whose names are deliberately public, and `unlocked`, the decrypted ones in memory
-with their password, undo stack and autosave tracking. One unlocked workspace is
-active at a time.
+`WorkspaceStore` owns two collections: `saved`, the public metadata for encrypted
+workspaces at rest, and `unlocked`, the decrypted ones in memory with their
+password, undo stack and autosave tracking. `useWorkspaces` subscribes React to
+that store. One unlocked workspace is active at a time.
 
 | Name                | Means                                                    |
 | ------------------- | -------------------------------------------------------- |
@@ -144,12 +157,12 @@ presentation-only, and can group rapid edits under one description.
 Four separate features once shared the word "scan". Each keeps its own words, and
 names stay unambiguous at the scope where they are exposed:
 
-| Feature          | Means                                                                         | Entry point                             | Owner                                   |
-| ---------------- | ----------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------- |
-| Wallet discovery | Derive branches and pull their history. "Scan wallet" or "Refresh" in the UI. | `walletDiscovery` (`useWalletActivity`) | `Domain/Wallet/wallet.ts`, `ChainData/` |
-| Wallet analysis  | Run the analysis tools over a wallet scope. "Analyze" in the UI.              | `useWalletAnalysis`                     | `App/Workspace/Analysis/`               |
-| Wallet review    | The queue of sources, destinations and activity to label.                     | `walletActions`, review panels          | `App/Workspace/Wallet/`                 |
-| Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | Graph `ConnectionScan/`                 |
+| Feature          | Means                                                                         | Entry point                             | Owner                                            |
+| ---------------- | ----------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------ |
+| Wallet discovery | Derive branches and pull their history. "Scan wallet" or "Refresh" in the UI. | `walletDiscovery` (`useWalletActivity`) | `Domain/Wallet/wallet.ts`, `Workbenches/Wallet/` |
+| Wallet analysis  | Run the analysis tools over a wallet scope. "Analyze" in the UI.              | `useWalletAnalysis`                     | `App/Workspace/Analysis/`                        |
+| Wallet review    | The queue of sources, destinations and activity to label.                     | `walletActions`, review panels          | `App/Workspace/Wallet/`                          |
+| Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | Graph `ConnectionScan/`                          |
 
 Wallet analysis and the Analysis workbench are the same feature reached from two
 places, so they share `AnalysisScan` and write one `findings` store. Wallet
@@ -171,9 +184,9 @@ Workspace consumes the app services it needs.
 `Workspace/useWorkspace.tsx` composes the concepts a workspace needs and owns
 only the small core: the active workspace, editing it, notices and workbench
 switching. Each concept lives in its product area, so the controller reads as a
-map of them: `graph` (projection, canvas, panels, filters, actions, flow inputs,
-scan targets), `wallet`, `analysis`, plus the shared `selection`, `annotations`,
-`evidence`, `history`, `lookup` and `dialogs`.
+map of them: `graph` (projection, canvas, panels, filters, actions, address,
+navigation, lookup, flow inputs and scan targets), `wallet`, `analysis`, plus the
+shared `selection`, `annotations`, `history` and `dialogs`.
 
 Workspace navigation owns direct switches, contextual handoffs and their single
 transient return point. A destination workbench owns how semantic entry focus is
@@ -181,17 +194,21 @@ resolved inside its UI; Workspace does not query another workbench's DOM.
 
 Panel state belongs to the workbench that shows it. Graph owns its tabs, and
 other workbenches reach them through `GraphHandoff` rather than writing them, so
-a wallet record opening in the inspector is a handoff rather than a tab write. Workbench implementation modules do not import sibling workbenches; shared transient UTXO observations live in `ChainData/WalletUtxos/`. Workbench action modules implement Graph, Wallet
-and Analysis behavior over that state. Wallet and Analysis reach Graph only
-through the `GraphHandoff` contract in `Workbenches/workbenchHandoff.ts`, never
-through Graph's own modules. Each workbench file binds the controller to its own
-view, which keeps a props-driven contract that tests render directly. Owned panels receive the Workspace
+a wallet record opening in the inspector is a handoff rather than a tab write.
+Workbench implementation modules do not import sibling workbenches. Shared
+transient UTXO observations live in `Wallet/WalletUtxos/`. Workbench action
+modules implement Graph, Wallet and Analysis behavior over that state. Wallet and
+Analysis reach Graph only through the `GraphHandoff` contract in
+`Workbenches/workbenchHandoff.ts`, never through Graph's own modules. Each
+workbench file binds the controller to its own view, which keeps a props-driven
+contract that tests render directly. Owned panels receive the Workspace
 controller; reusable controls keep focused props. Workspace dialog and tour
 components bind that controller to their UI without owning another copy of state.
-Chain evidence lives at Workspace scope under `ChainData/`, split into fetching,
-the selected address's record and graph expansion. The flow-input hooks stay with
-the workbench that shows them, under `Graph/TransactionFlow/` and
-`Wallet/Review/`, and `useWorkspace` aggregates what other areas need. The dialog
-module exports modal and focus helpers used by other areas. Graph filter controls
-are also used by the entity browser, and `MultiSelectFilter` is shared by Wallet
-and Analysis.
+Shared transaction and input-context evidence lives under `Evidence/`. Graph owns
+address history loading and projection under `Graph/Address/`, and lookup plus
+funding/spending expansion under `Graph/Navigation/`. The flow-input hooks stay
+with the workbench that shows them, under `Graph/TransactionFlow/` and
+`Wallet/Review/`, and `useWorkspace` composes their explicit interfaces. The
+dialog module exports modal and focus helpers used by other areas. Graph filter
+controls are also used by the entity browser, and `MultiSelectFilter` is shared by
+Wallet and Analysis.

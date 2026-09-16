@@ -9,7 +9,8 @@ import {
   replaceScanRun,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
@@ -237,7 +238,7 @@ describe('shared ancestry between the inputs of a five-input, five-output transa
   });
 
   it('fetches missing ancestry and retains verified input paths for exact graph acceptance', async () => {
-    const workspace = newWorkspace('Public five-input scan fixture', 'testnet4');
+    const workspace = createWorkspace('Public five-input scan fixture', 'testnet4');
     workspace.transactions = { [id(spending)]: pool[id(spending)]! };
     workspace.view.graphNodeIds = [...displayed];
     const sourceIndex = 4;

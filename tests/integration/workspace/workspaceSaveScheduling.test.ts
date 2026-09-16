@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
-import { decryptWorkspace, encryptWorkspace } from '../../../src/Infra/Storage/crypto';
-import { WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import {
+  decryptWorkspace,
+  encryptWorkspace,
+} from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import { createBrowserWorkspaceStore } from '../../../src/App/createWorkspaceStore';
 import {
   DEFAULT_SCAN_SETTINGS,
   type ScanRun,
@@ -17,7 +21,7 @@ import type { Transaction } from '../../../src/Domain/Chain/transaction';
 const password = 'public scheduling fixture password';
 function fixture(encrypt?: typeof encryptWorkspace) {
   let raw: string | null = null;
-  const store = new WorkspaceStore({
+  const store = createBrowserWorkspaceStore({
     storage: {
       getItem: () => raw,
       setItem: (_key, value) => {
@@ -26,7 +30,7 @@ function fixture(encrypt?: typeof encryptWorkspace) {
     },
     encrypt,
   });
-  const workspace = newWorkspace('Gesture fixture', 'mainnet');
+  const workspace = createWorkspace('Gesture fixture', 'mainnet');
   store.open(workspace, password);
   return { store, id: workspace.id, raw: () => raw };
 }
@@ -113,7 +117,7 @@ describe('encrypted save scheduling around graph interaction', () => {
     const result = await store.exportEncrypted(id);
     expect(result.name).toBe('Latest export');
     expect(old.data.view.glow).not.toBe(false);
-    expect(await decryptWorkspace(result.envelope, password)).toMatchObject({
+    expect(await decryptWorkspace(JSON.parse(result.contents), password)).toMatchObject({
       name: 'Latest export',
       view: { glow: false },
     });

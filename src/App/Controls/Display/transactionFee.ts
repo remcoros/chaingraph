@@ -1,7 +1,7 @@
 import { indexPreviousOutputs, resolvePreviousOutput } from '../../../Domain/Chain/prevouts';
 import { transactionStatus } from './transactionStatus';
 import { sats, type Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../Workspace/workspace';
 
 export interface TransactionFee {
   feeSats: number;

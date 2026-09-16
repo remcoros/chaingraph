@@ -1,14 +1,14 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Wallet } from '../../src/Domain/Wallet/walletTypes';
-import type { Workspace } from '../../src/Domain/Workspace/workspaceTypes';
-import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import type { Workspace } from '../../src/App/Workspace/workspace';
+import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
 import { deriveAddresses } from '../../src/Domain/Wallet/wallet';
 import { PUBLIC_ZPUB } from './bitcoin';
 
 /** Synthetic loaded history using the public CC0 BIP84 account fixture. */
 export function largeWalletFixture(addressCount = 600, transactionsPerAddress = 3): Workspace {
-  const workspace = newWorkspace('Public large-wallet performance fixture', 'mainnet');
+  const workspace = createWorkspace('Public large-wallet performance fixture', 'mainnet');
   const addresses = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, addressCount);
   const wallet: Wallet = {
     id: '30000000-0000-4000-8000-000000000003',

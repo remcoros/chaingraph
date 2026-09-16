@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   clearContextProvenance,
   promoteInputContext,
-} from '../../../src/App/Workspace/ChainData/observationContext';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+} from '../../../src/App/Workspace/Evidence/InputContext';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 import { removeWorkspaceEntity } from '../../../src/App/Workspace/entityRemoval';
-import { WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
+import {
+  createBrowserWorkspaceStore,
+  type WorkspaceStore,
+} from '../../../src/App/createWorkspaceStore';
 import { applyWalletScan } from '../../../src/App/Workspace/Wallet/walletActivity';
 
 const parent = 'a'.repeat(64),
   child = 'b'.repeat(64);
 function fixture() {
-  const store = new WorkspaceStore({ storage: { getItem: () => null, setItem: () => {} } });
-  const workspace = newWorkspace('Context Undo fixture', 'mainnet');
+  const store = createBrowserWorkspaceStore({
+    storage: { getItem: () => null, setItem: () => {} },
+  });
+  const workspace = createWorkspace('Context Undo fixture', 'mainnet');
   workspace.transactions = {
     [parent]: {
       txid: parent,

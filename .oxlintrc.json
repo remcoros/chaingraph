@@ -42,7 +42,32 @@
             "patterns": [
               {
                 "group": ["**/App/**", "**/Infra/**"],
-                "message": "Domain holds contracts and pure logic. It must not depend on the app, transport, storage or UI."
+                "message": "Domain holds shared contracts and pure logic. It must not depend on application capabilities, transport, storage or UI."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/App/Workspace/Persistence/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "react",
+                  "react/*",
+                  "react-dom",
+                  "react-dom/*",
+                  "**/Workbenches/**",
+                  "**/Dialogs/**",
+                  "**/Store/WorkspaceStore",
+                  "**/Store/useWorkspaces"
+                ],
+                "message": "Workspace persistence may depend on workspace models and its Store port, never React views, workbenches or the concrete session store."
               }
             ]
           }
@@ -58,7 +83,23 @@
             "patterns": [
               {
                 "group": ["**/App/**"],
-                "message": "Infra carries transport and storage. Depend on Domain only, never on the app or UI."
+                "message": "Infra carries transport and generic mechanisms. Depend on Domain only, never on application capabilities or UI."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/App/Workspace/Store/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/Persistence/**", "**/Workbenches/**"],
+                "message": "The workspace session store depends on the persistence port and Workspace-owned concepts, never a persistence adapter or workbench implementation."
               }
             ]
           }
@@ -149,7 +190,11 @@
       }
     },
     {
-      "files": ["src/App/Workspace/ChainData/**", "src/App/Workspace/Selection/**"],
+      "files": [
+        "src/App/Workspace/Evidence/**",
+        "src/App/Workspace/Selection/**",
+        "src/App/Workspace/Wallet/WalletUtxos/**"
+      ],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",

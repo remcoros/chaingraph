@@ -1,11 +1,10 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
 import type { Transaction } from '../../Domain/Chain/transaction';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from './api';
 
 /** A hidden entity is still a valid trace source; a removed branch is not. */
 export function traceSourceExists(
-  workspace: Pick<Workspace, 'transactions'>,
+  workspace: { transactions: Record<string, Transaction> },
   nodeId: string,
 ): boolean {
   const [kind, txid, index] = nodeId.split(':');

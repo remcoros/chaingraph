@@ -3,7 +3,7 @@ import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { exportLabels, importLabels } from './labels';
 import { isExtendedPublicKey } from '../../../Domain/Wallet/wallet';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 
 // Public BIP32/BIP86 vectors (BSD-2-Clause) and BIP84 vectors (CC0).
 // Sources and attribution: docs/references.md.
@@ -179,7 +179,7 @@ describe('BIP329 label import boundary', () => {
   });
 
   it('round trips exported labels through import without loss', () => {
-    const w = newWorkspace('Round trip', 'mainnet');
+    const w = createWorkspace('Round trip', 'mainnet');
     w.annotations[`tx:${txid}`] = { label: 'Tx label', note: 'note', icon: '★', bookmarked: true };
     w.annotations[`out:${txid}:0`] = {
       label: 'Out label',

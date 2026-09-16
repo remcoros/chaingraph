@@ -1,9 +1,9 @@
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
-import type { GraphFilters } from '../graphViewState';
+import type { Workspace } from '../workspace';
+import type { GraphFilters } from '../GraphState/filters';
 import { addGraphNodes } from '../GraphState/graphMembership';
 import { buildGraph } from '../GraphState/graphEvidence';
 import { outputAddress } from '../../../Domain/Chain/prevouts';
-import { promoteInputContext } from '../ChainData/observationContext';
+import { promoteInputContext } from '../Evidence/InputContext';
 
 /** Resolve exact evidence references before leaving a finding, including input
  * outpoints whose creators are not loaded. Selection can hydrate that one creator

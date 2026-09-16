@@ -1,7 +1,7 @@
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { Wallet } from '../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
-import { clearContextProvenance } from '../ChainData/observationContext';
+import type { Workspace } from '../workspace';
+import { clearContextProvenance } from '../Evidence/InputContext';
 import { mergeTransactionObservations } from '../../../Domain/Chain/prevouts';
 
 /** Immutable wallet evidence used by analyses, excluding refresh/UI bookkeeping. */

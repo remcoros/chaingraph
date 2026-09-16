@@ -11,7 +11,7 @@ import {
 import { walletCheckAge } from '../../Wallet/walletActivity';
 import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
 import type { WalletReviewCoverage } from '../../Wallet/walletReview';
-import type { WalletUtxoView } from '../../ChainData/WalletUtxos';
+import type { WalletUtxoView } from '../../Wallet/WalletUtxos';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import { walletDiscoveryStatus } from './walletDiscoveryStatus';

@@ -2,7 +2,7 @@ import { canonicalAddress, canonicalEntityNodeId } from '../../Domain/Metadata/e
 import { graphRemovalClosure } from './GraphState/graphBranch';
 import { outputNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
 import { short } from '../Controls/Display/referenceFormat';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from './workspace';
 import { buildGraph } from './GraphState/graphEvidence';
 import { outputAddress } from '../../Domain/Chain/prevouts';
 import { buildWalletMatches } from './Annotations/tagProjection';

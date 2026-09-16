@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { SelectedTags } from './';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import { installDomStubs } from '../../../../../../tests/domStubs';
 
 installDomStubs();
@@ -22,7 +22,7 @@ function node(txid: string): GraphNode {
 
 /** Mirrors the inspector: the selection and the workspace can both change under it. */
 function Host({ second }: { second: Workspace }) {
-  const [workspace, setWorkspace] = useState(() => newWorkspace('Tags fixture', 'mainnet'));
+  const [workspace, setWorkspace] = useState(() => createWorkspace('Tags fixture', 'mainnet'));
   const [selected, setSelected] = useState(() => node(A));
   return (
     <>
@@ -46,28 +46,28 @@ const addButton = () => screen.getByLabelText('Add or choose tags');
 
 describe('SelectedTags', () => {
   it('opens its picker when asked', () => {
-    render(<Host second={newWorkspace('Other', 'mainnet')} />);
+    render(<Host second={createWorkspace('Other', 'mainnet')} />);
     expect(addButton().getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(addButton());
     expect(addButton().getAttribute('aria-expanded')).toBe('true');
   });
 
   it('closes the picker when the selection moves to another entity', () => {
-    render(<Host second={newWorkspace('Other', 'mainnet')} />);
+    render(<Host second={createWorkspace('Other', 'mainnet')} />);
     fireEvent.click(addButton());
     fireEvent.click(screen.getByText('select another'));
     expect(addButton().getAttribute('aria-expanded')).toBe('false');
   });
 
   it('closes the picker when another workspace is opened', () => {
-    render(<Host second={newWorkspace('Other', 'mainnet')} />);
+    render(<Host second={createWorkspace('Other', 'mainnet')} />);
     fireEvent.click(addButton());
     fireEvent.click(screen.getByText('open another workspace'));
     expect(addButton().getAttribute('aria-expanded')).toBe('false');
   });
 
   it('leaves the picker open while nothing it depends on changes', () => {
-    render(<Host second={newWorkspace('Other', 'mainnet')} />);
+    render(<Host second={createWorkspace('Other', 'mainnet')} />);
     fireEvent.click(addButton());
     fireEvent.click(addButton());
     fireEvent.click(addButton());

@@ -8,7 +8,8 @@ import {
 } from './connectionScanAddition';
 import { prepareScanPath, replaceScanRun } from './connectionScanRecords';
 import { buildGraph } from '../../../GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
+import { parseWorkspace } from '../../../Persistence/Format';
 import { projectGraphMembership } from '../../../GraphState/graphMembership';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
 
@@ -21,7 +22,7 @@ const transaction = (n: number, parent?: number): Transaction => ({
   vout: [0, 1].map((n) => ({ n, value: 1, scriptPubKey: { hex: '51' } })),
 });
 function fixture() {
-  const workspace = newWorkspace('Public path addition fixture', 'mainnet');
+  const workspace = createWorkspace('Public path addition fixture', 'mainnet');
   workspace.transactions = { [id(3)]: transaction(3, 2) };
   workspace.view.graphNodeIds = [tx(3)];
   const result: ScanResult = {

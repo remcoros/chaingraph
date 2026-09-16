@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Workspace } from '../Domain/Workspace/workspaceTypes';
+import type { Workspace } from './Workspace/workspace';
 import { useBackendNetworks } from './useBackendNetworks';
-import { useWorkspaces, type SavedWorkspace } from './Workspace/useWorkspaces';
+import { useWorkspaces } from './Workspace/Store/useWorkspaces';
+import type { SavedWorkspace } from './Workspace/savedWorkspace';
+import { appServices } from './appServices';
 export function useAppState() {
-  const workspaces = useWorkspaces();
+  const workspaces = useWorkspaces(appServices.workspaceStore);
   const activeWorkspace = workspaces.active?.data;
   const fetchScope = workspaces.active?.fetchScope;
   const getUnlockedWorkspace = workspaces.getUnlocked;

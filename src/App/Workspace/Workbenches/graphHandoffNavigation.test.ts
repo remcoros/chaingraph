@@ -8,16 +8,16 @@ import { analysisTools } from '../Analysis/analysis';
 import { filterGraph } from './Graph/Filters/graphFilters';
 import { projectGraphMembership } from '../GraphState/graphMembership';
 import { flowInputPlan } from './Graph/TransactionFlow/flowInputPlan';
-import { mergeFlowInputs } from '../ChainData/flowInputs';
+import { mergeFlowInputs } from '../Evidence/InputContext';
 import { buildGraph } from '../GraphState/graphEvidence';
-import { newWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
 import { outputNodeId, txNodeId } from '../../../Domain/Metadata/entityReferences';
 
 const parent = '1'.repeat(64);
 const child = '2'.repeat(64);
 const missing = '9'.repeat(64);
 function fixture() {
-  const workspace = newWorkspace('Public handoff fixture', 'mainnet');
+  const workspace = createWorkspace('Public handoff fixture', 'mainnet');
   workspace.transactions = {
     [parent]: {
       txid: parent,
@@ -115,7 +115,7 @@ describe('shared Show and Isolate preparation', () => {
     const selected = shown.nodes.find((node) => node.id === requested)!;
     const plan = flowInputPlan(navigation.workspace, selected);
     expect(plan).toEqual({ transactionId: parent, missing: [missing] });
-    const hydrated = mergeFlowInputs(navigation.workspace, parent, selected, [
+    const hydrated = mergeFlowInputs(navigation.workspace, parent, { txid: missing, vout: 3 }, [
       {
         txid: missing,
         vin: [{ txid: '8'.repeat(64), vout: 0 }],

@@ -3,7 +3,7 @@ import { addressNodeId, outputNodeId, txNodeId } from '../../../Domain/Metadata/
 import { sats } from '../../../Domain/Chain/transaction';
 import { short } from '../../Controls/Display/referenceFormat';
 import type { GraphData, GraphNode } from './types';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../workspace';
 
 /**
  * The evidence a graph is drawn from, and how a transaction's inputs count as

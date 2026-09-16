@@ -13,8 +13,11 @@ import type {
 import type { Network } from '../../Domain/Chain/network';
 import type { Transaction } from '../../Domain/Chain/transaction';
 import type { Wallet } from '../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
-import { parseTransaction, validateTransactionAddresses } from '../../Domain/Workspace/workspace';
+import type { TransactionObservations } from '../../Domain/Chain/prevouts';
+import {
+  parseTransaction,
+  validateTransactionAddresses,
+} from '../../Domain/Chain/transactionValidation';
 import { outputAddress } from '../../Domain/Chain/prevouts';
 import { addressToScriptHash, deriveAddresses } from '../../Domain/Wallet/wallet';
 import { withHistoryHeight } from '../../Domain/Chain/transactionStatus';
@@ -1046,7 +1049,7 @@ export async function fetchIndexedSpenders(
 
 export async function loadSpending(
   tx: Transaction,
-  w: Workspace,
+  w: TransactionObservations,
   vout: number | undefined,
   signal?: AbortSignal,
   offset = 0,

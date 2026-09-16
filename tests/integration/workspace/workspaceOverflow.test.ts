@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { newWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
 import {
   decryptWorkspace,
   encryptWorkspace,
   type EncryptedEnvelope,
-} from '../../../src/Infra/Storage/crypto';
-import type { EnvelopeStorage } from '../../../src/Infra/Storage/envelopeStorage';
-import { INLINE_INDEX_LIMIT, WorkspaceStore } from '../../../src/App/Workspace/useWorkspaces';
+} from '../../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import type { EnvelopeStorage } from '../../../src/App/Workspace/Persistence/Browser/indexedEnvelopeStorage';
+import { createBrowserWorkspaceStore } from '../../../src/App/createWorkspaceStore';
+import { INLINE_INDEX_LIMIT } from '../../../src/App/Workspace/Persistence/Browser/BrowserWorkspacePersistence';
 
 const password = 'overflow storage password';
 function memoryStorage() {
@@ -55,11 +56,11 @@ describe('encrypted workspace overflow storage', () => {
   it('moves a large envelope out of the public index and reloads, edits, locks and deletes it', async () => {
     const local = memoryStorage(),
       blobs = encryptedMemory();
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
-    const workspace = newWorkspace('Large public name', 'mainnet');
+    const workspace = createWorkspace('Large public name', 'mainnet');
     for (let i = 0; i < 120; i++)
       workspace.annotations[`tx:${i.toString(16).padStart(64, '0')}`] = {
         label: '',
@@ -77,7 +78,7 @@ describe('encrypted workspace overflow storage', () => {
     expect(raw).not.toContain('ciphertext');
     expect(raw).not.toContain('private annotation');
     expect(blobs.records.size).toBe(1);
-    const restored = new WorkspaceStore({
+    const restored = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
@@ -98,12 +99,12 @@ describe('encrypted workspace overflow storage', () => {
   it('migrates existing inline saves only after quota pressure, keeping both workspaces readable', async () => {
     const local = memoryStorage(),
       blobs = encryptedMemory();
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
-    const first = newWorkspace('Existing', 'mainnet'),
-      second = newWorkspace('New', 'testnet4');
+    const first = createWorkspace('Existing', 'mainnet'),
+      second = createWorkspace('New', 'testnet4');
     store.open(first, password);
     await store.lock(first.id);
     expect(local.getItem()).toContain('ciphertext');
@@ -111,7 +112,7 @@ describe('encrypted workspace overflow storage', () => {
     store.open(second, password);
     await store.lock(second.id);
     expect(blobs.records.size).toBe(2);
-    const restored = new WorkspaceStore({
+    const restored = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
@@ -127,7 +128,7 @@ describe('encrypted workspace overflow storage', () => {
   it('keeps the old index and unlocked edits if IndexedDB cannot commit', async () => {
     const local = memoryStorage(),
       blobs = encryptedMemory();
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: {
         ...blobs.storage,
@@ -136,7 +137,7 @@ describe('encrypted workspace overflow storage', () => {
         },
       },
     });
-    const workspace = newWorkspace('Retain me', 'mainnet');
+    const workspace = createWorkspace('Retain me', 'mainnet');
     store.open(workspace, password);
     await store.persist(workspace.id);
     const before = local.getItem();
@@ -155,15 +156,15 @@ describe('encrypted workspace overflow storage', () => {
     const local = memoryStorage(),
       blobs = encryptedMemory();
     local.limit(500);
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
-    const workspace = newWorkspace('Existing encrypted copy', 'mainnet');
+    const workspace = createWorkspace('Existing encrypted copy', 'mainnet');
     store.open(workspace, password);
     await store.persist(workspace.id);
     const before = local.getItem(),
-      reference = store.getSnapshot().saved[0].envelopeRef!;
+      reference = JSON.parse(before!)[0].envelopeRef as string;
     local.limit(0);
     store.update(workspace.id, (data) => ({ ...data, name: 'Latest' }));
     await expect(store.lock(workspace.id)).rejects.toThrow('Quota');
@@ -187,7 +188,7 @@ describe('encrypted workspace overflow storage', () => {
       local.limit(500);
       const started = deferred(),
         release = deferred();
-      const first = new WorkspaceStore({
+      const first = createBrowserWorkspaceStore({
         storage: local,
         envelopes: {
           ...blobs.storage,
@@ -198,12 +199,12 @@ describe('encrypted workspace overflow storage', () => {
           },
         },
       });
-      const second = new WorkspaceStore({
+      const second = createBrowserWorkspaceStore({
         storage: local,
         envelopes: blobs.storage,
       });
-      const a = newWorkspace('First', 'mainnet'),
-        b = newWorkspace('Second', 'mainnet');
+      const a = createWorkspace('First', 'mainnet'),
+        b = createWorkspace('Second', 'mainnet');
       first.open(a, password);
       second.open(b, password);
       const pending = first.persist(a.id);
@@ -229,7 +230,7 @@ describe('encrypted workspace overflow storage', () => {
     const started = deferred(),
       release = deferred();
     let first = true;
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: {
         ...blobs.storage,
@@ -243,7 +244,7 @@ describe('encrypted workspace overflow storage', () => {
         },
       },
     });
-    const workspace = newWorkspace('Original', 'mainnet');
+    const workspace = createWorkspace('Original', 'mainnet');
     store.open(workspace, password);
     const saving = store.persist(workspace.id);
     await started.promise;
@@ -266,15 +267,15 @@ describe('encrypted workspace overflow storage', () => {
     const local = memoryStorage(),
       blobs = encryptedMemory();
     local.limit(500);
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
-    const workspace = newWorkspace('Authenticated identity', 'mainnet');
+    const workspace = createWorkspace('Authenticated identity', 'mainnet');
     store.open(workspace, password);
     await store.lock(workspace.id);
     const entry = store.getSnapshot().saved[0],
-      reference = entry.envelopeRef!,
+      reference = JSON.parse(local.getItem()!)[0].envelopeRef as string,
       original = blobs.records.get(reference)!;
     blobs.records.delete(reference);
     await expect(store.unlock(entry, password)).rejects.toThrow('missing or malformed');
@@ -285,7 +286,7 @@ describe('encrypted workspace overflow storage', () => {
     await expect(store.unlock(entry, password)).rejects.toThrow();
     blobs.records.set(
       reference,
-      await encryptWorkspace(newWorkspace('Other workspace', 'mainnet'), password),
+      await encryptWorkspace(createWorkspace('Other workspace', 'mainnet'), password),
     );
     await expect(store.unlock(entry, password)).rejects.toThrow('identity');
     expect(store.getSnapshot().saved).toEqual([entry]);
@@ -296,11 +297,11 @@ describe('encrypted workspace overflow storage', () => {
     const local = memoryStorage(),
       blobs = encryptedMemory();
     local.limit(500);
-    const store = new WorkspaceStore({
+    const store = createBrowserWorkspaceStore({
       storage: local,
       envelopes: blobs.storage,
     });
-    const workspace = newWorkspace('Keep backup', 'mainnet');
+    const workspace = createWorkspace('Keep backup', 'mainnet');
     store.open(workspace, password);
     await store.lock(workspace.id);
     const before = local.getItem();
@@ -318,21 +319,21 @@ describe('encrypted workspace overflow storage', () => {
       const local = memoryStorage(),
         blobs = encryptedMemory();
       local.limit(1000);
-      const seed = new WorkspaceStore({
+      const seed = createBrowserWorkspaceStore({
         storage: local,
         envelopes: blobs.storage,
       });
-      const a = newWorkspace('A original', 'mainnet'),
-        b = newWorkspace('B original', 'mainnet');
+      const a = createWorkspace('A original', 'mainnet'),
+        b = createWorkspace('B original', 'mainnet');
       seed.open(a, password);
       seed.open(b, password);
       await seed.lock(a.id);
       await seed.lock(b.id);
-      const first = new WorkspaceStore({
+      const first = createBrowserWorkspaceStore({
         storage: local,
         envelopes: blobs.storage,
       });
-      const second = new WorkspaceStore({
+      const second = createBrowserWorkspaceStore({
         storage: local,
         envelopes: blobs.storage,
       });
@@ -349,7 +350,7 @@ describe('encrypted workspace overflow storage', () => {
       const results = await Promise.allSettled([first.persist(a.id), second.persist(b.id)]);
       expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
       expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
-      const reloaded = new WorkspaceStore({
+      const reloaded = createBrowserWorkspaceStore({
         storage: local,
         envelopes: blobs.storage,
       });
@@ -367,7 +368,7 @@ describe('encrypted workspace overflow storage', () => {
       const local = memoryStorage(),
         blobs = encryptedMemory();
       local.limit(500);
-      const store = new WorkspaceStore({
+      const store = createBrowserWorkspaceStore({
         storage: local,
         envelopes: {
           ...blobs.storage,
@@ -377,12 +378,12 @@ describe('encrypted workspace overflow storage', () => {
           },
         },
       });
-      const workspace = newWorkspace('Committed despite mutex abort', 'mainnet');
+      const workspace = createWorkspace('Committed despite mutex abort', 'mainnet');
       store.open(workspace, password);
       await store.lock(workspace.id);
       expect(store.getSnapshot().unlocked).toHaveLength(0);
       expect(blobs.records.size).toBe(1);
-      const reloaded = new WorkspaceStore({
+      const reloaded = createBrowserWorkspaceStore({
         storage: local,
         envelopes: blobs.storage,
       });
@@ -397,8 +398,8 @@ describe('encrypted workspace overflow storage', () => {
     vi.stubGlobal('navigator', {});
     try {
       const local = memoryStorage();
-      const store = new WorkspaceStore({ storage: local });
-      const workspace = newWorkspace('Export remains possible', 'mainnet');
+      const store = createBrowserWorkspaceStore({ storage: local });
+      const workspace = createWorkspace('Export remains possible', 'mainnet');
       store.open(workspace, password);
       await expect(store.lock(workspace.id)).rejects.toThrow('cannot coordinate');
       expect(store.getSnapshot().unlocked).toHaveLength(1);
@@ -412,17 +413,17 @@ describe('encrypted workspace overflow storage', () => {
       const local = memoryStorage(),
         blobs = encryptedMemory();
       local.limit(500);
-      const workspace = newWorkspace('Preserve racing unlock', 'mainnet');
-      const seed = new WorkspaceStore({ storage: local, envelopes: blobs.storage });
+      const workspace = createWorkspace('Preserve racing unlock', 'mainnet');
+      const seed = createBrowserWorkspaceStore({ storage: local, envelopes: blobs.storage });
       seed.open(workspace, password);
       await seed.lock(workspace.id);
       const originalIndex = local.getItem(),
-        reference = seed.getSnapshot().saved[0].envelopeRef!;
+        reference = JSON.parse(originalIndex!)[0].envelopeRef as string;
       const decryptStarted = deferred(),
         decryptRelease = deferred();
       const coordinatorStarted = deferred(),
         coordinatorRelease = deferred();
-      const store = new WorkspaceStore({
+      const store = createBrowserWorkspaceStore({
         storage: local,
         decrypt: async (envelope, key) => {
           const data = await decryptWorkspace(envelope, key);
@@ -452,7 +453,7 @@ describe('encrypted workspace overflow storage', () => {
         expect(local.getItem()).toBe(originalIndex);
         expect(blobs.records.has(reference)).toBe(true);
         await store.lock(workspace.id);
-        const restored = new WorkspaceStore({ storage: local, envelopes: blobs.storage });
+        const restored = createBrowserWorkspaceStore({ storage: local, envelopes: blobs.storage });
         await restored.unlock(restored.getSnapshot().saved[0], password);
         expect(restored.getSnapshot().unlocked[0].data.id).toBe(workspace.id);
       } else {

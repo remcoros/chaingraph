@@ -1,8 +1,8 @@
 import type { NodePresentation } from './Renderer/presentation';
 import type { WalletMatch } from '../../Annotations/tagProjection';
 import type { GraphData, GraphNode } from '../../GraphState/types';
-import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
-import type { WorkspaceTag } from '../../../../Domain/Workspace/annotationTypes';
+import type { Workspace } from '../../workspace';
+import type { WorkspaceTag } from '../../Annotations/workspaceTags';
 
 export const EMPTY_GRAPH_ANNOTATIONS: Workspace['annotations'] = {};
 const EMPTY_WALLETS: Workspace['wallets'] = [];

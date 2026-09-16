@@ -3,7 +3,8 @@ import type { Transaction } from '../../../../../Domain/Chain/transaction';
 import type { WalletReviewFlowEntry } from '../walletReviewContext';
 import { indexPreviousOutputs } from '../../../../../Domain/Chain/prevouts';
 import { buildGraph } from '../../../GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
+import { parseWorkspace } from '../../../Persistence/Format';
 import {
   loadWalletFlowInputWave,
   mergeWalletFlowInputs,
@@ -34,7 +35,7 @@ const input = (txid = parent, vout = 0): WalletReviewFlowEntry => ({
   missing: true,
 });
 const fixture = () => {
-  const workspace = newWorkspace('Visible input fixture', 'mainnet');
+  const workspace = createWorkspace('Visible input fixture', 'mainnet');
   workspace.wallets = [
     {
       id: walletId,

@@ -1,6 +1,6 @@
 import { formatBitcoinAmount } from '../../../../Controls/Display/amountFormat';
 import { selectedWalletFilterIds } from './graphFilters';
-import type { GraphFilters } from '../../../graphViewState';
+import type { GraphFilters } from '../../../GraphState/filters';
 import type { GraphNode } from '../../../GraphState/types';
 
 /** Filter dimensions a person can see and remove individually. */

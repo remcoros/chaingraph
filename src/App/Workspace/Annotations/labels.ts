@@ -1,5 +1,5 @@
-import type { Annotation } from '../../../Domain/Workspace/annotationTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Annotation } from './annotation';
+import type { Workspace } from '../workspace';
 import { addressToScriptHash, isExtendedPublicKey } from '../../../Domain/Wallet/wallet';
 import type { Network } from '../../../Domain/Chain/network';
 export function exportLabels(w: Workspace): string {

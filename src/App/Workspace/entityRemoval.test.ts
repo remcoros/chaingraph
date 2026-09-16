@@ -4,12 +4,13 @@ import type { Wallet } from '../../Domain/Wallet/walletTypes';
 import { planEntityRemoval, removeWorkspaceEntity } from './entityRemoval';
 import { addGraphNodes, projectGraphMembership } from './GraphState/graphMembership';
 import { buildGraph } from './GraphState/graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../Domain/Workspace/workspace';
+import { createWorkspace } from './createWorkspace';
+import { parseWorkspace } from './Persistence/Format';
 import {
   promoteInputContext,
   markContextTransactions,
   clearContextProvenance,
-} from './ChainData/observationContext';
+} from './Evidence/InputContext';
 import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
 
 const parent = 'a'.repeat(64),
@@ -17,7 +18,7 @@ const parent = 'a'.repeat(64),
 const address = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa';
 const note = { label: '', note: 'Investigation note', icon: '', bookmarked: false };
 function fixture() {
-  const w = newWorkspace('Removal fixture', 'mainnet');
+  const w = createWorkspace('Removal fixture', 'mainnet');
   w.transactions = {
     [parent]: {
       txid: parent,

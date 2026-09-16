@@ -5,8 +5,8 @@ import {
   createBatchTag as writeNewBatchTag,
 } from './batchEdits';
 import { canonicalTagNodeId } from './tagProjection';
-import type { Annotation } from '../../../Domain/Workspace/annotationTypes';
-import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { Annotation } from './annotation';
+import type { Workspace } from '../workspace';
 
 const EMPTY: Annotation = { label: '', note: '', icon: '', bookmarked: false };
 

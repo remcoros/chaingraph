@@ -10,7 +10,8 @@ import {
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanGroups';
 import { replaceScanRun } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
 import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { newWorkspace, parseWorkspace } from '../../../src/Domain/Workspace/workspace';
+import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;
@@ -24,7 +25,7 @@ const transaction = (n: number, parents: [number, number][] = []): Transaction =
 });
 
 function fixture() {
-  const workspace = newWorkspace('Public scan rerun fixture', 'mainnet');
+  const workspace = createWorkspace('Public scan rerun fixture', 'mainnet');
   workspace.transactions = { [id(1)]: transaction(1) };
   workspace.view.graphNodeIds = [tx(1), tx(3)];
   const result: ScanResult = {

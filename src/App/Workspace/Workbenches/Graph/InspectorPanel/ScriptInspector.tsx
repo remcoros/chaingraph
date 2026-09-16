@@ -3,7 +3,7 @@ import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode } from '../../../GraphState/types';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Workspace } from '../../../workspace';
 import { short } from '../../../../Controls/Display/referenceFormat';
 import { inspectScript, type RawInspection, fetchRawInspection } from './transactionInspection';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';

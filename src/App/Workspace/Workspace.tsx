@@ -10,7 +10,6 @@ import { AnalysisWorkbench } from './Workbenches/Analysis/AnalysisWorkbench';
 
 export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   const {
-    lookup,
     shownWorkbench,
     workbench,
     tour,
@@ -19,9 +18,10 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
     annotations,
     setNotice,
     workspaces,
-    operationStatus: operation,
-    operationRef,
+    operation: workspaceOperation,
   } = workspace;
+  const operation = workspaceOperation.status;
+  const lookup = workspace.graph.lookup;
   const {
     mobile: shownMobilePanel,
     setMobilePanel,
@@ -32,7 +32,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
   const { batch: selection } = workspace.selection;
   const { selectionOnCanvas, matchingScope, graphFiltering, visibleGraph } =
     workspace.graph.projection;
-  const { backgroundAddressHistoryLoad } = workspace.evidence;
+  const { backgroundHistoryLoad: backgroundAddressHistoryLoad } = workspace.graph.address;
   const { setEntityHidden, prepareIsolation, updateFilters } = workspace.graph.actions;
 
   if (!activeWorkspace) return null;
@@ -115,7 +115,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
             <>
               <LoaderCircle className="spin" size={13} />
               {operation}
-              <button onClick={() => operationRef.current?.abort()}>Cancel</button>
+              <button onClick={() => workspaceOperation.cancel()}>Cancel</button>
             </>
           ) : backgroundAddressHistoryLoad ? (
             <>

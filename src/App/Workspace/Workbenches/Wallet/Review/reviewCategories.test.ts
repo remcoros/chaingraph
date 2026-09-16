@@ -8,7 +8,7 @@ import {
   walletReviewCategoryScanState,
 } from './reviewCategories';
 import { REVIEW_REASONS, type WalletReviewItem } from '../../../Wallet/walletReview';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');
@@ -29,7 +29,7 @@ const makeItem = (n: number, overrides: Partial<WalletReviewItem> = {}): WalletR
 
 describe('discoverable wallet finding categories', () => {
   it('never counts wallet matches or unknown ownership as unidentified counterparties', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const items = [
       makeItem(1, {
         reason: 'source-address',
@@ -56,7 +56,7 @@ describe('discoverable wallet finding categories', () => {
   });
 
   it('includes actionable review types and registry tools, not output-only compatibility types', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const catalog = walletReviewCategories(workspace, []);
     expect(catalog.map((category) => category.id)).toEqual([
       ...REVIEW_REASONS.filter(
@@ -89,7 +89,7 @@ describe('discoverable wallet finding categories', () => {
   });
 
   it('counts overlapping missing label, tags and neither before an OR selection', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const items = [makeItem(1), makeItem(2), makeItem(3), makeItem(4)];
     workspace.annotations = {
       [items[0].nodeId]: {
@@ -151,7 +151,7 @@ describe('discoverable wallet finding categories', () => {
   });
 
   it('counts only primary address groups, not earlier receipts, UTXOs, legacy outputs or missing exceptions', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const items = [
       makeItem(1, { reason: 'source', relationshipKinds: ['source'], status: 'unknown' }),
       makeItem(2, { reason: 'funding-source', status: 'reviewed' }),
@@ -200,7 +200,7 @@ describe('discoverable wallet finding categories', () => {
   });
 
   it('uses address metadata independently from all constituent output labels and tags', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const item = makeItem(1, {
       reason: 'source-address',
       ownership: 'external',
@@ -237,7 +237,7 @@ describe('discoverable wallet finding categories', () => {
   });
 
   it('uses effective address tags but does not inherit address labels or tags from a transaction', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const item = makeItem(1, { address });
     workspace.annotations[`addr:${address}`] = {
       label: 'Address label',
@@ -256,7 +256,7 @@ describe('discoverable wallet finding categories', () => {
   });
 
   it('matches exact supported algorithms and does not equate saved findings with a completed scan', () => {
-    const workspace = newWorkspace('Categories', 'mainnet');
+    const workspace = createWorkspace('Categories', 'mainnet');
     const finding = {
       id: 'cioh:fixture',
       algorithm: 'cioh-v2',

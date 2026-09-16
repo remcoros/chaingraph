@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
-import { matchingWalletUtxoObservation } from '../../../ChainData/WalletUtxos/walletUtxoObservation';
+import { matchingWalletUtxoObservation } from '../../../Wallet/WalletUtxos/walletUtxoObservation';
 import { SmallAmountControl } from '../SmallAmountControl';
 import { isSmallAmount } from '../smallAmounts';
 import {
@@ -45,9 +45,9 @@ import { BatchTagEditor, MetadataPopover } from '../../../../Controls/Metadata/M
 import { IconPalette } from '../../../../Controls/Metadata/IconPicker';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
-import type { TransactionFlowState } from '../../../graphViewState';
-import type { WalletUtxoObservation } from '../../../ChainData/WalletUtxos/walletUtxoObservation';
+import type { Workspace } from '../../../workspace';
+import type { TransactionFlowState } from '../../../GraphState/panelState';
+import type { WalletUtxoObservation } from '../../../Wallet/WalletUtxos/walletUtxoObservation';
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';
 import type { EntitySelection } from '../../../Selection/useEntitySelection';
 

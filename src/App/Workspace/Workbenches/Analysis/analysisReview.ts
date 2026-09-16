@@ -1,5 +1,5 @@
 import { analysisTools } from '../../Analysis/analysis';
-import type { AnalysisFinding } from '../../../../Domain/Workspace/analysisFinding';
+import type { AnalysisFinding } from '../../Analysis/analysisFinding';
 
 export const reviewPriorities = ['high', 'medium', 'low'] as const;
 export type ReviewPriority = (typeof reviewPriorities)[number];

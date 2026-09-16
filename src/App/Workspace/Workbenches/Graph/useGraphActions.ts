@@ -14,16 +14,17 @@ import {
 } from '../../GraphState/graphMembership';
 import { useEffect } from 'react';
 import { filterGraph } from './Filters/graphFilters';
-import type { GraphFilters } from '../../graphViewState';
+import type { GraphFilters } from '../../GraphState/filters';
 import { setNodesHidden, showAllNodes } from '../../GraphState/visibility';
-import { promoteInputContext } from '../../ChainData/observationContext';
+import { promoteInputContext } from '../../Evidence/InputContext';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../Infra/Bitcoin/api';
 
 import { entityPanelFiltersFromGraph } from './Filters/entityPanelFilters';
 import { ADDRESS_DISPLAY_NOTICE } from '../../workspaceNotices';
 
 import type { GraphProjection } from './useGraphProjection';
-import type { ChainFetch } from '../../ChainData/useChainFetch';
+import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 import type { ConnectionScanTargets } from '../../Selection/useConnectionScanTargets';
@@ -40,7 +41,8 @@ interface Inputs {
   canvas: GraphCanvas;
   scanTargets: ConnectionScanTargets;
   annotations: WorkspaceAnnotations;
-  fetch: ChainFetch;
+  transactions: TransactionEvidence;
+  operation: WorkspaceOperation;
   viewOwner: string | undefined;
 }
 export function useGraphActions({
@@ -52,7 +54,8 @@ export function useGraphActions({
   canvas,
   scanTargets,
   annotations,
-  fetch,
+  transactions,
+  operation,
   viewOwner,
 }: Inputs) {
   const {
@@ -90,7 +93,8 @@ export function useGraphActions({
   const { cancelPicking: cancelScanTargetPicking } = scanTargets;
   const { edit: metadataEdit } = annotations;
   const requestMetadataEdit = metadataEdit.request;
-  const { getTransaction, run } = fetch;
+  const { getTransaction, recordTransactions } = transactions;
+  const { run } = operation;
 
   const setEntityHidden = (ids: string[], hidden: boolean) => {
     try {
@@ -325,6 +329,15 @@ export function useGraphActions({
       if (action === 'show') setGraphFilters({});
     });
   }
+  function refreshTransaction(transactionId: string | undefined) {
+    if (!activeWorkspace || !transactionId) return;
+    const ownerId = activeWorkspace.id;
+    void run(async (signal) => {
+      const transaction = await getTransaction(transactionId, signal);
+      signal.throwIfAborted();
+      recordTransactions(ownerId, [transaction]);
+    });
+  }
   return {
     setEntityHidden,
     revealGraphNodes,
@@ -341,6 +354,7 @@ export function useGraphActions({
     resetGraphFilters,
     resetEntityFilters,
     updateAllGraphOutputs,
+    refreshTransaction,
   };
 }
 

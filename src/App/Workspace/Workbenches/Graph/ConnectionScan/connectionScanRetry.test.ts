@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from './connectionScan';
 import { applyScanRecheck, retryConnectionScanResult } from './connectionScanRetry';
 import { TransactionFetchScope } from '../../../../../Infra/Bitcoin/transactionScheduler';
-import { newWorkspace } from '../../../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../../../createWorkspace';
 import { replaceScanRun } from './connectionScanRecords';
 import type { Transaction } from '../../../../../Domain/Chain/transaction';
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -51,7 +51,7 @@ describe('bounded endpoint recheck', () => {
     'conflicting-evidence',
   ] as const)('retains a still-unresolved %s through real record validation', (finding) => {
     const workspace = {
-      ...newWorkspace('Public retry fixture', 'testnet4'),
+      ...createWorkspace('Public retry fixture', 'testnet4'),
       transactions: { [id(1)]: tx },
     };
     const updated = applyScanRecheck(run, result, { finding });

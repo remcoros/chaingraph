@@ -16,7 +16,8 @@ import { graphUnconnectedOutputIds } from './graphBranch';
 import { outputNodeId, txNodeId } from '../../../Domain/Metadata/entityReferences';
 import type { Transaction } from '../../../Domain/Chain/transaction';
 import { buildGraph } from './graphEvidence';
-import { newWorkspace, parseWorkspace } from '../../../Domain/Workspace/workspace';
+import { createWorkspace } from '../createWorkspace';
+import { parseWorkspace } from '../Persistence/Format';
 import { createTemplateWorkspace } from '../../Examples/workspaceTemplates';
 import { showAllNodes } from './visibility';
 
@@ -34,7 +35,7 @@ const spending: Transaction = {
   vout: [{ n: 0, value: 0.9, scriptPubKey: {} }],
 };
 function workspace() {
-  const w = newWorkspace('Explicit graph fixture', 'mainnet');
+  const w = createWorkspace('Explicit graph fixture', 'mainnet');
   w.transactions = { [a]: structuredClone(funding) };
   return w;
 }
@@ -329,7 +330,7 @@ describe('explicit canvas membership', () => {
     ).toEqual([txNodeId(a), outputNodeId(a, 1)]);
     expect(() => parseGraphNodeIds([`addr:${address}`], 'testnet4')).toThrow();
     expect(() =>
-      addGraphNodes(newWorkspace('Wrong network', 'testnet4'), [`addr:${address}`]),
+      addGraphNodes(createWorkspace('Wrong network', 'testnet4'), [`addr:${address}`]),
     ).toThrow();
     expect(() => removeGraphNodes(workspace(), ['out:invalid:0'])).toThrow();
     expect(() =>

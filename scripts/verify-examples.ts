@@ -1,5 +1,5 @@
 import { examplesForNetwork } from './exampleVerificationExamples';
-import { parseTransaction } from '../src/Domain/Workspace/workspace';
+import { parseTransaction } from '../src/Domain/Chain/transactionValidation';
 import type { Network } from '../src/Domain/Chain/network';
 import type { Transaction } from '../src/Domain/Chain/transaction';
 import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
