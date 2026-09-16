@@ -1,4 +1,4 @@
-import { type GraphFilters } from '../../../../../Domain/types';
+import type { GraphFilters } from '../../../graphViewState';
 export function entityPanelFiltersFromGraph(filters: GraphFilters): GraphFilters {
   const panelFilters = { ...filters };
   delete panelFilters.excludeIds;

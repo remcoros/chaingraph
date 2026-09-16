@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { addressNodeId, outputNodeId, txNodeId } from '../../Domain/types';
-import { outputAddress } from '../../Domain/Workspace/workspace';
+import { addressNodeId, outputNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
+import { outputAddress } from '../../Domain/Chain/prevouts';
 import type { AppState } from '../useAppState';
 
 export interface WorkspaceLookup {

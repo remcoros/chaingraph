@@ -4,26 +4,21 @@ import {
   resolvePreviousOutput,
   type PreviousOutputResolution,
 } from '../../../../Domain/Chain/prevouts';
-import { verifiedWalletAddresses } from '../../../../Domain/Wallet/walletRecords';
+import { verifiedWalletAddresses } from '../../Wallet/walletRecords';
 import type {
   WalletSelectionAddresses,
   WalletSelectionIndex,
-} from '../../../../Domain/Wallet/walletSelectionIndex';
+} from '../../Wallet/walletSelectionIndex';
 import {
   canonicalTransactionId,
   loadedWalletTransactions,
   validOutputIndex,
   walletOutputEvidence,
-} from '../../../../Domain/Wallet/walletRelationships';
-import {
-  outputNodeId,
-  sats,
-  txNodeId,
-  type Transaction,
-  type TxOutput,
-  type Wallet,
-  type Workspace,
-} from '../../../../Domain/types';
+} from '../../Wallet/walletRelationships';
+import { outputNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
+import { sats, type Transaction, type TxOutput } from '../../../../Domain/Chain/transaction';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 
 export interface WalletReviewFlowEntry {
   /** Canonical entity reference; a coinbase entry refers to its transaction. */

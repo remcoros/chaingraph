@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../../../../../Domain/Chain/amountFormat';
+import { formatBitcoinAmount } from '../../../../Controls/Display/amountFormat';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -11,8 +11,10 @@ import {
   TriangleAlert,
   FileCode,
 } from 'lucide-react';
-import type { Annotation, GraphNode, Workspace } from '../../../../../Domain/types';
-import { listTagsForNode } from '../../../../../Domain/Metadata/tags';
+import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import { listTagsForNode } from '../../../Annotations/tagProjection';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from './walletFlowVisibility';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';

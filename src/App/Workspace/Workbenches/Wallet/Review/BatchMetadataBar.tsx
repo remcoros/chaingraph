@@ -7,8 +7,8 @@ import {
   EntityNoteEditor,
   MetadataPopover,
 } from '../../../../Controls/Metadata/MetadataEditors';
-import { applyBatchIcon, planBatchIcon } from '../../../../../Domain/Metadata/batchMetadata';
-import type { Workspace } from '../../../../../Domain/types';
+import { applyBatchIcon, planBatchIcon } from '../../../Annotations/batchMetadata';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 
 export interface BatchMetadataBarProps {
   workspace: Workspace;

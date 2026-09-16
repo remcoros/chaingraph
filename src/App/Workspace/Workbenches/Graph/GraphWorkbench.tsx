@@ -1,9 +1,9 @@
-import { formatBitcoinAmount } from '../../../../Domain/Chain/amountFormat';
+import { formatBitcoinAmount } from '../../../Controls/Display/amountFormat';
 import { Amount } from '../../../Controls/Display/Amount';
 import {
   RECENT_ADDRESS_GRAPH_LIMIT,
   selectedAddress as selectedAddressForHistory,
-} from '../../../../Domain/Chain/addressHistory';
+} from '../../ChainData/addressHistory';
 import { GraphLegend } from './GraphLegend';
 import { GraphContextToolbar, type GraphContextSideCounts } from './GraphContextToolbar';
 import { GraphControls } from './GraphControls';
@@ -21,9 +21,9 @@ import {
   X,
 } from 'lucide-react';
 import { FlowPanel } from './TransactionFlow/FlowPanel';
-import { selectedWalletFilterIds } from '../../../../Domain/Graph/graphFilters';
+import { selectedWalletFilterIds } from './Filters/graphFilters';
 import { hasActiveFilters } from './Filters/filterPresentation';
-import { applyBatchIcon } from '../../../../Domain/Metadata/batchMetadata';
+import { applyBatchIcon } from '../../Annotations/batchMetadata';
 import { openFlowPanel } from '../../graphViewState';
 import {
   FilterChips,
@@ -31,8 +31,8 @@ import {
   GraphFilterButton,
 } from './Filters/GraphFilterControls';
 import { GraphWalletFilter } from './Filters/GraphWalletFilter';
-import { transactionNodeIds } from '../../../../Domain/Graph/visibility';
-import { outputNodeId, txNodeId } from '../../../../Domain/types';
+import { transactionNodeIds } from '../../GraphState/visibility';
+import { outputNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
 import type { WorkspaceController } from '../../useWorkspace';
 import { InspectorPanel } from './InspectorPanel';
 import { EntitiesPanel } from './EntitiesPanel';

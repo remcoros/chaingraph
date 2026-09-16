@@ -5,9 +5,11 @@ import {
   scanAnalysis,
   scanDefaults,
   type AnalysisScan,
-} from '../../../../Domain/Analysis/analysisScan';
-import { walletEvidenceChanged } from '../../../../Domain/Wallet/walletActivity';
-import { short, type Wallet, type Workspace } from '../../../../Domain/types';
+} from '../../Analysis/analysisScan';
+import { walletEvidenceChanged } from '../../Wallet/walletActivity';
+import { short } from '../../../Controls/Display/referenceFormat';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import type { WalletRow } from './walletRows';
 
 export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: WalletRow) {

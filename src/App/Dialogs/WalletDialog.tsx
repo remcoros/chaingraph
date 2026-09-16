@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Network, ScriptType, Wallet } from '../../Domain/types';
+import type { Network } from '../../Domain/Chain/network';
+import type { ScriptType, Wallet } from '../../Domain/Wallet/walletTypes';
 import { deriveAddresses, inspectExtendedPublicKey } from '../../Domain/Wallet/wallet';
 import { Modal } from './Modal';
 

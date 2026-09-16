@@ -1,5 +1,6 @@
-import type { Wallet, Workspace } from '../../../../Domain/types';
-import type { WalletUtxoRecord } from '../../../../Domain/Wallet/walletRecords';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { WalletUtxoRecord } from '../../Wallet/walletRecords';
 
 /**
  * Context every wallet surface shares: the loaded workspace, capability flags

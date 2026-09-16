@@ -1,6 +1,7 @@
-import { formatBitcoinAmount } from '../../../../../Domain/Chain/amountFormat';
-import { selectedWalletFilterIds } from '../../../../../Domain/Graph/graphFilters';
-import type { GraphFilters, GraphNode } from '../../../../../Domain/types';
+import { formatBitcoinAmount } from '../../../../Controls/Display/amountFormat';
+import { selectedWalletFilterIds } from './graphFilters';
+import type { GraphFilters } from '../../../graphViewState';
+import type { GraphNode } from '../../../GraphState/types';
 
 /** Filter dimensions a person can see and remove individually. */
 export type FilterKey =

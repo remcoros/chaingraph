@@ -1,8 +1,6 @@
-import {
-  graphNavigationTransactionIds,
-  resolveGraphHandoff,
-} from '../../../../Domain/Graph/graphHandoff';
-import { txNodeId, type Workspace } from '../../../../Domain/types';
+import { graphNavigationTransactionIds, resolveGraphHandoff } from '../graphHandoffNavigation';
+import { txNodeId } from '../../../../Domain/Metadata/entityReferences';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
 import type { WorkspaceCore } from '../../workspaceCore';

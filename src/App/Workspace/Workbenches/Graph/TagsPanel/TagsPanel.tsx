@@ -1,27 +1,19 @@
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
-import {
-  addressNodeId,
-  type GraphData,
-  type GraphNode,
-  type Workspace,
-  type WorkspaceTag,
-} from '../../../../../Domain/types';
-import {
-  listTagsForNode,
-  tagNodeIds,
-  tagsFromLabels,
-  MAX_TAG_MEMBERS,
-  MAX_WORKSPACE_TAGS,
-} from '../../../../../Domain/Metadata/tags';
+import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import type { GraphData, GraphNode } from '../../../GraphState/types';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { WorkspaceTag } from '../../../../../Domain/Workspace/annotationTypes';
+import { listTagsForNode, tagNodeIds, tagsFromLabels } from '../../../Annotations/tagProjection';
+import { MAX_TAG_MEMBERS, MAX_WORKSPACE_TAGS } from '../../../../../Domain/Workspace/tagStorage';
 import {
   BatchTagEditor,
   ColorPicker,
   MetadataPopover,
 } from '../../../../Controls/Metadata/MetadataEditors';
-import { DEFAULT_TAG_COLOR } from '../../../../../Domain/Metadata/tagColors';
+import { DEFAULT_TAG_COLOR } from '../../../../Controls/Metadata/tagColors';
 import './tags.css';
-import { applyBatchTag } from '../../../../../Domain/Metadata/batchMetadata';
+import { applyBatchTag } from '../../../Annotations/batchMetadata';
 import { canonicalAddress } from '../../../../../Domain/Metadata/entityReferences';
 import { Modal } from '../../../../Dialogs';
 import { useDialogFocus } from '../../../../Controls/useDialogFocus';

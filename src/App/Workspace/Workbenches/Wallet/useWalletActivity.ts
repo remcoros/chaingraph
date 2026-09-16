@@ -1,8 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { applyWalletScan, walletActivitySummary } from '../../../../Domain/Wallet/walletActivity';
-import { clearContextProvenance } from '../../../../Domain/Workspace/workspace';
+import { applyWalletScan, walletActivitySummary } from '../../Wallet/walletActivity';
+import { clearContextProvenance } from '../../ChainData/observationContext';
 import { mergeTransactionObservations } from '../../../../Domain/Chain/prevouts';
-import { type Transaction, type Wallet, type Workspace } from '../../../../Domain/types';
+import type { Transaction } from '../../../../Domain/Chain/transaction';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import { loadAddress, scanWallet } from '../../../../Infra/Bitcoin/api';
 import type { RefObject } from 'react';
 

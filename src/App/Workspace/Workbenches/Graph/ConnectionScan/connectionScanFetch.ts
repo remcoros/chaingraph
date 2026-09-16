@@ -1,18 +1,10 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import type { Network, Transaction } from '../../../../../Domain/types';
-import type {
-  ScanBudget,
-  ScanDirection,
-  ScanNeighbors,
-  ScanObservation,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
-import {
-  SCAN_LIMITS,
-  ScanBudgetExceeded,
-  isScanNodeId,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
-import { outputAddress } from '../../../../../Domain/Workspace/workspace';
+import type { Network } from '../../../../../Domain/Chain/network';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { ScanBudget, ScanDirection, ScanNeighbors, ScanObservation } from './connectionScan';
+import { SCAN_LIMITS, ScanBudgetExceeded, isScanNodeId } from './connectionScan';
+import { outputAddress } from '../../../../../Domain/Chain/prevouts';
 import { addressToScriptHash } from '../../../../../Domain/Wallet/wallet';
 import {
   fetchHistory,

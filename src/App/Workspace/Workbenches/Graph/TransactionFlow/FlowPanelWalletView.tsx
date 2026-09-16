@@ -1,5 +1,5 @@
 import { Wallet as WalletIcon } from 'lucide-react';
-import type { Wallet } from '../../../../../Domain/types';
+import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
 
 export interface FlowPanelWalletViewProps {
   selectedWallet?: Wallet;

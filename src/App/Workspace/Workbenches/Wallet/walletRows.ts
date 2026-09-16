@@ -1,36 +1,32 @@
 import {
   addressNodeId,
   outputNodeId,
-  short,
   txNodeId,
-  type Network,
-  type TxOutput,
-  type Wallet,
-  type Workspace,
-} from '../../../../Domain/types';
-import { listTagsForNode } from '../../../../Domain/Metadata/tags';
+} from '../../../../Domain/Metadata/entityReferences';
+import { short } from '../../../Controls/Display/referenceFormat';
+import type { Network } from '../../../../Domain/Chain/network';
+import type { TxOutput } from '../../../../Domain/Chain/transaction';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import { listTagsForNode } from '../../Annotations/tagProjection';
 import { isOpReturn } from '../../../../Domain/Chain/opReturn';
 import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
 import type {
   WalletSelectionAddresses,
   WalletSelectionIndex,
-} from '../../../../Domain/Wallet/walletSelectionIndex';
+} from '../../Wallet/walletSelectionIndex';
 import {
   verifiedWalletAddresses,
   listWalletAddresses,
   listWalletTransactions,
   type WalletUtxoRecord,
-} from '../../../../Domain/Wallet/walletRecords';
-import {
-  isCompletedReview,
-  reviewKey,
-  type WalletReviewItem,
-} from '../../../../Domain/Wallet/walletReview';
+} from '../../Wallet/walletRecords';
+import { isCompletedReview, reviewKey, type WalletReviewItem } from '../../Wallet/walletReview';
 import {
   listLoadedAddressTransactionIds,
   walletCounterparties,
   type WalletAddressRelationships,
-} from '../../../../Domain/Wallet/walletRelationships';
+} from '../../Wallet/walletRelationships';
 
 export type WalletTab =
   'review' | 'utxos' | 'transactions' | 'addresses' | 'sources' | 'destinations';

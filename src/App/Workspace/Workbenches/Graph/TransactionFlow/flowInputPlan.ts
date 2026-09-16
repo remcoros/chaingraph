@@ -1,5 +1,6 @@
-import type { GraphNode, Workspace } from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,

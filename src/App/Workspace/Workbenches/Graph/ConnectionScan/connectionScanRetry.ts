@@ -5,9 +5,9 @@ import {
   type ScanObservation,
   type ScanStopReason,
   type ScanRun,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
-import { scanResultGroupKey } from '../../../../../Domain/ConnectionScan/connectionScanGroups';
-import { scanResultEvidenceIds } from '../../../../../Domain/ConnectionScan/connectionScanRecords';
+} from './connectionScan';
+import { scanResultGroupKey } from './connectionScanGroups';
+import { scanResultEvidenceIds } from '../../../../../Domain/Workspace/connectionScanStorage';
 import { createConnectionScanFetch, type ConnectionScanFetchOptions } from './connectionScanFetch';
 
 type Options = Omit<ConnectionScanFetchOptions, 'signal'> & {

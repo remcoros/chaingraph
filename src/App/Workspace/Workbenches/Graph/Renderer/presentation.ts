@@ -1,4 +1,4 @@
-import type { GraphLink, GraphNode } from '../../../../../Domain/types';
+import type { GraphLink, GraphNode } from '../../../GraphState/types';
 import type { GraphFrame, GraphHit, RenderNode } from './adapter';
 import type { GraphFlowContext } from './flowContext';
 

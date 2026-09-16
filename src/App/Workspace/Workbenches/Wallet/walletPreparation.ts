@@ -1,12 +1,13 @@
-import type { Wallet, Workspace } from '../../../../Domain/types';
-import { buildWalletReview } from '../../../../Domain/Wallet/walletReview';
-import { groupWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
-import { verifyWalletUtxo } from '../../../../Domain/Wallet/walletRecords';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import { buildWalletReview } from '../../Wallet/walletReview';
+import { groupWalletRelationships } from '../../Wallet/walletRelationships';
+import { verifyWalletUtxo } from '../../Wallet/walletRecords';
 import {
   buildWalletSelectionAddresses,
   buildWalletSelectionIndex,
-} from '../../../../Domain/Wallet/walletSelectionIndex';
-import { createWalletOutputEvidenceResolver } from '../../../../Domain/Wallet/walletOutputEvidence';
+} from '../../Wallet/walletSelectionIndex';
+import { createWalletOutputEvidenceResolver } from '../../Wallet/walletOutputEvidence';
 import type { WalletUtxoView } from '../../ChainData/WalletUtxos';
 
 type Dependencies = readonly unknown[];

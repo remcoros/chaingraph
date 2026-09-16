@@ -1,6 +1,7 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import type { Wallet, Workspace } from '../../src/Domain/types';
+import type { Wallet } from '../../src/Domain/Wallet/walletTypes';
+import type { Workspace } from '../../src/Domain/Workspace/workspaceTypes';
 import { newWorkspace } from '../../src/Domain/Workspace/workspace';
 import { deriveAddresses } from '../../src/Domain/Wallet/wallet';
 import { PUBLIC_ZPUB } from './bitcoin';

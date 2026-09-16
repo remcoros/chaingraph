@@ -1,7 +1,7 @@
 import { SelectedTags } from '../TagsPanel';
 import { ChevronRight, Eye } from 'lucide-react';
 import { NodeInspector, WalletInspector } from './Inspector';
-import { pruneWalletReviews } from '../../../../../Domain/Wallet/walletReview';
+import { pruneWalletReviews } from '../../../Wallet/walletReview';
 import type { WorkspaceController } from '../../../useWorkspace';
 
 export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceController }) {

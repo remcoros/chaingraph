@@ -1,5 +1,6 @@
-import { SCAN_LIMITS } from '../../../../../Domain/ConnectionScan/connectionScan';
-import type { Transaction, Workspace } from '../../../../../Domain/types';
+import { SCAN_LIMITS } from './connectionScan';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import { fetchTransaction } from '../../../../../Infra/Bitcoin/api';
 import { validateScanTransaction } from './connectionScanEvidence';
 import type { TransactionFetchScope } from '../../../../../Infra/Bitcoin/transactionScheduler';

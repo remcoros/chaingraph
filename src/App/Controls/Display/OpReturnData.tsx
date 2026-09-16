@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { decodeOpReturn } from '../../../Domain/Chain/opReturn';
+import { decodeOpReturn } from './opReturn';
 import { CopyButton } from '../CopyButton';
 import './op-return-data.css';
 

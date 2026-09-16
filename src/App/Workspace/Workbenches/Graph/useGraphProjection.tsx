@@ -1,30 +1,28 @@
-import { indexScanNeighbours } from '../../../../Domain/ConnectionScan/connectionScanNeighbours';
+import { indexScanNeighbours } from './ConnectionScan/connectionScanNeighbours';
 import { EMPTY_GRAPH_ANNOTATIONS, GraphMetadataProjection } from './graphMetadata';
 import { indexGraphFlow } from './Renderer/flowContext';
-import {
-  graphUnconnectedOutputIds,
-  graphTransactionOutputIds,
-} from '../../../../Domain/Graph/graphBranch';
+import { graphUnconnectedOutputIds, graphTransactionOutputIds } from '../../GraphState/graphBranch';
 import {
   projectGraphMembership,
   projectGraphAddresses,
   fullGraphMembershipEvidence,
-} from '../../../../Domain/Graph/graphMembership';
+} from '../../GraphState/graphMembership';
 import { EntityBadges } from '../../../Controls/Metadata/EntityBadges';
-import { buildWalletMatches, tagNodeIds, buildTagIndex } from '../../../../Domain/Metadata/tags';
+import { buildWalletMatches, tagNodeIds, buildTagIndex } from '../../Annotations/tagProjection';
 import { useCallback, useDeferredValue, useMemo } from 'react';
 import {
   filterGraph,
   buildGraphFilterIndex,
   intersectIds,
   matchingWalletFilterNodeIds,
-} from '../../../../Domain/Graph/graphFilters';
+} from './Filters/graphFilters';
 import { describeMatchScope } from './Filters/filterPresentation';
-import type { GraphFilters } from '../../../../Domain/types';
+import type { GraphFilters } from '../../graphViewState';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
-import { type GraphEvidenceWorkspace } from '../../../../Domain/Workspace/workspace';
-import { filterSmallAmounts, omitAmountOrphans } from '../../../../Domain/Graph/smallAmounts';
-import { type GraphData, type Workspace } from '../../../../Domain/types';
+import type { GraphEvidenceWorkspace } from '../../GraphState/graphEvidence';
+import { filterSmallAmounts, omitAmountOrphans } from './smallAmounts';
+import type { GraphData } from '../../GraphState/types';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 
 const EMPTY_WALLETS: Workspace['wallets'] = [];
 type GraphEvidenceInput = Omit<GraphEvidenceWorkspace, 'inputContext' | 'annotations' | 'view'>;

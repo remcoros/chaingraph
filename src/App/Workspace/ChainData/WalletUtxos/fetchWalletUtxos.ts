@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import type { Network, Wallet } from '../../../../Domain/types';
-import type { WalletUtxoRecord } from '../../../../Domain/Wallet/walletRecords';
+import type { Network } from '../../../../Domain/Chain/network';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { WalletUtxoRecord } from '../../Wallet/walletRecords';
 import { rpc } from '../../../../Infra/Bitcoin/api';
 import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
 

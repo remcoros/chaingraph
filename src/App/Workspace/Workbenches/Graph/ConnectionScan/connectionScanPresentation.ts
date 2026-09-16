@@ -1,12 +1,9 @@
-import type {
-  ScanResult,
-  ScanRun,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
+import type { ScanResult, ScanRun } from './connectionScan';
 import {
   resultCategory,
   resultFinding,
   type ScanResultCategory,
-} from '../../../../../Domain/ConnectionScan/connectionScanClassification';
+} from './connectionScanClassification';
 
 /** Name the relation the user can reveal, rather than the search frontier that found it. */
 export function scanRelationPresentation(result: ScanResult):

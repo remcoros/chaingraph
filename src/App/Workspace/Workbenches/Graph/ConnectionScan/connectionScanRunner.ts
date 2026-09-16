@@ -3,8 +3,8 @@ import {
   validateScanSettings,
   type ScanBudget,
   type ScanRun,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
-import type { Transaction } from '../../../../../Domain/types';
+} from './connectionScan';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
 import { createConnectionScanFetch, type ConnectionScanFetchOptions } from './connectionScanFetch';
 import type {
   ConnectionScanRequest,

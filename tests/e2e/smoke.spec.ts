@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { buildGraph, newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
+import { newWorkspace } from '../../src/Domain/Workspace/workspace';
 import { openFixtureWorkspace } from '../fixtures/open-workspace';
 
 // A tiny, deliberately minimal fixture: one funding and one spending transaction.

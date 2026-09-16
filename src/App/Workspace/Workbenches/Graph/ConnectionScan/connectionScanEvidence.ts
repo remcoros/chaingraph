@@ -1,8 +1,6 @@
-import type { Network, Transaction, TxOutputDetails } from '../../../../../Domain/types';
-import type {
-  ScanNeighbors,
-  ScanObservation,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
+import type { Network } from '../../../../../Domain/Chain/network';
+import type { Transaction, TxOutputDetails } from '../../../../../Domain/Chain/transaction';
+import type { ScanNeighbors, ScanObservation } from './connectionScan';
 import {
   parseTransaction,
   validateTransactionAddresses,

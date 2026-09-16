@@ -1,4 +1,4 @@
-import { createTemplateWorkspace } from '../../Domain/Workspace/workspaceTemplates';
+import { createTemplateWorkspace } from './workspaceTemplates';
 
 // One creation per worker. No password is sent here.
 self.onmessage = async (event: MessageEvent<{ id: string; name: string; description: string }>) => {

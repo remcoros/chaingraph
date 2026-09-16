@@ -1,4 +1,4 @@
-import type { GraphLink, GraphNode } from '../../../../../Domain/types';
+import type { GraphLink, GraphNode } from '../../../GraphState/types';
 
 export type FlowRole = 'input' | 'output';
 export interface GraphFlowContext {

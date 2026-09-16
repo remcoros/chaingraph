@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Network } from '../Domain/types';
+import type { Network } from '../Domain/Chain/network';
 import { backendNetworks, backendStatus, type BackendStatus } from '../Infra/Bitcoin/api';
 
 /** Discovery is independent of upstream health. Each poll owns its network and cancellation. */

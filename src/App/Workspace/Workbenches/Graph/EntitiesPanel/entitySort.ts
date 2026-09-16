@@ -1,4 +1,4 @@
-import type { GraphNode } from '../../../../../Domain/types';
+import type { GraphNode } from '../../../GraphState/types';
 
 export type EntitySort = 'graph' | 'label' | 'value-desc' | 'value-asc' | 'type';
 

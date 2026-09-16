@@ -14,28 +14,23 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react';
-import { short, type Transaction, type Workspace } from '../../../../../Domain/types';
+import { short } from '../../../../Controls/Display/referenceFormat';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import {
   DEFAULT_SCAN_SETTINGS,
   SCAN_LIMITS,
   type ScanResult,
   type ScanRun,
   type ScanSettings,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
-import {
-  replaceScanRun,
-  clearScanRuns,
-  type ScanPathWorkspace,
-} from '../../../../../Domain/ConnectionScan/connectionScanRecords';
-import {
-  prepareScanPathAddition,
-  prepareScanNodeAddition,
-} from '../../../../../Domain/ConnectionScan/connectionScanAddition';
+} from './connectionScan';
+import { replaceScanRun, clearScanRuns, type ScanPathWorkspace } from './connectionScanRecords';
+import { prepareScanPathAddition, prepareScanNodeAddition } from './connectionScanAddition';
 import { loadScanActionEvidence } from './connectionScanActionEvidence';
 import { runConnectionScanInWorker } from './connectionScanRunner';
 import type { TransactionFetchScope } from '../../../../../Infra/Bitcoin/transactionScheduler';
 import { traceSourceExists } from '../../../../../Infra/Bitcoin/tracing';
-import { indexLoadedSpends } from '../../../../../Domain/Chain/transactionFlow';
+import { indexLoadedSpends } from '../TransactionFlow/transactionFlow';
 import {
   presentScanRun,
   scanStatus,
@@ -46,19 +41,19 @@ import {
   resultFinding,
   resultCategory,
   type ScanResultFinding,
-} from '../../../../../Domain/ConnectionScan/connectionScanClassification';
+} from './connectionScanClassification';
 import {
   groupScanResults,
   groupScanRuns,
   mergeScanRunSnapshots,
   scanResultGroupKey,
   scanMeetingNode,
-} from '../../../../../Domain/ConnectionScan/connectionScanGroups';
+} from './connectionScanGroups';
 import { retryConnectionScanResult, applyScanRecheck } from './connectionScanRetry';
-import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
-import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import { prepareCustomScanTargets } from '../../../../../Domain/ConnectionScan/connectionScanTargets';
-import { prepareNeighbourScanTargets } from '../../../../../Domain/ConnectionScan/connectionScanNeighbours';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
+import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
+import { prepareCustomScanTargets } from '../../../Selection/connectionScanTargets';
+import { prepareNeighbourScanTargets } from './connectionScanNeighbours';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';

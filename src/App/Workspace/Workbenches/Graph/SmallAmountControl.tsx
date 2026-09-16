@@ -1,5 +1,5 @@
-import { formatBitcoinAmount } from '../../../../Domain/Chain/amountFormat';
-import { SMALL_AMOUNT_PRESETS } from '../../../../Domain/Graph/smallAmounts';
+import { formatBitcoinAmount } from '../../../Controls/Display/amountFormat';
+import { SMALL_AMOUNT_PRESETS } from './smallAmounts';
 
 export function SmallAmountControl({
   threshold = 0,

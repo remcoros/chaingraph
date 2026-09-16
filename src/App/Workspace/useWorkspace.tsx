@@ -1,6 +1,6 @@
 import { resolveWalletUtxoObservation } from './ChainData/WalletUtxos/walletUtxoObservation';
 import { useWalletUtxos } from './ChainData/WalletUtxos';
-import { type WalletUtxoRecord } from '../../Domain/Wallet/walletRecords';
+import { type WalletUtxoRecord } from './Wallet/walletRecords';
 import { useFlowInputs } from './Workbenches/Graph/TransactionFlow/useFlowInputs';
 import {
   useCallback,
@@ -23,9 +23,10 @@ import { useDialogState } from './useDialogState';
 import { useWorkspaceHistory } from './useWorkspaceHistory';
 import { useAnnotations } from './Annotations/useAnnotations';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
-import { setNodesHidden } from '../../Domain/Graph/visibility';
+import { setNodesHidden } from './GraphState/visibility';
 import { useWorkspaceAnalysis } from './Workbenches/Analysis/useWorkspaceAnalysis';
-import { type Wallet, type Workspace } from '../../Domain/types';
+import type { Wallet } from '../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { fetchTransaction } from '../../Infra/Bitcoin/api';
 import { useTour } from '../Help/useTour';
 import type { useAppState } from '../useAppState';

@@ -1,17 +1,20 @@
-import type { Network, Transaction, Wallet, Workspace } from '../../../../Domain/types';
+import type { Network } from '../../../../Domain/Chain/network';
+import type { Transaction } from '../../../../Domain/Chain/transaction';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../Domain/Chain/prevouts';
 import {
   canonicalTransactionId,
   validOutputIndex,
   walletOutputEvidence,
   type WalletAddressRelationships,
-} from '../../../../Domain/Wallet/walletRelationships';
-import { verifiedWalletAddresses } from '../../../../Domain/Wallet/walletRecords';
+} from '../../Wallet/walletRelationships';
+import { verifiedWalletAddresses } from '../../Wallet/walletRecords';
 import {
   parseTransaction,
   validateTransactionAddresses,
 } from '../../../../Domain/Workspace/workspace';
-import { mergeFlowInputs } from '../../../../Domain/Chain/flowInputs';
+import { mergeFlowInputs } from '../../ChainData/flowInputs';
 import {
   loadWalletFlowInputWave,
   WALLET_FLOW_INPUT_WAVE_LIMIT,

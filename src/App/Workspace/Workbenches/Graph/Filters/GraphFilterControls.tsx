@@ -6,11 +6,8 @@ import {
   clearFilterKey,
   type FilterKey,
 } from './filterPresentation';
-import {
-  valueFilterError,
-  selectedWalletFilterIds,
-} from '../../../../../Domain/Graph/graphFilters';
-import type { GraphFilters } from '../../../../../Domain/types';
+import { valueFilterError, selectedWalletFilterIds } from './graphFilters';
+import type { GraphFilters } from '../../../graphViewState';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { WalletFilterOptions } from './GraphWalletFilter';

@@ -1,4 +1,4 @@
-import type { GraphSnapshot } from '../../../../../Domain/Graph/graphSnapshot';
+import type { GraphSnapshot } from '../../../../../Domain/Workspace/graphSnapshotStorage';
 /** Renderer-only contract. No workspace objects or mutable renderer objects cross it. */
 export interface RenderNode {
   id: string;

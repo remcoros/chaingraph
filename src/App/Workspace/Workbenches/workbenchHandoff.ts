@@ -1,5 +1,7 @@
-import type { GraphNavigationOptions } from '../../../Domain/Graph/graphHandoff';
-import type { GraphData, GraphFilters, Transaction } from '../../../Domain/types';
+import type { GraphNavigationOptions } from './graphHandoffNavigation';
+import type { GraphData } from '../GraphState/types';
+import type { GraphFilters } from '../graphViewState';
+import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { GraphMobilePanel, GraphRightTab } from '../graphViewState';
 
 /**

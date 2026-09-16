@@ -1,8 +1,4 @@
-import {
-  runConnectionScan,
-  ScanBudgetExceeded,
-  type ScanNeighbors,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
+import { runConnectionScan, ScanBudgetExceeded, type ScanNeighbors } from './connectionScan';
 import type { ScanWorkerInput, ScanWorkerOutput } from './connectionScanProtocol';
 const controller = new AbortController();
 let started = false;

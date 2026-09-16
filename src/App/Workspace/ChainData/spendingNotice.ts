@@ -1,5 +1,7 @@
 import { isOpReturn } from '../../../Domain/Chain/opReturn';
-import { short, type Network, type Transaction } from '../../../Domain/types';
+import { short } from '../../Controls/Display/referenceFormat';
+import type { Network } from '../../../Domain/Chain/network';
+import type { Transaction } from '../../../Domain/Chain/transaction';
 import type { loadSpending } from '../../../Infra/Bitcoin/api';
 import { fetchCurrentUtxo } from '../../../Infra/Bitcoin/utxoStatus';
 

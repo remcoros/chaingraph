@@ -22,34 +22,30 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { Amount } from '../../../../Controls/Display/Amount';
-import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
 import { matchingWalletUtxoObservation } from '../../../ChainData/WalletUtxos/walletUtxoObservation';
 import { SmallAmountControl } from '../SmallAmountControl';
-import { isSmallAmount } from '../../../../../Domain/Graph/smallAmounts';
+import { isSmallAmount } from '../smallAmounts';
 import {
   TransactionBlockTime,
   TransactionFeeLabel,
 } from '../../../../Controls/Display/TransactionBlockTime';
-import {
-  type Transaction,
-  type TxOutput,
-  outputNodeId,
-  txNodeId,
-  sats,
-} from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
-import { indexLoadedSpends, selectedFlowLeg } from '../../../../../Domain/Chain/transactionFlow';
+import { type Transaction, type TxOutput, sats } from '../../../../../Domain/Chain/transaction';
+import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import { relatedTransactions } from '../../../Selection/relatedTransactions';
+import { indexLoadedSpends, selectedFlowLeg } from './transactionFlow';
 import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../../Domain/Chain/prevouts';
 import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
-import { outputAddress } from '../../../../../Domain/Workspace/workspace';
+import { outputAddress } from '../../../../../Domain/Chain/prevouts';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { SelectionCheckbox } from '../../../Selection/SelectionToolbar';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import { BatchTagEditor, MetadataPopover } from '../../../../Controls/Metadata/MetadataEditors';
 import { IconPalette } from '../../../../Controls/Metadata/IconPicker';
-import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import type { GraphNode, Workspace } from '../../../../../Domain/types';
+import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import type { TransactionFlowState } from '../../../graphViewState';
 import type { WalletUtxoObservation } from '../../../ChainData/WalletUtxos/walletUtxoObservation';
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';

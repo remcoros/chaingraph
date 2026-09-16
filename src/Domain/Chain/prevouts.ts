@@ -1,15 +1,10 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
-import {
-  outputNodeId,
-  sats,
-  type Network,
-  type Transaction,
-  type TxInput,
-  type TxOutput,
-  type Workspace,
-} from '../types';
+import { outputNodeId } from '../Metadata/entityReferences';
+import { sats, type Transaction, type TxInput, type TxOutput } from './transaction';
+import type { Network } from './network';
+import type { Workspace } from '../Workspace/workspaceTypes';
 
 export type PreviousOutputResolution =
   { status: 'loaded' | 'attached'; output: TxOutput } | { status: 'missing' | 'conflict' };

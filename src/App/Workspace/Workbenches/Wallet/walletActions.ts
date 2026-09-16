@@ -1,12 +1,14 @@
-import { graphNavigationTransactionIds } from '../../../../Domain/Graph/graphHandoff';
+import { graphNavigationTransactionIds } from '../graphHandoffNavigation';
 import {
   verifiedWalletAddresses,
   verifyWalletUtxo,
   type WalletUtxoRecord,
-} from '../../../../Domain/Wallet/walletRecords';
-import { listWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
-import { addGraphNodes } from '../../../../Domain/Graph/graphMembership';
-import { type GraphFilters, type Wallet, type Workspace } from '../../../../Domain/types';
+} from '../../Wallet/walletRecords';
+import { listWalletRelationships } from '../../Wallet/walletRelationships';
+import { addGraphNodes } from '../../GraphState/graphMembership';
+import type { GraphFilters } from '../../graphViewState';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';

@@ -36,7 +36,7 @@ import {
   GRAPH_SNAPSHOT_NODE_LIMIT,
   graphSnapshotSchema,
   type GraphSnapshot,
-} from '../../../../../Domain/Graph/graphSnapshot';
+} from '../../../../../Domain/Workspace/graphSnapshotStorage';
 
 // One draw call for all halos; the ordinary node meshes retain graph picking.
 function makeHalos() {

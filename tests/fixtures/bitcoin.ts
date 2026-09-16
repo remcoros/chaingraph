@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import type { Network } from '../../src/Domain/types';
+import type { Network } from '../../src/Domain/Chain/network';
 
 // The key and three addresses are public BIP84 test vectors (CC0):
 // https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HDKey } from '@scure/bip32';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -6,7 +6,7 @@ import {
   addressToScriptHash,
   deriveAddresses,
   inspectExtendedPublicKey,
-  validateExtendedPublicKey,
+  verifyWalletAddresses,
 } from './wallet';
 
 // Public mathematical test fixtures from BIP84 (CC0), BIP86/BIP32 (BSD-2-Clause),
@@ -95,8 +95,8 @@ describe('watch-only wallet derivation', () => {
   });
 
   it('rejects cross-network keys, addresses, and mismatched SLIP132 script hints', () => {
-    expect(() => validateExtendedPublicKey(zpub, 'testnet4')).toThrow('belongs to mainnet');
-    expect(() => validateExtendedPublicKey(upub, 'mainnet')).toThrow('belongs to testnet4');
+    expect(() => inspectExtendedPublicKey(zpub, 'testnet4')).toThrow('belongs to mainnet');
+    expect(() => inspectExtendedPublicKey(upub, 'mainnet')).toThrow('belongs to testnet4');
     expect(() => addressToScriptHash('1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', 'testnet4')).toThrow(
       'Invalid address',
     );
@@ -114,28 +114,82 @@ describe('watch-only wallet derivation', () => {
 
   it('rejects private material, malformed keys, root keys, and unbounded derivation', () => {
     expect(() =>
-      validateExtendedPublicKey(
+      inspectExtendedPublicKey(
         'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi',
         'mainnet',
       ),
     ).toThrow('Private keys');
     expect(() =>
-      validateExtendedPublicKey(
+      inspectExtendedPublicKey(
         'xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm',
         'mainnet',
       ),
     ).toThrow('Private keys');
     expect(() =>
-      validateExtendedPublicKey(
+      inspectExtendedPublicKey(
         'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8',
         'mainnet',
       ),
     ).toThrow('depth 3');
-    expect(() => validateExtendedPublicKey(zpub.slice(0, -1) + '1', 'mainnet')).toThrow('checksum');
+    expect(() => inspectExtendedPublicKey(zpub.slice(0, -1) + '1', 'mainnet')).toThrow('checksum');
     expect(() => deriveAddresses(xpub, 'mainnet', 'p2pkh', 0, 0, 1001)).toThrow('1–1000');
     expect(() => deriveAddresses(xpub, 'mainnet', 'p2pkh', 0, 0x7fffffff, 2)).toThrow(
       'non-hardened',
     );
     expect(() => deriveAddresses(xpub, 'mainnet', 'p2pkh', 0, -1, 20)).toThrow('non-hardened');
+  });
+});
+
+describe('imported wallet ownership claims', () => {
+  it('accepts authoritative BIP84 receive/change addresses in arbitrary order', () => {
+    const addresses = [
+      { address: 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', index: 0, branch: 0 as const },
+      { address: 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g', index: 1, branch: 0 as const },
+      { address: 'bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el', index: 0, branch: 1 as const },
+    ]
+      .map((item) => ({
+        ...item,
+        scripthash: addressToScriptHash(item.address, 'mainnet'),
+        path: `account/${item.branch}/${item.index}`,
+      }))
+      .reverse();
+    expect(() => verifyWalletAddresses(zpub, 'mainnet', 'p2wpkh', addresses)).not.toThrow();
+  });
+
+  it('rejects an address from another account even with matching hash and plausible path', () => {
+    const foreign = deriveAddresses(taprootXpub, 'mainnet', 'p2wpkh', 0, 0, 1);
+    expect(addressToScriptHash(foreign[0].address, 'mainnet')).toBe(foreign[0].scripthash);
+    expect(() => verifyWalletAddresses(zpub, 'mainnet', 'p2wpkh', foreign)).toThrow(
+      'does not match',
+    );
+  });
+
+  it('checks sparse maximum indexes without scanning intervening children', () => {
+    const addresses = [
+      ...deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1),
+      ...deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0x7fffffff, 1),
+      ...deriveAddresses(zpub, 'mainnet', 'p2wpkh', 1, 0x7ffffffe, 1),
+    ];
+    const spy = vi.spyOn(HDKey.prototype, 'deriveChild');
+    try {
+      verifyWalletAddresses(zpub, 'mainnet', 'p2wpkh', addresses);
+      expect(spy).toHaveBeenCalledTimes(5); // Two branch parents and three actual children.
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('rejects duplicate paths and modified derivation metadata', () => {
+    const [address] = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 1);
+    expect(() => verifyWalletAddresses(zpub, 'mainnet', 'p2wpkh', [address, address])).toThrow(
+      'duplicate',
+    );
+    expect(() =>
+      verifyWalletAddresses(zpub, 'mainnet', 'p2wpkh', [{ ...address, path: 'account/1/0' }]),
+    ).toThrow('does not match');
+    expect(() =>
+      verifyWalletAddresses(zpub, 'mainnet', 'p2wpkh', [{ ...address, index: 0x80000000 }]),
+    ).toThrow('Invalid');
+    expect(() => verifyWalletAddresses(zpub, 'mainnet', 'p2tr', [])).toThrow('requires');
   });
 });

@@ -1,4 +1,4 @@
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { parseWorkspace } from '../../Domain/Workspace/workspace';
 import { migrateWorkspace } from '../../Domain/Workspace/workspaceMigrations';
 import { decryptWorkspace, encryptWorkspace, MAX_ENCRYPTED_FILE_BYTES } from './crypto';

@@ -1,5 +1,5 @@
 import { Amount } from '../../../../Controls/Display/Amount';
-import { listWalletAddresses } from '../../../../../Domain/Wallet/walletRecords';
+import { listWalletAddresses } from '../../../Wallet/walletRecords';
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
@@ -10,7 +10,7 @@ import {
   TransactionBlockTime,
   TransactionFeeLabel,
 } from '../../../../Controls/Display/TransactionBlockTime';
-import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft,
@@ -24,32 +24,28 @@ import {
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
-import {
-  short,
-  txNodeId,
-  addressNodeId,
-  type AddressBalanceObservation,
-  type Annotation,
-  type Wallet,
-  type Workspace,
-  type Transaction,
-  type GraphNode,
-  type GraphData,
-} from '../../../../../Domain/types';
-import { addressBalanceSats } from '../../../../../Domain/Chain/addressHistory';
-import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import { equalOutputCount } from '../../../../../Domain/Analysis/analysis';
-import { outputAddress } from '../../../../../Domain/Workspace/workspace';
-import { walletCheckAge } from '../../../../../Domain/Wallet/walletActivity';
+import { short } from '../../../../Controls/Display/referenceFormat';
+import { txNodeId, addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import type { AddressBalanceObservation } from '../../../../../Domain/Chain/observations';
+import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { GraphNode, GraphData } from '../../../GraphState/types';
+import { addressBalanceSats } from '../../../ChainData/addressHistory';
+import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
+import { equalOutputCount } from '../../../Analysis/analysis';
+import { outputAddress } from '../../../../../Domain/Chain/prevouts';
+import { walletCheckAge } from '../../../Wallet/walletActivity';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { VisibilityActions, type VisibilityProps } from '../../../Selection/VisibilityActions';
-import { emptyAnnotation } from '../../../../../Domain/Metadata/annotations';
+import { emptyAnnotation } from '../../../Annotations/emptyAnnotation';
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
-import { decodeOpReturn } from '../../../../../Domain/Chain/opReturn';
-import { indexLoadedSpends } from '../../../../../Domain/Chain/transactionFlow';
-import type { WalletMatch } from '../../../../../Domain/Metadata/tags';
+import { decodeOpReturn } from '../../../../Controls/Display/opReturn';
+import { indexLoadedSpends } from '../TransactionFlow/transactionFlow';
+import type { WalletMatch } from '../../../Annotations/tagProjection';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 

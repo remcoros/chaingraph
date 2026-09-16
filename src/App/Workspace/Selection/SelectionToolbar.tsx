@@ -1,8 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { CheckSquare, Eye, EyeOff, Focus, Plus, Tag, Type, Undo2, X } from 'lucide-react';
-import type { Workspace } from '../../../Domain/types';
-import { labelBatchPlan } from '../../../Domain/Metadata/batchEdits';
-import { applyBatchIcon, planBatchIcon } from '../../../Domain/Metadata/batchMetadata';
+import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import { labelBatchPlan } from '../Annotations/batchEdits';
+import { applyBatchIcon, planBatchIcon } from '../Annotations/batchMetadata';
 import {
   BatchLabelEditor,
   BatchTagEditor,

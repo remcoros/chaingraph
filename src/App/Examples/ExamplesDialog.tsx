@@ -1,4 +1,4 @@
-import type { Network } from '../../Domain/types';
+import type { Network } from '../../Domain/Chain/network';
 import { Modal } from '../Dialogs';
 import { WorkspaceTemplateCards } from './WorkspaceTemplateCards';
 

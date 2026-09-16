@@ -1,4 +1,4 @@
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { CURRENT_WORKSPACE_VERSION } from '../../Domain/Workspace/workspaceMigrations';
 import { MAX_ENCRYPTED_FILE_BYTES, type EncryptedEnvelope } from './crypto';
 import { decryptAndValidateWorkspace, validateAndEncryptWorkspace } from './workspaceEncryption';

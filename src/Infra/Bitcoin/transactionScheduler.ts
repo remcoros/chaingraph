@@ -1,4 +1,5 @@
-import type { Network, Transaction } from '../../Domain/types';
+import type { Network } from '../../Domain/Chain/network';
+import type { Transaction } from '../../Domain/Chain/transaction';
 
 export type FetchPriority = 'navigation' | 'visible' | 'background';
 const MAX_ACTIVE_TRANSACTIONS = 12;

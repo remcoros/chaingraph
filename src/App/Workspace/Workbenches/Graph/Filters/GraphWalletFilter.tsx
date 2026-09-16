@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { ChevronDown, Wallet } from 'lucide-react';
-import { selectedWalletFilterIds } from '../../../../../Domain/Graph/graphFilters';
-import type { GraphFilters } from '../../../../../Domain/types';
+import { selectedWalletFilterIds } from './graphFilters';
+import type { GraphFilters } from '../../../graphViewState';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
 import './graph-filters.css';
 

@@ -2,8 +2,8 @@ import {
   graphNavigationTransactionIds,
   prepareGraphNavigation,
   type GraphNavigationOptions,
-} from '../../../../Domain/Graph/graphHandoff';
-import { graphUnconnectedOutputIds } from '../../../../Domain/Graph/graphBranch';
+} from '../graphHandoffNavigation';
+import { graphUnconnectedOutputIds } from '../../GraphState/graphBranch';
 import {
   addGraphNodes,
   ensureGraphMembership,
@@ -11,12 +11,12 @@ import {
   removeGraphNodes,
   fullGraphMembershipEvidence,
   showAllGraphOutputs,
-} from '../../../../Domain/Graph/graphMembership';
+} from '../../GraphState/graphMembership';
 import { useEffect } from 'react';
-import { filterGraph } from '../../../../Domain/Graph/graphFilters';
-import { type GraphFilters } from '../../../../Domain/types';
-import { setNodesHidden, showAllNodes } from '../../../../Domain/Graph/visibility';
-import { promoteInputContext } from '../../../../Domain/Workspace/workspace';
+import { filterGraph } from './Filters/graphFilters';
+import type { GraphFilters } from '../../graphViewState';
+import { setNodesHidden, showAllNodes } from '../../GraphState/visibility';
+import { promoteInputContext } from '../../ChainData/observationContext';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../Infra/Bitcoin/api';
 
 import { entityPanelFiltersFromGraph } from './Filters/entityPanelFilters';

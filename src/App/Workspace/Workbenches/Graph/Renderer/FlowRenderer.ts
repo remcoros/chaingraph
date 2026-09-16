@@ -32,7 +32,7 @@ import {
   graphSnapshotSchema,
   GRAPH_SNAPSHOT_NODE_LIMIT,
   type GraphSnapshot,
-} from '../../../../../Domain/Graph/graphSnapshot';
+} from '../../../../../Domain/Workspace/graphSnapshotStorage';
 import { frameCamera } from './cameraFraming';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
 import { LayoutScheduler } from './layoutScheduler';

@@ -1,11 +1,13 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flowInputPlan, shouldLoadFlowInputs, type FlowPlanWorkspace } from './flowInputPlan';
-import { mergeFlowInputs } from '../../../../../Domain/Chain/flowInputs';
-import type { GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
+import { mergeFlowInputs } from '../../../ChainData/flowInputs';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { indexPreviousOutputs } from '../../../../../Domain/Chain/prevouts';
-import { indexLoadedSpends } from '../../../../../Domain/Chain/transactionFlow';
+import { indexLoadedSpends } from './transactionFlow';
 import { mapLimit } from '../../../../../Infra/Bitcoin/api';
 
 /** Default navigation resolves only the selected outpoint. Bulk input details are explicit. */

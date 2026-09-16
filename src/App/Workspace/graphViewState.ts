@@ -1,4 +1,6 @@
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+
+export type GraphFilters = NonNullable<Workspace['view']['filters']>;
 
 type StoredGraphPanelsState = NonNullable<Workspace['view']['panels']>;
 type StoredLeftPanel = NonNullable<StoredGraphPanelsState['left']>;

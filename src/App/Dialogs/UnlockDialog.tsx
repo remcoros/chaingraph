@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import { formatLocalTimestamp } from '../../Domain/Chain/transactionTime';
+import { formatLocalTimestamp } from '../Controls/Display/transactionTime';
 import { WorkspaceOperationError } from '../../Infra/Storage/workspaceOperationError';
 import type { SavedWorkspace } from '../Workspace/useWorkspaces';
 import { Modal } from './Modal';

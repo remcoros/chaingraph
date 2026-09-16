@@ -11,11 +11,11 @@ import {
   TriangleAlert,
   Undo2,
 } from 'lucide-react';
-import { short, type Wallet, type Workspace, type WorkspaceTag } from '../../../../../Domain/types';
-import {
-  isCompletedReview,
-  type WalletReviewItem,
-} from '../../../../../Domain/Wallet/walletReview';
+import { short } from '../../../../Controls/Display/referenceFormat';
+import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { WorkspaceTag } from '../../../../../Domain/Workspace/annotationTypes';
+import { isCompletedReview, type WalletReviewItem } from '../../../Wallet/walletReview';
 import {
   buildWalletReviewContext,
   orderWalletContextTransactions,
@@ -34,7 +34,7 @@ import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import type {
   WalletSelectionIndex,
   WalletSelectionAddresses,
-} from '../../../../../Domain/Wallet/walletSelectionIndex';
+} from '../../../Wallet/walletSelectionIndex';
 import { walletRelatedRecords, walletRelatedDescription } from './walletRelatedRecords';
 import { walletReviewGuidance, walletSubjectTitle } from './walletReviewGuidance';
 

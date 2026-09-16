@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import type { Workspace } from '../../src/Domain/types';
+import type { Workspace } from '../../src/Domain/Workspace/workspaceTypes';
 import { encryptWorkspace } from '../../src/Infra/Storage/crypto';
 import { laboratoryWorkspace } from './laboratory';
 

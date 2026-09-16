@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Wallet } from '../../Domain/types';
+import type { Wallet } from '../../Domain/Wallet/walletTypes';
 import type { AppState } from '../useAppState';
 
 /** Which workspace dialog is open, and the target a wallet rename applies to. */

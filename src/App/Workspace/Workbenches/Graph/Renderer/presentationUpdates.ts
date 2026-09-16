@@ -1,4 +1,4 @@
-import type { GraphNode } from '../../../../../Domain/types';
+import type { GraphNode } from '../../../GraphState/types';
 import type { GraphAdapter, GraphFrame, NodeAppearancePatch, RenderNode } from './adapter';
 import {
   buildGraphPresentationIndex,

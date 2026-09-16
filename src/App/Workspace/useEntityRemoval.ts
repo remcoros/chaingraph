@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react';
-import {
-  planEntityRemoval,
-  removeWorkspaceEntity,
-  type EntityRemovalPlan,
-} from '../../Domain/Workspace/entityRemoval';
-import { addressNodeId, txNodeId, type Workspace } from '../../Domain/types';
-import { buildGraph } from '../../Domain/Workspace/workspace';
+import { planEntityRemoval, removeWorkspaceEntity, type EntityRemovalPlan } from './entityRemoval';
+import { addressNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import { buildGraph } from './GraphState/graphEvidence';
 import type { AppState } from '../useAppState';
 
 /** The workspace fields a removal plan is derived from. */

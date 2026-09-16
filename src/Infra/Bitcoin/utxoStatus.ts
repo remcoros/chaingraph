@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { sats, type Network, type TxOutput } from '../../Domain/types';
+import { sats, type TxOutput } from '../../Domain/Chain/transaction';
+import type { Network } from '../../Domain/Chain/network';
 import { rpc } from './api';
 
 const resultSchema = z.object({

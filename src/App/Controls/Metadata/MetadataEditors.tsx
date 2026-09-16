@@ -9,10 +9,11 @@ import {
   createBatchTag,
   planBatchLabel,
   planBatchTag,
-} from '../../../Domain/Metadata/batchMetadata';
-import { canonicalTagNodeId } from '../../../Domain/Metadata/tags';
-import type { Workspace, WorkspaceTag } from '../../../Domain/types';
-import { DEFAULT_TAG_COLOR, TAG_COLORS } from '../../../Domain/Metadata/tagColors';
+} from '../../Workspace/Annotations/batchMetadata';
+import { canonicalTagNodeId } from '../../Workspace/Annotations/tagProjection';
+import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import type { WorkspaceTag } from '../../../Domain/Workspace/annotationTypes';
+import { DEFAULT_TAG_COLOR, TAG_COLORS } from './tagColors';
 import './metadata-editors.css';
 
 export interface MetadataEditorProps {

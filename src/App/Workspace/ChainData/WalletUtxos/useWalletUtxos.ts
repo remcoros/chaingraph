@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import type { Wallet, Workspace } from '../../../../Domain/types';
-import type { WalletUtxoRecord } from '../../../../Domain/Wallet/walletRecords';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import type { WalletUtxoRecord } from '../../Wallet/walletRecords';
 import { fetchWalletUtxos } from './fetchWalletUtxos';
 
 export interface WalletUtxoView {

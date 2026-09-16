@@ -1,5 +1,6 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from './transactionScheduler';
-import type { Transaction, Workspace } from '../../Domain/types';
+import type { Transaction } from '../../Domain/Chain/transaction';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { mapLimit, MAX_SCAN_TRANSACTIONS } from './api';
 
 /** A hidden entity is still a valid trace source; a removed branch is not. */

@@ -7,7 +7,7 @@ import { HelpMenu } from './Help/HelpMenu';
 import { AboutDialog } from './Help/AboutDialog';
 import { WorkspaceHome } from './FrontPage/WorkspaceHome';
 
-import { WORKSPACE_TEMPLATES } from '../Domain/Workspace/workspaceTemplates';
+import { WORKSPACE_TEMPLATES } from './Examples/workspaceTemplates';
 import { MAX_ENCRYPTED_FILE_BYTES } from '../Infra/Storage/crypto';
 
 import { ADDRESS_DISPLAY_NOTICE } from './Workspace/workspaceNotices';

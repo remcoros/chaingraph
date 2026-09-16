@@ -126,6 +126,29 @@
       }
     },
     {
+      "files": [
+        "src/App/Workspace/Workbenches/Wallet/useWalletAnalysis.ts",
+        "src/App/Workspace/Workbenches/Wallet/useWalletAnalysis.test.ts"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/Workbenches/Analysis/**", "../Analysis/**"],
+                "message": "Wallet must not import Analysis workbench internals. Shared analysis modules live in Workspace/Analysis."
+              },
+              {
+                "group": ["**/Workbenches/Graph/**", "../Graph/**", "../../Graph/**"],
+                "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["src/App/Workspace/ChainData/**", "src/App/Workspace/Selection/**"],
       "rules": {
         "eslint/no-restricted-imports": [

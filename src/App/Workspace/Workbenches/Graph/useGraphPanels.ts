@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Workspace } from '../../../../Domain/types';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import {
   openFlowPanel,
   type GraphLeftTab,

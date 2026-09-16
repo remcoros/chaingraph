@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { Modal } from './Modal';
 
 export function WorkspaceDetailsDialog({

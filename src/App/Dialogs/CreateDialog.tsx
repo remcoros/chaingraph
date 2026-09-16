@@ -1,8 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
-import type { Network, Workspace } from '../../Domain/types';
+import type { Network } from '../../Domain/Chain/network';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { newWorkspace } from '../../Domain/Workspace/workspace';
-import type { WorkspaceTemplate } from '../../Domain/Workspace/workspaceTemplates';
+import type { WorkspaceTemplate } from '../Examples/workspaceTemplates';
 import { loadTemplateWorkspace } from '../Examples/templateWorkspace';
 import { Modal } from './Modal';
 import { focusDialogField, PasswordControls, PasswordField } from './PasswordControls';

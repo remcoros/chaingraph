@@ -1,4 +1,4 @@
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import type { AppState } from '../useAppState';
 
 /**

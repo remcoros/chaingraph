@@ -11,17 +11,15 @@ import {
   ShieldCheck,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import {
-  type Annotation,
-  type GraphNode,
-  type Wallet,
-  type Workspace,
-  type Transaction,
-} from '../../../../../Domain/types';
+import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
 import type { GraphLeftTab } from '../../../graphViewState';
-import { walletCheckAge } from '../../../../../Domain/Wallet/walletActivity';
-import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import type { GraphFilters } from '../../../../../Domain/types';
+import { walletCheckAge } from '../../../Wallet/walletActivity';
+import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
+import type { GraphFilters } from '../../../graphViewState';
 import type { EntitySelection } from '../../../Selection/useEntitySelection';
 import EntityBrowser from './EntityBrowser';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';

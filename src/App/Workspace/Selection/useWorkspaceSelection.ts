@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { addGraphNodes } from '../../../Domain/Graph/graphMembership';
-import type { GraphFilters } from '../../../Domain/types';
+import { addGraphNodes } from '../GraphState/graphMembership';
+import type { GraphFilters } from '../graphViewState';
 import type { AppState } from '../../useAppState';
 import { useEntitySelection, type EntitySelection } from './useEntitySelection';
 

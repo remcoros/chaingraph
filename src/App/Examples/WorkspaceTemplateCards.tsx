@@ -1,6 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
-import type { Network } from '../../Domain/types';
-import { WORKSPACE_TEMPLATES } from '../../Domain/Workspace/workspaceTemplates';
+import type { Network } from '../../Domain/Chain/network';
+import { WORKSPACE_TEMPLATES } from './workspaceTemplates';
 
 export function WorkspaceTemplateCards({
   networks,

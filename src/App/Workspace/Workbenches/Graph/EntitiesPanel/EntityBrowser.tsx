@@ -32,12 +32,15 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { valueFilterError } from '../../../../../Domain/Graph/graphFilters';
+import { valueFilterError } from '../Filters/graphFilters';
 import { sortEntities, type EntitySort } from './entitySort';
 import { hasActiveFilters } from '../Filters/filterPresentation';
-import type { GraphFilters } from '../../../../../Domain/types';
-import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
-import type { Annotation, GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
+import type { GraphFilters } from '../../../graphViewState';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
+import type { Annotation } from '../../../../../Domain/Workspace/annotationTypes';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import './entity-browser.css';
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';

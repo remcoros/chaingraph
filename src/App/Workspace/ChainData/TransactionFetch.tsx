@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { fetchTransaction } from '../../../Infra/Bitcoin/api';
-import type { Network } from '../../../Domain/types';
+import type { Network } from '../../../Domain/Chain/network';
 import type {
   FetchPriority,
   TransactionFetchScope,

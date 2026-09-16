@@ -1,9 +1,12 @@
-import { outputNodeId, type Network, type Wallet, type Workspace } from '../../../../Domain/types';
+import { outputNodeId } from '../../../../Domain/Metadata/entityReferences';
+import type { Network } from '../../../../Domain/Chain/network';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import {
   verifiedWalletAddresses,
   verifyWalletUtxo,
   type WalletUtxoRecord,
-} from '../../../../Domain/Wallet/walletRecords';
+} from '../../Wallet/walletRecords';
 
 export interface WalletUtxoObservation {
   workspaceId: string;

@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import type { Wallet } from '../../Domain/types';
+import type { Wallet } from '../../Domain/Wallet/walletTypes';
 import { Modal } from './Modal';
 
 export function WalletNameDialog({

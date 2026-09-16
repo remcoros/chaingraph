@@ -12,15 +12,16 @@ import {
   Wallet as WalletIcon,
   LoaderCircle,
 } from 'lucide-react';
-import type { Wallet, Workspace } from '../../../../../Domain/types';
-import type { WalletUtxoRecord } from '../../../../../Domain/Wallet/walletRecords';
+import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import type { WalletUtxoRecord } from '../../../Wallet/walletRecords';
 import {
   applyReviewDecisions,
   isCompletedReview,
   REASON_LABELS,
   spendGuidance,
   type WalletReviewItem,
-} from '../../../../../Domain/Wallet/walletReview';
+} from '../../../Wallet/walletReview';
 import {
   buildWalletRecordRows,
   buildWalletRelationshipRows,
@@ -39,7 +40,7 @@ import {
   walletReviewCategoryScanState,
   type WalletReviewCategoryWorkspace,
 } from './reviewCategories';
-import type { AnalysisScan } from '../../../../../Domain/Analysis/analysisScan';
+import type { AnalysisScan } from '../../../Analysis/analysisScan';
 import { useRecordSelection } from '../useRecordSelection';
 import type { WalletUtxoController } from '../../../ChainData/WalletUtxos';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
@@ -60,9 +61,9 @@ import { matchRelatedEntities } from '../walletRelatedSelection';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
-import { walletRecordBlockObservation } from '../../../../../Domain/Chain/transactionTime';
+import { walletRecordBlockObservation } from '../../../Wallet/walletRecordBlockObservation';
 import { CopyButton } from '../../../../Controls/CopyButton';
-import { buildTagIndex } from '../../../../../Domain/Metadata/tags';
+import { buildTagIndex } from '../../../Annotations/tagProjection';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import { WalletPreparationCache } from '../walletPreparation';
 import '../wallet-workbench.css';

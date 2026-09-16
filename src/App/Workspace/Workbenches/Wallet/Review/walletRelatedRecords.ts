@@ -1,8 +1,9 @@
-import { outputNodeId, txNodeId, type Workspace } from '../../../../../Domain/types';
-import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
-import { walletOutputEvidence } from '../../../../../Domain/Wallet/walletRelationships';
+import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import { relatedTransactions } from '../../../Selection/relatedTransactions';
+import { walletOutputEvidence } from '../../../Wallet/walletRelationships';
 import { walletRowFinding, type WalletRow } from '../walletRows';
-import type { WalletSelectionIndex } from '../../../../../Domain/Wallet/walletSelectionIndex';
+import type { WalletSelectionIndex } from '../../../Wallet/walletSelectionIndex';
 
 export interface WalletRelatedRecords {
   inputs: string[];

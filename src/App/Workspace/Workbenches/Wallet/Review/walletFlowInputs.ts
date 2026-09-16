@@ -1,5 +1,7 @@
 import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
-import type { Network, Transaction, Workspace } from '../../../../../Domain/types';
+import type { Network } from '../../../../../Domain/Chain/network';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import type { WalletReviewFlowEntry } from '../walletReviewContext';
 import {
   indexPreviousOutputs,
@@ -11,7 +13,7 @@ import {
   validateTransactionAddresses,
 } from '../../../../../Domain/Workspace/workspace';
 import { mapLimit } from '../../../../../Infra/Bitcoin/api';
-import { mergeFlowInputs } from '../../../../../Domain/Chain/flowInputs';
+import { mergeFlowInputs } from '../../../ChainData/flowInputs';
 
 export const WALLET_FLOW_INPUT_WAVE_LIMIT = 20;
 export const WALLET_FLOW_VISIBLE_INPUT_LIMIT = 100;

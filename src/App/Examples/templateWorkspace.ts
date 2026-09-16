@@ -1,4 +1,4 @@
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 
 /** Load and validate snapshots away from the UI thread; cancellation terminates the job. */
 export function loadTemplateWorkspace(

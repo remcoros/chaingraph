@@ -1,4 +1,4 @@
-import type { AnalysisScan, scanDefaults } from '../../../../Domain/Analysis/analysisScan';
+import type { AnalysisScan, scanDefaults } from '../../Analysis/analysisScan';
 import type { ReviewPriority } from './analysisReview';
 
 /**

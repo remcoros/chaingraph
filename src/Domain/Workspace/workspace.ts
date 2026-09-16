@@ -1,39 +1,32 @@
 import { z } from 'zod';
 import {
-  buildGraph,
-  clearContextProvenance,
-  markContextTransactions,
-  promoteInputContext,
-  type GraphEvidenceWorkspace,
-} from './graphEvidence';
-export { buildGraph, clearContextProvenance, markContextTransactions, promoteInputContext };
-export { outputAddress } from '../Chain/prevouts';
-export type { GraphEvidenceWorkspace };
-import {
   assertConnectionScanBudget,
   connectionScansSchema,
   latestConnectionScanRecords,
   validateConnectionScanRecords,
-} from '../ConnectionScan/connectionScanRecords';
+} from './connectionScanStorage';
 import { address as bitcoinAddress, networks as bitcoinNetworks } from 'bitcoinjs-lib';
 import { hexToBytes } from '@noble/hashes/utils.js';
-import { graphSnapshotSchema } from '../Graph/graphSnapshot';
+import { graphSnapshotSchema } from './graphSnapshotStorage';
 import {
   assertGraphNodeBudget,
   graphNodeIdsSchema,
   parseGraphNodeIds,
-} from '../Graph/graphMembershipValidation';
+} from './graphMembershipStorage';
 import {
   assertHiddenNodeBudget,
   hiddenNodeIdsSchema,
   parseHiddenNodeIds,
-} from '../Graph/visibility';
-import type { Workspace, Transaction, Network } from '../types';
-import { sats } from '../types';
-import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from '../Metadata/tags';
-import { assertWalletReviewBudget, walletReviewsSchema } from '../Wallet/walletReview';
+} from './visibilityStorage';
+import type { Workspace } from './workspaceTypes';
+import type { Transaction } from '../Chain/transaction';
+import type { Network } from '../Chain/network';
+import { sats } from '../Chain/transaction';
+import { assertTagBudget, parseWorkspaceTags, workspaceTagsSchema } from './tagStorage';
+import { assertWalletReviewBudget, walletReviewsSchema } from './walletReviewStorage';
 import { indexPreviousOutputs } from '../Chain/prevouts';
 import { CURRENT_WORKSPACE_VERSION, migrateWorkspace } from './workspaceMigrations';
+import { legacyGraphNodeIds } from './legacyGraphMembership';
 import {
   addressToScriptHash,
   inspectExtendedPublicKey,
@@ -41,7 +34,7 @@ import {
 } from '../Wallet/wallet';
 const MAX_MONEY = 21_000_000;
 const MAX_MONEY_SATS = MAX_MONEY * 100_000_000;
-export const MAX_GRAPH_RECORDS = 50_000;
+const MAX_GRAPH_RECORDS = 50_000;
 const txid = z.string().regex(/^[0-9a-f]{64}$/);
 const text = z.string().max(10000);
 const uint32 = z.number().int().min(0).max(0xffffffff);
@@ -388,7 +381,7 @@ const workspaceSchema = z.object({
   }),
 });
 
-export class WorkspaceValidationError extends Error {
+class WorkspaceValidationError extends Error {
   constructor(
     readonly code:
       | 'graph-limit'
@@ -693,10 +686,7 @@ export function parseWorkspace(
       throw new Error('Address UTXO observation contains an invalid transaction ID.');
   }
   if (parsed.view.graphNodeIds === undefined)
-    parsed.view.graphNodeIds = parseGraphNodeIds(
-      buildGraph(parsed).nodes.map((node) => node.id),
-      parsed.network,
-    );
+    parsed.view.graphNodeIds = parseGraphNodeIds(legacyGraphNodeIds(parsed), parsed.network);
   return parsed;
 }
 export function newWorkspace(name: string, network: Workspace['network']): Workspace {

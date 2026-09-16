@@ -7,19 +7,21 @@ import {
   RECENT_ADDRESS_GRAPH_LIMIT,
   shouldLoadAddressHistory,
   selectedAddress as selectedAddressForHistory,
-} from '../../../Domain/Chain/addressHistory';
-import { addGraphNodes } from '../../../Domain/Graph/graphMembership';
+} from './addressHistory';
+import { addGraphNodes } from '../GraphState/graphMembership';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type GraphFilters, type GraphNode } from '../../../Domain/types';
+import type { GraphFilters } from '../graphViewState';
+import type { GraphNode } from '../GraphState/types';
 import type { AppState } from '../../useAppState';
 import type { WorkspaceCore } from '../workspaceCore';
 import type { WorkspaceSelection } from '../Selection/useWorkspaceSelection';
 import type { WorkspaceLookup } from '../useWorkspaceLookup';
-import { clearContextProvenance } from '../../../Domain/Workspace/workspace';
+import { clearContextProvenance } from './observationContext';
 import { openFlowPanel } from '../graphViewState';
 import { mergeTransactionObservations } from '../../../Domain/Chain/prevouts';
 import { withHistoryHeight } from '../../../Domain/Chain/transactionStatus';
-import { outputNodeId, addressNodeId, txNodeId, type Transaction } from '../../../Domain/types';
+import { outputNodeId, addressNodeId, txNodeId } from '../../../Domain/Metadata/entityReferences';
+import type { Transaction } from '../../../Domain/Chain/transaction';
 import {
   fetchAddressBalance,
   fetchAddressUtxos,

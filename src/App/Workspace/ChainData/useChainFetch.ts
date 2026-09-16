@@ -1,13 +1,13 @@
-import { ensureGraphMembership } from '../../../Domain/Graph/graphMembership';
+import { ensureGraphMembership } from '../GraphState/graphMembership';
 import type { AppState } from '../../useAppState';
 import type { WorkspaceCore } from '../workspaceCore';
 import {
   clearContextProvenance,
   markContextTransactions,
   promoteInputContext,
-} from '../../../Domain/Workspace/workspace';
+} from './observationContext';
 import { mergeTransactionObservations } from '../../../Domain/Chain/prevouts';
-import { type Transaction } from '../../../Domain/types';
+import type { Transaction } from '../../../Domain/Chain/transaction';
 import { fetchTransaction } from '../../../Infra/Bitcoin/api';
 import { traceSourceExists } from '../../../Infra/Bitcoin/tracing';
 import type { RefObject } from 'react';

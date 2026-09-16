@@ -1,4 +1,4 @@
-import { short } from '../../../Domain/types';
+import { short } from './referenceFormat';
 import './responsive-identifier.css';
 
 function flexibleIdentifier(value: string) {

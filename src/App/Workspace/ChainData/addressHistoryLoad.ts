@@ -1,4 +1,4 @@
-import { type Network } from '../../../Domain/types';
+import type { Network } from '../../../Domain/Chain/network';
 export type AddressHistoryLoadPhase = 'history' | 'details' | 'balance';
 export interface AddressHistoryLoadState {
   workspaceId: string;

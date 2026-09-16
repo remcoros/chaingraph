@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { Workspace } from '../../Domain/types';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
 import { decryptWorkspaceOffThread } from '../../Infra/Storage/workspaceEncryptionClient';
 import { WorkspaceOperationError } from '../../Infra/Storage/workspaceOperationError';
 import { Modal } from './Modal';

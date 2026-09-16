@@ -1,8 +1,9 @@
-import type { Transaction, Workspace } from '../../../Domain/types';
-import { transactionStatus } from '../../../Domain/Chain/transactionStatus';
-import { transactionBlockTime } from '../../../Domain/Chain/transactionTime';
-import { transactionFee } from '../../../Domain/Chain/transactionFee';
-import { formatSats } from '../../../Domain/Chain/amountFormat';
+import type { Transaction } from '../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../Domain/Workspace/workspaceTypes';
+import { transactionStatus } from './transactionStatus';
+import { transactionBlockTime } from './transactionTime';
+import { transactionFee } from './transactionFee';
+import { formatSats } from './amountFormat';
 import './transaction-block-time.css';
 
 export function TransactionFeeLabel({

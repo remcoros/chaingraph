@@ -1,5 +1,9 @@
 import { addressToScriptHash } from '../Wallet/wallet';
-import { outputNodeId, type Network } from '../types';
+import type { Network } from '../Chain/network';
+
+export const txNodeId = (txid: string) => `tx:${txid}`;
+export const outputNodeId = (txid: string, vout: number) => `out:${txid}:${vout}`;
+export const addressNodeId = (address: string) => `addr:${address}`;
 
 export function canonicalAddress(address: string): string {
   return /^(bc|tb)1/i.test(address) ? address.toLowerCase() : address;

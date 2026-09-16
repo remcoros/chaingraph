@@ -1,18 +1,18 @@
 import { Amount } from '../../../../Controls/Display/Amount';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
-import {
-  formatLocalTimestamp,
-  walletRecordBlockObservation,
-} from '../../../../../Domain/Chain/transactionTime';
+import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
+import { walletRecordBlockObservation } from '../../../Wallet/walletRecordBlockObservation';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
-import { outputNodeId, txNodeId, type Wallet, type Workspace } from '../../../../../Domain/types';
+import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import {
   listWalletTransactions,
   verifyWalletUtxo,
   type WalletUtxoRecord,
-} from '../../../../../Domain/Wallet/walletRecords';
+} from '../../../Wallet/walletRecords';
 import type { WalletUtxoController } from '../../../ChainData/WalletUtxos';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './wallet-records.css';

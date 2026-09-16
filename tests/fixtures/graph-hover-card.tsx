@@ -9,8 +9,9 @@ import type {
   GraphAdapterEvents,
   GraphAdapterFactory,
 } from '../../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
-import { buildGraph, newWorkspace } from '../../src/Domain/Workspace/workspace';
-import { txNodeId } from '../../src/Domain/types';
+import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
+import { newWorkspace } from '../../src/Domain/Workspace/workspace';
+import { txNodeId } from '../../src/Domain/Metadata/entityReferences';
 
 // Synthetic observations stay in memory and never issue chain requests.
 const txid = '1234567' + 'a'.repeat(50) + 'abcdef0';

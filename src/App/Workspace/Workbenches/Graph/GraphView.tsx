@@ -14,22 +14,19 @@ import {
   Play,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  short,
-  type GraphLink,
-  type GraphNode,
-  type Transaction,
-  type Workspace,
-} from '../../../../Domain/types';
+import { short } from '../../../Controls/Display/referenceFormat';
+import type { GraphLink, GraphNode } from '../../GraphState/types';
+import type { Transaction } from '../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './graph.css';
 import type { GraphFlowContext } from './Renderer/flowContext';
 import { VisibilityActions, type VisibilityProps } from '../../Selection/VisibilityActions';
 import {
   graphSnapshotSchema,
-  mergeGraphSnapshot,
   type GraphSnapshot,
-} from '../../../../Domain/Graph/graphSnapshot';
+} from '../../../../Domain/Workspace/graphSnapshotStorage';
+import { mergeGraphSnapshot } from './Renderer/graphSnapshot';
 import type { GraphAdapter, GraphAdapterFactory } from './Renderer/adapter';
 import { createDefaultAdapter } from './Renderer/defaultAdapter';
 import {

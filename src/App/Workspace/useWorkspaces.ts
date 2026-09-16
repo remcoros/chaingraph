@@ -4,16 +4,17 @@ import {
 } from '../../Infra/Bitcoin/transactionScheduler';
 import { WalletPreparationCache } from './Workbenches/Wallet/walletPreparation';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import type { Transaction, Workspace } from '../../Domain/types';
-import { describeWorkspaceChange } from '../../Domain/Workspace/undoDescription';
+import type { Transaction } from '../../Domain/Chain/transaction';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import { describeWorkspaceChange } from './undoDescription';
 import {
   MAX_SCAN_EVIDENCE_TRANSACTIONS,
   MAX_SCAN_RECORD_BYTES,
   scanResultEvidenceIds,
-} from '../../Domain/ConnectionScan/connectionScanRecords';
+} from '../../Domain/Workspace/connectionScanStorage';
 import { parseWorkspace, assertWorkspaceBudget } from '../../Domain/Workspace/workspace';
-import { carryScanMetadata, walletEvidenceChanged } from '../../Domain/Wallet/walletActivity';
-import { carryObservationContext } from '../../Domain/Chain/observationContext';
+import { carryScanMetadata, walletEvidenceChanged } from './Wallet/walletActivity';
+import { carryObservationContext } from './observationContext';
 import {
   assertEnvelopeHeader,
   WorkspaceCryptoError,

@@ -1,10 +1,12 @@
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { GraphNode, Transaction, Workspace } from '../../../../../Domain/types';
-import { short } from '../../../../../Domain/types';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
+import { short } from '../../../../Controls/Display/referenceFormat';
 import { inspectScript, type RawInspection, fetchRawInspection } from './transactionInspection';
-import { relatedTransactions } from '../../../../../Domain/Chain/relatedTransactions';
+import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';

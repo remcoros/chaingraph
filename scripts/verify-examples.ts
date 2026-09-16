@@ -1,6 +1,7 @@
-import { examplesForNetwork } from '../src/Domain/Workspace/examples';
+import { examplesForNetwork } from './exampleVerificationExamples';
 import { parseTransaction } from '../src/Domain/Workspace/workspace';
-import type { Network, Transaction } from '../src/Domain/types';
+import type { Network } from '../src/Domain/Chain/network';
+import type { Transaction } from '../src/Domain/Chain/transaction';
 import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
 
 // Uses a running proxy only. Does not load environment files or print destinations.

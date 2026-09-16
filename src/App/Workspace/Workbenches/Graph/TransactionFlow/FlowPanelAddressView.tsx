@@ -3,20 +3,17 @@ import { Box, Bookmark, Layers } from 'lucide-react';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
-import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
-import {
-  addressBalanceSats,
-  type AddressHistory,
-} from '../../../../../Domain/Chain/addressHistory';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
+import { addressBalanceSats, type AddressHistory } from '../../../ChainData/addressHistory';
 import { paginateAddressHistorySections } from './addressHistorySections';
-import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import {
-  txNodeId,
-  type AddressBalanceObservation,
-  type AddressUtxoObservation,
-  type GraphNode,
-  type Workspace,
-} from '../../../../../Domain/types';
+import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
+import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import type {
+  AddressBalanceObservation,
+  AddressUtxoObservation,
+} from '../../../../../Domain/Chain/observations';
+import type { GraphNode } from '../../../GraphState/types';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 
 export interface FlowPanelAddressViewProps {
   workspace: Workspace;

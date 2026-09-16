@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { type Workspace } from '../Domain/types';
+import type { Workspace } from '../Domain/Workspace/workspaceTypes';
 import { useBackendNetworks } from './useBackendNetworks';
 import { useWorkspaces, type SavedWorkspace } from './Workspace/useWorkspaces';
 export function useAppState() {

@@ -35,8 +35,12 @@ src/
       useDialogState.ts     which workspace dialog is open and its target
 
       LookupForm.tsx        Workspace toolbar lookup form
+      Analysis/             analysis registry, tools, scans and bounded recovery
+      Annotations/          labels, tags and metadata mutations
       Selection/            shared selection, connection-scan targets and visibility
-      Annotations/          labels, tags, icons, bookmarks and BIP329 exchange
+      ConnectionScan/       scan-node vocabulary shared by Selection and Graph
+      GraphState/           graph evidence, membership and manual visibility
+      Wallet/               wallet evidence, records, relationships and review model
       Workbenches/
         workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
         Wallet/             wallet overview, scan and preparation state
@@ -81,42 +85,40 @@ src/
           useWorkspaceAnalysis.ts retained sessions and the wallet-run revision
           analysisSession.ts  retained scan, scope and reader filters per workspace
   Domain/
-    types.ts                shared Bitcoin and workspace contracts
-    Chain/                  transaction, address and prevout evidence
-    Wallet/                 key derivation, review and record projections
-    Graph/                  membership, filters, handoffs and visibility
-    Analysis/               analysis registry, scope and review logic
-      tools/                heuristic implementations
-    ConnectionScan/         bounded search, targets, records and path addition
-    Metadata/               pure edits, tags, references and BIP329 labels
-    Workspace/              schema, migration, removal and example catalog
-      templateData/         bundled public chain snapshots
+    Chain/                  network, transaction and observed prevout contracts
+    Wallet/                 watch-only key derivation and persisted wallet contracts
+    Metadata/               canonical entity references
+    Workspace/              persisted contracts, schemas, limits and migrations
   Infra/
     Bitcoin/                HTTP API, scheduling, ancestry and UTXO requests
     Storage/                encryption worker, compression and envelope storage
 server/                     bounded read-only Core/Electrum proxy
-tests/                      domain and integration suites; shared fixtures
+tests/
+  integration/             tests that intentionally cross module or layer boundaries
+  fixtures/                fixtures shared by more than one product concept
+  e2e/                     browser product workflows
 scripts/                    development, validation and release tooling
 ```
 
 ## Common tasks
 
-| Task                                   | Start here                                                                              | Relevant tests in `tests/`                                                                                        |
-| -------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs/`                                       | `password-controls.test.ts`, `workspace-storage.test.ts`                                                          |
-| Autosave, lock or undo                 | `App/Workspace/useWorkspaces.ts`, `Infra/Storage/`                                      | `workspace-save-scheduling.test.ts`, `workspace-encryption-worker.test.ts`, `workspace-undo-descriptions.test.ts` |
-| Wallet review or records               | `App/Workspace/Workbenches/Wallet/`, `Graph/InspectorPanel/`, `Domain/Wallet/`          | `wallet-review*.test.ts`, `wallet-records.test.ts`, `wallet-preparation.test.ts`                                  |
-| Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `Domain/Chain/`                     | `transactionFlow.test.ts`, `address-history.test.ts`, `flow-inputs.test.ts`                                       |
-| Canvas rendering or layout             | `App/Workspace/Workbenches/Graph/Renderer/`                                             | `flow-layout.test.ts`, `graph-presentation.test.ts`, `flow-renderer-responsiveness.test.ts`                       |
-| Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/Selection/`, `Domain/Graph/` | `graph-filters.test.ts`, `graph-membership.test.ts`, `visibility.test.ts`                                         |
-| Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `Domain/ConnectionScan/`             | `connectionScan*.test.ts`                                                                                         |
-| Analysis tools or reports              | `App/Workspace/Workbenches/Analysis/`, `Domain/Analysis/`                               | `analysis*.test.ts`                                                                                               |
-| Labels, tags or icons                  | `App/Controls/Metadata/`, `Graph/TagsPanel/`, `Domain/Metadata/`                        | `batch-*.test.ts`, `tags.test.ts`, `labels.test.ts`                                                               |
-| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/ChainData/TransactionFetch.tsx`                        | `network-api.test.ts`, `transaction-scheduler.test.ts`, `scanner.test.ts`                                         |
+| Task                                   | Start here                                                                            | Test location                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Dialogs/`                                     | Dialog tests beside their owners; cross-storage cases in `tests/integration/workspace/`        |
+| Autosave, lock or undo                 | `App/Workspace/useWorkspaces.ts`, `Infra/Storage/`                                    | Colocated unit tests and `tests/integration/workspace/`                                        |
+| Wallet review or records               | `App/Workspace/Wallet/`, `Workbenches/Wallet/`, `Graph/InspectorPanel/`               | Colocated Wallet tests and `tests/integration/wallet/`                                         |
+| Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `App/Workspace/ChainData/`        | Tests beside those modules; mixed cases in `tests/integration/chain/`                          |
+| Canvas rendering or layout             | `App/Workspace/Workbenches/Graph/Renderer/`                                           | Colocated renderer tests                                                                       |
+| Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/GraphState/`, `Selection/` | Tests beside those modules; persistence cases under `tests/integration/graph/` or `workspace/` |
+| Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `App/Workspace/ConnectionScan/`    | Colocated algorithm tests and `tests/integration/connection-scan/`                             |
+| Analysis tools or reports              | `App/Workspace/Analysis/`, `App/Workspace/Workbenches/Analysis/`                      | Colocated analysis and workbench tests                                                         |
+| Labels, tags or icons                  | `App/Workspace/Annotations/`, `App/Controls/Metadata/`, `Graph/TagsPanel/`            | Colocated annotation tests and `tests/integration/workspace/tags.test.ts`                      |
+| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/ChainData/TransactionFetch.tsx`                      | Colocated scheduler tests and `tests/integration/bitcoin/`                                     |
 
-Paths in the task table are relative to `src/`. Primitive
-tests live in `Domain/Wallet/wallet.test.ts` and `Infra/Storage/crypto.test.ts`;
-backend tests live beside the server modules. Test commands are in
+Paths in the task table are relative to `src/`. Focused tests live beside their
+production owner as `*.test.ts` or `*.test.tsx`. Cross-module tests live under
+`tests/integration/`; shared fixtures stay under `tests/fixtures/`; backend tests
+live beside the server modules. Test commands are in
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Workspace vocabulary
@@ -142,12 +144,12 @@ presentation-only, and can group rapid edits under one description.
 Four separate features once shared the word "scan". Each keeps its own words, and
 names stay unambiguous at the scope where they are exposed:
 
-| Feature          | Means                                                                         | Entry point                             | Domain                     |
-| ---------------- | ----------------------------------------------------------------------------- | --------------------------------------- | -------------------------- |
-| Wallet discovery | Derive branches and pull their history. "Scan wallet" or "Refresh" in the UI. | `walletDiscovery` (`useWalletActivity`) | `Wallet/wallet.ts`         |
-| Wallet analysis  | Run the analysis tools over a wallet scope. "Analyze" in the UI.              | `useWalletAnalysis`                     | `Analysis/analysisScan.ts` |
-| Wallet review    | The queue of sources, destinations and activity to label.                     | `walletActions`, review panels          | `Wallet/walletReview.ts`   |
-| Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | `ConnectionScan/`          |
+| Feature          | Means                                                                         | Entry point                             | Owner                                   |
+| ---------------- | ----------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------- |
+| Wallet discovery | Derive branches and pull their history. "Scan wallet" or "Refresh" in the UI. | `walletDiscovery` (`useWalletActivity`) | `Domain/Wallet/wallet.ts`, `ChainData/` |
+| Wallet analysis  | Run the analysis tools over a wallet scope. "Analyze" in the UI.              | `useWalletAnalysis`                     | `App/Workspace/Analysis/`               |
+| Wallet review    | The queue of sources, destinations and activity to label.                     | `walletActions`, review panels          | `App/Workspace/Wallet/`                 |
+| Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | Graph `ConnectionScan/`                 |
 
 Wallet analysis and the Analysis workbench are the same feature reached from two
 places, so they share `AnalysisScan` and write one `findings` store. Wallet

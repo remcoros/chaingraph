@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../Dialogs';
 import type { BackendStatus } from '../../Infra/Bitcoin/api';
-import type { Network } from '../../Domain/types';
+import type { Network } from '../../Domain/Chain/network';
 import './product.css';
 
 export function AboutDialog({

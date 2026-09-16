@@ -1,13 +1,13 @@
-import { analysisTools } from '../../../../../Domain/Analysis/analysis';
-import type { AnalysisScan } from '../../../../../Domain/Analysis/analysisScan';
-import { listTagsForNode } from '../../../../../Domain/Metadata/tags';
-import type { Workspace } from '../../../../../Domain/types';
+import { analysisTools } from '../../../Analysis/analysis';
+import type { AnalysisScan } from '../../../Analysis/analysisScan';
+import { listTagsForNode } from '../../../Annotations/tagProjection';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import {
   REVIEW_REASONS,
   REASON_LABELS,
   type ReviewReason,
   type WalletReviewItem,
-} from '../../../../../Domain/Wallet/walletReview';
+} from '../../../Wallet/walletReview';
 
 export interface WalletReviewCategory {
   id: string;

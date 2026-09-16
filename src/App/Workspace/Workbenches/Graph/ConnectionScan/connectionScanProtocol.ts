@@ -4,7 +4,7 @@ import type {
   ScanNeighbors,
   ScanRun,
   ScanStopReason,
-} from '../../../../../Domain/ConnectionScan/connectionScan';
+} from './connectionScan';
 export type ConnectionScanRequest = Pick<
   ConnectionScanOptions,
   'id' | 'source' | 'targetIds' | 'displayedNodeIds' | 'knownNodeIds' | 'knownLinks' | 'settings'

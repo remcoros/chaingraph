@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { base64 } from '@scure/base';
 import { parseWorkspace } from '../src/Domain/Workspace/workspace';
-import type { Workspace } from '../src/Domain/types';
+import type { Workspace } from '../src/Domain/Workspace/workspaceTypes';
 import {
   decryptWorkspace,
   encryptWorkspace,

@@ -1,5 +1,5 @@
 import TagsPanel from '../TagsPanel';
-import { type GraphFilters } from '../../../../../Domain/types';
+import type { GraphFilters } from '../../../graphViewState';
 import { EntitiesPanelDetail } from './EntitiesPanelDetail';
 import type { WorkspaceController } from '../../../useWorkspace';
 

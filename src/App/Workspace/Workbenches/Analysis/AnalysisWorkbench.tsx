@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   Info,
 } from 'lucide-react';
-import { analysisTools } from '../../../../Domain/Analysis/analysis';
+import { analysisTools } from '../../Analysis/analysis';
 import {
   analysisScopeChoice,
   mergeScanFindings,
@@ -26,20 +26,17 @@ import {
   type AnalysisScopeSelection,
   type AnalysisScopeWallet,
   type AnalysisScopeWorkspace,
-} from '../../../../Domain/Analysis/analysisScan';
+} from '../../Analysis/analysisScan';
 import type { AnalysisSession } from './analysisSession';
-import { formatLocalTimestamp } from '../../../../Domain/Chain/transactionTime';
-import {
-  addressNodeId,
-  sats,
-  txNodeId,
-  type AnalysisFinding,
-  type GraphNode,
-  type Wallet,
-  type Workspace,
-} from '../../../../Domain/types';
-import { walletEvidenceChanged } from '../../../../Domain/Wallet/walletActivity';
-import { outputAddress } from '../../../../Domain/Workspace/workspace';
+import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
+import { addressNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
+import { sats } from '../../../../Domain/Chain/transaction';
+import type { AnalysisFinding } from '../../../../Domain/Workspace/analysisFinding';
+import type { GraphNode } from '../../GraphState/types';
+import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../../../Domain/Workspace/workspaceTypes';
+import { walletEvidenceChanged } from '../../Wallet/walletActivity';
+import { outputAddress } from '../../../../Domain/Chain/prevouts';
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,
@@ -58,7 +55,7 @@ import {
   analysisDataGaps,
   recoverAnalysisData,
   recoveryLimits,
-} from '../../../../Domain/Analysis/analysisRecovery';
+} from '../../Analysis/analysisRecovery';
 import { useTransactionFetch } from '../../ChainData/TransactionFetch';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';

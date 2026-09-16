@@ -7,8 +7,9 @@ creates lives in the browser, encrypted at rest.
 
 ```mermaid
 flowchart LR
-  UI[Browser workbench] --> Domain[Workspace and analysis modules]
-  Domain --> Vault[Encrypted browser storage and workspace files]
+  UI[Browser workbench] --> App[Workspace concepts and operations]
+  App --> Domain[Persisted and chain contracts]
+  App --> Vault[Encrypted browser storage and workspace files]
   UI --> Scan[Browser key derivation and bounded scans]
   Scan --> API[Same-origin HTTP API]
   API --> Core[Bitcoin Core RPC]
@@ -32,28 +33,27 @@ Three principles run through every module:
 See [source-map.md](source-map.md) for the directory tree, task entry points and
 test locations. Source is grouped by product ownership.
 
-| Location                                                       | Responsibility                                                                     |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `src/App/App.tsx`, `src/App/useAppState.ts`                    | App shell, session navigation, home and dialogs                                    |
-| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`          | Shared state, selection, presentation and workbench switching/focus                |
-| `src/App/Workspace/ChainData/`                                 | Bounded address and transaction loading, cancellation and evidence updates         |
-| `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/` | Each workbench composes its own views and binds shared Workspace state             |
-| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs/`         | Workspace entry, example creation, help and dialogs                                |
-| `src/App/Workspace/useWorkspaces.ts`                           | Unlocked sessions, undo/redo, autosave and locking                                 |
-| `src/App/Workspace/Selection/`, `Tags/`                        | Shared selection and workspace tag management                                      |
-| `src/App/Workspace/Workbenches/Wallet/`                        | Wallet overview, records, review UI, scan hooks and preparation cache              |
-| `src/App/Workspace/Workbenches/Graph/`                         | Graph surface, side panels, filters, transaction flow and metadata projection      |
-| `src/App/Workspace/Workbenches/Graph/Renderer/`                | Renderer-neutral contract, Three.js renderer, layout worker and picking            |
-| `src/App/Workspace/Workbenches/Graph/ConnectionScan/`          | Connection panel, worker bridge and bounded scan fetching                          |
-| `src/App/Workspace/Workbenches/Analysis/`                      | Analysis controls and reports                                                      |
-| `src/App/Controls/`                                            | Reused App-owned controls, evidence display and metadata editors                   |
-| `src/Domain/types.ts`, `src/Domain/Workspace/`                 | Shared contracts, schema validation, migrations, removal and example snapshots     |
-| `src/Domain/Chain/`, `Wallet/`, `Graph/`                       | Chain evidence, key derivation, wallet projections, graph membership and filtering |
-| `src/Domain/Analysis/`, `ConnectionScan/`, `Metadata/`         | Heuristics, bounded connection search, pure annotation edits and BIP329 labels     |
-| `src/Infra/Bitcoin/`                                           | Typed HTTP calls, ancestry/spending requests and prioritized fetch coordination    |
-| `src/Infra/Storage/`                                           | Authenticated envelopes, encryption worker, compression and browser persistence    |
-| `server/app.ts`, `rpc-schema.ts`                               | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist  |
-| `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`       | Upstream adapters, chain identity, network configuration and concurrency           |
+| Location                                                       | Responsibility                                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/App/App.tsx`, `src/App/useAppState.ts`                    | App shell, session navigation, home and dialogs                                   |
+| `src/App/Workspace/Workspace.tsx`, `useWorkspace.tsx`          | Shared state, selection, presentation and workbench switching/focus               |
+| `src/App/Workspace/Analysis/`, `Annotations/`, `GraphState/`   | Shared analysis, metadata and graph-state operations used by workbenches          |
+| `src/App/Workspace/ChainData/`, `Wallet/`, `Selection/`        | Shared evidence loading, wallet projections and selection operations              |
+| `src/App/Workspace/Workbenches/Graph/`, `Wallet/`, `Analysis/` | Each workbench composes its own views and binds shared Workspace state            |
+| `src/App/FrontPage/`, `Examples/`, `Help/`, `Dialogs/`         | Workspace entry, example creation, help and dialogs                               |
+| `src/App/Workspace/useWorkspaces.ts`                           | Unlocked sessions, undo/redo, autosave and locking                                |
+| `src/App/Workspace/Workbenches/Wallet/`                        | Wallet overview, records, review UI, scan hooks and preparation cache             |
+| `src/App/Workspace/Workbenches/Graph/`                         | Graph surface, side panels, filters, transaction flow and metadata projection     |
+| `src/App/Workspace/Workbenches/Graph/Renderer/`                | Renderer-neutral contract, Three.js renderer, layout worker and picking           |
+| `src/App/Workspace/Workbenches/Graph/ConnectionScan/`          | Connection panel, worker bridge and bounded scan fetching                         |
+| `src/App/Workspace/Workbenches/Analysis/`                      | Analysis controls and reports                                                     |
+| `src/App/Controls/`                                            | Reused App-owned controls, evidence display and metadata editors                  |
+| `src/Domain/Workspace/`                                        | Persisted workspace contracts, schemas, limits and migrations                     |
+| `src/Domain/Chain/`, `Wallet/`, `Metadata/`                    | Chain contracts, watch-only key derivation and canonical entity references        |
+| `src/Infra/Bitcoin/`                                           | Typed HTTP calls, ancestry/spending requests and prioritized fetch coordination   |
+| `src/Infra/Storage/`                                           | Authenticated envelopes, encryption worker, compression and browser persistence   |
+| `server/app.ts`, `rpc-schema.ts`                               | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist |
+| `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`       | Upstream adapters, chain identity, network configuration and concurrency          |
 
 ## Browser-owned state
 
@@ -415,7 +415,7 @@ separate wallet components mounted for every workspace or run analysis in the ba
 
 ## Analysis
 
-`analysisTools` in `src/Domain/Analysis/analysis.ts` is the extension point. A tool
+`analysisTools` in `src/App/Workspace/Analysis/analysis.ts` is the extension point. A tool
 declares metadata, evidence category, source reference and typed parameters;
 `analyze(workspace, transactionIds?, options)` returns findings, scope,
 summary, coverage and a no-match explanation. Findings carry a stable identity,
@@ -441,10 +441,11 @@ transaction and says so rather than fetching.
 
 ## Connection scans
 
-`src/Domain/ConnectionScan/connectionScan.ts` runs in `src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan.worker.ts`. Automatic
+`src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan.ts` runs in the
+worker beside it. Automatic
 scopes (`connectionScanNeighbours.ts`: breadth-first over loaded
 creates/spends links, up to 1,000 nearest nodes; visible; all added) and custom
-picks (`connectionScanTargets.ts`: exactly the picked transaction/outpoint IDs,
+picks (`App/Workspace/Selection/connectionScanTargets.ts`: exactly the picked transaction/outpoint IDs,
 deduplicated, source excluded, at most 1,000) freeze their targets and the
 loaded-link baseline before the run. FIFO fronts alternate source and target
 admission per requested direction, with up to four neighbour lookups in flight.

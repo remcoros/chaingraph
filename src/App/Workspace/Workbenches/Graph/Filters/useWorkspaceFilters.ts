@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import { valueFilterError } from '../../../../../Domain/Graph/graphFilters';
-import type { GraphFilters, Workspace } from '../../../../../Domain/types';
+import { valueFilterError } from './graphFilters';
+import type { GraphFilters } from '../../../graphViewState';
+import type { Workspace } from '../../../../../Domain/Workspace/workspaceTypes';
 import { entityPanelFiltersFromGraph } from './entityPanelFilters';
 
 const EMPTY_GRAPH_FILTERS: GraphFilters = {};

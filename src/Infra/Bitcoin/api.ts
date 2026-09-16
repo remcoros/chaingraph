@@ -9,16 +9,13 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type {
   AddressBalanceObservation,
   AddressUtxoObservation,
-  Network,
-  Transaction,
-  Wallet,
-  Workspace,
-} from '../../Domain/types';
-import {
-  parseTransaction,
-  outputAddress,
-  validateTransactionAddresses,
-} from '../../Domain/Workspace/workspace';
+} from '../../Domain/Chain/observations';
+import type { Network } from '../../Domain/Chain/network';
+import type { Transaction } from '../../Domain/Chain/transaction';
+import type { Wallet } from '../../Domain/Wallet/walletTypes';
+import type { Workspace } from '../../Domain/Workspace/workspaceTypes';
+import { parseTransaction, validateTransactionAddresses } from '../../Domain/Workspace/workspace';
+import { outputAddress } from '../../Domain/Chain/prevouts';
 import { addressToScriptHash, deriveAddresses } from '../../Domain/Wallet/wallet';
 import { withHistoryHeight } from '../../Domain/Chain/transactionStatus';
 export interface BackendStatus {
