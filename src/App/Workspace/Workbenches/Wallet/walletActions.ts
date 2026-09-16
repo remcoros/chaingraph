@@ -6,15 +6,11 @@ import {
 } from '../../../../Domain/Wallet/walletRecords';
 import { listWalletRelationships } from '../../../../Domain/Wallet/walletRelationships';
 import { addGraphNodes } from '../../../../Domain/Graph/graphMembership';
-import {
-  type GraphFilters,
-  type GraphRightTab,
-  type Wallet,
-  type Workspace,
-} from '../../../../Domain/types';
+import { type GraphFilters, type Wallet, type Workspace } from '../../../../Domain/types';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
+import type { GraphRightTab } from '../../graphViewState';
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 

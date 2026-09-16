@@ -49,7 +49,8 @@ import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIde
 import { BatchTagEditor, MetadataPopover } from '../../../../Controls/Metadata/MetadataEditors';
 import { IconPalette } from '../../../../Controls/Metadata/IconPicker';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
-import type { GraphNode, TransactionFlowState, Workspace } from '../../../../../Domain/types';
+import type { GraphNode, Workspace } from '../../../../../Domain/types';
+import type { TransactionFlowState } from '../../../graphViewState';
 import type { WalletUtxoObservation } from '../../../ChainData/WalletUtxos/walletUtxoObservation';
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';
 import type { EntitySelection } from '../../../Selection/useEntitySelection';

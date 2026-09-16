@@ -7,7 +7,7 @@ import type { WorkspaceCore } from '../workspaceCore';
 import type { WorkspaceSelection } from '../Selection/useWorkspaceSelection';
 import { setNodesHidden } from '../../../Domain/Graph/visibility';
 import { buildGraph } from '../../../Domain/Workspace/workspace';
-import { openFlowPanel } from '../../../Domain/Workspace/panelState';
+import { openFlowPanel } from '../graphViewState';
 import { outputNodeId, txNodeId } from '../../../Domain/types';
 import { loadSpending } from '../../../Infra/Bitcoin/api';
 import { ancestryNotice, loadAncestors, traceSourceExists } from '../../../Infra/Bitcoin/tracing';

@@ -1,16 +1,16 @@
 import { useCallback, useMemo } from 'react';
-import type {
-  GraphLeftTab,
-  GraphMobilePanel,
-  GraphPanelsState,
-  GraphRightTab,
-  TransactionFlowState,
-  Workspace,
-} from '../../../../Domain/types';
-import { openFlowPanel } from '../../../../Domain/Workspace/panelState';
+import type { Workspace } from '../../../../Domain/types';
+import {
+  openFlowPanel,
+  type GraphLeftTab,
+  type GraphMobilePanel,
+  type GraphPanelsState,
+  type GraphRightTab,
+  type TransactionFlowState,
+} from '../../graphViewState';
 import type { WorkspaceOperations } from '../../useWorkspaces';
 
-export type { GraphLeftTab, GraphMobilePanel, GraphRightTab };
+export type { GraphLeftTab, GraphMobilePanel, GraphRightTab } from '../../graphViewState';
 
 /** A tour step's view of the graph, which previews panels without changing them. */
 export interface GraphPanelPreview {

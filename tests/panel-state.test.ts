@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openFlowPanel } from '../src/Domain/Workspace/panelState';
+import { openFlowPanel } from '../src/App/Workspace/graphViewState';
 
 describe('workspace panel state', () => {
   it('opens collapsed flow state without shrinking full-height state', () => {

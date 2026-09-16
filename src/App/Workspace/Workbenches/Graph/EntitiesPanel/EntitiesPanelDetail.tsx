@@ -13,12 +13,12 @@ import {
 } from 'lucide-react';
 import {
   type Annotation,
-  type GraphLeftTab,
   type GraphNode,
   type Wallet,
   type Workspace,
   type Transaction,
 } from '../../../../../Domain/types';
+import type { GraphLeftTab } from '../../../graphViewState';
 import { walletCheckAge } from '../../../../../Domain/Wallet/walletActivity';
 import { formatLocalTimestamp } from '../../../../../Domain/Chain/transactionTime';
 import type { GraphFilters } from '../../../../../Domain/types';

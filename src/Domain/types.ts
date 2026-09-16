@@ -120,21 +120,20 @@ export interface AnalysisFinding {
   stale?: boolean;
   reviewRule?: ReviewRule;
 }
-export type GraphLeftTab = 'wallets' | 'entities' | 'bookmarks' | 'tags';
-export type GraphRightTab = 'scan' | 'inspect' | 'addresses' | 'transactions' | 'utxos';
-export type GraphMobilePanel = 'graph' | 'left' | 'right';
-export type FlowPanelHeight = 'collapsed' | 'expanded' | 'full';
-export interface TransactionFlowState {
+interface StoredTransactionFlowState {
   transactionId?: string;
   expandedInputs?: boolean;
   expandedOutputs?: boolean;
-  height?: FlowPanelHeight;
+  height?: 'collapsed' | 'expanded' | 'full';
 }
-export interface GraphPanelsState {
-  left?: { tab?: GraphLeftTab; collapsed?: boolean };
-  right?: { tab?: GraphRightTab; collapsed?: boolean };
-  flow?: TransactionFlowState;
-  mobile?: GraphMobilePanel;
+interface StoredGraphPanelsState {
+  left?: { tab?: 'wallets' | 'entities' | 'bookmarks' | 'tags'; collapsed?: boolean };
+  right?: {
+    tab?: 'scan' | 'inspect' | 'addresses' | 'transactions' | 'utxos';
+    collapsed?: boolean;
+  };
+  flow?: StoredTransactionFlowState;
+  mobile?: 'graph' | 'left' | 'right';
 }
 export interface Workspace {
   /** Decrypted data schema version, independent of the encrypted envelope format. */
@@ -190,7 +189,7 @@ export interface Workspace {
     selectionId?: string;
     filters?: GraphFilters;
     workbench?: 'graph' | 'analysis' | 'trace' | 'wallet';
-    panels?: GraphPanelsState;
+    panels?: StoredGraphPanelsState;
     prefetchDepth?: 0 | 1 | 2;
     selectedWallet?: string;
   };

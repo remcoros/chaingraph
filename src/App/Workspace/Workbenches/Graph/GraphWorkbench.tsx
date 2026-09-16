@@ -24,7 +24,7 @@ import { FlowPanel } from './TransactionFlow/FlowPanel';
 import { selectedWalletFilterIds } from '../../../../Domain/Graph/graphFilters';
 import { hasActiveFilters } from './Filters/filterPresentation';
 import { applyBatchIcon } from '../../../../Domain/Metadata/batchMetadata';
-import { openFlowPanel } from '../../../../Domain/Workspace/panelState';
+import { openFlowPanel } from '../../graphViewState';
 import {
   FilterChips,
   GraphConnectionsAction,
