@@ -8,9 +8,11 @@ import {
   presentScanRun,
   scanStatus,
   scanStatusLabel,
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanPresentation';
+import {
   resultFinding,
   resultCategory,
-} from '../src/Domain/ConnectionScan/connectionScanPresentation';
+} from '../src/Domain/ConnectionScan/connectionScanClassification';
 
 const run: ScanRun = {
   id: 'public-run',

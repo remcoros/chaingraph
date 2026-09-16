@@ -7,7 +7,7 @@ import {
 import {
   presentScanRun,
   scanRelationPresentation,
-} from '../src/Domain/ConnectionScan/connectionScanPresentation';
+} from '../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanPresentation';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;
 const out = (n: number, vout = 0) => `out:${n.toString(16).padStart(64, '0')}:${vout}`;

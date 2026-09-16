@@ -4,7 +4,7 @@ import {
   filterAnalysisFindings,
   findingReview,
   reviewPriorities,
-} from '../src/Domain/Analysis/analysisReview';
+} from '../src/App/Workspace/Workbenches/Analysis/analysisReview';
 import { newWorkspace, parseWorkspace } from '../src/Domain/Workspace/workspace';
 import type { AnalysisFinding, Transaction } from '../src/Domain/types';
 const id = (n: number) => n.toString(16).padStart(64, '0');

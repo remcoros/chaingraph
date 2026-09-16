@@ -39,12 +39,14 @@ import { indexLoadedSpends } from '../../../../../Domain/Chain/transactionFlow';
 import {
   presentScanRun,
   scanStatus,
-  resultFinding,
-  resultCategory,
   scanRelationPresentation,
   scanResultTooltip,
+} from './connectionScanPresentation';
+import {
+  resultFinding,
+  resultCategory,
   type ScanResultFinding,
-} from '../../../../../Domain/ConnectionScan/connectionScanPresentation';
+} from '../../../../../Domain/ConnectionScan/connectionScanClassification';
 import {
   groupScanResults,
   groupScanRuns,

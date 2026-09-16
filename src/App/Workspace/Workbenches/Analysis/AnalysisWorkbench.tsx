@@ -53,7 +53,7 @@ import {
   filterAnalysisFindings,
   reviewPriorities,
   type ReviewPriority,
-} from '../../../../Domain/Analysis/analysisReview';
+} from './analysisReview';
 import {
   analysisDataGaps,
   recoverAnalysisData,

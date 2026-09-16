@@ -1,6 +1,6 @@
 import { scanReconnectionKey } from './connectionScanContext';
 import type { ScanResult, ScanRun } from './connectionScan';
-import { resultCategory, resultFinding } from './connectionScanPresentation';
+import { resultCategory, resultFinding } from './connectionScanClassification';
 
 export function scanMeetingNode(result: ScanResult): string | undefined {
   if (result.meetingNode) return result.meetingNode;

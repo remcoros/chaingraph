@@ -1,5 +1,5 @@
 import type { AnalysisScan, scanDefaults } from '../../../../Domain/Analysis/analysisScan';
-import type { ReviewPriority } from '../../../../Domain/Analysis/analysisReview';
+import type { ReviewPriority } from './analysisReview';
 
 /**
  * Retained analysis state for one workspace: the last scan, its scope and the
