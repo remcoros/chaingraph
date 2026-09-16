@@ -277,6 +277,8 @@ export function ConnectionScanPanel(props: Props) {
     const abort = new AbortController();
     actionController.current = abort;
     setAdding(nodeId ? `node:${nodeId}` : `path:${result.id}`);
+    let failed = false;
+    let failure: unknown;
     try {
       const evidence = await loadScanActionEvidence({
         workspace: snapshot,
@@ -287,15 +289,21 @@ export function ConnectionScanPanel(props: Props) {
         isCurrent: () => mounted.current && current.current.active && owner.isCurrent(),
       });
       abort.signal.throwIfAborted();
-      if (!mounted.current || !current.current.active || !owner.isCurrent())
-        throw new DOMException('Path action cancelled.', 'AbortError');
-      const proof = { ...plan.transactions, ...evidence };
-      if (nodeId) owner.onSelect(nodeId, proof);
-      else owner.onAdd(result, prefixLength, proof);
-    } finally {
-      if (actionController.current === abort) actionController.current = undefined;
-      if (mounted.current) setAdding(undefined);
+      if (!mounted.current || !current.current.active || !owner.isCurrent()) {
+        failed = true;
+        failure = new DOMException('Path action cancelled.', 'AbortError');
+      } else {
+        const proof = { ...plan.transactions, ...evidence };
+        if (nodeId) owner.onSelect(nodeId, proof);
+        else owner.onAdd(result, prefixLength, proof);
+      }
+    } catch (cause) {
+      failed = true;
+      failure = cause;
     }
+    if (actionController.current === abort) actionController.current = undefined;
+    if (mounted.current) setAdding(undefined);
+    if (failed) throw failure;
   }
 
   async function start(startSource: string | undefined) {
@@ -397,6 +405,12 @@ export function ConnectionScanPanel(props: Props) {
     setSettings(frozenSettings);
     showRun(initial);
     setFilter('findings');
+    const finishScan = () => {
+      if (mounted.current && controller.current === abort) {
+        controller.current = undefined;
+        setBusy(false);
+      }
+    };
     try {
       const result = await runConnectionScanInWorker({
         request: {
@@ -439,11 +453,17 @@ export function ConnectionScanPanel(props: Props) {
           }
         },
       });
-      if (!mounted.current || controller.current !== abort || !current.current.isCurrent()) return;
+      if (!mounted.current || controller.current !== abort || !current.current.isCurrent()) {
+        finishScan();
+        return;
+      }
       showRun(result.run);
       retainResult(result);
     } catch {
-      if (!mounted.current || controller.current !== abort || !current.current.isCurrent()) return;
+      if (!mounted.current || controller.current !== abort || !current.current.isCurrent()) {
+        finishScan();
+        return;
+      }
       const failed: ScanRun = {
         ...(latestProgress.current?.run ?? initial),
         status: abort.signal.aborted ? 'cancelled' : 'failed',
@@ -453,12 +473,8 @@ export function ConnectionScanPanel(props: Props) {
       retainResult({ run: failed, evidence: latestProgress.current?.evidence ?? {} });
       if (!abort.signal.aborted)
         setError('Scan could not finish. Retry when evidence is available.');
-    } finally {
-      if (mounted.current && controller.current === abort) {
-        controller.current = undefined;
-        setBusy(false);
-      }
     }
+    finishScan();
   }
 
   async function retry(owner: ScanRun, result: ScanResult) {
@@ -468,6 +484,12 @@ export function ConnectionScanPanel(props: Props) {
     setRetrying({ runId: owner.id, resultId: result.id });
     setRetryNotice('');
     const runId = owner.id;
+    const finishRetry = () => {
+      if (retryController.current === abort) {
+        retryController.current = undefined;
+        if (mounted.current) setRetrying(undefined);
+      }
+    };
     try {
       const currentEvidence = {
         ...workspace.connectionScans?.evidence,
@@ -496,8 +518,10 @@ export function ConnectionScanPanel(props: Props) {
         retryController.current !== abort ||
         !mounted.current ||
         !current.current.isCurrent()
-      )
+      ) {
+        finishRetry();
         return;
+      }
       if (checked.globalReason) {
         setRetryNotice(
           checked.globalReason === 'rate-limited'
@@ -506,6 +530,7 @@ export function ConnectionScanPanel(props: Props) {
               ? 'Connect the backend to retry this lookup.'
               : 'Lookup could not finish. Retry when the backend is available.',
         );
+        finishRetry();
         return;
       }
       const latest =
@@ -528,12 +553,8 @@ export function ConnectionScanPanel(props: Props) {
         current.current.isCurrent()
       )
         setRetryNotice('Lookup could not finish. Retry with the backend connected.');
-    } finally {
-      if (retryController.current === abort) {
-        retryController.current = undefined;
-        if (mounted.current) setRetrying(undefined);
-      }
     }
+    finishRetry();
   }
 
   const groups = groupScanRuns(scanRuns);

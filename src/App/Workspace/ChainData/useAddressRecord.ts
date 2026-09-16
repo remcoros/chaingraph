@@ -261,8 +261,20 @@ export function useAddressRecord({
 
       let failed = false;
       void (async () => {
-        let historyError: unknown;
+        let historyFailed = false;
         let balanceFailed = false;
+        const reportHistoryFailure = () => {
+          failed = true;
+          setAddressHistoryLoads((loads) => ({
+            ...loads,
+            [key]: {
+              ...loads[key],
+              phase: 'history',
+              error: 'Address history could not be loaded. Retry.',
+            },
+          }));
+          setNotice('Address history could not be loaded. Retry.');
+        };
         const balancePromise = needsBalance
           ? fetchAddressBalance(current.network, address, controller.signal).catch(() => {
               controller.signal.throwIfAborted();
@@ -288,9 +300,9 @@ export function useAddressRecord({
                 { scope: fetchScope },
                 { onHistory: persistHistory, onTransaction: persistTransaction },
               );
-            } catch (error) {
+            } catch {
               controller.signal.throwIfAborted();
-              historyError = error;
+              historyFailed = true;
             }
           }
           flushTransactions();
@@ -311,31 +323,24 @@ export function useAddressRecord({
               }),
               false,
             );
-          if (historyError) throw historyError;
-          if (balanceFailed)
-            setNotice(
-              result
-                ? 'Address history loaded, but the address balance could not be checked. Retry.'
-                : 'Address balance could not be checked. Retry.',
-            );
-          if (result?.truncated)
-            setNotice(
-              balanceFailed
-                ? 'Address history is partial and the balance could not be checked. Retry.'
-                : 'Address history is partial: some transaction details are not loaded. Select a row to load one.',
-            );
+          if (historyFailed) reportHistoryFailure();
+          else {
+            if (balanceFailed)
+              setNotice(
+                result
+                  ? 'Address history loaded, but the address balance could not be checked. Retry.'
+                  : 'Address balance could not be checked. Retry.',
+              );
+            if (result?.truncated)
+              setNotice(
+                balanceFailed
+                  ? 'Address history is partial and the balance could not be checked. Retry.'
+                  : 'Address history is partial: some transaction details are not loaded. Select a row to load one.',
+              );
+          }
         } catch {
           if (controller.signal.aborted) return;
-          failed = true;
-          setAddressHistoryLoads((loads) => ({
-            ...loads,
-            [key]: {
-              ...loads[key],
-              phase: 'history',
-              error: 'Address history could not be loaded. Retry.',
-            },
-          }));
-          setNotice('Address history could not be loaded. Retry.');
+          reportHistoryFailure();
         }
       })().finally(() => {
         if (transactionFlushTimer) clearTimeout(transactionFlushTimer);
@@ -513,14 +518,16 @@ export function useAddressRecord({
                       : undefined,
                   mempool: undefined,
                 };
+            loaded = loaded + 1;
             setOperation(
-              `Loading UTXO timestamps ${++loaded}/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
+              `Loading UTXO timestamps ${loaded}/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
             );
             return observed;
           } catch {
             signal.throwIfAborted();
+            loaded = loaded + 1;
             setOperation(
-              `Loading UTXO timestamps ${++loaded}/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
+              `Loading UTXO timestamps ${loaded}/${Math.min(detailTargets.length, MAX_SCAN_TRANSACTIONS)}`,
             );
             return undefined;
           }

@@ -49,9 +49,8 @@ export function UnlockDialog({
                 ? error.message
                 : 'Could not unlock. Check your password. If browser data was cleared or is unavailable, restore an exported workspace backup.',
             );
-          } finally {
-            if (!signal.aborted) setBusy(false);
           }
+          if (!signal.aborted) setBusy(false);
         }}
       >
         <PasswordField

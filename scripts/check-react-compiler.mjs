@@ -17,6 +17,13 @@ const verbose = process.argv.includes('--verbose');
 const maxIndex = process.argv.indexOf('--max');
 const budget = maxIndex === -1 ? undefined : Number(process.argv[maxIndex + 1]);
 
+// Every known bailout is listed explicitly so fixes ratchet the baseline down.
+// Do not add an entry without reviewing why the affected component or hook is
+// safe to leave uncompiled.
+const bailoutBaseline = new Map([
+  ['src/App/Workspace/useWorkspace.tsx', new Map([['Cannot access refs during render', 2]])],
+]);
+
 function* sources(dir) {
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
@@ -27,6 +34,7 @@ function* sources(dir) {
 }
 
 const byReason = new Map();
+const observedBaseline = new Map();
 let files = 0;
 let compiled = 0;
 let bailouts = 0;
@@ -47,6 +55,9 @@ for (const file of sources(root)) {
   for (const error of errors) {
     const reason = error.message.replace(/\(BuildHIR[^)]*\)\s*/, '').slice(0, 72);
     byReason.set(reason, (byReason.get(reason) ?? 0) + 1);
+    const fileReasons = observedBaseline.get(relative) ?? new Map();
+    fileReasons.set(reason, (fileReasons.get(reason) ?? 0) + 1);
+    observedBaseline.set(relative, fileReasons);
     if (verbose) {
       const offset = error.labels?.[0]?.start;
       const line = offset == null ? 0 : source.slice(0, offset).split('\n').length;
@@ -66,7 +77,31 @@ if (affected.length) {
   for (const [file, count] of affected.sort((a, b) => b[1] - a[1]))
     console.log(`  ${String(count).padStart(3)}  ${file}`);
 }
+
+const baselineMismatches = [];
+for (const [file, reasons] of observedBaseline) {
+  for (const [reason, count] of reasons) {
+    const expected = bailoutBaseline.get(file)?.get(reason) ?? 0;
+    if (count !== expected)
+      baselineMismatches.push(`${file}: ${reason}: observed ${count}, expected ${expected}`);
+  }
+}
+for (const [file, reasons] of bailoutBaseline) {
+  for (const [reason, expected] of reasons) {
+    const observed = observedBaseline.get(file)?.get(reason) ?? 0;
+    if (observed !== expected && !observedBaseline.get(file)?.has(reason))
+      baselineMismatches.push(`${file}: ${reason}: observed ${observed}, expected ${expected}`);
+  }
+}
+
+if (baselineMismatches.length) {
+  console.error('\nReact Compiler bailout baseline changed:');
+  for (const mismatch of baselineMismatches) console.error(`  ${mismatch}`);
+}
+
+let failed = baselineMismatches.length > 0;
 if (budget !== undefined && bailouts > budget) {
   console.error(`\nBailout budget exceeded: ${bailouts} > ${budget}`);
-  process.exit(1);
+  failed = true;
 }
+if (failed) process.exit(1);

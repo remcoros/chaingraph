@@ -91,8 +91,11 @@ export function useAnnotations({
     chooseLabelFile: () => labelsInput.current?.click(),
     importLabelFile: async (file) => {
       if (!current) return;
+      if (file.size > MAX_LABEL_FILE_BYTES) {
+        setError('Label file exceeds 5 MB.');
+        return;
+      }
       try {
-        if (file.size > MAX_LABEL_FILE_BYTES) throw new Error('Label file exceeds 5 MB.');
         const result = importLabels(await file.text());
         edit((workspace) => {
           const annotations = { ...workspace.annotations };

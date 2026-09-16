@@ -112,9 +112,8 @@ function ScriptInspectorBody({
     } catch (failure) {
       if (!controller.signal.aborted)
         setError(failure instanceof Error ? failure.message : 'Raw inspection failed.');
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
     }
+    if (!controller.signal.aborted) setLoading(false);
   }
   if (!related.length) return null;
   const outputHex =

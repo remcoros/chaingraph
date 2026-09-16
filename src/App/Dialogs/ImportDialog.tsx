@@ -50,9 +50,8 @@ export function ImportDialog({
                 ? error.message
                 : 'Could not open this workspace. Check the password and file format.',
             );
-          } finally {
-            if (!signal.aborted) setBusy(false);
           }
+          if (!signal.aborted) setBusy(false);
         }}
       >
         <PasswordField

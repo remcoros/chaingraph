@@ -415,6 +415,13 @@ function AnalysisWorkbenchView({
     pending.current = controller;
     setBusy(true);
     setNotice('');
+    const finishRun = () => {
+      if (pending.current === controller) {
+        pending.current = undefined;
+        setBusy(false);
+        setRecovering(false);
+      }
+    };
     try {
       const gaps = autoLoad
         ? analysisDataGaps(
@@ -443,8 +450,10 @@ function AnalysisWorkbenchView({
         latest.current.network !== workspace.network ||
         latest.current.transactions !== workspace.transactions ||
         walletEvidenceChanged(workspace.wallets, latest.current.wallets)
-      )
+      ) {
+        finishRun();
         return;
+      }
       if (snapshot.transactions !== workspace.transactions) {
         onRecovered(workspace, {
           ...snapshot,
@@ -464,13 +473,8 @@ function AnalysisWorkbenchView({
     } catch {
       if (!controller.signal.aborted)
         setNotice('Scan could not finish. Existing findings are retained. Try again.');
-    } finally {
-      if (pending.current === controller) {
-        pending.current = undefined;
-        setBusy(false);
-        setRecovering(false);
-      }
     }
+    finishRun();
   }
   const recoveryScope = scan?.scope ?? scope;
   const recoverScripts = (scan?.options ?? options)['script-types']?.scriptMode !== 'outputs';
@@ -494,6 +498,14 @@ function AnalysisWorkbenchView({
     setRecovering(true);
     setNotice('');
     const timeout = setTimeout(() => controller.abort(), recoveryLimits.timeoutMs);
+    const finishRecovery = () => {
+      clearTimeout(timeout);
+      if (pending.current === controller) {
+        pending.current = undefined;
+        setBusy(false);
+        setRecovering(false);
+      }
+    };
     try {
       const result = await recoverAnalysisData(
         workspace,
@@ -515,8 +527,10 @@ function AnalysisWorkbenchView({
         latest.current.network !== workspace.network ||
         latest.current.transactions !== workspace.transactions ||
         walletEvidenceChanged(workspace.wallets, latest.current.wallets)
-      )
+      ) {
+        finishRecovery();
         return;
+      }
       const merged = mergeScanFindings(
         result.workspace.transactions === workspace.transactions
           ? latest.current.findings
@@ -535,14 +549,8 @@ function AnalysisWorkbenchView({
             ? 'Loading cancelled or timed out. This attempt was not saved. Retry when ready.'
             : 'Data unavailable. Existing findings are retained. Retry when ready.',
         );
-    } finally {
-      clearTimeout(timeout);
-      if (pending.current === controller) {
-        pending.current = undefined;
-        setBusy(false);
-        setRecovering(false);
-      }
     }
+    finishRecovery();
   }
   return (
     <section className="analysis-workbench" aria-label="Analysis workbench">

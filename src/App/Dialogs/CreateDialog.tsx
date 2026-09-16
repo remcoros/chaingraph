@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
 import type { Network, Workspace } from '../../Domain/types';
 import { newWorkspace } from '../../Domain/Workspace/workspace';
@@ -41,8 +41,9 @@ export function CreateDialog({
   }
   const pending = useRef<AbortController | undefined>(undefined);
   const supported = useRef(networks);
-  // oxlint-disable-next-line react/refs -- Read after awaiting the template load, so it has to be the value as of then, not as of submit.
-  supported.current = networks;
+  useLayoutEffect(() => {
+    supported.current = networks;
+  }, [networks]);
   const close = () => {
     pending.current?.abort();
     onClose();
@@ -92,9 +93,11 @@ export function CreateDialog({
         : { ...newWorkspace(name.trim(), selectedNet), description: description.trim() };
       controller.signal.throwIfAborted();
       if (!supported.current?.includes(w.network))
-        throw new Error(`Backend does not support ${w.network}. Check the backend connection.`);
-      onCreate(w, password);
-      onClose();
+        setError(`Backend does not support ${w.network}. Check the backend connection.`);
+      else {
+        onCreate(w, password);
+        onClose();
+      }
     } catch (error) {
       if (!controller.signal.aborted)
         setError(
@@ -102,11 +105,10 @@ export function CreateDialog({
             ? error.message
             : 'Could not create the workspace. Please try again.',
         );
-    } finally {
-      if (!controller.signal.aborted) {
-        pending.current = undefined;
-        setBusy(false);
-      }
+    }
+    if (!controller.signal.aborted) {
+      pending.current = undefined;
+      setBusy(false);
     }
   }
   return (

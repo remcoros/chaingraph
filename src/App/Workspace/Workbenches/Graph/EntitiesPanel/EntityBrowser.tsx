@@ -367,7 +367,7 @@ export default function EntityBrowser({
   extraFiltersActive = false,
   selectedId,
   onSelect,
-  totalCount = nodes.length,
+  totalCount,
   contextCount = 0,
   contextNodeCount,
   contextPreviewPending,
@@ -387,6 +387,7 @@ export default function EntityBrowser({
   filtersLinked = true,
   onFiltersLinkedChange,
 }: Props) {
+  const loadedCount = totalCount ?? nodes.length;
   // Rows read actions only from event handlers. Refresh after commit so new
   // parent callbacks do not invalidate every row or retain stale selection logic.
   const rowActions = useRef<EntityRowActions>({
@@ -616,7 +617,7 @@ export default function EntityBrowser({
           <span role="status">
             {contextPreviewPending
               ? 'Filtering…'
-              : `${nodes.length.toLocaleString()} ${visibility === 'graph' ? 'on graph' : 'matches'} / ${totalCount.toLocaleString()} loaded`}
+              : `${nodes.length.toLocaleString()} ${visibility === 'graph' ? 'on graph' : 'matches'} / ${loadedCount.toLocaleString()} loaded`}
           </span>
           <div className="entity-result-actions">
             <EntitySortButton sort={sort} onChange={setSort} />
@@ -669,7 +670,7 @@ export default function EntityBrowser({
         ))}
         {!nodes.length && (
           <p className="empty-panel">
-            {totalCount
+            {loadedCount
               ? 'No matching entities. Adjust or clear the filters.'
               : 'Load a wallet, address, transaction or example to begin.'}
           </p>

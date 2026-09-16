@@ -39,8 +39,11 @@ export function WalletDialog({
         className="stack"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!name.trim()) {
+            setError('Enter a wallet name.');
+            return;
+          }
           try {
-            if (!name.trim()) throw new Error('Enter a wallet name.');
             deriveAddresses(key.trim(), network, script, 0, 0, 1);
             onAdd({
               id: crypto.randomUUID(),
