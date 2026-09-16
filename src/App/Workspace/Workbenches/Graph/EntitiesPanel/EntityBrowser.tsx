@@ -32,12 +32,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import {
-  sortEntities,
-  valueFilterError,
-  hasActiveFilters,
-  type EntitySort,
-} from '../../../../../Domain/Graph/graphFilters';
+import { valueFilterError } from '../../../../../Domain/Graph/graphFilters';
+import { sortEntities, type EntitySort } from './entitySort';
+import { hasActiveFilters } from '../Filters/filterPresentation';
 import type { GraphFilters } from '../../../../../Domain/types';
 import { transactionStatus } from '../../../../../Domain/Chain/transactionStatus';
 import type { Annotation, GraphNode, Transaction, Workspace } from '../../../../../Domain/types';

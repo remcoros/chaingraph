@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatBitcoinAmount, formatSats } from '../src/Domain/Chain/amountFormat';
-import { activeFilterChips } from '../src/Domain/Graph/graphFilters';
+import { activeFilterChips } from '../src/App/Workspace/Workbenches/Graph/Filters/filterPresentation';
 
 describe('exact Bitcoin amount display', () => {
   it.each([

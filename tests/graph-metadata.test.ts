@@ -6,7 +6,8 @@ import {
 import { newWorkspace } from '../src/Domain/Workspace/workspace';
 import { fullGraphMembershipEvidence } from '../src/Domain/Graph/graphMembership';
 import { buildTagIndex } from '../src/Domain/Metadata/tags';
-import { filterGraph, sortEntities } from '../src/Domain/Graph/graphFilters';
+import { filterGraph } from '../src/Domain/Graph/graphFilters';
+import { sortEntities } from '../src/App/Workspace/Workbenches/Graph/EntitiesPanel/entitySort';
 import type { Annotation, GraphData, Workspace } from '../src/Domain/types';
 
 const id = '1'.repeat(64);

@@ -1,18 +1,20 @@
 import { formatBitcoinAmount } from '../src/Domain/Chain/amountFormat';
 import { describe, expect, it } from 'vitest';
 import {
-  activeFilterChips,
   buildGraphFilterIndex,
-  clearFilterKey,
-  describeMatchScope,
   filterGraph,
-  hasActiveFilters,
   intersectIds,
   matchingWalletFilterNodeIds,
   selectedWalletFilterIds,
-  sortEntities,
   valueFilterError,
 } from '../src/Domain/Graph/graphFilters';
+import {
+  activeFilterChips,
+  clearFilterKey,
+  describeMatchScope,
+  hasActiveFilters,
+} from '../src/App/Workspace/Workbenches/Graph/Filters/filterPresentation';
+import { sortEntities } from '../src/App/Workspace/Workbenches/Graph/EntitiesPanel/entitySort';
 import type { Annotation, GraphData } from '../src/Domain/types';
 
 const graph: GraphData = {

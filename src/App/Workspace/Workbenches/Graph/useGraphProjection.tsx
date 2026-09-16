@@ -14,12 +14,12 @@ import { EntityBadges } from '../../../Controls/Metadata/EntityBadges';
 import { buildWalletMatches, tagNodeIds, buildTagIndex } from '../../../../Domain/Metadata/tags';
 import { useCallback, useDeferredValue, useMemo } from 'react';
 import {
-  describeMatchScope,
   filterGraph,
   buildGraphFilterIndex,
   intersectIds,
   matchingWalletFilterNodeIds,
 } from '../../../../Domain/Graph/graphFilters';
+import { describeMatchScope } from './Filters/filterPresentation';
 import type { GraphFilters } from '../../../../Domain/types';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
 import { type GraphEvidenceWorkspace } from '../../../../Domain/Workspace/workspace';

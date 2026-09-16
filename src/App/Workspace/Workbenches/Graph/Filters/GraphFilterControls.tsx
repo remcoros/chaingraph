@@ -4,9 +4,11 @@ import {
   activeFilterChips,
   activeFilterKeys,
   clearFilterKey,
+  type FilterKey,
+} from './filterPresentation';
+import {
   valueFilterError,
   selectedWalletFilterIds,
-  type FilterKey,
 } from '../../../../../Domain/Graph/graphFilters';
 import type { GraphFilters } from '../../../../../Domain/types';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
