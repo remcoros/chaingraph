@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --use-system-ca --import tsx scripts/dev.ts",
     "dev:live": "node --use-system-ca --import tsx scripts/dev.ts",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run --silent check:compiler && npm run --silent build:app",
+    "build:app": "tsc --noEmit --pretty false && vite build --logLevel warn",
     "start": "node --use-system-ca --import tsx server/index.ts",
     "start:live": "node --use-system-ca --import tsx server/index.ts",
     "test": "vitest run",
@@ -19,7 +20,7 @@
     "lint": "oxlint --config .oxlintrc.json src server scripts tests *.config.ts",
     "lint:fix": "oxlint --config .oxlintrc.json --fix src server scripts tests",
     "check:compiler": "node scripts/check-react-compiler.mjs",
-    "check": "npm run check:portability && npm run lint && npm run check:compiler && npm run build && npm test",
+    "check": "npm run --silent check:portability && npm run --silent lint && npm run --silent build && npm run --silent test",
     "check:portability": "node scripts/check-portability.mjs",
     "test:live": "node --use-system-ca --import tsx scripts/smoke-live.ts",
     "licenses": "node scripts/licenses.mjs",
@@ -40,30 +41,33 @@
     "d3-force-3d": "3.0.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "lucide-react": "^1.45.0",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "three": "^0.186.0",
-    "zod": "^4.6.2"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.1",
     "esbuild": "^0.28.2",
-    "jsdom": "^30.0.1",
+    "jsdom": "^30.1.0",
     "oxc-transform-react": "^0.145.0",
-    "oxlint": "^1.82.0",
-    "prettier": "^3.9.6",
+    "oxlint": "^1.83.0",
+    "prettier": "^3.9.7",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

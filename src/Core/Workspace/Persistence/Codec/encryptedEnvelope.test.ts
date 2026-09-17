@@ -191,7 +191,7 @@ describe('versioned workspace compression', () => {
 
   it('authenticates before attempting to construct a decompressor', async () => {
     const envelope = await encryptWorkspace({ notes: 'abc'.repeat(10000) }, password);
-    const construct = vi.fn(() => {
+    const construct = vi.fn(function unsupportedDecompressionStream() {
       throw new Error('unsupported');
     });
     vi.stubGlobal('DecompressionStream', construct);
