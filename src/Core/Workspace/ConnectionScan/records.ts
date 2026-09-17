@@ -1,6 +1,6 @@
 import { deduplicateScanRuns } from './results';
 import { indexPreviousOutputs, type Transaction } from '../../ChainData/index';
-import { previousOutputsConflict, type Network } from '../../Bitcoin/index';
+import { isProvablyUnspendable, previousOutputsConflict, type Network } from '../../Bitcoin/index';
 
 import { outpointReference } from '../entityReferences';
 import type { ConnectionScanRecords, ScanResult, ScanRun } from './connectionScans';
@@ -201,8 +201,7 @@ function findingEvidenceConflicts(
       (output) => output.n === Number(result.endpoint.split(':')[2]),
     );
     if (!output) return true;
-    if (result.finding === 'unspendable')
-      return !/^6a(?:[0-9a-f]{2})*$/i.test(output.scriptPubKey.hex ?? '');
+    if (result.finding === 'unspendable') return !isProvablyUnspendable(output);
   }
   return false;
 }

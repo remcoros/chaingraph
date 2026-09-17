@@ -38,7 +38,7 @@ import type { GraphNode, GraphData } from '../../../GraphState/types';
 import { addressBalanceSats } from '../Address/addressHistory';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { equalOutputCount } from '../../../../../Core/Workspace/Analysis/analysis';
-import { outputAddress } from '../../../../../Core/Bitcoin';
+import { isProvablyUnspendable, outputAddress } from '../../../../../Core/Bitcoin';
 import { walletCheckAge } from '../../../../../Core/Workspace/Wallets/walletActivity';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { VisibilityActions, type VisibilityProps } from '../../../Selection/VisibilityActions';
@@ -46,7 +46,6 @@ import { emptyAnnotation } from '../../../../../Core/Workspace/Annotations/empty
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
-import { decodeOpReturn } from '../../../../Controls/Display/opReturn';
 import { indexLoadedSpends } from '../TransactionFlow/transactionFlow';
 import type { WalletMatch } from '../../../../../Core/Workspace/Wallets/walletMatches';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
@@ -500,10 +499,10 @@ export function NodeInspector({
     !!walletObservation &&
     (!utxo.observation ||
       Date.parse(walletObservation.checkedAt) > Date.parse(utxo.observation.checkedAt));
-  const opReturn = decodeOpReturn(selectedOutput?.scriptPubKey.hex);
+  const unspendable = selectedOutput !== undefined && isProvablyUnspendable(selectedOutput);
   const spendingReason =
     unavailable ||
-    (opReturn ? 'OP_RETURN outputs are unspendable.' : undefined) ||
+    (unspendable ? 'OP_RETURN outputs are unspendable.' : undefined) ||
     (selected.kind === 'address'
       ? 'Select a transaction or output to find spending transactions.'
       : !tx

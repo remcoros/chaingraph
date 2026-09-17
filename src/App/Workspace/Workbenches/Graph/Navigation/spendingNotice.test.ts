@@ -106,6 +106,15 @@ describe('spending lookup feedback', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('checks a malformed OP_RETURN-looking script instead of treating it as unspendable', async () => {
+    const fetch = respond(null);
+    const malformed = { ...tx, vout: [{ ...tx.vout[0], scriptPubKey: { hex: '6a0' } }] };
+    expect(await spendingNotice(empty, malformed, 'mainnet', 0, signal())).toContain(
+      "Not in your node's current UTXO set",
+    );
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it('discards a result that arrives after cancellation', async () => {
     const controller = new AbortController();
     vi.stubGlobal(

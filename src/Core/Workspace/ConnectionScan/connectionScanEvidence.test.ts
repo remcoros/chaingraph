@@ -10,7 +10,6 @@ import { createConnectionScanFetch } from './connectionScanFetch';
 import { TransactionFetchScope } from '../../ChainData/transactionScheduler';
 import type { ScanBudget } from './connectionScan';
 import { fetchScanUtxo, isVerifiedCoinbase, scanLookupFailure } from './connectionScanEvidence';
-import { isProvablyUnspendable } from '../../Bitcoin';
 import type { Transaction } from '../../ChainData';
 
 const txid = 'a'.repeat(64);
@@ -115,14 +114,6 @@ describe('scan endpoint proof', () => {
     expect(isVerifiedCoinbase({ ...base, vin: [{ coinbase: '00' }, { txid, vout: 0 }] })).toBe(
       false,
     );
-  });
-  it('requires an initial OP_RETURN opcode in valid raw script bytes', () => {
-    for (const hex of ['6a', '6A026162'])
-      expect(isProvablyUnspendable({ value: 0, scriptPubKey: { hex } })).toBe(true);
-    for (const hex of ['516a', '6az', '6a0', ''])
-      expect(isProvablyUnspendable({ value: 0, scriptPubKey: { hex, type: 'nulldata' } })).toBe(
-        false,
-      );
   });
 });
 

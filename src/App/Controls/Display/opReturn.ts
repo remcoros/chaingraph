@@ -1,8 +1,12 @@
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { isOpReturn } from '../../../Core/Bitcoin';
 
 /** A UI budget, not a Bitcoin consensus or relay-policy limit. */
 const OP_RETURN_DISPLAY_LIMIT = 65_536;
+
+/** Allows malformed bytes to be shown as a diagnostic, without classifying them as unspendable. */
+function hasOpReturnPrefix(hex?: string): hex is string {
+  return hex?.slice(0, 2).toLowerCase() === '6a';
+}
 
 export interface OpReturnData {
   /** Includes the opcode name and at most 72 data code points. */
@@ -51,7 +55,7 @@ function hasBinaryControlCharacter(text: string): boolean {
 
 /** Inspect literal push data only. Never executes a script or interprets a protocol. */
 export function decodeOpReturn(hex?: string): OpReturnData | undefined {
-  if (!isOpReturn(hex)) return undefined;
+  if (!hasOpReturnPrefix(hex)) return undefined;
   if (hex.length > OP_RETURN_DISPLAY_LIMIT * 2)
     return result(
       'data exceeds display limit',

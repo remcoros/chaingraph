@@ -38,7 +38,12 @@ import {
   indexPreviousOutputs,
   resolvePreviousOutput,
 } from '../../../../../Core/ChainData';
-import { type TxOutput, sats, outputAddress, isOpReturn } from '../../../../../Core/Bitcoin';
+import {
+  type TxOutput,
+  sats,
+  outputAddress,
+  isProvablyUnspendable,
+} from '../../../../../Core/Bitcoin';
 import {
   outpointReference,
   transactionReference,
@@ -154,7 +159,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   const offGraph = hidden || notOnGraph;
   const visibilityLabel = `${notOnGraph ? 'Add' : 'Show'} ${inputs ? 'input' : 'output'} ${row.index} in graph`;
   const address = row.output && outputAddress(row.output);
-  const opReturn = isOpReturn(row.output?.scriptPubKey.hex);
+  const opReturn = row.output !== undefined && isProvablyUnspendable(row.output);
   const navigate = () => {
     if (!row.id) return;
     if (inputs) {
@@ -856,7 +861,7 @@ export function FlowPanelTransactionView({
     selectedResolution?.status === 'loaded' || selectedResolution?.status === 'attached'
       ? selectedResolution.output
       : undefined;
-  const selectedUnspendable = isOpReturn(selectedOutput?.scriptPubKey.hex);
+  const selectedUnspendable = selectedOutput !== undefined && isProvablyUnspendable(selectedOutput);
   const loadedSpenders = selected?.kind === 'output' ? (spends.get(selected.id) ?? []) : [];
   const walletObservation =
     selected?.kind === 'output'

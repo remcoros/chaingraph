@@ -10,7 +10,7 @@ import {
   resolvePreviousOutput,
   type PreviousOutputIndex,
 } from '../../../ChainData';
-import { isOpReturn, type TxOutput } from '../../../Bitcoin';
+import { isProvablyUnspendable, type TxOutput } from '../../../Bitcoin';
 
 import { formatBitcoinAmount } from '../../../Formatting';
 
@@ -136,7 +136,7 @@ export function choiceOption<T extends string>(
   return value as T;
 }
 export function isDataOutput(output: TxOutput): boolean {
-  return output.scriptPubKey.type === 'nulldata' || isOpReturn(output.scriptPubKey.hex);
+  return output.scriptPubKey.type === 'nulldata' || isProvablyUnspendable(output);
 }
 export const spendableOutputs = (tx: Transaction) =>
   tx.vout.filter((output) => !isDataOutput(output));

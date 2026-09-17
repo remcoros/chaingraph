@@ -375,6 +375,12 @@ describe('Wallet review findings regressions', () => {
     expect(
       walletRowRelationship(row, wallet, workspace.network, {
         ownership: 'unknown',
+        scriptPubKey: { hex: '6a0' },
+      }),
+    ).toBe('Script output');
+    expect(
+      walletRowRelationship(row, wallet, workspace.network, {
+        ownership: 'unknown',
         prevoutStatus: 'conflict',
         scriptPubKey: { hex: '6a' },
       }),

@@ -1,4 +1,4 @@
-import { isOpReturn, type Network } from '../../../../../Core/Bitcoin';
+import { isProvablyUnspendable, type Network } from '../../../../../Core/Bitcoin';
 import { short } from '../../../../../Core/Formatting';
 
 import type { Transaction } from '../../../../../Core/ChainData';
@@ -28,7 +28,7 @@ export async function spendingNotice(
   const output = vout === undefined ? undefined : transaction.vout.find((item) => item.n === vout);
   if (!output)
     return `${subject}: ${incomplete ?? 'No spending transactions found for these outputs.'}`;
-  if (isOpReturn(output.scriptPubKey.hex)) return `${subject}: OP_RETURN output; unspendable.`;
+  if (isProvablyUnspendable(output)) return `${subject}: OP_RETURN output; unspendable.`;
 
   try {
     const observation = await fetchCurrentUtxo(
