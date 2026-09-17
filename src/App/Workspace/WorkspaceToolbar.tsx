@@ -6,6 +6,7 @@ import {
   Ellipsis,
   GitBranch,
   LockKeyhole,
+  Pencil,
   Search,
   Upload,
   Wallet as WalletIcon,
@@ -231,6 +232,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
                   dialogs.openSettings();
                 }}
               >
+                <Pencil size={15} />
                 Workspace details
               </button>
               <button
