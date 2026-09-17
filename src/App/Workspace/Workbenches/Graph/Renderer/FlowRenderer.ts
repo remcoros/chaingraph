@@ -29,10 +29,10 @@ import type {
   NodeAppearancePatch,
 } from './adapter';
 import {
-  graphSnapshotSchema,
+  validateGraphSnapshot,
   GRAPH_SNAPSHOT_NODE_LIMIT,
   type GraphSnapshot,
-} from '../../../GraphState/graphSnapshot';
+} from '../../../../../Core/Workspace/view';
 import { frameCamera } from './cameraFraming';
 import type { LayoutRequest, LayoutResult, Position } from './flowLayout';
 import { LayoutScheduler } from './layoutScheduler';
@@ -486,7 +486,7 @@ export class FlowRenderer implements GraphAdapter {
     if (!this.pointers.size) this.setActive(false);
   };
   restoreSnapshot(snapshot: GraphSnapshot) {
-    const parsed = graphSnapshotSchema.safeParse(snapshot);
+    const parsed = validateGraphSnapshot(snapshot);
     if (!parsed.success) return;
     this.modes.clear();
     this.topology = '';

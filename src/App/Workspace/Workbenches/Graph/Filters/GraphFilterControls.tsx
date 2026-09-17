@@ -7,7 +7,7 @@ import {
   type FilterKey,
 } from './filterPresentation';
 import { valueFilterError, selectedWalletFilterIds } from './graphFilters';
-import type { GraphFilters } from '../../../GraphState/filters';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { WalletFilterOptions } from './GraphWalletFilter';

@@ -1,22 +1,16 @@
 import { useMemo, useState } from 'react';
-import { planEntityRemoval, removeWorkspaceEntity, type EntityRemovalPlan } from './entityRemoval';
-import { addressNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
-import type { Workspace } from './workspace';
+import { planEntityRemoval, type EntityRemovalPlan } from '../../Core/Workspace/entityRemoval';
+import { removeWorkspaceEntity } from './entityRemoval';
+import { addressReference, transactionReference } from '../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../Core/Workspace/workspace';
+
 import { buildGraph } from './GraphState/graphEvidence';
 import type { AppState } from '../useAppState';
 
 /** The workspace fields a removal plan is derived from. */
-type RemovalInput = Pick<
-  Workspace,
-  | 'network'
-  | 'transactions'
-  | 'inputContext'
-  | 'contextTransactionIds'
-  | 'annotations'
-  | 'tags'
-  | 'wallets'
-  | 'watchedAddresses'
->;
+type RemovalInput = Pick<Workspace, 'network' | 'chainData' | 'annotations' | 'wallets'> & {
+  view: Pick<Workspace['view'], 'inputContext'>;
+};
 
 export interface EntityRemoval {
   /** Removal awaiting confirmation, when the plan asks for one. */
@@ -60,25 +54,26 @@ export function useEntityRemoval({
 }: Inputs): EntityRemoval {
   const [pending, setPending] = useState<{ workspaceId: string; nodeId: string }>();
   const network = activeWorkspace?.network;
-  const transactions = activeWorkspace?.transactions;
-  const inputContext = activeWorkspace?.inputContext;
-  const contextTransactionIds = activeWorkspace?.contextTransactionIds;
-  const annotations = activeWorkspace?.annotations;
-  const tags = activeWorkspace?.tags;
-  const wallets = activeWorkspace?.wallets;
-  const watchedAddresses = activeWorkspace?.watchedAddresses;
+  const transactions = activeWorkspace?.chainData.transactions;
+  const inputContext = activeWorkspace?.view.inputContext;
+  const contextTransactionIds = activeWorkspace?.chainData.contextTransactionIds;
+  const annotations = activeWorkspace?.annotations.entities;
+  const tags = activeWorkspace?.annotations.tags;
+  const wallets = activeWorkspace?.wallets.definitions;
+  const watchedAddresses = activeWorkspace?.chainData.watchedAddresses;
   const input = useMemo<RemovalInput | undefined>(() => {
     if (!network || !transactions || !annotations || !wallets || !watchedAddresses)
       return undefined;
     return {
       network,
-      transactions,
-      inputContext,
-      contextTransactionIds,
-      annotations,
-      tags,
-      wallets,
-      watchedAddresses,
+      chainData: {
+        transactions: transactions,
+        contextTransactionIds: contextTransactionIds,
+        watchedAddresses: watchedAddresses,
+      },
+      annotations: { entities: annotations, tags: tags },
+      wallets: { definitions: wallets },
+      view: { inputContext: inputContext },
     };
   }, [
     network,
@@ -105,7 +100,10 @@ export function useEntityRemoval({
   const removableNodeIds = useMemo(
     () =>
       transactions && watchedAddresses
-        ? [...Object.keys(transactions).map(txNodeId), ...watchedAddresses.map(addressNodeId)]
+        ? [
+            ...Object.keys(transactions).map(transactionReference),
+            ...watchedAddresses.map(addressReference),
+          ]
         : [],
     [transactions, watchedAddresses],
   );

@@ -5,10 +5,10 @@ import {
   fetchTransaction,
   loadSpending,
   rpc,
-} from '../../../src/Infra/Bitcoin/api';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import type { Network } from '../../../src/Domain/Chain/network';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
+} from '../../../src/Core/ChainData/api';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import type { Network } from '../../../src/Core/Bitcoin';
+import type { Transaction } from '../../../src/Core/ChainData';
 
 const id = (number: number) => number.toString(16).padStart(64, '0');
 const transaction = (txid: string, value = 1): Transaction => ({
@@ -131,7 +131,7 @@ describe('explicit Bitcoin network transport', () => {
         return response({ result: transaction(id(1)) });
       }),
     );
-    expect(await fetchTransaction('mainnet', id(1))).toEqual(transaction(id(1)));
+    expect(await fetchTransaction('mainnet', id(1))).toMatchObject(transaction(id(1)));
     expect(calls).toEqual([
       { target: 'core', params: [id(1), 2], network: 'mainnet', method: 'getrawtransaction' },
       { target: 'core', params: [id(1), 1], network: 'mainnet', method: 'getrawtransaction' },
@@ -202,8 +202,12 @@ describe('explicit Bitcoin network transport', () => {
     const funding = transaction(id(1));
     const scan = (network: Network) => {
       const workspace = createWorkspace(`Public ${network} fixture`, network);
-      workspace.transactions[funding.txid] = funding;
-      return loadSpending(funding, workspace, 0);
+      workspace.chainData.transactions[funding.txid] = funding;
+      return loadSpending(
+        funding,
+        { network: workspace.network, transactions: workspace.chainData.transactions },
+        0,
+      );
     };
     const [mainnet, testnet] = await Promise.all([scan('mainnet'), scan('testnet4')]);
     expect(mainnet.transactions).toHaveLength(12);

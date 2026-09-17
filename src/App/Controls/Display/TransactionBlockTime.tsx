@@ -1,9 +1,9 @@
-import type { Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../Workspace/workspace';
+import type { Transaction } from '../../../Core/ChainData';
+import type { Workspace } from '../../../Core/Workspace/workspace';
 import { transactionStatus } from './transactionStatus';
 import { transactionBlockTime } from './transactionTime';
 import { transactionFee } from './transactionFee';
-import { formatSats } from './amountFormat';
+import { formatSats } from '../../../Core/Formatting';
 import './transaction-block-time.css';
 
 export function TransactionFeeLabel({
@@ -11,7 +11,9 @@ export function TransactionFeeLabel({
   workspace,
 }: {
   transaction?: Transaction;
-  workspace?: Pick<Workspace, 'network' | 'transactions'>;
+  workspace?: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  };
 }) {
   if (!transaction || !workspace || transactionStatus(transaction).kind !== 'confirmed')
     return null;
@@ -33,7 +35,9 @@ export function TransactionBlockTime({
   showTimestamp = true,
 }: {
   transaction?: Transaction;
-  workspace?: Pick<Workspace, 'network' | 'transactions'>;
+  workspace?: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  };
   timestampOnly?: boolean;
   showFee?: boolean;
   separateStatusAndTime?: boolean;

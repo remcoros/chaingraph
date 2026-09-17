@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScan';
 import { prepareCustomScanTargets } from '../../../src/App/Workspace/Selection/connectionScanTargets';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;

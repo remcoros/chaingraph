@@ -1,4 +1,4 @@
-import type { Transaction } from '../../../Domain/Chain/transaction';
+import type { Transaction } from '../../../Core/ChainData';
 
 export interface TransactionStatus {
   kind: 'confirmed' | 'mempool' | 'unknown' | 'conflicted';
@@ -8,25 +8,25 @@ export interface TransactionStatus {
 
 /** Saved observations, never a height inferred from a changing chain tip. */
 export function transactionStatus(transaction?: Transaction): TransactionStatus {
-  if ((transaction?.confirmations ?? 0) < 0)
+  if (transaction?.status?.kind === 'inactive')
     return {
       kind: 'conflicted',
       label: 'Outside active chain',
       title: 'The saved observation reports a transaction outside the active chain.',
     };
-  if (transaction?.blockHeight !== undefined)
+  if (transaction?.status?.blockHeight !== undefined)
     return {
       kind: 'confirmed',
-      label: `#${transaction.blockHeight}`,
+      label: `#${transaction.status?.blockHeight}`,
       title: 'Containing block height from the last saved chain observation.',
     };
-  if (transaction?.mempool === true)
+  if (transaction?.status?.kind === 'mempool')
     return {
       kind: 'mempool',
       label: 'Unconfirmed',
       title: 'Seen in the mempool at the last lookup. Refresh to check its current status.',
     };
-  if ((transaction?.confirmations ?? 0) > 0)
+  if (transaction?.status?.kind === 'confirmed')
     return {
       kind: 'confirmed',
       label: 'Confirmed',

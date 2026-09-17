@@ -4,11 +4,18 @@ Run the focused scan suite before changing traversal, meeting reconstruction,
 pruning, deduplication, fetching or scan optimizations:
 
 ```sh
-npx vitest run tests/connectionScan
+npx vitest run src/Core/Workspace/ConnectionScan src/App/Workspace/Workbenches/Graph/ConnectionScan tests/integration/connection-scan src/Core/Workspace/Persistence/Integration/connectionScanRecords.test.ts src/Core/Workspace/Persistence/Integration/connectionScanContextRecords.test.ts
 ```
 
 These are domain and mocked transport checks. They do not start a browser or
 query a real backend. The normal `npm test` command also includes them.
+
+Engine and acquisition live under Core ConnectionScan with their unit tests;
+retained-record types, schemas and validity rules live beside them in independently
+importable files. Graph keeps its
+panel, target projection, grouping and path-add tests. Cross-module tests using
+public interfaces live under `tests/integration/connection-scan/`; the two suites
+that additionally exercise private codecs live in Persistence's `Integration/`.
 
 ## What the tests protect
 
@@ -28,8 +35,8 @@ query a real backend. The normal `npm test` command also includes them.
 | `connectionScanBounds`                                                      | Meeting reconstruction respects deadlines, shared transaction/result caps, branch boundaries and unavailable evidence. Earlier valid findings survive limits; traversal state stays out of results.                                                                                                                                          |
 | `connectionScan`                                                            | Direct paths, stopping at newly discovered target paths, direction restrictions, frozen settings, fan-out boundaries, budgets, cancellation, deterministic scheduling and result priorities.                                                                                                                                                 |
 | `connectionScanFetch`, `connectionScanEvidence`                             | Loaded evidence reuse, exact spends and outpoints, bounded fallback, network/session isolation, safe failures, terminal proof and worker ownership.                                                                                                                                                                                          |
-| `connectionScanConcurrency`, `connectionScanWorkerBudget` | Bounded parallel lookups, breadth-level ordering, cancellation, shared worker/fetch reservations and retaining admitted results when the transaction budget fills. |
-| `connectionScanFetchBatching` | Exact spender distribution across batched outpoints, per-point fallback, shared script histories and budget/cancellation boundaries. |
+| `connectionScanConcurrency`, `connectionScanWorkerBudget`                   | Bounded parallel lookups, breadth-level ordering, cancellation, shared worker/fetch reservations and retaining admitted results when the transaction budget fills.                                                                                                                                                                           |
+| `connectionScanFetchBatching`                                               | Exact spender distribution across batched outpoints, per-point fallback, shared script histories and budget/cancellation boundaries.                                                                                                                                                                                                         |
 | `connectionScanIntegration`, `connectionScanRecords`                        | Observed paths survive validation, compact encrypted persistence and exact graph acceptance.                                                                                                                                                                                                                                                 |
 | `connectionScanGroups`, `connectionScanPresentation`, `connectionScanRetry` | Retained scan ownership, grouped results, dismissals, global stop reasons and bounded rechecks.                                                                                                                                                                                                                                              |
 

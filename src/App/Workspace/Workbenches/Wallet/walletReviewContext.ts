@@ -1,24 +1,29 @@
-import { canonicalEntityNodeId } from '../../../../Domain/Metadata/entityReferences';
+import {
+  canonicalEntityReference,
+  outpointReference,
+  transactionReference,
+} from '../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,
   type PreviousOutputResolution,
-} from '../../../../Domain/Chain/prevouts';
-import { verifiedWalletAddresses } from '../../Wallet/walletRecords';
+  type Transaction,
+} from '../../../../Core/ChainData';
+import { verifiedWalletAddresses } from '../../../../Core/Workspace/Wallets/walletRecords';
 import type {
   WalletSelectionAddresses,
   WalletSelectionIndex,
-} from '../../Wallet/walletSelectionIndex';
+} from '../../../../Core/Workspace/Wallets/walletSelectionIndex';
 import {
   canonicalTransactionId,
   loadedWalletTransactions,
   validOutputIndex,
   walletOutputEvidence,
-} from '../../Wallet/walletRelationships';
-import { outputNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
-import { sats, type Transaction, type TxOutput } from '../../../../Domain/Chain/transaction';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
+} from '../../../../Core/Workspace/Wallets/walletRelationships';
+
+import { sats, type TxOutput } from '../../../../Core/Bitcoin';
 
 export interface WalletReviewFlowEntry {
   /** Canonical entity reference; a coinbase entry refers to its transaction. */
@@ -76,9 +81,11 @@ export function orderWalletContextTransactions(
     const a = transactions.get(left);
     const b = transactions.get(right);
     return (
-      Number(b?.mempool === true) - Number(a?.mempool === true) ||
-      (b?.blockHeight ?? -1) - (a?.blockHeight ?? -1) ||
-      (b?.blocktime ?? b?.time ?? -1) - (a?.blocktime ?? a?.time ?? -1) ||
+      Number((b?.status?.kind === 'mempool') === true) -
+        Number((a?.status?.kind === 'mempool') === true) ||
+      (b?.status?.blockHeight ?? -1) - (a?.status?.blockHeight ?? -1) ||
+      (b?.status?.blocktime ?? b?.status?.time ?? -1) -
+        (a?.status?.blocktime ?? a?.status?.time ?? -1) ||
       left.localeCompare(right)
     );
   });
@@ -91,7 +98,7 @@ function outpoint(id: string): { txid: string; vout: number } | undefined {
 
 function canonicalId(id: string, workspace: Pick<Workspace, 'network'>): string | undefined {
   try {
-    return canonicalEntityNodeId(id, workspace.network);
+    return canonicalEntityReference(id, workspace.network);
   } catch {
     return undefined;
   }
@@ -101,7 +108,9 @@ function canonicalId(id: string, workspace: Pick<Workspace, 'network'>): string 
  * graph widening, automatic downloads or inferred input-to-output value mapping.
  * Wallet address derivation was verified at the workspace import/scan boundary. */
 export function buildWalletReviewContext(
-  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  },
   wallet: Pick<Wallet, 'addresses'>,
   item: WalletReviewContextSubject,
   contextTransactionId?: string,
@@ -124,7 +133,12 @@ export function buildWalletReviewContext(
   const hashes =
     walletAddresses?.scripthashes ??
     new Set(verifiedWalletAddresses(wallet, workspace.network).map((entry) => entry.scripthash));
-  const prevouts = index?.prevouts ?? indexPreviousOutputs(workspace);
+  const prevouts =
+    index?.prevouts ??
+    indexPreviousOutputs({
+      network: workspace.network,
+      transactions: workspace.chainData.transactions,
+    });
 
   const entry = (
     txid: string,
@@ -132,7 +146,7 @@ export function buildWalletReviewContext(
     output?: TxOutput,
     prevoutStatus?: PreviousOutputResolution['status'],
   ): WalletReviewFlowEntry => {
-    const id = outputNodeId(txid, vout);
+    const id = outpointReference(txid, vout);
     const { scripthash: hash, address } = walletOutputEvidence(output, workspace.network);
     return {
       id,
@@ -148,7 +162,11 @@ export function buildWalletReviewContext(
     };
   };
   const knownOutput = (txid: string, vout: number) => {
-    const resolution = resolvePreviousOutput(workspace, { txid, vout }, prevouts);
+    const resolution = resolvePreviousOutput(
+      { network: workspace.network, transactions: workspace.chainData.transactions },
+      { txid, vout },
+      prevouts,
+    );
     return {
       output:
         resolution.status === 'loaded' || resolution.status === 'attached'
@@ -165,7 +183,7 @@ export function buildWalletReviewContext(
         return entry(parent, input.vout, resolved.output, resolved.status);
       }
       return {
-        id: txNodeId(transactionId!),
+        id: transactionReference(transactionId!),
         txid: transactionId,
         ownership: 'unknown',
         selected: false,
@@ -210,10 +228,11 @@ export function buildWalletReviewContext(
   }
   return {
     transactionId,
-    transactionNodeId: transactionId ? txNodeId(transactionId) : undefined,
+    transactionNodeId: transactionId ? transactionReference(transactionId) : undefined,
     selectedNodeId: selectedId,
     transactionSelected:
-      selectedId === (transactionId ? txNodeId(transactionId) : undefined) && !!selectedId,
+      selectedId === (transactionId ? transactionReference(transactionId) : undefined) &&
+      !!selectedId,
     transaction,
     status: transaction ? 'loaded' : transactionId ? 'missing' : 'unavailable',
     inputs,

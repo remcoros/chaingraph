@@ -11,15 +11,17 @@ import {
   ShieldCheck,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import type { Annotation } from '../../../Annotations/annotation';
+import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import type { GraphLeftTab, GraphFilters } from '../../../../../Core/Workspace/view';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../workspace';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { GraphLeftTab } from '../../../GraphState/panelState';
-import { walletCheckAge } from '../../../Wallet/walletActivity';
+
+import type { Transaction } from '../../../../../Core/ChainData';
+
+import { walletCheckAge } from '../../../../../Core/Workspace/Wallets/walletActivity';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
-import type { GraphFilters } from '../../../GraphState/filters';
+
 import type { EntitySelection } from '../../../Selection/useEntitySelection';
 import EntityBrowser from './EntityBrowser';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
@@ -144,12 +146,12 @@ export function EntitiesPanelDetail({
         <button
           data-testid="panel-tab-wallets"
           className={leftTab === 'wallets' ? 'active icon-button' : 'icon-button'}
-          aria-label={`Wallets, ${activeWorkspace.wallets.length}`}
+          aria-label={`Wallets, ${activeWorkspace.wallets.definitions.length}`}
           title="Wallets"
           onClick={() => setLeftTab('wallets')}
         >
           <WalletIcon size={15} aria-hidden="true" />
-          <span>{activeWorkspace.wallets.length}</span>
+          <span>{activeWorkspace.wallets.definitions.length}</span>
         </button>
         <button
           data-testid="panel-tab-bookmarks"
@@ -176,7 +178,7 @@ export function EntitiesPanelDetail({
       ) : leftTab === 'wallets' ? (
         <>
           <div className="panel-body wallet-list">
-            {activeWorkspace.wallets.map((item) => (
+            {activeWorkspace.wallets.definitions.map((item) => (
               <div className="wallet-card" key={item.id}>
                 <div className="wallet-card-heading">
                   <button
@@ -223,7 +225,7 @@ export function EntitiesPanelDetail({
                 )}
               </div>
             ))}
-            {activeWorkspace.wallets.length === 0 && (
+            {activeWorkspace.wallets.definitions.length === 0 && (
               <div className="empty-panel">
                 <WalletIcon size={27} />
                 <h3>Wallets monitor activity here</h3>
@@ -238,7 +240,7 @@ export function EntitiesPanelDetail({
             </div>
           </div>
           <div className="scan-settings">
-            {!!activeWorkspace.wallets.length && (
+            {!!activeWorkspace.wallets.definitions.length && (
               <div className="compact-controls">
                 <button
                   className="refresh-wallets"
@@ -301,7 +303,7 @@ export function EntitiesPanelDetail({
           key={activeWorkspace.id}
           nodes={entityNodes}
           batchNodes={entityBatchNodes}
-          annotations={activeWorkspace.annotations}
+          annotations={activeWorkspace.annotations.entities}
           filters={
             graphFilters ?? { query: entityFilter, kind: entityKind as GraphFilters['kind'] }
           }
@@ -328,12 +330,12 @@ export function EntitiesPanelDetail({
           onVisibilityChange={onVisibilityChange}
           hiddenCount={hiddenCount}
           onShowAllHidden={onShowAllHidden}
-          transactions={transactions ?? activeWorkspace.transactions}
+          transactions={transactions ?? activeWorkspace.chainData.transactions}
           workspace={activeWorkspace}
           removableNodeIds={removableNodeIds}
           onRemoveNode={onRemoveNode}
-          wallets={activeWorkspace.wallets}
-          tags={activeWorkspace.tags}
+          wallets={activeWorkspace.wallets.definitions}
+          tags={activeWorkspace.annotations.tags}
           selection={selection}
         />
       ) : (

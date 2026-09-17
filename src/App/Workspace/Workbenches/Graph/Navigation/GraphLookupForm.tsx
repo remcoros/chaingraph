@@ -1,7 +1,6 @@
 import { useState, type FormEvent, type RefObject } from 'react';
 import { Search, Plus } from 'lucide-react';
-import { addressToScriptHash } from '../../../../../Domain/Wallet/wallet';
-import type { Network } from '../../../../../Domain/Chain/network';
+import { addressToScriptHash, type Network } from '../../../../../Core/Bitcoin';
 
 export interface GraphLookupFormProps {
   /** Owned by the parent so existing keyboard shortcuts can still focus the field. */

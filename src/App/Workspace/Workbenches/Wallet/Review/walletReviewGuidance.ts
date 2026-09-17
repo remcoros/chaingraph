@@ -1,4 +1,4 @@
-import type { AnalysisFinding } from '../../../Analysis/analysisFinding';
+import type { AnalysisFinding } from '../../../../../Core/Workspace/Analysis/finding';
 import type { WalletRow } from '../walletRows';
 
 export function walletSubjectTitle(row: WalletRow): string {

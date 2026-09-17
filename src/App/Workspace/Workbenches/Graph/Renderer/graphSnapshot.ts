@@ -1,4 +1,4 @@
-import { GRAPH_SNAPSHOT_NODE_LIMIT, type GraphSnapshot } from '../../../GraphState/graphSnapshot';
+import { GRAPH_SNAPSHOT_NODE_LIMIT, type GraphSnapshot } from '../../../../../Core/Workspace/view';
 
 export type { GraphSnapshot };
 

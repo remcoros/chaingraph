@@ -1,13 +1,13 @@
-import { analysisTools } from '../../../Analysis/analysis';
-import type { AnalysisScan } from '../../../Analysis/analysisScan';
-import { listTagsForNode } from '../../../Annotations/tagProjection';
-import type { Workspace } from '../../../workspace';
+import { analysisTools } from '../../../../../Core/Workspace/Analysis/analysis';
+import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
+import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import {
   REVIEW_REASONS,
   REASON_LABELS,
   type ReviewReason,
   type WalletReviewItem,
-} from '../../../Wallet/walletReview';
+} from '../../../../../Core/Workspace/Wallets/walletReview';
 
 export interface WalletReviewCategory {
   id: string;
@@ -73,13 +73,12 @@ const metadataCategories = [
   },
 ] as const;
 
-export type WalletReviewCategoryWorkspace = Pick<
-  Workspace,
-  'annotations' | 'tags' | 'findings' | 'walletReviews'
->;
+export type WalletReviewCategoryWorkspace = Pick<Workspace, 'annotations' | 'analysis'> & {
+  wallets: Pick<Workspace['wallets'], 'reviews'>;
+};
 
 function effectiveMetadata(workspace: WalletReviewCategoryWorkspace, item: WalletReviewItem) {
-  const label = (workspace.annotations[item.nodeId]?.label ?? item.label).trim();
+  const label = (workspace.annotations.entities[item.nodeId]?.label ?? item.label).trim();
   const tags = listTagsForNode(workspace, {
     id: item.nodeId,
     kind: item.nodeId.startsWith('tx:')
@@ -87,20 +86,20 @@ function effectiveMetadata(workspace: WalletReviewCategoryWorkspace, item: Walle
       : item.nodeId.startsWith('addr:')
         ? 'address'
         : 'output',
-    label,
     address: item.address,
   });
   return { labelled: !!label, tagged: tags.some((tag) => !!tag.name.trim()) };
 }
 
 function algorithmFor(
-  workspace: Pick<WalletReviewCategoryWorkspace, 'findings'>,
+  workspace: Pick<WalletReviewCategoryWorkspace, 'analysis'>,
   item: WalletReviewItem,
 ): string | undefined {
   if (item.reason !== 'link') return undefined;
   return (
     item.algorithm ??
-    workspace.findings.find((finding) => item.key.endsWith(`|link|${finding.id}`))?.algorithm
+    workspace.analysis.findings.find((finding) => item.key.endsWith(`|link|${finding.id}`))
+      ?.algorithm
   );
 }
 
@@ -146,7 +145,7 @@ export function walletReviewCategories(
       description: reasonDescriptions[reason],
     })),
     ...(items.some((item) => item.reason === 'counterparty' || item.reason === 'funding-source') ||
-    Object.keys(workspace.walletReviews ?? {}).some(
+    Object.keys(workspace.wallets.reviews ?? {}).some(
       (key) => key.includes('|counterparty|') || key.includes('|funding-source|'),
     )
       ? [
@@ -196,12 +195,12 @@ export interface WalletReviewCategoryScanState {
 /** Scan execution is session state, separate from category counts. An absent
  * report never establishes that an algorithm ran and found zero results. */
 export function walletReviewCategoryScanState(
-  workspace: Pick<Workspace, 'findings'>,
+  workspace: { analysis: Pick<Workspace['analysis'], 'findings'> },
   scan?: AnalysisScan,
 ): WalletReviewCategoryScanState {
   const tools: WalletReviewCategoryScanState['tools'] = analysisTools.map((tool) => {
     const report = scan?.reports.find((entry) => entry.toolId === tool.id);
-    const saved = workspace.findings.some(
+    const saved = workspace.analysis.findings.some(
       (finding) => finding.algorithm === tool.id || finding.algorithm.startsWith(`${tool.id}-v`),
     );
     return {

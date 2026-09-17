@@ -1,14 +1,17 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
-import { analysisTools } from '../../../Analysis/analysis';
-import type { AnalysisScan } from '../../../Analysis/analysisScan';
+import { analysisTools } from '../../../../../Core/Workspace/Analysis/analysis';
+import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
 import {
   matchesReviewCategories,
   walletReviewCategories,
   walletReviewCategoryScanState,
 } from './reviewCategories';
-import { REVIEW_REASONS, type WalletReviewItem } from '../../../Wallet/walletReview';
-import { createWorkspace } from '../../../createWorkspace';
+import {
+  REVIEW_REASONS,
+  type WalletReviewItem,
+} from '../../../../../Core/Workspace/Wallets/walletReview';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');
@@ -91,7 +94,7 @@ describe('discoverable wallet finding categories', () => {
   it('counts overlapping missing label, tags and neither before an OR selection', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
     const items = [makeItem(1), makeItem(2), makeItem(3), makeItem(4)];
-    workspace.annotations = {
+    workspace.annotations.entities = {
       [items[0].nodeId]: {
         label: ' \n ',
         note: 'A note is not a label',
@@ -102,7 +105,7 @@ describe('discoverable wallet finding categories', () => {
       [items[3].nodeId]: { label: 'Both', note: '', icon: '', bookmarked: false },
     };
     items[2].address = address;
-    workspace.tags = [
+    workspace.annotations.tags = [
       {
         id: 'fixture-tag',
         name: 'Known context',
@@ -179,7 +182,7 @@ describe('discoverable wallet finding categories', () => {
     expect(matchesReviewCategories(items[5], ['unidentified-sources'], workspace)).toBe(true);
     expect(matchesReviewCategories(items[6], ['unidentified-destinations'], workspace)).toBe(true);
     expect(items[0].status).toBe('unknown');
-    workspace.annotations[items[1].nodeId] = {
+    workspace.annotations.entities[items[1].nodeId] = {
       label: 'Recorded',
       note: '',
       icon: '',
@@ -188,7 +191,7 @@ describe('discoverable wallet finding categories', () => {
     expect(matchesReviewCategories(items[1], ['unidentified-sources'], workspace)).toBe(false);
     expect(matchesReviewCategories(items[1], ['funding-source'], workspace)).toBe(true);
     expect(matchesReviewCategories(items[5], ['unidentified-sources'], workspace)).toBe(true);
-    workspace.annotations[`addr:${address}`] = {
+    workspace.annotations.entities[`addr:${address}`] = {
       label: 'Address label',
       note: '',
       icon: '',
@@ -208,13 +211,13 @@ describe('discoverable wallet finding categories', () => {
       address,
       outpointIds: [`out:${id(1)}:0`, `out:${id(2)}:0`],
     });
-    workspace.annotations[`out:${id(1)}:0`] = {
+    workspace.annotations.entities[`out:${id(1)}:0`] = {
       label: 'One output',
       note: '',
       icon: '',
       bookmarked: false,
     };
-    workspace.tags = [
+    workspace.annotations.tags = [
       {
         id: 'tag',
         name: 'Output tag',
@@ -223,11 +226,11 @@ describe('discoverable wallet finding categories', () => {
       },
     ];
     expect(matchesReviewCategories(item, ['unidentified-sources'], workspace)).toBe(true);
-    workspace.tags[0].nodeIds.push(item.nodeId);
+    workspace.annotations.tags[0].nodeIds.push(item.nodeId);
     expect(matchesReviewCategories(item, ['unidentified-sources'], workspace)).toBe(false);
     expect(item.status).toBe('open');
-    workspace.tags = [];
-    workspace.annotations[item.nodeId] = {
+    workspace.annotations.tags = [];
+    workspace.annotations.entities[item.nodeId] = {
       label: '  ',
       note: 'Note only',
       icon: 'gift',
@@ -239,17 +242,17 @@ describe('discoverable wallet finding categories', () => {
   it('uses effective address tags but does not inherit address labels or tags from a transaction', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
     const item = makeItem(1, { address });
-    workspace.annotations[`addr:${address}`] = {
+    workspace.annotations.entities[`addr:${address}`] = {
       label: 'Address label',
       note: '',
       icon: '',
       bookmarked: false,
     };
-    workspace.tags = [
+    workspace.annotations.tags = [
       { id: 'tx-tag', name: 'Transaction context', color: '#27c4a7', nodeIds: [`tx:${id(1)}`] },
     ];
     expect(matchesReviewCategories(item, ['utxo-unidentified'], workspace)).toBe(true);
-    workspace.tags[0].nodeIds = [`addr:${address}`];
+    workspace.annotations.tags[0].nodeIds = [`addr:${address}`];
     expect(matchesReviewCategories(item, ['utxo-unidentified'], workspace)).toBe(false);
     expect(matchesReviewCategories(item, ['utxo-missing-label'], workspace)).toBe(true);
     expect(matchesReviewCategories(item, ['utxo-missing-tags'], workspace)).toBe(false);
@@ -267,7 +270,7 @@ describe('discoverable wallet finding categories', () => {
       createdAt: '2026-09-09T00:00:00.000Z',
       kind: 'hypothesis' as const,
     };
-    workspace.findings = [finding];
+    workspace.analysis.findings = [finding];
     const item = makeItem(1, { key: `wallet|link|${finding.id}`, reason: 'link' });
     const catalog = walletReviewCategories(workspace, [item]);
     expect(catalog.find((category) => category.id === 'heuristic:cioh')?.count).toBe(1);

@@ -3,21 +3,22 @@ import {
   verifiedWalletAddresses,
   verifyWalletUtxo,
   type WalletUtxoRecord,
-} from '../../Wallet/walletRecords';
-import { listWalletRelationships } from '../../Wallet/walletRelationships';
+} from '../../../../Core/Workspace/Wallets/walletRecords';
+import { listWalletRelationships } from '../../../../Core/Workspace/Wallets/walletRelationships';
 import { addGraphNodes } from '../../GraphState/graphMembership';
-import type { GraphFilters } from '../../GraphState/filters';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
+import type { GraphFilters, GraphRightTab } from '../../../../Core/Workspace/view';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
-import type { GraphRightTab } from '../../GraphState/panelState';
+
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
 
 import type { GraphHandoff } from '../workbenchHandoff';
-import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { ChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 
 interface WalletActionRuntime {
@@ -37,7 +38,7 @@ interface Inputs {
   setSelectionMode: WorkspaceSelection['batch']['setMode'];
   /** Everything this workbench needs to hand a record over to Graph. */
   handoff: GraphHandoff;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   wallet: Wallet | undefined;
   shownRightTab: GraphRightTab;
@@ -70,7 +71,7 @@ export function createWalletActions({
     graph,
     recoveryGraph,
   } = handoff;
-  const { recordTransactions } = transactions;
+  const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
 
   function selectWalletRecord(
@@ -108,14 +109,17 @@ export function createWalletActions({
       const admitted = addGraphNodes(current, ids);
       return {
         ...admitted,
-        watchedAddresses: addresses.length
-          ? [...new Set([...current.watchedAddresses, ...addresses])]
-          : current.watchedAddresses,
         view: {
           ...admitted.view,
           hiddenNodeIds: current.view.hiddenNodeIds?.filter((id) => !idSet.has(id)),
           showAddresses: addresses.length > 0 || current.view.showAddresses,
           smallAmountThreshold: center ? undefined : current.view.smallAmountThreshold,
+        },
+        chainData: {
+          ...admitted.chainData,
+          watchedAddresses: addresses.length
+            ? [...new Set([...current.chainData.watchedAddresses, ...addresses])]
+            : current.chainData.watchedAddresses,
         },
       };
     };
@@ -144,9 +148,10 @@ export function createWalletActions({
       signal.throwIfAborted();
       if (!isCurrent()) return;
       const current = workspaces.getUnlocked(ownerId)?.data;
-      if (!current || !current.wallets.some((item) => item.id === walletId)) return;
+      if (!current || !current.wallets.definitions.some((item) => item.id === walletId)) return;
       const transaction =
-        current.transactions[transactionId] ?? loaded.find((tx) => tx.txid === transactionId);
+        current.chainData.transactions[transactionId] ??
+        loaded.find((tx) => tx.txid === transactionId);
       if (utxo && (!transaction || !verifyWalletUtxo(utxo, transaction, activeWorkspace.network)))
         throw new Error(
           'The UTXO response does not match its transaction. Refresh the wallet UTXOs and retry.',
@@ -209,11 +214,14 @@ export function createWalletActions({
     edit(
       (current) => ({
         ...current,
-        wallets: current.wallets.map((wallet) =>
-          wallet.id === target.id
-            ? { ...wallet, unreviewedTransactionIds: [], activityOverflow: false }
-            : wallet,
-        ),
+        wallets: {
+          ...current.wallets,
+          definitions: current.wallets.definitions.map((wallet) =>
+            wallet.id === target.id
+              ? { ...wallet, unreviewedTransactionIds: [], activityOverflow: false }
+              : wallet,
+          ),
+        },
       }),
       false,
     );

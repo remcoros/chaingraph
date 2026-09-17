@@ -1,9 +1,13 @@
-import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Workspace } from '../../../workspace';
+import {
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
-import { walletOutputEvidence } from '../../../Wallet/walletRelationships';
+import { walletOutputEvidence } from '../../../../../Core/Workspace/Wallets/walletRelationships';
 import { walletRowFinding, type WalletRow } from '../walletRows';
-import type { WalletSelectionIndex } from '../../../Wallet/walletSelectionIndex';
+import type { WalletSelectionIndex } from '../../../../../Core/Workspace/Wallets/walletSelectionIndex';
 
 export interface WalletRelatedRecords {
   inputs: string[];
@@ -12,7 +16,10 @@ export interface WalletRelatedRecords {
 }
 
 export function walletRelatedRecords(
-  workspace: Pick<Workspace, 'network' | 'transactions' | 'findings'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+    analysis: Pick<Workspace['analysis'], 'findings'>;
+  },
   row: WalletRow,
   index?: WalletSelectionIndex,
 ): WalletRelatedRecords {
@@ -25,23 +32,24 @@ export function walletRelatedRecords(
   }
   for (const txid of finding?.txids ?? []) transactions.add(txid);
   if (row.kind === 'transaction' && row.txid) {
-    const transaction = workspace.transactions[row.txid];
+    const transaction = workspace.chainData.transactions[row.txid];
     transactions.delete(row.txid);
     for (const input of transaction?.vin ?? []) {
       if (input.txid !== undefined && input.vout !== undefined && input.coinbase === undefined)
-        inputs.add(outputNodeId(input.txid, input.vout));
+        inputs.add(outpointReference(input.txid, input.vout));
     }
-    for (const output of transaction?.vout ?? []) outputs.add(outputNodeId(row.txid, output.n));
+    for (const output of transaction?.vout ?? [])
+      outputs.add(outpointReference(row.txid, output.n));
   } else if (row.kind === 'output') {
     outputs.delete(row.nodeId);
     if (row.txid) transactions.add(row.txid);
     if (index) {
-      const creating = workspace.transactions[row.txid ?? ''];
+      const creating = workspace.chainData.transactions[row.txid ?? ''];
       if (creating) transactions.add(creating.txid);
-      const point = outputNodeId(row.txid ?? '', Number(row.nodeId.split(':')[2]));
+      const point = outpointReference(row.txid ?? '', Number(row.nodeId.split(':')[2]));
       for (const txid of index.spendingTransactionIds.get(point) ?? []) transactions.add(txid);
     } else
-      for (const { tx } of relatedTransactions(workspace.transactions, {
+      for (const { tx } of relatedTransactions(workspace.chainData.transactions, {
         id: row.nodeId,
         kind: 'output',
         label: '',
@@ -64,16 +72,16 @@ export function walletRelatedRecords(
         for (const id of byTransaction.get(txid) ?? []) outputs.add(id);
     } else
       for (const txid of row.contextTransactionIds) {
-        const transaction = workspace.transactions[txid];
+        const transaction = workspace.chainData.transactions[txid];
         for (const output of transaction?.vout ?? [])
           if (walletOutputEvidence(output, workspace.network).address === row.address)
-            outputs.add(outputNodeId(txid, output.n));
+            outputs.add(outpointReference(txid, output.n));
       }
   }
   return {
     inputs: [...inputs],
     outputs: [...outputs],
-    transactions: [...transactions].map(txNodeId),
+    transactions: [...transactions].map(transactionReference),
   };
 }
 
@@ -88,21 +96,21 @@ export function walletRelatedDescription(
   const spends = (txid: string, outpoint: string) =>
     index.spendingTransactionIds.get(outpoint)?.includes(txid) ?? false;
   const addressFor = (outpoint: string) => {
-    const evidence = index.prevouts.get(outpoint);
+    const evidence = index.prevouts.get(outpoint.slice(4));
     return evidence?.status === 'loaded' || evidence?.status === 'attached'
       ? walletOutputEvidence(evidence.output, workspace.network).address
       : undefined;
   };
   if (id.startsWith('tx:')) {
     const txid = id.slice(3);
-    const transaction = workspace.transactions[txid];
+    const transaction = workspace.chainData.transactions[txid];
     if (row.kind === 'output') {
       if (row.txid === txid) return 'Creates this outpoint';
       if (spends(txid, row.nodeId)) return 'Spends this outpoint';
     }
     if (row.kind === 'transaction' && row.txid) {
       if (
-        workspace.transactions[row.txid]?.vin.some(
+        workspace.chainData.transactions[row.txid]?.vin.some(
           (input) =>
             input.coinbase === undefined && input.vout !== undefined && input.txid === txid,
         )
@@ -125,7 +133,7 @@ export function walletRelatedDescription(
           input.txid !== undefined &&
           input.vout !== undefined &&
           input.coinbase === undefined &&
-          addressFor(outputNodeId(input.txid, input.vout)) === row.address,
+          addressFor(outpointReference(input.txid, input.vout)) === row.address,
       );
       if (receives && sends) return 'Spends from and pays this address';
       if (receives) return 'Pays this address';
@@ -157,10 +165,10 @@ export function walletRelatedDescription(
     (id.startsWith('tx:') && finding?.txids.includes(id.slice(3)))
   )
     return 'Included in this finding';
-  if (id.startsWith('tx:') && !workspace.transactions[id.slice(3)])
+  if (id.startsWith('tx:') && !workspace.chainData.transactions[id.slice(3)])
     return 'Relationship details unavailable until this transaction is loaded';
   if (id.startsWith('out:')) {
-    const evidence = index.prevouts.get(id);
+    const evidence = index.prevouts.get(id.slice(4));
     if (evidence?.status === 'conflict')
       return 'Conflicting output details prevent checking the relationship';
     if (!evidence || evidence.status === 'missing')

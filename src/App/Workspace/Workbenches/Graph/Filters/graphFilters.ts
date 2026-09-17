@@ -1,6 +1,11 @@
-import type { Annotation } from '../../../Annotations/annotation';
+import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
 import type { GraphData, GraphNode } from '../../../GraphState/types';
-import type { GraphFilters } from '../../../GraphState/filters';
+
+/** Runtime membership projection, never serialized into the workspace. */
+export interface GraphProjectionFilters extends GraphFilters {
+  excludeIds?: string[];
+}
 
 type EntityVisibility = 'visible' | 'hidden' | 'all';
 
@@ -63,13 +68,13 @@ export function buildGraphFilterIndex(graph: GraphData): GraphFilterIndex {
 }
 
 /** Explicit multi-selection takes precedence over an older saved single selection. */
-export function selectedWalletFilterIds(filters: GraphFilters): string[] {
+export function selectedWalletFilterIds(filters: GraphProjectionFilters): string[] {
   return [...new Set(filters.walletIds ?? (filters.walletId ? [filters.walletId] : []))];
 }
 
 /** Resolve the union of derived-script matches; callers intersect other filter dimensions. */
 export function matchingWalletFilterNodeIds(
-  filters: GraphFilters,
+  filters: GraphProjectionFilters,
   matches: ReadonlyMap<string, { walletIds: string[] }>,
 ): string[] | undefined {
   const selected = new Set(selectedWalletFilterIds(filters));
@@ -79,7 +84,7 @@ export function matchingWalletFilterNodeIds(
     .map(([nodeId]) => nodeId);
 }
 
-export function valueFilterError(filters: GraphFilters): string | undefined {
+export function valueFilterError(filters: GraphProjectionFilters): string | undefined {
   for (const value of [filters.minSats, filters.maxSats]) {
     if (
       value !== undefined &&
@@ -98,7 +103,7 @@ export function valueFilterError(filters: GraphFilters): string | undefined {
 /** Filters observations in a loaded snapshot, never inferring chain-wide spend status. */
 export function filterGraph(
   graph: GraphData,
-  filters: GraphFilters = {},
+  filters: GraphProjectionFilters = {},
   annotations: Record<string, Annotation> = {},
   visibility: { hiddenNodeIds?: readonly string[]; mode?: EntityVisibility } = {},
   options: { index?: GraphFilterIndex; previewContext?: boolean } = {},

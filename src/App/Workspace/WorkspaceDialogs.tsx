@@ -1,9 +1,10 @@
 import { CopyButton } from '../Controls/CopyButton';
 import { Modal } from '../Dialogs/Modal';
 import { WorkspaceDetailsDialog } from './Dialogs/WorkspaceDetailsDialog';
-import { WalletDialog } from './Wallet/Dialogs/WalletDialog';
-import { WalletNameDialog } from './Wallet/Dialogs/WalletNameDialog';
+import { WalletDialog } from './Wallets/Dialogs/WalletDialog';
+import { WalletNameDialog } from './Wallets/Dialogs/WalletNameDialog';
 import type { WorkspaceController } from './useWorkspace';
+import { short } from '../../Core/Formatting';
 
 type Props = { workspace: WorkspaceController };
 
@@ -50,12 +51,17 @@ export function EntityRemovalDialog({ workspace }: Props) {
   const { entityRemoval } = workspace;
   const { pending, plan: removalPlan } = entityRemoval;
   if (!pending || !removalPlan) return null;
+  const title =
+    workspace.activeWorkspace?.annotations.entities[removalPlan.nodeId]?.label ||
+    (removalPlan.kind === 'transaction'
+      ? short(removalPlan.nodeId.slice(3))
+      : removalPlan.nodeId.slice(5));
   return (
     <Modal
       title={removalPlan.kind === 'transaction' ? 'Remove transaction?' : 'Stop watching address?'}
       onClose={() => entityRemoval.cancel()}
     >
-      <p>{removalPlan.title}</p>
+      <p>{title}</p>
       <div className="selection-facts">
         <span>{removalPlan.kind === 'transaction' ? 'Transaction ID' : 'Address'}</span>
         <code className="mono wrap" style={{ userSelect: 'all', display: 'block' }}>
@@ -107,7 +113,9 @@ export function WalletDialogs({ workspace }: Props) {
           onChange={(name) =>
             workspace.edit(
               (current) => {
-                const target = current.wallets.find((item) => item.id === editingWallet.id);
+                const target = current.wallets.definitions.find(
+                  (item) => item.id === editingWallet.id,
+                );
                 if (
                   current.id !== workspace.dialogs.renameTarget?.workspaceId ||
                   !target ||
@@ -116,9 +124,12 @@ export function WalletDialogs({ workspace }: Props) {
                   return current;
                 return {
                   ...current,
-                  wallets: current.wallets.map((item) =>
-                    item.id === target.id ? { ...item, name } : item,
-                  ),
+                  wallets: {
+                    ...current.wallets,
+                    definitions: current.wallets.definitions.map((item) =>
+                      item.id === target.id ? { ...item, name } : item,
+                    ),
+                  },
                 };
               },
               true,
@@ -133,7 +144,7 @@ export function WalletDialogs({ workspace }: Props) {
           network={activeWorkspace.network}
           onAdd={(newWallet) => {
             if (
-              activeWorkspace.wallets.some(
+              activeWorkspace.wallets.definitions.some(
                 (wallet) =>
                   wallet.key === newWallet.key && wallet.scriptType === newWallet.scriptType,
               )
@@ -143,7 +154,10 @@ export function WalletDialogs({ workspace }: Props) {
             }
             workspace.edit((current) => ({
               ...current,
-              wallets: [...current.wallets, newWallet],
+              wallets: {
+                ...current.wallets,
+                definitions: [...current.wallets.definitions, newWallet],
+              },
             }));
             workspace.selection.setSelectedWallet(newWallet.id);
             workspace.selection.setSelectedId(undefined);

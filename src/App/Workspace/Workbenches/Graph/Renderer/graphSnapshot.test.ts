@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { graphSnapshotSchema, type GraphSnapshot } from '../../../GraphState/graphSnapshot';
+import { validateGraphSnapshot, type GraphSnapshot } from '../../../../../Core/Workspace/view';
 import { mergeGraphSnapshot } from './graphSnapshot';
-import { createWorkspace } from '../../../createWorkspace';
-import { parseWorkspace } from '../../../Persistence/Format';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../../../Core/Workspace/Persistence';
 
 const snapshot: GraphSnapshot = {
   version: 1,
@@ -47,34 +47,32 @@ describe('encrypted graph-view data validation', () => {
   it('rejects non-finite, oversized and degenerate imported camera/position data', () => {
     for (const value of [NaN, Infinity, -Infinity, 10_000_001]) {
       expect(
-        graphSnapshotSchema.safeParse({ ...snapshot, nodes: [{ ...snapshot.nodes[0], x: value }] })
-          .success,
+        validateGraphSnapshot({ ...snapshot, nodes: [{ ...snapshot.nodes[0], x: value }] }).success,
       ).toBe(false);
     }
     expect(
-      graphSnapshotSchema.safeParse({
+      validateGraphSnapshot({
         ...snapshot,
         camera: { ...snapshot.camera, up: { x: 0, y: 0, z: 0 } },
       }).success,
     ).toBe(false);
     expect(
-      graphSnapshotSchema.safeParse({
+      validateGraphSnapshot({
         ...snapshot,
         camera: { ...snapshot.camera, position: snapshot.camera.target },
       }).success,
     ).toBe(false);
     expect(
-      graphSnapshotSchema.safeParse({ ...snapshot, nodes: [snapshot.nodes[0], snapshot.nodes[0]] })
-        .success,
+      validateGraphSnapshot({ ...snapshot, nodes: [snapshot.nodes[0], snapshot.nodes[0]] }).success,
     ).toBe(false);
     expect(
-      graphSnapshotSchema.safeParse({
+      validateGraphSnapshot({
         ...snapshot,
         nodes: [{ ...snapshot.nodes[0], id: 'x'.repeat(201) }],
       }).success,
     ).toBe(false);
     expect(
-      graphSnapshotSchema.safeParse({
+      validateGraphSnapshot({
         ...snapshot,
         nodes: Array.from({ length: 50_001 }, (_, index) => ({
           ...snapshot.nodes[0],

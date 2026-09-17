@@ -1,8 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import type { PreviousOutputIndex } from '../../../../../Domain/Chain/prevouts';
-import type { Network } from '../../../../../Domain/Chain/network';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
+import type { PreviousOutputIndex, Transaction } from '../../../../../Core/ChainData';
+import type { Network } from '../../../../../Core/Bitcoin';
+
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { WalletReviewFlowEntry } from '../walletReviewContext';
 import {
   loadWalletFlowInputWave,
@@ -186,7 +186,7 @@ export function useWalletFlowInputs(options: Options) {
       );
       const additions = result.loaded.filter(
         (transaction) =>
-          !latest.current.workspace.transactions[transaction.txid] &&
+          !latest.current.workspace.chainData.transactions[transaction.txid] &&
           currentPlan.refs.some(
             (ref) =>
               ref.txid === transaction.txid &&

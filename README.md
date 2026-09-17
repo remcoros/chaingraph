@@ -1,8 +1,8 @@
-# Chaingraph 
+# Chaingraph
 
 <div align="center"><img src="public/favicon.svg" width="80px" /></div>
 
-Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to understand their wallets and follow activity on chain. 
+Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to understand their wallets and follow activity on chain.
 
 It runs against your Bitcoin Core node and Electrum server, and everything you save stays encrypted in your browser.
 
@@ -18,11 +18,14 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 - **Review wallets.** Import one or more watch-only wallets from an account-level
   extended public key. Chaingraph derives addresses in the browser, scans their
   activity through your node, and gives you a review queue for UTXOs, used
-  addresses, sources and destinations.
+  addresses, sources and destinations. Successful address UTXO checks are saved
+  inside the encrypted workspace with their dates and coverage; refresh them
+  explicitly after reopening when you need a new observation.
   <img src="docs/screenshots/readme-wallet.png" />
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
-  outputs and addresses. Undo and redo edits in the current session, or exchange
+  outputs and addresses. Undo and redo edits without rolling back accepted chain
+  refreshes in the current session, or exchange
   labels through plaintext BIP329 files.
 
 - **Run analysis.** Use seven local tools to find patterns in outputs, inputs,
@@ -128,6 +131,12 @@ automatically and can be exported as encrypted files for backup or transfer.
   backups before large investigations.
 
 ## Documentation
+
+The browser source separates React UI and wiring (`src/App`) from workspace
+capabilities (`src/Core/Workspace`). Each concept owns its data types and validation;
+the Workspace root composes the canonical document. `Persistence` owns encrypted
+formats, migration and storage.
+The source map below identifies each concept and its tests.
 
 - [User guide](docs/user-guide.md)
 - [Deployment and releases](docs/deployment.md)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Transaction } from '../../../../../Core/ChainData';
 import { spendingNotice } from './spendingNotice';
 
 const tx: Transaction = {

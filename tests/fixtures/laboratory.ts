@@ -1,7 +1,7 @@
 import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
-import type { Transaction } from '../../src/Domain/Chain/transaction';
-import type { Workspace } from '../../src/App/Workspace/workspace';
+import { createWorkspace } from '../../src/Core/Workspace/createWorkspace';
+import type { Transaction } from '../../src/Core/ChainData';
+import type { Workspace } from '../../src/Core/Workspace/workspace';
 // Deliberately synthetic, deterministic fixture; never presented as chain data.
 export function laboratoryWorkspace(): Workspace {
   const w = createWorkspace('Synthetic graph fixture', 'testnet4');
@@ -13,7 +13,7 @@ export function laboratoryWorkspace(): Workspace {
     for (let i = 0; i < 150; i++) {
       const parentid = id(2000 + group * 150 + i);
       vin.push({ txid: parentid, vout: 0 });
-      w.transactions[parentid] = {
+      w.chainData.transactions[parentid] = {
         txid: parentid,
         vin: [{ coinbase: 'synthetic' }],
         vout: [
@@ -23,10 +23,10 @@ export function laboratoryWorkspace(): Workspace {
             scriptPubKey: { type: 'witness_v0_keyhash' },
           },
         ],
-        confirmations: 12,
+        status: { kind: 'confirmed' as const, confirmations: 12 },
       };
     }
-    w.transactions[joinid] = {
+    w.chainData.transactions[joinid] = {
       txid: joinid,
       vin,
       vout: Array.from({ length: 150 }, (_, n) => ({
@@ -34,10 +34,10 @@ export function laboratoryWorkspace(): Workspace {
         value: 0.01,
         scriptPubKey: { type: 'witness_v0_keyhash' },
       })),
-      confirmations: 6,
       vsize: 21000,
+      status: { kind: 'confirmed' as const, confirmations: 6 },
     };
-    w.annotations[`tx:${joinid}`] = {
+    w.annotations.entities[`tx:${joinid}`] = {
       label: `Synthetic CoinJoin ${group + 1}`,
       note: 'Generated fixture: 150 inputs and 150 equal outputs. Not an on-chain transaction.',
       icon: '◇',
@@ -45,14 +45,14 @@ export function laboratoryWorkspace(): Workspace {
     };
     for (let i = 0; i < 30; i++) {
       const child = id(4000 + group * 30 + i);
-      w.transactions[child] = {
+      w.chainData.transactions[child] = {
         txid: child,
         vin: [{ txid: joinid, vout: i }],
         vout: [
           { n: 0, value: 0.006, scriptPubKey: {} },
           { n: 1, value: 0.00399, scriptPubKey: {} },
         ],
-        confirmations: 2,
+        status: { kind: 'confirmed' as const, confirmations: 2 },
       };
     }
   }

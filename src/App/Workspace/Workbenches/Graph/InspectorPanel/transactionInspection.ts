@@ -1,9 +1,9 @@
 import { Transaction as BitcoinTransaction, script } from 'bitcoinjs-lib';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import type { Network } from '../../../../../Domain/Chain/network';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import { rpc } from '../../../../../Infra/Bitcoin/api';
+import type { Network } from '../../../../../Core/Bitcoin';
+import type { Transaction } from '../../../../../Core/ChainData';
+import { rpc } from '../../../../../Core/ChainData/api';
 
 /** A display-only decode. ASM is normalized by bitcoinjs; hex remains authoritative. */
 export function inspectScript(hex: string | undefined): {

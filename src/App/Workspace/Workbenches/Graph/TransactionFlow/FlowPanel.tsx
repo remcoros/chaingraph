@@ -33,7 +33,7 @@ export function FlowPanel(props: FlowPanelProps) {
     fullHeight: panelHeight === 'full',
     onHeight: (next: typeof panelHeight) => onStateChange?.({ ...state, height: next }),
   };
-  const annotation = selected ? workspace.annotations[selected.id] : undefined;
+  const annotation = selected ? workspace.annotations.entities[selected.id] : undefined;
 
   if (!selected)
     return selectedWallet ? (

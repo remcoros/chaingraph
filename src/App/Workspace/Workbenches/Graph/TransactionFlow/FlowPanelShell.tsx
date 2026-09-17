@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp } from 'lucide-react';
-import type { FlowPanelHeight } from '../../../GraphState/panelState';
+import type { FlowPanelHeight } from '../../../../../Core/Workspace/view';
 
 /** The height controls, owned above the views so they survive a change of view. */
 export interface FlowPanelHeightState {

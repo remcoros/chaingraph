@@ -7,13 +7,13 @@ import { transactionStatus } from '../../../../Controls/Display/transactionStatu
 import { addressBalanceSats, type AddressHistory } from '../Address/addressHistory';
 import { paginateAddressHistorySections } from './addressHistorySections';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
-import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import { transactionReference } from '../../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type {
   AddressBalanceObservation,
   AddressUtxoObservation,
-} from '../../../../../Domain/Chain/observations';
+} from '../../../../../Core/ChainData';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../workspace';
 
 export interface FlowPanelAddressViewProps {
   workspace: Workspace;
@@ -256,12 +256,16 @@ export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewPro
         history.unloadedCount > 0 ||
         (canLoad && (history.source === 'loaded transactions' || !history.complete))));
   const renderUtxo = (utxo: AddressUtxoObservation['utxos'][number]) => {
-    const transaction = workspace.transactions[utxo.txid];
+    const transaction = workspace.chainData.transactions[utxo.txid];
     const timestampTransaction =
       utxo.height > 0 &&
       transaction &&
-      (transaction.blockHeight === undefined || transaction.blockHeight === utxo.height)
-        ? { ...transaction, blockHeight: utxo.height, mempool: undefined }
+      (transaction.status?.blockHeight === undefined ||
+        transaction.status?.blockHeight === utxo.height)
+        ? {
+            ...transaction,
+            status: { ...transaction.status, kind: 'confirmed' as const, blockHeight: utxo.height },
+          }
         : undefined;
     return (
       <button
@@ -311,8 +315,8 @@ export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewPro
     );
   };
   const renderHistoryEntry = (entry: AddressHistory['entries'][number]) => {
-    const transactionNodeId = txNodeId(entry.txid);
-    const annotation = workspace.annotations[transactionNodeId];
+    const transactionNodeId = transactionReference(entry.txid);
+    const annotation = workspace.annotations.entities[transactionNodeId];
     const metadata = renderMetadata?.(transactionNodeId);
     const observedStatus = entry.transaction ? transactionStatus(entry.transaction) : undefined;
     const status =

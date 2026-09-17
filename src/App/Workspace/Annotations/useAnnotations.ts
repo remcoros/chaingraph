@@ -1,9 +1,13 @@
 import { useRef } from 'react';
-import type { Annotation } from './annotation';
-import type { Workspace } from '../workspace';
-import { emptyAnnotation } from './emptyAnnotation';
-import { exportLabels, importLabels } from './labels';
-import { parseWorkspaceTags } from './workspaceTags';
+import {
+  type Annotation,
+  parseWorkspaceTags,
+} from '../../../Core/Workspace/Annotations/annotations';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+
+import { emptyAnnotation } from '../../../Core/Workspace/Annotations/emptyAnnotation';
+import { exportLabels, importLabels } from '../../../Core/Workspace/Annotations/labels';
+
 import { download } from '../../../Infra/Browser/download';
 import type { AppState } from '../../useAppState';
 import { useMetadataEditRequest, type MetadataEditRequest } from './useMetadataEditRequest';
@@ -54,14 +58,20 @@ export function useAnnotations({
   const labelsInput = useRef<HTMLInputElement>(null);
   const editRequest = useMetadataEditRequest(current?.id);
   return {
-    bookmarks: Object.entries(current?.annotations ?? {}).filter(([, a]) => a.bookmarked),
+    bookmarks: Object.entries(current?.annotations.entities ?? {}).filter(([, a]) => a.bookmarked),
     edit: editRequest,
     labelsInput,
     changeTags: (update) => {
       try {
         edit((workspace) => {
           const next = update(workspace);
-          return { ...next, tags: parseWorkspaceTags(next.tags ?? [], next.network) };
+          return {
+            ...next,
+            annotations: {
+              ...next.annotations,
+              tags: parseWorkspaceTags(next.annotations.tags ?? [], next.network),
+            },
+          };
         });
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Could not update tags.');
@@ -99,7 +109,7 @@ export function useAnnotations({
       try {
         const result = importLabels(await file.text());
         edit((workspace) => {
-          const annotations = { ...workspace.annotations };
+          const annotations = { ...workspace.annotations.entities };
           for (const [id, annotation] of Object.entries(result.annotations))
             annotations[id] = {
               ...(annotations[id] ?? emptyAnnotation),
@@ -107,11 +117,14 @@ export function useAnnotations({
             };
           return {
             ...workspace,
-            annotations,
-            wallets: workspace.wallets.map((wallet) => ({
-              ...wallet,
-              name: result.annotations[`xpub:${wallet.key}`]?.label.trim() || wallet.name,
-            })),
+            annotations: { ...workspace.annotations, entities: annotations },
+            wallets: {
+              ...workspace.wallets,
+              definitions: workspace.wallets.definitions.map((wallet) => ({
+                ...wallet,
+                name: result.annotations[`xpub:${wallet.key}`]?.label.trim() || wallet.name,
+              })),
+            },
           };
         });
         setNotice(

@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../../../../Controls/Display/amountFormat';
+import { formatBitcoinAmount } from '../../../../../Core/Formatting';
 import { describe, expect, it } from 'vitest';
 import {
   buildGraphFilterIndex,
@@ -15,7 +15,7 @@ import {
   hasActiveFilters,
 } from './filterPresentation';
 import { sortEntities } from '../EntitiesPanel/entitySort';
-import type { Annotation } from '../../../Annotations/annotation';
+import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
 import type { GraphData } from '../../../GraphState/types';
 
 const graph: GraphData = {

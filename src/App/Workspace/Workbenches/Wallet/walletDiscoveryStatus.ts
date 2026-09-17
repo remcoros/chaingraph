@@ -1,4 +1,4 @@
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 
 export function walletDiscoveryStatus(wallet: Wallet): { text: string; hint?: string } | undefined {
   if (!wallet.scannedAt || wallet.scanComplete === true) return;

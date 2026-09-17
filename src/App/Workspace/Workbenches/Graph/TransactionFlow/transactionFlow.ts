@@ -1,5 +1,5 @@
-import { outputNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import { outpointReference } from '../../../../../Core/Workspace/entityReferences';
+import type { Transaction } from '../../../../../Core/ChainData';
 
 /** Exact outpoints only. Several loaded spends remain alternatives, not a chain verdict. */
 export function indexLoadedSpends(transactions: Record<string, Transaction>) {
@@ -9,7 +9,7 @@ export function indexLoadedSpends(transactions: Record<string, Transaction>) {
     for (const input of tx.vin) {
       if (input.coinbase !== undefined || input.txid === undefined || input.vout === undefined)
         continue;
-      const id = outputNodeId(input.txid, input.vout);
+      const id = outpointReference(input.txid, input.vout);
       if (seen.has(id)) continue;
       seen.add(id);
       const spends = result.get(id) ?? [];
@@ -28,9 +28,9 @@ export function selectedFlowLeg(tx: Transaction, outputId?: string) {
       input.coinbase === undefined &&
       input.txid !== undefined &&
       input.vout !== undefined &&
-      outputNodeId(input.txid, input.vout) === outputId,
+      outpointReference(input.txid, input.vout) === outputId,
   );
   if (inputIndex >= 0) return { direction: 'previous' as const, index: inputIndex };
-  const output = tx.vout.find((output) => outputNodeId(tx.txid, output.n) === outputId);
+  const output = tx.vout.find((output) => outpointReference(tx.txid, output.n) === outputId);
   return output ? { direction: 'next' as const, index: output.n } : undefined;
 }

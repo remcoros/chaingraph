@@ -1,37 +1,35 @@
 import { spendingNotice } from './spendingNotice';
 import { addGraphNodes } from '../../../GraphState/graphMembership';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { GraphData } from '../../../GraphState/types';
-import type { GraphFilters } from '../../../GraphState/filters';
-import type { AppState } from '../../../../useAppState';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
+import {
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
 import type { WorkspaceCore } from '../../../workspaceCore';
 import type { WorkspaceSelection } from '../../../Selection/useWorkspaceSelection';
 import { setNodesHidden } from '../../../GraphState/visibility';
 import { buildGraph } from '../../../GraphState/graphEvidence';
 import { openFlowPanel } from '../../../GraphState/panelState';
-import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import { loadSpending } from '../../../../../Infra/Bitcoin/api';
-import {
-  ancestryNotice,
-  loadAncestors,
-  traceSourceExists,
-} from '../../../../../Infra/Bitcoin/tracing';
-import type { Dispatch, SetStateAction } from 'react';
 
-import type { TransactionEvidence } from '../../../Evidence/Transactions';
+import { ancestryNotice } from './ancestryNotice';
+import { loadAncestors } from './ancestry';
+import { traceSourceExists } from '../../../GraphState/traceSource';
+
+import type { ChainDataAcquisition } from '../../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../../useWorkspaceOperation';
 
 interface Inputs {
   core: WorkspaceCore;
   selection: WorkspaceSelection;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
   setFocusRequest: Dispatch<
     SetStateAction<{ id: string; token: number; preserveZoom?: boolean } | undefined>
   >;
   recoveryGraph: GraphData;
-  fetchScope: AppState['fetchScope'];
   canTraceAncestry: boolean;
 }
 
@@ -44,7 +42,6 @@ export function useGraphExpansion({
   setGraphFilters,
   setFocusRequest,
   recoveryGraph,
-  fetchScope,
   canTraceAncestry,
 }: Inputs) {
   const { activeWorkspace, activeWorkspaceRef, workspaces, setOperation, setNotice } = core;
@@ -55,7 +52,8 @@ export function useGraphExpansion({
     select,
     selectedId,
   } = selection;
-  const { getTransaction, recordTransactions } = transactions;
+  const { transaction: getTransaction } = transactions.read;
+  const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
   // A search position belongs to one workspace, so leaving it discards the
   // offsets rather than resuming a later workspace mid-search.
@@ -83,7 +81,11 @@ export function useGraphExpansion({
     const generation = selectionGeneration.current;
     if (
       !canTraceAncestry &&
-      !(direction === 'funding' && node.kind === 'output' && snapshot.transactions[node.txid])
+      !(
+        direction === 'funding' &&
+        node.kind === 'output' &&
+        snapshot.chainData.transactions[node.txid]
+      )
     )
       return;
     if (options?.preserveCamera) {
@@ -96,8 +98,8 @@ export function useGraphExpansion({
           ? 'Loading previous transactions…'
           : 'Checking outputs for spending transactions…',
       );
-      const loaded = snapshot.transactions[node.txid!];
-      const traceSourceId = loaded ? txNodeId(node.txid!) : node.id;
+      const loaded = snapshot.chainData.transactions[node.txid!];
+      const traceSourceId = loaded ? transactionReference(node.txid!) : node.id;
       const transaction = loaded ?? (await getTransaction(node.txid!, signal));
       signal.throwIfAborted();
       if (
@@ -105,13 +107,14 @@ export function useGraphExpansion({
         activeWorkspaceRef.current?.id !== activeWorkspace.id
       )
         return;
-      if (!traceSourceExists(getUnlocked(activeWorkspace.id)!.data, traceSourceId)) return;
+      if (!traceSourceExists(getUnlocked(activeWorkspace.id)!.data.chainData, traceSourceId))
+        return;
       if (direction === 'funding') {
         if (node.kind === 'output') {
           recordTransactions(activeWorkspace.id, loaded ? [] : [transaction], {
             promotionIds: [transaction.txid],
           });
-          const id = txNodeId(transaction.txid);
+          const id = transactionReference(transaction.txid);
           workspaces.active?.edit(
             (current) => ({
               ...setNodesHidden(current, [id], false),
@@ -136,7 +139,7 @@ export function useGraphExpansion({
           recordTransactions(activeWorkspace.id, [transaction]);
         } else {
           const before = getUnlocked(activeWorkspace.id)!.data;
-          const result = await loadAncestors([transaction], before.transactions, 1, {
+          const result = await loadAncestors([transaction], before.chainData.transactions, 1, {
             signal,
             fetch: (id, signal) => getTransaction(id, signal, 'background'),
             onProgress: setOperation,
@@ -151,16 +154,16 @@ export function useGraphExpansion({
             recordTransactions(activeWorkspace.id, result.transactions, {
               promotionIds: result.resolvedTransactionIds,
               contextIds: result.transactions.map((tx) => tx.txid),
-              accept: (current) => traceSourceExists(current, traceSourceId),
+              accept: (current) => traceSourceExists(current.chainData, traceSourceId),
             })
           ) {
             const parents = new Set(result.resolvedTransactionIds);
             workspaces.active?.edit((current) =>
               addGraphNodes(current, [
-                ...result.resolvedTransactionIds.map(txNodeId),
+                ...result.resolvedTransactionIds.map(transactionReference),
                 ...transaction.vin.flatMap((input) =>
                   input.txid && input.vout !== undefined && parents.has(input.txid)
-                    ? [outputNodeId(input.txid, input.vout)]
+                    ? [outpointReference(input.txid, input.vout)]
                     : [],
                 ),
               ]),
@@ -171,13 +174,11 @@ export function useGraphExpansion({
       } else {
         const outputIndex = node.kind === 'output' ? node.vout : undefined;
         const searchKey = `${transaction.txid}:${outputIndex ?? 'all'}`;
-        const result = await loadSpending(
+        const result = await transactions.read.spending(
           transaction,
-          activeWorkspace,
           outputIndex,
           signal,
           spendingOffsets.current.get(searchKey)?.offset ?? 0,
-          { scope: fetchScope, priority: 'background' },
           spendingOffsets.current.get(searchKey)?.unavailableTxids,
         );
         signal.throwIfAborted();
@@ -192,18 +193,18 @@ export function useGraphExpansion({
             [...(!loaded ? [transaction] : []), ...result.transactions],
             {
               promotionIds: result.transactions.map((tx) => tx.txid),
-              accept: (current) => traceSourceExists(current, traceSourceId),
+              accept: (current) => traceSourceExists(current.chainData, traceSourceId),
             },
           )
         )
           return;
-        const spendingNodeIds = result.transactions.map((item) => txNodeId(item.txid));
+        const spendingNodeIds = result.transactions.map((item) => transactionReference(item.txid));
         const connectingOutputs = result.transactions.flatMap((item) =>
           item.vin.flatMap((input) =>
             input.txid === transaction.txid &&
             input.vout !== undefined &&
             (outputIndex === undefined || input.vout === outputIndex)
-              ? [outputNodeId(input.txid, input.vout)]
+              ? [outpointReference(input.txid, input.vout)]
               : [],
           ),
         );
@@ -252,7 +253,7 @@ export function useGraphExpansion({
           active &&
           selectionGeneration.current === generation &&
           activeWorkspaceRef.current?.id === activeWorkspace.id &&
-          traceSourceExists(active, traceSourceId)
+          traceSourceExists(active.chainData, traceSourceId)
         )
           setNotice(notice);
       }

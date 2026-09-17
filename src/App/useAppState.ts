@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Workspace } from './Workspace/workspace';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createChainDataAcquisition } from '../Core/Workspace/Session/chainDataAcquisition';
+import type { Workspace } from '../Core/Workspace/workspace';
 import { useBackendNetworks } from './useBackendNetworks';
 import { useWorkspaces } from './Workspace/Store/useWorkspaces';
-import type { SavedWorkspace } from './Workspace/savedWorkspace';
+import type { SavedWorkspace } from '../Core/Workspace/Persistence';
 import { appServices } from './appServices';
 export function useAppState() {
   const workspaces = useWorkspaces(appServices.workspaceStore);
@@ -10,6 +11,20 @@ export function useAppState() {
   const fetchScope = workspaces.active?.fetchScope;
   const getUnlockedWorkspace = workspaces.getUnlocked;
   const workspaceId = activeWorkspace?.id;
+  const workspaceNetwork = activeWorkspace?.network;
+  const workspaceDemo = activeWorkspace?.demo;
+  const chainDataAcquisition = useMemo(
+    () =>
+      createChainDataAcquisition({
+        activeWorkspace:
+          workspaceId && workspaceNetwork
+            ? { id: workspaceId, network: workspaceNetwork, demo: !!workspaceDemo }
+            : undefined,
+        getUnlocked: getUnlockedWorkspace,
+        fetchScope,
+      }),
+    [workspaceId, workspaceNetwork, workspaceDemo, getUnlockedWorkspace, fetchScope],
+  );
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [fileDialog, setFileDialog] = useState<File>();
@@ -107,6 +122,7 @@ export function useAppState() {
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [flushActiveGraph, getUnlockedWorkspace]);
   return {
+    chainDataAcquisition,
     workspaces,
     activeWorkspace,
     fetchScope,

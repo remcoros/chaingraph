@@ -3,16 +3,15 @@ import {
   formatLocalTimestamp,
   transactionBlockTime,
 } from '../../../src/App/Controls/Display/transactionTime';
-import { walletRecordBlockObservation } from '../../../src/App/Workspace/Wallet/walletRecordBlockObservation';
+import { walletRecordBlockObservation } from '../../../src/Core/Workspace/Wallets/walletRecordBlockObservation';
 import { transactionStatus } from '../../../src/App/Controls/Display/transactionStatus';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
+import type { Transaction } from '../../../src/Core/ChainData';
 
 const tx: Transaction = {
   txid: 'a'.repeat(64),
   vin: [],
   vout: [],
-  blockHeight: 800000,
-  blocktime: 1690168629,
+  status: { kind: 'confirmed' as const, blockHeight: 800000, blocktime: 1690168629 },
 };
 
 describe('saved block times', () => {
@@ -34,30 +33,90 @@ describe('saved block times', () => {
   });
 
   it('uses blocktime, never current time or the generic time field', () => {
-    expect(transactionBlockTime({ ...tx, time: 1 })).toEqual(transactionBlockTime(tx));
-    expect(transactionBlockTime({ ...tx, blocktime: undefined, time: 1690168629 })).toBeUndefined();
     expect(
-      transactionBlockTime({ ...tx, blockHeight: undefined, confirmations: 20 }),
+      transactionBlockTime({
+        ...tx,
+        status: { ...tx.status, kind: tx.status?.kind ?? 'unknown', time: 1 },
+      }),
+    ).toEqual(transactionBlockTime(tx));
+    expect(
+      transactionBlockTime({
+        ...tx,
+        status: {
+          ...tx.status,
+          kind: tx.status?.kind ?? 'unknown',
+          blocktime: undefined,
+          time: 1690168629,
+        },
+      }),
+    ).toBeUndefined();
+    expect(
+      transactionBlockTime({
+        ...tx,
+        status: {
+          ...tx.status,
+          kind: 'confirmed' as const,
+          blockHeight: undefined,
+          confirmations: 20,
+        },
+      }),
     ).toBeDefined();
-    expect(transactionStatus({ ...tx, blockHeight: undefined, confirmations: 20 }).label).toBe(
-      'Confirmed',
-    );
+    expect(
+      transactionStatus({
+        ...tx,
+        status: {
+          ...tx.status,
+          kind: 'confirmed' as const,
+          blockHeight: undefined,
+          confirmations: 20,
+        },
+      }).label,
+    ).toBe('Confirmed');
   });
 
   it('does not give mempool, missing, or conflicted observations a block date', () => {
-    const unknown = { ...tx, blockHeight: undefined, confirmations: 0, time: 1690168629 };
+    const unknown = {
+      ...tx,
+      status: {
+        ...tx.status,
+        kind: 'unknown' as const,
+        blockHeight: undefined,
+        confirmations: 0,
+        time: 1690168629,
+      },
+    };
     expect(transactionStatus(unknown).label).toBe('Status unknown');
     expect(transactionBlockTime(unknown)).toBeUndefined();
-    expect(transactionStatus({ ...unknown, mempool: true }).label).toBe('Unconfirmed');
-    expect(transactionBlockTime({ ...unknown, mempool: true })).toBeUndefined();
-    expect(transactionBlockTime({ ...tx, confirmations: -1 })).toBeUndefined();
+    expect(
+      transactionStatus({ ...unknown, status: { ...unknown.status, kind: 'mempool' as const } })
+        .label,
+    ).toBe('Unconfirmed');
+    expect(
+      transactionBlockTime({ ...unknown, status: { ...unknown.status, kind: 'mempool' as const } }),
+    ).toBeUndefined();
+    expect(
+      transactionBlockTime({
+        ...tx,
+        status: { ...tx.status, kind: 'inactive' as const, confirmations: -1 },
+      }),
+    ).toBeUndefined();
     expect(transactionBlockTime(undefined)).toBeUndefined();
   });
 
   it('handles missing/invalid times and the epoch without inventing dates', () => {
     for (const value of [undefined, NaN, Infinity, -1, 1e20])
-      expect(transactionBlockTime({ ...tx, blocktime: value })).toBeUndefined();
-    expect(transactionBlockTime({ ...tx, blocktime: 0 })?.exact).toBe('1970-01-01 00:00:00');
+      expect(
+        transactionBlockTime({
+          ...tx,
+          status: { ...tx.status, kind: tx.status?.kind ?? 'unknown', blocktime: value },
+        }),
+      ).toBeUndefined();
+    expect(
+      transactionBlockTime({
+        ...tx,
+        status: { ...tx.status, kind: tx.status?.kind ?? 'unknown', blocktime: 0 },
+      })?.exact,
+    ).toBe('1970-01-01 00:00:00');
   });
 
   it('renders stored instants in the user timezone without a timezone suffix', () => {
@@ -90,7 +149,7 @@ describe('saved block times', () => {
     expect(transactionBlockTime(heightOnly)).toBeUndefined();
     const conflicted = walletRecordBlockObservation(
       tx.txid,
-      { ...tx, confirmations: -1 },
+      { ...tx, status: { ...tx.status, kind: 'inactive' as const, confirmations: -1 } },
       800000,
       false,
     );

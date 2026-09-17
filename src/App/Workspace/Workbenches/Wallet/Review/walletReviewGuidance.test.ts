@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { createWorkspace } from '../../../createWorkspace';
-import { deriveAddresses } from '../../../../../Domain/Wallet/wallet';
-import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import { applyReviewDecisions, buildWalletReview, reviewKey } from '../../../Wallet/walletReview';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
+import { addressReference } from '../../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+
+import {
+  applyReviewDecisions,
+  buildWalletReview,
+  reviewKey,
+} from '../../../../../Core/Workspace/Wallets/walletReview';
 import { walletReviewCategories } from './reviewCategories';
 import { matchesWalletStatus, reviewRow } from '../walletRows';
 import { walletReviewGuidance, walletSubjectTitle } from './walletReviewGuidance';
@@ -27,10 +32,10 @@ function fixture() {
     scriptType: 'p2wpkh',
     addresses,
   };
-  workspace.wallets = [wallet];
-  workspace.transactions = structuredClone(transactions);
+  workspace.wallets.definitions = [wallet];
+  workspace.chainData.transactions = structuredClone(transactions);
   const sender = bitcoinAddress.toBech32(new Uint8Array(20).fill(17), 0, 'bc');
-  workspace.transactions[TX_FUNDING].vin = [
+  workspace.chainData.transactions[TX_FUNDING].vin = [
     {
       txid: 'c'.repeat(64),
       vout: 0,
@@ -63,20 +68,20 @@ describe('guided wallet review', () => {
     expect(own.map((item) => item.nodeId).sort()).toEqual(
       addresses
         .slice(0, 2)
-        .map((entry) => addressNodeId(entry.address))
+        .map((entry) => addressReference(entry.address))
         .sort(),
     );
     expect(initial.items[0].reason).toBe('current-utxo');
     const target = own.find((item) => item.address === addresses[0].address)!;
     const reviewed = applyReviewDecisions(workspace, wallet, [target], 'reviewed');
-    expect(Object.keys(reviewed.walletReviews!)).toEqual([target.key]);
-    reviewed.annotations[target.nodeId] = {
+    expect(Object.keys(reviewed.wallets.reviews!)).toEqual([target.key]);
+    reviewed.annotations.entities[target.nodeId] = {
       label: 'Savings receipts',
       note: '',
       icon: '',
       bookmarked: false,
     };
-    reviewed.transactions['d'.repeat(64)] = {
+    reviewed.chainData.transactions['d'.repeat(64)] = {
       txid: 'd'.repeat(64),
       vin: [{ coinbase: '00' }],
       vout: [
@@ -115,13 +120,13 @@ describe('guided wallet review', () => {
   it('retains compatible saved output decisions as history without copying them to addresses', () => {
     const { workspace, wallet, options } = fixture();
     const key = reviewKey(wallet.id, 'counterparty', `${TX_SPENDING}:1`);
-    workspace.walletReviews = {
+    workspace.wallets.reviews = {
       [key]: { status: 'unknown', at: '2026-09-09T10:00:00Z', evidence: 'old' },
     };
     const legacy = buildWalletReview(workspace, wallet, options).items.find(
       (item) => item.key === key,
     )!;
-    workspace.walletReviews[key].evidence = legacy.evidence;
+    workspace.wallets.reviews[key].evidence = legacy.evidence;
     const review = buildWalletReview(workspace, wallet, options);
     expect(review.items.find((item) => item.key === key)).toMatchObject({
       status: 'unknown',

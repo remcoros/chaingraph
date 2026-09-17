@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import { type Transaction, indexPreviousOutputs } from '../../../../../Core/ChainData';
 import type { WalletReviewFlowEntry } from '../walletReviewContext';
-import { indexPreviousOutputs } from '../../../../../Domain/Chain/prevouts';
+
 import { buildGraph } from '../../../GraphState/graphEvidence';
-import { createWorkspace } from '../../../createWorkspace';
-import { parseWorkspace } from '../../../Persistence/Format';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../../../Core/Workspace/Persistence';
 import {
   loadWalletFlowInputWave,
   mergeWalletFlowInputs,
@@ -36,7 +36,7 @@ const input = (txid = parent, vout = 0): WalletReviewFlowEntry => ({
 });
 const fixture = () => {
   const workspace = createWorkspace('Visible input fixture', 'mainnet');
-  workspace.wallets = [
+  workspace.wallets.definitions = [
     {
       id: walletId,
       name: 'Public wallet',
@@ -46,7 +46,7 @@ const fixture = () => {
       addresses: [],
     },
   ];
-  workspace.transactions[child] = {
+  workspace.chainData.transactions[child] = {
     ...tx(child),
     vin: [
       { txid: parent, vout: 0 },
@@ -59,10 +59,13 @@ const fixture = () => {
 describe('visible Wallet input planning', () => {
   it('reuses the loaded snapshot index and skips workspace scans for empty visible inputs', () => {
     const workspace = fixture();
-    workspace.transactions[parent] = tx(parent);
-    const prevouts = indexPreviousOutputs(workspace);
+    workspace.chainData.transactions[parent] = tx(parent);
+    const prevouts = indexPreviousOutputs({
+      network: workspace.network,
+      transactions: workspace.chainData.transactions,
+    });
     const expected = walletFlowInputPlan(workspace, walletId, child, [input(), input(parent, 2)]);
-    workspace.transactions = new Proxy(workspace.transactions, {
+    workspace.chainData.transactions = new Proxy(workspace.chainData.transactions, {
       ownKeys() {
         throw new Error('Row selection must not enumerate the loaded transaction history.');
       },
@@ -102,7 +105,7 @@ describe('visible Wallet input planning', () => {
   it('bounds visible references at 100 and each request wave at 20, excluding in-flight attempts', () => {
     const workspace = fixture();
     const ids = Array.from({ length: 130 }, (_, index) => index.toString(16).padStart(64, '0'));
-    workspace.transactions[child].vin = ids.map((txid) => ({ txid, vout: 0 }));
+    workspace.chainData.transactions[child].vin = ids.map((txid) => ({ txid, vout: 0 }));
     const plan = walletFlowInputPlan(
       workspace,
       walletId,
@@ -117,7 +120,7 @@ describe('visible Wallet input planning', () => {
 
   it('does not fetch a cached parent again when its requested output is absent', () => {
     const workspace = fixture();
-    workspace.transactions[parent] = tx(parent);
+    workspace.chainData.transactions[parent] = tx(parent);
     const plan = walletFlowInputPlan(workspace, walletId, child, [input(parent, 2)]);
     expect(plan.transactionIds).toEqual([]);
     expect(plan.pendingCount).toBe(0);
@@ -126,7 +129,7 @@ describe('visible Wallet input planning', () => {
 
   it('does not fetch a parent when attached evidence supplies the visible output details', () => {
     const workspace = fixture();
-    workspace.transactions[child].vin[0].prevout = {
+    workspace.chainData.transactions[child].vin[0].prevout = {
       value: 1,
       scriptPubKey: { hex: '51' },
     };
@@ -136,16 +139,16 @@ describe('visible Wallet input planning', () => {
     expect(plan.transactionIds).toEqual([]);
     expect(plan.pendingCount).toBe(0);
     expect(plan.missingOutputCount).toBe(0);
-    expect(workspace.transactions[parent]).toBeUndefined();
+    expect(workspace.chainData.transactions[parent]).toBeUndefined();
   });
 
   it('invalidates a removed wallet, removed source or changed input list', () => {
     const workspace = fixture();
     const before = walletFlowSourceKey(workspace, walletId, child);
-    workspace.transactions[child].vin = [{ txid: grandparent, vout: 0 }];
+    workspace.chainData.transactions[child].vin = [{ txid: grandparent, vout: 0 }];
     expect(walletFlowSourceKey(workspace, walletId, child)).not.toBe(before);
     expect(walletFlowInputPlan(workspace, walletId, child, [input()]).transactionIds).toEqual([]);
-    workspace.wallets = [];
+    workspace.wallets.definitions = [];
     expect(walletFlowSourceKey(workspace, walletId, child)).toBe('');
     expect(walletFlowInputPlan(workspace, walletId, child, [input()]).refs).toEqual([]);
   });
@@ -154,20 +157,20 @@ describe('visible Wallet input planning', () => {
 describe('visible Wallet evidence merges', () => {
   it('keeps cache-only merges identical without promotion, provenance changes or replacement', () => {
     const workspace = fixture();
-    workspace.transactions[parent] = tx(parent, 3);
-    workspace.inputContext = { [parent]: [2] };
+    workspace.chainData.transactions[parent] = tx(parent, 3);
+    workspace.view.inputContext = { [parent]: [2] };
     expect(mergeWalletFlowInputs(workspace, walletId, child, [input()], [])).toBe(workspace);
     expect(mergeWalletFlowInputs(workspace, walletId, child, [input()], [tx(parent, 4)])).toBe(
       workspace,
     );
-    expect(workspace.transactions[parent].vout).toHaveLength(3);
-    expect(workspace.inputContext).toEqual({ [parent]: [2] });
+    expect(workspace.chainData.transactions[parent].vout).toHaveLength(3);
+    expect(workspace.view.inputContext).toEqual({ [parent]: [2] });
   });
 
   it('preserves explicit visible prevouts and existing context without exposing giant parent siblings', () => {
     const workspace = fixture();
-    workspace.transactions[grandparent] = tx(grandparent);
-    workspace.inputContext = { [grandparent]: [0] };
+    workspace.chainData.transactions[grandparent] = tx(grandparent);
+    workspace.view.inputContext = { [grandparent]: [0] };
     const funding = { ...tx(parent, 50), vin: [{ txid: 'd'.repeat(64), vout: 0 }] };
     const merged = mergeWalletFlowInputs(
       workspace,
@@ -176,24 +179,24 @@ describe('visible Wallet evidence merges', () => {
       [input(parent, 2), input()],
       [funding],
     );
-    expect(merged.inputContext).toEqual({ [grandparent]: [0], [parent]: [0, 2] });
-    expect(merged.contextTransactionIds).toContain(parent);
-    expect(merged.transactions[parent].vout).toHaveLength(50);
+    expect(merged.view.inputContext).toEqual({ [grandparent]: [0], [parent]: [0, 2] });
+    expect(merged.chainData.contextTransactionIds).toContain(parent);
+    expect(merged.chainData.transactions[parent].vout).toHaveLength(50);
     const graphIds = buildGraph(merged).nodes.map((node) => node.id);
     expect(graphIds).toContain(`out:${parent}:2`);
     expect(graphIds).not.toContain(`out:${parent}:1`);
     expect(graphIds).not.toContain(`out:${'d'.repeat(64)}:0`);
-    expect(merged.annotations).toBe(workspace.annotations);
-    expect(parseWorkspace(merged).inputContext).toEqual(merged.inputContext);
+    expect(merged.annotations.entities).toBe(workspace.annotations.entities);
+    expect(parseWorkspace(merged).view.inputContext).toEqual(merged.view.inputContext);
   });
 
   it('rejects arrivals for a removed source, removed wallet or no longer relevant prevout', () => {
     const workspace = fixture();
-    const absentSource = { ...workspace, transactions: {} };
+    const absentSource = { ...workspace, chainData: { ...workspace.chainData, transactions: {} } };
     expect(mergeWalletFlowInputs(absentSource, walletId, child, [input()], [tx(parent)])).toBe(
       absentSource,
     );
-    const absentWallet = { ...workspace, wallets: [] };
+    const absentWallet = { ...workspace, wallets: { ...workspace.wallets, definitions: [] } };
     expect(mergeWalletFlowInputs(absentWallet, walletId, child, [input()], [tx(parent)])).toBe(
       absentWallet,
     );
@@ -222,8 +225,8 @@ describe('visible Wallet evidence merges', () => {
       [input()],
       [{ ...tx(parent), vin: [{ txid: grandparent, vout: 0 }] }, tx(grandparent)],
     );
-    expect(merged.transactions[parent]).toBeDefined();
-    expect(merged.transactions[grandparent]).toBeUndefined();
+    expect(merged.chainData.transactions[parent]).toBeDefined();
+    expect(merged.chainData.transactions[grandparent]).toBeUndefined();
     expect(walletFlowInputPlan(merged, walletId, child, [input()]).transactionIds).toEqual([]);
   });
 });

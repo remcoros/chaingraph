@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { FolderOpen, LockKeyhole, Plus, ShieldCheck, Upload, Trash2 } from 'lucide-react';
-import type { Network } from '../../Domain/Chain/network';
+import type { Network } from '../../Core/Bitcoin';
 import { WorkspaceTemplateCards } from '../Examples/WorkspaceTemplateCards';
-import type { SavedWorkspace } from '../Workspace/savedWorkspace';
-import type { UnlockedWorkspace } from '../Workspace/Store/WorkspaceStore';
+import type { SavedWorkspace } from '../../Core/Workspace/Persistence';
+import type { UnlockedWorkspace } from '../../Core/Workspace/Session/WorkspaceStore';
 import { formatLocalTimestamp } from '../Controls/Display/transactionTime';
 interface Props {
   saved: SavedWorkspace[];

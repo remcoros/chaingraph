@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
+import { createWorkspace } from '../../src/Core/Workspace/createWorkspace';
 import { openFixtureWorkspace } from '../fixtures/open-workspace';
 
 // A tiny, deliberately minimal fixture: one funding and one spending transaction.
@@ -10,17 +10,17 @@ function smokeWorkspace() {
   w.demo = false;
   const funding = 'a'.repeat(64);
   const spending = 'b'.repeat(64);
-  w.transactions[funding] = {
+  w.chainData.transactions[funding] = {
     txid: funding,
     vin: [{ coinbase: '00' }],
     vout: [{ n: 0, value: 1, scriptPubKey: { type: 'witness_v0_keyhash' } }],
-    confirmations: 10,
+    status: { kind: 'confirmed' as const, confirmations: 10 },
   };
-  w.transactions[spending] = {
+  w.chainData.transactions[spending] = {
     txid: spending,
     vin: [{ txid: funding, vout: 0 }],
     vout: [{ n: 0, value: 0.9, scriptPubKey: { type: 'witness_v0_keyhash' } }],
-    confirmations: 5,
+    status: { kind: 'confirmed' as const, confirmations: 5 },
   };
   w.view.graphNodeIds = buildGraph(w).nodes.map((node) => node.id);
   return w;

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { GraphMetadataProjection, EMPTY_GRAPH_ANNOTATIONS } from './graphMetadata';
-import { createWorkspace } from '../../createWorkspace';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
 import { fullGraphMembershipEvidence } from '../../GraphState/graphMembership';
 import { buildTagIndex } from '../../Annotations/tagProjection';
 import { filterGraph } from './Filters/graphFilters';
 import { sortEntities } from './EntitiesPanel/entitySort';
-import type { Annotation } from '../../Annotations/annotation';
+import type { Annotation } from '../../../../Core/Workspace/Annotations/annotations';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
 import type { GraphData } from '../../GraphState/types';
-import type { Workspace } from '../../workspace';
 
 const id = '1'.repeat(64);
 const transaction = `tx:${id}`;
@@ -17,12 +17,15 @@ const blank: Annotation = { label: '', icon: '', note: '', bookmarked: false };
 const matches = new Map();
 function setup() {
   const workspace = createWorkspace('Metadata fixture', 'mainnet');
-  workspace.transactions[id] = {
+  workspace.chainData.transactions[id] = {
     txid: id,
     vin: [{ coinbase: '00' }],
     vout: [{ n: 0, value: 1, scriptPubKey: { address } }],
   };
-  const graph = fullGraphMembershipEvidence({ ...workspace, annotations: EMPTY_GRAPH_ANNOTATIONS });
+  const graph = fullGraphMembershipEvidence({
+    ...workspace,
+    annotations: { ...workspace.annotations, entities: EMPTY_GRAPH_ANNOTATIONS },
+  });
   const cache = new GraphMetadataProjection();
   const tags = buildTagIndex(workspace, graph);
   return {
@@ -46,22 +49,25 @@ describe('graph metadata projection', () => {
     const initial = project(workspace);
     const edited = {
       ...workspace,
-      annotations: { [output]: { ...blank, bookmarked: true, note: 'review later' } },
+      annotations: {
+        ...workspace.annotations,
+        entities: { [output]: { ...blank, bookmarked: true, note: 'review later' } },
+      },
     };
     expect(project(edited)).toBe(initial);
     expect(
-      filterGraph(graph, { bookmarkedOnly: true }, edited.annotations).matchedNodes.map(
+      filterGraph(graph, { bookmarkedOnly: true }, edited.annotations.entities).matchedNodes.map(
         (n) => n.id,
       ),
     ).toEqual([output]);
     expect(
-      filterGraph(graph, { query: 'review later' }, edited.annotations).matchedNodes.map(
+      filterGraph(graph, { query: 'review later' }, edited.annotations.entities).matchedNodes.map(
         (n) => n.id,
       ),
     ).toEqual([output]);
     expect(project(workspace)).toBe(initial);
     expect(
-      filterGraph(graph, { bookmarkedOnly: true }, workspace.annotations).matchedNodes,
+      filterGraph(graph, { bookmarkedOnly: true }, workspace.annotations.entities).matchedNodes,
     ).toEqual([]);
   });
 
@@ -71,8 +77,11 @@ describe('graph metadata projection', () => {
     const edited = {
       ...workspace,
       annotations: {
-        [transaction]: { ...blank, label: 'Zebra' },
-        [output]: { ...blank, label: 'Apple', icon: '★' },
+        ...workspace.annotations,
+        entities: {
+          [transaction]: { ...blank, label: 'Zebra' },
+          [output]: { ...blank, label: 'Apple', icon: '★' },
+        },
       },
     };
     const changed = project(edited);
@@ -89,7 +98,9 @@ describe('graph metadata projection', () => {
       ).map((n) => n.id),
     ).toEqual([output, transaction]);
     expect(
-      filterGraph(graph, { query: '★ Apple' }, edited.annotations).matchedNodes.map((n) => n.id),
+      filterGraph(graph, { query: '★ Apple' }, edited.annotations.entities).matchedNodes.map(
+        (n) => n.id,
+      ),
     ).toEqual([output]);
     const cleared = project(workspace);
     expect(cleared.presentation.get(output)).toMatchObject({ label: '', icon: '' });
@@ -110,7 +121,12 @@ describe('graph metadata projection', () => {
     );
     const tagged = {
       ...workspace,
-      tags: [{ id: 'fixture', name: 'Recognized', color: '#f7931a', nodeIds: [`addr:${address}`] }],
+      annotations: {
+        ...workspace.annotations,
+        tags: [
+          { id: 'fixture', name: 'Recognized', color: '#f7931a', nodeIds: [`addr:${address}`] },
+        ],
+      },
     };
     const changed = cache.project(graph, tagged, buildTagIndex(tagged, graph), matches, 'all');
     expect(changed.presentation.get(transaction)).toBe(initial.presentation.get(transaction));
@@ -138,7 +154,13 @@ describe('graph metadata projection', () => {
 
   it('drops old node metadata when graph evidence changes', () => {
     const { workspace, graph, cache, project } = setup();
-    project({ ...workspace, annotations: { [output]: { ...blank, label: 'Old output' } } });
+    project({
+      ...workspace,
+      annotations: {
+        ...workspace.annotations,
+        entities: { [output]: { ...blank, label: 'Old output' } },
+      },
+    });
     const next = cache.project({ nodes: [], links: [] }, workspace, new Map(), matches, 'all');
     expect(next.presentation.size).toBe(0);
     expect(next.labeledNodes.size).toBe(0);

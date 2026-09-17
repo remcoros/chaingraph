@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
-import { parseTransaction } from '../../../src/Domain/Chain/transactionValidation';
-import { outputAddress } from '../../../src/Domain/Chain/prevouts';
-import { analysisTools } from '../../../src/App/Workspace/Analysis/analysis';
-import { outputNodeId, txNodeId } from '../../../src/Domain/Metadata/entityReferences';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import type { Wallet } from '../../../src/Domain/Wallet/walletTypes';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+import { parseTransaction, type Transaction } from '../../../src/Core/ChainData';
+import { outputAddress } from '../../../src/Core/Bitcoin';
+import { analysisTools } from '../../../src/Core/Workspace/Analysis/analysis';
+import {
+  outpointReference,
+  transactionReference,
+} from '../../../src/Core/Workspace/entityReferences';
+import type { Wallet } from '../../../src/Core/Workspace/Wallets/wallets';
+
 import { laboratoryWorkspace } from '../../fixtures/laboratory';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -42,28 +45,28 @@ describe('workspace graph and analysis', () => {
       ],
       [{ address: addrB, value: 0.9 }],
     );
-    w.transactions = { [funding.txid]: funding, [spending.txid]: spending };
-    w.annotations[outputNodeId(id(1), 0)] = {
+    w.chainData.transactions = { [funding.txid]: funding, [spending.txid]: spending };
+    w.annotations.entities[outpointReference(id(1), 0)] = {
       label: 'Savings',
       note: 'User provenance',
       bookmarked: true,
       icon: '🔒',
     };
     const graph = buildGraph(w);
-    expect(graph.nodes.find((node) => node.id === outputNodeId(id(1), 0))).toMatchObject({
+    expect(graph.nodes.find((node) => node.id === outpointReference(id(1), 0))).toMatchObject({
       label: '🔒 Savings',
       value: 100_000_000,
     });
-    expect(w.annotations[outputNodeId(id(1), 0)].label).toBe('Savings');
-    expect(graph.nodes.find((node) => node.id === outputNodeId(id(99), 1))).toMatchObject({
+    expect(w.annotations.entities[outpointReference(id(1), 0)].label).toBe('Savings');
+    expect(graph.nodes.find((node) => node.id === outpointReference(id(99), 1))).toMatchObject({
       kind: 'output',
       txid: id(99),
       vout: 1,
     });
     expect(graph.links).toContainEqual(
       expect.objectContaining({
-        source: outputNodeId(id(1), 0),
-        target: txNodeId(id(2)),
+        source: outpointReference(id(1), 0),
+        target: transactionReference(id(2)),
         kind: 'spends',
       }),
     );
@@ -78,7 +81,7 @@ describe('workspace graph and analysis', () => {
       Array.from({ length: 150 }, (_, n) => ({ txid: id(n + 1), vout: 0 })),
       Array.from({ length: 150 }, () => ({ address: addrA, value: 0.01 })),
     );
-    w.transactions[big.txid] = big;
+    w.chainData.transactions[big.txid] = big;
     const graph = buildGraph(w);
     expect(graph.nodes).toHaveLength(301);
     expect(graph.links).toHaveLength(300);
@@ -104,22 +107,22 @@ describe('workspace graph and analysis', () => {
       ],
       [{ address: addrA, value: 1.9 }],
     );
-    w.transactions = { [funding.txid]: funding, [spending.txid]: spending };
+    w.chainData.transactions = { [funding.txid]: funding, [spending.txid]: spending };
     const findings = findTool('cioh').run(w);
     expect(findings).toHaveLength(1);
     expect(new Set(findings[0].nodeIds)).toEqual(
-      new Set([outputNodeId(id(1), 0), outputNodeId(id(1), 1)]),
+      new Set([outpointReference(id(1), 0), outpointReference(id(1), 1)]),
     );
     expect(findings[0].description).toContain('PayJoin');
-    w.findings = findings;
+    w.analysis.findings = findings;
     expect(buildGraph(w).nodes.filter((node) => node.cluster)).toHaveLength(2);
-    w.findings = findings.map((finding) => ({ ...finding, excluded: true }));
+    w.analysis.findings = findings.map((finding) => ({ ...finding, excluded: true }));
     expect(buildGraph(w).nodes.filter((node) => node.cluster)).toHaveLength(0);
   });
 
   it('reports address reuse only within loaded outputs and keeps labels on roundtrip', () => {
     const w = createWorkspace('Labeled wallet', 'mainnet');
-    w.transactions[id(1)] = tx(
+    w.chainData.transactions[id(1)] = tx(
       1,
       [],
       [
@@ -127,34 +130,37 @@ describe('workspace graph and analysis', () => {
         { address: addrA, value: 2 },
       ],
     );
-    w.annotations[txNodeId(id(1))] = {
+    w.annotations.entities[transactionReference(id(1))] = {
       label: 'Funding',
       note: 'Personal note',
       bookmarked: true,
       icon: '★',
     };
-    w.findings = findTool('address-reuse').run(w);
+    w.analysis.findings = findTool('address-reuse').run(w);
     const parsed = parseWorkspace(JSON.parse(JSON.stringify(w)));
-    expect(parsed.annotations).toEqual(w.annotations);
-    expect(parsed.findings).toHaveLength(1);
-    expect(parsed.findings[0].nodeIds).toHaveLength(2);
-    expect(parsed.findings[0].txids).toEqual([id(1)]);
-    expect(parsed.findings[0].description).toContain('within this transaction');
-    expect(parsed.findings[0].details).toContain('loaded history');
-    expect(parsed.findings).toEqual(w.findings);
-    expect(parsed.findings[0].description).toContain(
+    expect(parsed.annotations.entities).toEqual(w.annotations.entities);
+    expect(parsed.analysis.findings).toHaveLength(1);
+    expect(parsed.analysis.findings[0].nodeIds).toHaveLength(2);
+    expect(parsed.analysis.findings[0].txids).toEqual([id(1)]);
+    expect(parsed.analysis.findings[0].description).toContain('within this transaction');
+    expect(parsed.analysis.findings[0].details).toContain('loaded history');
+    expect(parsed.analysis.findings).toEqual(w.analysis.findings);
+    expect(parsed.analysis.findings[0].description).toContain(
       'not evidence of repeated receiving activity across separate transactions',
     );
   });
 
   it('rejects malformed workspace versions, network names and mismatched transaction keys', () => {
     const w = createWorkspace('Import boundary', 'mainnet');
-    expect(() => parseWorkspace({ ...w, version: 5 })).toThrow();
+    expect(() => parseWorkspace({ ...w, version: 7 })).toThrow();
     expect(() => parseWorkspace({ ...w, network: 'testnet' })).toThrow();
     expect(() =>
       parseWorkspace({
         ...w,
-        transactions: { [id(10)]: tx(11, [], [{ address: addrA, value: 1 }]) },
+        chainData: {
+          ...w.chainData,
+          transactions: { [id(10)]: tx(11, [], [{ address: addrA, value: 1 }]) },
+        },
       }),
     ).toThrow('invalid transaction records');
   });
@@ -165,7 +171,7 @@ describe('workspace graph and analysis', () => {
     expect(outputAddress({ ...output, scriptPubKey: { addresses: [addrA] } })).toBe(addrA);
     const w = createWorkspace('Legacy script', 'mainnet');
     w.view.showAddresses = true;
-    w.transactions[id(1)] = { ...tx(1, [], []), vout: [output] };
+    w.chainData.transactions[id(1)] = { ...tx(1, [], []), vout: [output] };
     expect(buildGraph(w).nodes.some((node) => node.kind === 'address')).toBe(false);
     expect(findTool('address-reuse').run(w)).toEqual([]);
   });
@@ -242,7 +248,10 @@ describe('transaction import boundary', () => {
     ['time', -1],
     ['blocktime', Infinity],
   ])('rejects invalid %s metadata', (field, value) => {
-    expect(() => parseTransaction({ ...valid(), [field]: value })).toThrow();
+    const invalid = ['confirmations', 'time', 'blocktime'].includes(field as string)
+      ? { ...valid(), status: { kind: 'unknown', [field]: value } }
+      : { ...valid(), [field]: value };
+    expect(() => parseTransaction(invalid)).toThrow();
   });
 
   it('bounds outpoints and sequence and checks serialized versus virtual size', () => {
@@ -254,7 +263,12 @@ describe('transaction import boundary', () => {
     ).toThrow();
     expect(() => parseTransaction({ ...valid(), size: 100, vsize: 101 })).toThrow('Virtual size');
     expect(
-      parseTransaction({ ...valid(), size: 200, vsize: 100, confirmations: -1 }).confirmations,
+      parseTransaction({
+        ...valid(),
+        size: 200,
+        vsize: 100,
+        status: { kind: 'inactive' as const, confirmations: -1 },
+      }).status?.confirmations,
     ).toBe(-1);
   });
 });
@@ -279,16 +293,22 @@ describe('wallet and aggregate workspace import bounds', () => {
   };
   const workspace = () => ({
     ...createWorkspace('Wallet import', 'mainnet'),
-    wallets: [structuredClone(wallet)],
+    wallets: {
+      ...createWorkspace('Wallet import', 'mainnet').wallets,
+      definitions: [structuredClone(wallet)],
+    },
   });
 
   it('accepts consistent public wallet records and rejects duplicate identity or derivation slots', () => {
-    expect(parseWorkspace(workspace()).wallets[0]).toEqual(wallet);
-    expect(() => parseWorkspace({ ...workspace(), wallets: [wallet, wallet] })).toThrow(
-      'duplicate wallet IDs',
-    );
+    expect(parseWorkspace(workspace()).wallets.definitions[0]).toEqual(wallet);
+    expect(() =>
+      parseWorkspace({
+        ...workspace(),
+        wallets: { ...workspace().wallets, definitions: [wallet, wallet] },
+      }),
+    ).toThrow('duplicate wallet IDs');
     const duplicate = workspace();
-    duplicate.wallets[0].addresses.push({ ...wallet.addresses[0] });
+    duplicate.wallets.definitions[0].addresses.push({ ...wallet.addresses[0] });
     expect(() => parseWorkspace(duplicate)).toThrow('duplicate receive/change');
   });
 
@@ -297,7 +317,10 @@ describe('wallet and aggregate workspace import bounds', () => {
       'belongs to mainnet',
     );
     expect(() =>
-      parseWorkspace({ ...workspace(), wallets: [{ ...wallet, scriptType: 'p2pkh' }] }),
+      parseWorkspace({
+        ...workspace(),
+        wallets: { ...workspace().wallets, definitions: [{ ...wallet, scriptType: 'p2pkh' }] },
+      }),
     ).toThrow('script type');
     for (const changes of [
       { scripthash: id(99) },
@@ -305,11 +328,14 @@ describe('wallet and aggregate workspace import bounds', () => {
       { index: 0x80000000 },
     ]) {
       const w = workspace();
-      Object.assign(w.wallets[0].addresses[0], changes);
+      Object.assign(w.wallets.definitions[0].addresses[0], changes);
       expect(() => parseWorkspace(w)).toThrow();
     }
     expect(() =>
-      parseWorkspace({ ...workspace(), wallets: [{ ...wallet, scanLimit: Infinity }] }),
+      parseWorkspace({
+        ...workspace(),
+        wallets: { ...workspace().wallets, definitions: [{ ...wallet, scanLimit: Infinity }] },
+      }),
     ).toThrow();
   });
 
@@ -317,7 +343,7 @@ describe('wallet and aggregate workspace import bounds', () => {
     const w = createWorkspace('Oversized import', 'mainnet');
     const outputs = Array.from({ length: 9000 }, (_, n) => ({ n, value: 0, scriptPubKey: {} }));
     for (let n = 1; n <= 6; n++)
-      w.transactions[id(n)] = { txid: id(n), vin: [{ coinbase: '00' }], vout: outputs };
+      w.chainData.transactions[id(n)] = { txid: id(n), vin: [{ coinbase: '00' }], vout: outputs };
     try {
       parseWorkspace(w);
       throw new Error('Expected workspace rejection');

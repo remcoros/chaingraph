@@ -2,20 +2,18 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
-  type ScanRun,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan';
-import {
-  addScanPath,
-  replaceScanRun,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScan';
+import type { ScanRun } from '../../../src/Core/Workspace/ConnectionScan/connectionScans';
+import { addScanPath } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanPath';
+import { replaceScanRun } from '../../../src/Core/Workspace/ConnectionScan/updates';
+import type { Transaction } from '../../../src/Core/ChainData';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
-import { TransactionFetchScope } from '../../../src/Infra/Bitcoin/transactionScheduler';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../../../src/Core/ChainData/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const txNode = (n: number) => `tx:${id(n)}`;
@@ -239,7 +237,7 @@ describe('shared ancestry between the inputs of a five-input, five-output transa
 
   it('fetches missing ancestry and retains verified input paths for exact graph acceptance', async () => {
     const workspace = createWorkspace('Public five-input scan fixture', 'testnet4');
-    workspace.transactions = { [id(spending)]: pool[id(spending)]! };
+    workspace.chainData.transactions = { [id(spending)]: pool[id(spending)]! };
     workspace.view.graphNodeIds = [...displayed];
     const sourceIndex = 4;
     const source = outNode(branches[sourceIndex]!.input);
@@ -257,7 +255,7 @@ describe('shared ancestry between the inputs of a five-input, five-output transa
     const adapter = createConnectionScanFetch(
       {
         network: workspace.network,
-        transactions: workspace.transactions,
+        transactions: workspace.chainData.transactions,
         scope: new TransactionFetchScope(workspace.network),
         signal,
         allowNetwork: true,
@@ -281,7 +279,7 @@ describe('shared ancestry between the inputs of a five-input, five-output transa
     expect(transport.fetchHistory).not.toHaveBeenCalled();
     expect(transport.fetchUtxo).not.toHaveBeenCalled();
     const saved = parseWorkspace(replaceScanRun(workspace, run, adapter.evidence));
-    expect(saved.transactions).toEqual(workspace.transactions);
+    expect(saved.chainData.transactions).toEqual(workspace.chainData.transactions);
     const retained = saved.connectionScans!.runs[0]!;
     for (const finding of inputConnections(retained)) {
       const accepted = parseWorkspace(addScanPath(saved, finding));

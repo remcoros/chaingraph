@@ -1,32 +1,40 @@
 import {
-  addressNodeId,
-  outputNodeId,
-  txNodeId,
-} from '../../../../Domain/Metadata/entityReferences';
-import { short } from '../../../Controls/Display/referenceFormat';
-import type { Network } from '../../../../Domain/Chain/network';
-import type { TxOutput } from '../../../../Domain/Chain/transaction';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
-import { listTagsForNode } from '../../Annotations/tagProjection';
-import { isOpReturn } from '../../../../Domain/Chain/opReturn';
-import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
+  addressReference,
+  outpointReference,
+  transactionReference,
+} from '../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+import { short } from '../../../../Core/Formatting';
+import {
+  type Network,
+  type TxOutput,
+  isOpReturn,
+  addressToScriptHash,
+} from '../../../../Core/Bitcoin';
+
+import { listTagsForNode } from '../../../../Core/Workspace/Annotations/tagMembership';
+
 import type {
   WalletSelectionAddresses,
   WalletSelectionIndex,
-} from '../../Wallet/walletSelectionIndex';
+} from '../../../../Core/Workspace/Wallets/walletSelectionIndex';
 import {
   verifiedWalletAddresses,
   listWalletAddresses,
   listWalletTransactions,
   type WalletUtxoRecord,
-} from '../../Wallet/walletRecords';
-import { isCompletedReview, reviewKey, type WalletReviewItem } from '../../Wallet/walletReview';
+} from '../../../../Core/Workspace/Wallets/walletRecords';
+import {
+  isCompletedReview,
+  reviewKey,
+  type WalletReviewItem,
+} from '../../../../Core/Workspace/Wallets/walletReview';
 import {
   listLoadedAddressTransactionIds,
   walletCounterparties,
   type WalletAddressRelationships,
-} from '../../Wallet/walletRelationships';
+} from '../../../../Core/Workspace/Wallets/walletRelationships';
 
 export type WalletTab =
   'review' | 'utxos' | 'transactions' | 'addresses' | 'sources' | 'destinations';
@@ -63,10 +71,13 @@ export interface WalletRow {
   ownership?: 'wallet' | 'external' | 'unknown';
 }
 
-export function walletRowFinding(workspace: Pick<Workspace, 'findings'>, row: WalletRow) {
+export function walletRowFinding(
+  workspace: { analysis: Pick<Workspace['analysis'], 'findings'> },
+  row: WalletRow,
+) {
   const review = row.reviews.find((item) => item.reason === 'link' && item.key === row.key);
   return review
-    ? workspace.findings.find((finding) => review.key.endsWith(`|link|${finding.id}`))
+    ? workspace.analysis.findings.find((finding) => review.key.endsWith(`|link|${finding.id}`))
     : undefined;
 }
 
@@ -74,13 +85,14 @@ export function walletRowTags(workspace: Workspace, row: WalletRow) {
   return listTagsForNode(workspace, {
     id: row.nodeId,
     kind: row.kind,
-    label: '',
     address: row.address,
   });
 }
 
 export function walletRowWithContext(
-  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  },
   row: WalletRow,
   index?: WalletSelectionIndex,
 ): WalletRow {
@@ -151,7 +163,7 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
 }
 
 export function buildWalletRelationshipRows(
-  workspace: Pick<Workspace, 'walletReviews'>,
+  workspace: { wallets: Pick<Workspace['wallets'], 'reviews'> },
   groups: WalletAddressRelationships,
   items: readonly WalletReviewItem[],
 ): Record<'sources' | 'destinations', WalletRow[]> {
@@ -187,12 +199,12 @@ export function buildWalletRelationshipRows(
 
 export function decorateWalletRow(
   row: Omit<WalletRow, 'reviews' | 'status' | 'changed'>,
-  workspace: Pick<Workspace, 'walletReviews'>,
+  workspace: { wallets: Pick<Workspace['wallets'], 'reviews'> },
   items: readonly WalletReviewItem[],
   fallbackReviewKey?: string,
 ): WalletRow {
   const reviews = items.filter((item) => item.nodeId === row.nodeId);
-  const fallback = fallbackReviewKey ? workspace.walletReviews?.[fallbackReviewKey] : undefined;
+  const fallback = fallbackReviewKey ? workspace.wallets.reviews?.[fallbackReviewKey] : undefined;
   const changed = reviews.some((item) => item.changed);
   const status =
     changed || reviews.some((item) => item.status === 'open')
@@ -208,7 +220,10 @@ export function decorateWalletRow(
 }
 
 export function buildWalletRecordRows(
-  workspace: Pick<Workspace, 'network' | 'transactions' | 'walletReviews'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+    wallets: Pick<Workspace['wallets'], 'reviews'>;
+  },
   wallet: Pick<Wallet, 'id' | 'addresses'>,
   utxos: readonly WalletUtxoRecord[],
   reviewItems: readonly WalletReviewItem[],
@@ -227,7 +242,7 @@ export function buildWalletRecordRows(
       tab === 'all' || tab === 'utxos'
         ? utxos.map((record) => {
             const identifier = `${record.txid}:${record.vout}`;
-            const nodeId = outputNodeId(record.txid, record.vout);
+            const nodeId = outpointReference(record.txid, record.vout);
             return decorate(
               {
                 key: nodeId,
@@ -252,7 +267,7 @@ export function buildWalletRecordRows(
     transactions:
       tab === 'all' || tab === 'transactions'
         ? listWalletTransactions(workspace, wallet).map((record) => {
-            const nodeId = txNodeId(record.txid);
+            const nodeId = transactionReference(record.txid);
             return decorate(
               {
                 key: nodeId,
@@ -278,7 +293,7 @@ export function buildWalletRecordRows(
     addresses:
       tab === 'all' || tab === 'addresses'
         ? listWalletAddresses(workspace, wallet).map((record) => {
-            const nodeId = addressNodeId(record.address);
+            const nodeId = addressReference(record.address);
             return decorate({
               key: nodeId,
               nodeId,

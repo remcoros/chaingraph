@@ -10,9 +10,10 @@ import {
   Search,
   Tags,
   Wallet,
+  type LucideIcon,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import type { GraphLeftTab, GraphMobilePanel } from '../Workspace/GraphState/panelState';
+
+import type { GraphLeftTab, GraphMobilePanel } from '../../Core/Workspace/view';
 
 export interface TourContext {
   hasSelection: boolean;

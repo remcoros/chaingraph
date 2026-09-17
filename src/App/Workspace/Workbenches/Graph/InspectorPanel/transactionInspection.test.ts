@@ -2,7 +2,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { Transaction as BitcoinTransaction } from 'bitcoinjs-lib';
 import { decodeRawTransaction, inspectScript, fetchRawInspection } from './transactionInspection';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import type { Transaction } from '../../../../../Core/ChainData';
 
 function fixture(witness = false) {
   const raw = new BitcoinTransaction();

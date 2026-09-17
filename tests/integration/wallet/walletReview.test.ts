@@ -9,22 +9,22 @@ import {
   reviewKey,
   spendGuidance,
   type WalletReviewItem,
-} from '../../../src/App/Workspace/Wallet/walletReview';
-import { MAX_WALLET_REVIEWS } from '../../../src/App/Workspace/Wallet/walletReviewRecords';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import type { Wallet } from '../../../src/Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../src/App/Workspace/workspace';
-import { addressToScriptHash } from '../../../src/Domain/Wallet/wallet';
-import type { WalletUtxoRecord } from '../../../src/App/Workspace/Wallet/walletRecords';
+} from '../../../src/Core/Workspace/Wallets/walletReview';
+import { MAX_WALLET_REVIEWS, type Wallet } from '../../../src/Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../src/Core/Workspace/workspace';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+import type { Transaction } from '../../../src/Core/ChainData';
+
+import { addressToScriptHash } from '../../../src/Core/Bitcoin';
+import type { WalletUtxoRecord } from '../../../src/Core/Workspace/Wallets/walletRecords';
 import {
   applyBatchIcon,
   applyBatchLabel,
   applyBatchTag,
-} from '../../../src/App/Workspace/Annotations/batchMetadata';
+} from '../../../src/Core/Workspace/Annotations/batchMetadata';
 import { walletReviewCategories } from '../../../src/App/Workspace/Workbenches/Wallet/Review/reviewCategories';
-import { groupWalletRelationships } from '../../../src/App/Workspace/Wallet/walletRelationships';
+import { groupWalletRelationships } from '../../../src/Core/Workspace/Wallets/walletRelationships';
 
 const mine = (fill: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(fill), 0, 'bc');
 const MINE_A = mine(1);
@@ -56,7 +56,7 @@ const receipt: Transaction = {
   txid: id(1),
   vin: [{ coinbase: '00' }],
   vout: [{ n: 0, value: 1, scriptPubKey: { hex: script(MINE_A) } }],
-  blockHeight: 800000,
+  status: { kind: 'confirmed' as const, blockHeight: 800000 },
 };
 const spend: Transaction = {
   txid: id(2),
@@ -65,7 +65,7 @@ const spend: Transaction = {
     { n: 0, value: 0.6, scriptPubKey: { hex: script(MINE_B) } },
     { n: 1, value: 0.39, scriptPubKey: { hex: script(THEIRS) } },
   ],
-  blockHeight: 800001,
+  status: { kind: 'confirmed' as const, blockHeight: 800001 },
 };
 const utxo: WalletUtxoRecord = {
   txid: id(2),
@@ -76,16 +76,26 @@ const utxo: WalletUtxoRecord = {
   scripthash: addressToScriptHash(MINE_B, 'mainnet'),
 };
 
-function fixture(overrides: Partial<Workspace> = {}): Workspace {
+function fixture(
+  overrides: Omit<Partial<Workspace>, 'chainData' | 'wallets'> & {
+    chainData?: Partial<Workspace['chainData']>;
+    wallets?: Partial<Workspace['wallets']>;
+  } = {},
+): Workspace {
+  const base = createWorkspace('Review fixture', 'mainnet');
   return {
-    ...createWorkspace('Review fixture', 'mainnet'),
-    wallets: [wallet],
-    transactions: { [receipt.txid]: receipt, [spend.txid]: spend },
+    ...base,
     ...overrides,
+    wallets: { ...base.wallets, definitions: [wallet], ...overrides.wallets },
+    chainData: {
+      ...base.chainData,
+      transactions: { [receipt.txid]: receipt, [spend.txid]: spend },
+      ...overrides.chainData,
+    },
   };
 }
 const build = (workspace: Workspace, utxos: WalletUtxoRecord[] = [utxo]) =>
-  buildWalletReview(workspace, workspace.wallets[0], {
+  buildWalletReview(workspace, workspace.wallets.definitions[0], {
     utxos,
     utxoCheckedAt: '2026-09-09T00:00:00.000Z',
     utxoCheckedAddresses: 2,
@@ -97,15 +107,59 @@ const destination = (items: WalletReviewItem[], address = THEIRS) =>
   find(items, 'destination-address').find((item) => item.address === address)!;
 
 describe('wallet review queue', () => {
+  it('drops only current-UTXO recommendations with loaded spenders while retaining the dated record and review decision', () => {
+    const original = fixture();
+    const item = find(build(original).items, 'current-utxo')[0];
+    const reviewed = applyReviewDecisions(original, wallet, [item], 'reviewed');
+    reviewed.chainData.addressUtxos = {
+      [MINE_B]: {
+        network: 'mainnet',
+        checkedAt: '2026-09-09T00:00:00.000Z',
+        utxos: [
+          { txid: utxo.txid, vout: utxo.vout, valueSats: utxo.valueSats, height: utxo.height },
+        ],
+      },
+    };
+    const later = {
+      ...reviewed,
+      chainData: {
+        ...reviewed.chainData,
+        transactions: {
+          ...reviewed.chainData.transactions,
+          [id(3)]: { txid: id(3), vin: [{ txid: utxo.txid, vout: utxo.vout }], vout: [] },
+        },
+      },
+    };
+    const result = build(later);
+    expect(find(result.items, 'current-utxo')).toEqual([]);
+    expect(result.coverage).toMatchObject({
+      utxoCount: 0,
+      utxoLoadedSpenders: 1,
+      utxoCheckedAt: '2026-09-09T00:00:00.000Z',
+    });
+    expect(later.wallets.reviews?.[item.key]).toEqual(reviewed.wallets.reviews?.[item.key]);
+    expect(later.chainData.addressUtxos).toBe(reviewed.chainData.addressUtxos);
+    const rechecked = buildWalletReview(reviewed, wallet, {
+      utxos: [utxo],
+      utxoCheckedAt: '2026-09-17T00:00:00.000Z',
+    });
+    expect(find(rechecked.items, 'current-utxo')[0]).toMatchObject({
+      status: 'reviewed',
+      changed: false,
+    });
+    expect(rechecked.coverage.utxoCheckedAt).toBe('2026-09-17T00:00:00.000Z');
+  });
   it('preserves golden current UTXO, earlier-receipt and counterparty fingerprints', () => {
     const key = reviewKey(wallet.id, 'counterparty', `${id(2)}:1`);
     const items = build(
       fixture({
-        walletReviews: {
-          [key]: {
-            status: 'unknown',
-            at: '2026-09-09T00:00:00.000Z',
-            evidence: 'd1b509083c3c21da',
+        wallets: {
+          reviews: {
+            [key]: {
+              status: 'unknown',
+              at: '2026-09-09T00:00:00.000Z',
+              evidence: 'd1b509083c3c21da',
+            },
           },
         },
       }),
@@ -131,7 +185,7 @@ describe('wallet review queue', () => {
       ],
     };
     const workspace = fixture({
-      transactions: { [id(8)]: predecessor, [id(1)]: receiving, [id(2)]: spend },
+      chainData: { transactions: { [id(8)]: predecessor, [id(1)]: receiving, [id(2)]: spend } },
     });
     const items = build(workspace).items;
     const funding = [
@@ -159,7 +213,7 @@ describe('wallet review queue', () => {
     );
     expect(find(items, 'source')).toHaveLength(1);
     const reviewed = applyReviewDecisions(workspace, wallet, funding, 'unknown');
-    reviewed.annotations[funding[0].nodeId] = {
+    reviewed.annotations.entities[funding[0].nodeId] = {
       label: 'Recorded context',
       note: '',
       icon: '',
@@ -177,7 +231,7 @@ describe('wallet review queue', () => {
     });
     const labelledOnly = {
       ...workspace,
-      annotations: reviewed.annotations,
+      annotations: { ...workspace.annotations, entities: reviewed.annotations.entities },
     };
     expect(
       find(build(labelledOnly).items, 'source-address').find((item) => item.address === THEIRS)
@@ -187,8 +241,8 @@ describe('wallet review queue', () => {
 
   it('reopens an existing missing-output decision when the actual previous-output evidence loads', () => {
     const receiving = { ...receipt, vin: [{ txid: id(9), vout: 0 }] };
-    const workspace = fixture({ transactions: { [id(1)]: receiving } });
-    workspace.walletReviews = {
+    const workspace = fixture({ chainData: { transactions: { [id(1)]: receiving } } });
+    workspace.wallets.reviews = {
       [reviewKey(wallet.id, 'funding-source', `${id(9)}:0`)]: {
         status: 'reviewed',
         at: '2026-09-09T00:00:00Z',
@@ -197,8 +251,8 @@ describe('wallet review queue', () => {
     };
     const item = find(build(workspace, []).items, 'funding-source')[0];
     const decided = applyReviewDecisions(workspace, wallet, [item], 'reviewed');
-    decided.transactions = {
-      ...decided.transactions,
+    decided.chainData.transactions = {
+      ...decided.chainData.transactions,
       [id(9)]: {
         txid: id(9),
         vin: [{ coinbase: '00' }],
@@ -253,7 +307,9 @@ describe('wallet review queue', () => {
     };
     const withBatch = build(
       fixture({
-        transactions: { [receipt.txid]: receipt, [spend.txid]: spend, [batch.txid]: batch },
+        chainData: {
+          transactions: { [receipt.txid]: receipt, [spend.txid]: spend, [batch.txid]: batch },
+        },
       }),
     );
     expect(destination(withBatch.items).outpointIds).toEqual([`out:${id(2)}:1`]);
@@ -268,9 +324,9 @@ describe('wallet review queue', () => {
     expect(counterparty.address).toBe(THEIRS);
     const decided = applyReviewDecisions(workspace, wallet, [source, counterparty], 'reviewed');
     // Imported display claims must not alter script-derived address identity.
-    decided.transactions = structuredClone(decided.transactions);
-    decided.transactions[id(1)].vout[0].scriptPubKey.address = THEIRS;
-    decided.transactions[id(2)].vout[1].scriptPubKey.address = MINE_A;
+    decided.chainData.transactions = structuredClone(decided.chainData.transactions);
+    decided.chainData.transactions[id(1)].vout[0].scriptPubKey.address = THEIRS;
+    decided.chainData.transactions[id(2)].vout[1].scriptPubKey.address = MINE_A;
     const rebuilt = build(decided);
     for (const before of [source, counterparty]) {
       const after = rebuilt.items.find((item) => item.key === before.key)!;
@@ -292,7 +348,7 @@ describe('wallet review queue', () => {
         scripthash: addressToScriptHash(testAddress(index + 1), 'testnet4'),
       })),
     };
-    const workspace = fixture({ network: 'testnet4', wallets: [testWallet] });
+    const workspace = fixture({ network: 'testnet4', wallets: { definitions: [testWallet] } });
     const review = build(workspace, [{ ...utxo, address: testAddress(2) }]);
     expect(find(review.items, 'source')[0].address).toBe(testAddress(1));
     expect(destination(review.items, testAddress(9)).address).toBe(testAddress(9));
@@ -302,9 +358,9 @@ describe('wallet review queue', () => {
     'does not fall back from raw script %s to a claimed counterparty address',
     (hex) => {
       const workspace = fixture();
-      workspace.transactions = structuredClone(workspace.transactions);
-      workspace.transactions[id(2)].vout[1].scriptPubKey = { hex, address: THEIRS };
-      workspace.walletReviews = {
+      workspace.chainData.transactions = structuredClone(workspace.chainData.transactions);
+      workspace.chainData.transactions[id(2)].vout[1].scriptPubKey = { hex, address: THEIRS };
+      workspace.wallets.reviews = {
         [reviewKey(wallet.id, 'counterparty', `${id(2)}:1`)]: {
           status: 'unknown',
           at: '2026-09-09T00:00:00Z',
@@ -318,15 +374,15 @@ describe('wallet review queue', () => {
 
   it('uses a validated address-only fallback and rejects a different network', () => {
     const workspace = fixture();
-    workspace.transactions = structuredClone(workspace.transactions);
-    workspace.transactions[id(1)].vout[0].scriptPubKey = { addresses: [MINE_A] };
-    workspace.transactions[id(2)].vout[1].scriptPubKey = { address: THEIRS };
+    workspace.chainData.transactions = structuredClone(workspace.chainData.transactions);
+    workspace.chainData.transactions[id(1)].vout[0].scriptPubKey = { addresses: [MINE_A] };
+    workspace.chainData.transactions[id(2)].vout[1].scriptPubKey = { address: THEIRS };
     expect(find(build(workspace).items, 'source')[0].address).toBe(MINE_A);
     expect(destination(build(workspace).items).address).toBe(THEIRS);
-    workspace.transactions[id(2)].vout[1].scriptPubKey = {
+    workspace.chainData.transactions[id(2)].vout[1].scriptPubKey = {
       address: bitcoinAddress.toBech32(new Uint8Array(20).fill(9), 0, 'tb'),
     };
-    workspace.walletReviews = {
+    workspace.wallets.reviews = {
       [reviewKey(wallet.id, 'counterparty', `${id(2)}:1`)]: {
         status: 'unknown',
         at: '2026-09-09T00:00:00Z',
@@ -338,7 +394,9 @@ describe('wallet review queue', () => {
   });
 
   it('reports unloaded UTXO sources instead of inventing them', () => {
-    const review = buildWalletReview(fixture({ transactions: {} }), wallet, { utxos: [utxo] });
+    const review = buildWalletReview(fixture({ chainData: { transactions: {} } }), wallet, {
+      utxos: [utxo],
+    });
     expect(review.missingSourceTransactions).toBe(1);
     expect(find(review.items, 'source')).toHaveLength(0);
     expect(review.coverage.utxoCount).toBe(1);
@@ -369,16 +427,22 @@ describe('wallet review queue', () => {
       createdAt: '2026-09-08T10:00:00.000Z',
       kind: 'hypothesis' as const,
     };
-    expect(find(build(fixture({ findings: [finding] })).items, 'link')).toHaveLength(1);
+    expect(find(build(fixture({ analysis: { findings: [finding] } })).items, 'link')).toHaveLength(
+      1,
+    );
     expect(
-      find(build(fixture({ findings: [{ ...finding, stale: true }] })).items, 'link'),
-    ).toHaveLength(0);
-    expect(
-      find(build(fixture({ findings: [{ ...finding, excluded: true }] })).items, 'link'),
+      find(build(fixture({ analysis: { findings: [{ ...finding, stale: true }] } })).items, 'link'),
     ).toHaveLength(0);
     expect(
       find(
-        build(fixture({ findings: [{ ...finding, nodeIds: [`out:${id(7)}:0`] }] })).items,
+        build(fixture({ analysis: { findings: [{ ...finding, excluded: true }] } })).items,
+        'link',
+      ),
+    ).toHaveLength(0);
+    expect(
+      find(
+        build(fixture({ analysis: { findings: [{ ...finding, nodeIds: [`out:${id(7)}:0`] }] } }))
+          .items,
         'link',
       ),
     ).toHaveLength(0);
@@ -388,27 +452,29 @@ describe('wallet review queue', () => {
 describe('address-level relationship reviews', () => {
   it('excludes wallet-matched address reviews without changing their stored decisions or old output reviews', () => {
     const workspace = fixture({
-      walletReviews: {
-        [reviewKey(wallet.id, 'source-address', `addr:${MINE_A}`)]: {
-          status: 'unknown',
-          at: '2026-09-09T00:00:00.000Z',
-          evidence: 'saved-address-review',
-        },
-        [reviewKey(wallet.id, 'destination-address', `addr:${MINE_B}`)]: {
-          status: 'later',
-          at: '2026-09-09T00:00:00.000Z',
-          evidence: 'saved-own-destination',
+      wallets: {
+        reviews: {
+          [reviewKey(wallet.id, 'source-address', `addr:${MINE_A}`)]: {
+            status: 'unknown',
+            at: '2026-09-09T00:00:00.000Z',
+            evidence: 'saved-address-review',
+          },
+          [reviewKey(wallet.id, 'destination-address', `addr:${MINE_B}`)]: {
+            status: 'later',
+            at: '2026-09-09T00:00:00.000Z',
+            evidence: 'saved-own-destination',
+          },
         },
       },
     });
-    const before = structuredClone(workspace.walletReviews);
+    const before = structuredClone(workspace.wallets.reviews);
     const items = build(workspace).items;
     expect(find(items, 'source-address')).toEqual([]);
     expect(find(items, 'destination-address').map((item) => item.address)).toEqual([THEIRS]);
     expect(find(items, 'source')).toHaveLength(1);
     expect(find(items, 'current-utxo')).toHaveLength(1);
     expect(destination(items).status).toBe('open');
-    expect(workspace.walletReviews).toEqual(before);
+    expect(workspace.wallets.reviews).toEqual(before);
     expect(
       walletReviewCategories(workspace, items).find((entry) => entry.id === 'unidentified-sources')
         ?.count,
@@ -417,23 +483,25 @@ describe('address-level relationship reviews', () => {
 
   const addressFixture = () =>
     fixture({
-      transactions: {
-        [id(8)]: {
-          txid: id(8),
-          vin: [{ coinbase: '00' }],
-          vout: [
-            { n: 0, value: 3, scriptPubKey: { hex: script(THEIRS) } },
-            { n: 1, value: 2, scriptPubKey: { hex: script(THEIRS) } },
-          ],
+      chainData: {
+        transactions: {
+          [id(8)]: {
+            txid: id(8),
+            vin: [{ coinbase: '00' }],
+            vout: [
+              { n: 0, value: 3, scriptPubKey: { hex: script(THEIRS) } },
+              { n: 1, value: 2, scriptPubKey: { hex: script(THEIRS) } },
+            ],
+          },
+          [id(1)]: {
+            ...receipt,
+            vin: [
+              { txid: id(8), vout: 0 },
+              { txid: id(8), vout: 1 },
+            ],
+          },
+          [id(2)]: spend,
         },
-        [id(1)]: {
-          ...receipt,
-          vin: [
-            { txid: id(8), vout: 0 },
-            { txid: id(8), vout: 1 },
-          ],
-        },
-        [id(2)]: spend,
       },
     });
   const sourceAddress = (workspace: Workspace) =>
@@ -471,13 +539,13 @@ describe('address-level relationship reviews', () => {
   it('decorates and edits only address metadata without completing a review or changing evidence', () => {
     const workspace = addressFixture();
     const outputId = `out:${id(8)}:0`;
-    workspace.annotations[outputId] = {
+    workspace.annotations.entities[outputId] = {
       label: 'Only this output',
       note: '',
       icon: 'coin',
       bookmarked: false,
     };
-    workspace.tags = [
+    workspace.annotations.tags = [
       { id: 'fixture-tag', name: 'Context', color: '#27c4a7', nodeIds: [outputId] },
     ];
     const item = sourceAddress(workspace);
@@ -486,13 +554,13 @@ describe('address-level relationship reviews', () => {
     const labelled = applyBatchLabel(workspace, item.nodeIds, 'Address context');
     const icon = applyBatchIcon(labelled, item.nodeIds, 'gift');
     const tagged = applyBatchTag(icon, item.nodeIds, 'fixture-tag', true);
-    expect(tagged.annotations[outputId]).toEqual(workspace.annotations[outputId]);
-    expect(Object.keys(tagged.annotations).sort()).toEqual([outputId, item.nodeId].sort());
-    expect(tagged.annotations[item.nodeId]).toMatchObject({
+    expect(tagged.annotations.entities[outputId]).toEqual(workspace.annotations.entities[outputId]);
+    expect(Object.keys(tagged.annotations.entities).sort()).toEqual([outputId, item.nodeId].sort());
+    expect(tagged.annotations.entities[item.nodeId]).toMatchObject({
       label: 'Address context',
       icon: 'gift',
     });
-    expect(tagged.tags![0].nodeIds).toEqual([outputId, item.nodeId]);
+    expect(tagged.annotations.tags![0].nodeIds).toEqual([outputId, item.nodeId]);
     expect(sourceAddress(tagged)).toMatchObject({
       label: 'Address context',
       tags: ['Context'],
@@ -500,7 +568,7 @@ describe('address-level relationship reviews', () => {
       changed: false,
       evidence: item.evidence,
     });
-    expect(tagged.walletReviews).toBeUndefined();
+    expect(tagged.wallets.reviews).toBeUndefined();
   });
 
   it.each(['unknown', 'reviewed', 'later'] as const)(
@@ -508,7 +576,7 @@ describe('address-level relationship reviews', () => {
     (status) => {
       const workspace = addressFixture();
       const key = reviewKey(wallet.id, 'funding-source', `${id(8)}:0`);
-      workspace.walletReviews = {
+      workspace.wallets.reviews = {
         [key]: { status, at: '2026-09-09T00:00:00.000Z', evidence: 'fixture-before-refresh' },
       };
       const oldOutput = find(build(workspace).items, 'funding-source')[0];
@@ -519,7 +587,7 @@ describe('address-level relationship reviews', () => {
         status,
         '2026-09-09T00:00:00.000Z',
       );
-      const records = structuredClone(saved.walletReviews);
+      const records = structuredClone(saved.wallets.reviews);
       const items = build(saved).items;
       expect(find(items, 'funding-source')[0]).toMatchObject({
         key,
@@ -530,7 +598,7 @@ describe('address-level relationship reviews', () => {
       });
       expect(sourceAddress(saved)).toMatchObject({ status: 'open', changed: false });
       expect(sourceAddress(saved).outpointIds).toHaveLength(2);
-      expect(saved.walletReviews).toEqual(records);
+      expect(saved.wallets.reviews).toEqual(records);
       const counts = walletReviewCategories(saved, items);
       expect(counts.find((entry) => entry.id === 'unidentified-sources')?.count).toBe(
         find(items, 'source-address').length,
@@ -545,8 +613,8 @@ describe('address-level relationship reviews', () => {
       at: '2026-09-09T00:00:00.000Z',
       evidence: 'd1b509083c3c21da',
     };
-    const workspace = fixture({ walletReviews: { [key]: decision } });
-    workspace.transactions[id(2)] = {
+    const workspace = fixture({ wallets: { reviews: { [key]: decision } } });
+    workspace.chainData.transactions[id(2)] = {
       ...spend,
       vout: [...spend.vout, { n: 2, value: 0.1, scriptPubKey: { hex: script(THEIRS) } }],
     };
@@ -561,7 +629,7 @@ describe('address-level relationship reviews', () => {
       status: 'open',
       outpointIds: [`out:${id(2)}:1`, `out:${id(2)}:2`],
     });
-    expect(workspace.walletReviews).toEqual({ [key]: decision });
+    expect(workspace.wallets.reviews).toEqual({ [key]: decision });
     expect(
       walletReviewCategories(workspace, items).find(
         (entry) => entry.id === 'unidentified-destinations',
@@ -581,19 +649,30 @@ describe('address-level relationship reviews', () => {
       const decided = applyReviewDecisions(workspace, wallet, [first], 'unknown');
       const reordered = {
         ...decided,
-        transactions: Object.fromEntries(Object.entries(decided.transactions).reverse()),
+        chainData: {
+          ...decided.chainData,
+          transactions: Object.fromEntries(
+            Object.entries(decided.chainData.transactions).reverse(),
+          ),
+        },
       };
       expect(sourceAddress(reordered).evidence).toBe(first.evidence);
-      const refreshed = { ...decided, transactions: structuredClone(decided.transactions) };
+      const refreshed = {
+        ...decided,
+        chainData: {
+          ...decided.chainData,
+          transactions: structuredClone(decided.chainData.transactions),
+        },
+      };
       if (change === 'outpoint') {
-        refreshed.transactions[id(8)].vout.push({
+        refreshed.chainData.transactions[id(8)].vout.push({
           n: 2,
           value: 1,
           scriptPubKey: { hex: script(THEIRS) },
         });
-        refreshed.transactions[id(1)].vin.push({ txid: id(8), vout: 2 });
+        refreshed.chainData.transactions[id(1)].vin.push({ txid: id(8), vout: 2 });
       } else {
-        refreshed.transactions[id(4)] = {
+        refreshed.chainData.transactions[id(4)] = {
           ...receipt,
           txid: id(4),
           vin: [{ txid: id(8), vout: 0 }],
@@ -605,44 +684,44 @@ describe('address-level relationship reviews', () => {
       expect(next).toMatchObject({
         status: 'unknown',
         changed: true,
-        decidedAt: decided.walletReviews![first.key].at,
+        decidedAt: decided.wallets.reviews![first.key].at,
       });
     },
   );
 
   it('changes only the address decision key, without acknowledging activity or other output reviews', () => {
     const workspace = addressFixture();
-    workspace.wallets = [{ ...wallet, unreviewedTransactionIds: [id(1)] }];
+    workspace.wallets.definitions = [{ ...wallet, unreviewedTransactionIds: [id(1)] }];
     const items = build(workspace).items;
     const prior = applyReviewDecisions(
       workspace,
-      workspace.wallets[0],
+      workspace.wallets.definitions[0],
       [find(items, 'current-utxo')[0], find(items, 'new-activity')[0]],
       'later',
     );
     const item = sourceAddress(prior);
-    const decided = applyReviewDecisions(prior, prior.wallets[0], [item], 'reviewed');
-    expect(decided.wallets).toBe(prior.wallets);
-    expect(decided.wallets[0].unreviewedTransactionIds).toEqual([id(1)]);
-    for (const [key, decision] of Object.entries(prior.walletReviews!))
-      expect(decided.walletReviews![key]).toEqual(decision);
-    expect(Object.keys(decided.walletReviews!).filter((key) => !prior.walletReviews![key])).toEqual(
-      [item.key],
-    );
+    const decided = applyReviewDecisions(prior, prior.wallets.definitions[0], [item], 'reviewed');
+    expect(decided.wallets.definitions).toBe(prior.wallets.definitions);
+    expect(decided.wallets.definitions[0].unreviewedTransactionIds).toEqual([id(1)]);
+    for (const [key, decision] of Object.entries(prior.wallets.reviews!))
+      expect(decided.wallets.reviews![key]).toEqual(decision);
+    expect(
+      Object.keys(decided.wallets.reviews!).filter((key) => !prior.wallets.reviews![key]),
+    ).toEqual([item.key]);
   });
 
   it('rejects a new group decision at the limit rather than pruning unrelated saved output reviews', () => {
     const workspace = addressFixture();
     const item = sourceAddress(workspace);
-    workspace.walletReviews = Object.fromEntries(
+    workspace.wallets.reviews = Object.fromEntries(
       Array.from({ length: MAX_WALLET_REVIEWS }, (_, index) => [
         reviewKey(wallet.id, 'source', `${id(index)}:0`),
         { status: 'unknown', at: '2026-09-09T00:00:00.000Z', evidence: 'saved' },
       ]),
     );
     expect(() => applyReviewDecisions(workspace, wallet, [item], 'reviewed')).toThrow('20,000');
-    expect(Object.keys(workspace.walletReviews)).toHaveLength(MAX_WALLET_REVIEWS);
-    expect(workspace.walletReviews[item.key]).toBeUndefined();
+    expect(Object.keys(workspace.wallets.reviews)).toHaveLength(MAX_WALLET_REVIEWS);
+    expect(workspace.wallets.reviews[item.key]).toBeUndefined();
   });
 });
 
@@ -658,12 +737,15 @@ describe('review decisions', () => {
         status === 'open' ? workspace : applyReviewDecisions(workspace, wallet, candidates, status);
       const labelled: Workspace = {
         ...decided,
-        annotations: Object.fromEntries(
-          candidates.map((item) => [
-            item.nodeId,
-            { label: `Recorded ${item.reason}`, note: '', icon: '', bookmarked: false },
-          ]),
-        ),
+        annotations: {
+          ...decided.annotations,
+          entities: Object.fromEntries(
+            candidates.map((item) => [
+              item.nodeId,
+              { label: `Recorded ${item.reason}`, note: '', icon: '', bookmarked: false },
+            ]),
+          ),
+        },
       };
       // Labels alone previously removed both kinds of candidate.
       const afterLabels = build(labelled).items;
@@ -672,7 +754,7 @@ describe('review decisions', () => {
           evidence: item.evidence,
           status,
           changed: false,
-          decidedAt: decided.walletReviews?.[item.key]?.at,
+          decidedAt: decided.wallets.reviews?.[item.key]?.at,
           label: `Recorded ${item.reason}`,
           tags: [],
         });
@@ -681,15 +763,18 @@ describe('review decisions', () => {
       // without losing the item, changing its evidence or resolving pending work.
       const tagged: Workspace = {
         ...labelled,
-        annotations: {},
-        tags: [
-          {
-            id: '30000000-0000-4000-8000-000000000001',
-            name: 'Recorded context',
-            color: '#27c4a7',
-            nodeIds: candidates.map((item) => item.nodeId),
-          },
-        ],
+        annotations: {
+          ...labelled.annotations,
+          entities: {},
+          tags: [
+            {
+              id: '30000000-0000-4000-8000-000000000001',
+              name: 'Recorded context',
+              color: '#27c4a7',
+              nodeIds: candidates.map((item) => item.nodeId),
+            },
+          ],
+        },
       };
       const afterTags = build(tagged).items;
       for (const item of candidates) {
@@ -698,7 +783,7 @@ describe('review decisions', () => {
           evidence: item.evidence,
           status,
           changed: false,
-          decidedAt: decided.walletReviews?.[item.key]?.at,
+          decidedAt: decided.wallets.reviews?.[item.key]?.at,
           label: '',
           tags: ['Recorded context'],
         });
@@ -707,7 +792,7 @@ describe('review decisions', () => {
         ).toBe(status === 'open' || status === 'later');
         expect(rebuilt?.title).not.toMatch(/unlabeled|unknown/i);
       }
-      expect(tagged.walletReviews).toBe(decided.walletReviews);
+      expect(tagged.wallets.reviews).toBe(decided.wallets.reviews);
     },
   );
 
@@ -715,7 +800,7 @@ describe('review decisions', () => {
     const workspace = fixture();
     const review = build(workspace);
     const decided = applyReviewDecisions(workspace, wallet, review.items.slice(0, 2), 'reviewed');
-    expect(Object.keys(decided.walletReviews ?? {})).toHaveLength(2);
+    expect(Object.keys(decided.wallets.reviews ?? {})).toHaveLength(2);
     const again = build(decided);
     expect(again.items[0].status).toBe('reviewed');
     expect(again.items[0].changed).toBe(false);
@@ -726,7 +811,7 @@ describe('review decisions', () => {
     const workspace = fixture();
     const item = build(workspace).items[0];
     const decided = applyReviewDecisions(workspace, wallet, [item], 'unknown');
-    expect(decided.walletReviews?.[item.key].status).toBe('unknown');
+    expect(decided.wallets.reviews?.[item.key].status).toBe('unknown');
     expect(build(decided).items[0].status).toBe('unknown');
   });
 
@@ -742,7 +827,10 @@ describe('review decisions', () => {
     };
     const refreshed = {
       ...decided,
-      transactions: { ...decided.transactions, [extraSpend.txid]: extraSpend },
+      chainData: {
+        ...decided.chainData,
+        transactions: { ...decided.chainData.transactions, [extraSpend.txid]: extraSpend },
+      },
     };
     const rebuilt = buildWalletReview(refreshed, wallet, {
       utxos: [utxo, { ...utxo, txid: id(4), vout: 0, valueSats: 20_000_000 }],
@@ -752,7 +840,7 @@ describe('review decisions', () => {
     expect(changed.changed).toBe(true);
     // Reopening drops the decision entirely.
     const reopened = applyReviewDecisions(refreshed, wallet, [changed], 'reopen');
-    expect(reopened.walletReviews?.[changed.key]).toBeUndefined();
+    expect(reopened.wallets.reviews?.[changed.key]).toBeUndefined();
   });
 
   it('does not reset unrelated decisions when new activity arrives', () => {
@@ -761,7 +849,10 @@ describe('review decisions', () => {
     const decided = applyReviewDecisions(workspace, wallet, [first], 'reviewed');
     const withActivity: Workspace = {
       ...decided,
-      wallets: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
+      wallets: {
+        ...decided.wallets,
+        definitions: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
+      },
     };
     const rebuilt = build(withActivity);
     expect(rebuilt.items.find((item) => item.key === first.key)?.status).toBe('reviewed');
@@ -770,8 +861,8 @@ describe('review decisions', () => {
     expect(activity[0].status).toBe('open');
     // Deciding an activity item also acknowledges the wallet's unreviewed queue.
     const acknowledged = applyReviewDecisions(withActivity, wallet, activity, 'reviewed');
-    expect(acknowledged.wallets[0].unreviewedTransactionIds).toEqual([]);
-    expect(acknowledged.walletReviews?.[first.key].status).toBe('reviewed');
+    expect(acknowledged.wallets.definitions[0].unreviewedTransactionIds).toEqual([]);
+    expect(acknowledged.wallets.reviews?.[first.key].status).toBe('reviewed');
   });
 
   it('keeps decisions scoped to their wallet and prunes removed wallets', () => {
@@ -780,7 +871,7 @@ describe('review decisions', () => {
     expect(item.key.startsWith(`${wallet.id}|`)).toBe(true);
     const other: Wallet = { ...wallet, id: '20000000-0000-4000-8000-000000000002', name: 'Other' };
     const decided = applyReviewDecisions(
-      { ...workspace, wallets: [wallet, other] },
+      { ...workspace, wallets: { ...workspace.wallets, definitions: [wallet, other] } },
       wallet,
       [item],
       'reviewed',
@@ -788,24 +879,39 @@ describe('review decisions', () => {
     const otherReview = buildWalletReview(decided, other, { utxos: [utxo] });
     expect(otherReview.items[0].status).toBe('open');
     expect(otherReview.items[0].key).not.toBe(item.key);
-    const pruned = pruneWalletReviews({ ...decided, wallets: [other] });
-    expect(pruned.walletReviews).toBeUndefined();
+    const pruned = pruneWalletReviews({
+      ...decided,
+      wallets: { ...decided.wallets, definitions: [other] },
+    });
+    expect(pruned.wallets.reviews).toBeUndefined();
   });
 
   it('round-trips review decisions through workspace validation', () => {
     const workspace = fixture();
     const item = build(workspace).items[0];
     // The synthetic wallet key is not derivable, so validate the stored record itself.
-    const decided = { ...applyReviewDecisions(workspace, wallet, [item], 'later'), wallets: [] };
-    expect(parseWorkspace(decided, false).walletReviews?.[item.key].status).toBe('later');
+    const decided = {
+      ...applyReviewDecisions(workspace, wallet, [item], 'later'),
+      wallets: {
+        ...applyReviewDecisions(workspace, wallet, [item], 'later').wallets,
+        definitions: [],
+      },
+    };
+    expect(parseWorkspace(decided).wallets.reviews?.[item.key].status).toBe('later');
     expect(() =>
-      parseWorkspace(
-        { ...decided, walletReviews: { bad: { status: 'done', at: '', evidence: '' } } },
-        false,
-      ),
+      parseWorkspace({
+        ...decided,
+        wallets: {
+          ...decided.wallets,
+          reviews: { bad: { status: 'done', at: '', evidence: '' } },
+        },
+      }),
     ).toThrow();
     // Older workspaces without the field still load.
-    expect(parseWorkspace({ ...fixture(), wallets: [] }, false).walletReviews).toBeUndefined();
+    expect(
+      parseWorkspace({ ...fixture(), wallets: { ...fixture().wallets, definitions: [] } }).wallets
+        .reviews,
+    ).toBeUndefined();
   });
 
   it('builds stable keys that do not collide between reasons', () => {
@@ -817,8 +923,10 @@ describe('spend guidance', () => {
   it('warns only when the selected outputs carry different recorded sources', () => {
     const workspace = fixture({
       annotations: {
-        [`out:${id(1)}:0`]: { label: 'Exchange A', note: '', icon: '', bookmarked: false },
-        [`out:${id(2)}:0`]: { label: 'Salary', note: '', icon: '', bookmarked: false },
+        entities: {
+          [`out:${id(1)}:0`]: { label: 'Exchange A', note: '', icon: '', bookmarked: false },
+          [`out:${id(2)}:0`]: { label: 'Salary', note: '', icon: '', bookmarked: false },
+        },
       },
     });
     expect(spendGuidance(workspace, [`out:${id(1)}:0`])).toBeUndefined();
@@ -837,22 +945,25 @@ describe('deferral and bounded queues', () => {
   it('keeps a deferred new-activity item pending and discoverable', () => {
     const withActivity: Workspace = {
       ...fixture(),
-      wallets: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
+      wallets: {
+        ...fixture().wallets,
+        definitions: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
+      },
     };
     const activity = find(build(withActivity).items, 'new-activity');
     expect(activity).toHaveLength(1);
     const deferred = applyReviewDecisions(withActivity, wallet, activity, 'later');
     // The wallet's own activity queue still holds it, so the item still exists.
-    expect(deferred.wallets[0].unreviewedTransactionIds).toEqual([id(2)]);
+    expect(deferred.wallets.definitions[0].unreviewedTransactionIds).toEqual([id(2)]);
     const rebuilt = find(build(deferred).items, 'new-activity');
     expect(rebuilt).toHaveLength(1);
     expect(rebuilt[0].status).toBe('later');
-    expect(deferred.walletReviews?.[activity[0].key].status).toBe('later');
+    expect(deferred.wallets.reviews?.[activity[0].key].status).toBe('later');
     // Completing it afterwards does acknowledge it.
     const completed = applyReviewDecisions(deferred, wallet, rebuilt, 'reviewed');
-    expect(completed.wallets[0].unreviewedTransactionIds).toEqual([]);
+    expect(completed.wallets.definitions[0].unreviewedTransactionIds).toEqual([]);
     // Unrelated decisions survive both steps.
-    expect(Object.keys(completed.walletReviews ?? {})).toHaveLength(1);
+    expect(Object.keys(completed.wallets.reviews ?? {})).toHaveLength(1);
   });
 
   it('treats only reviewed and unknown as completed reviews', () => {
@@ -873,7 +984,7 @@ describe('deferral and bounded queues', () => {
       vout: 0,
       valueSats: 60_000_000 - index,
     }));
-    const workspace = fixture({ transactions: {} });
+    const workspace = fixture({ chainData: { transactions: {} } });
     const all = buildWalletReview(workspace, wallet, { utxos });
     expect(find(all.items, 'current-utxo')).toHaveLength(400);
     expect(find(all.items, 'wallet-address')).toHaveLength(2);
@@ -898,7 +1009,7 @@ describe('deferral and bounded queues', () => {
       vout: 0,
       valueSats: 60_000_000 - index,
     }));
-    const workspace = fixture({ transactions: {} });
+    const workspace = fixture({ chainData: { transactions: {} } });
     const first = buildWalletReview(workspace, wallet, { utxos });
     const deferred = applyReviewDecisions(workspace, wallet, [first.items[0]], 'later');
     const reviewed = applyReviewDecisions(deferred, wallet, first.items.slice(1), 'reviewed');

@@ -7,34 +7,23 @@ import {
 } from './addressHistory';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode } from '../../../GraphState/types';
-import type { AppState } from '../../../../useAppState';
 import type { WorkspaceCore } from '../../../workspaceCore';
 import type { WorkspaceSelection } from '../../../Selection/useWorkspaceSelection';
-import { clearContextProvenance } from '../../../Evidence/InputContext';
-import { mergeTransactionObservations } from '../../../../../Domain/Chain/prevouts';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import {
-  fetchAddressBalance,
-  fetchAddressUtxos,
-  fetchTransaction,
-  loadAddress,
-  mapLimit,
-  MAX_SCAN_TRANSACTIONS,
-  type AddressHistoryLoadCallbacks,
-} from '../../../../../Infra/Bitcoin/api';
+import type { Transaction } from '../../../../../Core/ChainData';
 
-import type { AddressHistoryLoadState } from './addressHistoryLoad';
-import { addressHistoryLoadKey } from './addressHistoryLoad';
-import type { TransactionEvidence } from '../../../Evidence/Transactions';
+import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../../Core/ChainData/api';
+
+import { type AddressHistoryLoadState, addressHistoryLoadKey } from './addressHistoryLoad';
+
+import type { ChainDataAcquisition } from '../../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../../useWorkspaceOperation';
 
 interface Inputs {
   core: WorkspaceCore;
   selection: WorkspaceSelection;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   selected: GraphNode | undefined;
-  fetchScope: AppState['fetchScope'];
   canLoadChainData: boolean;
 }
 
@@ -45,13 +34,21 @@ export function useAddressEvidence({
   transactions,
   operation,
   selected,
-  fetchScope,
   canLoadChainData,
 }: Inputs) {
   const { activeWorkspace, activeWorkspaceRef, workspaces, setOperation, setNotice } = core;
   const { getUnlocked } = workspaces;
   const { generation: selectionGeneration } = selection;
-  const { recordTransactions } = transactions;
+  const {
+    transaction: getTransaction,
+    addressBalance: getAddressBalance,
+    addressUtxos: getAddressUtxos,
+  } = transactions.read;
+  const {
+    transactions: recordTransactions,
+    addresses: recordAddressObservations,
+    addressHistory: observeAddressHistory,
+  } = transactions.observe;
   const { run } = operation;
   const [addressHistoryLoads, setAddressHistoryLoads] = useState<
     Record<string, AddressHistoryLoadState>
@@ -71,9 +68,9 @@ export function useAddressEvidence({
     };
   }, [activeWorkspace?.id, addressHistoryJobsRef]);
   const addressHistoryNetwork = activeWorkspace?.network;
-  const addressHistoryTransactions = activeWorkspace?.transactions;
-  const addressHistoryWallets = activeWorkspace?.wallets;
-  const addressHistoryObservations = activeWorkspace?.addressHistories;
+  const addressHistoryTransactions = activeWorkspace?.chainData.transactions;
+  const addressHistoryWallets = activeWorkspace?.wallets.definitions;
+  const addressHistoryObservations = activeWorkspace?.chainData.addressHistories;
   const addressHistoryGraphNodeIds = activeWorkspace?.view.graphNodeIds;
   const addressHistoryHiddenNodeIds = activeWorkspace?.view.hiddenNodeIds;
   const addressHistorySelectedAddress =
@@ -86,7 +83,7 @@ export function useAddressEvidence({
       return undefined;
     return indexAddressHistoryTransactions({
       network: addressHistoryNetwork,
-      transactions: addressHistoryTransactions,
+      chainData: { transactions: addressHistoryTransactions },
     });
   }, [addressHistoryNetwork, addressHistoryTransactions, hasAddressHistorySelection]);
   // React Compiler cannot prove the validated address result is immutable. Retain this
@@ -103,13 +100,15 @@ export function useAddressEvidence({
     return projectAddressHistory(
       {
         network: addressHistoryNetwork,
-        transactions: addressHistoryTransactions,
-        wallets: addressHistoryWallets ?? [],
-        addressHistories: addressHistoryObservations,
         view: {
           graphNodeIds: addressHistoryGraphNodeIds,
           hiddenNodeIds: addressHistoryHiddenNodeIds,
         },
+        chainData: {
+          transactions: addressHistoryTransactions,
+          addressHistories: addressHistoryObservations,
+        },
+        wallets: { definitions: addressHistoryWallets ?? [] },
       },
       addressHistorySelectedAddress,
       addressHistoryIndex,
@@ -127,11 +126,11 @@ export function useAddressEvidence({
   // oxlint-enable react/preserve-manual-memoization
   const addressBalance =
     activeWorkspace && selected?.kind === 'address' && selected.address
-      ? activeWorkspace.addressBalances?.[selected.address]
+      ? activeWorkspace.chainData.addressBalances?.[selected.address]
       : undefined;
   const addressUtxos =
     activeWorkspace && selected?.kind === 'address' && selected.address
-      ? activeWorkspace.addressUtxos?.[selected.address]
+      ? activeWorkspace.chainData.addressUtxos?.[selected.address]
       : undefined;
   const addressHistoryLoad =
     activeWorkspace && selected?.kind === 'address' && selected.address
@@ -154,7 +153,7 @@ export function useAddressEvidence({
       const currentHistory = listAddressHistory(current, address);
       const needsHistory =
         force || shouldLoadAddressHistory(currentHistory) || !currentHistory?.complete;
-      const needsBalance = force || !current.addressBalances?.[address];
+      const needsBalance = force || !current.chainData.addressBalances?.[address];
       if (!needsHistory && !needsBalance) return;
 
       const controller = new AbortController();
@@ -176,65 +175,6 @@ export function useAddressEvidence({
           return previous ? { ...loads, [key]: { ...previous, ...update } } : loads;
         });
       };
-      const persistHistory: NonNullable<AddressHistoryLoadCallbacks['onHistory']> = (
-        history,
-        detailTotal,
-        truncated,
-      ) => {
-        if (activeWorkspaceRef.current?.id !== ownerId) return;
-        getUnlocked(ownerId)?.edit(
-          (latest) => ({
-            ...latest,
-            addressHistories: {
-              ...latest.addressHistories,
-              [address]: {
-                history,
-                truncated,
-                scannedAt: new Date().toISOString(),
-              },
-            },
-          }),
-          false,
-        );
-        updateProgress({ phase: 'details', done: 0, total: detailTotal });
-      };
-      let pendingTransactions: Transaction[] = [];
-      let transactionFlushTimer: ReturnType<typeof setTimeout> | undefined;
-      const flushTransactions = () => {
-        if (transactionFlushTimer) {
-          clearTimeout(transactionFlushTimer);
-          transactionFlushTimer = undefined;
-        }
-        const batch = pendingTransactions;
-        pendingTransactions = [];
-        if (!batch.length || activeWorkspaceRef.current?.id !== ownerId) return;
-        getUnlocked(ownerId)?.edit(
-          (latest) => ({
-            ...clearContextProvenance(
-              latest,
-              batch.map((transaction) => transaction.txid),
-            ),
-            transactions: {
-              ...latest.transactions,
-              ...Object.fromEntries(
-                batch.map((transaction) => [
-                  transaction.txid,
-                  mergeTransactionObservations(
-                    latest.transactions[transaction.txid],
-                    transaction,
-                    latest.network,
-                  ),
-                ]),
-              ),
-            },
-          }),
-          false,
-        );
-      };
-      const persistTransaction = (transaction: Transaction) => {
-        pendingTransactions.push(transaction);
-        if (!transactionFlushTimer) transactionFlushTimer = setTimeout(flushTransactions, 16);
-      };
 
       let failed = false;
       void (async () => {
@@ -253,53 +193,40 @@ export function useAddressEvidence({
           setNotice('Address history could not be loaded. Retry.');
         };
         const balancePromise = needsBalance
-          ? fetchAddressBalance(current.network, address, controller.signal).catch(() => {
+          ? getAddressBalance(address, controller.signal).catch(() => {
               controller.signal.throwIfAborted();
               balanceFailed = true;
               return undefined;
             })
           : Promise.resolve(undefined);
-        let result: Awaited<ReturnType<typeof loadAddress>> | undefined;
+        let result:
+          Awaited<ReturnType<ChainDataAcquisition['observe']['addressHistory']>> | undefined;
         try {
           if (needsHistory) {
             try {
-              result = await loadAddress(
-                address,
-                current.network,
-                current.transactions,
-                controller.signal,
-                (progress) =>
+              result = await observeAddressHistory(address, {
+                signal: controller.signal,
+                accept: () => activeWorkspaceRef.current?.id === ownerId,
+                onHistory: (detailTotal) =>
+                  updateProgress({ phase: 'details', done: 0, total: detailTotal }),
+                onProgress: (progress) =>
                   updateProgress({
                     phase: 'details',
                     done: progress.done,
                     total: progress.total ?? 0,
                   }),
-                { scope: fetchScope },
-                { onHistory: persistHistory, onTransaction: persistTransaction },
-              );
+              });
             } catch {
               controller.signal.throwIfAborted();
               historyFailed = true;
             }
           }
-          flushTransactions();
           controller.signal.throwIfAborted();
-          if (result && activeWorkspaceRef.current?.id === ownerId)
-            getUnlocked(ownerId)?.edit(
-              (latest) => clearContextProvenance(latest, result!.observedTransactionIds),
-              false,
-            );
           if (needsBalance) updateProgress({ phase: 'balance' });
           const balance = await balancePromise;
           controller.signal.throwIfAborted();
           if (balance && activeWorkspaceRef.current?.id === ownerId)
-            getUnlocked(ownerId)?.edit(
-              (latest) => ({
-                ...latest,
-                addressBalances: { ...latest.addressBalances, [address]: balance },
-              }),
-              false,
-            );
+            recordAddressObservations({ addressBalances: { [address]: balance } });
           if (historyFailed) reportHistoryFailure();
           else {
             if (balanceFailed)
@@ -320,8 +247,6 @@ export function useAddressEvidence({
           reportHistoryFailure();
         }
       })().finally(() => {
-        if (transactionFlushTimer) clearTimeout(transactionFlushTimer);
-        flushTransactions();
         addressHistoryJobsRef.current.delete(key);
         if (!failed)
           setAddressHistoryLoads((loads) => {
@@ -334,8 +259,9 @@ export function useAddressEvidence({
     },
     [
       canLoadChainData,
-      fetchScope,
-      getUnlocked,
+      getAddressBalance,
+      observeAddressHistory,
+      recordAddressObservations,
       activeWorkspaceRef,
       addressHistoryJobsRef,
       setNotice,
@@ -368,20 +294,11 @@ export function useAddressEvidence({
     const generation = selectionGeneration.current;
     void run(async (signal) => {
       setOperation('Checking address balance…');
-      const observation = await fetchAddressBalance(activeWorkspace.network, address, signal);
+      const observation = await getAddressBalance(address, signal);
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation || activeWorkspaceRef.current?.id !== ownerId)
         return;
-      getUnlocked(ownerId)?.edit(
-        (latest) => ({
-          ...latest,
-          addressBalances: {
-            ...latest.addressBalances,
-            [address]: observation,
-          },
-        }),
-        false,
-      );
+      recordAddressObservations({ addressBalances: { [address]: observation } });
     });
   }
   function loadAddressUtxos(force = false) {
@@ -391,16 +308,16 @@ export function useAddressEvidence({
     const ownerId = activeWorkspace.id;
     const current = getUnlocked(ownerId)?.data;
     if (!current) return;
-    if (!force && current.addressUtxos?.[address]) return;
+    if (!force && current.chainData.addressUtxos?.[address]) return;
     const generation = selectionGeneration.current;
     void run(async (signal) => {
       setOperation('Loading address UTXOs…');
-      const utxos = await fetchAddressUtxos(current.network, address, signal);
-      let balance: Awaited<ReturnType<typeof fetchAddressBalance>> | undefined;
+      const utxos = await getAddressUtxos(address, signal);
+      let balance: Awaited<ReturnType<typeof getAddressBalance>> | undefined;
       let balanceFailed = false;
-      if (force || !current.addressBalances?.[address]) {
+      if (force || !current.chainData.addressBalances?.[address]) {
         try {
-          balance = await fetchAddressBalance(current.network, address, signal);
+          balance = await getAddressBalance(address, signal);
         } catch {
           signal.throwIfAborted();
           balanceFailed = true;
@@ -409,27 +326,13 @@ export function useAddressEvidence({
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation || activeWorkspaceRef.current?.id !== ownerId)
         return;
-      getUnlocked(ownerId)?.edit(
-        (latest) => ({
-          ...latest,
-          addressUtxos: {
-            ...latest.addressUtxos,
-            [address]: utxos,
-          },
-          ...(balance
-            ? {
-                addressBalances: {
-                  ...latest.addressBalances,
-                  [address]: balance,
-                },
-              }
-            : {}),
-        }),
-        false,
-      );
+      recordAddressObservations({
+        addressUtxos: { [address]: utxos },
+        ...(balance && { addressBalances: { [address]: balance } }),
+      });
       if (balanceFailed) setNotice('UTXOs loaded. Address balance could not be checked. Retry.');
 
-      const latestTransactions = (getUnlocked(ownerId)?.data ?? current).transactions;
+      const latestTransactions = (getUnlocked(ownerId)?.data ?? current).chainData.transactions;
       const detailTargets = [
         ...new Map(
           utxos.utxos
@@ -448,38 +351,39 @@ export function useAddressEvidence({
         4,
         async (utxo): Promise<Transaction | undefined> => {
           try {
-            const transaction = await fetchTransaction(
-              current.network,
-              utxo.txid,
-              signal,
-              undefined,
-              {
-                scope: fetchScope,
-                priority: 'background',
-              },
-            );
-            if (transaction.confirmations !== undefined && transaction.confirmations < 0)
+            const transaction = await getTransaction(utxo.txid, signal, 'background');
+            if (
+              transaction.status?.confirmations !== undefined &&
+              transaction.status?.confirmations < 0
+            )
               return undefined;
             const conflictingHeight =
-              transaction.blockHeight !== undefined && transaction.blockHeight !== utxo.height;
+              transaction.status?.blockHeight !== undefined &&
+              transaction.status?.blockHeight !== utxo.height;
             const observed = conflictingHeight
               ? {
                   ...transaction,
-                  blockHeight: utxo.height,
-                  blockhash: undefined,
-                  blocktime: undefined,
-                  time: undefined,
-                  confirmations: undefined,
-                  mempool: undefined,
+                  status: {
+                    kind: 'confirmed' as const,
+                    blockHeight: utxo.height,
+                    blockhash: undefined,
+                    blocktime: undefined,
+                    time: undefined,
+                    confirmations: undefined,
+                  },
                 }
               : {
                   ...transaction,
-                  blockHeight: utxo.height,
-                  confirmations:
-                    transaction.confirmations !== undefined && transaction.confirmations > 0
-                      ? transaction.confirmations
-                      : undefined,
-                  mempool: undefined,
+                  status: {
+                    ...transaction.status,
+                    kind: 'confirmed' as const,
+                    blockHeight: utxo.height,
+                    confirmations:
+                      transaction.status?.confirmations !== undefined &&
+                      transaction.status?.confirmations > 0
+                        ? transaction.status?.confirmations
+                        : undefined,
+                  },
                 };
             loaded = loaded + 1;
             setOperation(

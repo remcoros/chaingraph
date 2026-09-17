@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../../../Controls/Display/amountFormat';
+import { formatBitcoinAmount } from '../../../../Core/Formatting';
 import { Amount } from '../../../Controls/Display/Amount';
 import {
   RECENT_ADDRESS_GRAPH_LIMIT,
@@ -23,7 +23,7 @@ import {
 import { FlowPanel } from './TransactionFlow/FlowPanel';
 import { selectedWalletFilterIds } from './Filters/graphFilters';
 import { hasActiveFilters } from './Filters/filterPresentation';
-import { applyBatchIcon } from '../../Annotations/batchMetadata';
+import { applyBatchIcon } from '../../../../Core/Workspace/Annotations/batchMetadata';
 import { openFlowPanel } from '../../GraphState/panelState';
 import {
   FilterChips,
@@ -32,7 +32,10 @@ import {
 } from './Filters/GraphFilterControls';
 import { GraphWalletFilter } from './Filters/GraphWalletFilter';
 import { transactionNodeIds } from '../../GraphState/visibility';
-import { outputNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
+import {
+  outpointReference,
+  transactionReference,
+} from '../../../../Core/Workspace/entityReferences';
 import type { WorkspaceController } from '../../useWorkspace';
 import { InspectorPanel } from './InspectorPanel';
 import { EntitiesPanel } from './EntitiesPanel';
@@ -153,7 +156,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     editNode,
   } = workspace.graph.actions;
   const contextTransaction =
-    graphFlowContext && activeWorkspace?.transactions[graphFlowContext.transactionId.slice(3)];
+    graphFlowContext &&
+    activeWorkspace?.chainData.transactions[graphFlowContext.transactionId.slice(3)];
   const contextSideIds = useMemo(
     () =>
       contextTransaction
@@ -210,7 +214,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
   const openSpendingFromToolbar = () => {
     if (!selectedId) return;
     if (selectedSpenderTxids.length === 1)
-      select(txNodeId(selectedSpenderTxids[0]), { preserveCamera: true });
+      select(transactionReference(selectedSpenderTxids[0]), { preserveCamera: true });
     else if (selectedSpenderTxids.length > 1) {
       setPanels((current) => ({ ...current, flow: openFlowPanel(current.flow) }));
       setNotice('Choose a spending transaction in the transaction flow panel.');
@@ -227,7 +231,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
   const recentUtxoCount = selectedAddressForToolbar
     ? addressUtxos
       ? recentAddressUtxoTargets.filter(
-          (utxo) => !canvasIds.has(outputNodeId(utxo.txid, utxo.vout)),
+          (utxo) => !canvasIds.has(outpointReference(utxo.txid, utxo.vout)),
         ).length
       : canLoadChainData
         ? RECENT_ADDRESS_GRAPH_LIMIT
@@ -240,8 +244,9 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
   const recentTransactionCount = selectedAddressForToolbar
     ? recentTransactionNeedsFetch && canLoadChainData
       ? RECENT_ADDRESS_GRAPH_LIMIT
-      : recentAddressTransactionTargets.filter((entry) => !canvasIds.has(txNodeId(entry.txid)))
-          .length
+      : recentAddressTransactionTargets.filter(
+          (entry) => !canvasIds.has(transactionReference(entry.txid)),
+        ).length
     : 0;
   const graphContextToolbar = activeWorkspace ? (
     <GraphContextToolbar
@@ -400,7 +405,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         key={activeWorkspace.id}
         active={workbench === 'graph'}
         filters={graphFilters}
-        wallets={activeWorkspace.wallets}
+        wallets={activeWorkspace.wallets.definitions}
         onChange={updateFilters}
       />
       <GraphFilterButton
@@ -408,8 +413,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         onChange={updateFilters}
         onReset={resetGraphFilters}
         extraFiltersActive={!!activeWorkspace.view.smallAmountThreshold}
-        wallets={activeWorkspace.wallets}
-        tags={activeWorkspace.tags}
+        wallets={activeWorkspace.wallets.definitions}
+        tags={activeWorkspace.annotations.tags}
       />
       <button
         className={`selection-mode-toggle ${selection.mode ? 'active' : ''}`}
@@ -438,15 +443,16 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
           filters={graphFilters}
           onChange={updateFilters}
           names={{
-            walletName: activeWorkspace.wallets.find(
+            walletName: activeWorkspace.wallets.definitions.find(
               (wallet) => wallet.id === graphFilters.walletId,
             )?.name,
             walletNames: selectedWalletFilterIds(graphFilters).map(
               (id) =>
-                activeWorkspace.wallets.find((wallet) => wallet.id === id)?.name ??
+                activeWorkspace.wallets.definitions.find((wallet) => wallet.id === id)?.name ??
                 'Removed wallet',
             ),
-            tagName: activeWorkspace.tags?.find((tag) => tag.id === graphFilters.tagId)?.name,
+            tagName: activeWorkspace.annotations.tags?.find((tag) => tag.id === graphFilters.tagId)
+              ?.name,
           }}
           hiddenCount={hiddenCount}
           onShowAllHidden={showAllHidden}
@@ -643,7 +649,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   showTags={appliedGraphRequest.showTags}
                   showIcons={appliedGraphRequest.showIcons}
                   fitToken={appliedGraphRequest.fitToken}
-                  transactions={activeWorkspace.transactions}
+                  transactions={activeWorkspace.chainData.transactions}
                   workspace={activeWorkspace}
                   onTrace={(id) => void expand('funding', id)}
                   onEdit={editNode}

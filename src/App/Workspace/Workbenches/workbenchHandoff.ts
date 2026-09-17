@@ -1,8 +1,7 @@
 import type { GraphNavigationOptions } from './graphHandoffNavigation';
 import type { GraphData } from '../GraphState/types';
-import type { GraphFilters } from '../GraphState/filters';
-import type { Transaction } from '../../../Domain/Chain/transaction';
-import type { GraphMobilePanel, GraphRightTab } from '../GraphState/panelState';
+import type { GraphFilters, GraphMobilePanel, GraphRightTab } from '../../../Core/Workspace/view';
+import type { Transaction } from '../../../Core/ChainData';
 
 /**
  * Graph capabilities that Wallet and Analysis use to hand a selection over.

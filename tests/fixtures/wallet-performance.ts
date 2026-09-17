@@ -1,9 +1,11 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import type { Wallet } from '../../src/Domain/Wallet/walletTypes';
-import type { Workspace } from '../../src/App/Workspace/workspace';
-import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
-import { deriveAddresses } from '../../src/Domain/Wallet/wallet';
+import type { Wallet } from '../../src/Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../src/Core/Workspace/workspace';
+import { deriveAddresses } from '../../src/Core/Workspace/Wallets/walletDerivation';
+
+import { createWorkspace } from '../../src/Core/Workspace/createWorkspace';
+
 import { PUBLIC_ZPUB } from './bitcoin';
 
 /** Synthetic loaded history using the public CC0 BIP84 account fixture. */
@@ -31,24 +33,27 @@ export function largeWalletFixture(addressCount = 600, transactionsPerAddress = 
     for (let step = 0; step < transactionsPerAddress; step++) {
       const txid = (1 + index * transactionsPerAddress + step).toString(16).padStart(64, '0');
       const height = 800000 + index * transactionsPerAddress + step;
-      workspace.transactions[txid] = {
+      workspace.chainData.transactions[txid] = {
         txid,
         vin: previous ? [{ txid: previous, vout: 0 }] : [{ coinbase: '00' }],
         vout: [
           { n: 0, value: 1 - step * 0.1, scriptPubKey: { hex, address: address.address } },
           { n: 1, value: 0.0999, scriptPubKey: { hex: externalScript, address: external } },
         ],
-        blockHeight: height,
-        confirmations: 900000 - height,
-        blocktime: 1700000000 + index * transactionsPerAddress + step,
         vsize: 140,
+        status: {
+          kind: 'confirmed',
+          blockHeight: height,
+          confirmations: 900000 - height,
+          blocktime: 1700000000 + index * transactionsPerAddress + step,
+        },
       };
       history.push({ tx_hash: txid, height });
       previous = txid;
     }
     wallet.addresses.push({ ...address, history });
   }
-  workspace.wallets = [wallet];
+  workspace.wallets.definitions = [wallet];
   workspace.view = {
     ...workspace.view,
     workbench: 'wallet',

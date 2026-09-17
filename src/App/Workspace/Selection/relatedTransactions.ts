@@ -1,6 +1,6 @@
-import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
+import { outpointReference } from '../../../Core/Workspace/entityReferences';
 import type { GraphNode } from '../GraphState/types';
-import type { Transaction } from '../../../Domain/Chain/transaction';
+import type { Transaction } from '../../../Core/ChainData';
 
 export function relatedTransactions(
   transactions: Record<string, Transaction>,
@@ -16,7 +16,8 @@ export function relatedTransactions(
     const creating = transactions[selected.txid ?? ''];
     if (creating) result.push({ tx: creating, role: 'Creating' });
     if (loadedSpends) {
-      for (const tx of loadedSpends.get(outputNodeId(selected.txid ?? '', selected.vout!)) ?? [])
+      for (const tx of loadedSpends.get(outpointReference(selected.txid ?? '', selected.vout!)) ??
+        [])
         result.push({ tx, role: 'Spending' });
       return result;
     }
@@ -32,14 +33,15 @@ export function relatedTransactions(
           output.scriptPubKey.address === selected.address ||
           output.scriptPubKey.addresses?.includes(selected.address ?? '')
         )
-          outputs.add(outputNodeId(tx.txid, output.n));
+          outputs.add(outpointReference(tx.txid, output.n));
       }
     }
     for (const tx of Object.values(transactions)) {
       if (
-        tx.vout.some((output) => outputs.has(outputNodeId(tx.txid, output.n))) ||
+        tx.vout.some((output) => outputs.has(outpointReference(tx.txid, output.n))) ||
         tx.vin.some(
-          (input) => input.txid !== undefined && outputs.has(outputNodeId(input.txid, input.vout!)),
+          (input) =>
+            input.txid !== undefined && outputs.has(outpointReference(input.txid, input.vout!)),
         )
       )
         result.push({ tx, role: 'Related' });

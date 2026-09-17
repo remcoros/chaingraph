@@ -5,13 +5,15 @@ import {
   indexPreviousOutputs,
   mergeTransactionObservations,
   resolvePreviousOutput,
-} from '../../../src/Domain/Chain/prevouts';
+  parseTransaction,
+  type Transaction,
+} from '../../../src/Core/ChainData';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
-import { parseTransaction } from '../../../src/Domain/Chain/transactionValidation';
-import { outputNodeId } from '../../../src/Domain/Metadata/entityReferences';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+
+import { outpointReference } from '../../../src/Core/Workspace/entityReferences';
+
 import { flowInputPlan } from '../../../src/App/Workspace/Workbenches/Graph/TransactionFlow/flowInputPlan';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -31,27 +33,30 @@ const spend = (details = prevout()): Transaction => ({
 describe('previous-output observations', () => {
   it('keeps enriched input details without fabricating a creating transaction', () => {
     const workspace = createWorkspace('Enriched', 'mainnet');
-    workspace.transactions[id(2)] = spend();
+    workspace.chainData.transactions[id(2)] = spend();
     const parsed = parseWorkspace(structuredClone(workspace));
     const resolution = resolvePreviousOutput(
-      parsed,
-      parsed.transactions[id(2)].vin[0],
-      indexPreviousOutputs(parsed),
+      { network: parsed.network, transactions: parsed.chainData.transactions },
+      parsed.chainData.transactions[id(2)].vin[0],
+      indexPreviousOutputs({
+        network: parsed.network,
+        transactions: parsed.chainData.transactions,
+      }),
     );
     expect(resolution).toMatchObject({
       status: 'attached',
       output: { n: 3, value: 1, scriptPubKey: { hex: script } },
     });
-    expect(parsed.transactions[id(1)]).toBeUndefined();
+    expect(parsed.chainData.transactions[id(1)]).toBeUndefined();
     expect(
-      buildGraph(parsed).nodes.find((node) => node.id === outputNodeId(id(1), 3)),
+      buildGraph(parsed).nodes.find((node) => node.id === outpointReference(id(1), 3)),
     ).toMatchObject({
       value: 100_000_000,
       address,
     });
     expect(
       buildGraph(parsed).links.some(
-        (link) => link.kind === 'creates' && link.target === outputNodeId(id(1), 3),
+        (link) => link.kind === 'creates' && link.target === outpointReference(id(1), 3),
       ),
     ).toBe(false);
   });
@@ -61,10 +66,15 @@ describe('previous-output observations', () => {
     delete old.vin[0].prevout;
     expect(parseTransaction(old)).toEqual(old);
     const workspace = createWorkspace('Old import', 'mainnet');
-    workspace.transactions[old.txid] = old;
-    expect(resolvePreviousOutput(workspace, old.vin[0]).status).toBe('missing');
+    workspace.chainData.transactions[old.txid] = old;
     expect(
-      buildGraph(workspace).nodes.find((node) => node.id === outputNodeId(id(1), 3))?.value,
+      resolvePreviousOutput(
+        { network: workspace.network, transactions: workspace.chainData.transactions },
+        old.vin[0],
+      ).status,
+    ).toBe('missing');
+    expect(
+      buildGraph(workspace).nodes.find((node) => node.id === outpointReference(id(1), 3))?.value,
     ).toBeUndefined();
   });
 
@@ -80,7 +90,7 @@ describe('previous-output observations', () => {
 
     const testnetAddress = bitcoinAddress.toBech32(new Uint8Array(20).fill(2), 0, 'tb');
     const workspace = createWorkspace('Wrong network', 'mainnet');
-    workspace.transactions[valid.txid] = {
+    workspace.chainData.transactions[valid.txid] = {
       ...valid,
       vin: [
         {
@@ -107,13 +117,18 @@ describe('previous-output observations', () => {
     const workspace = createWorkspace('Conflict', 'mainnet');
     const first = spend(prevout(1));
     const second = { ...spend(prevout(2)), txid: id(3) };
-    workspace.transactions = { [first.txid]: first, [second.txid]: second };
-    expect(indexPreviousOutputs(workspace).get(outputNodeId(id(1), 3))).toEqual({
+    workspace.chainData.transactions = { [first.txid]: first, [second.txid]: second };
+    expect(
+      indexPreviousOutputs({
+        network: workspace.network,
+        transactions: workspace.chainData.transactions,
+      }).get(`${id(1)}:3`),
+    ).toEqual({
       status: 'conflict',
     });
     expect(() => parseWorkspace(workspace)).toThrow('conflicting previous-output');
 
-    workspace.transactions = {
+    workspace.chainData.transactions = {
       [first.txid]: first,
       [id(1)]: {
         txid: id(1),
@@ -125,14 +140,31 @@ describe('previous-output observations', () => {
         })),
       },
     };
-    expect(resolvePreviousOutput(workspace, first.vin[0]).status).toBe('conflict');
+    expect(
+      resolvePreviousOutput(
+        { network: workspace.network, transactions: workspace.chainData.transactions },
+        first.vin[0],
+      ).status,
+    ).toBe('conflict');
 
-    workspace.transactions[id(1)].vout = workspace.transactions[id(1)].vout.slice(0, 3);
-    expect(resolvePreviousOutput(workspace, first.vin[0]).status).toBe('conflict');
+    workspace.chainData.transactions[id(1)].vout = workspace.chainData.transactions[
+      id(1)
+    ].vout.slice(0, 3);
+    expect(
+      resolvePreviousOutput(
+        { network: workspace.network, transactions: workspace.chainData.transactions },
+        first.vin[0],
+      ).status,
+    ).toBe('conflict');
     expect(() => parseWorkspace(workspace)).toThrow('conflicting previous-output');
 
-    delete workspace.transactions[first.txid].vin[0].prevout;
-    expect(resolvePreviousOutput(workspace, first.vin[0]).status).toBe('conflict');
+    delete workspace.chainData.transactions[first.txid].vin[0].prevout;
+    expect(
+      resolvePreviousOutput(
+        { network: workspace.network, transactions: workspace.chainData.transactions },
+        first.vin[0],
+      ).status,
+    ).toBe('conflict');
     expect(() => parseWorkspace(workspace)).toThrow('conflicting previous-output');
   });
 
@@ -150,10 +182,10 @@ describe('previous-output observations', () => {
 
   it('skips enriched parents during bulk hydration but keeps selected-input navigation', () => {
     const workspace = createWorkspace('Flow', 'mainnet');
-    workspace.transactions[id(2)] = spend();
+    workspace.chainData.transactions[id(2)] = spend();
     const txNode = buildGraph(workspace).nodes.find((node) => node.id === `tx:${id(2)}`)!;
     const inputNode = buildGraph(workspace).nodes.find(
-      (node) => node.id === outputNodeId(id(1), 3),
+      (node) => node.id === outpointReference(id(1), 3),
     )!;
     expect(flowInputPlan(workspace, txNode, true).missing).toEqual([]);
     expect(flowInputPlan(workspace, inputNode).missing).toEqual([id(1)]);

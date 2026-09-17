@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { transactionFee } from './transactionFee';
-import type { Transaction } from '../../../Domain/Chain/transaction';
-import { createWorkspace } from '../../Workspace/createWorkspace';
+import type { Transaction } from '../../../Core/ChainData';
+import { createWorkspace } from '../../../Core/Workspace/createWorkspace';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
 
@@ -16,11 +16,10 @@ function fixture() {
     txid: id(2),
     vin: [{ txid: parent.txid, vout: 0 }],
     vout: [{ n: 0, value: 0.00000826, scriptPubKey: { hex: '0014' } }],
-    blockHeight: 800000,
-    blocktime: 1690168629,
     vsize: 1740,
+    status: { kind: 'confirmed' as const, blockHeight: 800000, blocktime: 1690168629 },
   };
-  workspace.transactions = {
+  workspace.chainData.transactions = {
     [parent.txid]: parent,
     [transaction.txid]: transaction,
   };
@@ -43,7 +42,10 @@ describe('transaction fees', () => {
     ).toBeUndefined();
     expect(transactionFee(workspace, { ...transaction, vsize: undefined })).toBeUndefined();
     expect(
-      transactionFee(workspace, { ...transaction, mempool: true, blockHeight: undefined }),
+      transactionFee(workspace, {
+        ...transaction,
+        status: { ...transaction.status, kind: 'mempool' as const, blockHeight: undefined },
+      }),
     ).toBeUndefined();
   });
 

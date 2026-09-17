@@ -1,8 +1,7 @@
 import { examplesForNetwork } from './exampleVerificationExamples';
-import { parseTransaction } from '../src/Domain/Chain/transactionValidation';
-import type { Network } from '../src/Domain/Chain/network';
-import type { Transaction } from '../src/Domain/Chain/transaction';
-import { addressToScriptHash } from '../src/Domain/Wallet/wallet';
+import { parseVerboseTransaction } from '../src/Core/ChainData/verboseTransaction';
+import { type Network, addressToScriptHash } from '../src/Core/Bitcoin';
+import type { Transaction } from '../src/Core/ChainData';
 
 // Uses a running proxy only. Does not load environment files or print destinations.
 const base = process.env.CHAINGRAPH_PROXY_URL ?? 'http://127.0.0.1:4000';
@@ -30,7 +29,7 @@ async function rpc(
 async function transaction(network: Network, id: string) {
   let result = transactions.get(`${network}:${id}`);
   if (!result) {
-    result = parseTransaction(await rpc(network, 'core', 'getrawtransaction', [id, 1]));
+    result = parseVerboseTransaction(await rpc(network, 'core', 'getrawtransaction', [id, 1]));
     if (result.txid !== id) throw new Error('Unexpected transaction identity');
     transactions.set(`${network}:${id}`, result);
   }
@@ -59,7 +58,7 @@ try {
     for (const example of examplesForNetwork(network)) {
       const tx = await transaction(network, example.txid);
       if (
-        !(tx.confirmations && tx.confirmations > 0) ||
+        !(tx.status?.confirmations && tx.status?.confirmations > 0) ||
         tx.vin.length !== example.evidence.inputCount ||
         tx.vout.length !== example.evidence.outputCount
       )
@@ -103,8 +102,8 @@ try {
           if (
             input?.txid !== tx.txid ||
             input.vout !== example.vout ||
-            !child.confirmations ||
-            child.confirmations < 1
+            !child.status?.confirmations ||
+            child.status?.confirmations < 1
           )
             throw new Error('Confirmed spending link missing');
         }

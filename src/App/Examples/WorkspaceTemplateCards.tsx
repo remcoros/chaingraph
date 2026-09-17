@@ -1,5 +1,5 @@
 import { ArrowUpRight } from 'lucide-react';
-import type { Network } from '../../Domain/Chain/network';
+import type { Network } from '../../Core/Bitcoin';
 import { WORKSPACE_TEMPLATES } from './workspaceTemplates';
 
 export function WorkspaceTemplateCards({

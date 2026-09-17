@@ -1,7 +1,10 @@
 import { useId, useRef, useState } from 'react';
 import { formatLocalTimestamp } from '../../Controls/Display/transactionTime';
-import { WorkspaceOperationError } from '../Persistence/Encryption';
-import type { SavedWorkspace } from '../savedWorkspace';
+import {
+  WorkspacePersistenceError,
+  type SavedWorkspace,
+} from '../../../Core/Workspace/Persistence';
+
 import { Modal } from '../../Dialogs/Modal';
 import { focusDialogField, PasswordControls, PasswordField } from './PasswordControls';
 import { useWorkspaceRead } from './useWorkspaceRead';
@@ -45,7 +48,7 @@ export function UnlockWorkspaceDialog({
           } catch (error) {
             if (signal.aborted) return;
             setError(
-              error instanceof WorkspaceOperationError
+              error instanceof WorkspacePersistenceError
                 ? error.message
                 : 'Could not unlock. Check your password. If browser data was cleared or is unavailable, restore an exported workspace backup.',
             );

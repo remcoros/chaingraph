@@ -14,22 +14,37 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react';
-import { short } from '../../../../Controls/Display/referenceFormat';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
+import { short } from '../../../../../Core/Formatting';
+import type { Transaction } from '../../../../../Core/ChainData';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import { SCAN_LIMITS } from '../../../../../Core/Workspace/ConnectionScan/scanPath';
+import type {
+  ScanResult,
+  ScanRun,
+  ScanSettings,
+} from '../../../../../Core/Workspace/ConnectionScan/connectionScans';
 import {
-  DEFAULT_SCAN_SETTINGS,
-  SCAN_LIMITS,
-  type ScanResult,
-  type ScanRun,
-  type ScanSettings,
-} from './connectionScan';
-import { replaceScanRun, clearScanRuns, type ScanPathWorkspace } from './connectionScanRecords';
+  resultFinding,
+  resultCategory,
+  type ScanResultFinding,
+} from '../../../../../Core/Workspace/ConnectionScan/connectionScanClassification';
+import {
+  mergeScanRunSnapshots,
+  scanResultGroupKey,
+  scanMeetingNode,
+} from '../../../../../Core/Workspace/ConnectionScan/results';
+import { DEFAULT_SCAN_SETTINGS } from '../../../../../Core/Workspace/ConnectionScan/connectionScan';
+
+import {
+  replaceScanRun,
+  clearScanRuns,
+} from '../../../../../Core/Workspace/ConnectionScan/updates';
+import type { ScanPathWorkspace } from './connectionScanPath';
 import { prepareScanPathAddition, prepareScanNodeAddition } from './connectionScanAddition';
-import { loadScanActionEvidence } from './connectionScanActionEvidence';
-import { runConnectionScanInWorker } from './connectionScanRunner';
-import type { TransactionFetchScope } from '../../../../../Infra/Bitcoin/transactionScheduler';
-import { traceSourceExists } from '../../../../../Infra/Bitcoin/tracing';
+import { loadScanActionEvidence } from '../../../../../Core/Workspace/ConnectionScan/connectionScanActionEvidence';
+import { runConnectionScanInWorker } from '../../../../../Core/Workspace/ConnectionScan/connectionScanRunner';
+import type { TransactionFetchScope } from '../../../../../Core/ChainData/transactionScheduler';
+import { traceSourceExists } from '../../../GraphState/traceSource';
 import { indexLoadedSpends } from '../TransactionFlow/transactionFlow';
 import {
   presentScanRun,
@@ -37,19 +52,13 @@ import {
   scanRelationPresentation,
   scanResultTooltip,
 } from './connectionScanPresentation';
+
+import { groupScanResults, groupScanRuns } from './connectionScanGroups';
+
 import {
-  resultFinding,
-  resultCategory,
-  type ScanResultFinding,
-} from './connectionScanClassification';
-import {
-  groupScanResults,
-  groupScanRuns,
-  mergeScanRunSnapshots,
-  scanResultGroupKey,
-  scanMeetingNode,
-} from './connectionScanGroups';
-import { retryConnectionScanResult, applyScanRecheck } from './connectionScanRetry';
+  retryConnectionScanResult,
+  applyScanRecheck,
+} from '../../../../../Core/Workspace/ConnectionScan/connectionScanRetry';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { prepareCustomScanTargets } from '../../../Selection/connectionScanTargets';
@@ -75,7 +84,8 @@ const titles: Record<ScanResultFinding, string> = {
   'conflicting-evidence': 'Conflicting evidence',
 };
 const eligible = (id?: string): id is string => !!id && /^(tx|out):/.test(id);
-const nameFor = (workspace: Workspace, id: string) => workspace.annotations[id]?.label || short(id);
+const nameFor = (workspace: Workspace, id: string) =>
+  workspace.annotations.entities[id]?.label || short(id);
 
 type Props = {
   workspace: Workspace;
@@ -256,7 +266,7 @@ export function ConnectionScanPanel(props: Props) {
   async function addOrSelect(result: ScanResult, prefixLength: number, nodeId?: string) {
     if (actionController.current) return;
     const owner = current.current;
-    if (nodeId && traceSourceExists(owner.workspace, nodeId)) {
+    if (nodeId && traceSourceExists(owner.workspace.chainData, nodeId)) {
       owner.onSelect(nodeId);
       return;
     }
@@ -368,7 +378,7 @@ export function ConnectionScanPanel(props: Props) {
       );
       return;
     }
-    if (!traceSourceExists(workspace, startSource)) {
+    if (!traceSourceExists(workspace.chainData, startSource)) {
       setError('Source evidence is no longer loaded. Add its saved path or load the source first.');
       return;
     }
@@ -427,7 +437,10 @@ export function ConnectionScanPanel(props: Props) {
           settings: frozenSettings,
         },
         network: workspace.network,
-        transactions: { ...workspace.connectionScans?.evidence, ...workspace.transactions },
+        transactions: {
+          ...workspace.connectionScans?.evidence,
+          ...workspace.chainData.transactions,
+        },
         loadedSpenders: (id) => [
           ...new Set([
             ...(props.loadedSpenders.get(id) ?? []),
@@ -497,7 +510,7 @@ export function ConnectionScanPanel(props: Props) {
         run: owner,
         result,
         network: workspace.network,
-        transactions: { ...currentEvidence, ...workspace.transactions },
+        transactions: { ...currentEvidence, ...workspace.chainData.transactions },
         scope,
         signal: abort.signal,
         allowNetwork: canLoadChainData,
@@ -986,12 +999,13 @@ function ScanResultGroup({
 
 function ScanPathNodeLabel({ workspace, id }: { workspace: Workspace; id: string }) {
   const transaction = id.startsWith('tx:')
-    ? (workspace.transactions[id.slice(3)] ?? workspace.connectionScans?.evidence[id.slice(3)])
+    ? (workspace.chainData.transactions[id.slice(3)] ??
+      workspace.connectionScans?.evidence[id.slice(3)])
     : undefined;
   return (
     <>
       <span className="connection-scan-path-name">
-        {workspace.annotations[id]?.label || <ResponsiveIdentifier value={id} />}
+        {workspace.annotations.entities[id]?.label || <ResponsiveIdentifier value={id} />}
       </span>
       {id.startsWith('tx:') && (
         <span
@@ -1035,26 +1049,28 @@ function ScanResultRow({
   const scanPathWorkspace = useMemo<ScanPathWorkspace>(
     () => ({
       network: workspace.network,
-      transactions: workspace.transactions,
-      inputContext: workspace.inputContext,
-      findings: workspace.findings,
-      annotations: workspace.annotations,
-      addressBalances: workspace.addressBalances,
-      watchedAddresses: workspace.watchedAddresses,
       connectionScans: workspace.connectionScans,
+      chainData: {
+        transactions: workspace.chainData.transactions,
+        addressBalances: workspace.chainData.addressBalances,
+        watchedAddresses: workspace.chainData.watchedAddresses,
+      },
+      analysis: { findings: workspace.analysis.findings },
+      annotations: { entities: workspace.annotations.entities },
       view: {
         showAddresses: workspace.view.showAddresses,
         graphNodeIds: workspace.view.graphNodeIds,
+        inputContext: workspace.view.inputContext,
       },
     }),
     [
       workspace.network,
-      workspace.transactions,
-      workspace.inputContext,
-      workspace.findings,
-      workspace.annotations,
-      workspace.addressBalances,
-      workspace.watchedAddresses,
+      workspace.chainData.transactions,
+      workspace.view.inputContext,
+      workspace.analysis.findings,
+      workspace.annotations.entities,
+      workspace.chainData.addressBalances,
+      workspace.chainData.watchedAddresses,
       workspace.connectionScans,
       workspace.view.showAddresses,
       workspace.view.graphNodeIds,
@@ -1083,7 +1099,7 @@ function ScanResultRow({
   const statuses = [...new Set([...result.path, ...(result.context?.path ?? [])])].map(
     (id) =>
       transactionStatus(
-        workspace.transactions[id.split(':')[1]] ??
+        workspace.chainData.transactions[id.split(':')[1]] ??
           workspace.connectionScans?.evidence[id.split(':')[1]],
       ).kind,
   );
@@ -1140,7 +1156,7 @@ function ScanResultRow({
               className="text-button"
               disabled={actionBusy}
               title={
-                traceSourceExists(workspace, id)
+                traceSourceExists(workspace.chainData, id)
                   ? `${label}: ${id}`
                   : `Add and select ${label}: ${id}`
               }
@@ -1161,8 +1177,8 @@ function ScanResultRow({
         ))}
       </div>
       <div className="connection-scan-result-body">
-        {workspace.annotations[result.endpoint]?.label && (
-          <p className="small">{workspace.annotations[result.endpoint].label}</p>
+        {workspace.annotations.entities[result.endpoint]?.label && (
+          <p className="small">{workspace.annotations.entities[result.endpoint].label}</p>
         )}
         {category === 'issue' && !hasDirection && (
           <p className="small muted">Start a new scan to refresh this older result.</p>
@@ -1178,7 +1194,9 @@ function ScanResultRow({
               aria-label={`Select meeting point: ${nameFor(workspace, meeting)}`}
               onClick={() => openNode(meeting)}
             >
-              {workspace.annotations[meeting]?.label || <ResponsiveIdentifier value={meeting} />}
+              {workspace.annotations.entities[meeting]?.label || (
+                <ResponsiveIdentifier value={meeting} />
+              )}
             </button>
           </div>
         )}

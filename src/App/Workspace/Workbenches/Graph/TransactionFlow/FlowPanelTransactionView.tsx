@@ -23,20 +23,31 @@ import {
 } from 'lucide-react';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
-import { matchingWalletUtxoObservation } from '../../../Wallet/WalletUtxos/walletUtxoObservation';
+import {
+  matchingWalletUtxoObservation,
+  type WalletUtxoObservation,
+} from '../../../../../Core/Workspace/Wallets/WalletUtxos/walletUtxoObservation';
 import { SmallAmountControl } from '../SmallAmountControl';
 import { isSmallAmount } from '../smallAmounts';
 import {
   TransactionBlockTime,
   TransactionFeeLabel,
 } from '../../../../Controls/Display/TransactionBlockTime';
-import { type Transaction, type TxOutput, sats } from '../../../../../Domain/Chain/transaction';
-import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import {
+  type Transaction,
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+} from '../../../../../Core/ChainData';
+import { type TxOutput, sats, outputAddress, isOpReturn } from '../../../../../Core/Bitcoin';
+import {
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import type { TransactionFlowState } from '../../../../../Core/Workspace/view';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { indexLoadedSpends, selectedFlowLeg } from './transactionFlow';
-import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../../Domain/Chain/prevouts';
-import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
-import { outputAddress } from '../../../../../Domain/Chain/prevouts';
+
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { SelectionCheckbox } from '../../../Selection/SelectionToolbar';
@@ -45,9 +56,7 @@ import { BatchTagEditor, MetadataPopover } from '../../../../Controls/Metadata/M
 import { IconPalette } from '../../../../Controls/Metadata/IconPicker';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../workspace';
-import type { TransactionFlowState } from '../../../GraphState/panelState';
-import type { WalletUtxoObservation } from '../../../Wallet/WalletUtxos/walletUtxoObservation';
+
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';
 import type { EntitySelection } from '../../../Selection/useEntitySelection';
 
@@ -332,7 +341,10 @@ function TransactionRows({
   previous: ReactNode;
   next: ReactNode;
 }) {
-  const { network, transactions } = workspace;
+  const {
+    network,
+    chainData: { transactions },
+  } = workspace;
   const hidden = useMemo(() => new Set(hiddenNodeIds), [hiddenNodeIds]);
   const admitted = useMemo(
     () => (graphNodeIds === undefined ? undefined : new Set(graphNodeIds)),
@@ -480,7 +492,7 @@ function TransactionRows({
       tx.vin.map((input, index) => {
         const resolution = resolvePreviousOutput({ network, transactions }, input, previousOutputs);
         return {
-          id: input.txid !== undefined ? outputNodeId(input.txid, input.vout!) : undefined,
+          id: input.txid !== undefined ? outpointReference(input.txid, input.vout!) : undefined,
           index,
           output:
             resolution.status === 'loaded' || resolution.status === 'attached'
@@ -495,7 +507,7 @@ function TransactionRows({
   const outputRows = useMemo<Row[]>(
     () =>
       tx.vout.map((output) => ({
-        id: outputNodeId(tx.txid, output.n),
+        id: outpointReference(tx.txid, output.n),
         index: output.n,
         output,
         coinbase: false,
@@ -597,11 +609,11 @@ function TransactionRows({
                   selected={Boolean(matches(row))}
                   pinned={row.id === selected?.id}
                   belowThreshold={belowThreshold(row)}
-                  label={row.id ? workspace.annotations[row.id]?.label : undefined}
-                  icon={row.id ? workspace.annotations[row.id]?.icon : undefined}
+                  label={row.id ? workspace.annotations.entities[row.id]?.label : undefined}
+                  icon={row.id ? workspace.annotations.entities[row.id]?.icon : undefined}
                   loaded={
                     inputs
-                      ? !!workspace.transactions[row.previousTxid ?? '']
+                      ? !!workspace.chainData.transactions[row.previousTxid ?? '']
                       : !!spends.get(row.id ?? '')?.length
                   }
                   spendCount={spends.get(row.id ?? '')?.length ?? 0}
@@ -628,7 +640,10 @@ function TransactionRows({
 // Panel lifetime preserves transaction choice and quick editors across selection kinds.
 export function useFlowPanelTransaction(props: Props) {
   const { workspace, selected, state, onStateChange } = props;
-  const { network, transactions } = workspace;
+  const {
+    network,
+    chainData: { transactions },
+  } = workspace;
   const spends = useMemo(() => indexLoadedSpends(transactions), [transactions]);
   const related = useMemo(
     () => (selected ? relatedTransactions(transactions, selected, spends) : []),
@@ -821,17 +836,21 @@ export function FlowPanelTransactionView({
     !!current &&
     selected?.kind !== 'address' &&
     props.graphNodeIds !== undefined &&
-    !props.graphNodeIds.includes(txNodeId(current.tx.txid));
+    !props.graphNodeIds.includes(transactionReference(current.tx.txid));
   const navigate = (txid: string, outputId: string) => {
     choose(txid);
-    props.onSetHidden?.([txNodeId(txid)], false);
+    props.onSetHidden?.([transactionReference(txid)], false);
     onSelect(outputId);
   };
   const missingCreating =
-    selected?.kind === 'output' && !workspace.transactions[selected.txid ?? ''];
+    selected?.kind === 'output' && !workspace.chainData.transactions[selected.txid ?? ''];
   const selectedResolution =
     selected?.kind === 'output' && selected.txid !== undefined && selected.vout !== undefined
-      ? resolvePreviousOutput(workspace, selected, previousOutputs)
+      ? resolvePreviousOutput(
+          { network: workspace.network, transactions: workspace.chainData.transactions },
+          selected,
+          previousOutputs,
+        )
       : undefined;
   const selectedOutput =
     selectedResolution?.status === 'loaded' || selectedResolution?.status === 'attached'
@@ -860,7 +879,9 @@ export function FlowPanelTransactionView({
       );
     const candidates =
       direction === 'previous'
-        ? [workspace.transactions[selected.txid ?? '']].filter((tx): tx is Transaction => !!tx)
+        ? [workspace.chainData.transactions[selected.txid ?? '']].filter(
+            (tx): tx is Transaction => !!tx,
+          )
         : loadedSpenders;
     if (direction === 'next' && selectedUnspendable)
       return <span className="transaction-flow-hint">OP_RETURN · unspendable</span>;
@@ -887,7 +908,7 @@ export function FlowPanelTransactionView({
                       : 'Spending transaction'}
                 </small>
                 <strong>
-                  {workspace.annotations[txNodeId(tx.txid)]?.label || (
+                  {workspace.annotations.entities[transactionReference(tx.txid)]?.label || (
                     <ResponsiveIdentifier value={tx.txid} preferFull />
                   )}
                 </strong>
@@ -984,31 +1005,34 @@ export function FlowPanelTransactionView({
                   </div>
                 )}
                 <div
-                  className={`flow-panel-identity ${selected.id === txNodeId(current.tx.txid) ? 'is-selected' : ''}`}
+                  className={`flow-panel-identity ${selected.id === transactionReference(current.tx.txid) ? 'is-selected' : ''}`}
                 >
                   <button
                     type="button"
                     className="transaction-identity-select"
                     aria-label={`Select displayed transaction ${current.tx.txid}`}
-                    aria-pressed={selected.id === txNodeId(current.tx.txid)}
+                    aria-pressed={selected.id === transactionReference(current.tx.txid)}
                     title={current.tx.txid}
-                    onClick={() => onSelect(txNodeId(current.tx.txid))}
+                    onClick={() => onSelect(transactionReference(current.tx.txid))}
                   >
                     <span className="transaction-identity-titlebar">
                       <span className="transaction-identity-icons">
                         <Box size={16} aria-hidden="true" />
-                        {workspace.annotations[txNodeId(current.tx.txid)]?.icon && (
+                        {workspace.annotations.entities[transactionReference(current.tx.txid)]
+                          ?.icon && (
                           <span
                             className="transaction-annotation-icon"
                             role="img"
-                            aria-label={`Annotation icon: ${workspace.annotations[txNodeId(current.tx.txid)].icon}`}
+                            aria-label={`Annotation icon: ${workspace.annotations.entities[transactionReference(current.tx.txid)].icon}`}
                           >
-                            {workspace.annotations[txNodeId(current.tx.txid)].icon}
+                            {
+                              workspace.annotations.entities[transactionReference(current.tx.txid)]
+                                .icon
+                            }
                           </span>
                         )}
-                        {workspace.annotations[txNodeId(current.tx.txid)]?.bookmarked && (
-                          <Bookmark size={14} aria-label="Bookmarked" />
-                        )}
+                        {workspace.annotations.entities[transactionReference(current.tx.txid)]
+                          ?.bookmarked && <Bookmark size={14} aria-label="Bookmarked" />}
                       </span>
                       <strong className="mono transaction-identity-id">
                         <ResponsiveIdentifier value={current.tx.txid} />
@@ -1021,15 +1045,22 @@ export function FlowPanelTransactionView({
                         showFee={false}
                         separateStatusAndTime
                       />
-                      {workspace.annotations[txNodeId(current.tx.txid)]?.label && (
+                      {workspace.annotations.entities[transactionReference(current.tx.txid)]
+                        ?.label && (
                         <strong
                           className="transaction-identity-label"
-                          title={workspace.annotations[txNodeId(current.tx.txid)].label}
+                          title={
+                            workspace.annotations.entities[transactionReference(current.tx.txid)]
+                              .label
+                          }
                         >
-                          {workspace.annotations[txNodeId(current.tx.txid)].label}
+                          {
+                            workspace.annotations.entities[transactionReference(current.tx.txid)]
+                              .label
+                          }
                         </strong>
                       )}
-                      {props.renderMetadata?.(txNodeId(current.tx.txid))}
+                      {props.renderMetadata?.(transactionReference(current.tx.txid))}
                     </span>
                     <span className="transaction-identity-footer">
                       <TransactionFeeLabel transaction={current.tx} workspace={workspace} />
@@ -1045,7 +1076,7 @@ export function FlowPanelTransactionView({
                       className="icon-button"
                       aria-label="Edit displayed transaction annotation"
                       title="Edit transaction label"
-                      onClick={() => props.onEdit(txNodeId(current.tx.txid), 'label')}
+                      onClick={() => props.onEdit(transactionReference(current.tx.txid), 'label')}
                     >
                       <Pencil size={13} />
                     </button>
@@ -1057,7 +1088,7 @@ export function FlowPanelTransactionView({
                       onClick={(event) =>
                         setQuickEditor({
                           kind: 'tags',
-                          nodeId: txNodeId(current.tx.txid),
+                          nodeId: transactionReference(current.tx.txid),
                           anchor: event.currentTarget,
                           point: event.detail ? { x: event.clientX, y: event.clientY } : undefined,
                         })
@@ -1073,7 +1104,7 @@ export function FlowPanelTransactionView({
                       onClick={(event) =>
                         setQuickEditor({
                           kind: 'icon',
-                          nodeId: txNodeId(current.tx.txid),
+                          nodeId: transactionReference(current.tx.txid),
                           anchor: event.currentTarget,
                           point: event.detail ? { x: event.clientX, y: event.clientY } : undefined,
                         })
@@ -1084,7 +1115,7 @@ export function FlowPanelTransactionView({
                     <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
                   </div>
                   {(currentNotOnGraph ||
-                    props.hiddenNodeIds?.includes(txNodeId(current.tx.txid))) && (
+                    props.hiddenNodeIds?.includes(transactionReference(current.tx.txid))) && (
                     <div className="transaction-hidden-state">
                       <span className="entity-hidden-badge">
                         <EyeOff size={10} /> {currentNotOnGraph ? 'Not on graph' : 'Hidden'}
@@ -1098,7 +1129,9 @@ export function FlowPanelTransactionView({
                               ? 'Add displayed transaction to graph'
                               : 'Show displayed transaction in graph'
                           }
-                          onClick={() => props.onSetHidden?.([txNodeId(current.tx.txid)], false)}
+                          onClick={() =>
+                            props.onSetHidden?.([transactionReference(current.tx.txid)], false)
+                          }
                         >
                           {currentNotOnGraph ? 'Add to graph' : 'Show'}
                         </button>
@@ -1140,7 +1173,7 @@ export function FlowPanelTransactionView({
           >
             <IconPalette
               id={quickEditorId}
-              value={workspace.annotations[quickEditor.nodeId]?.icon ?? ''}
+              value={workspace.annotations.entities[quickEditor.nodeId]?.icon ?? ''}
               onChange={(icon) => props.onSetIcon(quickEditor.nodeId, icon)}
               onClose={() => setQuickEditor(undefined)}
             />

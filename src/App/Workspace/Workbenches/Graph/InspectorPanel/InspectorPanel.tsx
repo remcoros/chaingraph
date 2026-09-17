@@ -15,8 +15,8 @@ import {
   ScanLine,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
+import type { Transaction } from '../../../../../Core/ChainData';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { WorkspaceController } from '../../../useWorkspace';
 import { InspectorPanelDetail } from './InspectorPanelDetail';
 function withScanActionEvidence(

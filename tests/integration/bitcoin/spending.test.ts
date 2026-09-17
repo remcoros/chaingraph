@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadSpending } from '../../../src/Infra/Bitcoin/api';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
+import { verboseTransaction } from '../../fixtures/verboseTransaction';
+import { loadSpending } from '../../../src/Core/ChainData/api';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import type { Transaction } from '../../../src/Core/ChainData';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const rootId = 'f'.repeat(64);
@@ -14,13 +15,16 @@ const root: Transaction = {
 };
 const workspace = () => ({
   ...createWorkspace('Spending regression', 'testnet4'),
-  transactions: { [rootId]: root },
+  chainData: {
+    ...createWorkspace('Spending regression', 'testnet4').chainData,
+    transactions: { [rootId]: root },
+  },
 });
 const candidate = (txid: string, vin: Transaction['vin'] = [{ coinbase: '00' }]): Transaction => ({
   txid,
   vin,
   vout: [output(0)],
-  confirmations: 1,
+  status: { kind: 'confirmed' as const, confirmations: 1 },
 });
 const scriptHash = (hex: string) =>
   createHash('sha256').update(Buffer.from(hex, 'hex')).digest().reverse().toString('hex');
@@ -37,7 +41,7 @@ function mockedRpc(history: string[], transactions: Map<string, Transaction>) {
           ? history.map((tx_hash) => ({ tx_hash, height: 1 }))
           : transactions.get(request.params[0]);
       if (result === undefined) throw new Error('Unexpected mocked transaction request');
-      return new Response(JSON.stringify({ result }), {
+      return new Response(JSON.stringify({ result: verboseTransaction(result) }), {
         headers: { 'content-type': 'application/json' },
       });
     }),
@@ -53,16 +57,35 @@ describe('spending expansion', () => {
     transactions.set(id(501), candidate(id(501), [{ txid: rootId, vout: 0 }]));
     const requests = mockedRpc([...ids].reverse(), transactions);
     const w = workspace();
-    const first = await loadSpending(root, w, 0);
+    const first = await loadSpending(
+      root,
+      { network: w.network, transactions: w.chainData.transactions },
+      0,
+    );
     expect(first).toEqual({ transactions: [], truncated: true, nextOffset: 500 });
     const firstIds = requests
       .filter((r) => r.method === 'getrawtransaction')
       .map((r) => r.params[0]);
     expect(firstIds).toHaveLength(500);
     expect(new Set(firstIds)).toEqual(new Set(ids.slice(0, 500)));
-    const second = await loadSpending(root, w, 0, undefined, first.nextOffset);
+    const second = await loadSpending(
+      root,
+      { network: w.network, transactions: w.chainData.transactions },
+      0,
+      undefined,
+      first.nextOffset,
+    );
     expect(second).toEqual({
-      transactions: [{ ...transactions.get(id(501)), confirmations: undefined, blockHeight: 1 }],
+      transactions: [
+        {
+          ...transactions.get(id(501)),
+          status: {
+            kind: 'confirmed' as const,
+            blockHeight: 1,
+            observation: { source: 'electrum', observedAt: expect.any(String) },
+          },
+        },
+      ],
       truncated: false,
     });
     expect(requests.filter((r) => r.method === 'getrawtransaction')).toHaveLength(501);
@@ -75,7 +98,11 @@ describe('spending expansion', () => {
       [id(3), candidate(id(3), [{ txid: id(4), vout: 0 }])],
     ]);
     const requests = mockedRpc([rootId, id(1), id(2), id(3), id(1)], transactions);
-    const result = await loadSpending(root, workspace(), 0);
+    const result = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(result.transactions.map((t) => t.txid)).toEqual([id(1)]);
     expect(result.truncated).toBe(false);
     expect(requests[0]).toEqual({
@@ -91,11 +118,24 @@ describe('spending expansion', () => {
     const spender = candidate(id(1), [{ txid: rootId, vout: 1 }]);
     const requests = mockedRpc([rootId, id(1)], new Map());
     const w = workspace();
-    w.transactions[id(1)] = spender;
-    const result = await loadSpending(root, w, undefined);
-    expect(result.transactions).toEqual([{ ...spender, confirmations: undefined, blockHeight: 1 }]);
-    expect(w.transactions[id(1)]).toBe(spender);
-    expect(spender.blockHeight).toBeUndefined();
+    w.chainData.transactions[id(1)] = spender;
+    const result = await loadSpending(
+      root,
+      { network: w.network, transactions: w.chainData.transactions },
+      undefined,
+    );
+    expect(result.transactions).toEqual([
+      {
+        ...spender,
+        status: {
+          kind: 'confirmed' as const,
+          blockHeight: 1,
+          observation: { source: 'electrum', observedAt: expect.any(String) },
+        },
+      },
+    ]);
+    expect(w.chainData.transactions[id(1)]).toBe(spender);
+    expect(spender.status?.blockHeight).toBeUndefined();
     expect(requests.map((r) => r.params[0])).toEqual([scriptHash('51'), scriptHash('52')]);
   });
 
@@ -105,7 +145,13 @@ describe('spending expansion', () => {
       ...root,
       vout: [output(0), { n: 1, value: 1, scriptPubKey: {} }],
     };
-    await expect(loadSpending(partial, workspace(), undefined)).resolves.toEqual({
+    await expect(
+      loadSpending(
+        partial,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        undefined,
+      ),
+    ).resolves.toEqual({
       transactions: [],
       truncated: true,
     });
@@ -115,9 +161,15 @@ describe('spending expansion', () => {
     'rejects invalid continuation offset %s before making requests',
     async (offset) => {
       const requests = mockedRpc([], new Map());
-      await expect(loadSpending(root, workspace(), 0, undefined, offset)).rejects.toThrow(
-        'nonnegative safe integer',
-      );
+      await expect(
+        loadSpending(
+          root,
+          { network: workspace().network, transactions: workspace().chainData.transactions },
+          0,
+          undefined,
+          offset,
+        ),
+      ).rejects.toThrow('nonnegative safe integer');
       expect(requests).toHaveLength(0);
     },
   );

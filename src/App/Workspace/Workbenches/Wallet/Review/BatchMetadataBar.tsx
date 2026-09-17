@@ -7,8 +7,11 @@ import {
   EntityNoteEditor,
   MetadataPopover,
 } from '../../../../Controls/Metadata/MetadataEditors';
-import { applyBatchIcon, planBatchIcon } from '../../../Annotations/batchMetadata';
-import type { Workspace } from '../../../workspace';
+import {
+  applyBatchIcon,
+  planBatchIcon,
+} from '../../../../../Core/Workspace/Annotations/batchMetadata';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 
 export interface BatchMetadataBarProps {
   workspace: Workspace;
@@ -54,8 +57,10 @@ export function BatchMetadataBar({
     setOpen(undefined);
   }
   if (!active || !ids.length) return null;
-  const firstIcon = workspace.annotations[ids[0]]?.icon ?? '';
-  const mixedIcons = ids.some((id) => (workspace.annotations[id]?.icon ?? '') !== firstIcon);
+  const firstIcon = workspace.annotations.entities[ids[0]]?.icon ?? '';
+  const mixedIcons = ids.some(
+    (id) => (workspace.annotations.entities[id]?.icon ?? '') !== firstIcon,
+  );
   return (
     <div
       className={`batch-bar ${single ? 'single-metadata-bar' : 'batch-selection-bar'}`}

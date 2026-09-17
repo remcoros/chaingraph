@@ -29,28 +29,60 @@
     "unicorn/no-useless-fallback-in-spread": "error",
     "unicorn/no-useless-spread": "error",
     "unicorn/prefer-string-starts-ends-with": "error",
-    "import/no-cycle": "error"
+    "import/no-cycle": "error",
+    "eslint/no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+            "message": "Import the Persistence public index, never its private implementation files."
+          },
+          {
+            "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+            "message": "Import Formatting through its public index, not its implementation files."
+          },
+          {
+            "group": ["**/Domain/**"],
+            "message": "Domain has been removed. Import the actual Core or App owner."
+          }
+        ]
+      }
+    ]
   },
   "ignorePatterns": ["dist/**", "node_modules/**", "artifacts/**", "test-results/**", "public/**"],
   "overrides": [
     {
-      "files": ["src/Domain/**"],
+      "files": ["src/Core/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": ["**/App/**", "**/Infra/**"],
-                "message": "Domain holds shared contracts and pure logic. It must not depend on application capabilities, transport, storage or UI."
+                "group": ["react", "react/*", "react-dom", "react-dom/*", "**/App/**"],
+                "message": "Core production code is independent of React and App. App supplies UI and composition."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
         ]
-      }
+      },
+      "excludeFiles": ["src/Core/Workspace/Persistence/Integration/**"]
     },
     {
-      "files": ["src/App/Workspace/Persistence/**"],
+      "files": ["src/Core/Workspace/Persistence/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -62,17 +94,32 @@
                   "react/*",
                   "react-dom",
                   "react-dom/*",
+                  "**/App/**",
                   "**/Workbenches/**",
                   "**/Dialogs/**",
-                  "**/Store/WorkspaceStore",
-                  "**/Store/useWorkspaces"
+                  "**/Session/WorkspaceStore",
+                  "**/Session",
+                  "**/Session/**"
                 ],
-                "message": "Workspace persistence may depend on workspace models and its Store port, never React views, workbenches or the concrete session store."
+                "message": "Persistence consumes Core document contracts and its persistence port, never App or the concrete session runtime."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
         ]
-      }
+      },
+      "excludeFiles": ["src/Core/Workspace/Persistence/Integration/**"]
     },
     {
       "files": ["src/Infra/**"],
@@ -83,7 +130,19 @@
             "patterns": [
               {
                 "group": ["**/App/**"],
-                "message": "Infra carries transport and generic mechanisms. Depend on Domain only, never on application capabilities or UI."
+                "message": "Infra carries transport and generic mechanisms. It must not import App."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
@@ -100,6 +159,18 @@
               {
                 "group": ["**/Persistence/**", "**/Workbenches/**"],
                 "message": "The workspace session store depends on the persistence port and Workspace-owned concepts, never a persistence adapter or workbench implementation."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
@@ -120,6 +191,18 @@
               {
                 "group": ["**/Workbenches/Graph/**", "../Graph/**", "../../Graph/**"],
                 "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
@@ -140,6 +223,18 @@
               {
                 "group": ["**/Workbenches/Analysis/**", "../Analysis/**", "../../Analysis/**"],
                 "message": "Graph must not import Analysis workbench internals. Share a Workbenches-root contract instead."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
@@ -160,6 +255,18 @@
               {
                 "group": ["**/Workbenches/Graph/**", "../Graph/**", "../../Graph/**"],
                 "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
@@ -183,6 +290,18 @@
               {
                 "group": ["**/Workbenches/Graph/**", "../Graph/**", "../../Graph/**"],
                 "message": "Reach Graph through the GraphHandoff contract in Workbenches/workbenchHandoff.ts, not through its own modules."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }
@@ -190,11 +309,7 @@
       }
     },
     {
-      "files": [
-        "src/App/Workspace/Evidence/**",
-        "src/App/Workspace/Selection/**",
-        "src/App/Workspace/Wallet/WalletUtxos/**"
-      ],
+      "files": ["src/App/Workspace/Selection/**", "src/App/Workspace/Wallets/WalletUtxos/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -203,6 +318,163 @@
               {
                 "group": ["**/Workbenches/**", "../Workbenches/**"],
                 "message": "Workspace-scope code is shared by every workbench and must not depend on one of them."
+              },
+              {
+                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
+                "message": "Import the Persistence public index, never its private implementation files."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/Core/Workspace/Persistence/**"],
+      "excludeFiles": ["src/Core/Workspace/Persistence/Integration/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "react",
+                  "react/*",
+                  "react-dom",
+                  "react-dom/*",
+                  "**/App/**",
+                  "**/Session",
+                  "**/Session/**",
+                  "**/Integration/**"
+                ],
+                "message": "Persistence consumes canonical workspace data and private storage/codec mechanisms, never App, Session or test integrations."
+              },
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/Core/Workspace/Persistence/Integration/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
+                "message": "Import Formatting through its public index, not its implementation files."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/Core/Formatting/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "react",
+                  "react/*",
+                  "react-dom",
+                  "react-dom/*",
+                  "**/App/**",
+                  "**/Workspace/**",
+                  "**/Infra/**",
+                  "**/Domain/**"
+                ],
+                "message": "Formatting takes display values and has no UI, workspace, transport or Domain dependency."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/Core/Bitcoin/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "react",
+                  "react/*",
+                  "react-dom",
+                  "react-dom/*",
+                  "**/App/**",
+                  "**/Workspace/**",
+                  "**/Infra/**",
+                  "**/Domain/**",
+                  "**/ChainData",
+                  "**/ChainData/**",
+                  "**/Formatting",
+                  "**/Formatting/**"
+                ],
+                "message": "Bitcoin has no application, workspace, transport or React dependency."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/Core/ChainData/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "react",
+                  "react/*",
+                  "react-dom",
+                  "react-dom/*",
+                  "**/App/**",
+                  "**/Workspace/**",
+                  "**/Infra/**",
+                  "**/Domain/**"
+                ],
+                "message": "ChainData owns workspace-independent chain models and queries, without App, Workspace, Infra or React dependencies."
+              },
+              {
+                "group": ["**/Domain/**"],
+                "message": "Domain has been removed. Import the actual Core or App owner."
               }
             ]
           }

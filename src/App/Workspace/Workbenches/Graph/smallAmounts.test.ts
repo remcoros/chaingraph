@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { filterSmallAmounts, omitAmountOrphans } from './smallAmounts';
 import { filterGraph } from './Filters/graphFilters';
-import { createWorkspace } from '../../createWorkspace';
-import { parseWorkspace } from '../../Persistence/Format';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../../Core/Workspace/Persistence';
 import type { GraphData } from '../../GraphState/types';
 
 const graph: GraphData = {

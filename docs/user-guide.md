@@ -242,8 +242,9 @@ selector shows wallet matches, tags, both or neither; tag colors win when both
 are shown.
 
 **Undo** and **Redo** in the header keep up to 15 steps for the current session.
-Hover either for the next action. Loading new chain data clears the history so
-an undo can never discard downloaded transactions.
+Hover either for the next action. Chain refreshes preserve this history: Undo
+and Redo restore your edits while keeping accepted observations. Explicitly
+adding or removing a transaction remains undoable.
 
 ## Wallets
 
@@ -289,9 +290,18 @@ Six tabs share one list and detail panel: **To review**, **UTXOs**,
   losing it. Decisions are encrypted with the workspace and only reappear when
   the underlying observations change. **Finding types** filters by category with
   counts; selected types combine with OR.
-- **UTXOs** checks discovered addresses through your backend when opened,
-  including mempool activity, 100 addresses per action. The result carries its
-  check time and coverage and is not stored as a balance.
+- **UTXOs** checks discovered addresses through your backend when no saved check
+  is available, including mempool activity, 100 addresses per action. Successful
+  address observations are encrypted with the workspace, not stored as a separate
+  wallet balance. Reopening retains their dates and coverage; use **Refresh** to
+  check again or continue a partial check. The aggregate date is the oldest
+  contributing address check. A failed refresh keeps previous observations and
+  their original dates, and offers a retry.
+  If loaded data contains an exact spender for a saved UTXO, it is excluded from
+  current recommendations and the current candidate list. Its dated check and
+  any review decision remain saved as historical evidence. The coverage strip
+  reports the conflict; **Check UTXOs** requests a new observation. Neither an
+  old check nor a loaded historical spender establishes today's chain state.
 - **Transactions** lists known history, newest first, including entries whose
   details are not loaded yet. Selecting one loads it if needed.
 - **Addresses** lists derived receive and change addresses with their index and
@@ -342,8 +352,10 @@ Findings open in review-priority order with their tips, affected entities and
 supporting transactions linked individually. **Show on graph** selects the
 evidence; **Isolate** additionally filters the graph to it, with a removable
 chip. Both offer **Back to Analysis**. **Exclude** removes a finding's overlay
-until you restore it. New wallet or transaction evidence marks old findings
-stale. Findings never rewrite the observed graph, and annotations stay
+until you restore it. Changes to the inputs a finding depends on mark it
+stale. Another confirmation alone does not invalidate a structure-only finding;
+new input amounts can require a fee analysis to be rerun. Refreshing data is not
+the same as rerunning analysis. Findings never rewrite the observed graph, and annotations stay
 independent of them.
 
 ## Connection scans

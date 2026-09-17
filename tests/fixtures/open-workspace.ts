@@ -1,11 +1,12 @@
 import { expect, type Page } from '@playwright/test';
-import type { Workspace } from '../../src/App/Workspace/workspace';
-import { encryptWorkspace } from '../../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
+import type { Workspace } from '../../src/Core/Workspace/workspace';
+import { createWorkspacePersistence } from '../../src/Core/Workspace/Persistence';
 import { laboratoryWorkspace } from './laboratory';
 
 /** Seed encrypted public test data, then exercise the ordinary unlock flow. */
 export async function openFixtureWorkspace(page: Page, workspace: Workspace, password: string) {
-  const envelope = await encryptWorkspace(workspace, password);
+  const exported = await createWorkspacePersistence().exportFile(workspace, password);
+  const envelope: unknown = JSON.parse(exported.contents);
   await page.addInitScript(
     ({ id, name, envelope }) => {
       localStorage.setItem('chaingraph.tour.seen', '1');

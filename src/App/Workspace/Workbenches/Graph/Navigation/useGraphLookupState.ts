@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  addressNodeId,
-  outputNodeId,
-  txNodeId,
-} from '../../../../../Domain/Metadata/entityReferences';
-import { outputAddress } from '../../../../../Domain/Chain/prevouts';
+  addressReference,
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
+import { outputAddress } from '../../../../../Core/Bitcoin';
 import type { AppState } from '../../../../useAppState';
 
 export interface GraphLookupState {
@@ -31,23 +31,23 @@ export function useGraphLookupState(
   const focus = useCallback(() => inputRef.current?.focus(), []);
   const [resetToken, setResetToken] = useState(0);
   const [error, setError] = useState('');
-  const transactions = activeWorkspace?.transactions;
-  const watchedAddresses = activeWorkspace?.watchedAddresses;
-  const inputContext = activeWorkspace?.inputContext;
+  const transactions = activeWorkspace?.chainData.transactions;
+  const watchedAddresses = activeWorkspace?.chainData.watchedAddresses;
+  const inputContext = activeWorkspace?.view.inputContext;
   const loadedIds = useMemo(() => {
-    const ids = new Set((watchedAddresses ?? []).map(addressNodeId));
+    const ids = new Set((watchedAddresses ?? []).map(addressReference));
     for (const transaction of Object.values(transactions ?? {})) {
-      ids.add(txNodeId(transaction.txid));
+      ids.add(transactionReference(transaction.txid));
       for (const output of transaction.vout) {
-        ids.add(outputNodeId(transaction.txid, output.n));
+        ids.add(outpointReference(transaction.txid, output.n));
         const address = outputAddress(output);
-        if (address) ids.add(addressNodeId(address));
+        if (address) ids.add(addressReference(address));
       }
       for (const input of transaction.vin) {
         if (!input.txid || input.vout === undefined) continue;
-        if (!inputContext?.[transaction.txid]) ids.add(outputNodeId(input.txid, input.vout));
+        if (!inputContext?.[transaction.txid]) ids.add(outpointReference(input.txid, input.vout));
         const address = input.prevout && outputAddress({ ...input.prevout, n: input.vout });
-        if (address) ids.add(addressNodeId(address));
+        if (address) ids.add(addressReference(address));
       }
     }
     return ids;
@@ -63,9 +63,9 @@ export function useGraphLookupState(
       const match = /^([0-9a-f]{64})(?::(\d+))?$/i.exec(text);
       const id = match
         ? match[2] === undefined
-          ? txNodeId(match[1].toLowerCase())
-          : outputNodeId(match[1].toLowerCase(), Number(match[2]))
-        : addressNodeId(/^(bc1|tb1)/i.test(text) ? text.toLowerCase() : text);
+          ? transactionReference(match[1].toLowerCase())
+          : outpointReference(match[1].toLowerCase(), Number(match[2]))
+        : addressReference(/^(bc1|tb1)/i.test(text) ? text.toLowerCase() : text);
       return loadedIds.has(id) ? id : undefined;
     },
   };

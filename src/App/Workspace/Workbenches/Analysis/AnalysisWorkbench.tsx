@@ -16,32 +16,40 @@ import {
   TriangleAlert,
   Info,
 } from 'lucide-react';
-import { analysisTools } from '../../Analysis/analysis';
+import { analysisTools } from '../../../../Core/Workspace/Analysis/analysis';
 import {
   analysisScopeChoice,
   mergeScanFindings,
   scanAnalysis,
+  analysisInputFingerprint,
+  analysisScanMatches,
   scanDefaults,
   type AnalysisScan,
   type AnalysisScopeSelection,
   type AnalysisScopeWallet,
   type AnalysisScopeWorkspace,
-} from '../../Analysis/analysisScan';
+} from '../../../../Core/Workspace/Analysis/analysisScan';
 import type { AnalysisSession } from './analysisSession';
 import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
-import { addressNodeId, txNodeId } from '../../../../Domain/Metadata/entityReferences';
-import { sats } from '../../../../Domain/Chain/transaction';
-import type { AnalysisFinding } from '../../Analysis/analysisFinding';
+import {
+  addressReference,
+  transactionReference,
+} from '../../../../Core/Workspace/entityReferences';
+import type { AnalysisFinding } from '../../../../Core/Workspace/Analysis/finding';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+import { sats, outputAddress } from '../../../../Core/Bitcoin';
+
 import type { GraphNode } from '../../GraphState/types';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
-import { walletEvidenceChanged } from '../../Wallet/walletActivity';
-import { outputAddress } from '../../../../Domain/Chain/prevouts';
+
+import { invalidateFindings } from '../../../../Core/Workspace/Analysis/findingStaleness';
+
 import {
   indexPreviousOutputs,
   resolvePreviousOutput,
   type PreviousOutputIndex,
-} from '../../../../Domain/Chain/prevouts';
+} from '../../../../Core/ChainData';
+
 import { MultiSelectFilter } from '../../../Controls/MultiSelectFilter';
 import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import {
@@ -55,8 +63,9 @@ import {
   analysisDataGaps,
   recoverAnalysisData,
   recoveryLimits,
-} from '../../Analysis/analysisRecovery';
-import { useTransactionFetch } from '../../Evidence/Transactions';
+  publishRecoveredAnalysis,
+} from '../../../../Core/Workspace/Analysis/analysisRecovery';
+import { useTransactionFetch } from '../../Store/TransactionFetch';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';
 
@@ -116,14 +125,18 @@ function EvidenceReference({
   const reference = id.slice(id.indexOf(':') + 1);
   const resolution =
     prefix === 'out'
-      ? resolvePreviousOutput(workspace, { txid, vout: Number(index) }, prevouts)
+      ? resolvePreviousOutput(
+          { network: workspace.network, transactions: workspace.chainData.transactions },
+          { txid, vout: Number(index) },
+          prevouts,
+        )
       : undefined;
   const output =
     resolution?.status === 'loaded' || resolution?.status === 'attached'
       ? resolution.output
       : undefined;
   const address = output && outputAddress(output);
-  const label = workspace.annotations[id]?.label;
+  const label = workspace.annotations.entities[id]?.label;
   return (
     <li>
       <div className="scan-evidence-reference">
@@ -143,7 +156,10 @@ function EvidenceReference({
         )}
       </div>
       {prefix === 'tx' && (
-        <TransactionBlockTime transaction={workspace.transactions[txid]} workspace={workspace} />
+        <TransactionBlockTime
+          transaction={workspace.chainData.transactions[txid]}
+          workspace={workspace}
+        />
       )}
       {label && <span className="scan-evidence-label">{label}</span>}
       {address && (
@@ -151,7 +167,7 @@ function EvidenceReference({
           className="text-button scan-evidence-address"
           title={address}
           aria-label={`Show address ${address} on graph`}
-          onClick={() => onGraph([addressNodeId(address)])}
+          onClick={() => onGraph([addressReference(address)])}
         >
           <span>Address</span>
           <span className="mono">
@@ -196,9 +212,9 @@ function AnalysisWorkbenchView({
     () =>
       indexPreviousOutputs({
         network: workspace.network,
-        transactions: workspace.transactions,
+        transactions: workspace.chainData.transactions,
       }),
-    [workspace.network, workspace.transactions],
+    [workspace.network, workspace.chainData.transactions],
   );
   const pending = useRef<AbortController | undefined>(undefined);
   const latest = useRef(workspace);
@@ -221,20 +237,17 @@ function AnalysisWorkbenchView({
   const evidence = useRef({
     id: workspace.id,
     network: workspace.network,
-    transactions: workspace.transactions,
-    wallets: workspace.wallets,
+    transactions: workspace.chainData.transactions,
+    wallets: workspace.wallets.definitions,
   });
   useEffect(() => {
     const dataChanged =
-      evidence.current.id !== workspace.id ||
-      evidence.current.network !== workspace.network ||
-      evidence.current.transactions !== workspace.transactions ||
-      walletEvidenceChanged(evidence.current.wallets, workspace.wallets);
+      evidence.current.id !== workspace.id || evidence.current.network !== workspace.network;
     evidence.current = {
       id: workspace.id,
       network: workspace.network,
-      transactions: workspace.transactions,
-      wallets: workspace.wallets,
+      transactions: workspace.chainData.transactions,
+      wallets: workspace.wallets.definitions,
     };
     if (pending.current && (!active || dataChanged)) {
       pending.current.abort();
@@ -243,7 +256,13 @@ function AnalysisWorkbenchView({
       setRecovering(false);
       setNotice('Operation cancelled. Existing findings are retained. Retry when ready.');
     }
-  }, [active, workspace.id, workspace.network, workspace.transactions, workspace.wallets]);
+  }, [
+    active,
+    workspace.id,
+    workspace.network,
+    workspace.chainData.transactions,
+    workspace.wallets.definitions,
+  ]);
   useEffect(() => {
     if (active)
       cache?.set(workspace.id, {
@@ -276,10 +295,10 @@ function AnalysisWorkbenchView({
   const analysisScopeWorkspace = useMemo<AnalysisScopeWorkspace>(
     () => ({
       network: workspace.network,
-      transactions: workspace.transactions,
-      wallets: workspace.wallets,
+      chainData: { transactions: workspace.chainData.transactions },
+      wallets: { definitions: workspace.wallets.definitions },
     }),
-    [workspace.network, workspace.transactions, workspace.wallets],
+    [workspace.network, workspace.chainData.transactions, workspace.wallets.definitions],
   );
   const scopeSelectedId = selected?.id;
   const scopeSelectedKind = selected?.kind;
@@ -330,17 +349,17 @@ function AnalysisWorkbenchView({
   const selectionUnavailable = (mode === 'context' && !hasSelection) || walletUnavailable;
   const changed =
     scan &&
-    ((scan.evidenceTransactions !== undefined &&
-      scan.evidenceTransactions !== workspace.transactions) ||
+    (!analysisScanMatches(scan, workspace) ||
       scan.scope.kind !== scope.kind ||
       scan.scope.label !== scope.label ||
       JSON.stringify(scan.scope.txids) !== JSON.stringify(scope.txids) ||
       JSON.stringify(scan.options) !== JSON.stringify(options) ||
       scan.findings.some(
-        (finding) => workspace.findings.find((current) => current.id === finding.id)?.stale,
+        (finding) =>
+          workspace.analysis.findings.find((current) => current.id === finding.id)?.stale,
       ));
   const currentIds = scan ? new Set(scan.findings.map((finding) => finding.id)) : undefined;
-  const currentFindings = workspace.findings.filter(
+  const currentFindings = workspace.analysis.findings.filter(
     (finding) => !currentIds || currentIds.has(finding.id),
   );
   const filtered = filterAnalysisFindings(currentFindings, { types, priorities, kind });
@@ -445,21 +464,25 @@ function AnalysisWorkbenchView({
         controller.signal.aborted ||
         latest.current.id !== workspace.id ||
         latest.current.network !== workspace.network ||
-        latest.current.transactions !== workspace.transactions ||
-        walletEvidenceChanged(workspace.wallets, latest.current.wallets)
+        analysisInputFingerprint(latest.current, scope.txids) !==
+          analysisInputFingerprint(workspace, scope.txids)
       ) {
         finishRun();
         return;
       }
-      if (snapshot.transactions !== workspace.transactions) {
+      if (snapshot.chainData.transactions !== workspace.chainData.transactions) {
         onRecovered(workspace, {
           ...snapshot,
-          findings: mergeScanFindings(
-            latest.current.findings.map((finding) => ({ ...finding, stale: true })),
-            next,
-          ),
+          analysis: {
+            ...snapshot.analysis,
+            findings: mergeScanFindings(
+              invalidateFindings(workspace, { ...snapshot, analysis: latest.current.analysis })
+                .analysis.findings,
+              next,
+            ),
+          },
         });
-      } else onFindings(mergeScanFindings(latest.current.findings, next));
+      } else onFindings(mergeScanFindings(latest.current.analysis.findings, next));
       if (enriched?.remaining)
         setNotice(
           `${enriched.remaining} input details still unavailable.${enriched.timedOut ? ' Automatic loading timed out.' : ''}${enriched.conflicts ? ' Conflicting evidence retained.' : ''}`,
@@ -478,14 +501,17 @@ function AnalysisWorkbenchView({
   const scopeGaps = useMemo(
     () =>
       analysisDataGaps(
-        { network: workspace.network, transactions: workspace.transactions },
+        {
+          network: workspace.network,
+          chainData: { transactions: workspace.chainData.transactions },
+        },
         recoveryScope.txids,
         recoverScripts,
       ),
-    [workspace.network, workspace.transactions, recoveryScope, recoverScripts],
+    [workspace.network, workspace.chainData.transactions, recoveryScope, recoverScripts],
   );
   const detailTxids =
-    detail?.scopeTxids ?? detail?.txids.filter((id) => workspace.transactions[id]) ?? [];
+    detail?.scopeTxids ?? detail?.txids.filter((id) => workspace.chainData.transactions[id]) ?? [];
   const detailGaps = detail ? scopeGaps.filter((gap) => detailTxids.includes(gap.txid)) : [];
   async function recover(txids: string[]) {
     if (!active || pending.current) return;
@@ -522,19 +548,25 @@ function AnalysisWorkbenchView({
         controller.signal.aborted ||
         latest.current.id !== workspace.id ||
         latest.current.network !== workspace.network ||
-        latest.current.transactions !== workspace.transactions ||
-        walletEvidenceChanged(workspace.wallets, latest.current.wallets)
+        analysisInputFingerprint(latest.current, recoveryScope.txids) !==
+          analysisInputFingerprint(workspace, recoveryScope.txids)
       ) {
         finishRecovery();
         return;
       }
       const merged = mergeScanFindings(
-        result.workspace.transactions === workspace.transactions
-          ? latest.current.findings
-          : latest.current.findings.map((finding) => ({ ...finding, stale: true })),
+        result.workspace.chainData.transactions === workspace.chainData.transactions
+          ? latest.current.analysis.findings
+          : invalidateFindings(workspace, {
+              ...result.workspace,
+              analysis: latest.current.analysis,
+            }).analysis.findings,
         next,
       );
-      onRecovered(workspace, { ...result.workspace, findings: merged });
+      onRecovered(workspace, {
+        ...result.workspace,
+        analysis: { ...result.workspace.analysis, findings: merged },
+      });
       setScan(next);
       setNotice(
         `${result.resolved} input details resolved. ${result.remaining ? `${result.remaining} still unavailable. ${result.budgetReached ? 'Request limit reached. Retry for more.' : 'Retry when node data is available.'}` : 'Findings current.'} ${result.conflicts ? 'Conflicting observations were rejected; existing evidence retained. ' : ''}Reran the last scope with its scan settings.`,
@@ -570,7 +602,7 @@ function AnalysisWorkbenchView({
                   <option value="context" disabled={!hasSelection}>
                     {selectionLabel}
                   </option>
-                  {workspace.wallets.map((item) => (
+                  {workspace.wallets.definitions.map((item) => (
                     <option key={item.id} value={`wallet:${item.id}`}>
                       Wallet: {item.name}
                     </option>
@@ -619,7 +651,7 @@ function AnalysisWorkbenchView({
             >
               <SlidersHorizontal size={14} /> Options
             </button>
-            {workspace.findings.length > 0 && (
+            {workspace.analysis.findings.length > 0 && (
               <button
                 className="text-button scan-clear"
                 disabled={busy}
@@ -912,7 +944,7 @@ function AnalysisWorkbenchView({
             <option value="hypothesis">Hypotheses</option>
             <option value="incomplete">Incomplete data</option>
           </select>
-          {(scan || workspace.findings.length > 0) && (
+          {(scan || workspace.analysis.findings.length > 0) && (
             <span className="muted">
               {findings.length} result{findings.length === 1 ? '' : 's'}
             </span>
@@ -1011,7 +1043,7 @@ function AnalysisWorkbenchView({
                   <button
                     onClick={() =>
                       onFindings(
-                        workspace.findings.map((finding) =>
+                        workspace.analysis.findings.map((finding) =>
                           finding.id === detail.id
                             ? { ...finding, excluded: !finding.excluded }
                             : finding,
@@ -1032,17 +1064,17 @@ function AnalysisWorkbenchView({
                   <>
                     <h3>Related transactions and outputs</h3>
                     <ul className="scan-evidence" aria-label="Related transactions and outputs">
-                      {[...new Set([...detail.nodeIds, ...detail.txids.map(txNodeId)])].map(
-                        (id) => (
-                          <EvidenceReference
-                            key={id}
-                            id={id}
-                            workspace={workspace}
-                            onGraph={showGraph}
-                            prevouts={prevouts}
-                          />
-                        ),
-                      )}
+                      {[
+                        ...new Set([...detail.nodeIds, ...detail.txids.map(transactionReference)]),
+                      ].map((id) => (
+                        <EvidenceReference
+                          key={id}
+                          id={id}
+                          workspace={workspace}
+                          onGraph={showGraph}
+                          prevouts={prevouts}
+                        />
+                      ))}
                     </ul>
                   </>
                 )}
@@ -1123,7 +1155,9 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
         active={workbench === 'analysis' && !lockingWorkspace && !tour.step}
         selected={selected}
         wallet={wallet}
-        onFindings={(findings) => edit((current) => ({ ...current, findings }))}
+        onFindings={(findings) =>
+          edit((current) => ({ ...current, analysis: { ...current.analysis, findings: findings } }))
+        }
         onRecovered={(before, next) => {
           if (
             activeWorkspaceRef.current?.id !== before.id ||
@@ -1131,15 +1165,9 @@ export function AnalysisWorkbench({ workspace }: { workspace: WorkspaceControlle
             lockingWorkspace
           )
             return;
-          let applied = false;
           edit((current) => {
-            if (current.transactions !== before.transactions) return current;
-            applied = true;
-            return { ...current, transactions: next.transactions };
+            return publishRecoveredAnalysis(before, next, current);
           });
-          // Evidence writes mark old findings stale. Install the rerun in the
-          // same synchronous action, retaining the single data-enrichment Undo.
-          if (applied) edit((current) => ({ ...current, findings: next.findings }), false);
         }}
         onGraph={showFindingOnGraph}
       />

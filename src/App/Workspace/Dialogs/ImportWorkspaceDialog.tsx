@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react';
-import type { Workspace } from '../workspace';
-import { decryptWorkspaceOffThread, WorkspaceOperationError } from '../Persistence/Encryption';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+import { WorkspacePersistenceError } from '../../../Core/Workspace/Persistence';
+import { appServices } from '../../appServices';
 import { Modal } from '../../Dialogs/Modal';
 import { focusDialogField, PasswordControls, PasswordField } from './PasswordControls';
 import { useWorkspaceRead } from './useWorkspaceRead';
@@ -38,14 +39,14 @@ export function ImportWorkspaceDialog({
           setBusy(true);
           const signal = read.start();
           try {
-            const data = await decryptWorkspaceOffThread(file, password, signal);
+            const data = await appServices.persistence.readFile(file, password, signal);
             signal.throwIfAborted();
             onImport(data, password);
             onClose();
           } catch (error) {
             if (signal.aborted) return;
             setError(
-              error instanceof WorkspaceOperationError
+              error instanceof WorkspacePersistenceError
                 ? error.message
                 : 'Could not open this workspace. Check the password and file format.',
             );

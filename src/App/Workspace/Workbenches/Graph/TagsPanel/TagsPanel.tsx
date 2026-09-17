@@ -1,11 +1,17 @@
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Minus, Network, Plus, Tag, Trash2, X } from 'lucide-react';
-import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import { addressReference, canonicalAddress } from '../../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import {
+  type WorkspaceTag,
+  MAX_TAG_MEMBERS,
+  MAX_WORKSPACE_TAGS,
+} from '../../../../../Core/Workspace/Annotations/annotations';
 import type { GraphData, GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../workspace';
-import type { WorkspaceTag } from '../../../Annotations/workspaceTags';
-import { listTagsForNode, tagNodeIds, tagsFromLabels } from '../../../Annotations/tagProjection';
-import { MAX_TAG_MEMBERS, MAX_WORKSPACE_TAGS } from '../../../Annotations/workspaceTags';
+
+import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
+import { tagNodeIds, tagsFromLabels } from '../../../Annotations/tagProjection';
+
 import {
   BatchTagEditor,
   ColorPicker,
@@ -13,8 +19,8 @@ import {
 } from '../../../../Controls/Metadata/MetadataEditors';
 import { DEFAULT_TAG_COLOR } from '../../../../Controls/Metadata/tagColors';
 import './tags.css';
-import { applyBatchTag } from '../../../Annotations/batchMetadata';
-import { canonicalAddress } from '../../../../../Domain/Metadata/entityReferences';
+import { applyBatchTag } from '../../../../../Core/Workspace/Annotations/batchMetadata';
+
 import { Modal } from '../../../../Dialogs';
 import { useDialogFocus } from '../../../../Controls/useDialogFocus';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
@@ -221,7 +227,7 @@ export function SelectedTags({
                 aria-label={`Remove ${tag.name} from selection`}
                 onClick={(event) => {
                   const addressId = selected.address
-                    ? addressNodeId(canonicalAddress(selected.address))
+                    ? addressReference(canonicalAddress(selected.address))
                     : undefined;
                   if (
                     selected.kind !== 'transaction' &&
@@ -262,7 +268,7 @@ export function SelectedTags({
             tag={removal.tag}
             onClose={() => setRemoval(null)}
             onRemove={() => {
-              const ids = [selected.id, addressNodeId(canonicalAddress(selected.address!))];
+              const ids = [selected.id, addressReference(canonicalAddress(selected.address!))];
               onChange((current) => applyBatchTag(current, ids, removal.tag.id, false));
               trigger.current?.focus();
               setRemoval(null);
@@ -328,7 +334,7 @@ function TagAssignmentPicker({
   const [scope, setScope] = useState<'node' | 'address'>('node');
   const effective = listTagsForNode(workspace, selected);
   const target =
-    scope === 'address' && selected.address ? addressNodeId(selected.address) : selected.id;
+    scope === 'address' && selected.address ? addressReference(selected.address) : selected.id;
   return (
     <MetadataPopover anchor={anchor} compact onClose={onClose}>
       <BatchTagEditor
@@ -342,7 +348,7 @@ function TagAssignmentPicker({
           const viaAddress =
             selected.kind === 'output' &&
             selected.address &&
-            tag.nodeIds.includes(addressNodeId(selected.address));
+            tag.nodeIds.includes(addressReference(selected.address));
           const viaOutput = selected.kind === 'output' && tag.nodeIds.includes(selected.id);
           return scope === 'node' && viaAddress ? (
             <small>Applied to address too</small>
@@ -429,17 +435,17 @@ function TagMembers({
                     className="text-button"
                     disabled={!loadedIds.has(id)}
                     title={id}
-                    aria-label={`Inspect ${workspace.annotations[id]?.label || id}`}
+                    aria-label={`Inspect ${workspace.annotations.entities[id]?.label || id}`}
                     onClick={() => onSelect(id)}
                   >
-                    {workspace.annotations[id]?.label || (
+                    {workspace.annotations.entities[id]?.label || (
                       <code>
                         <ResponsiveIdentifier value={id} />
                       </code>
                     )}
                   </button>
                   <small>
-                    {workspace.annotations[id]?.label && (
+                    {workspace.annotations.entities[id]?.label && (
                       <>
                         <code title={id}>
                           <ResponsiveIdentifier value={id} />
@@ -546,7 +552,7 @@ export default function TagsPanel({
       returnFocus.current = null;
     }
   }, [editing, creating]);
-  const tags = workspace.tags ?? [];
+  const tags = workspace.annotations.tags ?? [];
   const visibleTags = tags.filter(
     (tag) =>
       tag.id === editing ||
@@ -582,9 +588,17 @@ export default function TagsPanel({
       return;
     onChange((current) => ({
       ...current,
-      tags: id
-        ? (current.tags ?? []).map((tag) => (tag.id === id ? { ...tag, ...value } : tag))
-        : [...(current.tags ?? []), { ...value, id: crypto.randomUUID(), nodeIds: targetIds }],
+      annotations: {
+        ...current.annotations,
+        tags: id
+          ? (current.annotations.tags ?? []).map((tag) =>
+              tag.id === id ? { ...tag, ...value } : tag,
+            )
+          : [
+              ...(current.annotations.tags ?? []),
+              { ...value, id: crypto.randomUUID(), nodeIds: targetIds },
+            ],
+      },
     }));
     if (!id) setQuery('');
   };
@@ -666,7 +680,10 @@ export default function TagsPanel({
               }
               onChange((current) => ({
                 ...current,
-                tags: [...(current.tags ?? []), ...proposals],
+                annotations: {
+                  ...current.annotations,
+                  tags: [...(current.annotations.tags ?? []), ...proposals],
+                },
               }));
               setImportStatus(
                 `Created ${proposals.length} ${proposals.length === 1 ? 'tag' : 'tags'}.`,
@@ -846,7 +863,10 @@ export default function TagsPanel({
               onClick={() => {
                 onChange((current) => ({
                   ...current,
-                  tags: (current.tags ?? []).filter((tag) => tag.id !== deletion.id),
+                  annotations: {
+                    ...current.annotations,
+                    tags: (current.annotations.tags ?? []).filter((tag) => tag.id !== deletion.id),
+                  },
                 }));
                 setDeleting(undefined);
                 setEditing(undefined);

@@ -34,9 +34,11 @@ import type {
 } from './adapter';
 import {
   GRAPH_SNAPSHOT_NODE_LIMIT,
-  graphSnapshotSchema,
+  validateGraphCamera,
+  validateGraphPositions,
+  validateGraphSnapshot,
   type GraphSnapshot,
-} from '../../../GraphState/graphSnapshot';
+} from '../../../../../Core/Workspace/view';
 
 // One draw call for all halos; the ordinary node meshes retain graph picking.
 function makeHalos() {
@@ -158,14 +160,14 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       z: round(value.z),
     });
     const controls = graph.controls() as { target: Vector3 };
-    const camera = graphSnapshotSchema.shape.camera.safeParse({
+    const camera = validateGraphCamera({
       position: point(graph.cameraPosition()),
       target: point(controls.target),
       up: point(graph.camera().up),
     });
     if (!camera.success) return;
     if (positionsDirty || !cachedPositions) {
-      const positions = graphSnapshotSchema.shape.nodes.safeParse(
+      const positions = validateGraphPositions(
         data
           .map((node) => ({
             id: node.id,
@@ -688,7 +690,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     flushSnapshot,
     restoreSnapshot(snapshot) {
       if (dead) return;
-      const parsed = graphSnapshotSchema.safeParse(snapshot);
+      const parsed = validateGraphSnapshot(snapshot);
       if (!parsed.success) return;
       initialSnapshot = parsed.data;
       lastFraming = undefined;

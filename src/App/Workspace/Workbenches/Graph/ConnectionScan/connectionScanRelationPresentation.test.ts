@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCAN_SETTINGS, type ScanResult, type ScanRun } from './connectionScan';
+import { DEFAULT_SCAN_SETTINGS } from '../../../../../Core/Workspace/ConnectionScan/connectionScan';
+import type {
+  ScanResult,
+  ScanRun,
+} from '../../../../../Core/Workspace/ConnectionScan/connectionScans';
 import { presentScanRun, scanRelationPresentation } from './connectionScanPresentation';
 
 const tx = (n: number) => `tx:${n.toString(16).padStart(64, '0')}`;

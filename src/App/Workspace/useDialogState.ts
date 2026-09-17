@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Wallet } from '../../Domain/Wallet/walletTypes';
+import type { Wallet } from '../../Core/Workspace/Wallets/wallets';
 import type { AppState } from '../useAppState';
 
 /** Which workspace dialog is open, and the target a wallet rename applies to. */
@@ -26,7 +26,7 @@ export function useDialogState(w: AppState['activeWorkspace']): WorkspaceDialogS
   const [renameTarget, setRenameTarget] = useState<{ workspaceId: string; walletId: string }>();
   const editingWallet =
     w?.id === renameTarget?.workspaceId
-      ? w?.wallets.find((item) => item.id === renameTarget?.walletId)
+      ? w?.wallets.definitions.find((item) => item.id === renameTarget?.walletId)
       : undefined;
   return {
     settingsOpen,

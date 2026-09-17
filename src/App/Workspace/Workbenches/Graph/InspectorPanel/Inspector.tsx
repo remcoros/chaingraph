@@ -1,9 +1,9 @@
 import { Amount } from '../../../../Controls/Display/Amount';
-import { listWalletAddresses } from '../../../Wallet/walletRecords';
+import { listWalletAddresses } from '../../../../../Core/Workspace/Wallets/walletRecords';
 import {
   matchingWalletUtxoObservation,
   type WalletUtxoObservation,
-} from '../../../Wallet/WalletUtxos/walletUtxoObservation';
+} from '../../../../../Core/Workspace/Wallets/WalletUtxos/walletUtxoObservation';
 import { useUtxoStatus } from './useUtxoStatus';
 import './utxo-status.css';
 import {
@@ -24,28 +24,31 @@ import {
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
-import { short } from '../../../../Controls/Display/referenceFormat';
-import { txNodeId, addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { AddressBalanceObservation } from '../../../../../Domain/Chain/observations';
-import type { Annotation } from '../../../Annotations/annotation';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../workspace';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import { short } from '../../../../../Core/Formatting';
+import {
+  transactionReference,
+  addressReference,
+} from '../../../../../Core/Workspace/entityReferences';
+import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import type { AddressBalanceObservation, Transaction } from '../../../../../Core/ChainData';
+
 import type { GraphNode, GraphData } from '../../../GraphState/types';
 import { addressBalanceSats } from '../Address/addressHistory';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
-import { equalOutputCount } from '../../../Analysis/analysis';
-import { outputAddress } from '../../../../../Domain/Chain/prevouts';
-import { walletCheckAge } from '../../../Wallet/walletActivity';
+import { equalOutputCount } from '../../../../../Core/Workspace/Analysis/analysis';
+import { outputAddress } from '../../../../../Core/Bitcoin';
+import { walletCheckAge } from '../../../../../Core/Workspace/Wallets/walletActivity';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { VisibilityActions, type VisibilityProps } from '../../../Selection/VisibilityActions';
-import { emptyAnnotation } from '../../../Annotations/emptyAnnotation';
+import { emptyAnnotation } from '../../../../../Core/Workspace/Annotations/emptyAnnotation';
 import { ScriptInspector } from './ScriptInspector';
 import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { decodeOpReturn } from '../../../../Controls/Display/opReturn';
 import { indexLoadedSpends } from '../TransactionFlow/transactionFlow';
-import type { WalletMatch } from '../../../Annotations/tagProjection';
+import type { WalletMatch } from '../../../../../Core/Workspace/Wallets/walletMatches';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 
@@ -427,14 +430,14 @@ export function NodeInspector({
 }: NodeInspectorProps) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const loadedSpends = useMemo(
-    () => indexLoadedSpends(activeWorkspace.transactions),
-    [activeWorkspace.transactions],
+    () => indexLoadedSpends(activeWorkspace.chainData.transactions),
+    [activeWorkspace.chainData.transactions],
   );
   const spendingByNode = useMemo(() => {
     const creatingNodes = new Map(
       graph.nodes
         .filter((node) => node.kind === 'output' && node.txid)
-        .map((node) => [node.id, txNodeId(node.txid!)]),
+        .map((node) => [node.id, transactionReference(node.txid!)]),
     );
     const index = new Map<string, Set<string>>();
     // Retain the graph's exact scope and link order for transaction-level navigation.
@@ -452,9 +455,9 @@ export function NodeInspector({
   const spendingNodes = useMemo(
     () =>
       [...(spendingByNode.get(selected.id) ?? [])].filter(
-        (id) => id.startsWith('tx:') && !!activeWorkspace.transactions[id.slice(3)],
+        (id) => id.startsWith('tx:') && !!activeWorkspace.chainData.transactions[id.slice(3)],
       ),
-    [spendingByNode, selected.id, activeWorkspace.transactions],
+    [spendingByNode, selected.id, activeWorkspace.chainData.transactions],
   );
   const selectedHidden = hiddenNodeIds.includes(selected.id);
   const selectedNotOnGraph = graphNodeIds !== undefined && !graphNodeIds.includes(selected.id);
@@ -520,7 +523,7 @@ export function NodeInspector({
   const traceReasons = [...new Set([previousReason, spendingReason].filter(Boolean) as string[])];
   const cautions: string[] = [];
   if (tx) {
-    if ((tx.confirmations ?? 0) < 0) cautions.push('Conflicted at fetch');
+    if ((tx.status?.confirmations ?? 0) < 0) cautions.push('Conflicted at fetch');
     const equal = equalOutputCount(tx);
     if (equal >= 3) cautions.push(`${equal} equal outputs, inspect carefully`);
   }
@@ -620,8 +623,8 @@ export function NodeInspector({
             )}
           </div>
         )}
-        {activeWorkspace.annotations[selected.id]?.label && (
-          <h2>{activeWorkspace.annotations[selected.id].label}</h2>
+        {activeWorkspace.annotations.entities[selected.id]?.label && (
+          <h2>{activeWorkspace.annotations.entities[selected.id].label}</h2>
         )}
         <dl className="selection-facts">
           <div>
@@ -662,7 +665,7 @@ export function NodeInspector({
                   title={previousReason || `Open creating transaction: ${selected.txid}`}
                   aria-label={`Open creating transaction: ${selected.txid}`}
                   onClick={() => {
-                    if (tx && onSelectNode) onSelectNode(txNodeId(tx.txid));
+                    if (tx && onSelectNode) onSelectNode(transactionReference(tx.txid));
                     else onExpand('funding');
                   }}
                 >
@@ -686,7 +689,7 @@ export function NodeInspector({
                       disabled={!onSelectNode}
                       title={`Add and select address: ${address}`}
                       aria-label={`Add and select address: ${address}`}
-                      onClick={() => onSelectNode?.(addressNodeId(address))}
+                      onClick={() => onSelectNode?.(addressReference(address))}
                     >
                       <code>
                         <ResponsiveIdentifier value={address} preferFull />
@@ -816,7 +819,7 @@ export function NodeInspector({
       </div>
       <AnnotationEditor
         key={annotationKey}
-        annotation={activeWorkspace.annotations[selected.id] ?? emptyAnnotation}
+        annotation={activeWorkspace.annotations.entities[selected.id] ?? emptyAnnotation}
         editToken={editToken}
         editTarget={editTarget}
         onEditHandled={onEditHandled}
@@ -839,7 +842,7 @@ export function NodeInspector({
               ? 'Matching input or output'
               : 'Address/script match'}
           </span>
-          {activeWorkspace.wallets
+          {activeWorkspace.wallets.definitions
             .filter((wallet) => walletMatch.walletIds.includes(wallet.id))
             .map((wallet) => (
               <button
@@ -926,8 +929,8 @@ export function NodeInspector({
                 <div>
                   <dt>State at fetch</dt>
                   <dd title={transactionStatus(tx).title}>
-                    {tx.confirmations && tx.confirmations > 0
-                      ? `${tx.confirmations} confirmations`
+                    {tx.status?.confirmations && tx.status?.confirmations > 0
+                      ? `${tx.status?.confirmations} confirmations`
                       : transactionStatus(tx).label}
                   </dd>
                 </div>

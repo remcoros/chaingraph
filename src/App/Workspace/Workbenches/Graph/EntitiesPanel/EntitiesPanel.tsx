@@ -1,5 +1,5 @@
 import TagsPanel from '../TagsPanel';
-import type { GraphFilters } from '../../../GraphState/filters';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
 import { EntitiesPanelDetail } from './EntitiesPanelDetail';
 import type { WorkspaceController } from '../../../useWorkspace';
 
@@ -64,7 +64,7 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
   return (
     <EntitiesPanelDetail
       activeWorkspace={activeWorkspace}
-      transactions={activeWorkspace.transactions}
+      transactions={activeWorkspace.chainData.transactions}
       removableNodeIds={entityRemoval.removableNodeIds}
       onRemoveNode={entityRemoval.request}
       selection={connectionScanTargets.picking ? undefined : selection}

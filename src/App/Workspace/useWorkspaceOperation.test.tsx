@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { useWorkspaceOperation } from './useWorkspaceOperation';
-import { createWorkspace } from './createWorkspace';
+import { createWorkspace } from '../../Core/Workspace/createWorkspace';
 import type { WorkspaceCore } from './workspaceCore';
 
 afterEach(cleanup);

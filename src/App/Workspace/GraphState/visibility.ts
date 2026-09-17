@@ -1,26 +1,12 @@
-import { z } from 'zod';
-import { canonicalEntityNodeId } from '../../../Domain/Metadata/entityReferences';
-import type { Network } from '../../../Domain/Chain/network';
-import { outputNodeId } from '../../../Domain/Metadata/entityReferences';
-import type { Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../workspace';
+import { MAX_HIDDEN_NODES, assertHiddenNodeBudget } from '../../../Core/Workspace/view';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+import {
+  canonicalEntityReference,
+  outpointReference,
+} from '../../../Core/Workspace/entityReferences';
 
-export const MAX_HIDDEN_NODES = 50_000;
-export const hiddenNodeIdsSchema = z.array(z.string().max(200)).max(MAX_HIDDEN_NODES);
+import type { Transaction } from '../../../Core/ChainData';
 
-export function assertHiddenNodeBudget(value: unknown): void {
-  if (Array.isArray(value) && value.length > MAX_HIDDEN_NODES)
-    throw new Error('Workspace exceeds the 50,000 hidden entity limit.');
-}
-
-export function parseHiddenNodeIds(value: unknown, network: Network): string[] {
-  assertHiddenNodeBudget(value);
-  return [
-    ...new Set(hiddenNodeIdsSchema.parse(value).map((id) => canonicalEntityNodeId(id, network))),
-  ];
-}
-
-/** Hide exactly these entities. This never edits transaction observations or linked entities. */
 export function setNodesHidden(
   workspace: Workspace,
   nodeIds: Iterable<string>,
@@ -34,7 +20,7 @@ export function setNodesHidden(
   for (const value of nodeIds) {
     if (++supplied > MAX_HIDDEN_NODES)
       throw new Error('A visibility action supports at most 50,000 entity references.');
-    const id = canonicalEntityNodeId(value, workspace.network);
+    const id = canonicalEntityReference(value, workspace.network);
     if (hidden && !ids.has(id)) {
       ids.add(id);
       changed = true;
@@ -62,12 +48,12 @@ export function showAllNodes(workspace: Workspace): Workspace {
 /** Inputs refer to previous output entities. Coinbase has no previous output to hide. */
 export function transactionNodeIds(transaction: Transaction, side: 'inputs' | 'outputs'): string[] {
   return side === 'outputs'
-    ? transaction.vout.map((output) => outputNodeId(transaction.txid, output.n))
+    ? transaction.vout.map((output) => outpointReference(transaction.txid, output.n))
     : [
         ...new Set(
           transaction.vin.flatMap((input) =>
             input.coinbase === undefined && input.txid !== undefined && input.vout !== undefined
-              ? [outputNodeId(input.txid, input.vout)]
+              ? [outpointReference(input.txid, input.vout)]
               : [],
           ),
         ),

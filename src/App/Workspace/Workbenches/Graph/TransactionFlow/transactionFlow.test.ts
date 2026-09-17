@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { indexLoadedSpends, selectedFlowLeg } from './transactionFlow';
-import { outputNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import { outpointReference } from '../../../../../Core/Workspace/entityReferences';
+import type { Transaction } from '../../../../../Core/ChainData';
 
 const creator: Transaction = {
   txid: 'a'.repeat(64),
@@ -16,20 +16,20 @@ const spender: Transaction = {
 
 describe('transaction flow relationships', () => {
   it('follows the exact output backwards and forwards without conflating sibling outputs', () => {
-    const id = outputNodeId(creator.txid, 1);
+    const id = outpointReference(creator.txid, 1);
     expect(selectedFlowLeg(creator, id)).toEqual({ direction: 'next', index: 1 });
     expect(selectedFlowLeg(spender, id)).toEqual({ direction: 'previous', index: 0 });
-    expect(selectedFlowLeg(spender, outputNodeId(creator.txid, 0))).toBeUndefined();
+    expect(selectedFlowLeg(spender, outpointReference(creator.txid, 0))).toBeUndefined();
     const index = indexLoadedSpends({ creator, spender });
     expect(index.get(id)).toEqual([spender]);
-    expect(index.has(outputNodeId(creator.txid, 0))).toBe(false);
+    expect(index.has(outpointReference(creator.txid, 0))).toBe(false);
   });
 
   it('keeps competing loaded spends, ignores coinbase and deduplicates an invalid repeated input', () => {
     const alternative = { ...spender, txid: 'c'.repeat(64), vin: [...spender.vin, ...spender.vin] };
     const index = indexLoadedSpends({ creator, spender, alternative });
     expect(index.size).toBe(1);
-    expect(index.get(outputNodeId(creator.txid, 1))).toEqual([spender, alternative]);
+    expect(index.get(outpointReference(creator.txid, 1))).toEqual([spender, alternative]);
     expect(indexLoadedSpends({ creator }).size).toBe(0);
     expect(selectedFlowLeg(creator)).toBeUndefined();
   });

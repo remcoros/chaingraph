@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../../../../Controls/Display/amountFormat';
+import { formatBitcoinAmount } from '../../../../../Core/Formatting';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -11,14 +11,15 @@ import {
   TriangleAlert,
   FileCode,
 } from 'lucide-react';
-import type { Annotation } from '../../../Annotations/annotation';
+import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../workspace';
-import { listTagsForNode } from '../../../Annotations/tagProjection';
+
+import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from './walletFlowVisibility';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
-import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
+import { isOpReturn } from '../../../../../Core/Bitcoin';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
@@ -67,7 +68,7 @@ export function WalletReviewFlow({
     );
   const editingTransaction = editingId === context.transactionNodeId;
   const transactionAnnotation = context.transactionNodeId
-    ? workspace.annotations[context.transactionNodeId]
+    ? workspace.annotations.entities[context.transactionNodeId]
     : undefined;
   return (
     <figure className="wallet-review-flow" aria-label="Wallet transaction flow">
@@ -283,14 +284,16 @@ function FlowColumn({
       )}
       <div className="wallet-flow-entries" ref={list}>
         {visible.map((entry, index) => {
-          const annotation = workspace.annotations[entry.id];
+          const annotation = workspace.annotations.entities[entry.id];
           const addressId = entry.address ? `addr:${entry.address}` : undefined;
-          const addressAnnotation = addressId ? workspace.annotations[addressId] : undefined;
+          const addressAnnotation = addressId
+            ? workspace.annotations.entities[addressId]
+            : undefined;
           const addressPrimary = !!editingAddress && entry.address === editingAddress;
           const primaryAnnotation = addressPrimary ? addressAnnotation : annotation;
           const creatingId = entry.txid ?? /^out:([0-9a-f]{64}):/.exec(entry.id)?.[1];
           const creatingAnnotation = creatingId
-            ? workspace.annotations[`tx:${creatingId}`]
+            ? workspace.annotations.entities[`tx:${creatingId}`]
             : undefined;
           const opReturn = isOpReturn(entry.scriptPubKey?.hex);
           const scriptOutput = !entry.address && !entry.missing && !!entry.scriptPubKey;

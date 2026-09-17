@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { createWorkspace } from '../../createWorkspace';
-import { deriveAddresses } from '../../../../Domain/Wallet/wallet';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { deriveAddresses } from '../../../../Core/Workspace/Wallets/walletDerivation';
+import { addressReference, outpointReference } from '../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import {
   buildWalletRecordRows,
   matchesWalletStatus,
@@ -13,13 +15,12 @@ import {
   resolveWalletRow,
   reviewRow,
   walletSelectAll,
+  type WalletRow,
 } from './walletRows';
 import { PUBLIC_ZPUB } from '../../../../../tests/fixtures/bitcoin';
-import { addressNodeId, outputNodeId } from '../../../../Domain/Metadata/entityReferences';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { WalletRow } from './walletRows';
-import { buildWalletReview } from '../../Wallet/walletReview';
-import { groupWalletRelationships } from '../../Wallet/walletRelationships';
+
+import { buildWalletReview } from '../../../../Core/Workspace/Wallets/walletReview';
+import { groupWalletRelationships } from '../../../../Core/Workspace/Wallets/walletRelationships';
 import { matchRelatedEntities } from './walletRelatedSelection';
 
 const A = 'a'.repeat(64),
@@ -45,8 +46,8 @@ function fixture() {
   const script = (index: number) => ({
     hex: bytesToHex(bitcoinAddress.toOutputScript(addresses[index].address)),
   });
-  workspace.wallets = [wallet];
-  workspace.transactions = {
+  workspace.wallets.definitions = [wallet];
+  workspace.chainData.transactions = {
     [A]: {
       txid: A,
       vin: [{ txid: '9'.repeat(64), vout: 0 }],
@@ -71,7 +72,7 @@ describe('shared Wallet rows', () => {
     const { workspace, wallet, addresses } = fixture();
     const counterparty = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 2, 1)[0].address;
     const parent = 'd'.repeat(64);
-    workspace.transactions[parent] = {
+    workspace.chainData.transactions[parent] = {
       txid: parent,
       vin: [{ coinbase: '00' }],
       vout: [
@@ -82,8 +83,8 @@ describe('shared Wallet rows', () => {
         },
       ],
     };
-    workspace.transactions[B].vin.push({ txid: parent, vout: 0 });
-    workspace.transactions[B].vout.push({
+    workspace.chainData.transactions[B].vin.push({ txid: parent, vout: 0 });
+    workspace.chainData.transactions[B].vout.push({
       n: 1,
       value: 0.05,
       scriptPubKey: { hex: bytesToHex(bitcoinAddress.toOutputScript(counterparty)) },
@@ -94,11 +95,11 @@ describe('shared Wallet rows', () => {
       groups,
       buildWalletReview(workspace, wallet).items,
     );
-    const id = addressNodeId(counterparty);
+    const id = addressReference(counterparty);
     const source = rows.sources.find((row) => row.nodeId === id)!;
     const destination = rows.destinations.find((row) => row.nodeId === id)!;
     expect(source.kind).toBe('address');
-    expect(source.outpointIds).toEqual([outputNodeId(parent, 0)]);
+    expect(source.outpointIds).toEqual([outpointReference(parent, 0)]);
     expect(source.reviews.map((item) => item.reason)).toEqual(['source-address']);
     expect(destination.reviews.map((item) => item.reason)).toEqual(['destination-address']);
     expect(walletRowWithContext(workspace, source).contextTransactionIds).toEqual([B]);
@@ -110,7 +111,7 @@ describe('shared Wallet rows', () => {
 
   it('retains the resolved subject when a missing outpoint becomes an address group', () => {
     const { workspace, wallet } = fixture();
-    workspace.walletReviews = {
+    workspace.wallets.reviews = {
       [`${wallet.id}|funding-source|${'9'.repeat(64)}:0`]: {
         status: 'later',
         at: '2026-09-09T00:00:00Z',
@@ -132,7 +133,7 @@ describe('shared Wallet rows', () => {
 
   it('settles on its own result, so the workbench stops re-resolving the row it shows', () => {
     const { workspace, wallet } = fixture();
-    workspace.walletReviews = {
+    workspace.wallets.reviews = {
       [`${wallet.id}|funding-source|${'9'.repeat(64)}:0`]: {
         status: 'later',
         at: '2026-09-09T00:00:00Z',
@@ -215,7 +216,7 @@ describe('shared Wallet rows', () => {
       B,
     ]);
     expect(walletRowWithContext(workspace, rows.addresses[1]).contextTransactionIds).toEqual([B]);
-    expect(rows.addresses[0].nodeId).toBe(addressNodeId(addresses[0].address));
+    expect(rows.addresses[0].nodeId).toBe(addressReference(addresses[0].address));
     expect(walletRowWithContext(workspace, rows.addresses[0]).contextTransactionIds).not.toContain(
       C,
     );
@@ -225,7 +226,7 @@ describe('shared Wallet rows', () => {
 
   it('keeps legacy unknown decisions completed on UTXO and transaction rows', () => {
     const { workspace, wallet, addresses } = fixture();
-    workspace.walletReviews = {
+    workspace.wallets.reviews = {
       [`${wallet.id}|current-utxo|${B}:0`]: {
         status: 'unknown',
         at: '2026-09-09T12:00:00Z',
@@ -262,12 +263,12 @@ describe('shared Wallet rows', () => {
 
   it('uses canonical metadata subjects and effective address tags without widening their scope', () => {
     const { workspace, wallet, addresses } = fixture();
-    workspace.tags = [
+    workspace.annotations.tags = [
       {
         id: '40000000-0000-4000-8000-000000000001',
         name: 'Public reserve',
         color: '#27c4a7',
-        nodeIds: [addressNodeId(addresses[1].address)],
+        nodeIds: [addressReference(addresses[1].address)],
       },
     ];
     const rows = buildWalletRecordRows(
@@ -285,7 +286,7 @@ describe('shared Wallet rows', () => {
       ],
       [],
     );
-    expect(rows.utxos[0].nodeId).toBe(outputNodeId(B, 0));
+    expect(rows.utxos[0].nodeId).toBe(outpointReference(B, 0));
     expect(walletRowTags(workspace, rows.utxos[0]).map((tag) => tag.name)).toEqual([
       'Public reserve',
     ]);
@@ -303,7 +304,7 @@ describe('Wallet review findings regressions', () => {
       expect(matchesWalletStatus(row, 'open')).toBe(false);
       expect(row.reviews).toEqual([]);
     }
-    expect(Object.keys(workspace.walletReviews ?? {})).toHaveLength(0);
+    expect(Object.keys(workspace.wallets.reviews ?? {})).toHaveLength(0);
     const item = buildWalletReview(workspace, wallet).items.find(
       (item) => !item.legacyOutputReview,
     )!;

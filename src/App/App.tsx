@@ -1,5 +1,5 @@
 import './component-styles';
-import { TransactionFetchShell } from './Workspace/Evidence/Transactions';
+import { TransactionFetchShell } from './Workspace/Store/TransactionFetch';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
 import { BookOpen, FolderOpen, Info, Library, Plus, X } from 'lucide-react';
 import { Modal } from './Dialogs';
@@ -12,8 +12,8 @@ import { WorkspaceHome } from './FrontPage/WorkspaceHome';
 
 import { WORKSPACE_TEMPLATES } from './Examples/workspaceTemplates';
 import { loadTemplateWorkspace } from './Examples/templateWorkspace';
-import { MAX_ENCRYPTED_FILE_BYTES } from './Workspace/Persistence/Encryption';
-import { createWorkspace } from './Workspace/createWorkspace';
+import { MAX_ENCRYPTED_FILE_BYTES } from '../Core/Workspace/Persistence';
+import { createWorkspace } from '../Core/Workspace/createWorkspace';
 
 import { ADDRESS_DISPLAY_NOTICE } from './Workspace/workspaceNotices';
 import { Workspace } from './Workspace/Workspace';
@@ -32,7 +32,7 @@ export default function App() {
   const workspace = useWorkspace(app);
   const { activeWorkspace, workspaces, fileInput, workspaceTabs } = app;
   return (
-    <TransactionFetchShell scope={app.fetchScope}>
+    <TransactionFetchShell acquisition={app.chainDataAcquisition}>
       <a
         className="skip-link"
         href={

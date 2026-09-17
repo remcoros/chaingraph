@@ -1,5 +1,5 @@
-import { formatBitcoinAmount } from '../src/App/Controls/Display/amountFormat';
-import type { Network } from '../src/Domain/Chain/network';
+import { formatBitcoinAmount } from '../src/Core/Formatting';
+import type { Network } from '../src/Core/Bitcoin';
 
 export interface CuratedExample {
   id: string;

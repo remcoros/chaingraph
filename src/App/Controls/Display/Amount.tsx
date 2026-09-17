@@ -1,4 +1,4 @@
-import { formatBitcoinAmount, formatSats } from './amountFormat';
+import { formatBitcoinAmount, formatSats } from '../../../Core/Formatting';
 
 /** Shared amount text and exact satoshi tooltip, without adding an interactive control. */
 export function Amount({

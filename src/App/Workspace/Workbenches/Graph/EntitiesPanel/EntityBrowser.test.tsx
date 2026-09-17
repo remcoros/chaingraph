@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import EntityBrowser from './EntityBrowser';
-import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { GraphFilters } from '../../../GraphState/filters';
+import { transactionReference } from '../../../../../Core/Workspace/entityReferences';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
+
 import type { GraphNode } from '../../../GraphState/types';
 import { installDomStubs } from '../../../../../../tests/domStubs';
 
@@ -13,7 +14,7 @@ afterEach(cleanup);
 
 const nodes: GraphNode[] = Array.from({ length: 120 }, (_, i) => {
   const txid = i.toString(16).padStart(64, '0');
-  return { id: txNodeId(txid), kind: 'transaction', label: `tx ${i}`, txid };
+  return { id: transactionReference(txid), kind: 'transaction', label: `tx ${i}`, txid };
 });
 
 /** Mirrors the graph panel: it owns the filters the browser reports back. */

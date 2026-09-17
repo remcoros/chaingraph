@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { walletRelatedRecords } from './walletRelatedRecords';
-import { createWorkspace } from '../../../createWorkspace';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import type { WalletRow } from '../walletRows';
 import {
   transactions,
@@ -24,7 +24,7 @@ const row = (nodeId: string, kind: WalletRow['kind']): WalletRow => ({
 });
 const fixture = () => {
   const workspace = createWorkspace('Public related records', 'mainnet');
-  workspace.transactions = structuredClone(transactions);
+  workspace.chainData.transactions = structuredClone(transactions);
   return workspace;
 };
 
@@ -46,7 +46,7 @@ it('lists creating and loaded spending transactions for an outpoint', () => {
 
 it('uses authoritative scripts for address outpoints rather than a conflicting display label', () => {
   const workspace = fixture();
-  workspace.transactions[TX_FUNDING].vout[1].scriptPubKey.address = RECEIVE_ADDRESS;
+  workspace.chainData.transactions[TX_FUNDING].vout[1].scriptPubKey.address = RECEIVE_ADDRESS;
   const record = {
     ...row(`addr:${RECEIVE_ADDRESS}`, 'address'),
     address: RECEIVE_ADDRESS,

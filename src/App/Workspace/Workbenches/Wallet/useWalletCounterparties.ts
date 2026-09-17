@@ -23,10 +23,15 @@ export function useWalletCounterparties({
     () => ({
       id: workspace.id,
       network: workspace.network,
-      wallets: workspace.wallets,
-      transactions: workspace.transactions,
+      wallets: { definitions: workspace.wallets.definitions },
+      chainData: { transactions: workspace.chainData.transactions },
     }),
-    [workspace.id, workspace.network, workspace.wallets, workspace.transactions],
+    [
+      workspace.id,
+      workspace.network,
+      workspace.wallets.definitions,
+      workspace.chainData.transactions,
+    ],
   );
   const options = useMemo<WalletCounterpartyConfiguration>(
     () => ({

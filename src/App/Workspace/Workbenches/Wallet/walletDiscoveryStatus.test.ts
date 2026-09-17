@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest';
 import { walletDiscoveryStatus } from './walletDiscoveryStatus';
-import { deriveAddresses } from '../../../../Domain/Wallet/wallet';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import { deriveAddresses } from '../../../../Core/Workspace/Wallets/walletDerivation';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+
 import { PUBLIC_ZPUB } from '../../../../../tests/fixtures/bitcoin';
 
 const wallet = (): Wallet => ({

@@ -1,24 +1,34 @@
-import { indexPreviousOutputs, resolvePreviousOutput } from '../../../Domain/Chain/prevouts';
+import {
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  type Transaction,
+} from '../../../Core/ChainData';
 import { transactionStatus } from './transactionStatus';
-import { sats, type Transaction } from '../../../Domain/Chain/transaction';
-import type { Workspace } from '../../Workspace/workspace';
+import { sats } from '../../../Core/Bitcoin';
+
+import type { Workspace } from '../../../Core/Workspace/workspace';
 
 export interface TransactionFee {
   feeSats: number;
   feeRateSatVb: number;
 }
 
-type FeeWorkspace = Pick<Workspace, 'network' | 'transactions'>;
+type FeeWorkspace = Pick<Workspace, 'network'> & {
+  chainData: Pick<Workspace['chainData'], 'transactions'>;
+};
 
 // TransactionBlockTime is used in dense lists. Reuse the previous-output index
 // while the immutable transactions record stays the same.
 const previousOutputIndexes = new WeakMap<object, ReturnType<typeof indexPreviousOutputs>>();
 
 function previousOutputs(workspace: FeeWorkspace) {
-  const key = workspace.transactions as object;
+  const key = workspace.chainData.transactions as object;
   const cached = previousOutputIndexes.get(key);
   if (cached) return cached;
-  const index = indexPreviousOutputs(workspace);
+  const index = indexPreviousOutputs({
+    network: workspace.network,
+    transactions: workspace.chainData.transactions,
+  });
   previousOutputIndexes.set(key, index);
   return index;
 }
@@ -43,7 +53,11 @@ export function transactionFee(
   let inputTotal = 0;
   for (const input of transaction.vin) {
     if (input.txid === undefined || input.vout === undefined) return undefined;
-    const resolution = resolvePreviousOutput(workspace, input, prevouts);
+    const resolution = resolvePreviousOutput(
+      { network: workspace.network, transactions: workspace.chainData.transactions },
+      input,
+      prevouts,
+    );
     if (resolution.status !== 'loaded' && resolution.status !== 'attached') return undefined;
     inputTotal += sats(resolution.output.value);
     if (!Number.isSafeInteger(inputTotal)) return undefined;

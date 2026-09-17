@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { addressNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../workspace';
-import { listWalletAddresses } from '../../../Wallet/walletRecords';
+import { addressReference } from '../../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+
+import { listWalletAddresses } from '../../../../../Core/Workspace/Wallets/walletRecords';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 
 const PAGE_SIZE = 40;
@@ -24,16 +25,19 @@ export function WalletAddressesPanel({
   const addresses = useMemo(
     () =>
       listWalletAddresses(
-        { network: workspace.network, transactions: workspace.transactions },
+        {
+          network: workspace.network,
+          chainData: { transactions: workspace.chainData.transactions },
+        },
         wallet,
       ),
-    [workspace.network, workspace.transactions, wallet],
+    [workspace.network, workspace.chainData.transactions, wallet],
   );
   const [query, setQuery] = useState('');
   const [requestedPage, setPage] = useState(0);
   const search = query.trim().toLowerCase();
   const filtered = addresses.filter((record) => {
-    const annotation = workspace.annotations[addressNodeId(record.address)];
+    const annotation = workspace.annotations.entities[addressReference(record.address)];
     return (
       !search ||
       [
@@ -70,8 +74,8 @@ export function WalletAddressesPanel({
       />
       <div className="wallet-record-list">
         {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((record) => {
-          const id = addressNodeId(record.address);
-          const annotation = workspace.annotations[id];
+          const id = addressReference(record.address);
+          const annotation = workspace.annotations.entities[id];
           return (
             <button
               key={id}

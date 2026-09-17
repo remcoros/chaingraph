@@ -1,19 +1,15 @@
-import type { AppState } from '../../../../useAppState';
 import type { WorkspaceCore } from '../../../workspaceCore';
 import type { WorkspaceSelection } from '../../../Selection/useWorkspaceSelection';
-import type { TransactionEvidence } from '../../../Evidence/Transactions';
+import type { ChainDataAcquisition } from '../../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../../useWorkspaceOperation';
 import {
-  addressNodeId,
-  outputNodeId,
-  txNodeId,
-} from '../../../../../Domain/Metadata/entityReferences';
-import { fetchTransaction } from '../../../../../Infra/Bitcoin/api';
-import {
-  ancestryNotice,
-  loadAncestors,
-  traceSourceExists,
-} from '../../../../../Infra/Bitcoin/tracing';
+  addressReference,
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
+import { ancestryNotice } from './ancestryNotice';
+import { loadAncestors } from './ancestry';
+import { traceSourceExists } from '../../../GraphState/traceSource';
 import type { useAddressEvidence } from '../Address/useAddressEvidence';
 import type { GraphLookupState } from './useGraphLookupState';
 
@@ -21,10 +17,9 @@ interface Inputs {
   core: WorkspaceCore;
   selection: WorkspaceSelection;
   state: GraphLookupState;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   addressEvidence: ReturnType<typeof useAddressEvidence>;
-  fetchScope: AppState['fetchScope'];
   canLoadChainData: boolean;
   prefetchDepth: 0 | 1 | 2;
   reveal: (id: string) => void;
@@ -38,7 +33,6 @@ export function useGraphLookup({
   transactions,
   operation,
   addressEvidence,
-  fetchScope,
   canLoadChainData,
   prefetchDepth,
   reveal,
@@ -47,7 +41,8 @@ export function useGraphLookup({
     core;
   const { getUnlocked } = workspaces;
   const { generation: selectionGeneration } = selection;
-  const { getTransaction, recordTransactions } = transactions;
+  const { transaction: getTransaction } = transactions.read;
+  const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
 
   async function submit(text: string) {
@@ -69,7 +64,7 @@ export function useGraphLookup({
       if (!canLoadChainData && !existing) return;
       setError('');
       setNotice('');
-      reveal(addressNodeId(text));
+      reveal(addressReference(text));
       state.clear();
       addressEvidence.startAddressHistoryLoad(text);
       return;
@@ -79,13 +74,8 @@ export function useGraphLookup({
     await run(async (signal) => {
       const [id, index] = text.split(':');
       setOperation('Loading transaction…');
-      const cached = activeWorkspace.transactions[id.toLowerCase()];
-      const transaction =
-        cached ??
-        (await fetchTransaction(activeWorkspace.network, id, signal, undefined, {
-          scope: fetchScope,
-          priority: 'navigation',
-        }));
+      const cached = activeWorkspace.chainData.transactions[id.toLowerCase()];
+      const transaction = cached ?? (await getTransaction(id, signal));
       if (index !== undefined && !transaction.vout.some((output) => output.n === Number(index)))
         throw new Error('This output index does not exist in the transaction.');
       signal.throwIfAborted();
@@ -99,23 +89,29 @@ export function useGraphLookup({
       });
       const requestedId =
         index === undefined
-          ? txNodeId(transaction.txid)
-          : outputNodeId(transaction.txid, Number(index));
+          ? transactionReference(transaction.txid)
+          : outpointReference(transaction.txid, Number(index));
       reveal(requestedId);
       if (prefetchDepth) {
         const before = getUnlocked(activeWorkspace.id)!.data;
-        const result = await loadAncestors([transaction], before.transactions, prefetchDepth, {
-          fetch: (transactionId, lookupSignal) =>
-            getTransaction(transactionId, lookupSignal, 'background'),
-          signal,
-          onProgress: setOperation,
-        });
+        const result = await loadAncestors(
+          [transaction],
+          before.chainData.transactions,
+          prefetchDepth,
+          {
+            fetch: (transactionId, lookupSignal) =>
+              getTransaction(transactionId, lookupSignal, 'background'),
+            signal,
+            onProgress: setOperation,
+          },
+        );
         signal.throwIfAborted();
         if (
           recordTransactions(activeWorkspace.id, result.transactions, {
             promotionIds: result.resolvedTransactionIds,
             contextIds: result.transactions.map((item) => item.txid),
-            accept: (current) => traceSourceExists(current, txNodeId(transaction.txid)),
+            accept: (current) =>
+              traceSourceExists(current.chainData, transactionReference(transaction.txid)),
           })
         )
           setNotice(ancestryNotice(result));

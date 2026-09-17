@@ -1,4 +1,4 @@
-import { formatSats } from '../../../../Controls/Display/amountFormat';
+import { formatSats } from '../../../../../Core/Formatting';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,7 @@ import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import { SelectionToolbar } from '../../../Selection/SelectionToolbar';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
-import { createWorkspace } from '../../../createWorkspace';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 
 const txid = 'a'.repeat(64);
 const parentId = 'b'.repeat(64);
@@ -143,7 +143,7 @@ describe('Compact metadata icon controls', () => {
     const workspace = createWorkspace('Batch controls test', 'mainnet');
     const ids = [`out:${txid}:0`, `out:${txid}:1`];
     for (const id of ids)
-      workspace.annotations[id] = { icon: '★', label: '', note: '', bookmarked: false };
+      workspace.annotations.entities[id] = { icon: '★', label: '', note: '', bookmarked: false };
     const render = (active = true) =>
       renderToStaticMarkup(
         createElement(BatchMetadataBar, {
@@ -156,9 +156,9 @@ describe('Compact metadata icon controls', () => {
         }),
       );
     expect(render()).toContain('aria-label="Set icon: Star"');
-    workspace.annotations[ids[1]].icon = '';
+    workspace.annotations.entities[ids[1]].icon = '';
     expect(render()).toContain('aria-label="Set icon: Mixed"');
-    workspace.annotations[ids[0]].icon = '';
+    workspace.annotations.entities[ids[0]].icon = '';
     expect(render()).toContain('aria-label="Set icon: None"');
     expect(render()).toContain('Replace icons');
     expect(render(false)).toBe('');
@@ -175,7 +175,7 @@ describe('Compact metadata icon controls', () => {
     const workspace = createWorkspace('Graph selection test', 'mainnet');
     const ids = [`out:${txid}:0`, `out:${txid}:1`];
     for (const id of ids)
-      workspace.annotations[id] = { icon: '★', label: '', note: '', bookmarked: false };
+      workspace.annotations.entities[id] = { icon: '★', label: '', note: '', bookmarked: false };
     const render = () =>
       renderToStaticMarkup(
         createElement(SelectionToolbar, {
@@ -202,7 +202,7 @@ describe('Compact metadata icon controls', () => {
       );
     expect(render()).toContain('aria-label="Set an icon on 2 selected entities: Star"');
     expect(render()).not.toContain('icon-picker-label');
-    workspace.annotations[ids[1]].icon = '';
+    workspace.annotations.entities[ids[1]].icon = '';
     expect(render()).toContain('aria-label="Set an icon on 2 selected entities: Mixed"');
   });
 });

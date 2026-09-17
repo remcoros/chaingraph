@@ -1,16 +1,21 @@
 import { useCallback, useMemo } from 'react';
-import type { Workspace } from '../../workspace';
-import {
-  openFlowPanel,
-  type GraphLeftTab,
-  type GraphMobilePanel,
-  type GraphPanelsState,
-  type GraphRightTab,
-  type TransactionFlowState,
-} from '../../GraphState/panelState';
-import type { WorkspaceOperations } from '../../Store/WorkspaceStore';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+import type {
+  GraphLeftTab,
+  GraphMobilePanel,
+  GraphPanelsState,
+  GraphRightTab,
+  TransactionFlowState,
+} from '../../../../Core/Workspace/view';
+import { openFlowPanel } from '../../GraphState/panelState';
 
-export type { GraphLeftTab, GraphMobilePanel, GraphRightTab } from '../../GraphState/panelState';
+import type { WorkspaceOperations } from '../../../../Core/Workspace/Session/WorkspaceStore';
+
+export type {
+  GraphLeftTab,
+  GraphMobilePanel,
+  GraphRightTab,
+} from '../../../../Core/Workspace/view';
 
 /** A tour step's view of the graph, which previews panels without changing them. */
 export interface GraphPanelPreview {

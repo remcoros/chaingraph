@@ -1,4 +1,6 @@
-import { isScanNodeId, SCAN_LIMITS } from './connectionScan';
+import { isScanNodeId } from '../../../../../Core/Workspace/ConnectionScan/scanNode';
+import { SCAN_LIMITS } from '../../../../../Core/Workspace/ConnectionScan/scanPath';
+
 import type { GraphData } from '../../../GraphState/types';
 
 /** Index loaded observed links once, independently of canvas membership and visibility. */

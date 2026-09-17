@@ -1,20 +1,20 @@
 import type { NodePresentation } from './Renderer/presentation';
-import type { WalletMatch } from '../../Annotations/tagProjection';
+import type { WalletMatch } from '../../../../Core/Workspace/Wallets/walletMatches';
 import type { GraphData, GraphNode } from '../../GraphState/types';
-import type { Workspace } from '../../workspace';
-import type { WorkspaceTag } from '../../Annotations/workspaceTags';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+import type { WorkspaceTag } from '../../../../Core/Workspace/Annotations/annotations';
 
-export const EMPTY_GRAPH_ANNOTATIONS: Workspace['annotations'] = {};
-const EMPTY_WALLETS: Workspace['wallets'] = [];
+export const EMPTY_GRAPH_ANNOTATIONS: Workspace['annotations']['entities'] = {};
+const EMPTY_WALLETS: Workspace['wallets']['definitions'] = [];
 const sameStrings = (a: readonly string[] = [], b: readonly string[] = []) =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
 interface Inputs {
   graph: GraphData;
-  annotations: Workspace['annotations'];
+  annotations: Workspace['annotations']['entities'];
   tags: ReadonlyMap<string, WorkspaceTag[]>;
   matches: ReadonlyMap<string, WalletMatch>;
-  wallets: Workspace['wallets'];
+  wallets: Workspace['wallets']['definitions'];
   mode: Workspace['view']['highlightMode'];
 }
 interface Metadata {
@@ -31,17 +31,22 @@ export class GraphMetadataProjection {
 
   project(
     graph: GraphData,
-    workspace: Pick<Workspace, 'annotations' | 'wallets'> | undefined,
+    workspace:
+      | {
+          annotations: Pick<Workspace['annotations'], 'entities'>;
+          wallets: Pick<Workspace['wallets'], 'definitions'>;
+        }
+      | undefined,
     tags: ReadonlyMap<string, WorkspaceTag[]>,
     matches: ReadonlyMap<string, WalletMatch>,
     mode: Workspace['view']['highlightMode'],
   ): Metadata {
     const next: Inputs = {
       graph,
-      annotations: workspace?.annotations ?? EMPTY_GRAPH_ANNOTATIONS,
+      annotations: workspace?.annotations.entities ?? EMPTY_GRAPH_ANNOTATIONS,
       tags,
       matches,
-      wallets: workspace?.wallets ?? EMPTY_WALLETS,
+      wallets: workspace?.wallets.definitions ?? EMPTY_WALLETS,
       mode,
     };
     const before = this.previous;

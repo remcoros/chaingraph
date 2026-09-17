@@ -1,3 +1,10 @@
+import {
+  type GraphProjectionFilters,
+  filterGraph,
+  buildGraphFilterIndex,
+  intersectIds,
+  matchingWalletFilterNodeIds,
+} from './Filters/graphFilters';
 import { indexScanNeighbours } from './ConnectionScan/connectionScanNeighbours';
 import { EMPTY_GRAPH_ANNOTATIONS, GraphMetadataProjection } from './graphMetadata';
 import { indexGraphFlow } from './Renderer/flowContext';
@@ -8,47 +15,48 @@ import {
   fullGraphMembershipEvidence,
 } from '../../GraphState/graphMembership';
 import { EntityBadges } from '../../../Controls/Metadata/EntityBadges';
-import { buildWalletMatches, tagNodeIds, buildTagIndex } from '../../Annotations/tagProjection';
+import { buildWalletMatches } from '../../../../Core/Workspace/Wallets/walletMatches';
+import { tagNodeIds, buildTagIndex } from '../../Annotations/tagProjection';
 import { useCallback, useDeferredValue, useMemo } from 'react';
-import {
-  filterGraph,
-  buildGraphFilterIndex,
-  intersectIds,
-  matchingWalletFilterNodeIds,
-} from './Filters/graphFilters';
+
 import { describeMatchScope } from './Filters/filterPresentation';
-import type { GraphFilters } from '../../GraphState/filters';
+import type { GraphFilters } from '../../../../Core/Workspace/view';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
 import { useEntitySelection } from '../../Selection/useEntitySelection';
 import type { GraphEvidenceWorkspace } from '../../GraphState/graphEvidence';
 import { filterSmallAmounts, omitAmountOrphans } from './smallAmounts';
 import type { GraphData } from '../../GraphState/types';
-import type { Workspace } from '../../workspace';
 
-const EMPTY_WALLETS: Workspace['wallets'] = [];
-type GraphEvidenceInput = Omit<GraphEvidenceWorkspace, 'inputContext' | 'annotations' | 'view'>;
+const EMPTY_WALLETS: Workspace['wallets']['definitions'] = [];
+type GraphEvidenceInput = Omit<GraphEvidenceWorkspace, 'annotations' | 'view'>;
 function completeGraphFromEvidence(input: GraphEvidenceInput | undefined): GraphData {
   if (!input) return { nodes: [], links: [] };
   return fullGraphMembershipEvidence({
     ...input,
-    inputContext: undefined,
-    annotations: EMPTY_GRAPH_ANNOTATIONS,
-    view: { showAddresses: true },
+    annotations: { entities: EMPTY_GRAPH_ANNOTATIONS },
+    view: {
+      showAddresses: true,
+      inputContext: undefined,
+    },
   });
 }
-type WalletMatchInput = Pick<Workspace, 'network' | 'transactions' | 'wallets'>;
+type WalletMatchInput = Pick<Workspace, 'network'> & {
+  chainData: Pick<Workspace['chainData'], 'transactions'>;
+  wallets: Pick<Workspace['wallets'], 'definitions'>;
+};
 function walletMatchesFromEvidence(input: WalletMatchInput | undefined, graph: GraphData) {
-  return input ? buildWalletMatches(input, graph) : new Map();
+  return input ? buildWalletMatches(input, graph.nodes) : new Map();
 }
-function tagIndexFromTags(tags: Workspace['tags'], graph: GraphData) {
-  return buildTagIndex({ tags }, graph);
+function tagIndexFromTags(tags: Workspace['annotations']['tags'], graph: GraphData) {
+  return buildTagIndex({ annotations: { tags: tags } }, graph);
 }
 function graphMetadataWorkspace(
-  annotations: Workspace['annotations'] | undefined,
-  wallets: Workspace['wallets'] | undefined,
+  annotations: Workspace['annotations']['entities'] | undefined,
+  wallets: Workspace['wallets']['definitions'] | undefined,
 ) {
   return {
-    annotations: annotations ?? EMPTY_GRAPH_ANNOTATIONS,
-    wallets: wallets ?? EMPTY_WALLETS,
+    annotations: { entities: annotations ?? EMPTY_GRAPH_ANNOTATIONS },
+    wallets: { definitions: wallets ?? EMPTY_WALLETS },
   };
 }
 function membershipFilters(
@@ -56,8 +64,8 @@ function membershipFilters(
   sourceMatches: ReadonlyMap<string, { walletIds: string[] }>,
   sourceTags: ReadonlyMap<string, unknown>,
   filters: GraphFilters,
-  tags: Workspace['tags'],
-): GraphFilters {
+  tags: Workspace['annotations']['tags'],
+): GraphProjectionFilters {
   const includes: (string[] | undefined)[] = [filters.includeIds];
   const excludes: string[] = [];
   includes.push(matchingWalletFilterNodeIds(filters, sourceMatches));
@@ -104,13 +112,13 @@ export function useGraphProjection({
   entityFiltersLinked,
 }: Inputs) {
   const workspaceNetwork = activeWorkspace?.network;
-  const workspaceTransactions = activeWorkspace?.transactions;
-  const workspaceFindings = activeWorkspace?.findings;
-  const workspaceAnnotations = activeWorkspace?.annotations;
-  const workspaceTags = activeWorkspace?.tags;
-  const workspaceWallets = activeWorkspace?.wallets;
-  const workspaceWatchedAddresses = activeWorkspace?.watchedAddresses;
-  const workspaceAddressBalances = activeWorkspace?.addressBalances;
+  const workspaceTransactions = activeWorkspace?.chainData.transactions;
+  const workspaceFindings = activeWorkspace?.analysis.findings;
+  const workspaceAnnotations = activeWorkspace?.annotations.entities;
+  const workspaceTags = activeWorkspace?.annotations.tags;
+  const workspaceWallets = activeWorkspace?.wallets.definitions;
+  const workspaceWatchedAddresses = activeWorkspace?.chainData.watchedAddresses;
+  const workspaceAddressBalances = activeWorkspace?.chainData.addressBalances;
   // Controls commit first; expensive graph/list projection can yield to newer input.
   const graphRenderRequest = useMemo(
     () => ({
@@ -172,10 +180,12 @@ export function useGraphProjection({
       return undefined;
     return {
       network: workspaceNetwork,
-      transactions: workspaceTransactions,
-      findings: workspaceFindings,
-      addressBalances: workspaceAddressBalances,
-      watchedAddresses: workspaceWatchedAddresses,
+      chainData: {
+        transactions: workspaceTransactions,
+        addressBalances: workspaceAddressBalances,
+        watchedAddresses: workspaceWatchedAddresses,
+      },
+      analysis: { findings: workspaceFindings },
     };
   }, [
     workspaceNetwork,
@@ -206,8 +216,8 @@ export function useGraphProjection({
     if (!workspaceNetwork || !workspaceTransactions || !workspaceWallets) return undefined;
     return {
       network: workspaceNetwork,
-      transactions: workspaceTransactions,
-      wallets: workspaceWallets,
+      chainData: { transactions: workspaceTransactions },
+      wallets: { definitions: workspaceWallets },
     };
   }, [workspaceNetwork, workspaceTransactions, workspaceWallets]);
   const walletMatches = useMemo(
@@ -261,14 +271,11 @@ export function useGraphProjection({
       membershipFilters(completeGraph, walletMatches, tagIndex, entityFilterRequest, workspaceTags),
     [entityFilterRequest, workspaceTags, completeGraph, walletMatches, tagIndex],
   );
+  const contextTransactionIds = activeWorkspace?.chainData.contextTransactionIds;
+  const inputContext = activeWorkspace?.view.inputContext;
   const automaticContextIds = useMemo(
-    () => [
-      ...new Set([
-        ...(activeWorkspace?.contextTransactionIds ?? []),
-        ...Object.keys(activeWorkspace?.inputContext ?? {}),
-      ]),
-    ],
-    [activeWorkspace?.contextTransactionIds, activeWorkspace?.inputContext],
+    () => [...new Set([...(contextTransactionIds ?? []), ...Object.keys(inputContext ?? {})])],
+    [contextTransactionIds, inputContext],
   );
   const completeAdmittedGraph = useMemo(
     () => projectGraphMembership(completeGraph, activeWorkspace?.view.graphNodeIds),
@@ -308,13 +315,13 @@ export function useGraphProjection({
     appliedGraphFilters.query?.trim() ||
     (appliedGraphFilters.label && appliedGraphFilters.label !== 'all') ||
     appliedGraphFilters.bookmarkedOnly
-      ? activeWorkspace?.annotations
+      ? activeWorkspace?.annotations.entities
       : EMPTY_GRAPH_ANNOTATIONS;
   const entityFilterAnnotations =
     entityFilterRequest.query?.trim() ||
     (entityFilterRequest.label && entityFilterRequest.label !== 'all') ||
     entityFilterRequest.bookmarkedOnly
-      ? activeWorkspace?.annotations
+      ? activeWorkspace?.annotations.entities
       : EMPTY_GRAPH_ANNOTATIONS;
   const canvasFilterResult = useMemo(
     () =>
@@ -449,7 +456,7 @@ export function useGraphProjection({
         <EntityBadges
           tags={tagIndex.get(id) ?? []}
           wallets={
-            activeWorkspace?.wallets
+            activeWorkspace?.wallets.definitions
               .filter((wallet) => match?.walletIds.includes(wallet.id))
               .map((wallet) => wallet.name) ?? []
           }
@@ -457,7 +464,7 @@ export function useGraphProjection({
         />
       );
     },
-    [walletMatches, tagIndex, activeWorkspace?.wallets],
+    [walletMatches, tagIndex, activeWorkspace?.wallets.definitions],
   );
   const selected = selectedId
     ? (graphMetadata.labeledNodes.get(selectedId) ?? recoveryNodesById.get(selectedId))

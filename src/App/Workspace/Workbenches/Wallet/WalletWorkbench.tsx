@@ -69,7 +69,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           });
           analysis.noteWalletAnalysis();
         }}
-        wallet={wallet ?? activeWorkspace.wallets[0]}
+        wallet={wallet ?? activeWorkspace.wallets.definitions[0]}
         canLoadChainData={canLoadChainData}
         busy={!!operation}
         chainDataDisabledReason={chainDataDisabledReason}
@@ -83,7 +83,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         onAddWallet={() => dialogs.openAddWallet()}
         onChange={(update, group) => edit(update, true, group)}
         onEditWallet={(walletId) => dialogs.openWalletRename(activeWorkspace.id, walletId)}
-        onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets[0])}
+        onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets.definitions[0])}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'show')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
         onShowSelection={(ids, isolate) => {

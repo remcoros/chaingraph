@@ -1,4 +1,7 @@
-import { isScanNodeId, MAX_CONNECTION_SCAN_TARGETS } from '../ConnectionScan/scanNode';
+import {
+  isScanNodeId,
+  MAX_CONNECTION_SCAN_TARGETS,
+} from '../../../Core/Workspace/ConnectionScan/scanNode';
 
 /** Freeze only explicit picks, without inspecting or expanding their evidence. */
 export function prepareCustomScanTargets({

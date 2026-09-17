@@ -1,13 +1,11 @@
-import type { ScanResult } from './connectionScan';
-import { addScanPath, prepareScanPath, type ScanPathWorkspace } from './connectionScanRecords';
-import { scanContextPath } from '../../../ConnectionScan/records';
+import type { ScanResult } from '../../../../../Core/Workspace/ConnectionScan/connectionScans';
+import { scanContextPath } from '../../../../../Core/Workspace/ConnectionScan/records';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import { outpointReference } from '../../../../../Core/Workspace/entityReferences';
+import { addScanPath, prepareScanPath, type ScanPathWorkspace } from './connectionScanPath';
+
 import { ensureGraphMembership } from '../../../GraphState/graphMembership';
-import {
-  indexPreviousOutputs,
-  type PreviousOutputIndex,
-} from '../../../../../Domain/Chain/prevouts';
-import { outputNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Workspace } from '../../../workspace';
+import { indexPreviousOutputs, type PreviousOutputIndex } from '../../../../../Core/ChainData';
 
 function additionResult(result: ScanResult, nodeIds: string[], creatorId: string): ScanResult {
   return {
@@ -20,19 +18,22 @@ function additionResult(result: ScanResult, nodeIds: string[], creatorId: string
   };
 }
 
-const emptyEvidence: Workspace['transactions'] = Object.freeze({});
+const emptyEvidence: Workspace['chainData']['transactions'] = Object.freeze({});
 const previousOutputIndexes = new WeakMap<
-  Workspace['transactions'],
-  WeakMap<Workspace['transactions'], Partial<Record<Workspace['network'], PreviousOutputIndex>>>
+  Workspace['chainData']['transactions'],
+  WeakMap<
+    Workspace['chainData']['transactions'],
+    Partial<Record<Workspace['network'], PreviousOutputIndex>>
+  >
 >();
 
 /** Card plans share an index while their immutable transaction and evidence maps are unchanged. */
 function additionPreviousOutputs(workspace: ScanPathWorkspace): PreviousOutputIndex {
   const evidence = workspace.connectionScans?.evidence ?? emptyEvidence;
-  let byEvidence = previousOutputIndexes.get(workspace.transactions);
+  let byEvidence = previousOutputIndexes.get(workspace.chainData.transactions);
   if (!byEvidence) {
     byEvidence = new WeakMap();
-    previousOutputIndexes.set(workspace.transactions, byEvidence);
+    previousOutputIndexes.set(workspace.chainData.transactions, byEvidence);
   }
   let byNetwork = byEvidence.get(evidence);
   if (!byNetwork) {
@@ -43,25 +44,26 @@ function additionPreviousOutputs(workspace: ScanPathWorkspace): PreviousOutputIn
     network: workspace.network,
     transactions:
       evidence === emptyEvidence
-        ? workspace.transactions
-        : { ...evidence, ...workspace.transactions },
+        ? workspace.chainData.transactions
+        : { ...evidence, ...workspace.chainData.transactions },
   }));
 }
 
 function addedTransactionConflicts(workspace: ScanPathWorkspace, txid: string): boolean {
-  const transaction = workspace.transactions[txid] ?? workspace.connectionScans?.evidence[txid];
+  const transaction =
+    workspace.chainData.transactions[txid] ?? workspace.connectionScans?.evidence[txid];
   if (!transaction) return false;
   const index = additionPreviousOutputs(workspace);
   // New proof can contradict attached output facts outside the selected path.
   const affected = [
-    ...transaction.vout.map((output) => outputNodeId(txid, output.n)),
+    ...transaction.vout.map((output) => outpointReference(txid, output.n)),
     ...transaction.vin.flatMap((input) =>
       input.txid !== undefined && input.vout !== undefined
-        ? [outputNodeId(input.txid, input.vout)]
+        ? [outpointReference(input.txid, input.vout)]
         : [],
     ),
   ];
-  return affected.some((id) => index.get(id)?.status === 'conflict');
+  return affected.some((id) => index.get(id.slice(4))?.status === 'conflict');
 }
 
 /** The terminal creator is display context, included in Add without changing saved search hops. */
@@ -153,11 +155,12 @@ export function prepareScanNodeAddition(workspace: Workspace, nodeId: string) {
     prepared.blockedByConflict ||= addedTransactionConflicts(workspace, nodeId.slice(3));
   } else if (nodeId.startsWith('out:')) {
     const [, txid, vout] = nodeId.split(':');
-    const creator = workspace.transactions[txid] ?? workspace.connectionScans?.evidence[txid];
+    const creator =
+      workspace.chainData.transactions[txid] ?? workspace.connectionScans?.evidence[txid];
     const index = additionPreviousOutputs(workspace);
     prepared.blockedByConflict ||=
       !!creator && !creator.vout.some((output) => output.n === Number(vout));
-    prepared.blockedByConflict ||= index.get(nodeId)?.status === 'conflict';
+    prepared.blockedByConflict ||= index.get(nodeId.slice(4))?.status === 'conflict';
   }
   return prepared;
 }

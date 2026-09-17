@@ -12,16 +12,17 @@ import {
   Wallet as WalletIcon,
   LoaderCircle,
 } from 'lucide-react';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../workspace';
-import type { WalletUtxoRecord } from '../../../Wallet/walletRecords';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+
+import type { WalletUtxoRecord } from '../../../../../Core/Workspace/Wallets/walletRecords';
 import {
   applyReviewDecisions,
   isCompletedReview,
   REASON_LABELS,
   spendGuidance,
   type WalletReviewItem,
-} from '../../../Wallet/walletReview';
+} from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
   buildWalletRecordRows,
   buildWalletRelationshipRows,
@@ -40,13 +41,13 @@ import {
   walletReviewCategoryScanState,
   type WalletReviewCategoryWorkspace,
 } from './reviewCategories';
-import type { AnalysisScan } from '../../../Analysis/analysisScan';
+import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
 import { useRecordSelection } from '../useRecordSelection';
-import type { WalletUtxoController } from '../../../Wallet/WalletUtxos';
+import type { WalletUtxoController } from '../../../Wallets/WalletUtxos';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import { useWalletAnalysis } from '../useWalletAnalysis';
 import { useWalletCounterparties } from '../useWalletCounterparties';
-import { useTransactionFetch } from '../../../Evidence/Transactions';
+import { useTransactionFetch } from '../../../Store/TransactionFetch';
 import { WALLET_FLOW_INPUT_WAVE_LIMIT } from './walletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletOverview } from '../WalletOverview';
@@ -61,11 +62,11 @@ import { matchRelatedEntities } from '../walletRelatedSelection';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
-import { walletRecordBlockObservation } from '../../../Wallet/walletRecordBlockObservation';
+import { walletRecordBlockObservation } from '../../../../../Core/Workspace/Wallets/walletRecordBlockObservation';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { buildTagIndex } from '../../../Annotations/tagProjection';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
-import { WalletPreparationCache } from '../../../Wallet/walletPreparation';
+import { WalletPreparationCache } from '../../../../../Core/Workspace/Wallets/walletPreparation';
 import '../wallet-workbench.css';
 
 export interface WalletWorkbenchViewProps extends WalletWorkbenchContext {
@@ -110,7 +111,10 @@ const PREVIEW_ACTIONS = {
 };
 
 function buildWalletRows(
-  workspace: Pick<Workspace, 'network' | 'transactions' | 'walletReviews'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+    wallets: Pick<Workspace['wallets'], 'reviews'>;
+  },
   wallet: Pick<Wallet, 'id' | 'addresses'>,
   currentUtxos: readonly WalletUtxoRecord[],
   reviewItems: readonly WalletReviewItem[],
@@ -141,9 +145,12 @@ function buildWalletRows(
   };
 }
 
-function buildWalletRowTagIndex(tags: Workspace['tags'], rows: readonly WalletRow[]) {
+function buildWalletRowTagIndex(
+  tags: Workspace['annotations']['tags'],
+  rows: readonly WalletRow[],
+) {
   return buildTagIndex(
-    { tags },
+    { annotations: { tags: tags } },
     {
       nodes: rows.map((row) => ({
         id: row.nodeId,
@@ -157,10 +164,10 @@ function buildWalletRowTagIndex(tags: Workspace['tags'], rows: readonly WalletRo
 }
 
 function walletCategoryScanState(
-  findings: Workspace['findings'],
+  findings: Workspace['analysis']['findings'],
   currentAnalysis: AnalysisScan | undefined,
 ) {
-  return walletReviewCategoryScanState({ findings }, currentAnalysis);
+  return walletReviewCategoryScanState({ analysis: { findings: findings } }, currentAnalysis);
 }
 
 function walletCategories(
@@ -181,7 +188,7 @@ function matchesWalletCategory(
 export const WalletWorkbenchView = memo(
   function WalletWorkbenchView(props: WalletWorkbenchViewProps) {
     const previewWorkspace = props.tourPreview?.example ?? props.workspace;
-    const previewWallet = props.tourPreview?.example?.wallets[0] ?? props.wallet;
+    const previewWallet = props.tourPreview?.example?.wallets.definitions[0] ?? props.wallet;
     const walletIdentity = props.wallet ? `${props.workspace.id}:${props.wallet.id}` : undefined;
     const [mountedWallet, setMountedWallet] = useState<string>();
     const prepared =
@@ -333,8 +340,8 @@ export function WalletReviewPanel(
       buildWalletRows(
         {
           network: workspace.network,
-          transactions: workspace.transactions,
-          walletReviews: workspace.walletReviews,
+          chainData: { transactions: workspace.chainData.transactions },
+          wallets: { reviews: workspace.wallets.reviews },
         },
         { id: wallet.id, addresses: wallet.addresses },
         currentUtxos,
@@ -344,8 +351,8 @@ export function WalletReviewPanel(
       ),
     [
       workspace.network,
-      workspace.transactions,
-      workspace.walletReviews,
+      workspace.chainData.transactions,
+      workspace.wallets.reviews,
       wallet.id,
       wallet.addresses,
       currentUtxos,
@@ -356,14 +363,14 @@ export function WalletReviewPanel(
   );
   const rows = rowsByTab[tab];
   const rowTags = useMemo(
-    () => buildWalletRowTagIndex(workspace.tags, rows),
-    [workspace.tags, rows],
+    () => buildWalletRowTagIndex(workspace.annotations.tags, rows),
+    [workspace.annotations.tags, rows],
   );
   const search = query.trim().toLowerCase();
   const metadataFiltered = useMemo(
     () =>
       rows.filter((row) => {
-        const annotation = workspace.annotations[row.nodeId];
+        const annotation = workspace.annotations.entities[row.nodeId];
         const tags = rowTags.get(row.nodeId) ?? [];
         if (
           search &&
@@ -389,7 +396,7 @@ export function WalletReviewPanel(
           return false;
         return true;
       }),
-    [rows, rowTags, workspace.annotations, search, labelFilter, tagFilter],
+    [rows, rowTags, workspace.annotations.entities, search, labelFilter, tagFilter],
   );
   const statusFiltered = useMemo(
     () => metadataFiltered.filter((row) => matchesWalletStatus(row, status)),
@@ -397,8 +404,8 @@ export function WalletReviewPanel(
   );
   const currentAnalysis = walletAnalysis.scan ?? props.sessionAnalysis;
   const scanState = useMemo(
-    () => walletCategoryScanState(workspace.findings, currentAnalysis),
-    [workspace.findings, currentAnalysis],
+    () => walletCategoryScanState(workspace.analysis.findings, currentAnalysis),
+    [workspace.analysis.findings, currentAnalysis],
   );
   const categories = useMemo(
     () =>
@@ -406,10 +413,12 @@ export function WalletReviewPanel(
         ? []
         : walletCategories(
             {
-              annotations: workspace.annotations,
-              tags: workspace.tags,
-              findings: workspace.findings,
-              walletReviews: workspace.walletReviews,
+              annotations: {
+                entities: workspace.annotations.entities,
+                tags: workspace.annotations.tags,
+              },
+              analysis: { findings: workspace.analysis.findings },
+              wallets: { reviews: workspace.wallets.reviews },
             },
             statusFiltered.flatMap((row) => row.reviews),
           ).map((category) => {
@@ -429,10 +438,10 @@ export function WalletReviewPanel(
           }),
     [
       tab,
-      workspace.annotations,
-      workspace.tags,
-      workspace.findings,
-      workspace.walletReviews,
+      workspace.annotations.entities,
+      workspace.annotations.tags,
+      workspace.analysis.findings,
+      workspace.wallets.reviews,
       statusFiltered,
       scanState,
       currentAnalysis,
@@ -449,10 +458,12 @@ export function WalletReviewPanel(
         ? statusFiltered.filter((row) =>
             row.reviews.some((item) =>
               matchesWalletCategory(item, selectedTypes, {
-                annotations: workspace.annotations,
-                tags: workspace.tags,
-                findings: workspace.findings,
-                walletReviews: workspace.walletReviews,
+                annotations: {
+                  entities: workspace.annotations.entities,
+                  tags: workspace.annotations.tags,
+                },
+                analysis: { findings: workspace.analysis.findings },
+                wallets: { reviews: workspace.wallets.reviews },
               }),
             ),
           )
@@ -462,10 +473,10 @@ export function WalletReviewPanel(
       allTypes,
       statusFiltered,
       selectedTypes,
-      workspace.annotations,
-      workspace.tags,
-      workspace.findings,
-      workspace.walletReviews,
+      workspace.annotations.entities,
+      workspace.annotations.tags,
+      workspace.analysis.findings,
+      workspace.wallets.reviews,
     ],
   );
   const displayedRows = filteredRows.slice(0, limit);
@@ -489,12 +500,15 @@ export function WalletReviewPanel(
     () =>
       currentRow
         ? walletRowWithContext(
-            { network: workspace.network, transactions: workspace.transactions },
+            {
+              network: workspace.network,
+              chainData: { transactions: workspace.chainData.transactions },
+            },
             currentRow,
             selectionIndex,
           )
         : undefined,
-    [workspace.network, workspace.transactions, selectionIndex, currentRow],
+    [workspace.network, workspace.chainData.transactions, selectionIndex, currentRow],
   );
   const selectionKeys = useMemo(() => new Set(selection.ids), [selection.ids]);
   const rowKeys = useMemo(() => new Set(rows.map((row) => row.key)), [rows]);
@@ -740,7 +754,7 @@ export function WalletReviewPanel(
             >
               <option value="all">Any tag state</option>
               <option value="untagged">No tags</option>
-              {(workspace.tags ?? []).map((tag) => (
+              {(workspace.annotations.tags ?? []).map((tag) => (
                 <option key={tag.id} value={tag.id}>
                   {tag.name}
                 </option>
@@ -901,7 +915,7 @@ export function WalletReviewPanel(
             aria-label={tab === 'review' ? 'Review queue' : `${tabLabel} records`}
           >
             {displayedRows.map((row) => {
-              const annotation = workspace.annotations[row.nodeId];
+              const annotation = workspace.annotations.entities[row.nodeId];
               const checked = selectionKeys.has(row.key);
               const current = !batching && selectedRow?.key === row.key;
               const tags = rowTags.get(row.nodeId) ?? [];
@@ -1022,11 +1036,11 @@ export function WalletReviewPanel(
                               row.utxo
                                 ? walletRecordBlockObservation(
                                     row.txid,
-                                    workspace.transactions[row.txid],
+                                    workspace.chainData.transactions[row.txid],
                                     row.utxo.height,
                                     row.utxo.height <= 0,
                                   )
-                                : workspace.transactions[row.txid]
+                                : workspace.chainData.transactions[row.txid]
                             }
                           />
                         )}

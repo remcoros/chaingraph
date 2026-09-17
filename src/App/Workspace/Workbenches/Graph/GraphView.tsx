@@ -14,15 +14,20 @@ import {
   Play,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { short } from '../../../Controls/Display/referenceFormat';
+import { short } from '../../../../Core/Formatting';
 import type { GraphLink, GraphNode } from '../../GraphState/types';
-import type { Transaction } from '../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../workspace';
+import type { Transaction } from '../../../../Core/ChainData';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+import {
+  validateGraphCamera,
+  validateGraphSnapshot,
+  type GraphSnapshot,
+} from '../../../../Core/Workspace/view';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './graph.css';
 import type { GraphFlowContext } from './Renderer/flowContext';
 import { VisibilityActions, type VisibilityProps } from '../../Selection/VisibilityActions';
-import { graphSnapshotSchema, type GraphSnapshot } from '../../GraphState/graphSnapshot';
+
 import { mergeGraphSnapshot } from './Renderer/graphSnapshot';
 import type { GraphAdapter, GraphAdapterFactory } from './Renderer/adapter';
 import { createDefaultAdapter } from './Renderer/defaultAdapter';
@@ -72,7 +77,9 @@ export interface GraphViewProps extends VisibilityProps {
   fitToken: number;
   focusRequest?: { id: string; token: number; preserveZoom?: boolean };
   transactions?: Record<string, Transaction>;
-  workspace?: Pick<Workspace, 'network' | 'transactions'>;
+  workspace?: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  };
   onTrace?: (id: string) => void;
   onEdit?: (id: string) => void;
   traceDisabledReason?: string;
@@ -281,11 +288,11 @@ export default function GraphView(props: GraphViewProps) {
             next.nodes === immutableNodeSource.current &&
             savedSnapshot.current?.dimensions === next.dimensions
           ) {
-            const camera = graphSnapshotSchema.shape.camera.safeParse(next.camera);
+            const camera = validateGraphCamera(next.camera);
             if (!camera.success) return;
             merged = { ...savedSnapshot.current, camera: camera.data };
           } else {
-            const parsed = graphSnapshotSchema.safeParse(next);
+            const parsed = validateGraphSnapshot(next);
             if (!parsed.success) return;
             merged = mergeGraphSnapshot(savedSnapshot.current, parsed.data);
             nodesSignature = JSON.stringify(merged.nodes);
@@ -668,10 +675,10 @@ export default function GraphView(props: GraphViewProps) {
                   </dd>
                 </div>
               )}
-              {transaction?.confirmations !== undefined && (
+              {transaction?.status?.confirmations !== undefined && (
                 <div>
                   <dt>Saved confirmations</dt>
-                  <dd>{transaction.confirmations.toLocaleString()}</dd>
+                  <dd>{transaction.status?.confirmations.toLocaleString()}</dd>
                 </div>
               )}
             </dl>

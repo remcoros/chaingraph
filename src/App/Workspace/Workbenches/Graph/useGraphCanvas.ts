@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import type { Workspace } from '../../workspace';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
 import type { AppState } from '../../../useAppState';
 
 /** A request to move the camera to one entity. */

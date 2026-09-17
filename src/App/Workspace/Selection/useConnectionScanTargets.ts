@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isScanNodeId } from '../ConnectionScan/scanNode';
+import { isScanNodeId } from '../../../Core/Workspace/ConnectionScan/scanNode';
 import { prepareCustomScanTargets } from './connectionScanTargets';
 
 /** An in-progress pick, scoped to the workspace and source node it started from. */

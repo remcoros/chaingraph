@@ -3,18 +3,15 @@ import { indexGraphFlow } from '../../../src/App/Workspace/Workbenches/Graph/Ren
 import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan';
-import {
-  addScanPath,
-  replaceScanRun,
-  clearScanRuns,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScan';
+import { addScanPath } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanPath';
+import { replaceScanRun, clearScanRuns } from '../../../src/Core/Workspace/ConnectionScan/updates';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { createConnectionScanFetch } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
-import { TransactionFetchScope } from '../../../src/Infra/Bitcoin/transactionScheduler';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+import type { Transaction } from '../../../src/Core/ChainData';
+import { createConnectionScanFetch } from '../../../src/Core/Workspace/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../../../src/Core/ChainData/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const node = (n: number) => `tx:${id(n)}`;
@@ -47,9 +44,14 @@ describe('connection scan module integration', () => {
         ].map((tx) => [tx.txid, tx]),
       );
       const workspace = createWorkspace('Public scan integration fixture', 'testnet4');
-      workspace.transactions = { [id(source)]: pool[id(source)], [id(target)]: pool[id(target)] };
+      workspace.chainData.transactions = {
+        [id(source)]: pool[id(source)],
+        [id(target)]: pool[id(target)],
+      };
       workspace.view.graphNodeIds = [node(source), node(target)];
-      const loadedIndex = indexGraphFlow(buildGraph({ ...workspace, transactions: pool }));
+      const loadedIndex = indexGraphFlow(
+        buildGraph({ ...workspace, chainData: { ...workspace.chainData, transactions: pool } }),
+      );
       const signal = new AbortController().signal;
       const adapter = createConnectionScanFetch({
         network: workspace.network,
@@ -72,7 +74,7 @@ describe('connection scan module integration', () => {
       expect(result).toBeDefined();
       expect(run.examined).toBeLessThanOrEqual(run.settings.maxTransactions);
       const saved = parseWorkspace(replaceScanRun(workspace, run, adapter.evidence));
-      expect(saved.transactions).toEqual(workspace.transactions);
+      expect(saved.chainData.transactions).toEqual(workspace.chainData.transactions);
       expect(saved.connectionScans?.evidence[id(9)]).toBeUndefined();
       const added = parseWorkspace(addScanPath(saved, result!));
       expect(added.view.graphNodeIds?.sort()).toEqual([...new Set(result!.path)].sort());

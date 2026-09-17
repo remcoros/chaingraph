@@ -1,28 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
-  isScanNodeId,
   runConnectionScan,
-  type ScanResult,
-  type ScanSettings,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScan';
+import { isScanNodeId } from '../../../src/Core/Workspace/ConnectionScan/scanNode';
+import type {
+  ScanResult,
+  ScanSettings,
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScans';
+import { mergeScanRunSnapshots } from '../../../src/Core/Workspace/ConnectionScan/results';
+import type { Workspace } from '../../../src/Core/Workspace/workspace';
+
 import { addScanPathAddition } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanAddition';
-import { mergeScanRunSnapshots } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanGroups';
+
 import {
   indexScanNeighbours,
   prepareNeighbourScanTargets,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanNeighbours';
-import { replaceScanRun } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
+import { replaceScanRun } from '../../../src/Core/Workspace/ConnectionScan/updates';
 import { projectGraphMembership } from '../../../src/App/Workspace/GraphState/graphMembership';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import type { Workspace } from '../../../src/App/Workspace/workspace';
+import type { Transaction } from '../../../src/Core/ChainData';
+
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
-import { TransactionFetchScope } from '../../../src/Infra/Bitcoin/transactionScheduler';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../../../src/Core/ChainData/transactionScheduler';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${hash(n)}`;
@@ -91,7 +96,7 @@ async function scanScenario(
   const adapter = createConnectionScanFetch(
     {
       network: workspace.network,
-      transactions: workspace.transactions,
+      transactions: workspace.chainData.transactions,
       scope,
       signal,
       fanOut: settings.fanOut,
@@ -141,7 +146,7 @@ function whirlpool() {
     5,
   );
   const workspace = createWorkspace('Public five-input scenario', 'mainnet');
-  workspace.transactions = { [selected.txid]: selected };
+  workspace.chainData.transactions = { [selected.txid]: selected };
   workspace.view.graphNodeIds = [tx(30)];
   return { workspace, pool: poolOf([selected, creator, intermediate]) };
 }
@@ -217,7 +222,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
 
   it('does not rediscover a fully loaded loop just because only its root is on canvas', async () => {
     const { workspace, pool } = whirlpool();
-    workspace.transactions = pool;
+    workspace.chainData.transactions = pool;
     const { run } = await scanScenario(workspace, pool, tx(30));
     expect(connections(run.results)).toEqual([]);
   });
@@ -237,7 +242,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
     async (direction) => {
       const pool = poolOf([transaction(1), transaction(2, [[1, 0]]), transaction(3, [[2, 0]])]);
       const workspace = createWorkspace('Public loaded ancestry scenario', 'mainnet');
-      workspace.transactions = pool;
+      workspace.chainData.transactions = pool;
       workspace.view.graphNodeIds = [tx(3)];
       const { run } = await scanScenario(workspace, pool, tx(3), { settings: { direction } });
       expect(connections(run.results)).toEqual([]);
@@ -249,7 +254,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
     async (direction) => {
       const selected = transaction(2, [[1, 0]], 1);
       const workspace = createWorkspace('Public direct I/O scenario', 'mainnet');
-      workspace.transactions = { [selected.txid]: selected };
+      workspace.chainData.transactions = { [selected.txid]: selected };
       workspace.view.graphNodeIds = [tx(2)];
       const { run } = await scanScenario(workspace, poolOf([selected, transaction(1)]), tx(2), {
         settings: { direction },
@@ -261,7 +266,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
   it('omits a shared creator already identified by sibling prevouts on disconnected transaction anchors', async () => {
     const pool = poolOf([transaction(1), transaction(2, [[1, 0]]), transaction(3, [[1, 1]])]);
     const workspace = createWorkspace('Public implicit creator scenario', 'mainnet');
-    workspace.transactions = { [hash(2)]: pool[hash(2)], [hash(3)]: pool[hash(3)] };
+    workspace.chainData.transactions = { [hash(2)]: pool[hash(2)], [hash(3)]: pool[hash(3)] };
     workspace.view.graphNodeIds = [tx(2), tx(3)];
     const { run } = await scanScenario(workspace, pool, tx(2), {
       targets: [tx(3)],
@@ -279,7 +284,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
       transaction(3, [[5, 0]]),
     ]);
     const workspace = createWorkspace('Public disconnected ancestor scenario', 'mainnet');
-    workspace.transactions = { [hash(2)]: pool[hash(2)], [hash(3)]: pool[hash(3)] };
+    workspace.chainData.transactions = { [hash(2)]: pool[hash(2)], [hash(3)]: pool[hash(3)] };
     workspace.view.graphNodeIds = [tx(2), tx(3)];
     const { run } = await scanScenario(workspace, pool, tx(2), {
       targets: [tx(3)],
@@ -303,7 +308,7 @@ describe('synthetic scan scenarios through loaded graph and transaction evidence
       ]),
     ]);
     const workspace = createWorkspace('Public disconnected spender scenario', 'mainnet');
-    workspace.transactions = { [hash(1)]: pool[hash(1)], [hash(2)]: pool[hash(2)] };
+    workspace.chainData.transactions = { [hash(1)]: pool[hash(1)], [hash(2)]: pool[hash(2)] };
     for (const graphNodeIds of [[out(1)], [out(1), out(2)]]) {
       workspace.view = { ...workspace.view, graphNodeIds };
       const { run } = await scanScenario(workspace, pool, out(1), {

@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { address, networks, payments } from 'bitcoinjs-lib';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
-import { fetchTransaction } from '../../../src/Infra/Bitcoin/api';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
-import { validateTransactionAddresses } from '../../../src/Domain/Chain/transactionValidation';
-import type { Network } from '../../../src/Domain/Chain/network';
-import type { Transaction, TxOutput } from '../../../src/Domain/Chain/transaction';
+import { fetchTransaction } from '../../../src/Core/ChainData/api';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+import { validateTransactionAddresses, type Transaction } from '../../../src/Core/ChainData';
+import type { Network, TxOutput } from '../../../src/Core/Bitcoin';
 
 const txid = 'a'.repeat(64);
 const publicHash = Uint8Array.from({ length: 20 }, (_, index) => index + 1);
@@ -20,7 +19,7 @@ const payment = (network: Network, hash = publicHash) =>
   payments.p2wpkh({ hash, network: network === 'mainnet' ? networks.bitcoin : networks.testnet });
 const workspace = (network: Network, tx: Transaction) => {
   const value = createWorkspace('Public address validation fixture', network);
-  value.transactions[tx.txid] = tx;
+  value.chainData.transactions[tx.txid] = tx;
   return value;
 };
 afterEach(() => vi.unstubAllGlobals());
@@ -35,8 +34,8 @@ describe('transaction output address boundaries', () => {
         'fetch',
         vi.fn(async () => new Response(JSON.stringify({ result: valid }))),
       );
-      expect(await fetchTransaction(network, txid)).toEqual(valid);
-      expect(parseWorkspace(workspace(network, valid)).transactions[txid]).toEqual(valid);
+      expect(await fetchTransaction(network, txid)).toMatchObject(valid);
+      expect(parseWorkspace(workspace(network, valid)).chainData.transactions[txid]).toEqual(valid);
       const foreign = transaction({ address: wrong.address!, hex: bytesToHex(correct.output!) });
       vi.stubGlobal(
         'fetch',
@@ -122,7 +121,7 @@ describe('transaction output address boundaries', () => {
   it('preserves script-only and opaque scripts without inventing address metadata', () => {
     for (const hex of ['6a', '51', bytesToHex(payment('testnet4').output!)]) {
       const tx = transaction({ hex });
-      expect(parseWorkspace(workspace('testnet4', tx)).transactions[txid]).toEqual(tx);
+      expect(parseWorkspace(workspace('testnet4', tx)).chainData.transactions[txid]).toEqual(tx);
     }
     // Decoded participant strings can accompany scripts with no single address.
     const validAddress = address.toBase58Check(publicHash, networks.bitcoin.pubKeyHash);

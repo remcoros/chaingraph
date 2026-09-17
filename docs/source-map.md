@@ -1,214 +1,230 @@
 # Source map
 
-Start with the product area below, then follow its direct imports. Search for a
-visible panel's name to find its entry point.
+Start with the product area below, then follow its direct imports. App is the
+React interface and composition code; Core contains workspace capabilities.
+Each Core concept owns its models and validity rules. `Core/Workspace/workspace.ts`
+composes the canonical document and cross-concept validation.
+`Core/Workspace/Persistence` implements encrypted save/load using those rules.
+Being serializable does not make a model persistence-owned; being a pure
+function does not make it Core-owned.
 
 ```text
 src/
   main.tsx
   App/
-    App.tsx                 app shell, home and dialogs
-    useAppState.ts          workspace store, navigation and feedback
-    Dialogs/                generic modal shell
-    FrontPage/              saved workspace list (WorkspaceHome)
-    Examples/               example picker and creation worker
-    Help/                   help menu, about dialog, guided tour and its Workspace adapter
-    Controls/               reusable App-owned controls, display and metadata UI
-      MultiSelectFilter.tsx reusable multi-select checklist filter
-      Display/              amounts, identifiers, timestamps and evidence help
-      Metadata/             annotation, icon and metadata editors
+    App.tsx                         shell, home and dialogs
+    useAppState.ts                  session navigation and feedback
+    appServices.ts                  supplies one persistence facade to Core Session
+    FrontPage/                      saved workspace list
+    Examples/                       example picker and creation worker
+    Help/                           help, about and guided-tour UI
+    Controls/                       reusable UI and display helpers
+    Dialogs/                        generic modal shell
     Workspace/
-      workspace.ts          canonical decrypted Workspace model
-      createWorkspace.ts    new-workspace factory, independent of persistence
-      Workspace.tsx         toolbar, workbenches and shared status surfaces
-      useWorkspace.tsx      shared state, selection and workbench coordination
-      WorkspaceToolbar.tsx  workbench navigation, lookup and workspace actions
-      WorkspaceDialogs.tsx  settings, wallet edits, removal and label import wiring
-      Dialogs/              create, import, unlock and workspace-details dialogs
-      Store/                sessions, undo/redo, autosave and persistence port
-        WorkspaceStore.ts   framework-independent unlocked-session lifecycle
-        useWorkspaces.ts    React subscription and autosave timer
-        WorkspacePersistence.ts adapter contract consumed by WorkspaceStore
-      Persistence/          encrypted Workspace save/load capability
-        Format/             schema validation, migrations and format entry point
-        Encryption/         authenticated envelope, compression and worker client
-        Browser/            public index, IndexedDB blobs and cross-tab publication
-      Evidence/             shared transaction and input-context evidence
-        Transactions/       transaction fetch context, caching and observation merge
-        InputContext/       partial-input evidence and undo preservation
-      useWorkspaceOperation.ts cancellable workspace operation lifecycle and feedback
-      Wallet/
-        WalletUtxos/        transient wallet UTXO loading shared by Wallet and Graph Inspector
-          index.ts           public UTXO controller and view contract
-          useWalletUtxos.ts  scoped UTXO lifecycle, cancellation and pagination state
-          fetchWalletUtxos.ts bounded Electrum listunspent requests
-      useEntityRemoval.ts   removal plans, confirmation and applied removals
-      useWorkspaceHistory.ts undo, redo and single-step batch edits
-      useDialogState.ts     which workspace dialog is open and its target
-
-      Analysis/             analysis registry, tools, scans and bounded recovery
-      Annotations/          labels, tags and metadata mutations
-      Selection/            shared selection, connection-scan targets and visibility
-      ConnectionScan/       scan-node vocabulary shared by Selection and Graph
-      GraphState/           graph evidence, membership and manual visibility
-      Wallet/               wallet evidence, records, relationships, preparation and review model
-        Dialogs/            add-wallet and wallet-name dialogs
+      Workspace.tsx                 toolbar, workbenches and status
+      useWorkspace.tsx              composes UI controllers and workspace actions
+      WorkspaceDialogs.tsx          workspace and wallet dialog wiring
+      Dialogs/                      create, import, unlock and details UI
+      Store/
+        useWorkspaces.ts            React subscriptions and autosave timer
+        TransactionFetch.tsx        React adapter for session-bound transaction reads
+      Annotations/                  editing hooks, tag proposals and projections
+      Selection/                    transient selection and scan-target picking
+      GraphState/                   Graph projections, membership actions and panels
+        panelState.ts               openFlowPanel presentation action
+        traceSource.ts              originating Graph interaction validity
+      Wallets/
+        Dialogs/                    add-wallet and wallet-name UI
+        WalletUtxos/                shared React UTXO controller
+      entityRemoval.ts              combines data removal with Graph orphan cleanup
+      useWorkspaceOperation.ts      cancellable operation UI and feedback
+      useWorkspaceHistory.ts        undo/redo UI actions
       Workbenches/
-        workbenchHandoff.ts Graph capabilities Wallet and Analysis hand off to
-        Wallet/             wallet overview, scan and preparation state
-          WalletWorkbench.tsx controller binding for the wallet workbench view
-          walletWorkbenchContext.ts shared context for the wallet panels
-          useWalletActivity.ts address discovery settings and runs
-          useWalletAnalysis.ts wallet-scoped analysis runs
-          Review/           wallet review panel, detail, flow and input loading
-            WalletReviewPanel.tsx wallet review view, state, filtering and list composition
-        Graph/              graph surface, controls, panels and metadata projection
-          GraphWorkbench.tsx graph canvas, navigation and panel composition
-          useGraphCanvas.ts  camera, fit and saved-view writes
-          useGraphPanels.ts  which panels and tabs the workbench shows
-          Address/          address projection, evidence loading and Graph actions
-          Navigation/       lookup form/state/resolution and graph expansion
-          TagsPanel/        graph tag manager and selected-node tag UI
-            index.ts         narrow tag-panel public entry
-            TagsPanel.tsx    tag manager and selected tag controls
-          EntitiesPanel/    graph entity, wallet and tag side panel
-            EntitiesPanel.tsx panel controller binding
-            EntitiesPanelDetail.tsx panel view and tab composition
-            EntityBrowser.tsx entity filtering, listing and paging
-          InspectorPanel/   graph inspection, scan and wallet-record side panel
-            InspectorPanel.tsx panel controller binding and tab composition
-            InspectorPanelDetail.tsx selected node or wallet detail actions
-            Inspector.tsx node and wallet inspection views
-            WalletRecordsPanel.tsx wallet address, transaction and UTXO tabs
-            WalletAddressesPanel.tsx wallet address tab contents
-            ScriptInspector.tsx raw transaction and script inspection
-            transactionInspection.ts raw inspection fetch helper
-            useUtxoStatus.ts ephemeral selected-outpoint status hook
-          useGraphActions.ts graph navigation, visibility and filter actions
-          useGraphProjection.tsx graph, entity and selection projections
-          Filters/          graph and wallet filter controls
-          TransactionFlow/  flow panel and its selected-entity views
-            FlowPanel.tsx   panel shell, summary and view composition
-            FlowPanelTransactionView.tsx transaction lanes, navigation and metadata tools
-            FlowPanelAddressView.tsx address history and UTXO tabs
-            useFlowInputs.ts loading the inputs a flow view needs
-          ConnectionScan/   scan panel, runner, worker and bounded fetching
-          Renderer/         adapter contract, Three.js, layout and picking
-        Analysis/           analysis controls and reports
-          AnalysisWorkbench.tsx controller binding and the analysis workbench view
-          useWorkspaceAnalysis.ts retained sessions and the wallet-run revision
-          analysisSession.ts  retained scan, scope and reader filters per workspace
-  Domain/
-    Chain/                  network, transaction and observed prevout contracts
-    Wallet/                 watch-only key derivation and persisted wallet contracts
-    Metadata/               canonical entity references
+        workbenchHandoff.ts          deliberate cross-workbench handoff contract
+        graphHandoffNavigation.ts   navigation and contextual return behavior
+        Graph/
+          GraphWorkbench.tsx        canvas and panel composition
+          GraphView.tsx             renderer binding and interaction routing
+          Address/                  address presentation and lookup orchestration
+          Navigation/               lookup UI and Graph expansion actions
+            ancestry.ts             bounded previous-level loading and progress
+          ConnectionScan/           panel, target projection and path-add actions
+          TransactionFlow/          selected-entity flows and input-loading UI
+          InspectorPanel/           entity, script and wallet-record inspection
+          EntitiesPanel/            entity browser and filters
+          TagsPanel/                tag-management panel
+          Filters/                  filter controls and Graph filtering
+          Renderer/                 Three.js, layout, camera and picking
+        Wallet/
+          WalletWorkbench.tsx       wallet view and controller binding
+          useWalletActivity.ts      discovery controls and monitoring lifecycle
+          useWalletAnalysis.ts      wallet entry point into Core Analysis
+          Review/                   review panel, categories, rows and flows
+        Analysis/
+          AnalysisWorkbench.tsx     controls, scope selection and reports
+          useWorkspaceAnalysis.ts   analysis UI lifecycle and retained reports
+
+  Core/
+    Bitcoin/                        native network, key, script and outpoint primitives
+      index.ts                      public primitives; no app or workspace dependencies
+      network.ts                    mainnet/testnet4 names and native encoding parameters
+      extendedPublicKey.ts          public payload parsing and exact BIP32 child derivation
+      scripts.ts                    public-key scripts and address/script hashing
+      outputs.ts                    output script interpretation and content comparison
+      transaction.ts                native input/output shapes
+    ChainData/                      chain models, observation rules and live queries
+      index.ts                      public models, validation and query functions
+      transaction.ts                one Transaction with its latest observed status
+      transactionValidation.ts      transaction shape and network validity
+      transactionStatus.ts          placement and history-height transformations
+      observations.ts               address history, balance and UTXO observations
+      prevouts.ts                   native outpoint-keyed loaded/attached output index
+      transactionObservations.ts    compatible enrichment and status merging
+      api.ts                        typed RPC, network capabilities and bounded chain queries
+      verboseTransaction.ts         upstream transaction decoding into the canonical model
+      utxoStatus.ts                 current UTXO-set checks and output verification
+      transactionScheduler.ts       prioritized, bounded fetches and request scopes
+    Formatting/                     shared exact amounts and reference abbreviation
+      index.ts                      public formatting functions
+    Workspace/
+      createWorkspace.ts            creation without storage
+      workspace.ts                  canonical document schema, type and validation
+      chainData.ts                  workspace chain collection and retention membership
+      entityReferences.ts           workspace references, independent of Graph rendering
+      view.ts                       saved panels, filters, geometry and membership
+      budgets.ts                    aggregate resource limits and validation errors
+      Persistence/
+        index.ts                    facade, full-cycle parser and public results/errors
+        workspacePersistence.ts     contract, factory and implementation
+        savedWorkspace.ts           public saved-entry and encrypted-export types
+        workspacePersistenceError.ts safe public errors and worker error mapping
+        Browser/                    private public-index and IndexedDB publication
+          workspaceStorage.ts       storage snapshots and coordinated writes
+          indexedEnvelopeStorage.ts immutable ciphertext payloads
+        Codec/
+          parseWorkspace.ts         migration, document validation and reopen policy
+          workspaceCodec.ts         encrypted workspace encoding/decoding
+          workspaceCodecClient.ts   off-thread queue, cancellation and lifecycle
+          workspaceCodec.worker.ts  one encoding/decoding job per worker
+          encryptedEnvelope.ts      envelope format and authenticated cryptography
+          workspaceCompression.ts   bounded compression and expansion
+          workspaceCodecError.ts    private envelope/codec error vocabulary
+        Migrations/                 historical document conversion and membership
+        Integration/                module-owned persistence fault/lifecycle tests
+      entityRemoval.ts              removal, retention and affected human metadata
+      transactionContext.ts         chain retention and saved input scope
+      flowInputContext.ts           accepts input observations and their saved scope
+      Session/
+        WorkspaceStore.ts           unlocked lifetime, revisions, history and saving
+        chainDataAcquisition.ts     captured-session reads and guarded observation publication
+        observations.ts             session ordering of accepted observations
+        observationHistory.ts       accepted observations across undo/redo
+        observationContextHistory.ts supported scope/provenance across history
+        undoDescription.ts          descriptions attached to history entries
+      Wallets/                      discovery, records and review behavior
+        wallets.ts                  wallet definitions, review records and their validity
+        walletDerivation.ts         account-wallet constraints and import validation
+        walletMatches.ts            script-verified entity relationships
+        walletPreparation.ts        session-scoped prepared review data
+        WalletUtxos/
+          fetchWalletUtxos.ts        bounded discovery-address UTXO checks
+          walletUtxoCheck.ts         retained address-observation projection and coverage
+          walletUtxoObservation.ts   checked-output verification and spender reconciliation
+      Annotations/                  annotation/tag mutation and membership operations
+        annotations.ts              types, schemas and tag normalization
+        tagMembership.ts            entity/address tag membership semantics
+      Analysis/                     algorithms, findings, recovery and invalidation
+        finding.ts                  retained finding types and schema
+      ConnectionScan/
+        connectionScans.ts          run/result types and schemas
+        records.ts                  retained proof, validation and compaction
+        results.ts                  result identities and deduplication
+        scanNode.ts                 supported scan targets
+        scanPath.ts                 path rules and scan limits
+        connectionScan.ts           bounded search algorithm
+        connectionScanContext.ts    frozen execution baseline
+        updates.ts                  replacement and clearing of runs
+        connectionScanFetch.ts      run-scoped bounded acquisition
+        connectionScanRunner.ts     worker lifecycle and shared fetch budget
+        connectionScan.worker.ts    search worker
+        connectionScanRetry.ts      bounded endpoint rechecks
   Infra/
-    Bitcoin/                HTTP API, scheduling, ancestry and UTXO requests
-    Browser/                generic browser mechanisms such as file downloads
-server/                     bounded read-only Core/Electrum proxy
+    Browser/                        generic mechanisms such as file downloads
+server/                             stateless read-only Core/Electrum proxy
 tests/
-  integration/             tests that intentionally cross module or layer boundaries
-  fixtures/                fixtures shared by more than one product concept
-  e2e/                     browser product workflows
-scripts/                    development, validation and release tooling
+  integration/                      intentional cross-module and storage/UI checks
+  fixtures/                         shared public and synthetic fixtures
+  e2e/                              browser product workflows
 ```
 
 ## Common tasks
 
-| Task                                   | Start here                                                                            | Test location                                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Home, workspace creation or unlock     | `App/FrontPage/WorkspaceHome.tsx`, `App/Workspace/Dialogs/`                           | Dialog tests beside their owners; cross-storage cases in `tests/integration/workspace/`        |
-| Autosave, lock or undo                 | `App/Workspace/Store/`, `App/Workspace/Persistence/Browser/`                          | Colocated unit tests and `tests/integration/workspace/`                                        |
-| Wallet review or records               | `App/Workspace/Wallet/`, `Workbenches/Wallet/`, `Graph/InspectorPanel/`               | Colocated Wallet tests and `tests/integration/wallet/`                                         |
-| Transaction flow or address history    | `App/Workspace/Workbenches/Graph/TransactionFlow/`, `Graph/Address/`                  | Tests beside those modules                                                                     |
-| Canvas rendering or layout             | `App/Workspace/Workbenches/Graph/Renderer/`                                           | Colocated renderer tests                                                                       |
-| Graph filters, membership or selection | `App/Workspace/Workbenches/Graph/Filters/`, `App/Workspace/GraphState/`, `Selection/` | Tests beside those modules; persistence cases under `tests/integration/graph/` or `workspace/` |
-| Connection scans                       | `App/Workspace/Workbenches/Graph/ConnectionScan/`, `App/Workspace/ConnectionScan/`    | Colocated algorithm tests and `tests/integration/connection-scan/`                             |
-| Analysis tools or reports              | `App/Workspace/Analysis/`, `App/Workspace/Workbenches/Analysis/`                      | Colocated analysis and workbench tests                                                         |
-| Labels, tags or icons                  | `App/Workspace/Annotations/`, `App/Controls/Metadata/`, `Graph/TagsPanel/`            | Colocated annotation tests and `tests/integration/workspace/tags.test.ts`                      |
-| Fetching or request coordination       | `Infra/Bitcoin/`, `App/Workspace/Evidence/Transactions/`, `useWorkspaceOperation.ts`  | Colocated scheduler/operation tests and `tests/integration/bitcoin/`                           |
+| Task                         | Start here                                                 | Tests                                                        |
+| ---------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+| Creation, import or unlock   | App workspace dialogs, Core `createWorkspace`, Persistence | Dialog tests and workspace integration tests                 |
+| Autosave, locking or undo    | Core `Session/`, App `Store/`, Persistence `Browser/`      | Colocated history tests and workspace integration tests      |
+| Wallet discovery or review   | Core `Wallets/`, App Wallet workbench                      | Colocated rules; Bitcoin/wallet integration tests            |
+| Connection scanning          | Core `ConnectionScan/`, App Graph `ConnectionScan/`        | Colocated engine tests and connection-scan integration tests |
+| Analysis algorithms          | Core `Analysis/`                                           | Colocated algorithm/recovery tests; format integration tests |
+| Metadata and labels          | Core `Annotations/`, App metadata controls                 | Colocated mutations and workspace integration tests          |
+| Canvas and flow presentation | App Graph `Renderer/`, `TransactionFlow/`                  | Tests beside their presentation implementation               |
+| Membership or entity removal | App `GraphState/`, Core and App `entityRemoval.ts`         | Colocated tests and graph integration tests                  |
+| Fetch scheduling             | Core `ChainData/`, Core Workspace `Session/`               | Colocated scheduler tests and Bitcoin integration tests      |
 
-Paths in the task table are relative to `src/`. Focused tests live beside their
-production owner as `*.test.ts` or `*.test.tsx`. Cross-module tests live under
-`tests/integration/`; shared fixtures stay under `tests/fixtures/`; backend tests
-live beside the server modules. Test commands are in
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+Persistence paths in the table are relative to `src/Core/Workspace/`; App and
+other Core paths are relative to `src/`. Unit tests live beside their
+production owner as `<file>.test.ts` or `<file>.test.tsx`. Tests deliberately
+combining public modules live under `tests/integration/`. Tests of private
+persistence storage/crypto faults combined with Session/App behavior live in
+Persistence's own `Integration/` suite. Neither location creates a production
+dependency on test helpers or App.
 
-## Workspace vocabulary
+## Dependency direction
 
-`WorkspaceStore` owns two collections: `saved`, the public metadata for encrypted
-workspaces at rest, and `unlocked`, the decrypted ones in memory with their
-password, undo stack and autosave tracking. `useWorkspaces` subscribes React to
-that store. One unlocked workspace is active at a time.
+App consumes Core capabilities and concept-owned models. Persistence also
+consumes those models and validity rules, never App or Session implementation. Session depends on the
+public WorkspacePersistence contract; App composition supplies the facade.
+Canonical document validation loads neither Persistence nor live query code.
+Domain and Infra/Bitcoin have been removed. Core Bitcoin owns native mechanisms;
+Core ChainData owns shared application chain data, typed RPC queries and scheduling,
+and consumes Bitcoin. Workspace consumes both and owns workspace references and
+wallet constraints. Neither Bitcoin nor ChainData imports workspace models or
+session execution. ChainData's existing index stays model/validation-only; live
+query callers use named-file imports.
 
-| Name                | Means                                                    |
-| ------------------- | -------------------------------------------------------- |
-| `workspaces`        | the store holding both `saved` and `unlocked`            |
-| `UnlockedWorkspace` | one decrypted workspace and everything held alongside it |
-| `activeWorkspace`   | the workspace the workbench is showing                   |
-| `edit`              | the sanctioned mutation of the active workspace          |
+Public interfaces may be named files. Bitcoin, ChainData and workspace concepts
+allow direct imports, without a mandatory index for every folder. Persistence and
+Formatting retain root-only interfaces. Lint rejects their private imports,
+including literal dynamic imports and re-exports. Internal imports remain direct.
+There are no public Browser/Codec
+indexes and no duplicate Persistence/Schema. Public factories do not initialize
+browser storage until a storage operation is requested. Import cycles are rejected.
 
-`edit` is not a setter. It refuses writes while that workspace is locking, treats
-an identical result as no edit, records an undo step unless the write is
-presentation-only, and can group rapid edits under one description.
+Each concept keeps its canonical data types with their schemas and validity rules.
+The Persistence parser migrates, validates the workspace and applies reopen transitions.
+Save/export reuse validation without interrupting running scans. Parsing and
+file operations do not require browser storage. Old format and envelope details
+do not leak into the live model. Pure UI helpers stay in App; transient Graph
+projection exclusions are not part of the saved filter type.
 
-## Scan, analysis and review vocabulary
+Workbench implementations do not import sibling workbench internals. Wallet and
+Analysis reach Graph through `GraphHandoff`, never by changing its panel state
+directly. ConnectionScan's Core engine owns search and result meaning; Graph
+supplies its selected/visible targets and presents or adds the returned paths.
 
-Four separate features once shared the word "scan". Each keeps its own words, and
-names stay unambiguous at the scope where they are exposed:
+## Workspace and scan vocabulary
 
-| Feature          | Means                                                                         | Entry point                             | Owner                                            |
-| ---------------- | ----------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------ |
-| Wallet discovery | Derive branches and pull their history. "Scan wallet" or "Refresh" in the UI. | `walletDiscovery` (`useWalletActivity`) | `Domain/Wallet/wallet.ts`, `Workbenches/Wallet/` |
-| Wallet analysis  | Run the analysis tools over a wallet scope. "Analyze" in the UI.              | `useWalletAnalysis`                     | `App/Workspace/Analysis/`                        |
-| Wallet review    | The queue of sources, destinations and activity to label.                     | `walletActions`, review panels          | `App/Workspace/Wallet/`                          |
-| Connection scan  | Find loops, dead ends and large branches in the graph.                        | `connectionScanTargets`, the scan panel | Graph `ConnectionScan/`                          |
+`WorkspaceStore` holds public saved entries and unlocked sessions. An unlocked
+session owns the decrypted document, password, history and save tracking.
+`useWorkspaces` adapts that runtime to React. `edit` is the sanctioned mutation:
+it rejects writes during locking, tracks revisions and applies history policy.
 
-Wallet analysis and the Analysis workbench are the same feature reached from two
-places, so they share `AnalysisScan` and write one `findings` store. Wallet
-review keeps its own decisions in `walletReviews`, but reads that same `findings`
-store: a finding covering the wallet becomes a `link` item in its queue. Inside
-`ConnectionScan/` the short names are fine; anything published on the workspace
-controller carries its feature prefix, because all four meet there.
+Wallet discovery, wallet analysis, wallet review and connection scanning are
+distinct workflows. Wallet analysis and the Analysis workbench run the same
+Core algorithms and write the same findings collection. Wallet review owns its
+decisions and consumes those findings. A connection scan finds bounded observed
+paths; it does not assign ownership or prove that no other path exists.
 
-## Ownership and responsibilities
-
-UI, styles and area-specific hooks live together. Browser transport and encrypted
-storage are separate from the server. Global styles live in `App/styles.css`, workbench
-styles in `App/Workspace/Workbenches/workbenches.css`, and design tokens live
-in the root `tokens.css`. Tool configuration stays at the repository root.
-
-`App/useAppState.ts` owns the workspace store, navigation, connection status and feedback,
-and exports them as the `AppState` contract. `App.tsx` reads these directly;
-Workspace consumes the app services it needs.
-`Workspace/useWorkspace.tsx` composes the concepts a workspace needs and owns
-only the small core: the active workspace, editing it, notices and workbench
-switching. Each concept lives in its product area, so the controller reads as a
-map of them: `graph` (projection, canvas, panels, filters, actions, address,
-navigation, lookup, flow inputs and scan targets), `wallet`, `analysis`, plus the
-shared `selection`, `annotations`, `history` and `dialogs`.
-
-Workspace navigation owns direct switches, contextual handoffs and their single
-transient return point. A destination workbench owns how semantic entry focus is
-resolved inside its UI; Workspace does not query another workbench's DOM.
-
-Panel state belongs to the workbench that shows it. Graph owns its tabs, and
-other workbenches reach them through `GraphHandoff` rather than writing them, so
-a wallet record opening in the inspector is a handoff rather than a tab write.
-Workbench implementation modules do not import sibling workbenches. Shared
-transient UTXO observations live in `Wallet/WalletUtxos/`. Workbench action
-modules implement Graph, Wallet and Analysis behavior over that state. Wallet and
-Analysis reach Graph only through the `GraphHandoff` contract in
-`Workbenches/workbenchHandoff.ts`, never through Graph's own modules. Each
-workbench file binds the controller to its own view, which keeps a props-driven
-contract that tests render directly. Owned panels receive the Workspace
-controller; reusable controls keep focused props. Workspace dialog and tour
-components bind that controller to their UI without owning another copy of state.
-Shared transaction and input-context evidence lives under `Evidence/`. Graph owns
-address history loading and projection under `Graph/Address/`, and lookup plus
-funding/spending expansion under `Graph/Navigation/`. The flow-input hooks stay
-with the workbench that shows them, under `Graph/TransactionFlow/` and
-`Wallet/Review/`, and `useWorkspace` composes their explicit interfaces. The
-dialog module exports modal and focus helpers used by other areas. Graph filter
-controls are also used by the entity browser, and `MultiSelectFilter` is shared by
-Wallet and Analysis.
+For domain vocabulary, see [CONTEXT.md](../CONTEXT.md). For unfinished work in the
+broader observation/runtime refactor, use the current working log rather than
+treating this location map as a claim that every planned behavior is done.

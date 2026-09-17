@@ -1,5 +1,5 @@
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { isOpReturn } from '../../../Domain/Chain/opReturn';
+import { isOpReturn } from '../../../Core/Bitcoin';
 
 /** A UI budget, not a Bitcoin consensus or relay-policy limit. */
 const OP_RETURN_DISPLAY_LIMIT = 65_536;

@@ -9,10 +9,11 @@ import {
   createBatchTag,
   planBatchLabel,
   planBatchTag,
-} from '../../Workspace/Annotations/batchMetadata';
-import { canonicalTagNodeId } from '../../Workspace/Annotations/tagProjection';
-import type { Workspace } from '../../Workspace/workspace';
-import type { WorkspaceTag } from '../../Workspace/Annotations/workspaceTags';
+} from '../../../Core/Workspace/Annotations/batchMetadata';
+import { canonicalEntityReference } from '../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+import type { WorkspaceTag } from '../../../Core/Workspace/Annotations/annotations';
+
 import { DEFAULT_TAG_COLOR, TAG_COLORS } from './tagColors';
 import './metadata-editors.css';
 
@@ -60,7 +61,9 @@ export function BatchLabelEditor({
   onApply,
 }: MetadataEditorProps) {
   const ref = useDialogFocus(onClose, undefined, false);
-  const [value, setValue] = useState(single ? (workspace.annotations[ids[0]]?.label ?? '') : '');
+  const [value, setValue] = useState(
+    single ? (workspace.annotations.entities[ids[0]]?.label ?? '') : '',
+  );
   const [replace, setReplace] = useState(single);
   const [error, setError] = useState('');
   const plan = planBatchLabel(workspace, ids, replace);
@@ -172,7 +175,7 @@ export function BatchTagEditor({
   const [query, setQuery] = useState('');
   const [color, setColor] = useState<string>(DEFAULT_TAG_COLOR);
   const [error, setError] = useState('');
-  const tags = workspace.tags ?? [];
+  const tags = workspace.annotations.tags ?? [];
   const name = query.trim();
   const matching = tags
     .filter((tag) =>
@@ -415,7 +418,7 @@ export function EntityNoteEditor({
 }) {
   const ref = useDialogFocus(onClose, undefined, false);
   const [group] = useState(() => `note:${crypto.randomUUID()}`);
-  const canonicalId = canonicalTagNodeId(id, workspace.network);
+  const canonicalId = canonicalEntityReference(id, workspace.network);
   return (
     <div
       ref={ref}
@@ -435,7 +438,7 @@ export function EntityNoteEditor({
         aria-label="Entity notes"
         rows={5}
         maxLength={10000}
-        value={workspace.annotations[canonicalId]?.note ?? ''}
+        value={workspace.annotations.entities[canonicalId]?.note ?? ''}
         onChange={(event) => {
           const note = event.target.value;
           onChange((current) => applyEntityNote(current, canonicalId, note), group);

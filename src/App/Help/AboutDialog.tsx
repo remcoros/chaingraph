@@ -9,8 +9,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Modal } from '../Dialogs';
-import type { BackendStatus } from '../../Infra/Bitcoin/api';
-import type { Network } from '../../Domain/Chain/network';
+import type { BackendStatus } from '../../Core/ChainData/api';
+import type { Network } from '../../Core/Bitcoin';
 import './product.css';
 
 export function AboutDialog({

@@ -1,16 +1,19 @@
-import { addressToScriptHash } from '../../../../../Domain/Wallet/wallet';
-import { canonicalAddress } from '../../../../../Domain/Metadata/entityReferences';
-import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../../Domain/Chain/prevouts';
-import { createWalletOutputEvidenceResolver } from '../../../Wallet/walletOutputEvidence';
-import { sats, type Transaction } from '../../../../../Domain/Chain/transaction';
-import type {
-  AddressBalanceObservation,
-  AddressHistoryObservation,
-  AddressUtxoObservation,
-} from '../../../../../Domain/Chain/observations';
+import { addressToScriptHash, sats } from '../../../../../Core/Bitcoin';
+import { canonicalAddress } from '../../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import {
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  type Transaction,
+  type AddressBalanceObservation,
+  type AddressHistoryObservation,
+  type AddressUtxoObservation,
+} from '../../../../../Core/ChainData';
+import { createWalletOutputEvidenceResolver } from '../../../../../Core/Workspace/Wallets/walletOutputEvidence';
+
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../workspace';
-import { verifiedWalletAddresses } from '../../../Wallet/walletRecords';
+
+import { verifiedWalletAddresses } from '../../../../../Core/Workspace/Wallets/walletRecords';
 
 export type AddressHistoryDirection = 'received' | 'spent' | 'activity' | 'unknown';
 
@@ -79,8 +82,10 @@ export interface AddressHistoryTransactionIndex {
   matchesByScripthash: ReadonlyMap<string, ReadonlyMap<string, AddressHistoryTransactionMatch>>;
 }
 
-export type AddressHistoryWorkspace = Pick<Workspace, 'network' | 'transactions' | 'wallets'> & {
-  addressHistories?: Workspace['addressHistories'];
+export type AddressHistoryWorkspace = Pick<Workspace, 'network'> & {
+  chainData: Pick<Workspace['chainData'], 'transactions' | 'addressHistories'>;
+  wallets: Pick<Workspace['wallets'], 'definitions'>;
+} & {
   view: Pick<Workspace['view'], 'graphNodeIds' | 'hiddenNodeIds'>;
 };
 
@@ -113,7 +118,7 @@ function historyObservation(
   complete: boolean;
   checkedAt?: string;
 } {
-  const direct = workspace.addressHistories?.[address];
+  const direct = workspace.chainData.addressHistories?.[address];
   if (direct)
     return {
       observation: direct,
@@ -126,7 +131,7 @@ function historyObservation(
   let complete = true;
   const entries: { tx_hash: string; height: number }[] = [];
   const target = addressToScriptHash(address, workspace.network);
-  for (const wallet of workspace.wallets) {
+  for (const wallet of workspace.wallets.definitions) {
     for (const item of verifiedWalletAddresses(wallet, workspace.network)) {
       if (addressToScriptHash(item.address, workspace.network) !== target) continue;
       matched = true;
@@ -139,7 +144,7 @@ function historyObservation(
     observation: { history: entries, truncated: !complete },
     source: 'wallet history',
     complete,
-    checkedAt: workspace.wallets
+    checkedAt: workspace.wallets.definitions
       .map((wallet) => wallet.scannedAt)
       .filter((value): value is string => value !== undefined)
       .sort()
@@ -148,11 +153,16 @@ function historyObservation(
 }
 
 export function buildAddressHistoryTransactionIndex(
-  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  },
 ): AddressHistoryTransactionIndex {
   const matchesByScripthash = new Map<string, Map<string, AddressHistoryTransactionMatch>>();
   const evidence = createWalletOutputEvidenceResolver(workspace.network);
-  const previousOutputs = indexPreviousOutputs(workspace);
+  const previousOutputs = indexPreviousOutputs({
+    network: workspace.network,
+    transactions: workspace.chainData.transactions,
+  });
   const addMatch = (
     scripthash: string,
     txid: string,
@@ -169,7 +179,7 @@ export function buildAddressHistoryTransactionIndex(
     else matchesByScripthash.delete(scripthash);
   };
 
-  for (const transaction of Object.values(workspace.transactions)) {
+  for (const transaction of Object.values(workspace.chainData.transactions)) {
     const txid = transaction.txid.toLowerCase();
     for (const output of transaction.vout) {
       const scripthash = evidence(output).scripthash;
@@ -178,7 +188,11 @@ export function buildAddressHistoryTransactionIndex(
     for (const input of transaction.vin) {
       if (input.coinbase !== undefined || input.txid === undefined || input.vout === undefined)
         continue;
-      const previous = resolvePreviousOutput(workspace, input, previousOutputs);
+      const previous = resolvePreviousOutput(
+        { network: workspace.network, transactions: workspace.chainData.transactions },
+        input,
+        previousOutputs,
+      );
       if (previous.status !== 'loaded' && previous.status !== 'attached') continue;
       const scripthash = evidence(previous.output).scripthash;
       if (scripthash) addMatch(scripthash, txid, 'spentSats', sats(previous.output.value));
@@ -190,12 +204,14 @@ export function buildAddressHistoryTransactionIndex(
 }
 
 export function indexAddressHistoryTransactions(
-  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  },
 ): AddressHistoryTransactionIndex {
-  const cached = transactionIndexCache.get(workspace.transactions);
+  const cached = transactionIndexCache.get(workspace.chainData.transactions);
   if (cached?.network === workspace.network) return cached;
   const index = buildAddressHistoryTransactionIndex(workspace);
-  transactionIndexCache.set(workspace.transactions, index);
+  transactionIndexCache.set(workspace.chainData.transactions, index);
   return index;
 }
 
@@ -203,7 +219,7 @@ function historyHeight(
   transaction: Transaction | undefined,
   heights: Set<number> | undefined,
 ): number | undefined {
-  if (transaction?.blockHeight !== undefined) return transaction.blockHeight;
+  if (transaction?.status?.blockHeight !== undefined) return transaction.status?.blockHeight;
   const confirmed = [...(heights ?? [])].filter((height) => height > 0);
   return confirmed.length === 1 ? confirmed[0] : undefined;
 }
@@ -244,7 +260,7 @@ export function projectAddressHistory(
   const onGraph = new Set(workspace.view.graphNodeIds ?? []);
   const entries = [...heights.entries()]
     .map(([txid, txHeights]): AddressHistoryEntry => {
-      const transaction = workspace.transactions[txid];
+      const transaction = workspace.chainData.transactions[txid];
       const match = matches.get(txid);
       const received = match?.receivedSats !== undefined;
       const spent = match?.spentSats !== undefined;
@@ -252,8 +268,9 @@ export function projectAddressHistory(
         txid,
         height: historyHeight(transaction, txHeights),
         mempool:
-          transaction?.mempool === true ||
-          (transaction?.blockHeight === undefined && [...txHeights].some((height) => height <= 0)),
+          (transaction?.status?.kind === 'mempool') === true ||
+          (transaction?.status?.blockHeight === undefined &&
+            [...txHeights].some((height) => height <= 0)),
         transaction,
         direction:
           received && spent ? 'activity' : received ? 'received' : spent ? 'spent' : 'unknown',

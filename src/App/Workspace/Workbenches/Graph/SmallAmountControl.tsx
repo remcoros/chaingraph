@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../../../Controls/Display/amountFormat';
+import { formatBitcoinAmount } from '../../../../Core/Formatting';
 import { SMALL_AMOUNT_PRESETS } from './smallAmounts';
 
 export function SmallAmountControl({

@@ -4,12 +4,13 @@ import {
   mergeScanFindings,
   scanAnalysis,
   scanDefaults,
+  analysisScanMatches,
   type AnalysisScan,
-} from '../../Analysis/analysisScan';
-import { walletEvidenceChanged } from '../../Wallet/walletActivity';
-import { short } from '../../../Controls/Display/referenceFormat';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
+} from '../../../../Core/Workspace/Analysis/analysisScan';
+import { short } from '../../../../Core/Formatting';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+
 import type { WalletRow } from './walletRows';
 
 export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: WalletRow) {
@@ -18,7 +19,7 @@ export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: 
       kind: row.kind,
       label: `${row.relationshipDirection === 'source' ? 'Source' : 'Destination'} ${short(row.address ?? row.identifier)}`,
       explanation: 'Loaded one-hop transaction contexts for this address in the selected wallet.',
-      txids: row.contextTransactionIds.filter((id) => !!workspace.transactions[id]),
+      txids: row.contextTransactionIds.filter((id) => !!workspace.chainData.transactions[id]),
     };
   return analysisScanScope(
     workspace,
@@ -26,7 +27,7 @@ export function walletAnalysisScope(workspace: Workspace, wallet: Wallet, row?: 
       ? {
           id: row.nodeId,
           kind: row.kind,
-          label: workspace.annotations[row.nodeId]?.label ?? '',
+          label: workspace.annotations.entities[row.nodeId]?.label ?? '',
           address: row.address,
           txid: row.txid,
           vout: row.kind === 'output' ? Number(row.nodeId.split(':')[2]) : undefined,
@@ -81,14 +82,20 @@ async function runWalletAnalysisRequest(
       latest.current.workspace.id !== snapshot.workspace.id ||
       latest.current.wallet.id !== snapshot.wallet.id ||
       latest.current.workspace.network !== snapshot.workspace.network ||
-      latest.current.workspace.transactions !== snapshot.workspace.transactions ||
-      walletEvidenceChanged(snapshot.workspace.wallets, latest.current.workspace.wallets)
+      !analysisScanMatches(result, latest.current.workspace)
     )
       return;
-    latest.current.onChange((current) => ({
-      ...current,
-      findings: mergeScanFindings(current.findings, result),
-    }));
+    latest.current.onChange((current) =>
+      !analysisScanMatches(result, current)
+        ? current
+        : {
+            ...current,
+            analysis: {
+              ...current.analysis,
+              findings: mergeScanFindings(current.analysis.findings, result),
+            },
+          },
+    );
     setScan(result);
     setMessage(walletAnalysisSummary(result));
     latest.current.onComplete?.(result);
@@ -124,16 +131,13 @@ export function useWalletAnalysis(options: WalletAnalysisOptions) {
     const previous = evidence.current;
     evidence.current = options.workspace;
     const changed =
-      previous.id !== options.workspace.id ||
-      previous.network !== options.workspace.network ||
-      previous.transactions !== options.workspace.transactions ||
-      walletEvidenceChanged(previous.wallets, options.workspace.wallets);
+      previous.id !== options.workspace.id || previous.network !== options.workspace.network;
     if (pending.current && (!options.active || changed)) {
       pending.current.abort();
       pending.current = undefined;
       setLoading(false);
       setMessage('Scan cancelled');
-    } else if (scan && changed) {
+    } else if (scan && (changed || !analysisScanMatches(scan, options.workspace))) {
       setMessage('Data changed · Scan again');
     }
   }, [options.active, options.workspace, scan]);

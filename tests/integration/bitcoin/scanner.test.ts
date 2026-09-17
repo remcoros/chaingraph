@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { verboseTransaction } from '../../fixtures/verboseTransaction';
 import {
   fetchTransaction,
   fetchHistory,
@@ -6,15 +7,16 @@ import {
   fetchAddressUtxos,
   loadAddress,
   mapLimit,
-  scanWallet,
   MAX_SCAN_TRANSACTIONS,
-} from '../../../src/Infra/Bitcoin/api';
-import { deriveAddresses } from '../../../src/Domain/Wallet/wallet';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
-import type { Network } from '../../../src/Domain/Chain/network';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import type { Wallet } from '../../../src/Domain/Wallet/walletTypes';
+} from '../../../src/Core/ChainData/api';
+import { scanWallet } from '../../../src/Core/Workspace/Wallets/scanning';
+import { deriveAddresses } from '../../../src/Core/Workspace/Wallets/walletDerivation';
+import type { Wallet } from '../../../src/Core/Workspace/Wallets/wallets';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+import type { Network } from '../../../src/Core/Bitcoin';
+import type { Transaction } from '../../../src/Core/ChainData';
+
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 
 const zpub =
@@ -30,9 +32,12 @@ const wallet: Wallet = {
 const txid = (n: number) => n.toString(16).padStart(64, '0');
 const transaction = (id: string, confirmations = 1): Transaction => ({
   txid: id,
-  confirmations,
   vin: [{ coinbase: '0101' }],
   vout: [{ n: 0, value: 1, scriptPubKey: { hex: '51' } }],
+  status: {
+    kind: confirmations < 0 ? 'inactive' : confirmations > 0 ? 'confirmed' : 'unknown',
+    confirmations,
+  },
 });
 type Request = { network: Network; target: string; method: string; params: unknown[] };
 function mockRpc(
@@ -43,7 +48,7 @@ function mockRpc(
     vi.fn(async (_url: string, init: RequestInit) => {
       init.signal?.throwIfAborted();
       const result = await handler(JSON.parse(init.body as string), init.signal);
-      return { ok: true, json: async () => ({ result }) };
+      return { ok: true, json: async () => ({ result: verboseTransaction(result) }) };
     }),
   );
 }
@@ -193,7 +198,13 @@ describe('browser-side wallet scanner', () => {
     expect(result.truncated).toBe(true);
     const saved = parseWorkspace(
       JSON.parse(
-        JSON.stringify({ ...createWorkspace('Continuation', 'mainnet'), wallets: [result.wallet] }),
+        JSON.stringify({
+          ...createWorkspace('Continuation', 'mainnet'),
+          wallets: {
+            ...createWorkspace('Continuation', 'mainnet').wallets,
+            definitions: [result.wallet],
+          },
+        }),
       ),
     );
     const updated = {
@@ -201,7 +212,7 @@ describe('browser-side wallet scanner', () => {
       ...Object.fromEntries(result.transactions.map((t) => [t.txid, t])),
     };
     fetched.length = 0;
-    const continued = await scanWallet(saved.wallets[0], 'mainnet', updated, {
+    const continued = await scanWallet(saved.wallets.definitions[0], 'mainnet', updated, {
       gap: 10,
       maxIndex: 30,
     });
@@ -287,16 +298,28 @@ describe('browser-side wallet scanner', () => {
   it('validates persisted continuation IDs and their queue bound', () => {
     const base = {
       ...createWorkspace('Queue validation', 'mainnet'),
-      wallets: [{ ...wallet, pendingTransactionIds: [txid(1)] }],
+      wallets: {
+        ...createWorkspace('Queue validation', 'mainnet').wallets,
+        definitions: [{ ...wallet, pendingTransactionIds: [txid(1)] }],
+      },
     };
-    expect(parseWorkspace(base).wallets[0].pendingTransactionIds).toEqual([txid(1)]);
+    expect(parseWorkspace(base).wallets.definitions[0].pendingTransactionIds).toEqual([txid(1)]);
     expect(() =>
-      parseWorkspace({ ...base, wallets: [{ ...wallet, pendingTransactionIds: ['invalid'] }] }),
+      parseWorkspace({
+        ...base,
+        wallets: {
+          ...base.wallets,
+          definitions: [{ ...wallet, pendingTransactionIds: ['invalid'] }],
+        },
+      }),
     ).toThrow();
     expect(() =>
       parseWorkspace({
         ...base,
-        wallets: [{ ...wallet, pendingTransactionIds: Array(10001).fill(txid(1)) }],
+        wallets: {
+          ...base.wallets,
+          definitions: [{ ...wallet, pendingTransactionIds: Array(10001).fill(txid(1)) }],
+        },
       }),
     ).toThrow();
   });
@@ -330,8 +353,10 @@ describe('browser-side wallet scanner', () => {
       [owned]: transaction(owned, 10),
       [unrelated]: transaction(unrelated, 10),
     });
-    expect(result.transactions).toMatchObject([{ txid: owned, blockHeight: 100 }]);
-    expect(result.transactions[0].confirmations).toBeUndefined();
+    expect(result.transactions).toMatchObject([
+      { txid: owned, status: { kind: 'confirmed' as const, blockHeight: 100 } },
+    ]);
+    expect(result.transactions[0].status?.confirmations).toBeUndefined();
     expect(result.observedTransactionIds).toEqual([owned]);
     expect(requests).toEqual(['blockchain.scripthash.get_history']);
   });
@@ -368,7 +393,9 @@ describe('browser-side wallet scanner', () => {
       { gap: 20, maxIndex: 60 },
     );
     expect(lookedUp).toContain(known.scripthash);
-    expect(result.transactions).toMatchObject([{ txid: txid(7), blockHeight: 101 }]);
+    expect(result.transactions).toMatchObject([
+      { txid: txid(7), status: { kind: 'confirmed' as const, blockHeight: 101 } },
+    ]);
     expect(result.wallet.scanComplete).toBe(true);
     const capped = await scanWallet(imported, 'mainnet', {}, { gap: 20, maxIndex: 20 });
     expect(capped.wallet.scanComplete).toBe(false);

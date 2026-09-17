@@ -1,14 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { applyWalletScan, walletActivitySummary } from '../../Wallet/walletActivity';
-import { clearContextProvenance } from '../../Evidence/InputContext';
-import { mergeTransactionObservations } from '../../../../Domain/Chain/prevouts';
-import type { Transaction } from '../../../../Domain/Chain/transaction';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
-import { loadAddress, scanWallet } from '../../../../Infra/Bitcoin/api';
+import { walletActivitySummary } from '../../../../Core/Workspace/Wallets/walletActivity';
 
-import type { AppState } from '../../../useAppState';
-import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+
+import type { ChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 import type { WorkspaceCore } from '../../workspaceCore';
 /**
@@ -30,9 +26,8 @@ export interface WalletDiscovery {
 }
 interface Inputs {
   core: WorkspaceCore;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
-  fetchScope: AppState['fetchScope'];
   canLoadChainData: boolean;
   /** Fits the graph once a first scan brings a wallet's transactions in. */
   fitAll: () => void;
@@ -41,13 +36,10 @@ export function useWalletActivity({
   core,
   transactions,
   operation,
-  fetchScope,
   canLoadChainData,
   fitAll,
 }: Inputs): WalletDiscovery {
-  const { activeWorkspace, activeWorkspaceRef, workspaceId, workspaces, setOperation, setNotice } =
-    core;
-  const { recordTransactions } = transactions;
+  const { activeWorkspace, activeWorkspaceRef, workspaceId, setOperation, setNotice } = core;
   const { run, cancel, isActive } = operation;
 
   const [gapLimit, setGapLimit] = useState(20);
@@ -67,18 +59,13 @@ export function useWalletActivity({
     let missing = 0;
     for (const target of targets) {
       setOperation(`${target.scannedAt ? 'Refreshing' : 'Scanning'} ${target.name}…`);
-      const result = await scanWallet(target, snapshot.network, snapshot.transactions, {
+      const result = await transactions.observe.walletScan(target, {
         gap: gapLimit,
         maxIndex: addressesPerBranch,
         signal,
-        fetchHints: { scope: fetchScope },
         onProgress: (p) => setOperation(p.message),
       });
-      signal.throwIfAborted();
-      workspaces
-        .getUnlocked(initial.id)
-        ?.edit((current) => applyWalletScan(current, result.wallet, result.transactions), false);
-      snapshot = applyWalletScan(snapshot, result.wallet, result.transactions);
+      snapshot = result.snapshot;
       added += result.wallet.lastActivity?.newTransactionIds.length ?? 0;
       refreshed += result.wallet.lastActivity?.refreshedTransactionCount ?? 0;
       missing += result.wallet.lastActivity?.missingTransactionCount ?? 0;
@@ -90,11 +77,11 @@ export function useWalletActivity({
     if (!activeWorkspace || !canLoadChainData) return;
     await run(async (signal) => {
       const result = await refreshWallets(
-        target ? [target] : activeWorkspace.wallets,
+        target ? [target] : activeWorkspace.wallets.definitions,
         activeWorkspace,
         signal,
       );
-      const checkedWallets = result.snapshot.wallets.filter(
+      const checkedWallets = result.snapshot.wallets.definitions.filter(
         (entry) => !target || entry.id === target.id,
       );
       const pendingTransactions = checkedWallets.reduce(
@@ -102,11 +89,11 @@ export function useWalletActivity({
         0,
       );
       setNotice(
-        `${target ? walletActivitySummary(result.snapshot.wallets.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${pendingTransactions ? ` ${pendingTransactions} transactions waiting; Refresh again to continue.` : result.partial ? ` Address search reached its ${addressesPerBranch}/branch limit. Increase Addresses / branch in Graph wallet controls to search further.` : ''}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
+        `${target ? walletActivitySummary(result.snapshot.wallets.definitions.find((item) => item.id === target.id)!) : `${result.added} new to workspace · ${result.refreshed} transactions refreshed`}.${pendingTransactions ? ` ${pendingTransactions} transactions waiting; Refresh again to continue.` : result.partial ? ` Address search reached its ${addressesPerBranch}/branch limit. Increase Addresses / branch in Graph wallet controls to search further.` : ''}${result.missing ? ` ${result.missing} previously observed transactions absent from checked histories; saved graph retained.` : ''}`,
       );
       // Only the first discovery frames an empty canvas. Returning checks leave
       // the user's camera, selection, filters and annotations alone.
-      if (!Object.keys(activeWorkspace.transactions).length && result.added) fitAll();
+      if (!Object.keys(activeWorkspace.chainData.transactions).length && result.added) fitAll();
     });
   }
   const pollWalletActivity = useEffectEvent(() => {
@@ -116,80 +103,17 @@ export function useWalletActivity({
     void run(async (signal) => {
       monitorOperationSignal.current = signal;
       setOperation('Checking watched activity…');
-      const checked = await refreshWallets(current.wallets, current, signal);
-      let added = checked.added;
-      let refreshed = checked.refreshed;
-      let partial = checked.partial;
-      let snapshot = checked.snapshot;
-      const polledTransactions: Transaction[] = [];
-      const polledObservedTransactionIds = new Set<string>();
-      const refreshedHistories: NonNullable<Workspace['addressHistories']> = {};
-      let pollFailed = false;
-      let pollFailure: unknown;
-      try {
-        for (const address of current.watchedAddresses) {
-          const result = await loadAddress(
-            address,
-            current.network,
-            snapshot.transactions,
-            signal,
-            undefined,
-            { scope: fetchScope },
-          );
-          signal.throwIfAborted();
-          polledTransactions.push(...result.transactions);
-          for (const txid of result.observedTransactionIds) polledObservedTransactionIds.add(txid);
-          refreshedHistories[address] = {
-            history: result.history,
-            truncated: result.truncated,
-            scannedAt: new Date().toISOString(),
-          };
-          added += result.transactions.filter((tx) => !snapshot.transactions[tx.txid]).length;
-          refreshed += result.transactions.filter((tx) => !!snapshot.transactions[tx.txid]).length;
-          snapshot = {
-            ...clearContextProvenance(snapshot, result.observedTransactionIds),
-            transactions: {
-              ...snapshot.transactions,
-              ...Object.fromEntries(
-                result.transactions.map((tx) => [
-                  tx.txid,
-                  mergeTransactionObservations(
-                    snapshot.transactions[tx.txid],
-                    tx,
-                    snapshot.network,
-                  ),
-                ]),
-              ),
-            },
-          };
-          partial = partial || result.truncated;
-        }
-      } catch (error) {
-        pollFailed = true;
-        pollFailure = error;
-      }
-      // Publish completed work as one immutable snapshot. If polling is cancelled,
-      // preserve the addresses already checked before the abort as well.
-      if (
-        activeWorkspaceRef.current?.id === current.id &&
-        activeWorkspaceRef.current.network === current.network
-      ) {
-        recordTransactions(current.id, polledTransactions, {
-          promotionIds: [...polledObservedTransactionIds],
-        });
-        if (Object.keys(refreshedHistories).length)
-          workspaces.getUnlocked(current.id)?.edit(
-            (latest) => ({
-              ...latest,
-              addressHistories: {
-                ...latest.addressHistories,
-                ...refreshedHistories,
-              },
-            }),
-            false,
-          );
-      }
-      if (pollFailed) throw pollFailure;
+      const checked = await refreshWallets(current.wallets.definitions, current, signal);
+      const polled = await transactions.observe.watchedAddresses(
+        current.chainData.watchedAddresses,
+        {
+          signal,
+          accept: (workspace) => activeWorkspaceRef.current?.id === workspace.id,
+        },
+      );
+      const added = checked.added + polled.added;
+      const refreshed = checked.refreshed + polled.refreshed;
+      const partial = checked.partial || polled.partial;
       setNotice(
         `Activity check finished · ${added} new to workspace · ${refreshed} transactions refreshed.${partial ? ' Some history remains partial; review scan limits.' : ''}${checked.missing ? ' Previously observed transactions disappeared from checked histories; review wallet details.' : ''}`,
       );

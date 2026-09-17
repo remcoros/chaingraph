@@ -1,7 +1,7 @@
 import { SelectedTags } from '../TagsPanel';
 import { ChevronRight, Eye } from 'lucide-react';
 import { NodeInspector, WalletInspector } from './Inspector';
-import { pruneWalletReviews } from '../../../Wallet/walletReview';
+import { pruneWalletReviews } from '../../../../../Core/Workspace/Wallets/walletReview';
 import type { WorkspaceController } from '../../../useWorkspace';
 
 export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceController }) {
@@ -70,7 +70,10 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
         edit((c) =>
           pruneWalletReviews({
             ...c,
-            wallets: c.wallets.filter((x) => x.id !== wallet.id),
+            wallets: {
+              ...c.wallets,
+              definitions: c.wallets.definitions.filter((x) => x.id !== wallet.id),
+            },
           }),
         );
         setSelectedWallet(undefined);
@@ -139,7 +142,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       canRemove={!!entityRemoval.selectedPlan}
       onRemove={() => entityRemoval.request()}
       onSave={(annotation, group) => {
-        const previous = activeWorkspace.annotations[selected.id] ?? {
+        const previous = activeWorkspace.annotations.entities[selected.id] ?? {
           label: '',
           note: '',
           icon: '',
@@ -152,7 +155,10 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
         edit(
           (current) => ({
             ...current,
-            annotations: { ...current.annotations, [selected.id]: annotation },
+            annotations: {
+              ...current.annotations,
+              entities: { ...current.annotations.entities, [selected.id]: annotation },
+            },
           }),
           true,
           `annotation:${selected.id}:${field}:${group}`,

@@ -15,8 +15,22 @@ Read the specific module(s) relevant to the task before editing them.
 `CONTRIBUTING.md` has the commands, worktree conventions and review expectations.
 Use `docs/source-map.md` to locate the product area and relevant tests before
 searching across the repository. UI and its owned helpers live under
-`src/App/Workspace/Workbenches/`; shared domain and infrastructure code live
-under `src/Domain/` and `src/Infra/`. Follow direct imports from the affected area.
+`src/App/Workspace/Workbenches/`. Framework-independent workspace capabilities
+live under `src/Core/Workspace/`; each concept owns its types and validity rules,
+and `Persistence/` owns encrypted formats and storage. Public interfaces may be
+named files; do not require an index for every folder. Persistence's outside
+callers use its public index, never its private implementation files. Shared display
+formatting lives under `src/Core/Formatting/`, also behind its public index.
+Domain has been removed. Native primitives live in `src/Core/Bitcoin/`; shared
+chain models and observation rules live in `src/Core/ChainData/`. Both expose
+optional public indexes and permit direct named-file imports. Bitcoin has no
+app/workspace dependency; ChainData consumes Bitcoin, never Workspace or its runtime.
+ChainData also owns workspace-independent RPC queries, decoding and scheduling.
+Its model/validation index does not export live queries; callers use named files.
+Canonical schema imports must not pull execution into document validation.
+Do not reintroduce Domain or invent
+new owners. Ask when ownership is unresolved. External adapters
+live under `src/Infra/`. Follow direct imports from the affected area.
 
 ## Product boundaries
 

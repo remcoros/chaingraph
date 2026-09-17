@@ -1,14 +1,17 @@
-import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
+import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Core/ChainData/transactionScheduler';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flowInputPlan, shouldLoadFlowInputs, type FlowPlanWorkspace } from './flowInputPlan';
-import { mergeFlowInputs, type FlowInputTarget } from '../../../Evidence/InputContext';
+import {
+  mergeFlowInputs,
+  type FlowInputTarget,
+} from '../../../../../Core/Workspace/flowInputContext';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
+import { type Transaction, indexPreviousOutputs } from '../../../../../Core/ChainData';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
-import { indexPreviousOutputs } from '../../../../../Domain/Chain/prevouts';
+
 import { indexLoadedSpends } from './transactionFlow';
-import { mapLimit } from '../../../../../Infra/Bitcoin/api';
+import { mapLimit } from '../../../../../Core/ChainData/api';
 
 function flowInputTarget(selected: GraphNode | undefined): FlowInputTarget | undefined {
   return selected?.kind === 'output' && selected.txid && selected.vout !== undefined
@@ -29,14 +32,18 @@ export function useFlowInputs(options: {
     latest.current = options;
   });
   const workspace = options.workspace;
-  const transactions = workspace?.transactions;
+  const transactions = workspace?.chainData.transactions;
   const network = workspace?.network;
   const selected = options.selected;
   const flowState = workspace?.view.panels?.flow;
   const flowWorkspace = useMemo<FlowPlanWorkspace | undefined>(
     () =>
       transactions && network
-        ? { network, transactions, view: { panels: { flow: flowState } } }
+        ? {
+            network,
+            view: { panels: { flow: flowState } },
+            chainData: { transactions: transactions },
+          }
         : undefined,
     [transactions, network, flowState],
   );
@@ -90,7 +97,8 @@ export function useFlowInputs(options: {
     const { transactionId, missing } = activePlan;
     update(
       workspace.id,
-      (current) => mergeFlowInputs(current, transactionId, flowInputTarget(selected), [], allInputs),
+      (current) =>
+        mergeFlowInputs(current, transactionId, flowInputTarget(selected), [], allInputs),
       false,
     );
     if (!missing.length) return;

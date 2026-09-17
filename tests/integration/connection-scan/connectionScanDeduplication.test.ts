@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_SCAN_SETTINGS,
-  type ScanResult,
-  type ScanRun,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan';
-import {
-  groupScanRuns,
-  mergeScanRunSnapshots,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanGroups';
-import { replaceScanRun } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import { DEFAULT_SCAN_SETTINGS } from '../../../src/Core/Workspace/ConnectionScan/connectionScan';
+import type {
+  ScanResult,
+  ScanRun,
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScans';
+import { mergeScanRunSnapshots } from '../../../src/Core/Workspace/ConnectionScan/results';
+import { groupScanRuns } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanGroups';
+
+import { replaceScanRun } from '../../../src/Core/Workspace/ConnectionScan/updates';
+import type { Transaction } from '../../../src/Core/ChainData';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${id(n)}`;
@@ -26,7 +25,7 @@ const transaction = (n: number, parents: [number, number][] = []): Transaction =
 
 function fixture() {
   const workspace = createWorkspace('Public scan rerun fixture', 'mainnet');
-  workspace.transactions = { [id(1)]: transaction(1) };
+  workspace.chainData.transactions = { [id(1)]: transaction(1) };
   workspace.view.graphNodeIds = [tx(1), tx(3)];
   const result: ScanResult = {
     id: 'first:1',
@@ -164,7 +163,7 @@ describe('connection scan rerun deduplication', () => {
       expect(saved.connectionScans!.runs).toEqual([next]);
     }
     expect(Object.keys(saved.connectionScans!.evidence).sort()).toEqual([id(2), id(3)]);
-    expect(saved.transactions).toEqual(workspace.transactions);
+    expect(saved.chainData.transactions).toEqual(workspace.chainData.transactions);
   });
 
   it('persists alternative paths and their proof while replacing just the repeated path', () => {

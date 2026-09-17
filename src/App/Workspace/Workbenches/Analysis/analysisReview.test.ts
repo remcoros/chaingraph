@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { analysisTools } from '../../Analysis/analysis';
+import { analysisTools } from '../../../../Core/Workspace/Analysis/analysis';
 import { filterAnalysisFindings, findingReview, reviewPriorities } from './analysisReview';
-import { createWorkspace } from '../../createWorkspace';
-import { parseWorkspace } from '../../Persistence/Format';
-import type { AnalysisFinding } from '../../Analysis/analysisFinding';
-import type { Transaction } from '../../../../Domain/Chain/transaction';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../../Core/Workspace/Persistence';
+import type { AnalysisFinding } from '../../../../Core/Workspace/Analysis/finding';
+import type { Transaction } from '../../../../Core/ChainData';
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const finding = (
   algorithm: string,
@@ -37,7 +37,7 @@ describe('Analysis review priority and faceted results', () => {
       vout: [{ n: 0, value, scriptPubKey: { hex: '00141111', type: 'witness_v0_keyhash' } }],
       vsize: 100,
     });
-    w.transactions = {
+    w.chainData.transactions = {
       [id(2)]: transaction(2, 0.99999),
       [id(3)]: transaction(3, 0.99995),
       [id(4)]: transaction(4, 0.9999),
@@ -50,8 +50,8 @@ describe('Analysis review priority and faceted results', () => {
         .run(w, undefined, { highFeeRate: 101 })
         .every((f) => findingReview(f).priority === 'low'),
     ).toBe(true);
-    w.findings = results;
-    expect(parseWorkspace(w).findings.map((f) => f.reviewRule)).toEqual([
+    w.analysis.findings = results;
+    expect(parseWorkspace(w).analysis.findings.map((f) => f.reviewRule)).toEqual([
       undefined,
       'fee-threshold',
       'fee-threshold',

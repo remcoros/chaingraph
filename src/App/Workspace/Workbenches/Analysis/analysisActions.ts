@@ -1,12 +1,12 @@
 import { graphNavigationTransactionIds, resolveGraphHandoff } from '../graphHandoffNavigation';
-import { txNodeId } from '../../../../Domain/Metadata/entityReferences';
-import type { Workspace } from '../../workspace';
+import { transactionReference } from '../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
 
 import type { WorkbenchMode, WorkbenchSwitchOptions } from '../../workbenchTypes';
 import type { WorkspaceCore } from '../../workspaceCore';
 
 import type { GraphHandoff } from '../workbenchHandoff';
-import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { ChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 
 interface AnalysisActionRuntime {
@@ -21,7 +21,7 @@ interface Inputs {
   workspaces: WorkspaceCore['workspaces'];
   setNotice: WorkspaceCore['setNotice'];
   handoff: GraphHandoff;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   canLoadChainData: boolean;
 }
@@ -35,7 +35,7 @@ export function createAnalysisActions({
   canLoadChainData,
 }: Inputs) {
   const { showOnGraph, loadGraphTransactions } = handoff;
-  const { recordTransactions } = transactions;
+  const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
 
   function showFindingOnGraph(
@@ -60,10 +60,10 @@ export function createAnalysisActions({
       ? ids.filter((id) => !target?.ids.includes(id))
       : target
         ? []
-        : supportingTxids.map(txNodeId);
+        : supportingTxids.map(transactionReference);
     if (!unresolved.length) return finish();
     const missing = graphNavigationTransactionIds(unresolved).filter(
-      (id) => !current.transactions[id],
+      (id) => !current.chainData.transactions[id],
     );
     if (!missing.length || !canLoadChainData || runtime.hasActiveOperation()) return false;
     const isCurrent = runtime.captureCurrent(current.id);

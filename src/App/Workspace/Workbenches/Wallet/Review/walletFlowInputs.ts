@@ -1,19 +1,18 @@
-import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Infra/Bitcoin/transactionScheduler';
-import type { Network } from '../../../../../Domain/Chain/network';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
-import type { WalletReviewFlowEntry } from '../walletReviewContext';
+import { TRANSACTION_BATCH_CONCURRENCY } from '../../../../../Core/ChainData/transactionScheduler';
+import type { Network } from '../../../../../Core/Bitcoin';
 import {
+  type Transaction,
   indexPreviousOutputs,
   resolvePreviousOutput,
   type PreviousOutputIndex,
-} from '../../../../../Domain/Chain/prevouts';
-import {
   parseTransaction,
   validateTransactionAddresses,
-} from '../../../../../Domain/Chain/transactionValidation';
-import { mapLimit } from '../../../../../Infra/Bitcoin/api';
-import { mergeFlowInputs } from '../../../Evidence/InputContext';
+} from '../../../../../Core/ChainData';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import type { WalletReviewFlowEntry } from '../walletReviewContext';
+
+import { mapLimit } from '../../../../../Core/ChainData/api';
+import { mergeFlowInputs } from '../../../../../Core/Workspace/flowInputContext';
 
 export const WALLET_FLOW_INPUT_WAVE_LIMIT = 20;
 export const WALLET_FLOW_VISIBLE_INPUT_LIMIT = 100;
@@ -44,8 +43,9 @@ export function walletFlowSourceKey(
   walletId: string,
   transactionId?: string,
 ): string {
-  if (!transactionId || !workspace.wallets.some((wallet) => wallet.id === walletId)) return '';
-  const source = workspace.transactions[transactionId];
+  if (!transactionId || !workspace.wallets.definitions.some((wallet) => wallet.id === walletId))
+    return '';
+  const source = workspace.chainData.transactions[transactionId];
   return source?.txid === transactionId ? JSON.stringify([transactionId, source.vin]) : '';
 }
 
@@ -61,7 +61,7 @@ export function walletFlowInputPlan(
   const refs: WalletFlowInputReference[] = [];
   const seen = new Set<string>();
   if (walletFlowSourceKey(workspace, walletId, transactionId)) {
-    const source = workspace.transactions[transactionId!];
+    const source = workspace.chainData.transactions[transactionId!];
     for (const input of inputs.slice(0, WALLET_FLOW_VISIBLE_INPUT_LIMIT)) {
       const ref = reference(input);
       if (
@@ -80,11 +80,22 @@ export function walletFlowInputPlan(
   }
   const missing = new Set<string>();
   let missingOutputCount = 0;
-  const prevouts = previousOutputs ?? (refs.length ? indexPreviousOutputs(workspace) : undefined);
+  const prevouts =
+    previousOutputs ??
+    (refs.length
+      ? indexPreviousOutputs({
+          network: workspace.network,
+          transactions: workspace.chainData.transactions,
+        })
+      : undefined);
   for (const ref of refs) {
-    const resolution = resolvePreviousOutput(workspace, ref, prevouts);
+    const resolution = resolvePreviousOutput(
+      { network: workspace.network, transactions: workspace.chainData.transactions },
+      ref,
+      prevouts,
+    );
     if (resolution.status === 'loaded' || resolution.status === 'attached') continue;
-    if (!workspace.transactions[ref.txid]) missing.add(ref.txid);
+    if (!workspace.chainData.transactions[ref.txid]) missing.add(ref.txid);
     else missingOutputCount++;
   }
   return {
@@ -111,7 +122,7 @@ export function mergeWalletFlowInputs(
   if (!refs.length) return workspace;
   let merged = workspace;
   for (const candidate of loaded.slice(0, WALLET_FLOW_INPUT_WAVE_LIMIT)) {
-    if (merged.transactions[candidate.txid]) continue;
+    if (merged.chainData.transactions[candidate.txid]) continue;
     const relevant = refs.filter((ref) => ref.txid === candidate.txid);
     if (!relevant.length) continue;
     try {

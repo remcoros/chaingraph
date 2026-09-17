@@ -10,12 +10,12 @@ import type {
   GraphAdapterFactory,
 } from '../../src/App/Workspace/Workbenches/Graph/Renderer/adapter';
 import { buildGraph } from '../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
-import { txNodeId } from '../../src/Domain/Metadata/entityReferences';
+import { createWorkspace } from '../../src/Core/Workspace/createWorkspace';
+import { transactionReference } from '../../src/Core/Workspace/entityReferences';
 
 // Synthetic observations stay in memory and never issue chain requests.
 const txid = '1234567' + 'a'.repeat(50) + 'abcdef0';
-const id = txNodeId(txid);
+const id = transactionReference(txid);
 const longLabel = 'Personal annotation ' + 'LongUnbrokenLabel'.repeat(11);
 let events: GraphAdapterEvents;
 const adapterFactory: GraphAdapterFactory = (container, nextEvents) => {
@@ -39,21 +39,24 @@ function Fixture() {
   const [fit, setFit] = useState(0);
   const workspace = useMemo(() => {
     const next = createWorkspace('Synthetic hover layout', 'testnet4');
-    next.transactions[txid] = {
+    next.chainData.transactions[txid] = {
       txid,
       vin: [{ coinbase: '00' }],
       vout: [{ n: 4294967295, value: 21000000, scriptPubKey: {} }],
-      confirmations: 1234567890,
-      blockHeight: 1234567,
-      blocktime: 1750000000,
+      status: {
+        kind: 'confirmed' as const,
+        confirmations: 1234567890,
+        blockHeight: 1234567,
+        blocktime: 1750000000,
+      },
     };
-    next.annotations[id] = {
+    next.annotations.entities[id] = {
       label: scenario === 'long' ? longLabel : scenario === 'hex-label' ? txid : '',
       note: '',
       icon: scenario === 'long' ? '★' : '',
       bookmarked: false,
     };
-    next.tags =
+    next.annotations.tags =
       scenario === 'long'
         ? [
             {
@@ -83,7 +86,7 @@ function Fixture() {
           point: { x, y, pointerType: 'mouse' },
         }),
       clear: () => events.hover({ point: { x: 0, y: 0, pointerType: 'mouse' } }),
-      canonical: () => workspace.transactions[txid].txid,
+      canonical: () => workspace.chainData.transactions[txid].txid,
     };
   }, [graph, workspace]);
   return (
@@ -109,7 +112,7 @@ function Fixture() {
         <GraphView
           {...graph}
           adapterFactory={adapterFactory}
-          transactions={workspace.transactions}
+          transactions={workspace.chainData.transactions}
           nodePresentation={
             scenario === 'raw'
               ? undefined
@@ -117,8 +120,8 @@ function Fixture() {
                   graph.nodes.map((node) => [
                     node.id,
                     {
-                      label: workspace.annotations[node.id]?.label ?? '',
-                      icon: workspace.annotations[node.id]?.icon ?? '',
+                      label: workspace.annotations.entities[node.id]?.label ?? '',
+                      icon: workspace.annotations.entities[node.id]?.icon ?? '',
                     },
                   ]),
                 )
@@ -137,7 +140,7 @@ function Fixture() {
           }}
           renderMetadata={() => (
             <EntityBadges
-              tags={workspace.tags ?? []}
+              tags={workspace.annotations.tags ?? []}
               wallets={scenario === 'long' ? ['LongWalletName'.repeat(10)] : []}
               related
             />

@@ -1,32 +1,19 @@
-import { z } from 'zod';
-import { canonicalEntityNodeId } from '../../../Domain/Metadata/entityReferences';
-import type { Network } from '../../../Domain/Chain/network';
+import {
+  MAX_GRAPH_NODES,
+  MAX_GRAPH_ACTION_NODES,
+  assertGraphNodeBudget,
+} from '../../../Core/Workspace/view';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+import { canonicalEntityReference } from '../../../Core/Workspace/entityReferences';
+
 import { graphRemovalClosure, graphTransactionOutputIds } from './graphBranch';
 import type { GraphData } from './types';
-import type { Workspace } from '../workspace';
-import type { GraphEvidenceWorkspace } from './graphEvidence';
+
+import { type GraphEvidenceWorkspace, buildGraph } from './graphEvidence';
 import { setNodesHidden } from './visibility';
-import { buildGraph } from './graphEvidence';
 
 // A legacy graph can include address nodes beyond the 50,000 observed records,
 // plus 10,000 independently watched addresses. Migration must preserve that view.
-export const MAX_GRAPH_NODES = 110_000;
-export const MAX_GRAPH_ACTION_NODES = 50_000;
-export const graphNodeIdsSchema = z.array(z.string().max(200)).max(MAX_GRAPH_NODES);
-
-export function assertGraphNodeBudget(value: unknown): void {
-  if (Array.isArray(value) && value.length > MAX_GRAPH_NODES)
-    throw new Error('Workspace exceeds the 110,000 graph entity limit.');
-}
-
-export function parseGraphNodeIds(value: unknown, network: Network): string[] {
-  assertGraphNodeBudget(value);
-  return [
-    ...new Set(graphNodeIdsSchema.parse(value).map((id) => canonicalEntityNodeId(id, network))),
-  ];
-}
-
-/** Seed legacy canvas membership before merging any newly loaded observations. */
 export function ensureGraphMembership(workspace: Workspace): Workspace {
   if (workspace.view.graphNodeIds !== undefined) return workspace;
   const graphNodeIds = buildGraph(workspace).nodes.map((node) => node.id);
@@ -70,7 +57,7 @@ function actionNodeIds(workspace: Workspace, nodeIds: Iterable<string>): Set<str
   for (const value of nodeIds) {
     if (++supplied > MAX_GRAPH_ACTION_NODES)
       throw new Error('A graph action supports at most 50,000 entity references.');
-    ids.add(canonicalEntityNodeId(value, workspace.network));
+    ids.add(canonicalEntityReference(value, workspace.network));
   }
   return ids;
 }
@@ -95,8 +82,11 @@ export function addGraphNodes(workspace: Workspace, nodeIds: Iterable<string>): 
 export function fullGraphMembershipEvidence(workspace: GraphEvidenceWorkspace): GraphData {
   return buildGraph({
     ...workspace,
-    inputContext: undefined,
-    view: { ...workspace.view, showAddresses: true },
+    view: {
+      ...workspace.view,
+      showAddresses: true,
+      inputContext: undefined,
+    },
   });
 }
 

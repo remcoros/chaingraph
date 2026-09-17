@@ -1,4 +1,4 @@
-import type { Transaction } from '../../../Domain/Chain/transaction';
+import type { Transaction } from '../../../Core/ChainData';
 import { transactionStatus } from './transactionStatus';
 
 const localTimestampOptions: Intl.DateTimeFormatOptions = {
@@ -44,6 +44,6 @@ export function transactionBlockTime(transaction?: Transaction) {
   // `time` is not a documented block timestamp. Mempool/unknown observations
   // must not acquire a block date from stale or ambiguous timestamp fields.
   return transactionStatus(transaction).kind === 'confirmed'
-    ? formatBlockTimestamp(transaction?.blocktime)
+    ? formatBlockTimestamp(transaction?.status?.blocktime)
     : undefined;
 }

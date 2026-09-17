@@ -3,10 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { SelectedTags } from './';
-import { createWorkspace } from '../../../createWorkspace';
-import { txNodeId } from '../../../../../Domain/Metadata/entityReferences';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { transactionReference } from '../../../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Workspace } from '../../../workspace';
+
 import { installDomStubs } from '../../../../../../tests/domStubs';
 
 installDomStubs();
@@ -17,7 +18,7 @@ const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
 
 function node(txid: string): GraphNode {
-  return { id: txNodeId(txid), kind: 'transaction', label: txid.slice(0, 8), txid };
+  return { id: transactionReference(txid), kind: 'transaction', label: txid.slice(0, 8), txid };
 }
 
 /** Mirrors the inspector: the selection and the workspace can both change under it. */

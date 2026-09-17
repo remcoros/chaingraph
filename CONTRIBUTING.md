@@ -7,8 +7,10 @@ boundary, and keep chain observations, user annotations and heuristic
 hypotheses separate.
 
 Use [docs/source-map.md](docs/source-map.md) to find a product area's UI, state,
-helpers and tests. The source tree follows App, FrontPage, Workspace and its
-workbenches, with shared UI, domain logic and browser infrastructure alongside.
+helpers and tests. App owns React UI and wiring; Core owns workspace capabilities.
+Each Core concept holds its canonical data types and validity rules together;
+`Core/Workspace/Persistence` owns encrypted formats and storage. Behavior and tests
+stay grouped by their actual concept.
 
 ## Set up
 
@@ -43,7 +45,7 @@ Narrower commands:
 
 ```sh
 npm test                      # vitest domain/backend suites
-npx vitest run tests/connectionScan   # focused scan suites, see docs/connection-scan-testing.md
+npx vitest run src/Core/Workspace/ConnectionScan tests/integration/connection-scan
 npm run test:live             # read-only smoke against configured real networks
 ```
 
@@ -108,17 +110,43 @@ tag workflow.
 ## Layer boundaries
 
 `npm run lint` (part of `npm run check`) enforces the dependency direction as
-well as style. `Domain` and `Infra` may not import `App`. Workspace persistence
-lives under `App/Workspace/Persistence`: it may depend on the canonical Workspace
-model and the store-owned persistence port, but never React views, workbenches or
-the concrete session store. The session store may depend on that port and other
-Workspace-owned concepts, never persistence adapters or workbench implementations.
-Workspace-scope code under `Evidence`, `Selection` and `Wallet/WalletUtxos` may not
-import a workbench. Graph-owned address evidence, lookup and expansion live with the
-Graph workbench. Wallet and Analysis reach Graph only through the `GraphHandoff`
-contract in `Workbenches/workbenchHandoff.ts`. Import cycles are rejected everywhere,
-with no exceptions. Prefer a declared contract, or move what both sides need into a
-module below them, over reintroducing one.
+well as style. Core production code cannot import React or App. Canonical schemas
+and pure validity rules do not load execution, transport or Persistence. Persistence consumes those rules,
+never App or the Session runtime. Session consumes the public persistence contract;
+`App/appServices.ts` constructs and supplies the facade.
+Domain has been removed. Core Bitcoin contains native primitives without
+application dependencies. Core ChainData consumes Bitcoin and provides shared
+chain models, validation, observation rules and workspace-independent RPC queries.
+Account-wallet policy belongs to Workspace Wallets; entity references belong to
+the Workspace root, not Bitcoin.
+Shared amount/reference formatting lives in Core Formatting. Infra cannot import
+App. ChainData owns Bitcoin RPC decoding and fetch scheduling; Session owns
+workspace-bound request lifetime and accepted publication. Live queries use
+named-file imports and are not re-exported by the model/validation index, so
+canonical document parsing does not load the transport or scheduler.
+
+App Selection and the shared wallet UTXO hook cannot import workbench internals.
+Wallet and Analysis reach Graph through `GraphHandoff` in
+`Workbenches/workbenchHandoff.ts`. ConnectionScan models, execution and retained
+result rules live together in Core; Graph owns target projection and path-add UI.
+Public interfaces may be named files, not just root indexes. Bitcoin, ChainData
+and workspace concepts allow direct imports; a folder alone does not imply private
+implementation. Persistence and Formatting retain explicit root interfaces.
+Outside callers cannot deep-import those two modules, including type imports,
+re-exports and literal dynamic imports. Internal files use direct imports.
+Browser, Codec and Migrations have no public subfolder entry points. Indexes
+must not initialize storage or workers. Do not export fault-injection options
+or private formats merely to support external tests.
+
+Unit tests live beside their owner. Persistence's module-owned `Integration/`
+suite exercises private storage/crypto fault injection together with real Session
+and App behavior. Only that test suite may cross those production dependency
+rules; no production caller may import it. Other cross-module tests remain in
+`tests/integration/` and use the relevant concept and Persistence public interfaces.
+
+Import cycles are rejected everywhere. Do not add forwarding files or hypothetical
+interfaces merely to make intermediate refactor states compile.
+Complete the related ownership changes and then validate the coherent chunk.
 
 ## Portable content
 

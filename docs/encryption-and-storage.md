@@ -46,11 +46,11 @@ v2 adds an authenticated `compression` field (`none` or `gzip`) and keeps
 everything else. Measured on synthetic fixtures with the production code path
 (Node's native codecs, so surrogate timings rather than browser latency):
 
-| Fixture | Plaintext JSON | v1 envelope | v2 envelope | Reduction |
-| --- | ---: | ---: | ---: | ---: |
-| Empty workspace | 319 B | 632 B | 653 B | none (below 1 KiB, gzip skipped) |
-| 1 wallet, 60 transactions | 48.7 KB | 65.1 KB | 10.6 KB | 84% |
-| 1 wallet, 5,000 transactions | 3.9 MB | 5.2 MB | 0.9 MB | 82% |
+| Fixture                      | Plaintext JSON | v1 envelope | v2 envelope |                        Reduction |
+| ---------------------------- | -------------: | ----------: | ----------: | -------------------------------: |
+| Empty workspace              |          319 B |       632 B |       653 B | none (below 1 KiB, gzip skipped) |
+| 1 wallet, 60 transactions    |        48.7 KB |     65.1 KB |     10.6 KB |                              84% |
+| 1 wallet, 5,000 transactions |         3.9 MB |      5.2 MB |      0.9 MB |                              82% |
 
 Compression is a size feature, not a speed feature: the large fixture saved
 about 110 ms slower and unlocked about 30 ms slower, because KDF and full
@@ -61,7 +61,7 @@ smaller; both `CompressionStream` and `DecompressionStream` must exist for any
 save, and a missing API fails the save rather than silently downgrading.
 Decompression starts only after GCM authentication, reads bounded chunks and
 aborts past 32 MiB. Reproduce with
-`node --import tsx scripts/benchmark-workspace-compression.ts`.
+`node --import tsx src/Core/Workspace/Persistence/Codec/workspaceCompression.benchmark.ts`.
 
 ## Browser persistence
 

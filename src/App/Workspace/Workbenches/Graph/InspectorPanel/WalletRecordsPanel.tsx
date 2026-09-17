@@ -1,26 +1,30 @@
 import { Amount } from '../../../../Controls/Display/Amount';
 import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
-import { walletRecordBlockObservation } from '../../../Wallet/walletRecordBlockObservation';
+import { walletRecordBlockObservation } from '../../../../../Core/Workspace/Wallets/walletRecordBlockObservation';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
-import { outputNodeId, txNodeId } from '../../../../../Domain/Metadata/entityReferences';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../workspace';
+import {
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+
 import {
   listWalletTransactions,
   verifyWalletUtxo,
   type WalletUtxoRecord,
-} from '../../../Wallet/walletRecords';
-import type { WalletUtxoController } from '../../../Wallet/WalletUtxos';
+} from '../../../../../Core/Workspace/Wallets/walletRecords';
+import type { WalletUtxoController } from '../../../Wallets/WalletUtxos';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import './wallet-records.css';
 
 export type WalletRecordsTab = 'addresses' | 'transactions' | 'utxos';
 const PAGE_SIZE = 40;
 
-/** Wallet context survives entity selection; transient UTXO observations never enter storage. */
+/** Wallet context survives entity selection; checks project the workspace's dated address observations. */
 export function WalletRecordsPanel({
   workspace,
   wallet,
@@ -43,10 +47,13 @@ export function WalletRecordsPanel({
   const transactions = useMemo(
     () =>
       listWalletTransactions(
-        { network: workspace.network, transactions: workspace.transactions },
+        {
+          network: workspace.network,
+          chainData: { transactions: workspace.chainData.transactions },
+        },
         wallet,
       ),
-    [workspace.network, workspace.transactions, wallet],
+    [workspace.network, workspace.chainData.transactions, wallet],
   );
   const [queries, setQueries] = useState({ addresses: '', transactions: '', utxos: '' });
   const [pages, setPages] = useState({ addresses: 0, transactions: 0, utxos: 0 });
@@ -68,15 +75,19 @@ export function WalletRecordsPanel({
     (utxos?.records ?? [])
       .filter(
         (record) =>
-          workspace.transactions[record.txid] &&
-          !verifyWalletUtxo(record, workspace.transactions[record.txid], workspace.network),
+          workspace.chainData.transactions[record.txid] &&
+          !verifyWalletUtxo(
+            record,
+            workspace.chainData.transactions[record.txid],
+            workspace.network,
+          ),
       )
       .map((record) => `${record.txid}:${record.vout}`),
   );
   const rows =
     active === 'transactions'
       ? transactions.map((record) => ({
-          id: txNodeId(record.txid),
+          id: transactionReference(record.txid),
           txid: record.txid,
           transaction: record.transaction,
           height: record.height,
@@ -89,15 +100,15 @@ export function WalletRecordsPanel({
             (a, b) => b.valueSats - a.valueSats || a.txid.localeCompare(b.txid) || a.vout - b.vout,
           )
           .map((record) => ({
-            id: outputNodeId(record.txid, record.vout),
+            id: outpointReference(record.txid, record.vout),
             txid: record.txid,
-            transaction: workspace.transactions[record.txid],
+            transaction: workspace.chainData.transactions[record.txid],
             height: record.height,
             mempool: record.height <= 0,
             utxo: record,
           }));
   const filtered = rows.filter((row) => {
-    const annotation = workspace.annotations[row.id];
+    const annotation = workspace.annotations.entities[row.id];
     return (
       !query ||
       [row.id, annotation?.label, annotation?.note, row.utxo?.address].some((value) =>
@@ -188,7 +199,7 @@ export function WalletRecordsPanel({
       />
       <div className="wallet-record-list">
         {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((row) => {
-          const annotation = workspace.annotations[row.id];
+          const annotation = workspace.annotations.entities[row.id];
           const identifier = row.utxo ? `${row.txid}:${row.utxo.vout}` : row.txid;
           return (
             <button

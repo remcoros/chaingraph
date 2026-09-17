@@ -1,28 +1,22 @@
-import { useMemo } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, type Dispatch, type SetStateAction } from 'react';
+
 import { addGraphNodes } from '../../../GraphState/graphMembership';
 import { openFlowPanel } from '../../../GraphState/panelState';
-import type { GraphFilters } from '../../../GraphState/filters';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
+import {
+  addressReference,
+  outpointReference,
+  transactionReference,
+} from '../../../../../Core/Workspace/entityReferences';
 import type { GraphNode } from '../../../GraphState/types';
 import type { WorkspaceCore } from '../../../workspaceCore';
 import type { WorkspaceSelection } from '../../../Selection/useWorkspaceSelection';
-import type { TransactionEvidence } from '../../../Evidence/Transactions';
+import type { ChainDataAcquisition } from '../../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../../useWorkspaceOperation';
-import type { AppState } from '../../../../useAppState';
-import {
-  addressNodeId,
-  outputNodeId,
-  txNodeId,
-} from '../../../../../Domain/Metadata/entityReferences';
-import { withHistoryHeight } from '../../../../../Domain/Chain/transactionStatus';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import { addressToScriptHash } from '../../../../../Domain/Wallet/wallet';
-import {
-  fetchAddressUtxos,
-  fetchHistory,
-  fetchTransaction,
-  mapLimit,
-} from '../../../../../Infra/Bitcoin/api';
+
+import { withHistoryHeight, type Transaction } from '../../../../../Core/ChainData';
+
+import { mapLimit } from '../../../../../Core/ChainData/api';
 import {
   listAddressHistory,
   recentAddressHistoryEntries,
@@ -35,7 +29,7 @@ import type { useAddressEvidence } from './useAddressEvidence';
 interface Inputs {
   core: WorkspaceCore;
   selection: WorkspaceSelection;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   evidence: ReturnType<typeof useAddressEvidence>;
   selected: GraphNode | undefined;
@@ -43,7 +37,6 @@ interface Inputs {
   setFocusRequest: Dispatch<
     SetStateAction<{ id: string; token: number; preserveZoom?: boolean } | undefined>
   >;
-  fetchScope: AppState['fetchScope'];
   canLoadChainData: boolean;
   revealLookup: (id: string) => void;
 }
@@ -58,14 +51,19 @@ export function useAddressNavigation({
   selected,
   setGraphFilters,
   setFocusRequest,
-  fetchScope,
   canLoadChainData,
   revealLookup,
 }: Inputs) {
   const { activeWorkspace, activeWorkspaceRef, workspaces, setOperation, setNotice } = core;
   const { getUnlocked } = workspaces;
   const { generation: selectionGeneration, select } = selection;
-  const { recordTransactions } = transactions;
+  const {
+    transaction: getTransaction,
+    addressUtxos: getAddressUtxos,
+    addressHistory: getAddressHistory,
+  } = transactions.read;
+  const { transactions: recordTransactions, addresses: recordAddressObservations } =
+    transactions.observe;
   const { run } = operation;
 
   function selectedAddressAction() {
@@ -93,7 +91,7 @@ export function useAddressNavigation({
     if (!action) return;
     const current = getUnlocked(action.ownerId)?.data;
     if (!current) return;
-    revealLookup(addressNodeId(action.address));
+    revealLookup(addressReference(action.address));
     if (!canLoadChainData) {
       if (listAddressHistory(current, action.address)?.source === 'loaded transactions')
         setNotice('Showing transactions mentioning this address in the loaded workspace data.');
@@ -107,35 +105,25 @@ export function useAddressNavigation({
     if (!action) return;
     const current = getUnlocked(action.ownerId)?.data;
     if (!current) return;
-    const cached = current.addressUtxos?.[action.address];
+    const cached = current.chainData.addressUtxos?.[action.address];
     if (!cached && !canLoadChainData) return;
     void run(async (signal) => {
       setOperation('Loading recent UTXOs…');
-      const observation =
-        cached ?? (await fetchAddressUtxos(current.network, action.address, signal));
+      const observation = cached ?? (await getAddressUtxos(action.address, signal));
       signal.throwIfAborted();
       if (
         selectionGeneration.current !== action.generation ||
         activeWorkspaceRef.current?.id !== action.ownerId
       )
         return;
-      if (!cached)
-        getUnlocked(action.ownerId)?.edit(
-          (latest) => ({
-            ...latest,
-            addressUtxos: {
-              ...latest.addressUtxos,
-              [action.address]: observation,
-            },
-          }),
-          false,
-        );
+      if (!cached) recordAddressObservations({ addressUtxos: { [action.address]: observation } });
       const recent = recentAddressUtxos(observation, RECENT_ADDRESS_GRAPH_LIMIT);
       if (!recent.length) {
         setNotice('No unspent outputs observed for this address.');
         return;
       }
-      const latestTransactions = (getUnlocked(action.ownerId)?.data ?? current).transactions;
+      const latestTransactions = (getUnlocked(action.ownerId)?.data ?? current).chainData
+        .transactions;
       const detailTargets = [
         ...new Map(
           recent
@@ -148,14 +136,9 @@ export function useAddressNavigation({
         4,
         async (utxo): Promise<Transaction | undefined> => {
           try {
-            const transaction = await fetchTransaction(
-              current.network,
-              utxo.txid,
-              signal,
-              utxo.height,
-              { scope: fetchScope, priority: 'visible' },
-            );
-            return transaction.confirmations !== undefined && transaction.confirmations < 0
+            const transaction = await getTransaction(utxo.txid, signal, 'visible', utxo.height);
+            return transaction.status?.confirmations !== undefined &&
+              transaction.status?.confirmations < 0
               ? undefined
               : withHistoryHeight(transaction, utxo.height);
           } catch {
@@ -180,9 +163,9 @@ export function useAddressNavigation({
       revealAddressGraphNodes(
         action.ownerId,
         recent.flatMap((utxo) => {
-          const transaction = latest.transactions[utxo.txid];
+          const transaction = latest.chainData.transactions[utxo.txid];
           return transaction?.vout.some((output) => output.n === utxo.vout)
-            ? [outputNodeId(utxo.txid, utxo.vout)]
+            ? [outpointReference(utxo.txid, utxo.vout)]
             : [];
         }),
       );
@@ -206,31 +189,14 @@ export function useAddressNavigation({
         !history || history.source === 'loaded transactions' || history.entries.length === 0;
       if (needsObservedHistory && !historyLoadActive && canLoadChainData) {
         setOperation('Loading recent transactions…');
-        const observedHistory = await fetchHistory(
-          latest.network,
-          addressToScriptHash(action.address, latest.network),
-          signal,
-        );
+        const observedHistory = await getAddressHistory(action.address, signal);
         signal.throwIfAborted();
         if (
           selectionGeneration.current !== action.generation ||
           activeWorkspaceRef.current?.id !== action.ownerId
         )
           return;
-        getUnlocked(action.ownerId)?.edit(
-          (workspace) => ({
-            ...workspace,
-            addressHistories: {
-              ...workspace.addressHistories,
-              [action.address]: {
-                history: observedHistory,
-                truncated: false,
-                scannedAt: new Date().toISOString(),
-              },
-            },
-          }),
-          false,
-        );
+        recordAddressObservations({ addressHistories: { [action.address]: observedHistory } });
         latest = getUnlocked(action.ownerId)?.data ?? latest;
         history = listAddressHistory(latest, action.address);
         historyLoadActive = evidence.isAddressHistoryLoading(
@@ -248,16 +214,13 @@ export function useAddressNavigation({
         );
         return;
       }
-      const detailTargets = recent.filter((entry) => !latest.transactions[entry.txid]);
+      const detailTargets = recent.filter((entry) => !latest.chainData.transactions[entry.txid]);
       const details = await mapLimit(
         canLoadChainData ? detailTargets : [],
         4,
         async (entry): Promise<Transaction | undefined> => {
           try {
-            return await fetchTransaction(latest.network, entry.txid, signal, entry.height, {
-              scope: fetchScope,
-              priority: 'visible',
-            });
+            return await getTransaction(entry.txid, signal, 'visible', entry.height);
           } catch {
             signal.throwIfAborted();
             return undefined;
@@ -277,7 +240,7 @@ export function useAddressNavigation({
       );
       revealAddressGraphNodes(
         action.ownerId,
-        recent.map((entry) => txNodeId(entry.txid)),
+        recent.map((entry) => transactionReference(entry.txid)),
       );
     });
   }
@@ -289,14 +252,9 @@ export function useAddressNavigation({
     void run(async (signal) => {
       const current = getUnlocked(ownerId)?.data;
       if (!current) return;
-      const cached = current.transactions[txid];
+      const cached = current.chainData.transactions[txid];
       setOperation(cached ? 'Opening transaction…' : 'Loading transaction…');
-      const transaction =
-        cached ??
-        (await fetchTransaction(current.network, txid, signal, height, {
-          scope: fetchScope,
-          priority: 'navigation',
-        }));
+      const transaction = cached ?? (await getTransaction(txid, signal, 'navigation', height));
       signal.throwIfAborted();
       if (selectionGeneration.current !== generation || activeWorkspaceRef.current?.id !== ownerId)
         return;
@@ -304,7 +262,7 @@ export function useAddressNavigation({
         promotionIds: [transaction.txid],
       });
       getUnlocked(ownerId)?.edit((latest) => {
-        const admitted = addGraphNodes(latest, [txNodeId(transaction.txid)]);
+        const admitted = addGraphNodes(latest, [transactionReference(transaction.txid)]);
         return {
           ...admitted,
           view: {
@@ -320,8 +278,8 @@ export function useAddressNavigation({
       }, false);
       const selectedId =
         vout !== undefined && transaction.vout.some((output) => output.n === vout)
-          ? outputNodeId(transaction.txid, vout)
-          : txNodeId(transaction.txid);
+          ? outpointReference(transaction.txid, vout)
+          : transactionReference(transaction.txid);
       select(selectedId);
       setFocusRequest({ id: selectedId, token: Date.now() });
     });

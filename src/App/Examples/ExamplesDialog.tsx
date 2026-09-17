@@ -1,4 +1,4 @@
-import type { Network } from '../../Domain/Chain/network';
+import type { Network } from '../../Core/Bitcoin';
 import { Modal } from '../Dialogs';
 import { WorkspaceTemplateCards } from './WorkspaceTemplateCards';
 

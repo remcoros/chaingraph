@@ -3,13 +3,17 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import { buildWalletReviewContext, orderWalletContextTransactions } from './walletReviewContext';
 import { matchRelatedEntities } from './walletRelatedSelection';
-import { buildWalletReview, type WalletReviewItem } from '../../Wallet/walletReview';
-import { createWorkspace } from '../../createWorkspace';
-import { outputNodeId } from '../../../../Domain/Metadata/entityReferences';
-import type { Transaction } from '../../../../Domain/Chain/transaction';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
-import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
+import {
+  buildWalletReview,
+  type WalletReviewItem,
+} from '../../../../Core/Workspace/Wallets/walletReview';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { outpointReference } from '../../../../Core/Workspace/entityReferences';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+import type { Transaction } from '../../../../Core/ChainData';
+
+import { addressToScriptHash } from '../../../../Core/Bitcoin';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = (n: number, prefix = 'bc') =>
@@ -63,12 +67,18 @@ const shared: Transaction = {
 function fixture(): Workspace {
   return {
     ...createWorkspace('Public review fixture', 'mainnet'),
-    wallets: [wallet],
-    transactions: { [parent.txid]: parent, [shared.txid]: shared },
+    wallets: {
+      ...createWorkspace('Public review fixture', 'mainnet').wallets,
+      definitions: [wallet],
+    },
+    chainData: {
+      ...createWorkspace('Public review fixture', 'mainnet').chainData,
+      transactions: { [parent.txid]: parent, [shared.txid]: shared },
+    },
   };
 }
 function item(
-  nodeId = outputNodeId(shared.txid, 0),
+  nodeId = outpointReference(shared.txid, 0),
   overrides: Partial<WalletReviewItem> = {},
 ): WalletReviewItem {
   return {
@@ -91,10 +101,23 @@ function item(
 describe('wallet selected review context', () => {
   it('opens the newest observed context first, including mempool activity', () => {
     const transactions = new Map<string, Transaction>([
-      [id(1), { ...parent, blockHeight: 800000, blocktime: 100 }],
-      [id(2), { ...parent, txid: id(2), blockHeight: 800002, blocktime: 102 }],
-      [id(3), { ...shared, blockHeight: 800001, blocktime: 101 }],
-      [id(4), { ...parent, txid: id(4), mempool: true }],
+      [
+        id(1),
+        { ...parent, status: { kind: 'confirmed' as const, blockHeight: 800000, blocktime: 100 } },
+      ],
+      [
+        id(2),
+        {
+          ...parent,
+          txid: id(2),
+          status: { kind: 'confirmed' as const, blockHeight: 800002, blocktime: 102 },
+        },
+      ],
+      [
+        id(3),
+        { ...shared, status: { kind: 'confirmed' as const, blockHeight: 800001, blocktime: 101 } },
+      ],
+      [id(4), { ...parent, txid: id(4), status: { kind: 'mempool' as const } }],
     ]);
     const ids = [id(1), id(3), id(2), id(4)];
     expect(orderWalletContextTransactions(ids, transactions)).toEqual([id(4), id(2), id(3), id(1)]);
@@ -105,8 +128,8 @@ describe('wallet selected review context', () => {
 
   it('uses saved times when heights are unavailable and keeps undated contexts deterministic', () => {
     const transactions = new Map<string, Transaction>([
-      [id(1), { ...parent, blocktime: 100 }],
-      [id(2), { ...parent, txid: id(2), time: 200 }],
+      [id(1), { ...parent, status: { kind: 'unknown' as const, blocktime: 100 } }],
+      [id(2), { ...parent, txid: id(2), status: { kind: 'unknown' as const, time: 200 } }],
       [id(3), shared],
     ]);
     expect(orderWalletContextTransactions([id(4), id(3), id(1), id(2)], transactions)).toEqual([
@@ -116,7 +139,7 @@ describe('wallet selected review context', () => {
       id(4),
     ]);
     expect(orderWalletContextTransactions([], transactions)).toEqual([]);
-    expect(transactions.get(id(3))?.blocktime).toBeUndefined();
+    expect(transactions.get(id(3))?.status?.blocktime).toBeUndefined();
   });
 
   it('shows a direct funding subject as the selected canonical input in an explicit receiving context', () => {
@@ -130,13 +153,13 @@ describe('wallet selected review context', () => {
       status: 'loaded',
       transactionId: id(3),
       transactionNodeId: `tx:${id(3)}`,
-      selectedNodeId: outputNodeId(id(1), 2),
+      selectedNodeId: outpointReference(id(1), 2),
       selectedSide: 'input',
       transactionSelected: false,
     });
     expect(context.selected).toBe(context.inputs[1]);
     expect(context.inputs[1]).toMatchObject({
-      id: outputNodeId(id(1), 2),
+      id: outpointReference(id(1), 2),
       address: other,
       selected: true,
       missing: false,
@@ -146,7 +169,7 @@ describe('wallet selected review context', () => {
     const missing = buildWalletReviewContext(
       fixture(),
       wallet,
-      { nodeId: outputNodeId(id(9), 0) },
+      { nodeId: outpointReference(id(9), 0) },
       id(3),
     );
     expect(missing.selected).toBe(missing.inputs[2]);
@@ -162,10 +185,10 @@ describe('wallet selected review context', () => {
     expect(selected.selectedNodeId).toBe(`addr:${mine}`);
     expect(selected.selected).toBeUndefined();
     expect(selected.inputs.filter((entry) => entry.selected).map((entry) => entry.id)).toEqual([
-      outputNodeId(id(1), 0),
+      outpointReference(id(1), 0),
     ]);
     expect(selected.outputs.filter((entry) => entry.selected).map((entry) => entry.id)).toEqual([
-      outputNodeId(id(3), 0),
+      outpointReference(id(3), 0),
     ]);
     const transaction = buildWalletReviewContext(fixture(), wallet, { nodeId: `tx:${id(3)}` });
     expect(transaction.transactionSelected).toBe(true);
@@ -175,12 +198,12 @@ describe('wallet selected review context', () => {
 
   it('does not treat a non-address raw script as a known external subject', () => {
     const workspace = fixture();
-    workspace.transactions[id(3)] = {
+    workspace.chainData.transactions[id(3)] = {
       ...shared,
       vout: [{ n: 0, value: 0, scriptPubKey: { hex: '6a00', address: mine } }],
     };
     expect(
-      buildWalletReviewContext(workspace, wallet, { nodeId: outputNodeId(id(3), 0) }).selected,
+      buildWalletReviewContext(workspace, wallet, { nodeId: outpointReference(id(3), 0) }).selected,
     ).toMatchObject({
       ownership: 'unknown',
       missing: false,
@@ -194,7 +217,7 @@ describe('wallet selected review context', () => {
     (hex) => {
       const workspace = fixture();
       const output = { n: 0, value: 0, scriptPubKey: { hex } };
-      workspace.transactions[id(3)] = { ...shared, vout: [output] };
+      workspace.chainData.transactions[id(3)] = { ...shared, vout: [output] };
       const context = buildWalletReviewContext(workspace, wallet, item());
       expect(context.outputs[0].scriptPubKey).toBe(output.scriptPubKey);
       expect(context.outputs[0]).toMatchObject({ ownership: 'unknown', missing: false });
@@ -204,15 +227,18 @@ describe('wallet selected review context', () => {
 
   it('updates script presentation with late prevout evidence and withholds conflicting scripts', () => {
     const workspace = fixture();
-    delete workspace.transactions[parent.txid];
-    workspace.transactions[shared.txid] = { ...shared, vin: [{ txid: parent.txid, vout: 0 }] };
+    delete workspace.chainData.transactions[parent.txid];
+    workspace.chainData.transactions[shared.txid] = {
+      ...shared,
+      vin: [{ txid: parent.txid, vout: 0 }],
+    };
     const input = () => buildWalletReviewContext(workspace, wallet, item()).inputs[0];
     expect(input()).toMatchObject({ missing: true, scriptPubKey: undefined });
     const scriptPubKey = { hex: '51' };
-    workspace.transactions[shared.txid].vin[0].prevout = { value: 1, scriptPubKey };
+    workspace.chainData.transactions[shared.txid].vin[0].prevout = { value: 1, scriptPubKey };
     expect(input()).toMatchObject({ missing: false, prevoutStatus: 'attached', scriptPubKey });
     expect(input().scriptPubKey).toBe(scriptPubKey);
-    workspace.transactions[parent.txid] = parent;
+    workspace.chainData.transactions[parent.txid] = parent;
     expect(input()).toMatchObject({
       missing: true,
       prevoutStatus: 'conflict',
@@ -229,7 +255,7 @@ describe('wallet selected review context', () => {
       'unknown',
     ]);
     expect(context.inputs[1]).toMatchObject({
-      id: outputNodeId(id(1), 2),
+      id: outpointReference(id(1), 2),
       address: other,
       valueSats: 200_000_000,
     });
@@ -239,9 +265,9 @@ describe('wallet selected review context', () => {
     expect(context.missingPrevouts).toBe(1);
     expect(context.inputs[2]).toMatchObject({ missing: true, ownership: 'unknown' });
     expect(context.inputs[2].valueSats).toBeUndefined();
-    expect(buildWalletReviewContext(fixture(), wallet, item(outputNodeId(id(3), 1))).role).toBe(
-      'possible-counterparty',
-    );
+    expect(
+      buildWalletReviewContext(fixture(), wallet, item(outpointReference(id(3), 1))).role,
+    ).toBe('possible-counterparty');
     const activity = buildWalletReviewContext(
       fixture(),
       wallet,
@@ -253,10 +279,10 @@ describe('wallet selected review context', () => {
 
   it('does not label every output of an incoming batch a possible counterparty', () => {
     const workspace = fixture();
-    workspace.transactions[id(3)] = { ...shared, vin: [{ txid: id(1), vout: 2 }] };
-    expect(buildWalletReviewContext(workspace, wallet, item(outputNodeId(id(3), 1))).role).toBe(
-      'unknown-output',
-    );
+    workspace.chainData.transactions[id(3)] = { ...shared, vin: [{ txid: id(1), vout: 2 }] };
+    expect(
+      buildWalletReviewContext(workspace, wallet, item(outpointReference(id(3), 1))).role,
+    ).toBe('unknown-output');
   });
 
   it('rejects mismatched wallet claims and never falls back from malformed raw scripts', () => {
@@ -268,7 +294,7 @@ describe('wallet selected review context', () => {
       'external',
     );
     const workspace = fixture();
-    workspace.transactions[id(3)] = {
+    workspace.chainData.transactions[id(3)] = {
       ...shared,
       vout: [{ n: 0, value: 1, scriptPubKey: { hex: 'broken', address: mine } }],
     };
@@ -279,7 +305,7 @@ describe('wallet selected review context', () => {
 
   it('validates address-only outputs against the workspace network', () => {
     const workspace = fixture();
-    workspace.transactions[id(3)] = {
+    workspace.chainData.transactions[id(3)] = {
       ...shared,
       vout: [
         { n: 0, value: 1, scriptPubKey: { address: mine } },
@@ -311,7 +337,7 @@ describe('wallet selected review context', () => {
     const context = buildWalletReviewContext(
       fixture(),
       wallet,
-      item(outputNodeId(id(8), 0), { address: mine, amountSats: 99 }),
+      item(outpointReference(id(8), 0), { address: mine, amountSats: 99 }),
     );
     expect(context).toMatchObject({
       status: 'missing',
@@ -323,7 +349,7 @@ describe('wallet selected review context', () => {
     });
 
     expect(context.selected).toMatchObject({
-      id: outputNodeId(id(8), 0),
+      id: outpointReference(id(8), 0),
       ownership: 'unknown',
       missing: true,
       selected: true,
@@ -333,7 +359,7 @@ describe('wallet selected review context', () => {
     expect(
       buildWalletReviewContext(fixture(), wallet, item('invalid', { txid: undefined })).status,
     ).toBe('unavailable');
-    const coinbase = buildWalletReviewContext(fixture(), wallet, item(outputNodeId(id(1), 0)));
+    const coinbase = buildWalletReviewContext(fixture(), wallet, item(outpointReference(id(1), 0)));
     expect(coinbase.inputs[0]).toMatchObject({
       coinbase: true,
       missing: false,
@@ -344,8 +370,8 @@ describe('wallet selected review context', () => {
 
   it('uses attached input evidence without treating the parent transaction as loaded', () => {
     const workspace = fixture();
-    delete workspace.transactions[parent.txid];
-    workspace.transactions[shared.txid] = {
+    delete workspace.chainData.transactions[parent.txid];
+    workspace.chainData.transactions[shared.txid] = {
       ...shared,
       vin: [
         {
@@ -359,7 +385,7 @@ describe('wallet selected review context', () => {
     const context = buildWalletReviewContext(
       workspace,
       wallet,
-      item(outputNodeId(parent.txid, 0), { txid: parent.txid }),
+      item(outpointReference(parent.txid, 0), { txid: parent.txid }),
     );
     expect(context.status).toBe('missing');
     expect(context.selected).toMatchObject({
@@ -382,7 +408,7 @@ describe('wallet selected review context', () => {
 
   it('preserves all rows and canonical metadata references for compact presentation', () => {
     const workspace = fixture();
-    workspace.transactions[id(3)] = {
+    workspace.chainData.transactions[id(3)] = {
       ...shared,
       vout: Array.from({ length: 80 }, (_, n) => ({
         n,
@@ -390,19 +416,19 @@ describe('wallet selected review context', () => {
         scriptPubKey: { hex: script(mine) },
       })),
     };
-    workspace.annotations[outputNodeId(id(3), 79)] = {
+    workspace.annotations.entities[outpointReference(id(3), 79)] = {
       label: 'Imported receipt',
       note: 'Human context',
       icon: 'gift',
       bookmarked: false,
     };
     const before = JSON.stringify(workspace);
-    const context = buildWalletReviewContext(workspace, wallet, item(outputNodeId(id(3), 79)));
+    const context = buildWalletReviewContext(workspace, wallet, item(outpointReference(id(3), 79)));
     expect(context.outputs).toHaveLength(80);
     expect(
       context.outputs.filter((output) => output.selected).map((output) => output.vout),
     ).toEqual([79]);
-    expect(workspace.annotations[context.selected!.id].icon).toBe('gift');
+    expect(workspace.annotations.entities[context.selected!.id].icon).toBe('gift');
     expect(JSON.stringify(workspace)).toBe(before);
   });
 
@@ -421,30 +447,30 @@ describe('wallet selected review context', () => {
       ],
     });
     const source = review.items.find((entry) => entry.reason === 'source')!;
-    expect(source.nodeIds).toEqual([outputNodeId(id(1), 0), outputNodeId(id(3), 0)]);
+    expect(source.nodeIds).toEqual([outpointReference(id(1), 0), outpointReference(id(3), 0)]);
     expect(
       buildWalletReviewContext(workspace, wallet, source).currentOutputs.map((entry) => entry.id),
-    ).toEqual([outputNodeId(id(3), 0)]);
+    ).toEqual([outpointReference(id(3), 0)]);
     const unrelated: Transaction = {
       txid: id(4),
       vin: [{ txid: id(7), vout: 0 }],
       vout: [{ n: 0, value: 1, scriptPubKey: { hex: script(mine) } }],
     };
-    workspace.transactions[unrelated.txid] = unrelated;
+    workspace.chainData.transactions[unrelated.txid] = unrelated;
     const expanded = {
       ...source,
       nodeIds: [
         ...source.nodeIds,
-        outputNodeId(id(3), 1),
-        outputNodeId(id(4), 0),
-        outputNodeId(id(8), 0),
-        outputNodeId(id(3), 0),
+        outpointReference(id(3), 1),
+        outpointReference(id(4), 0),
+        outpointReference(id(8), 0),
+        outpointReference(id(3), 0),
         'invalid',
       ],
     };
     expect(
       buildWalletReviewContext(workspace, wallet, expanded).currentOutputs.map((entry) => entry.id),
-    ).toEqual([outputNodeId(id(3), 0)]);
+    ).toEqual([outpointReference(id(3), 0)]);
     expect(
       buildWalletReviewContext(workspace, wallet, { ...source, nodeIds: [source.nodeId] })
         .currentOutputs,

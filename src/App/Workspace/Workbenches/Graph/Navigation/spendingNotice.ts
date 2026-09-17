@@ -1,13 +1,13 @@
-import { isOpReturn } from '../../../../../Domain/Chain/opReturn';
-import { short } from '../../../../Controls/Display/referenceFormat';
-import type { Network } from '../../../../../Domain/Chain/network';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { loadSpending } from '../../../../../Infra/Bitcoin/api';
-import { fetchCurrentUtxo } from '../../../../../Infra/Bitcoin/utxoStatus';
+import { isOpReturn, type Network } from '../../../../../Core/Bitcoin';
+import { short } from '../../../../../Core/Formatting';
+
+import type { Transaction } from '../../../../../Core/ChainData';
+import type { ChainDataAcquisition } from '../../../../../Core/Workspace/Session/chainDataAcquisition';
+import { fetchCurrentUtxo } from '../../../../../Core/ChainData/utxoStatus';
 
 /** Successful graph additions are their own feedback. Report only status or a next step. */
 export async function spendingNotice(
-  result: Awaited<ReturnType<typeof loadSpending>>,
+  result: Awaited<ReturnType<ChainDataAcquisition['read']['spending']>>,
   transaction: Transaction,
   network: Network,
   vout: number | undefined,

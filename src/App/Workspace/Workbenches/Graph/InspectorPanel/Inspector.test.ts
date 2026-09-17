@@ -3,10 +3,10 @@ import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createWorkspace } from '../../../createWorkspace';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import { addressToScriptHash } from '../../../../../Domain/Wallet/wallet';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import type { Transaction } from '../../../../../Core/ChainData';
+import { addressToScriptHash } from '../../../../../Core/Bitcoin';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
 import { WalletInspector } from './Inspector';
 
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');
@@ -39,11 +39,14 @@ describe('WalletInspector', () => {
   it('counts script-only receipts while excluding spoofed decoded addresses', () => {
     const workspace = {
       ...createWorkspace('Evidence', 'mainnet'),
-      wallets: [wallet],
-      transactions: {
-        [txid]: {
-          ...transaction,
-          vout: [transaction.vout[0], { n: 1, value: 1, scriptPubKey: { hex: '51', address } }],
+      wallets: { ...createWorkspace('Evidence', 'mainnet').wallets, definitions: [wallet] },
+      chainData: {
+        ...createWorkspace('Evidence', 'mainnet').chainData,
+        transactions: {
+          [txid]: {
+            ...transaction,
+            vout: [transaction.vout[0], { n: 1, value: 1, scriptPubKey: { hex: '51', address } }],
+          },
         },
       },
     };

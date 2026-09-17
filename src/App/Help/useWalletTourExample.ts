@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Workspace } from '../Workspace/workspace';
+import type { Workspace } from '../../Core/Workspace/workspace';
 import { loadTemplateWorkspace } from '../Examples/templateWorkspace';
 
 /** A public example loaded for the tour, with the state its status strip shows. */

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
-import type { Network } from '../../../Domain/Chain/network';
+import type { Network } from '../../../Core/Bitcoin';
 import type { WorkspaceTemplate } from '../../Examples/workspaceTemplates';
 import { Modal } from '../../Dialogs/Modal';
 import { focusDialogField, PasswordControls, PasswordField } from './PasswordControls';

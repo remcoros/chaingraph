@@ -35,12 +35,14 @@ import {
 import { valueFilterError } from '../Filters/graphFilters';
 import { sortEntities, type EntitySort } from './entitySort';
 import { hasActiveFilters } from '../Filters/filterPresentation';
-import type { GraphFilters } from '../../../GraphState/filters';
+import type { GraphFilters } from '../../../../../Core/Workspace/view';
+import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
-import type { Annotation } from '../../../Annotations/annotation';
+
 import type { GraphNode } from '../../../GraphState/types';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
+import type { Transaction } from '../../../../../Core/ChainData';
+
 import './entity-browser.css';
 import type { VisibilityProps } from '../../../Selection/VisibilityActions';
 import { AnchoredPopover } from '../../../../Controls/AnchoredPopover';
@@ -169,7 +171,9 @@ function nextVisibility(current: VisibilityMode): VisibilityMode {
 
 interface Props extends VisibilityProps {
   transactions?: Record<string, Transaction>;
-  workspace?: Pick<Workspace, 'network' | 'transactions'>;
+  workspace?: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  };
   removableNodeIds?: readonly string[];
   onRemoveNode?: (id: string) => void;
   visibility?: 'visible' | 'hidden' | 'all' | 'graph';
@@ -208,7 +212,9 @@ interface EntityRowProps {
   node: GraphNode;
   annotation?: Annotation;
   transaction?: Transaction;
-  workspace?: Pick<Workspace, 'network' | 'transactions'>;
+  workspace?: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  };
   selected: boolean;
   hidden: boolean;
   canSetHidden: boolean;
@@ -405,11 +411,13 @@ export default function EntityBrowser({
     };
   });
   const network = workspace?.network;
-  const evidenceTransactions = workspace?.transactions;
+  const evidenceTransactions = workspace?.chainData.transactions;
   // A saved view change is not new fee evidence. Output/address rows need none.
   const rowWorkspace = useMemo(
     () =>
-      network && evidenceTransactions ? { network, transactions: evidenceTransactions } : undefined,
+      network && evidenceTransactions
+        ? { network, chainData: { transactions: evidenceTransactions } }
+        : undefined,
     [network, evidenceTransactions],
   );
   const removable = useMemo(() => new Set(removableNodeIds), [removableNodeIds]);

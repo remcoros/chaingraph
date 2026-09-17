@@ -1,9 +1,10 @@
-import type { Workspace } from '../workspace';
-import type { GraphFilters } from '../GraphState/filters';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+import type { GraphFilters } from '../../../Core/Workspace/view';
+
 import { addGraphNodes } from '../GraphState/graphMembership';
 import { buildGraph } from '../GraphState/graphEvidence';
-import { outputAddress } from '../../../Domain/Chain/prevouts';
-import { promoteInputContext } from '../Evidence/InputContext';
+import { outputAddress } from '../../../Core/Bitcoin';
+import { promoteInputContext } from '../../../Core/Workspace/transactionContext';
 
 /** Resolve exact evidence references before leaving a finding, including input
  * outpoints whose creators are not loaded. Selection can hydrate that one creator
@@ -19,13 +20,13 @@ export function resolveGraphHandoff(
     const match = /^(tx|out):([0-9a-f]{64})(?::([0-9]+))?$/.exec(id);
     if (match) {
       const [, kind, txid, index] = match;
-      const creator = workspace.transactions[txid];
+      const creator = workspace.chainData.transactions[txid];
       if (creator && (kind === 'tx' || creator.vout.some((out) => out.n === Number(index))))
         promote.add(txid);
       if (kind === 'out') {
         for (const support of supportingTxids) {
           if (
-            workspace.transactions[support]?.vin.some(
+            workspace.chainData.transactions[support]?.vin.some(
               (input) => input.txid === txid && input.vout === Number(index),
             )
           )
@@ -33,8 +34,12 @@ export function resolveGraphHandoff(
         }
       }
     } else if (id.startsWith('addr:')) {
-      for (const txid of Object.keys(workspace.inputContext ?? {})) {
-        if (workspace.transactions[txid]?.vout.some((out) => outputAddress(out) === id.slice(5)))
+      for (const txid of Object.keys(workspace.view.inputContext ?? {})) {
+        if (
+          workspace.chainData.transactions[txid]?.vout.some(
+            (out) => outputAddress(out) === id.slice(5),
+          )
+        )
           promote.add(txid);
       }
     }
@@ -103,13 +108,16 @@ export function prepareGraphNavigation(
     filters,
     workspace: {
       ...admitted,
-      watchedAddresses: addresses.length
-        ? [...new Set([...admitted.watchedAddresses, ...addresses])]
-        : admitted.watchedAddresses,
       view: {
         ...admitted.view,
         showAddresses: addresses.length > 0 || admitted.view.showAddresses,
         smallAmountThreshold: undefined,
+      },
+      chainData: {
+        ...admitted.chainData,
+        watchedAddresses: addresses.length
+          ? [...new Set([...admitted.chainData.watchedAddresses, ...addresses])]
+          : admitted.chainData.watchedAddresses,
       },
     },
   };

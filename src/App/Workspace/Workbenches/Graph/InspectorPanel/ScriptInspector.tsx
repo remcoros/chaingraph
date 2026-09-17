@@ -2,9 +2,9 @@ import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBl
 import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode } from '../../../GraphState/types';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
-import type { Workspace } from '../../../workspace';
-import { short } from '../../../../Controls/Display/referenceFormat';
+import type { Transaction } from '../../../../../Core/ChainData';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import { short } from '../../../../../Core/Formatting';
 import { inspectScript, type RawInspection, fetchRawInspection } from './transactionInspection';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { CopyButton } from '../../../../Controls/CopyButton';
@@ -51,8 +51,8 @@ export function ScriptInspector(props: ScriptInspectorProps) {
   const { workspace, selected, loadedSpends } = props;
   const [open, setOpen] = useState(false);
   const related = useMemo(
-    () => relatedTransactions(workspace.transactions, selected, loadedSpends),
-    [workspace.transactions, selected, loadedSpends],
+    () => relatedTransactions(workspace.chainData.transactions, selected, loadedSpends),
+    [workspace.chainData.transactions, selected, loadedSpends],
   );
   if (!related.length) return null;
   return (

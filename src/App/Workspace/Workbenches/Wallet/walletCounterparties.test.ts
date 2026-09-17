@@ -1,12 +1,16 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '../../../../Domain/Chain/transaction';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
-import { groupWalletRelationships, walletCounterparties } from '../../Wallet/walletRelationships';
-import { createWorkspace } from '../../createWorkspace';
-import { addressToScriptHash } from '../../../../Domain/Wallet/wallet';
+import type { Transaction } from '../../../../Core/ChainData';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+
+import {
+  groupWalletRelationships,
+  walletCounterparties,
+} from '../../../../Core/Workspace/Wallets/walletRelationships';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { addressToScriptHash } from '../../../../Core/Bitcoin';
 import {
   createWalletCounterpartyLoader,
   mergeWalletCounterpartyInputs,
@@ -45,12 +49,15 @@ const wallet: Wallet = {
 };
 const fixture = (count = 1): Workspace => ({
   ...createWorkspace('Counterparty inputs', 'mainnet'),
-  wallets: [wallet],
-  transactions: {
-    [id(1)]: {
-      txid: id(1),
-      vin: Array.from({ length: count }, (_, n) => ({ txid: id(100 + n), vout: 0 })),
-      vout: [output(0, mine)],
+  wallets: { ...createWorkspace('Counterparty inputs', 'mainnet').wallets, definitions: [wallet] },
+  chainData: {
+    ...createWorkspace('Counterparty inputs', 'mainnet').chainData,
+    transactions: {
+      [id(1)]: {
+        txid: id(1),
+        vin: Array.from({ length: count }, (_, n) => ({ txid: id(100 + n), vout: 0 })),
+        vout: [output(0, mine)],
+      },
     },
   },
 });
@@ -95,13 +102,13 @@ const settled = (loader: ReturnType<typeof createWalletCounterpartyLoader>) =>
 describe('counterparty projection', () => {
   it('excludes the selected wallet but not another imported wallet matching the other address', () => {
     const workspace = fixture();
-    workspace.transactions[id(100)] = transaction(id(100));
-    workspace.transactions[id(2)] = {
+    workspace.chainData.transactions[id(100)] = transaction(id(100));
+    workspace.chainData.transactions[id(2)] = {
       txid: id(2),
       vin: [{ txid: id(1), vout: 0 }],
       vout: [output(0, mine), output(1, other)],
     };
-    workspace.wallets.push({
+    workspace.wallets.definitions.push({
       ...wallet,
       id: 'other-wallet',
       addresses: [
@@ -137,7 +144,7 @@ describe('bounded counterparty input resolution', () => {
     await settled(run.loader);
     expect(fetch).toHaveBeenCalledTimes(20);
     expect(maximum).toBe(4);
-    expect(run.workspace.transactions[id(900)]).toBeUndefined();
+    expect(run.workspace.chainData.transactions[id(900)]).toBeUndefined();
     expect(run.loader.getSnapshot()).toMatchObject({ missingCount: 6, failedCount: 0 });
     run.configure();
     await Promise.resolve();
@@ -151,8 +158,8 @@ describe('bounded counterparty input resolution', () => {
   it('merges all grouped output references from a shared new parent, but cache-only work is a no-op', async () => {
     const workspace = fixture();
     const parent = id(175);
-    workspace.transactions[id(1)].vin = [{ txid: parent.toUpperCase(), vout: 0 }];
-    workspace.transactions[id(2)] = {
+    workspace.chainData.transactions[id(1)].vin = [{ txid: parent.toUpperCase(), vout: 0 }];
+    workspace.chainData.transactions[id(2)] = {
       txid: id(2),
       vin: [{ txid: parent, vout: 2 }],
       vout: [output(0, mine)],
@@ -161,9 +168,9 @@ describe('bounded counterparty input resolution', () => {
     const run = harness(workspace, fetch);
     await settled(run.loader);
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(run.workspace.inputContext?.[parent]).toEqual([0, 2]);
-    expect(run.workspace.contextTransactionIds).toContain(parent);
-    expect(run.workspace.transactions[parent].vout).toHaveLength(5);
+    expect(run.workspace.view.inputContext?.[parent]).toEqual([0, 2]);
+    expect(run.workspace.chainData.contextTransactionIds).toContain(parent);
+    expect(run.workspace.chainData.transactions[parent].vout).toHaveLength(5);
     expect(run.update).toHaveBeenCalledTimes(1);
     run.configure({ active: false });
     run.configure({ active: true });
@@ -184,9 +191,9 @@ describe('bounded counterparty input resolution', () => {
 
   it('skips cached parents with absent outpoints and distinguishes decoded non-address evidence', () => {
     const workspace = fixture(2);
-    workspace.transactions[id(1)].vin[0].vout = 2;
-    workspace.transactions[id(100)] = transaction(id(100));
-    workspace.transactions[id(101)] = {
+    workspace.chainData.transactions[id(1)].vin[0].vout = 2;
+    workspace.chainData.transactions[id(100)] = transaction(id(100));
+    workspace.chainData.transactions[id(101)] = {
       ...transaction(id(101)),
       vout: [{ n: 0, value: 0, scriptPubKey: { hex: '6a00' } }],
     };
@@ -206,7 +213,7 @@ describe('bounded counterparty input resolution', () => {
 
   it('does not load parents when attached evidence already resolves counterparty inputs', async () => {
     const workspace = fixture();
-    workspace.transactions[id(1)].vin[0].prevout = {
+    workspace.chainData.transactions[id(1)].vin[0].prevout = {
       value: 1,
       scriptPubKey: output().scriptPubKey,
     };
@@ -219,7 +226,7 @@ describe('bounded counterparty input resolution', () => {
       nonAddressCount: 0,
     });
     expect(fetch).not.toHaveBeenCalled();
-    expect(run.workspace.transactions[id(100)]).toBeUndefined();
+    expect(run.workspace.chainData.transactions[id(100)]).toBeUndefined();
     run.loader.stop();
   });
 
@@ -234,10 +241,13 @@ describe('bounded counterparty input resolution', () => {
     run.configure({
       workspace: {
         ...run.workspace,
-        transactions: {
-          ...run.workspace.transactions,
-          [id(104)]: transaction(id(104)),
-          [id(105)]: transaction(id(105)),
+        chainData: {
+          ...run.workspace.chainData,
+          transactions: {
+            ...run.workspace.chainData.transactions,
+            [id(104)]: transaction(id(104)),
+            [id(105)]: transaction(id(105)),
+          },
         },
       },
     });
@@ -245,8 +255,8 @@ describe('bounded counterparty input resolution', () => {
     await settled(run.loader);
     expect(fetch).toHaveBeenCalledTimes(4);
     expect(run.loader.getSnapshot().missingCount).toBe(0);
-    expect(run.workspace.inputContext?.[id(104)]).toBeUndefined();
-    expect(run.workspace.contextTransactionIds).not.toContain(id(104));
+    expect(run.workspace.view.inputContext?.[id(104)]).toBeUndefined();
+    expect(run.workspace.chainData.contextTransactionIds).not.toContain(id(104));
     expect(run.update).toHaveBeenCalledTimes(1);
     run.loader.stop();
   });
@@ -270,7 +280,13 @@ describe('bounded counterparty input resolution', () => {
         run.configure({ workspace: { ...run.workspace, id: 'replacement' }, enabled: false });
       else if (change === 'network')
         run.configure({ workspace: { ...run.workspace, network: 'testnet4' } });
-      else run.configure({ workspace: { ...run.workspace, transactions: {} } });
+      else
+        run.configure({
+          workspace: {
+            ...run.workspace,
+            chainData: { ...run.workspace.chainData, transactions: {} },
+          },
+        });
       expect(signals.every((signal) => signal.aborted)).toBe(true);
       releases.forEach((release) => release());
       await settled(run.loader);
@@ -297,12 +313,18 @@ describe('bounded counterparty input resolution', () => {
     });
     await settled(loader);
     expect(apply).toBeDefined();
-    const removed = { ...workspace, transactions: {} };
+    const removed = { ...workspace, chainData: { ...workspace.chainData, transactions: {} } };
     expect(apply!(removed)).toBe(removed);
     const changed = {
       ...workspace,
-      transactions: {
-        [id(1)]: { ...workspace.transactions[id(1)], vin: [{ txid: id(800), vout: 0 }] },
+      chainData: {
+        ...workspace.chainData,
+        transactions: {
+          [id(1)]: {
+            ...workspace.chainData.transactions[id(1)],
+            vin: [{ txid: id(800), vout: 0 }],
+          },
+        },
       },
     };
     expect(apply!(changed)).toBe(changed);
@@ -310,9 +332,12 @@ describe('bounded counterparty input resolution', () => {
     expect(apply!(foreign)).toBe(foreign);
     const noWalletReceipt = {
       ...workspace,
-      transactions: {
-        ...workspace.transactions,
-        [id(1)]: { ...workspace.transactions[id(1)], vout: [output(0, other)] },
+      chainData: {
+        ...workspace.chainData,
+        transactions: {
+          ...workspace.chainData.transactions,
+          [id(1)]: { ...workspace.chainData.transactions[id(1)], vout: [output(0, other)] },
+        },
       },
     };
     expect(apply!(noWalletReceipt)).toBe(noWalletReceipt);
@@ -329,7 +354,7 @@ describe('bounded counterparty input resolution', () => {
     });
     const run = harness(fixture(), fetch);
     const changed = fixture();
-    changed.transactions[id(1)].vin = [{ txid: id(800), vout: 0 }];
+    changed.chainData.transactions[id(1)].vin = [{ txid: id(800), vout: 0 }];
     run.configure({ workspace: { ...changed, id: run.workspace.id } });
     release!();
     await settled(run.loader);
@@ -339,7 +364,7 @@ describe('bounded counterparty input resolution', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     release!();
     await settled(run.loader);
-    expect(run.workspace.transactions[id(800)]).toBeDefined();
+    expect(run.workspace.chainData.transactions[id(800)]).toBeDefined();
     run.loader.stop();
   });
 

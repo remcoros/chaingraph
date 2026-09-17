@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WORKSPACE_TEMPLATES, createTemplateWorkspace } from './workspaceTemplates';
 import { buildGraph } from '../Workspace/GraphState/graphEvidence';
-import { parseWorkspace } from '../Workspace/Persistence/Format';
-import { indexPreviousOutputs } from '../../Domain/Chain/prevouts';
-import { outputNodeId, txNodeId } from '../../Domain/Metadata/entityReferences';
-import { sats } from '../../Domain/Chain/transaction';
+import { parseWorkspace } from '../../Core/Workspace/Persistence';
+import { indexPreviousOutputs } from '../../Core/ChainData';
+import { outpointReference, transactionReference } from '../../Core/Workspace/entityReferences';
+import { sats } from '../../Core/Bitcoin';
 import { projectGraphMembership } from '../Workspace/GraphState/graphMembership';
 import { transactionNodeIds } from '../Workspace/GraphState/visibility';
-import { formatBitcoinAmount } from '../Controls/Display/amountFormat';
+import { formatBitcoinAmount } from '../../Core/Formatting';
 import { ICON_PALETTE } from '../Controls/Metadata/iconOptions';
 
 afterEach(() => vi.restoreAllMocks());
@@ -42,7 +42,7 @@ describe('real annotated workspace templates', () => {
     for (const template of WORKSPACE_TEMPLATES) {
       const workspace = await createTemplateWorkspace(template.id);
       const icons = new Set(
-        Object.values(workspace.annotations)
+        Object.values(workspace.annotations.entities)
           .map((annotation) => annotation.icon)
           .filter(Boolean),
       );
@@ -60,45 +60,53 @@ describe('real annotated workspace templates', () => {
       expect(parseWorkspace(workspace)).toEqual(workspace);
       expect(workspace.network).toBe(template.network);
       expect(workspace.demo).toBe(false);
-      expect(workspace.wallets).toHaveLength(template.id === 'mainnet-public-wallet' ? 1 : 0);
-      expect(workspace.findings).toEqual([]);
-      expect(Object.keys(workspace.transactions).length).toBeLessThanOrEqual(30);
+      expect(workspace.wallets.definitions).toHaveLength(
+        template.id === 'mainnet-public-wallet' ? 1 : 0,
+      );
+      expect(workspace.analysis.findings).toEqual([]);
+      expect(Object.keys(workspace.chainData.transactions).length).toBeLessThanOrEqual(30);
       expect(
-        Object.values(workspace.transactions).every(
+        Object.values(workspace.chainData.transactions).every(
           (tx) => tx.vin.length <= (template.id === 'mainnet-wabisabi' ? 350 : 326),
         ),
       ).toBe(true);
-      const selected = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
+      const selected =
+        workspace.chainData.transactions[workspace.view.panels!.flow!.transactionId!];
       expect(selected).toBeDefined();
       // Every input resolves to known previous-output content, whether the parent is
       // loaded in full or the output is attached to the spending input.
-      const previous = indexPreviousOutputs(workspace);
+      const previous = indexPreviousOutputs({
+        network: workspace.network,
+        transactions: workspace.chainData.transactions,
+      });
       for (const input of selected.vin) {
         if (input.txid === undefined) continue;
-        const resolution = previous.get(outputNodeId(input.txid, input.vout!));
+        const resolution = previous.get(`${input.txid}:${input.vout}`);
         expect(resolution?.status === 'loaded' || resolution?.status === 'attached').toBe(true);
       }
       // Every cached spend references a real output of its cached parent.
-      for (const tx of Object.values(workspace.transactions)) {
+      for (const tx of Object.values(workspace.chainData.transactions)) {
         for (const input of tx.vin) {
-          if (input.txid === undefined || !workspace.transactions[input.txid]) continue;
-          expect(workspace.transactions[input.txid].vout[input.vout!]?.n).toBe(input.vout);
+          if (input.txid === undefined || !workspace.chainData.transactions[input.txid]) continue;
+          expect(workspace.chainData.transactions[input.txid].vout[input.vout!]?.n).toBe(
+            input.vout,
+          );
         }
       }
       const graph = buildGraph(workspace);
       const nodes = new Set(graph.nodes.map((node) => node.id));
       expect(nodes.has(workspace.view.selectionId!)).toBe(true);
-      expect(Object.values(workspace.annotations).some((annotation) => annotation.bookmarked)).toBe(
-        true,
-      );
-      for (const [id, annotation] of Object.entries(workspace.annotations)) {
+      expect(
+        Object.values(workspace.annotations.entities).some((annotation) => annotation.bookmarked),
+      ).toBe(true);
+      for (const [id, annotation] of Object.entries(workspace.annotations.entities)) {
         expect(nodes.has(id)).toBe(true);
         expect(annotation.label.length).toBeGreaterThan(0);
         expect(annotation.note.length).toBeGreaterThan(0);
         expect(annotation.icon.length).toBeGreaterThan(0);
       }
-      expect(workspace.tags!.length).toBeGreaterThan(0);
-      for (const tag of workspace.tags!) {
+      expect(workspace.annotations.tags!.length).toBeGreaterThan(0);
+      for (const tag of workspace.annotations.tags!) {
         expect(tag.nodeIds.length).toBeGreaterThan(0);
         expect(tag.nodeIds.every((id) => nodes.has(id))).toBe(true);
       }
@@ -119,12 +127,13 @@ describe('real annotated workspace templates', () => {
       const nodes = new Set(graph.nodes.map((node) => node.id));
       expect(nodes.size).toBe(workspace.view.graphNodeIds!.length);
       expect(nodes.has(workspace.view.selectionId!)).toBe(true);
-      for (const id of Object.keys(workspace.annotations)) expect(nodes.has(id), id).toBe(true);
+      for (const id of Object.keys(workspace.annotations.entities))
+        expect(nodes.has(id), id).toBe(true);
       const linked = new Set(graph.links.flatMap((link) => [link.source, link.target]));
       for (const id of nodes) expect(linked.has(id), `Disconnected opening node: ${id}`).toBe(true);
       for (const node of graph.nodes.filter((node) => node.kind === 'transaction')) {
-        const transaction = workspace.transactions[node.txid!];
-        if (workspace.inputContext?.[transaction.txid]) continue;
+        const transaction = workspace.chainData.transactions[node.txid!];
+        if (workspace.view.inputContext?.[transaction.txid]) continue;
         for (const side of ['inputs', 'outputs'] as const) {
           const candidates = transactionNodeIds(transaction, side);
           const shown = candidates.filter((id) => nodes.has(id));
@@ -148,15 +157,16 @@ describe('real annotated workspace templates', () => {
       ['testnet4-fan-out', 53],
     ] as const) {
       const workspace = await createTemplateWorkspace(id);
-      const root = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
+      const root = workspace.chainData.transactions[workspace.view.panels!.flow!.transactionId!];
       const visible = new Set(workspace.view.graphNodeIds);
       expect(root.vout).toHaveLength(expected);
       for (const output of root.vout)
-        expect(visible.has(outputNodeId(root.txid, output.n)), `${id} output ${output.n}`).toBe(
-          true,
-        );
+        expect(
+          visible.has(outpointReference(root.txid, output.n)),
+          `${id} output ${output.n}`,
+        ).toBe(true);
       for (const node of transactionNodeIds(root, 'inputs')) expect(visible.has(node)).toBe(true);
-      expect(visible.has(txNodeId(root.txid))).toBe(true);
+      expect(visible.has(transactionReference(root.txid))).toBe(true);
     }
   });
 
@@ -170,31 +180,35 @@ describe('real annotated workspace templates', () => {
         vi.setSystemTime(new Date('2026-09-08T18:01:00Z'));
         const second = await createTemplateWorkspace(template.id, 'My investigation', 'My notes');
         expect(first.id).not.toBe(second.id);
-        if (first.wallets.length) {
-          expect(first.wallets[0].id).not.toBe(second.wallets[0].id);
-          expect(first.wallets[0].addresses).toEqual(second.wallets[0].addresses);
+        if (first.wallets.definitions.length) {
+          expect(first.wallets.definitions[0].id).not.toBe(second.wallets.definitions[0].id);
+          expect(first.wallets.definitions[0].addresses).toEqual(
+            second.wallets.definitions[0].addresses,
+          );
         }
         expect(first.createdAt).not.toBe(second.createdAt);
         expect(second.name).toBe('My investigation');
         expect(second.description).toBe('My notes');
-        const firstIds = new Set(first.tags!.map((tag) => tag.id));
-        expect(second.tags!.every((tag) => !firstIds.has(tag.id))).toBe(true);
+        const firstIds = new Set(first.annotations.tags!.map((tag) => tag.id));
+        expect(second.annotations.tags!.every((tag) => !firstIds.has(tag.id))).toBe(true);
         const expected = structuredClone(second);
         const root = first.view.panels!.flow!.transactionId!;
-        first.transactions[root].vout[0].value = 1;
-        first.transactions[root].vout[0].scriptPubKey.hex = '6a';
-        first.annotations[Object.keys(first.annotations)[0]].note = 'Edited';
-        first.tags![0].nodeIds.length = 0;
-        const contextId = Object.keys(first.inputContext ?? {})[0];
-        if (contextId) first.inputContext![contextId].length = 0;
-        if (first.contextTransactionIds) first.contextTransactionIds.length = 0;
+        first.chainData.transactions[root].vout[0].value = 1;
+        first.chainData.transactions[root].vout[0].scriptPubKey.hex = '6a';
+        first.annotations.entities[Object.keys(first.annotations.entities)[0]].note = 'Edited';
+        first.annotations.tags![0].nodeIds.length = 0;
+        const contextId = Object.keys(first.view.inputContext ?? {})[0];
+        if (contextId) first.view.inputContext![contextId].length = 0;
+        if (first.chainData.contextTransactionIds) first.chainData.contextTransactionIds.length = 0;
         first.view.panels!.flow!.height = 'collapsed';
         expect(second).toEqual(expected);
         const third = await createTemplateWorkspace(template.id);
-        expect(third.transactions).toEqual(second.transactions);
-        expect(third.annotations).toEqual(second.annotations);
-        expect(third.inputContext).toEqual(second.inputContext);
-        expect(third.contextTransactionIds).toEqual(second.contextTransactionIds);
+        expect(third.chainData.transactions).toEqual(second.chainData.transactions);
+        expect(third.annotations.entities).toEqual(second.annotations.entities);
+        expect(third.view.inputContext).toEqual(second.view.inputContext);
+        expect(third.chainData.contextTransactionIds).toEqual(
+          second.chainData.contextTransactionIds,
+        );
       } finally {
         vi.useRealTimers();
       }
@@ -205,34 +219,39 @@ describe('real annotated workspace templates', () => {
     const workspace = await createTemplateWorkspace('mainnet-equal-outputs');
     const seed = '323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2';
     const successor = '015d9cf0a12057d009395710611c65109f36b3eaefa3a694594bf243c097f404';
-    expect(workspace.transactions[seed].vin).toHaveLength(5);
-    expect(workspace.transactions[seed].vout.map((output) => sats(output.value))).toEqual([
-      5_000_000, 5_000_000, 5_000_000, 5_000_000, 5_000_000,
-    ]);
-    expect(workspace.transactions[successor].vin[1]).toMatchObject({ txid: seed, vout: 2 });
-    expect(workspace.transactions[successor].vin).toHaveLength(9);
-    expect(workspace.transactions[successor].vout.map((output) => sats(output.value))).toEqual([
-      791_116, 907_419, 9_136_520, 9_136_520,
-    ]);
+    expect(workspace.chainData.transactions[seed].vin).toHaveLength(5);
+    expect(workspace.chainData.transactions[seed].vout.map((output) => sats(output.value))).toEqual(
+      [5_000_000, 5_000_000, 5_000_000, 5_000_000, 5_000_000],
+    );
+    expect(workspace.chainData.transactions[successor].vin[1]).toMatchObject({
+      txid: seed,
+      vout: 2,
+    });
+    expect(workspace.chainData.transactions[successor].vin).toHaveLength(9);
+    expect(
+      workspace.chainData.transactions[successor].vout.map((output) => sats(output.value)),
+    ).toEqual([791_116, 907_419, 9_136_520, 9_136_520]);
     const graph = buildGraph(workspace);
     expect(graph.links).toContainEqual(
       expect.objectContaining({
-        source: outputNodeId(seed, 2),
-        target: txNodeId(successor),
+        source: outpointReference(seed, 2),
+        target: transactionReference(successor),
         kind: 'spends',
       }),
     );
     // One full parent has 247 outputs; the initial graph keeps only referenced context.
     expect(graph.nodes.length).toBeLessThan(60);
-    for (const input of workspace.transactions[successor].vin) {
-      expect(workspace.transactions[input.txid!].vout[input.vout!]).toBeDefined();
+    for (const input of workspace.chainData.transactions[successor].vin) {
+      expect(workspace.chainData.transactions[input.txid!].vout[input.vout!]).toBeDefined();
     }
   });
 
   it('preserves the mainnet message script and its zero value', async () => {
     const workspace = await createTemplateWorkspace('mainnet-op-return');
     const transaction =
-      workspace.transactions['8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684'];
+      workspace.chainData.transactions[
+        '8bae12b5f4c088d940733dcd1455efc6a3a69cf9340e17a981286d3778615684'
+      ];
     expect(transaction.vout[0]).toMatchObject({
       n: 0,
       value: 0,
@@ -245,16 +264,16 @@ describe('real annotated workspace templates', () => {
     const workspace = await createTemplateWorkspace('testnet4-spent-output');
     const seed = 'd4e564d295233f62603f7a7e9527acf88f6e467985868f15339887285d64bb1a';
     const spender = '8cfd7566b77a32519b7f9054c879ce73628255fb6171e431ba5134c114cd1044';
-    expect(workspace.transactions[seed].vin[0]).toMatchObject({
+    expect(workspace.chainData.transactions[seed].vin[0]).toMatchObject({
       txid: '0ffaf73db54ae2666a19324415fb158993b7b30478237ec56d655cfbed2bf606',
       vout: 0,
     });
-    expect(workspace.transactions[spender].vin[0]).toMatchObject({ txid: seed, vout: 1 });
-    expect(sats(workspace.transactions[seed].vout[1].value)).toBe(447_915_285);
+    expect(workspace.chainData.transactions[spender].vin[0]).toMatchObject({ txid: seed, vout: 1 });
+    expect(sats(workspace.chainData.transactions[seed].vout[1].value)).toBe(447_915_285);
     expect(buildGraph(workspace).links).toContainEqual(
       expect.objectContaining({
-        source: outputNodeId(seed, 1),
-        target: txNodeId(spender),
+        source: outpointReference(seed, 1),
+        target: transactionReference(spender),
         kind: 'spends',
       }),
     );
@@ -263,7 +282,9 @@ describe('real annotated workspace templates', () => {
   it('preserves all 53 fan-out outputs and distinguishes observed script forms', async () => {
     const workspace = await createTemplateWorkspace('testnet4-fan-out');
     const tx =
-      workspace.transactions['cc159432ffb7a166abeccc79800e9616a09ea9ac6937080c2ca37b38671970e5'];
+      workspace.chainData.transactions[
+        'cc159432ffb7a166abeccc79800e9616a09ea9ac6937080c2ca37b38671970e5'
+      ];
     expect(tx.vin).toHaveLength(1);
     expect(tx.vout).toHaveLength(53);
     expect(
@@ -277,28 +298,28 @@ describe('real annotated workspace templates', () => {
     const workspace = await createTemplateWorkspace('mainnet-large-value-path');
     const seed = 'a6d697a25266ce3c78774fd1d75f896b7af522ada209b0f6228ea497bc49a46d';
     const parent = '17a0d14d4ec50f3384e1c9c6eac7a67345b4c1946a518ab2d943a6d71fe5266e';
-    expect(workspace.transactions[seed].vin).toHaveLength(15);
-    expect(workspace.transactions[seed].vin[0]).toMatchObject({ txid: parent, vout: 1 });
-    expect(workspace.transactions[seed].vout.map((output) => sats(output.value))).toEqual([
-      59_849_955_894, 340_000_000_000,
-    ]);
-    expect(workspace.view.selectionId).toBe(outputNodeId(seed, 1));
+    expect(workspace.chainData.transactions[seed].vin).toHaveLength(15);
+    expect(workspace.chainData.transactions[seed].vin[0]).toMatchObject({ txid: parent, vout: 1 });
+    expect(workspace.chainData.transactions[seed].vout.map((output) => sats(output.value))).toEqual(
+      [59_849_955_894, 340_000_000_000],
+    );
+    expect(workspace.view.selectionId).toBe(outpointReference(seed, 1));
     expect(workspace.view.sizeBy).toBe('value');
     expect(buildGraph(workspace).nodes.length).toBeLessThan(50);
   });
 
   it('keeps the 143-output case complete with truthful amount and script groups', async () => {
     const workspace = await createTemplateWorkspace('mainnet-batch-outputs');
-    const root = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
+    const root = workspace.chainData.transactions[workspace.view.panels!.flow!.transactionId!];
     expect(root.vin).toHaveLength(1);
     expect(root.vout).toHaveLength(143);
-    const small = workspace.tags!.find(
+    const small = workspace.annotations.tags!.find(
       (tag) => tag.name === `Below ${formatBitcoinAmount(10_000)}`,
     );
     expect(small?.nodeIds).toEqual(
       root.vout
         .filter((output) => sats(output.value) < 10_000)
-        .map((output) => outputNodeId(root.txid, output.n)),
+        .map((output) => outpointReference(root.txid, output.n)),
     );
     expect(new Set(root.vout.map((output) => output.scriptPubKey.type)).size).toBe(4);
     expect(buildGraph(workspace).nodes.length).toBeLessThan(150);
@@ -306,51 +327,54 @@ describe('real annotated workspace templates', () => {
 
   it('opens the large CoinJoin with complete inputs and amount groups without ownership findings', async () => {
     const workspace = await createTemplateWorkspace('mainnet-wabisabi');
-    const root = workspace.transactions[workspace.view.panels!.flow!.transactionId!];
+    const root = workspace.chainData.transactions[workspace.view.panels!.flow!.transactionId!];
     expect(root.vin).toHaveLength(327);
     expect(root.vout).toHaveLength(279);
     // The snapshot carries the CoinJoin alone; each spend records the exact output it
     // consumed instead of the whole parent transaction.
-    expect(Object.keys(workspace.transactions)).toHaveLength(1);
-    expect(workspace.contextTransactionIds ?? []).toEqual([]);
-    const previous = indexPreviousOutputs(workspace);
+    expect(Object.keys(workspace.chainData.transactions)).toHaveLength(1);
+    expect(workspace.chainData.contextTransactionIds ?? []).toEqual([]);
+    const previous = indexPreviousOutputs({
+      network: workspace.network,
+      transactions: workspace.chainData.transactions,
+    });
     for (const input of root.vin) {
       expect(input.prevout?.scriptPubKey.hex).toMatch(/^(?:[0-9a-f]{2})+$/);
-      expect(previous.get(outputNodeId(input.txid!, input.vout!))?.status).toBe('attached');
+      expect(previous.get(`${input.txid}:${input.vout}`)?.status).toBe('attached');
     }
-    const group = workspace.tags!.find(
+    const group = workspace.annotations.tags!.find(
       (tag) => tag.name === `${formatBitcoinAmount(2_097_152)} × 20`,
     );
     expect(group?.nodeIds).toEqual(
       root.vout
         .filter((output) => sats(output.value) === 2_097_152)
-        .map((output) => outputNodeId(root.txid, output.n)),
+        .map((output) => outpointReference(root.txid, output.n)),
     );
-    expect(workspace.findings).toEqual([]);
+    expect(workspace.analysis.findings).toEqual([]);
     expect(buildGraph(workspace).nodes.length).toBe(607);
     // The canvas opens on the complete transaction: every input outpoint, every
     // output, and the CoinJoin itself, with nothing left to reveal by hand.
     const visible = new Set(workspace.view.graphNodeIds);
     expect(visible.size).toBe(607);
     for (const input of root.vin)
-      expect(visible.has(outputNodeId(input.txid!, input.vout!))).toBe(true);
+      expect(visible.has(outpointReference(input.txid!, input.vout!))).toBe(true);
     for (const output of root.vout)
-      expect(visible.has(outputNodeId(root.txid, output.n))).toBe(true);
-    expect(visible.has(txNodeId(root.txid))).toBe(true);
-    for (const tag of workspace.tags!)
+      expect(visible.has(outpointReference(root.txid, output.n))).toBe(true);
+    expect(visible.has(transactionReference(root.txid))).toBe(true);
+    for (const tag of workspace.annotations.tags!)
       expect(tag.nodeIds.every((node) => visible.has(node))).toBe(true);
   });
 
   it('includes a derived public watch-only wallet with honest partial scan state', async () => {
     const workspace = await createTemplateWorkspace('mainnet-public-wallet');
-    const [wallet] = workspace.wallets;
+    const [wallet] = workspace.wallets.definitions;
     expect(wallet.key.startsWith('zpub')).toBe(true);
     expect(wallet.scriptType).toBe('p2wpkh');
     expect(wallet.scanComplete).toBe(false);
     expect(wallet.addresses).toHaveLength(20);
     expect(wallet.pendingTransactionIds!.length).toBeGreaterThan(0);
     const addresses = new Set(wallet.addresses.map((address) => address.address));
-    const walletOutputs = Object.values(workspace.transactions).flatMap((transaction) =>
+    const walletOutputs = Object.values(workspace.chainData.transactions).flatMap((transaction) =>
       transaction.vout.filter(
         (output) => output.scriptPubKey.address && addresses.has(output.scriptPubKey.address),
       ),
@@ -362,12 +386,15 @@ describe('real annotated workspace templates', () => {
     expect(() =>
       parseWorkspace({
         ...workspace,
-        wallets: [
-          {
-            ...wallet,
-            addresses: [{ ...wallet.addresses[0], index: wallet.addresses[0].index + 100 }],
-          },
-        ],
+        wallets: {
+          ...workspace.wallets,
+          definitions: [
+            {
+              ...wallet,
+              addresses: [{ ...wallet.addresses[0], index: wallet.addresses[0].index + 100 }],
+            },
+          ],
+        },
       }),
     ).toThrow();
   });
@@ -376,15 +403,18 @@ describe('real annotated workspace templates', () => {
     const workspace = await createTemplateWorkspace('testnet4-mixed-path');
     const seed = 'b92eb2d8abf81a25197bacde9845eea3d711bd6edf25e1e8975d731271dd83eb';
     const successor = 'e0d797ca417b3c39e64677da7be5591f7c5e5d945743e9046efdbb10fd8ba76f';
-    expect(workspace.transactions[successor].vin[0]).toMatchObject({ txid: seed, vout: 0 });
-    expect(workspace.transactions[seed].vout.map((output) => sats(output.value))).toEqual([
-      1_018_062, 0, 4_998_981_938,
-    ]);
-    expect(sats(workspace.transactions[successor].vout[0].value)).toBe(1_000_000);
+    expect(workspace.chainData.transactions[successor].vin[0]).toMatchObject({
+      txid: seed,
+      vout: 0,
+    });
+    expect(workspace.chainData.transactions[seed].vout.map((output) => sats(output.value))).toEqual(
+      [1_018_062, 0, 4_998_981_938],
+    );
+    expect(sats(workspace.chainData.transactions[successor].vout[0].value)).toBe(1_000_000);
     expect(buildGraph(workspace).links).toContainEqual(
       expect.objectContaining({
-        source: outputNodeId(seed, 0),
-        target: txNodeId(successor),
+        source: outpointReference(seed, 0),
+        target: transactionReference(successor),
         kind: 'spends',
       }),
     );

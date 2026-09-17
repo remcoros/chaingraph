@@ -1,8 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { CheckSquare, Eye, EyeOff, Focus, Plus, Tag, Type, Undo2, X } from 'lucide-react';
-import type { Workspace } from '../workspace';
-import { labelBatchPlan } from '../Annotations/batchEdits';
-import { applyBatchIcon, planBatchIcon } from '../Annotations/batchMetadata';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+import { labelBatchPlan } from '../../../Core/Workspace/Annotations/batchEdits';
+import { applyBatchIcon, planBatchIcon } from '../../../Core/Workspace/Annotations/batchMetadata';
 import {
   BatchLabelEditor,
   BatchTagEditor,
@@ -61,8 +61,10 @@ export function SelectionToolbar({
   const tagId = useId();
   const ids = selection.ids;
   const count = ids.length;
-  const firstIcon = workspace.annotations[ids[0]]?.icon ?? '';
-  const mixedIcons = ids.some((id) => (workspace.annotations[id]?.icon ?? '') !== firstIcon);
+  const firstIcon = workspace.annotations.entities[ids[0]]?.icon ?? '';
+  const mixedIcons = ids.some(
+    (id) => (workspace.annotations.entities[id]?.icon ?? '') !== firstIcon,
+  );
   // The batch action stays available only while its own edit is the undo head.
   // Any later undoable edit, an undo, a lock or a workspace change retires it, so
   // it can never discard an unrelated newer edit.

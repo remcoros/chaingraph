@@ -3,11 +3,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  decryptWorkspace,
-  encryptWorkspace,
-} from '../src/App/Workspace/Persistence/Encryption/encryptedEnvelope';
-import { createWorkspace } from '../src/App/Workspace/createWorkspace';
+import { createWorkspacePersistence } from '../src/Core/Workspace/Persistence';
+import { createWorkspace } from '../src/Core/Workspace/createWorkspace';
 import { transactions } from '../tests/fixtures/bitcoin';
 
 // Exercise browser runtime boundaries using only a fresh, synthetic workspace.
@@ -19,13 +16,15 @@ const workspaceName = 'Production smoke';
 const storageKey = 'chaingraph.encrypted-workspaces.v1';
 const artifacts = path.resolve('artifacts/production-smoke');
 const workspace = createWorkspace(workspaceName, 'mainnet');
-workspace.transactions = transactions;
+workspace.chainData.transactions = transactions;
+const persistence = createWorkspacePersistence();
+const exportedFixture = await persistence.exportFile(workspace, password);
 const fixture = JSON.stringify([
   {
     id: workspace.id,
     publicName: workspaceName,
     savedAt: new Date().toISOString(),
-    envelope: await encryptWorkspace(workspace, password),
+    envelope: JSON.parse(exportedFixture.contents) as unknown,
   },
 ]);
 const cache = path.join(os.homedir(), '.cache/ms-playwright');
@@ -104,7 +103,7 @@ try {
       const parsed = new URL(url);
       return (
         parsed.origin === new URL(base).origin &&
-        /\/assets\/workspaceEncryption\.worker-[^/]+\.js$/.test(parsed.pathname)
+        /\/assets\/workspaceCodec\.worker-[^/]+\.js$/.test(parsed.pathname)
       );
     }).length;
   try {
@@ -128,7 +127,10 @@ try {
       .poll(
         async () => {
           const raw = await page.evaluate((key) => localStorage.getItem(key)!, storageKey);
-          const saved = await decryptWorkspace(JSON.parse(raw)[0].envelope, password);
+          const saved = await persistence.readFile(
+            new Blob([JSON.stringify(JSON.parse(raw)[0].envelope)]),
+            password,
+          );
           return (saved as { description?: string }).description;
         },
         {
@@ -142,7 +144,9 @@ try {
     const entries = JSON.parse(stored);
     expect(entries).toHaveLength(1);
     expect(entries[0].publicName).toBe(workspaceName);
-    expect(await decryptWorkspace(entries[0].envelope, password)).toMatchObject({
+    expect(
+      await persistence.readFile(new Blob([JSON.stringify(entries[0].envelope)]), password),
+    ).toMatchObject({
       name: workspaceName,
       network: 'mainnet',
       description,
@@ -192,7 +196,7 @@ try {
     const exported = await readFile(downloadedPath!, 'utf8');
     expect(exported).not.toContain(description);
     expect(exported).not.toContain(password);
-    expect(await decryptWorkspace(JSON.parse(exported), password)).toMatchObject({
+    expect(await persistence.readFile(new Blob([exported]), password)).toMatchObject({
       id: entries[0].id,
       name: workspaceName,
       network: 'mainnet',

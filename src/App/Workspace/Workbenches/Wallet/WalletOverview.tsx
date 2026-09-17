@@ -8,10 +8,10 @@ import {
   ScanSearch,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import { walletCheckAge } from '../../Wallet/walletActivity';
+import { walletCheckAge } from '../../../../Core/Workspace/Wallets/walletActivity';
 import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
-import type { WalletReviewCoverage } from '../../Wallet/walletReview';
-import type { WalletUtxoView } from '../../Wallet/WalletUtxos';
+import type { WalletReviewCoverage } from '../../../../Core/Workspace/Wallets/walletReview';
+import type { WalletUtxoCheck } from '../../../../Core/Workspace/Wallets/WalletUtxos/walletUtxoCheck';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import { walletDiscoveryStatus } from './walletDiscoveryStatus';
@@ -50,7 +50,7 @@ export function WalletOverview({
 > & {
   wallet: NonNullable<WalletWorkbenchContext['wallet']>;
   coverage: WalletReviewCoverage;
-  utxos?: WalletUtxoView;
+  utxos?: WalletUtxoCheck;
   utxoLoading: boolean;
   onCheck: (cursor?: number) => void;
   active: boolean;
@@ -73,7 +73,7 @@ export function WalletOverview({
                 value={wallet.id}
                 onChange={(event) => onSelectWallet(event.target.value)}
               >
-                {workspace.wallets.map((item) => (
+                {workspace.wallets.definitions.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
@@ -124,7 +124,7 @@ export function WalletOverview({
       </header>
       <dl className="wallet-coverage" aria-label="Wallet coverage">
         <div>
-          <dt>Current UTXOs</dt>
+          <dt>UTXOs at last check</dt>
           <dd>
             {coverage.utxoCount === undefined ? (
               tourPreview ? (
@@ -136,7 +136,9 @@ export function WalletOverview({
               )
             ) : (
               <>
-                {coverage.utxoCount} unspent · <Amount value={coverage.utxoBalanceSats} />
+                {coverage.utxoCount}{' '}
+                {coverage.utxoLoadedSpenders ? 'remaining candidates' : 'observed unspent'} ·{' '}
+                <Amount value={coverage.utxoBalanceSats} />
               </>
             )}
           </dd>
@@ -204,6 +206,15 @@ export function WalletOverview({
             UTXOs checked · {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
             {formatLocalTimestamp(utxos.checkedAt) ?? 'Unknown time'}
             {utxos.failed ? ` · ${utxos.failed} failed` : ''}
+          </span>
+        )}
+        {!!coverage.utxoLoadedSpenders && (
+          <span className="small warning" role="status">
+            {coverage.utxoLoadedSpenders} saved UTXO{' '}
+            {coverage.utxoLoadedSpenders === 1
+              ? 'has a loaded spender'
+              : 'checks have loaded spenders'}
+            . Historical checks retained; use Check UTXOs to resolve current status.
           </span>
         )}
         {!!utxos?.failed && (

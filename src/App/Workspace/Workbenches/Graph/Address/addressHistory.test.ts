@@ -10,9 +10,9 @@ import {
   shouldLoadAddressHistory,
 } from './addressHistory';
 import { paginateAddressHistorySections } from '../TransactionFlow/addressHistorySections';
-import { addressToScriptHash } from '../../../../../Domain/Wallet/wallet';
-import { createWorkspace } from '../../../createWorkspace';
-import type { Transaction } from '../../../../../Domain/Chain/transaction';
+import { addressToScriptHash } from '../../../../../Core/Bitcoin';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import type { Transaction } from '../../../../../Core/ChainData';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
 const address = (value: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(value), 0, 'bc');
@@ -44,8 +44,8 @@ describe('address history projection', () => {
   it('keeps unloaded history navigable and derives direction only from loaded evidence', () => {
     const target = address(1);
     const workspace = createWorkspace('Address history', 'mainnet');
-    workspace.transactions = { [received.txid]: received, [spent.txid]: spent };
-    workspace.addressHistories = {
+    workspace.chainData.transactions = { [received.txid]: received, [spent.txid]: spent };
+    workspace.chainData.addressHistories = {
       [target]: {
         history: [
           { tx_hash: id(3), height: 20 },
@@ -86,7 +86,7 @@ describe('address history projection', () => {
   it('uses verified wallet history when a direct address observation is absent', () => {
     const target = address(2);
     const workspace = createWorkspace('Wallet address history', 'mainnet');
-    workspace.wallets = [
+    workspace.wallets.definitions = [
       {
         id: crypto.randomUUID(),
         name: 'Fixture wallet',
@@ -118,7 +118,10 @@ describe('address history projection', () => {
     const empty = listAddressHistory(
       {
         ...workspace,
-        addressHistories: { [target]: { history: [], truncated: false } },
+        chainData: {
+          ...workspace.chainData,
+          addressHistories: { [target]: { history: [], truncated: false } },
+        },
       },
       target,
     );
@@ -245,7 +248,10 @@ describe('address history projection', () => {
 
     const changed = {
       ...workspace,
-      transactions: { ...workspace.transactions, [received.txid]: received },
+      chainData: {
+        ...workspace.chainData,
+        transactions: { ...workspace.chainData.transactions, [received.txid]: received },
+      },
     };
     expect(indexAddressHistoryTransactions(changed)).not.toBe(first);
   });

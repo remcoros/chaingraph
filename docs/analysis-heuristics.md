@@ -1,7 +1,7 @@
 # Analysis heuristics
 
 What each analysis tool computes, what it can and cannot claim, and the research
-it rests on. Tools live in `src/App/Workspace/Analysis/tools/`, run locally over loaded
+it rests on. Tools live in `src/Core/Workspace/Analysis/tools/`, run locally over loaded
 workspace records and make no network requests. Wallet review reuses the same
 registry.
 

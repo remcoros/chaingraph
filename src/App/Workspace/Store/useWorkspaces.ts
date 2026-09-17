@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
-import type { WorkspaceStore } from './WorkspaceStore';
+import type { WorkspaceStore } from '../../../Core/Workspace/Session/WorkspaceStore';
 
 export function useWorkspaces(store: WorkspaceStore) {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);

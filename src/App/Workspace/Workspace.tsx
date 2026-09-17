@@ -136,8 +136,8 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
               <span className="status-separator">/</span>
               {visibleGraph.links.length.toLocaleString()} connections
               <span className="status-separator">/</span>
-              {Object.keys(activeWorkspace.transactions).length.toLocaleString()}{' '}
-              {Object.keys(activeWorkspace.transactions).length === 1
+              {Object.keys(activeWorkspace.chainData.transactions).length.toLocaleString()}{' '}
+              {Object.keys(activeWorkspace.chainData.transactions).length === 1
                 ? 'transaction'
                 : 'transactions'}
             </>

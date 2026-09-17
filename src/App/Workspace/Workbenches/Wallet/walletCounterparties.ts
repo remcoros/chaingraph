@@ -1,20 +1,23 @@
-import type { Network } from '../../../../Domain/Chain/network';
-import type { Transaction } from '../../../../Domain/Chain/transaction';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../workspace';
-import { indexPreviousOutputs, resolvePreviousOutput } from '../../../../Domain/Chain/prevouts';
+import type { Network } from '../../../../Core/Bitcoin';
+import {
+  type Transaction,
+  indexPreviousOutputs,
+  resolvePreviousOutput,
+  parseTransaction,
+  validateTransactionAddresses,
+} from '../../../../Core/ChainData';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../Core/Workspace/workspace';
+
 import {
   canonicalTransactionId,
   validOutputIndex,
   walletOutputEvidence,
   type WalletAddressRelationships,
-} from '../../Wallet/walletRelationships';
-import { verifiedWalletAddresses } from '../../Wallet/walletRecords';
-import {
-  parseTransaction,
-  validateTransactionAddresses,
-} from '../../../../Domain/Chain/transactionValidation';
-import { mergeFlowInputs } from '../../Evidence/InputContext';
+} from '../../../../Core/Workspace/Wallets/walletRelationships';
+import { verifiedWalletAddresses } from '../../../../Core/Workspace/Wallets/walletRecords';
+
+import { mergeFlowInputs } from '../../../../Core/Workspace/flowInputContext';
 import {
   loadWalletFlowInputWave,
   WALLET_FLOW_INPUT_WAVE_LIMIT,
@@ -22,10 +25,10 @@ import {
 } from './Review/walletFlowInputs';
 
 /** The loader observes only the evidence that can change its one-hop input plan. */
-export type WalletCounterpartyWorkspace = Pick<
-  Workspace,
-  'id' | 'network' | 'wallets' | 'transactions'
->;
+export type WalletCounterpartyWorkspace = Pick<Workspace, 'id' | 'network'> & {
+  wallets: Pick<Workspace['wallets'], 'definitions'>;
+  chainData: Pick<Workspace['chainData'], 'transactions'>;
+};
 
 export interface WalletCounterpartyOptions {
   workspace: Workspace;
@@ -62,8 +65,11 @@ export interface WalletCounterpartyInputPlan {
   unavailableCount: number;
 }
 
-function loaded(workspace: Pick<Workspace, 'transactions'>, id: string) {
-  const transaction = workspace.transactions[id];
+function loaded(
+  workspace: { chainData: Pick<Workspace['chainData'], 'transactions'> },
+  id: string,
+) {
+  const transaction = workspace.chainData.transactions[id];
   return canonicalTransactionId(transaction?.txid) === id ? transaction : undefined;
 }
 
@@ -73,7 +79,7 @@ function sourceEvidence(
   walletId: string,
   contexts: InputContext[],
 ) {
-  const wallet = workspace.wallets.find((entry) => entry.id === walletId);
+  const wallet = workspace.wallets.definitions.find((entry) => entry.id === walletId);
   if (!wallet) return { contexts: [], sourceKey: '' };
   const hashes = new Set(
     verifiedWalletAddresses(wallet, workspace.network).map((entry) => entry.scripthash),
@@ -156,17 +162,28 @@ export function walletCounterpartyInputPlan(
   );
   const missing = new Set<string>();
   const unavailable = new Set<string>();
-  const prevouts = indexPreviousOutputs(workspace);
+  const prevouts = indexPreviousOutputs({
+    network: workspace.network,
+    transactions: workspace.chainData.transactions,
+  });
   for (const ref of evidence.contexts.flatMap((context) => context.refs)) {
-    const resolution = resolvePreviousOutput(workspace, ref, prevouts);
+    const resolution = resolvePreviousOutput(
+      { network: workspace.network, transactions: workspace.chainData.transactions },
+      ref,
+      prevouts,
+    );
     if (resolution.status === 'loaded' || resolution.status === 'attached') continue;
-    if (!workspace.transactions[ref.txid]) missing.add(ref.txid);
+    if (!workspace.chainData.transactions[ref.txid]) missing.add(ref.txid);
     else unavailable.add(ref.id);
   }
   const nonAddress = new Set<string>();
   for (const entry of [...groups.sourceExceptions, ...groups.destinationExceptions]) {
     if (entry.missing) continue;
-    const resolution = resolvePreviousOutput(workspace, entry, prevouts);
+    const resolution = resolvePreviousOutput(
+      { network: workspace.network, transactions: workspace.chainData.transactions },
+      entry,
+      prevouts,
+    );
     const output =
       resolution.status === 'loaded' || resolution.status === 'attached'
         ? resolution.output
@@ -202,7 +219,7 @@ export function mergeWalletCounterpartyInputs(
     return workspace;
   let merged = workspace;
   for (const candidate of candidates.slice(0, WALLET_FLOW_INPUT_WAVE_LIMIT)) {
-    if (merged.transactions[candidate.txid]) continue;
+    if (merged.chainData.transactions[candidate.txid]) continue;
     let transaction: Transaction;
     try {
       transaction = parseTransaction(candidate);
@@ -325,7 +342,7 @@ export function createWalletCounterpartyLoader(readLatest?: () => WalletCounterp
             signal.throwIfAborted();
           }
           // Another local loader may fill queued parents while four requests are in flight.
-          const cached = liveOptions()?.workspace.transactions[id];
+          const cached = liveOptions()?.workspace.chainData.transactions[id];
           return cached ?? current.fetch(network, id, signal);
         },
         controller.signal,
@@ -334,7 +351,7 @@ export function createWalletCounterpartyLoader(readLatest?: () => WalletCounterp
       for (const id of result.failed) failed.add(id);
       const refs = plan.contexts.flatMap((context) => context.refs);
       const additions = result.loaded.filter((transaction) => {
-        if (liveOptions()?.workspace.transactions[transaction.txid]) return false;
+        if (liveOptions()?.workspace.chainData.transactions[transaction.txid]) return false;
         const usable = refs.some(
           (ref) =>
             ref.txid === transaction.txid &&

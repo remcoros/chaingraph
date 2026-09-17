@@ -1,6 +1,6 @@
-import { resolveWalletUtxoObservation } from './Wallet/WalletUtxos/walletUtxoObservation';
-import { useWalletUtxos } from './Wallet/WalletUtxos';
-import { type WalletUtxoRecord } from './Wallet/walletRecords';
+import { resolveWalletUtxoObservation } from '../../Core/Workspace/Wallets/WalletUtxos/walletUtxoObservation';
+import { useWalletUtxos } from './Wallets/WalletUtxos';
+import type { WalletUtxoRecord } from '../../Core/Workspace/Wallets/walletRecords';
 import { useFlowInputs } from './Workbenches/Graph/TransactionFlow/useFlowInputs';
 import {
   useCallback,
@@ -25,16 +25,15 @@ import { useAnnotations } from './Annotations/useAnnotations';
 import { useConnectionScanTargets } from './Selection/useConnectionScanTargets';
 import { setNodesHidden } from './GraphState/visibility';
 import { useWorkspaceAnalysis } from './Workbenches/Analysis/useWorkspaceAnalysis';
-import type { Wallet } from '../../Domain/Wallet/walletTypes';
-import type { Workspace } from './workspace';
-import { fetchTransaction } from '../../Infra/Bitcoin/api';
+import type { Wallet } from '../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../Core/Workspace/workspace';
+
 import { useTour } from '../Help/useTour';
 import type { useAppState } from '../useAppState';
 import type { WorkbenchEntryTarget, WorkbenchMode, WorkbenchSwitchOptions } from './workbenchTypes';
 import { download } from '../../Infra/Browser/download';
 import { isModalOpen } from '../Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
-import { useTransactionEvidence } from './Evidence/Transactions';
 import { useAddressEvidence } from './Workbenches/Graph/Address/useAddressEvidence';
 import { useAddressNavigation } from './Workbenches/Graph/Address/useAddressNavigation';
 import { useGraphExpansion } from './Workbenches/Graph/Navigation/useGraphExpansion';
@@ -53,7 +52,9 @@ function resolveWalletUtxoObservationFromEvidence(
 ) {
   return resolveWalletUtxoObservation(input, wallet, view, selectedId);
 }
-type WalletUtxoObservationInput = Pick<Workspace, 'id' | 'network' | 'transactions'>;
+type WalletUtxoObservationInput = Pick<Workspace, 'id' | 'network'> & {
+  chainData: Pick<Workspace['chainData'], 'transactions'>;
+};
 type Tail<T extends unknown[]> = T extends [unknown, ...infer Rest] ? Rest : never;
 type WorkbenchReturnPoint = {
   workspaceId: string;
@@ -93,7 +94,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const lookup = useGraphLookupState(activeWorkspace);
   const focusLookup = lookup.focus;
   const workspaceNetwork = activeWorkspace?.network;
-  const workspaceTransactions = activeWorkspace?.transactions;
+  const workspaceTransactions = activeWorkspace?.chainData.transactions;
 
   const dialogs = useDialogState(activeWorkspace);
   const [viewOwner, setViewOwner] = useState<string>();
@@ -202,9 +203,10 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const workspaceOperation = useWorkspaceOperation(core);
   const tour = useTour({
     workspaceId: activeWorkspace?.id,
-    hasWallets: !!activeWorkspace?.wallets.length,
+    hasWallets: !!activeWorkspace?.wallets.definitions.length,
     hasSelection: !!selectedId,
-    hasTransactions: !!activeWorkspace && Object.keys(activeWorkspace.transactions).length > 0,
+    hasTransactions:
+      !!activeWorkspace && Object.keys(activeWorkspace.chainData.transactions).length > 0,
   });
   const tourStep = tour.step;
   // Tour previews never change saved workspace state or selection history.
@@ -212,7 +214,9 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const shownPanels = graphPanelsInView(graphPanels.saved, {
     preview: tourStep?.view,
     previewing: !!tourStep,
-    hasSelectedWallet: !!activeWorkspace?.wallets.some((item) => item.id === selectedWallet),
+    hasSelectedWallet: !!activeWorkspace?.wallets.definitions.some(
+      (item) => item.id === selectedWallet,
+    ),
   });
   const {
     right: { tab: shownRightTab },
@@ -263,8 +267,8 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   useEffect(() => {
     prune(recoveryNodesById);
   }, [recoveryNodesById, prune]);
-  const wallet = activeWorkspace?.wallets.find((x) => x.id === selectedWallet);
-  const tx = selected?.txid ? activeWorkspace?.transactions[selected.txid] : undefined;
+  const wallet = activeWorkspace?.wallets.definitions.find((x) => x.id === selectedWallet);
+  const tx = selected?.txid ? activeWorkspace?.chainData.transactions[selected.txid] : undefined;
   const resetWorkspacePresentation = useEffectEvent(() => {
     workspaceOperation.cancel();
     preserveSelectionCamera(undefined);
@@ -274,12 +278,14 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     connectionScanTargets.reset();
     setSelectedWallet(
       activeWorkspace?.view.selectedWallet &&
-        activeWorkspace.wallets.some((item) => item.id === activeWorkspace.view.selectedWallet)
+        activeWorkspace.wallets.definitions.some(
+          (item) => item.id === activeWorkspace.view.selectedWallet,
+        )
         ? activeWorkspace.view.selectedWallet
-        : activeWorkspace?.wallets[0]?.id,
+        : activeWorkspace?.wallets.definitions[0]?.id,
     );
     setWorkbench(
-      activeWorkspace?.view.workbench === 'wallet' && activeWorkspace.wallets.length
+      activeWorkspace?.view.workbench === 'wallet' && activeWorkspace.wallets.definitions.length
         ? 'wallet'
         : activeWorkspace?.view.workbench === 'analysis'
           ? 'analysis'
@@ -374,10 +380,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
               ? `${activeWorkspace?.network ?? displayNetwork ?? 'Bitcoin'} backend is unavailable.`
               : undefined);
   const canTraceAncestry = canLoadChainData;
-  const evidenceWallet = wallet ?? activeWorkspace?.wallets[0];
+  const transactionEvidence = app.chainDataAcquisition;
+  const evidenceWallet = wallet ?? activeWorkspace?.wallets.definitions[0];
   const walletUtxos = useWalletUtxos({
     workspace: activeWorkspace,
     wallet: evidenceWallet,
+    transactions: transactionEvidence,
     enabled:
       canLoadChainData &&
       viewOwner === activeWorkspace?.id &&
@@ -389,7 +397,11 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     () =>
       resolveWalletUtxoObservationFromEvidence(
         workspaceId && workspaceNetwork && workspaceTransactions
-          ? { id: workspaceId, network: workspaceNetwork, transactions: workspaceTransactions }
+          ? {
+              id: workspaceId,
+              network: workspaceNetwork,
+              chainData: { transactions: workspaceTransactions },
+            }
           : undefined,
         evidenceWallet,
         walletUtxos.utxos,
@@ -404,14 +416,12 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       selectedId,
     ],
   );
-  const transactionEvidence = useTransactionEvidence({ core, fetchScope });
   const addressEvidence = useAddressEvidence({
     core,
     selection,
     transactions: transactionEvidence,
     operation: workspaceOperation,
     selected,
-    fetchScope,
     canLoadChainData,
   });
   const addressNavigation = useAddressNavigation({
@@ -423,7 +433,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     selected,
     setGraphFilters,
     setFocusRequest,
-    fetchScope,
     canLoadChainData,
     revealLookup,
   });
@@ -434,7 +443,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     transactions: transactionEvidence,
     operation: workspaceOperation,
     addressEvidence,
-    fetchScope,
     canLoadChainData,
     prefetchDepth,
     reveal: revealLookup,
@@ -447,7 +455,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setGraphFilters,
     setFocusRequest,
     recoveryGraph,
-    fetchScope,
     canTraceAncestry,
   });
   const graphAddress = {
@@ -472,15 +479,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspace: activeWorkspace,
     selected,
     enabled: canTraceAncestry && !operation && workbench === 'graph',
-    fetch: (id, signal) => {
-      if (!activeWorkspace) return Promise.reject(new Error('Open a workspace first.'));
-      return activeWorkspace.transactions[id]
-        ? Promise.resolve(activeWorkspace.transactions[id])
-        : fetchTransaction(activeWorkspace.network, id, signal, undefined, {
-            scope: fetchScope,
-            priority: 'visible',
-          });
-    },
+    fetch: (id, signal) => transactionEvidence.read.transaction(id, signal, 'visible'),
     update: (id, fn, undo) => workspaces.getUnlocked(id)?.edit(fn, undo),
   });
   function revealLookup(id: string) {
@@ -488,14 +487,17 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     const address = id.startsWith('addr:') ? id.slice(5) : undefined;
     active?.edit((current) => ({
       ...setNodesHidden(current, [id], false),
-      watchedAddresses: address
-        ? [...new Set([...current.watchedAddresses, address])]
-        : current.watchedAddresses,
       view: {
         ...current.view,
         hiddenNodeIds: current.view.hiddenNodeIds?.filter((hidden) => hidden !== id),
         smallAmountThreshold: undefined,
         showAddresses: !!address || current.view.showAddresses,
+      },
+      chainData: {
+        ...current.chainData,
+        watchedAddresses: address
+          ? [...new Set([...current.chainData.watchedAddresses, address])]
+          : current.chainData.watchedAddresses,
       },
     }));
     select(id);
@@ -521,7 +523,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     core,
     transactions: transactionEvidence,
     operation: workspaceOperation,
-    fetchScope,
     canLoadChainData,
     fitAll,
   });

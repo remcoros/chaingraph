@@ -1,16 +1,16 @@
-import { formatBitcoinAmount } from '../../../Controls/Display/amountFormat';
+import { formatBitcoinAmount } from '../../../../Core/Formatting';
 import { expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { analysisTools } from '../../Analysis/analysis';
-import { createWorkspace } from '../../createWorkspace';
-import { parseWorkspace } from '../../Persistence/Format';
+import { analysisTools } from '../../../../Core/Workspace/Analysis/analysis';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../../Core/Workspace/Persistence';
 import { AnalysisWorkbenchView } from './AnalysisWorkbench';
 
 function feeExample() {
   const w = createWorkspace('Public fee example', 'mainnet');
   const txid = 'a'.repeat(64);
-  w.transactions[txid] = {
+  w.chainData.transactions[txid] = {
     txid,
     vin: [
       {
@@ -25,13 +25,13 @@ function feeExample() {
     vout: [{ n: 0, value: 0.00002, scriptPubKey: { hex: '0014' + '22'.repeat(20) } }],
     vsize: 110,
   };
-  w.findings = analysisTools.find((tool) => tool.id === 'value-flow')!.run(w);
+  w.analysis.findings = analysisTools.find((tool) => tool.id === 'value-flow')!.run(w);
   return w;
 }
 
 it('explains the small-transfer fee example and saves guidance with the finding', () => {
   const w = feeExample();
-  expect(w.findings[0]).toMatchObject({
+  expect(w.analysis.findings[0]).toMatchObject({
     title: `Network fee: ${formatBitcoinAmount(3_140)}`,
     kind: 'observation',
     description: expect.stringContaining(
@@ -40,10 +40,14 @@ it('explains the small-transfer fee example and saves guidance with the finding'
     details: expect.stringContaining('28.55 sat/vB'),
     guidance: { kind: 'tip', text: expect.stringContaining('Before sending a small amount') },
   });
-  expect(parseWorkspace(JSON.parse(JSON.stringify(w))).findings).toEqual(w.findings);
-  delete w.findings[0].guidance;
-  delete w.findings[0].details;
-  expect(parseWorkspace(w).findings[0].description).toBe(w.findings[0].description);
+  expect(parseWorkspace(JSON.parse(JSON.stringify(w))).analysis.findings).toEqual(
+    w.analysis.findings,
+  );
+  delete w.analysis.findings[0].guidance;
+  delete w.analysis.findings[0].details;
+  expect(parseWorkspace(w).analysis.findings[0].description).toBe(
+    w.analysis.findings[0].description,
+  );
 });
 
 it('renders guidance and one reference per transaction, with no scan totals in finding details', () => {

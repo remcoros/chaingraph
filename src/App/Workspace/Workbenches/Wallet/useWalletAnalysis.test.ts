@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { walletAnalysisScope, walletAnalysisSummary } from './useWalletAnalysis';
-import { scanDefaults, type AnalysisScan } from '../../Analysis/analysisScan';
-import { createWorkspace } from '../../createWorkspace';
-import { deriveAddresses } from '../../../../Domain/Wallet/wallet';
-import type { Wallet } from '../../../../Domain/Wallet/walletTypes';
+import { scanDefaults, type AnalysisScan } from '../../../../Core/Workspace/Analysis/analysisScan';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import { deriveAddresses } from '../../../../Core/Workspace/Wallets/walletDerivation';
+import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+
 import type { WalletRow } from './walletRows';
 import {
   PUBLIC_ZPUB,
@@ -22,9 +23,9 @@ function fixture() {
     color: '#27c4a7',
     addresses: deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1),
   };
-  workspace.wallets = [wallet];
-  workspace.transactions = structuredClone(transactions);
-  workspace.transactions['c'.repeat(64)] = {
+  workspace.wallets.definitions = [wallet];
+  workspace.chainData.transactions = structuredClone(transactions);
+  workspace.chainData.transactions['c'.repeat(64)] = {
     txid: 'c'.repeat(64),
     vin: [{ coinbase: '00' }],
     vout: [{ n: 0, value: 0, scriptPubKey: { hex: '6a' } }],

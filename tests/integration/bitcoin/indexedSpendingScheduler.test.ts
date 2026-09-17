@@ -1,17 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Network } from '../../../src/Domain/Chain/network';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
+import { verboseTransaction } from '../../fixtures/verboseTransaction';
+import type { Network } from '../../../src/Core/Bitcoin';
+import type { Transaction } from '../../../src/Core/ChainData';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
 import {
   backendNetworks,
   fetchIndexedSpenders,
   fetchTransaction,
   loadSpending,
-} from '../../../src/Infra/Bitcoin/api';
+} from '../../../src/Core/ChainData/api';
 import {
   TransactionFetchScope,
   transactionScheduler,
-} from '../../../src/Infra/Bitcoin/transactionScheduler';
+} from '../../../src/Core/ChainData/transactionScheduler';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const points = Array.from({ length: 4 }, (_, vout) => ({ txid: id(1), vout }));
@@ -27,11 +28,15 @@ const candidate = (txid: string): Transaction => ({
 });
 const workspace = () => ({
   ...createWorkspace('Public scheduling fixture', 'testnet4'),
-  transactions: { [root.txid]: root },
+  chainData: {
+    ...createWorkspace('Public scheduling fixture', 'testnet4').chainData,
+    transactions: { [root.txid]: root },
+  },
 });
 type Call = { network: Network; target: string; method: string; params: unknown[] };
 type Pending = { call: Call; signal: AbortSignal; resolve: (result: unknown) => void };
-const ok = (result: unknown) => new Response(JSON.stringify({ result }));
+const ok = (result: unknown) =>
+  new Response(JSON.stringify({ result: verboseTransaction(result) }));
 const unavailable = () =>
   new Response(
     JSON.stringify({ error: 'Synthetic lookup unavailable', code: 'core_spender_unavailable' }),
@@ -56,7 +61,12 @@ const complete = (request: Pending, changes: Partial<Transaction> = {}) => {
   const blockhash = request.call.params[2] as string | undefined;
   request.resolve({
     ...candidate(request.call.params[0] as string),
-    ...(blockhash ? { blockhash, confirmations: 2, in_active_chain: true } : {}),
+    ...(blockhash
+      ? {
+          in_active_chain: true,
+          status: { kind: 'confirmed' as const, blockhash, confirmations: 2 },
+        }
+      : {}),
     ...changes,
   });
 };
@@ -148,7 +158,7 @@ describe('indexed spending through the shared transaction scheduler', () => {
     ]);
     pending.forEach((request) => complete(request));
     const results = await Promise.all([first, second]);
-    expect(results.map((tx) => [tx.blockhash, tx.blockHeight])).toEqual([
+    expect(results.map((tx) => [tx.status?.blockhash, tx.status?.blockHeight])).toEqual([
       [id(90), 100],
       [id(91), 100],
     ]);
@@ -204,10 +214,17 @@ describe('indexed spending through the shared transaction scheduler', () => {
       indexUnavailable = route === 'fallback';
       hold = (call) => call.method === 'getrawtransaction';
       const owned = scope();
-      const loading = loadSpending(root, workspace(), undefined, undefined, 0, {
-        scope: owned,
-        priority: 'navigation',
-      });
+      const loading = loadSpending(
+        root,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        undefined,
+        undefined,
+        0,
+        {
+          scope: owned,
+          priority: 'navigation',
+        },
+      );
       const cancelled = expect(loading).rejects.toMatchObject({ name: 'AbortError' });
       await vi.waitFor(() => expect(rawCalls()).toHaveLength(3));
       await tick();
@@ -239,11 +256,18 @@ describe('indexed spending through the shared transaction scheduler', () => {
       const w = workspace();
       if (phase === 'loaded confirmed header') {
         confirmedBlock = id(93);
-        w.transactions[id(10)] = candidate(id(10));
+        w.chainData.transactions[id(10)] = candidate(id(10));
       }
       hold = (call) =>
         call.method === (phase === 'index RPC' ? 'gettxspendingprevout' : 'getblockheader');
-      const loading = loadSpending(root, w, 0, undefined, 0, { scope: owned });
+      const loading = loadSpending(
+        root,
+        { network: w.network, transactions: w.chainData.transactions },
+        0,
+        undefined,
+        0,
+        { scope: owned },
+      );
       const cancelled = expect(loading).rejects.toMatchObject({ name: 'AbortError' });
       await vi.waitFor(() => expect(pending).toHaveLength(1));
       transactionScheduler.dispose(owned);
@@ -251,7 +275,16 @@ describe('indexed spending through the shared transaction scheduler', () => {
       expect(pending[0].signal.aborted).toBe(true);
       await cancelled;
       const count = calls.length;
-      await expect(loadSpending(root, w, 0, undefined, 0, { scope: owned })).rejects.toMatchObject({
+      await expect(
+        loadSpending(
+          root,
+          { network: w.network, transactions: w.chainData.transactions },
+          0,
+          undefined,
+          0,
+          { scope: owned },
+        ),
+      ).rejects.toMatchObject({
         name: 'AbortError',
       });
       await tick();
@@ -278,7 +311,14 @@ describe('indexed spending through the shared transaction scheduler', () => {
         fetchIndexedSpenders('testnet4', [points[0]], {}, undefined, { scope: owned }),
       ).rejects.toThrow(expected);
       await expect(
-        loadSpending(root, workspace(), 0, undefined, 0, { scope: owned }),
+        loadSpending(
+          root,
+          { network: workspace().network, transactions: workspace().chainData.transactions },
+          0,
+          undefined,
+          0,
+          { scope: owned },
+        ),
       ).rejects.toThrow(expected);
       await expect(
         fetchTransaction('testnet4', id(10), undefined, undefined, { scope: owned }),
@@ -297,12 +337,12 @@ describe('indexed spending through the shared transaction scheduler', () => {
     await vi.waitFor(() => expect(pending).toHaveLength(1));
     const indexed = fetchIndexedSpenders('testnet4', [points[0]], {}, undefined, { scope: owned });
     await vi.waitFor(() => expect(pending).toHaveLength(2));
-    complete(pending[0], { confirmations: -1 });
+    complete(pending[0], { status: { kind: 'inactive' as const, confirmations: -1 } });
     complete(pending[1]);
-    expect((await navigation).confirmations).toBe(-1);
+    expect((await navigation).status?.confirmations).toBe(-1);
     expect(await indexed).toMatchObject({
       unresolved: [],
-      transactions: [{ txid: id(10), mempool: true, confirmations: 0 }],
+      transactions: [{ txid: id(10), status: { kind: 'mempool' as const, confirmations: 0 } }],
     });
     expect(rawCalls()).toHaveLength(2);
   });

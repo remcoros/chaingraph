@@ -14,16 +14,16 @@ import {
 } from '../../GraphState/graphMembership';
 import { useEffect } from 'react';
 import { filterGraph } from './Filters/graphFilters';
-import type { GraphFilters } from '../../GraphState/filters';
+import type { GraphFilters } from '../../../../Core/Workspace/view';
 import { setNodesHidden, showAllNodes } from '../../GraphState/visibility';
-import { promoteInputContext } from '../../Evidence/InputContext';
-import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../Infra/Bitcoin/api';
+import { promoteInputContext } from '../../../../Core/Workspace/transactionContext';
+import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../Core/ChainData/api';
 
 import { entityPanelFiltersFromGraph } from './Filters/entityPanelFilters';
 import { ADDRESS_DISPLAY_NOTICE } from '../../workspaceNotices';
 
 import type { GraphProjection } from './useGraphProjection';
-import type { TransactionEvidence } from '../../Evidence/Transactions';
+import type { ChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../useWorkspaceOperation';
 import type { WorkspaceCore } from '../../workspaceCore';
 import type { WorkspaceSelection } from '../../Selection/useWorkspaceSelection';
@@ -41,7 +41,7 @@ interface Inputs {
   canvas: GraphCanvas;
   scanTargets: ConnectionScanTargets;
   annotations: WorkspaceAnnotations;
-  transactions: TransactionEvidence;
+  transactions: ChainDataAcquisition;
   operation: WorkspaceOperation;
   viewOwner: string | undefined;
 }
@@ -93,7 +93,7 @@ export function useGraphActions({
   const { cancelPicking: cancelScanTargetPicking } = scanTargets;
   const { edit: metadataEdit } = annotations;
   const requestMetadataEdit = metadataEdit.request;
-  const { getTransaction, recordTransactions } = transactions;
+  const { transaction: getTransaction } = transactions.read;
   const { run } = operation;
 
   const setEntityHidden = (ids: string[], hidden: boolean) => {
@@ -194,7 +194,7 @@ export function useGraphActions({
               ...(filters ?? effectiveFilters),
               showAddresses: activeWorkspace?.view.showAddresses,
             },
-            activeWorkspace?.annotations,
+            activeWorkspace?.annotations.entities,
             {
               hiddenNodeIds: showHidden
                 ? activeWorkspace?.view.hiddenNodeIds?.filter((hidden) => hidden !== id)
@@ -253,7 +253,9 @@ export function useGraphActions({
   async function loadGraphTransactions(ids: readonly string[], signal: AbortSignal) {
     const current = workspaces.getUnlocked(activeWorkspace?.id ?? '')?.data;
     if (!current) return [];
-    const missing = graphNavigationTransactionIds(ids).filter((id) => !current.transactions[id]);
+    const missing = graphNavigationTransactionIds(ids).filter(
+      (id) => !current.chainData.transactions[id],
+    );
     if (missing.length > MAX_SCAN_TRANSACTIONS)
       throw new Error('Select at most 500 missing transactions to show on graph at once.');
     if (missing.length) setOperation('Loading graph selection…');
@@ -331,11 +333,8 @@ export function useGraphActions({
   }
   function refreshTransaction(transactionId: string | undefined) {
     if (!activeWorkspace || !transactionId) return;
-    const ownerId = activeWorkspace.id;
     void run(async (signal) => {
-      const transaction = await getTransaction(transactionId, signal);
-      signal.throwIfAborted();
-      recordTransactions(ownerId, [transaction]);
+      await transactions.observe.refreshTransaction(transactionId, signal);
     });
   }
   return {

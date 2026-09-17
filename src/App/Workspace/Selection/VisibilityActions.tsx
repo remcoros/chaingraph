@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, EyeOff, Layers, X } from 'lucide-react';
-import type { Transaction } from '../../../Domain/Chain/transaction';
+import type { Transaction } from '../../../Core/ChainData';
 import { transactionNodeIds } from '../GraphState/visibility';
 import { useDialogFocus } from '../../Controls/useDialogFocus';
 import './visibility.css';

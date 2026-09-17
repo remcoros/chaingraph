@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { verboseTransaction } from '../../fixtures/verboseTransaction';
 import {
   backendNetworks,
   fetchIndexedSpenders,
   loadSpending,
-} from '../../../src/Infra/Bitcoin/api';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import type { Network } from '../../../src/Domain/Chain/network';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
+} from '../../../src/Core/ChainData/api';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import type { Network } from '../../../src/Core/Bitcoin';
+import type { Transaction } from '../../../src/Core/ChainData';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const point = { txid: id(1), vout: 0 };
@@ -18,10 +19,14 @@ const root: Transaction = {
 const spender: Transaction = { txid: id(2), vin: [point], vout: [root.vout[0]] };
 const workspace = () => ({
   ...createWorkspace('Public index fixture', 'testnet4'),
-  transactions: { [root.txid]: root },
+  chainData: {
+    ...createWorkspace('Public index fixture', 'testnet4').chainData,
+    transactions: { [root.txid]: root },
+  },
 });
 type Call = { network: Network; target: string; method: string; params: any[] };
-const ok = (result: unknown) => new Response(JSON.stringify({ result }));
+const ok = (result: unknown) =>
+  new Response(JSON.stringify({ result: verboseTransaction(result) }));
 const error = () =>
   new Response(JSON.stringify({ error: 'Lookup unavailable', code: 'core_spender_unavailable' }), {
     status: 503,
@@ -68,7 +73,11 @@ describe('optional exact output spending lookup', () => {
     expect(await fetchIndexedSpenders('mainnet', [point], {})).toBeUndefined();
     enabled = [];
     await backendNetworks();
-    await loadSpending(root, workspace(), 0);
+    await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(calls.map((c) => c.method)).toEqual(['blockchain.scripthash.get_history']);
   });
   it('requires strict configured per-network capability documents', async () => {
@@ -109,11 +118,21 @@ describe('optional exact output spending lookup', () => {
               }),
               { status: 502 },
             )
-          : ok({ ...spender, blockhash: id(9), confirmations: 2, in_active_chain: true })
+          : ok({
+              ...spender,
+              in_active_chain: true,
+              status: { kind: 'confirmed' as const, blockhash: id(9), confirmations: 2 },
+            })
         : undefined;
-    const result = await loadSpending(root, workspace(), 0);
+    const result = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(result).toMatchObject({ lookup: 'index', truncated: false });
-    expect(result.transactions[0]).toMatchObject({ blockhash: id(9), blockHeight: 100 });
+    expect(result.transactions[0]).toMatchObject({
+      status: { kind: 'confirmed' as const, blockhash: id(9), blockHeight: 100 },
+    });
     expect(calls.filter((c) => c.method === 'getrawtransaction').map((c) => c.params)).toEqual([
       [id(2), 2, id(9)],
       [id(2), 1, id(9)],
@@ -142,21 +161,31 @@ describe('optional exact output spending lookup', () => {
     ).toEqual([spender.txid]);
   });
   it('reuses a local exact mempool transaction without downloads and retains conflicting alternatives', async () => {
-    const old = { ...spender, txid: id(3), confirmations: -1 };
+    const old = {
+      ...spender,
+      txid: id(3),
+      status: { kind: 'inactive' as const, confirmations: -1 },
+    };
     const result = await fetchIndexedSpenders('testnet4', [point], {
       [spender.txid]: spender,
       [old.txid]: old,
     });
     expect(result?.transactions.map((t) => t.txid)).toEqual([id(2), id(3)]);
     expect(calls).toHaveLength(1);
-    expect(spender.mempool).toBeUndefined();
+    expect(spender.status).toBeUndefined();
   });
   it('treats a complete empty row as a fresh lookup observation without history or deleting saved spends', async () => {
     indexReply = [point];
     const result = await fetchIndexedSpenders('testnet4', [point], { [spender.txid]: spender });
     expect(result).toMatchObject({ unresolved: [], transactions: [spender] });
     expect(calls).toHaveLength(1);
-    expect(await loadSpending(root, workspace(), 0)).toEqual({
+    expect(
+      await loadSpending(
+        root,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        0,
+      ),
+    ).toEqual({
       transactions: [],
       truncated: false,
       lookup: 'index',
@@ -172,7 +201,11 @@ describe('optional exact output spending lookup', () => {
   ])('falls back for malformed or partial replies: %j', async (reply) => {
     indexReply = reply;
     history = [{ tx_hash: spender.txid, height: 0 }];
-    const result = await loadSpending(root, workspace(), 0);
+    const result = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(result).toMatchObject({ lookup: 'electrum-fallback', truncated: false });
     expect(result.transactions.map((t) => t.txid)).toEqual([spender.txid]);
     expect(calls.some((c) => c.method === 'blockchain.scripthash.get_history')).toBe(true);
@@ -180,14 +213,26 @@ describe('optional exact output spending lookup', () => {
   it('uses bounded history fallback for incompatible, missing or syncing index errors', async () => {
     handler = (c) => (c.method === 'gettxspendingprevout' ? error() : undefined);
     history = [{ tx_hash: spender.txid, height: 0 }];
-    expect((await loadSpending(root, workspace(), 0)).transactions[0].txid).toBe(spender.txid);
+    expect(
+      (
+        await loadSpending(
+          root,
+          { network: workspace().network, transactions: workspace().chainData.transactions },
+          0,
+        )
+      ).transactions[0].txid,
+    ).toBe(spender.txid);
   });
   it('rejects a transaction that does not spend the exact output and reports unresolved data', async () => {
     handler = (c) =>
       c.method === 'getrawtransaction'
         ? ok({ ...spender, vin: [{ ...point, vout: 1 }] })
         : undefined;
-    const result = await loadSpending(root, workspace(), 0);
+    const result = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(result).toMatchObject({
       transactions: [],
       truncated: true,
@@ -213,18 +258,36 @@ describe('optional exact output spending lookup', () => {
       },
     ]) {
       handler = (c) => (c.method === 'getrawtransaction' ? ok(tx) : undefined);
-      expect((await loadSpending(root, workspace(), 0)).transactions).toEqual([]);
+      expect(
+        (
+          await loadSpending(
+            root,
+            { network: workspace().network, transactions: workspace().chainData.transactions },
+            0,
+          )
+        ).transactions,
+      ).toEqual([]);
     }
   });
   it('preserves disconnected-block evidence but does not regard it as current coverage', async () => {
     indexReply = [{ ...point, spendingtxid: spender.txid, blockhash: id(9) }];
     handler = (c) =>
       c.method === 'getrawtransaction'
-        ? ok({ ...spender, blockhash: id(9), confirmations: 0, in_active_chain: false })
+        ? ok({
+            ...spender,
+            in_active_chain: false,
+            status: { kind: 'unknown' as const, blockhash: id(9), confirmations: 0 },
+          })
         : undefined;
-    const result = await loadSpending(root, workspace(), 0);
+    const result = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(result).toMatchObject({ truncated: true, lookup: 'electrum-fallback' });
-    expect(result.transactions[0]).toMatchObject({ confirmations: -1 });
+    expect(result.transactions[0]).toMatchObject({
+      status: { kind: 'inactive' as const, confirmations: -1 },
+    });
   });
   it('rechecks active block status when reusing loaded bytes, even after a cached height', async () => {
     indexReply = [{ ...point, spendingtxid: spender.txid, blockhash: id(9) }];
@@ -236,7 +299,7 @@ describe('optional exact output spending lookup', () => {
         : undefined;
     const result = await fetchIndexedSpenders('testnet4', [point], existing);
     expect(result?.unresolved).toEqual([point]);
-    expect(result?.transactions[0].confirmations).toBe(-1);
+    expect(result?.transactions[0].status?.confirmations).toBe(-1);
     expect(calls.filter((c) => c.method === 'getblockheader')).toHaveLength(2);
   });
   it('keeps unavailable transaction data and failed fallback explicitly partial', async () => {
@@ -248,7 +311,13 @@ describe('optional exact output spending lookup', () => {
       ].includes(c.method)
         ? error()
         : undefined;
-    expect(await loadSpending(root, workspace(), 0)).toMatchObject({
+    expect(
+      await loadSpending(
+        root,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        0,
+      ),
+    ).toMatchObject({
       transactions: [],
       truncated: true,
       lookup: 'electrum-fallback',
@@ -256,9 +325,23 @@ describe('optional exact output spending lookup', () => {
   });
   it('can resolve exact outputs without scripts, but unavailable lookup stays partial', async () => {
     const noScript = { ...root, vout: [{ n: 0, value: 1, scriptPubKey: {} }] };
-    expect((await loadSpending(noScript, workspace(), 0)).lookup).toBe('index');
+    expect(
+      (
+        await loadSpending(
+          noScript,
+          { network: workspace().network, transactions: workspace().chainData.transactions },
+          0,
+        )
+      ).lookup,
+    ).toBe('index');
     handler = (c) => (c.method === 'gettxspendingprevout' ? error() : undefined);
-    expect(await loadSpending(noScript, workspace(), 0)).toMatchObject({ truncated: true });
+    expect(
+      await loadSpending(
+        noScript,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        0,
+      ),
+    ).toMatchObject({ truncated: true });
   });
   it('never falls back or merges results after cancellation', async () => {
     const controller = new AbortController();
@@ -268,7 +351,14 @@ describe('optional exact output spending lookup', () => {
         return error();
       }
     };
-    await expect(loadSpending(root, workspace(), 0, controller.signal)).rejects.toMatchObject({
+    await expect(
+      loadSpending(
+        root,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        0,
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({
       name: 'AbortError',
     });
     expect(calls).toHaveLength(1);
@@ -279,9 +369,18 @@ describe('optional exact output spending lookup', () => {
       c.method === 'getrawtransaction'
         ? error()
         : c.method === 'blockchain.transaction.get'
-          ? ok({ ...spender, blockhash: id(9), confirmations: 0 })
+          ? ok({
+              ...spender,
+              status: { kind: 'unknown' as const, blockhash: id(9), confirmations: 0 },
+            })
           : undefined;
-    expect(await loadSpending(root, workspace(), 0)).toMatchObject({
+    expect(
+      await loadSpending(
+        root,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        0,
+      ),
+    ).toMatchObject({
       lookup: 'electrum-fallback',
       truncated: true,
       failed: 1,
@@ -301,9 +400,13 @@ describe('optional exact output spending lookup', () => {
               vin: [{ ...point, vout: c.params[0] === id(510) ? 1 : 0 }],
             })
           : undefined;
-    const first = await loadSpending(root, w, undefined);
+    const first = await loadSpending(
+      root,
+      { network: w.network, transactions: w.chainData.transactions },
+      undefined,
+    );
     expect(first.nextOffset).toBe(500);
-    for (const tx of first.transactions) w.transactions[tx.txid] = tx;
+    for (const tx of first.transactions) w.chainData.transactions[tx.txid] = tx;
     const start = calls.length;
     // A now-available partial direct answer must not narrow the history offset.
     indexReply = [{ ...point }, { ...point, vout: 1, spendingtxid: id(510) }];
@@ -311,7 +414,13 @@ describe('optional exact output spending lookup', () => {
       c.method === 'getrawtransaction'
         ? ok({ ...spender, txid: c.params[0], vin: [{ ...point, vout: 1 }] })
         : undefined;
-    const second = await loadSpending(root, w, undefined, undefined, first.nextOffset);
+    const second = await loadSpending(
+      root,
+      { network: w.network, transactions: w.chainData.transactions },
+      undefined,
+      undefined,
+      first.nextOffset,
+    );
     expect(second.truncated).toBe(false);
     expect(second.transactions.map((tx) => tx.txid)).toEqual([id(510)]);
     expect(calls.slice(start).some((c) => c.method === 'gettxspendingprevout')).toBe(false);
@@ -334,7 +443,11 @@ describe('optional exact output spending lookup', () => {
             ? error()
             : ok({ ...spender, txid: c.params[0] });
       };
-      const result = await loadSpending(root, workspace(), undefined);
+      const result = await loadSpending(
+        root,
+        { network: workspace().network, transactions: workspace().chainData.transactions },
+        undefined,
+      );
       expect(result).toMatchObject({ truncated: true, failed: 1 });
       expect(result.nextOffset).toBeUndefined();
     },
@@ -347,11 +460,15 @@ describe('optional exact output spending lookup', () => {
           ? error()
           : ok({ ...spender, txid: c.params[0], vin: [{ txid: id(99), vout: 0 }] })
         : undefined;
-    const first = await loadSpending(root, workspace(), 0);
+    const first = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
     expect(first).toMatchObject({ nextOffset: 499, failed: 1, unavailableTxids: [spender.txid] });
     const second = await loadSpending(
       root,
-      workspace(),
+      { network: workspace().network, transactions: workspace().chainData.transactions },
       0,
       undefined,
       first.nextOffset,
@@ -364,7 +481,10 @@ describe('optional exact output spending lookup', () => {
   it('finishes a 500-spender action across history pages without repeating the first direct batch', async () => {
     const points = Array.from({ length: 500 }, (_, vout) => ({ ...point, vout }));
     const large = { ...root, vout: points.map((p) => ({ ...root.vout[0], n: p.vout })) };
-    const w = { ...workspace(), transactions: { [large.txid]: large } };
+    const w = {
+      ...workspace(),
+      chainData: { ...workspace().chainData, transactions: { [large.txid]: large } },
+    };
     indexReply = points.map((p, n) => ({ ...p, spendingtxid: id(n + 1000) }));
     history = Array.from({ length: 750 }, (_, n) => ({ tx_hash: id(n + 1000), height: 0 }));
     handler = (c) =>
@@ -375,21 +495,25 @@ describe('optional exact output spending lookup', () => {
             vin: [points[parseInt(c.params[0], 16) - 1000] ?? { txid: id(99), vout: 0 }],
           })
         : undefined;
-    const first = await loadSpending(large, w, undefined);
+    const first = await loadSpending(
+      large,
+      { network: w.network, transactions: w.chainData.transactions },
+      undefined,
+    );
     expect(first.nextOffset).toBe(250);
-    for (const tx of first.transactions) w.transactions[tx.txid] = tx;
+    for (const tx of first.transactions) w.chainData.transactions[tx.txid] = tx;
     const second = await loadSpending(
       large,
-      w,
+      { network: w.network, transactions: w.chainData.transactions },
       undefined,
       undefined,
       first.nextOffset,
       {},
       first.unavailableTxids,
     );
-    for (const tx of second.transactions) w.transactions[tx.txid] = tx;
+    for (const tx of second.transactions) w.chainData.transactions[tx.txid] = tx;
     expect(second.truncated).toBe(false);
-    expect(Object.keys(w.transactions)).toHaveLength(501);
+    expect(Object.keys(w.chainData.transactions)).toHaveLength(501);
     expect(calls.filter((c) => c.method === 'gettxspendingprevout')).toHaveLength(1);
   });
   it('caps direct transaction work, reserving a bounded fallback budget', async () => {

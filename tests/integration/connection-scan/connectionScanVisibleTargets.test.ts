@@ -2,25 +2,23 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_SCAN_SETTINGS,
   runConnectionScan,
-  type ScanResult,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScan';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScan';
+import type { ScanResult } from '../../../src/Core/Workspace/ConnectionScan/connectionScans';
 import {
   indexScanNeighbours,
   prepareNeighbourScanTargets,
 } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanNeighbours';
-import {
-  addScanPath,
-  replaceScanRun,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanRecords';
-import type { Transaction } from '../../../src/Domain/Chain/transaction';
+import { addScanPath } from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanPath';
+import { replaceScanRun } from '../../../src/Core/Workspace/ConnectionScan/updates';
+import type { Transaction } from '../../../src/Core/ChainData';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
-import { createWorkspace } from '../../../src/App/Workspace/createWorkspace';
-import { parseWorkspace } from '../../../src/App/Workspace/Persistence/Format';
+import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
+import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
 import {
   createConnectionScanFetch,
   type ConnectionScanTransport,
-} from '../../../src/App/Workspace/Workbenches/Graph/ConnectionScan/connectionScanFetch';
-import { TransactionFetchScope } from '../../../src/Infra/Bitcoin/transactionScheduler';
+} from '../../../src/Core/Workspace/ConnectionScan/connectionScanFetch';
+import { TransactionFetchScope } from '../../../src/Core/ChainData/transactionScheduler';
 
 const hash = (n: number) => n.toString(16).padStart(64, '0');
 const tx = (n: number) => `tx:${hash(n)}`;
@@ -65,7 +63,7 @@ const hiddenPath = [out(8, 150), tx(8), out(8, 50), tx(5), out(5, 1)];
 
 async function scan(source: string, maxHops = 7, direction: 'upstream' | 'both' = 'upstream') {
   const workspace = createWorkspace('Synthetic visible-target regression', 'mainnet');
-  workspace.transactions = { [selected.txid]: selected };
+  workspace.chainData.transactions = { [selected.txid]: selected };
   workspace.view.graphNodeIds = [...displayed];
   const pool = Object.fromEntries([selected, creator, intermediate].map((t) => [t.txid, t]));
   const transport: ConnectionScanTransport = {
@@ -81,7 +79,7 @@ async function scan(source: string, maxHops = 7, direction: 'upstream' | 'both' 
   const adapter = createConnectionScanFetch(
     {
       network: 'mainnet',
-      transactions: workspace.transactions,
+      transactions: workspace.chainData.transactions,
       scope: new TransactionFetchScope('mainnet'),
       signal,
       fanOut: 11,
@@ -155,7 +153,7 @@ describe('default neighbour scan from a transaction-only graph', () => {
     ['the selected input and its spending transaction context', out(8, 150), displayed],
   ] as const)('streams the deeper loop with %s displayed', async (_label, source, graphNodeIds) => {
     const workspace = createWorkspace('Synthetic transaction-only regression', 'mainnet');
-    workspace.transactions = { [selected.txid]: selected };
+    workspace.chainData.transactions = { [selected.txid]: selected };
     workspace.view.graphNodeIds = [...graphNodeIds];
     const graph = buildGraph(workspace);
     const neighbours = indexScanNeighbours(graph);
@@ -178,7 +176,7 @@ describe('default neighbour scan from a transaction-only graph', () => {
     const adapter = createConnectionScanFetch(
       {
         network: 'mainnet',
-        transactions: workspace.transactions,
+        transactions: workspace.chainData.transactions,
         scope: new TransactionFetchScope('mainnet'),
         signal: new AbortController().signal,
         fanOut: DEFAULT_SCAN_SETTINGS.fanOut,
@@ -217,7 +215,7 @@ describe('default neighbour scan from a transaction-only graph', () => {
     const saved = parseWorkspace(replaceScanRun(workspace, run, adapter.evidence));
     const accepted = parseWorkspace(addScanPath(saved, result!));
     expect(new Set(accepted.view.graphNodeIds)).toEqual(new Set([...graphNodeIds, ...hiddenPath]));
-    expect(accepted.transactions[creator.txid]).toBeDefined();
-    expect(accepted.transactions[intermediate.txid]).toBeDefined();
+    expect(accepted.chainData.transactions[creator.txid]).toBeDefined();
+    expect(accepted.chainData.transactions[intermediate.txid]).toBeDefined();
   });
 });

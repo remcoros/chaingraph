@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { createWorkspace } from '../../src/App/Workspace/createWorkspace';
-import type { Workspace } from '../../src/App/Workspace/workspace';
+import { createWorkspace } from '../../src/Core/Workspace/createWorkspace';
+import type { Workspace } from '../../src/Core/Workspace/workspace';
 import { largeWalletFixture } from './wallet-performance';
 
 /** Public BIP84 addresses, synthetic history, deterministic hash-like transaction IDs. */
@@ -15,13 +15,13 @@ export function compressionWalletFixture(
   workspace.name = 'Synthetic workspace compression benchmark';
   // Long zero prefixes make unrealistic compression fixtures. Hash fixed public labels instead.
   const ids = new Map(
-    Object.keys(workspace.transactions).map((id) => [
+    Object.keys(workspace.chainData.transactions).map((id) => [
       id,
       bytesToHex(sha256(new TextEncoder().encode(`public-compression-fixture:${id}`))),
     ]),
   );
-  workspace.transactions = Object.fromEntries(
-    Object.entries(workspace.transactions).map(([id, tx]) => {
+  workspace.chainData.transactions = Object.fromEntries(
+    Object.entries(workspace.chainData.transactions).map(([id, tx]) => {
       const txid = ids.get(id)!;
       return [
         txid,
@@ -40,7 +40,7 @@ export function compressionWalletFixture(
       ];
     }),
   );
-  for (const wallet of workspace.wallets) {
+  for (const wallet of workspace.wallets.definitions) {
     for (const address of wallet.addresses) {
       address.history = address.history?.map((entry) => ({
         ...entry,
@@ -48,9 +48,9 @@ export function compressionWalletFixture(
       }));
     }
   }
-  for (const [index, txid] of Object.keys(workspace.transactions).entries()) {
+  for (const [index, txid] of Object.keys(workspace.chainData.transactions).entries()) {
     if (index % 5 !== 0) continue;
-    workspace.annotations[`tx:${txid}`] = {
+    workspace.annotations.entities[`tx:${txid}`] = {
       label: `Synthetic receipt ${index}`,
       note: 'Public benchmark fixture. Synthetic transaction observations are not real chain evidence.',
       icon: '',

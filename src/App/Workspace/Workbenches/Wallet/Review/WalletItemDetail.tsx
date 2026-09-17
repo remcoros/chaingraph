@@ -11,18 +11,22 @@ import {
   TriangleAlert,
   Undo2,
 } from 'lucide-react';
-import { short } from '../../../../Controls/Display/referenceFormat';
-import type { Wallet } from '../../../../../Domain/Wallet/walletTypes';
-import type { Workspace } from '../../../workspace';
-import type { WorkspaceTag } from '../../../Annotations/workspaceTags';
-import { isCompletedReview, type WalletReviewItem } from '../../../Wallet/walletReview';
+import { short } from '../../../../../Core/Formatting';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import type { WorkspaceTag } from '../../../../../Core/Workspace/Annotations/annotations';
+
+import {
+  isCompletedReview,
+  type WalletReviewItem,
+} from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
   buildWalletReviewContext,
   orderWalletContextTransactions,
   type WalletReviewFlowEntry,
 } from '../walletReviewContext';
 import { walletRowFinding, walletRowRelationship, type WalletRow } from '../walletRows';
-import { useTransactionFetch } from '../../../Evidence/Transactions';
+import { useTransactionFetch } from '../../../Store/TransactionFetch';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';
@@ -34,7 +38,7 @@ import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import type {
   WalletSelectionIndex,
   WalletSelectionAddresses,
-} from '../../../Wallet/walletSelectionIndex';
+} from '../../../../../Core/Workspace/Wallets/walletSelectionIndex';
 import { walletRelatedRecords, walletRelatedDescription } from './walletRelatedRecords';
 import { walletReviewGuidance, walletSubjectTitle } from './walletReviewGuidance';
 
@@ -42,7 +46,9 @@ export type WalletDecisionAction = 'reviewed' | 'later' | 'reopen';
 
 /** The selected context already receives indexes and verified addresses. */
 function selectedWalletReviewContext(
-  workspace: Pick<Workspace, 'network' | 'transactions'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+  },
   wallet: Pick<Wallet, 'addresses'>,
   subject: { nodeId: string; txid?: string; nodeIds?: readonly string[]; reason?: string },
   contextId: string,
@@ -60,7 +66,10 @@ function selectedWalletReviewContext(
 }
 
 function selectedWalletRelatedRecords(
-  workspace: Pick<Workspace, 'network' | 'transactions' | 'findings'>,
+  workspace: Pick<Workspace, 'network'> & {
+    chainData: Pick<Workspace['chainData'], 'transactions'>;
+    analysis: Pick<Workspace['analysis'], 'findings'>;
+  },
   row: WalletRow,
   selectionIndex: WalletSelectionIndex,
 ) {
@@ -193,7 +202,10 @@ export function WalletItemDetail({
     () =>
       contextId
         ? selectedWalletReviewContext(
-            { network: workspace.network, transactions: workspace.transactions },
+            {
+              network: workspace.network,
+              chainData: { transactions: workspace.chainData.transactions },
+            },
             { addresses: wallet.addresses },
             {
               nodeId: contextReviewNodeId ?? row.nodeId,
@@ -208,7 +220,7 @@ export function WalletItemDetail({
         : undefined,
     [
       workspace.network,
-      workspace.transactions,
+      workspace.chainData.transactions,
       wallet.addresses,
       contextReviewNodeId,
       contextReviewTxid,
@@ -244,7 +256,7 @@ export function WalletItemDetail({
     fetch: fetchTransaction,
     update: updateEvidence,
   });
-  const annotation = workspace.annotations[row.nodeId];
+  const annotation = workspace.annotations.entities[row.nodeId];
   const awaitingAddress =
     row.kind === 'output' &&
     !row.address &&
@@ -308,13 +320,19 @@ export function WalletItemDetail({
       selectedWalletRelatedRecords(
         {
           network: workspace.network,
-          transactions: workspace.transactions,
-          findings: workspace.findings,
+          chainData: { transactions: workspace.chainData.transactions },
+          analysis: { findings: workspace.analysis.findings },
         },
         row,
         selectionIndex,
       ),
-    [workspace.network, workspace.transactions, workspace.findings, row, selectionIndex],
+    [
+      workspace.network,
+      workspace.chainData.transactions,
+      workspace.analysis.findings,
+      row,
+      selectionIndex,
+    ],
   );
   return (
     <>
@@ -445,7 +463,7 @@ export function WalletItemDetail({
               <dt>{row.kind === 'output' ? 'Creating transaction block' : 'Transaction block'}</dt>
               <dd>
                 <TransactionBlockTime
-                  transaction={workspace.transactions[row.txid]}
+                  transaction={workspace.chainData.transactions[row.txid]}
                   workspace={workspace}
                   showFee={row.kind !== 'output'}
                 />
@@ -530,7 +548,7 @@ export function WalletItemDetail({
                 >
                   {contextTransactionIds.map((txid) => (
                     <option value={txid} key={txid} title={txid}>
-                      {workspace.annotations[`tx:${txid}`]?.label || short(txid)}
+                      {workspace.annotations.entities[`tx:${txid}`]?.label || short(txid)}
                     </option>
                   ))}
                 </select>
@@ -620,12 +638,12 @@ export function WalletItemDetail({
                     {description && (
                       <span className="wallet-related-description">{description}</span>
                     )}
-                    {workspace.annotations[id]?.label && (
+                    {workspace.annotations.entities[id]?.label && (
                       <span
                         className="wallet-related-label"
-                        title={workspace.annotations[id].label}
+                        title={workspace.annotations.entities[id].label}
                       >
-                        {workspace.annotations[id].label}
+                        {workspace.annotations.entities[id].label}
                       </span>
                     )}
                   </div>

@@ -1,9 +1,14 @@
-import { indexPreviousOutputs, outputAddress } from '../../../Domain/Chain/prevouts';
-import { addressNodeId, outputNodeId, txNodeId } from '../../../Domain/Metadata/entityReferences';
-import { sats } from '../../../Domain/Chain/transaction';
-import { short } from '../../Controls/Display/referenceFormat';
+import { indexPreviousOutputs } from '../../../Core/ChainData';
+import { outputAddress, sats } from '../../../Core/Bitcoin';
+import {
+  addressReference,
+  outpointReference,
+  transactionReference,
+} from '../../../Core/Workspace/entityReferences';
+import type { Workspace } from '../../../Core/Workspace/workspace';
+
+import { short } from '../../../Core/Formatting';
 import type { GraphData, GraphNode } from './types';
-import type { Workspace } from '../workspace';
 
 /**
  * The evidence a graph is drawn from, and how a transaction's inputs count as
@@ -14,44 +19,44 @@ import type { Workspace } from '../workspace';
  */
 export type GraphEvidenceWorkspace = Pick<
   Workspace,
-  | 'network'
-  | 'transactions'
-  | 'inputContext'
-  | 'findings'
-  | 'annotations'
-  | 'addressBalances'
-  | 'watchedAddresses'
+  'network' | 'chainData' | 'analysis' | 'annotations'
 > & {
-  view: Pick<Workspace['view'], 'showAddresses'>;
+  view: Pick<Workspace['view'], 'showAddresses' | 'inputContext'>;
 };
 
 export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
   const nodes = new Map<string, GraphNode>();
   const links = new Map<string, GraphData['links'][number]>();
   const addressBalanceValue = (address: string) => {
-    const observation = workspace.addressBalances?.[address];
+    const observation = workspace.chainData.addressBalances?.[address];
     if (!observation || observation.network !== workspace.network) return undefined;
     const total = observation.confirmedSats + observation.unconfirmedSats;
     return Number.isSafeInteger(total) && total >= 0 ? total : undefined;
   };
-  const previousOutputs = indexPreviousOutputs(workspace);
+  const previousOutputs = indexPreviousOutputs({
+    network: workspace.network,
+    transactions: workspace.chainData.transactions,
+  });
   const contextOutputs = new Map(
-    Object.entries(workspace.inputContext ?? {}).map(([id, indexes]) => [id, new Set(indexes)]),
+    Object.entries(workspace.view.inputContext ?? {}).map(([id, indexes]) => [
+      id,
+      new Set(indexes),
+    ]),
   );
   // Every input of a fully displayed transaction stays visible with loaded metadata,
   // including when several displayed transactions share the same funding parent.
-  for (const tx of Object.values(workspace.transactions)) {
+  for (const tx of Object.values(workspace.chainData.transactions)) {
     if (contextOutputs.has(tx.txid)) continue;
     for (const input of tx.vin)
       if (input.txid && input.vout !== undefined) contextOutputs.get(input.txid)?.add(input.vout);
   }
   const clusters = new Map<string, string>();
-  for (const finding of workspace.findings)
+  for (const finding of workspace.analysis.findings)
     if (!finding.excluded && !finding.stale)
       for (const id of finding.nodeIds) clusters.set(id, finding.id);
   const add = (node: GraphNode) => {
     const old = nodes.get(node.id);
-    const annotation = workspace.annotations[node.id];
+    const annotation = workspace.annotations.entities[node.id];
     const label = annotation?.label || node.label;
     nodes.set(node.id, {
       ...old,
@@ -64,9 +69,9 @@ export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
     const id = `${source}>${target}`;
     links.set(id, { id, source, target, kind });
   };
-  for (const tx of Object.values(workspace.transactions)) {
+  for (const tx of Object.values(workspace.chainData.transactions)) {
     add({
-      id: txNodeId(tx.txid),
+      id: transactionReference(tx.txid),
       kind: 'transaction',
       txid: tx.txid,
       label: short(tx.txid),
@@ -75,7 +80,7 @@ export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
     for (const output of tx.vout) {
       const scope = contextOutputs.get(tx.txid);
       if (scope && !scope.has(output.n)) continue;
-      const id = outputNodeId(tx.txid, output.n);
+      const id = outpointReference(tx.txid, output.n);
       const address = outputAddress(output);
       add({
         id,
@@ -86,9 +91,9 @@ export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
         value: sats(output.value),
         address,
       });
-      link(txNodeId(tx.txid), id, 'creates');
+      link(transactionReference(tx.txid), id, 'creates');
       if (address && workspace.view.showAddresses) {
-        const aid = addressNodeId(address);
+        const aid = addressReference(address);
         add({
           id: aid,
           kind: 'address',
@@ -100,13 +105,13 @@ export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
       }
     }
   }
-  for (const tx of Object.values(workspace.transactions)) {
+  for (const tx of Object.values(workspace.chainData.transactions)) {
     if (contextOutputs.has(tx.txid)) continue;
     for (const input of tx.vin) {
       if (!input.txid || input.vout === undefined) continue;
-      const id = outputNodeId(input.txid, input.vout);
+      const id = outpointReference(input.txid, input.vout);
       if (!nodes.has(id)) {
-        const resolution = previousOutputs.get(id);
+        const resolution = previousOutputs.get(`${input.txid}:${input.vout}`);
         const output =
           resolution?.status === 'loaded' || resolution?.status === 'attached'
             ? resolution.output
@@ -122,7 +127,7 @@ export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
           address,
         });
         if (address && workspace.view.showAddresses) {
-          const aid = addressNodeId(address);
+          const aid = addressReference(address);
           add({
             id: aid,
             kind: 'address',
@@ -133,12 +138,12 @@ export function buildGraph(workspace: GraphEvidenceWorkspace): GraphData {
           link(id, aid, 'address');
         }
       }
-      link(id, txNodeId(tx.txid), 'spends');
+      link(id, transactionReference(tx.txid), 'spends');
     }
   }
   if (workspace.view.showAddresses) {
-    for (const address of workspace.watchedAddresses) {
-      const id = addressNodeId(address);
+    for (const address of workspace.chainData.watchedAddresses) {
+      const id = addressReference(address);
       if (!nodes.has(id))
         add({
           id,
