@@ -13,6 +13,8 @@ export {
   addressToScript,
   addressToScriptHash,
   outputScript,
+  inspectScript,
+  type ScriptInspection,
   scriptHash,
   scriptHashHex,
   scriptToAddress,

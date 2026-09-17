@@ -2,9 +2,14 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { ripemd160 } from '@noble/hashes/legacy.js';
 import { bytesToHex, concatBytes, hexToBytes } from '@noble/hashes/utils.js';
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
-import { address as bitcoinAddress } from 'bitcoinjs-lib';
+import { address as bitcoinAddress, script as bitcoinScript } from 'bitcoinjs-lib';
 import { bitcoinNetwork, type Network } from './network';
 export type ScriptType = 'p2pkh' | 'p2sh-p2wpkh' | 'p2wpkh' | 'p2tr';
+export interface ScriptInspection {
+  hex?: string;
+  asm?: string;
+  error?: string;
+}
 function hash160(bytes: Uint8Array): Uint8Array {
   return ripemd160(sha256(bytes));
 }
@@ -18,6 +23,21 @@ export function scriptHashHex(hex: string): string {
     return scriptHash(hexToBytes(hex));
   } catch {
     throw new Error('Invalid Bitcoin script hex.');
+  }
+}
+
+/** A display-oriented assembly decode. It never executes or validates a script. */
+export function inspectScript(hex: string | undefined): ScriptInspection {
+  if (hex === undefined) return {};
+  if (hex.length > 8_000_000 || !/^(?:[0-9a-fA-F]{2})*$/.test(hex))
+    return { error: 'Invalid or oversized script hex.' };
+  try {
+    return { hex, asm: bitcoinScript.toASM(hexToBytes(hex)) || '(empty script)' };
+  } catch {
+    return {
+      hex,
+      error: 'Malformed push data: opcodes cannot be decoded. Original hex is preserved.',
+    };
   }
 }
 

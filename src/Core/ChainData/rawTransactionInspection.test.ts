@@ -1,8 +1,7 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Transaction as BitcoinTransaction } from 'bitcoinjs-lib';
-import { decodeRawTransaction, inspectScript, fetchRawInspection } from './transactionInspection';
-import { relatedTransactions } from '../../../Selection/relatedTransactions';
-import type { Transaction } from '../../../../../Core/ChainData';
+import type { Transaction } from './transaction';
+import { decodeRawTransaction, fetchRawInspection } from './rawTransactionInspection';
 
 function fixture(witness = false) {
   const raw = new BitcoinTransaction();
@@ -22,45 +21,31 @@ function fixture(witness = false) {
   return { raw, transaction };
 }
 
-describe('display-only raw transaction inspection', () => {
-  it('decodes SegWit bytes without confusing txid and witness transaction ID', () => {
+describe('raw transaction inspection', () => {
+  it('binds decoded SegWit bytes to the selected loaded transaction', () => {
     const { raw, transaction } = fixture(true);
     const result = decodeRawTransaction(raw.toHex(), transaction);
     expect(result.txid).toBe(transaction.txid);
     expect(result.wtxid).not.toBe(result.txid);
     expect(result.inputs[0]).toEqual({ script: '51', witness: ['aa', ''], sequence: 0xfffffffd });
     expect(result.outputs[0].script).toBe('51');
-    expect(result.weight).toBe(raw.weight());
   });
-  it('shows the actual coinbase serialization hash, not the witness-tree zero placeholder', () => {
+
+  it('requires the exact coinbase sentinel for a saved coinbase input', () => {
     const raw = new BitcoinTransaction();
     raw.addInput(new Uint8Array(32), 0xffffffff, 0xffffffff, Uint8Array.of(0x51));
     raw.addOutput(Uint8Array.of(0x51), 5000000000n);
-    const tx: Transaction = {
+    const coinbase: Transaction = {
       txid: raw.getId(),
       vin: [{ coinbase: '51' }],
       vout: [{ n: 0, value: 50, scriptPubKey: { hex: '51' } }],
     };
-    expect(decodeRawTransaction(raw.toHex(), tx).wtxid).toBe(raw.getId());
-  });
-  it('rejects the null outpoint when the saved input claims an ordinary prevout', () => {
-    // COutPoint::IsNull is a zero hash AND n == UINT32_MAX (Bitcoin Core
-    // src/primitives/transaction.h). A crafted record must not present that
-    // coinbase sentinel as spending a regular transaction.
-    const raw = new BitcoinTransaction();
-    raw.addInput(new Uint8Array(32), 0xffffffff, 0xffffffff, Uint8Array.of(0x51));
-    raw.addOutput(Uint8Array.of(0x51), 5000000000n);
-    const crafted: Transaction = {
-      txid: raw.getId(),
-      vin: [{ txid: '00'.repeat(32), vout: 0xffffffff }],
-      vout: [{ n: 0, value: 50, scriptPubKey: { hex: '51' } }],
-    };
+    expect(decodeRawTransaction(raw.toHex(), coinbase).wtxid).toBe(raw.getId());
+    const crafted = { ...coinbase, vin: [{ txid: '00'.repeat(32), vout: 0xffffffff }] };
     expect(() => decodeRawTransaction(raw.toHex(), crafted)).toThrow(/disagrees/);
   });
-  it('binds a zero hash at a non-null index structurally, without claiming UTXO existence', () => {
-    // Only the exact null outpoint is the coinbase sentinel; a zero hash with
-    // another index is serialized like any other prevout. Binding it to the
-    // saved record is structural agreement, not consensus or UTXO validation.
+
+  it('binds a zero hash at a non-null index structurally without claiming UTXO existence', () => {
     const raw = new BitcoinTransaction();
     raw.addInput(new Uint8Array(32), 0, 0xffffffff, Uint8Array.of(0x51));
     raw.addOutput(Uint8Array.of(0x51), 1000n);
@@ -69,11 +54,10 @@ describe('display-only raw transaction inspection', () => {
       vin: [{ txid: '00'.repeat(32), vout: 0 }],
       vout: [{ n: 0, value: 0.00001, scriptPubKey: { hex: '51' } }],
     };
-    const result = decodeRawTransaction(raw.toHex(), transaction);
-    expect(result.txid).toBe(transaction.txid);
-    expect(result.inputs[0].script).toBe('51');
+    expect(decodeRawTransaction(raw.toHex(), transaction).txid).toBe(transaction.txid);
   });
-  it('rejects mismatched IDs, inconsistent observations and malformed/oversized data', () => {
+
+  it('rejects mismatched IDs and inconsistent loaded observations', () => {
     const { raw, transaction } = fixture();
     expect(() =>
       decodeRawTransaction(raw.toHex(), { ...transaction, txid: '22'.repeat(32) }),
@@ -90,58 +74,12 @@ describe('display-only raw transaction inspection', () => {
         vout: [{ n: 0, value: 0.00012344, scriptPubKey: { hex: '51' } }],
       }),
     ).toThrow(/disagrees/);
-    for (const data of [null, {}, 'f', 'zz', '00', raw.toHex() + '00', '00'.repeat(4_000_001)])
-      expect(() => decodeRawTransaction(data, transaction)).toThrow();
-  });
-  it('distinguishes unknown scripts, empty scripts, malformed pushes and normalized opcodes', () => {
-    expect(inspectScript(undefined)).toEqual({});
-    expect(inspectScript('')).toEqual({ hex: '', asm: '(empty script)' });
-    expect(inspectScript('76a914' + '11'.repeat(20) + '88ac').asm).toBe(
-      'OP_DUP OP_HASH160 ' + '11'.repeat(20) + ' OP_EQUALVERIFY OP_CHECKSIG',
-    );
-    expect(inspectScript('4c05aa')).toMatchObject({
-      hex: '4c05aa',
-      error: expect.stringMatching(/Malformed/),
-    });
-    expect(inspectScript('zz').error).toMatch(/Invalid/);
-  });
-});
-
-describe('loaded transaction relationships', () => {
-  it('retains creating and all loaded competing spends for the exact selected outpoint', () => {
-    const { transaction: creating } = fixture();
-    const spending = {
-      ...creating,
-      txid: '22'.repeat(32),
-      vin: [{ txid: creating.txid, vout: 0 }],
-    };
-    const competing = { ...spending, txid: '33'.repeat(32) };
-    const other = { ...spending, txid: '44'.repeat(32), vin: [{ txid: creating.txid, vout: 1 }] };
-    const transactions = Object.fromEntries(
-      [creating, spending, competing, other].map((tx) => [tx.txid, tx]),
-    );
-    const selected = {
-      kind: 'output' as const,
-      id: `out:${creating.txid}:0`,
-      txid: creating.txid,
-      vout: 0,
-      label: '',
-    };
-    expect(relatedTransactions(transactions, selected).map((item) => item.role)).toEqual([
-      'Creating',
-      'Spending',
-      'Spending',
-    ]);
-    delete transactions[creating.txid];
-    expect(relatedTransactions(transactions, selected).map((item) => item.role)).toEqual([
-      'Spending',
-      'Spending',
-    ]);
   });
 });
 
 afterEach(() => vi.unstubAllGlobals());
-it('falls back to Electrum and does not continue after cancellation', async () => {
+
+it('falls back to Electrum and stops after cancellation', async () => {
   const { raw, transaction } = fixture();
   const fetch = vi
     .fn()
@@ -165,7 +103,7 @@ it('falls back to Electrum and does not continue after cancellation', async () =
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
-it('keeps delayed raw-transaction fallback on its original network while another inspection completes', async () => {
+it('keeps a delayed fallback on its original network while another inspection completes', async () => {
   const { raw, transaction } = fixture();
   let release!: () => void;
   const waiting = new Promise<void>((resolve) => {

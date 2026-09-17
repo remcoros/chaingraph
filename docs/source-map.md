@@ -69,7 +69,8 @@ src/
       index.ts                      public primitives; no app or workspace dependencies
       network.ts                    mainnet/testnet4 names and native encoding parameters
       extendedPublicKey.ts          public payload parsing and exact BIP32 child derivation
-      scripts.ts                    public-key scripts and address/script hashing
+      scripts.ts                    public-key scripts, address conversion and assembly inspection
+      rawTransaction.ts             bounded native serialized-transaction decoding
       outputs.ts                    output script interpretation and content comparison
       transaction.ts                native input/output shapes
     Browser/                        generic mechanisms such as file downloads
@@ -85,6 +86,7 @@ src/
       verboseTransaction.ts         upstream transaction decoding into the canonical model
       utxoStatus.ts                 current UTXO-set checks and output verification
       transactionScheduler.ts       prioritized, bounded fetches and request scopes
+      rawTransactionInspection.ts   raw-byte retrieval and loaded-observation binding
     Formatting/                     shared exact amounts and reference abbreviation
       index.ts                      public formatting functions
     Workspace/

@@ -5,7 +5,11 @@ import type { GraphNode } from '../../../GraphState/types';
 import type { Transaction } from '../../../../../Core/ChainData';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import { short } from '../../../../../Core/Formatting';
-import { inspectScript, type RawInspection, fetchRawInspection } from './transactionInspection';
+import { inspectScript } from '../../../../../Core/Bitcoin';
+import {
+  type RawInspection,
+  fetchRawInspection,
+} from '../../../../../Core/ChainData/rawTransactionInspection';
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';

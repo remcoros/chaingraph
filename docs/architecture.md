@@ -624,11 +624,11 @@ trigger data loading. `FlowPanelTransactionView`,
 status line and body, and keep their downstream components in their own file.
 Transaction choice and quick editors have panel lifetime; address tabs and
 pagination have address lifetime.
-The transaction view projects creating/spending relationships through
-`transactionInspection.ts`. `ScriptInspector` decodes
-saved scripts to opcodes; `src/App/Workspace/Workbenches/Graph/InspectorPanel/transactionInspection.ts` fetches raw bytes on
-demand, verifies them against the ID and loaded observations with bitcoinjs,
-and keeps them in component memory only. Sources are in
+The Inspector derives selected transactions and their loaded relationships through
+`relatedTransactions.ts`. `ScriptInspector` renders Core Bitcoin's saved-script
+decode; `src/Core/ChainData/rawTransactionInspection.ts` fetches raw bytes on
+demand, delegates native decoding to Core Bitcoin, verifies them against the ID
+and loaded observations, and keeps them in component memory only. Sources are in
 [references.md](references.md).
 
 **UTXO status.** `useUtxoStatus` binds an abortable `gettxout` (with mempool)
