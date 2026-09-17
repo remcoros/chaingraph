@@ -54,6 +54,19 @@ docker compose --env-file /dev/null up --build -d
 
 For mainnet, use `config/.env.mainnet` instead, or add that file beside the testnet4 file to serve both. Apply the same file mode and group when adding it. The example's loopback endpoints need changing for container access: container loopback refers to the container itself. No runtime config files enter the build context.
 
+If Core or Fulcrum uses a private CA, add its read-only mount and `NODE_EXTRA_CA_CERTS` to the existing `chaingraph` Compose service. For example, a Start9 CA at `/usr/share/ca-certificates/start9/simple-strip.crt` can be configured as:
+
+```yaml
+services:
+  chaingraph:
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/chaingraph-ca/simple-strip.crt
+    volumes:
+      - /usr/share/ca-certificates/start9/simple-strip.crt:/run/chaingraph-ca/simple-strip.crt:ro
+```
+
+Keep TLS verification enabled.
+
 Compose mounts only this dedicated directory at `/run/chaingraph`, read-only. `CHAINGRAPH_CONFIG_DIR` chooses a different **host** directory; the container's `CHAINGRAPH_NETWORK_CONFIG_DIR` remains `/run/chaingraph`. Do not point the mount at the entire source checkout or a general secrets directory. The host directory must already exist. Restart the service after changing a network file.
 
 The Linux permission example gives the container's UID/GID 1000 access without world-readable credentials. Keep the files owned by your editing user and readable by group 1000; parent directories need traversal permission. With rootless Docker or user-namespace remapping, grant access to the mapped container identity instead. Mount a configuration directory with one or both named files; do not combine network settings through `env_file`.
@@ -70,7 +83,9 @@ docker compose --env-file /dev/null down
 
 If you chose `CHAINGRAPH_CONFIG_DIR`, export it in the shell used for each Compose command. The runtime uses Node 24, UID/GID 1000, system CA certificates, a read-only filesystem, a bounded temporary directory and no Linux capabilities. The image contains compiled browser assets and a bundled server, without development dependencies. Its health check verifies that the UI is served; upstream readiness is reported separately. An unavailable configured upstream does not prevent opening saved workspaces or creating workspaces from bundled examples. Live lookups require the matching upstream to be available.
 
-For cookie authentication, remove both RPC user/password settings from that network's file and set `BITCOIN_RPC_COOKIE_FILE` to a read-only bind-mounted cookie path. Mount the containing directory when Bitcoin rotates the cookie by replacement. Give each pair its own path if both use cookies. Ensure UID 1000 can read it; do not broaden permissions to world-readable. For a private certificate authority, mount its PEM file read-only and set the container's `NODE_EXTRA_CA_CERTS` environment value to that path. Add those mounts and the CA environment setting with a Compose override. Do not disable TLS verification. Neither cookies nor CA files belong in the image.
+For cookie authentication, remove both RPC user/password settings from that network's file and set `BITCOIN_RPC_COOKIE_FILE` to a read-only bind-mounted cookie path. Mount the containing directory when Bitcoin rotates the cookie by replacement. Give each pair its own path if both use cookies. Ensure UID 1000 can read it; do not broaden permissions to world-readable.
+
+For a private certificate authority, mount its PEM file read-only and set the container's `NODE_EXTRA_CA_CERTS` environment value to that path. Add those mounts and the CA environment setting with a Compose override. Do not disable TLS verification. Neither cookies nor CA files belong in the image.
 
 ## Shared HTTP settings
 

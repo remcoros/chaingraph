@@ -3,6 +3,7 @@ import tls from 'node:tls';
 import type { NetworkConfig } from './config';
 import { SafeError } from './errors';
 import { Limiter } from './limit';
+import { logFailure } from './logging';
 
 interface Pending {
   resolve: (value: unknown) => void;
@@ -119,7 +120,15 @@ export class ElectrumClient {
       socket.setNoDelay(true);
       socket.setKeepAlive(true, 30000);
       socket.on('data', (chunk) => this.receive(socket, String(chunk)));
-      socket.on('error', () => this.fail(socket, new SafeError('Electrum connection failed')));
+      socket.on('error', (error) => {
+        logFailure({
+          component: 'electrum',
+          operation: 'socket',
+          network: this.config.network,
+          error,
+        });
+        this.fail(socket, new SafeError('Electrum connection failed'));
+      });
       socket.on('close', () => this.fail(socket, new SafeError('Electrum disconnected')));
       try {
         await new Promise<void>((resolve, reject) => {

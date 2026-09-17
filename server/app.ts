@@ -1,8 +1,9 @@
 import express, { type ErrorRequestHandler } from 'express';
 import path from 'node:path';
-import type { ServerConfig } from './config';
+import type { Network, ServerConfig } from './config';
 import { NetworkRegistry } from './networks';
 import { errorMessage, SafeError } from './errors';
+import { logFailure } from './logging';
 import { parseRpc } from './rpc-schema';
 
 export function createApp(
@@ -112,10 +113,15 @@ export function createApp(
     });
   });
   app.get('/api/status', async (req, res) => {
+    let failure: { component: 'bitcoin-rpc' | 'electrum' | 'http-api'; operation: string } = {
+      component: 'http-api',
+      operation: 'status',
+    };
     let pair: ReturnType<NetworkRegistry['get']>;
     try {
       pair = networks.get(req.query.network);
     } catch (error) {
+      logFailure({ ...failure, error });
       res.status(error instanceof SafeError ? error.status : 400).json({
         error: errorMessage(error),
         ...(error instanceof SafeError && error.code ? { code: error.code } : {}),
@@ -124,45 +130,65 @@ export function createApp(
     }
     const signal = requestSignal(res, pair.config.network);
     try {
+      failure = { component: 'bitcoin-rpc', operation: 'getblockchaininfo' };
       const info = await pair.core.chainInfo(signal);
       // Negotiated version is connection metadata; a fresh ping checks that the
       // server still answers after handshake, rather than reporting a stale socket.
-      await pair.electrum.call('server.ping', [], await pair.genesis(signal), signal);
+      failure = { component: 'bitcoin-rpc', operation: 'getblockhash' };
+      const genesis = await pair.genesis(signal);
+      failure = { component: 'electrum', operation: 'server.ping' };
+      await pair.electrum.call('server.ping', [], genesis, signal);
       if (!res.headersSent)
         res.json({ network: pair.config.network, connected: true, height: info.blocks });
     } catch (error) {
+      logFailure({ ...failure, network: pair.config.network, error });
       if (!res.headersSent)
         res.json({ network: pair.config.network, connected: false, error: errorMessage(error) });
     }
   });
   app.post('/api/rpc', async (req, res) => {
     const signal = requestSignal(res);
+    let failure: { component: 'bitcoin-rpc' | 'electrum' | 'http-api'; operation: string } = {
+      component: 'http-api',
+      operation: 'rpc',
+    };
+    let selectedNetwork: Network | undefined;
     try {
       if (!req.is('application/json'))
         throw new SafeError('Content-Type must be application/json', 415);
       const { network, target, method, params } = parseRpc(req.body);
+      selectedNetwork = network;
+      failure = { component: 'bitcoin-rpc', operation: method };
       const pair = networks.get(network);
       let result: unknown;
       if (target === 'core' && method === 'gettxspendingprevout') {
         result = await pair.spendingPrevouts(params, signal);
       } else {
+        failure = { component: 'bitcoin-rpc', operation: 'getblockchaininfo' };
         const info = await pair.core.chainInfo(signal);
-        result =
-          target === 'core'
-            ? method === 'getblockchaininfo'
-              ? info
-              : await pair.core.call(method, params, signal)
-            : await pair.electrum.call(method, params, await pair.genesis(signal), signal);
+        if (target === 'core') {
+          failure = { component: 'bitcoin-rpc', operation: method };
+          result =
+            method === 'getblockchaininfo' ? info : await pair.core.call(method, params, signal);
+        } else {
+          failure = { component: 'bitcoin-rpc', operation: 'getblockhash' };
+          const genesis = await pair.genesis(signal);
+          failure = { component: 'electrum', operation: method };
+          result = await pair.electrum.call(method, params, genesis, signal);
+        }
       }
       if (!res.headersSent) {
         const body = JSON.stringify({ result });
         if (
           Buffer.byteLength(body) > Math.min(config.maxResponseBytes, pair.config.maxResponseBytes)
-        )
+        ) {
+          failure = { component: 'http-api', operation: 'serialize-response' };
           throw new SafeError('Response exceeds configured size limit', 413);
+        }
         res.type('json').send(body);
       }
     } catch (error) {
+      logFailure({ ...failure, ...(selectedNetwork ? { network: selectedNetwork } : {}), error });
       if (!res.headersSent)
         res.status(error instanceof SafeError ? error.status : 502).json({
           error: errorMessage(error),

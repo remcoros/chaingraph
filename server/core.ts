@@ -4,6 +4,7 @@ import https from 'node:https';
 import type { NetworkConfig } from './config';
 import { SafeError } from './errors';
 import { Limiter } from './limit';
+import { logFailure } from './logging';
 
 /** A pooled keep-alive socket reset by the peer before any response arrived.
  * Node documents that servers may close idle pooled connections; a request
@@ -46,7 +47,13 @@ export class CoreClient {
               await readFile(this.config.coreCookieFile, { encoding: 'utf8', signal: combined })
             ).trim()
           : `${this.config.coreUser}:${this.config.corePassword}`;
-      } catch {
+      } catch (error) {
+        logFailure({
+          component: 'bitcoin-rpc',
+          operation: 'read-authentication-cookie',
+          network: this.config.network,
+          error,
+        });
         throw new SafeError('Bitcoin RPC authentication unavailable');
       }
       if (
@@ -90,6 +97,12 @@ export class CoreClient {
         return value.result;
       } catch (error) {
         if (error instanceof SafeError) throw error;
+        logFailure({
+          component: 'bitcoin-rpc',
+          operation: method,
+          network: this.config.network,
+          error,
+        });
         if (combined.aborted)
           throw new SafeError('Bitcoin RPC request timed out or was cancelled', 504);
         throw new SafeError('Bitcoin RPC connection failed');
