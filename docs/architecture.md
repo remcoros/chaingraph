@@ -570,6 +570,15 @@ synthetic or public fixtures. `npm run build` proves types and bundling. Push
 and PR CI run these plus formatting, portability and license checks; no
 browser is launched.
 
+`tests/integration/devWorkers.test.ts` also exercises the real Vite development
+transforms without a browser. It checks every worker's transitive source imports
+for React instrumentation and evaluates the example tag palette without window
+globals. React Compiler and Fast Refresh target JSX and `use*.ts` hook modules,
+not all of `App`: pure App-owned helpers can also run in workers. The test guards
+hook compilation coverage so the narrower filter cannot silently drop existing
+memoization. Production builds and SSR example tests alone do not cover this
+development-only boundary.
+
 Release verification adds `npm run test:production`: HTTP checks of built
 assets, CSP and security headers and network discovery, then a narrow browser
 run of the bundled encryption worker under production CSP, a WebGL context, and

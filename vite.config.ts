@@ -11,25 +11,17 @@ export default defineConfig({
       // React Compiler memoizes components and hooks automatically, which is the
       // safety net for a UI written with almost no hand-rolled useCallback/memo.
       //
-      // Scoped to where React actually lives. Enabling the compiler hands the
-      // TypeScript, JSX and Fast Refresh transforms to oxc-transform-react, and
-      // its refresh pass instruments every file it is given rather than only
-      // files containing JSX. A module with no JSX still gains $RefreshReg$
-      // registration for each capitalised export.
-      //
-      // Web workers have no Fast Refresh runtime, so any such module in a
-      // worker's import graph throws 'ReferenceError: $RefreshReg$ is not
-      // defined' and the worker dies on load. Unlocking a workspace then failed
-      // with "The workspace worker stopped" and returned to the home screen. In
-      // this project the encryption worker reached the persisted workspace
-      // format and, through its Domain dependencies, bitcoinjs-lib.
-      //
-      // Domain, persistence and Infra hold no React, which the import boundaries in
-      // .oxlintrc.json already enforce, so naming App and Shared states that
-      // rather than working around the transform. The filter must keep the
-      // extension test: include replaces the default one, and without it the
-      // plugin tries to parse imported CSS as JavaScript.
-      include: [/\/src\/(App|Shared)\/.*\.[jt]sx?$/],
+      // App also owns pure helpers used by workers, not just React modules.
+      // oxc-transform-react can register capitalised constants for Fast Refresh
+      // even without JSX. Workers have no $RefreshReg$ runtime: instrumenting
+      // tagColors.ts broke example creation before its message handler loaded.
+      // Compile JSX modules and the use*.ts hook modules, not whole folders.
+      // Keep explicit extensions so imported CSS is not parsed as JavaScript.
+      // devWorkers.test.ts guards worker graphs and React compilation together.
+      include: [
+        /\/src\/(App|Shared)\/.*\.[jt]sx$/,
+        /\/src\/(App|Shared)\/(?:.*\/)?use[A-Z0-9][^/]*\.[jt]s$/,
+      ],
       compiler: { logDiagnostics: true },
     }),
   ],
