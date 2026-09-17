@@ -1119,7 +1119,7 @@ export function FlowPanelTransactionView({
                       }
                     >
                       <Smile size={13} />
-                    </button>                    
+                    </button>
                   </div>
                   {(currentNotOnGraph ||
                     props.hiddenNodeIds?.includes(transactionReference(current.tx.txid))) && (

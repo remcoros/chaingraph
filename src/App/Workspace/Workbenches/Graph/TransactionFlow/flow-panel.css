@@ -703,7 +703,7 @@
   text-align: right;
 }
 .flow-panel-identity .icon-button {
-  padding:0;
+  padding: 0;
 }
 .flow-panel-identity .icon-button .icon-button {
   min-height: 27px;
@@ -788,28 +788,26 @@
 .transaction-flow-inputs .transaction-rows {
   border-right: 0;
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  background:
-    linear-gradient(
-        to bottom,
-        var(--transaction-flow-rail) 0%,
-        var(--transaction-flow-rail) 24%,
-        color-mix(in srgb, var(--transaction-flow-rail) 58%, transparent) 68%,
-        transparent 100%
-      )
-      right / 2px 100% no-repeat;
+  background: linear-gradient(
+      to bottom,
+      var(--transaction-flow-rail) 0%,
+      var(--transaction-flow-rail) 24%,
+      color-mix(in srgb, var(--transaction-flow-rail) 58%, transparent) 68%,
+      transparent 100%
+    )
+    right / 2px 100% no-repeat;
 }
 .transaction-flow-outputs .transaction-rows {
   border-left: 0;
   border-radius: var(--radius-md) 0 0 var(--radius-md);
-  background:
-    linear-gradient(
-        to bottom,
-        var(--transaction-flow-rail) 0%,
-        var(--transaction-flow-rail) 24%,
-        color-mix(in srgb, var(--transaction-flow-rail) 58%, transparent) 68%,
-        transparent 100%
-      )
-      left / 2px 100% no-repeat;
+  background: linear-gradient(
+      to bottom,
+      var(--transaction-flow-rail) 0%,
+      var(--transaction-flow-rail) 24%,
+      color-mix(in srgb, var(--transaction-flow-rail) 58%, transparent) 68%,
+      transparent 100%
+    )
+    left / 2px 100% no-repeat;
 }
 .transaction-row::after {
   content: '';
@@ -820,7 +818,10 @@
   border-radius: 999px;
   background: var(--transaction-flow-branch);
 }
-.transaction-row:has(.transaction-row-content:hover, .transaction-row-content:focus-visible)::after {
+.transaction-row:has(
+    .transaction-row-content:hover,
+    .transaction-row-content:focus-visible
+  )::after {
   background: color-mix(in srgb, var(--color-accent) 36%, var(--transaction-flow-branch));
 }
 .transaction-flow-inputs .transaction-row::after {
