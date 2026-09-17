@@ -11,13 +11,19 @@ export function replaceScanRun(
   validateScanRun(run);
   const runs = workspace.connectionScans?.runs ?? [];
   const records = compactConnectionScanRecords(
-    workspace,
+    workspace.connectionScans,
+    workspace.chainData.transactions,
     runs.some((retained) => retained.id === run.id)
       ? runs.map((retained) => (retained.id === run.id ? run : retained))
       : [...runs, run],
     evidence,
   );
-  validateConnectionScanRecords(records, workspace, false);
+  validateConnectionScanRecords(
+    records,
+    workspace.network,
+    workspace.chainData.transactions,
+    false,
+  );
   return { ...workspace, connectionScans: records };
 }
 

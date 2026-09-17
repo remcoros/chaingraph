@@ -85,7 +85,7 @@ export function prepareScanPath(
     [...needed].filter((id) => observation(id)).map((id) => [id, observation(id)!]),
   );
   try {
-    blockedByConflict ||= scanResultConflicts(prefix, observation, workspace);
+    blockedByConflict ||= scanResultConflicts(prefix, observation, workspace.network);
   } catch {
     blockedByConflict = true;
   }
@@ -140,6 +140,13 @@ export function addScanPath(
     prepared.nodeIds,
   );
   return added.connectionScans
-    ? { ...added, connectionScans: compactConnectionScanRecords(added, added.connectionScans.runs) }
+    ? {
+        ...added,
+        connectionScans: compactConnectionScanRecords(
+          added.connectionScans,
+          added.chainData.transactions,
+          added.connectionScans.runs,
+        ),
+      }
     : added;
 }

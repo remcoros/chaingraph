@@ -29,7 +29,12 @@
     "unicorn/no-useless-fallback-in-spread": "error",
     "unicorn/no-useless-spread": "error",
     "unicorn/prefer-string-starts-ends-with": "error",
-    "import/no-cycle": "error",
+    "import/no-cycle": [
+      "error",
+      {
+        "ignoreTypes": false
+      }
+    ],
     "eslint/no-restricted-imports": [
       "error",
       {

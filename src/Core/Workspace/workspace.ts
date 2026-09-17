@@ -149,8 +149,15 @@ export function validateWorkspace(data: unknown, verifyDerivation = true): Works
   if (parsed.connectionScans) {
     for (const transaction of Object.values(parsed.connectionScans.evidence))
       validateTransactionAddresses(transaction, parsed.network);
-    validateConnectionScanRecords(parsed.connectionScans, parsed);
-    parsed.connectionScans = latestConnectionScanRecords(parsed);
+    validateConnectionScanRecords(
+      parsed.connectionScans,
+      parsed.network,
+      parsed.chainData.transactions,
+    );
+    parsed.connectionScans = latestConnectionScanRecords(
+      parsed.connectionScans,
+      parsed.chainData.transactions,
+    );
   }
   const walletIds = new Set<string>();
   for (const wallet of parsed.wallets.definitions) {

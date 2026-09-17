@@ -1,10 +1,9 @@
 import { deduplicateScanRuns } from './results';
 import { indexPreviousOutputs, type Transaction } from '../../ChainData/index';
-import { previousOutputsConflict } from '../../Bitcoin/index';
+import { previousOutputsConflict, type Network } from '../../Bitcoin/index';
 
 import { outpointReference } from '../entityReferences';
 import type { ConnectionScanRecords, ScanResult, ScanRun } from './connectionScans';
-import type { Workspace } from '../workspace';
 import { isScanNodeId } from './scanNode';
 import { SCAN_LIMITS, scanPathHops } from './scanPath';
 
@@ -213,7 +212,7 @@ function edgeConflicts(
   b: string,
   direction: 'upstream' | 'downstream',
   observation: (id: string) => Transaction | undefined,
-  workspace: Pick<Workspace, 'network'>,
+  network: Network,
 ): boolean {
   const edge = edgeEvidence(a, b, direction);
   const tx = observation(edge.txid);
@@ -232,7 +231,7 @@ function edgeConflicts(
   return (
     !output ||
     (!!input.prevout &&
-      previousOutputsConflict(output, { n: input.vout!, ...input.prevout }, workspace.network))
+      previousOutputsConflict(output, { n: input.vout!, ...input.prevout }, network))
   );
 }
 
@@ -240,12 +239,12 @@ function edgeConflicts(
 export function scanResultConflicts(
   result: ScanResult,
   observation: (id: string) => Transaction | undefined,
-  workspace: Pick<Workspace, 'network'>,
+  network: Network,
 ): boolean {
   return (
     findingEvidenceConflicts(result, observation) ||
     result.directions.some((direction, index) =>
-      edgeConflicts(result.path[index], result.path[index + 1], direction, observation, workspace),
+      edgeConflicts(result.path[index], result.path[index + 1], direction, observation, network),
     )
   );
 }
@@ -253,9 +252,8 @@ export function scanResultConflicts(
 /** Verify semantics and every edge whose evidence remains available. Missing evidence is explicit at Add path. */
 export function validateConnectionScanRecords(
   records: ConnectionScanRecords,
-  workspace: Pick<Workspace, 'network'> & {
-    chainData: Pick<Workspace['chainData'], 'transactions'>;
-  },
+  network: Network,
+  transactions: Record<string, Transaction>,
   verifyWorkspaceConsistency = true,
 ): void {
   assertConnectionScanBudget(records);
@@ -334,8 +332,7 @@ export function validateConnectionScanRecords(
         )
           throw new Error('Scan meeting node does not match the direction switch.');
       }
-      const observation = (id: string) =>
-        workspace.chainData.transactions[id] ?? records.evidence[id];
+      const observation = (id: string) => transactions[id] ?? records.evidence[id];
       if (findingEvidenceConflicts(result, observation))
         throw new Error('Scan finding is not supported by its transaction observations.');
       if (context) {
@@ -344,7 +341,7 @@ export function validateConnectionScanRecords(
             (id) => (observation(transactionId(id))?.status?.confirmations ?? 0) < 0,
           ) ||
           context.directions.some((direction, i) =>
-            edgeConflicts(context.path[i], context.path[i + 1], direction, observation, workspace),
+            edgeConflicts(context.path[i], context.path[i + 1], direction, observation, network),
           )
         )
           throw new Error('Scan context is not supported by its transaction observations.');
@@ -361,7 +358,7 @@ export function validateConnectionScanRecords(
         // while every preceding edge must still match the observed transactions.
         if (
           !(result.finding === 'conflicting-evidence' && i === result.directions.length - 1) &&
-          edgeConflicts(result.path[i], result.path[i + 1], direction, observation, workspace)
+          edgeConflicts(result.path[i], result.path[i + 1], direction, observation, network)
         )
           throw new Error('Scan path is not supported by its transaction observations.');
       }
@@ -375,8 +372,8 @@ export function validateConnectionScanRecords(
     verifyWorkspaceConsistency &&
     [
       ...indexPreviousOutputs({
-        network: workspace.network,
-        transactions: { ...records.evidence, ...workspace.chainData.transactions },
+        network,
+        transactions: { ...records.evidence, ...transactions },
       }).entries(),
     ].some(
       ([id, item]) => item.status === 'conflict' && !disputedTerminalOutpoints.has(`out:${id}`),
@@ -386,19 +383,18 @@ export function validateConnectionScanRecords(
 }
 
 export function compactConnectionScanRecords(
-  workspace: Workspace,
+  previous: ConnectionScanRecords | undefined,
+  transactions: Record<string, Transaction>,
   runs: ScanRun[],
   supplied: Record<string, Transaction> = {},
 ): ConnectionScanRecords {
-  runs = deduplicateScanRuns(runs, workspace.connectionScans?.runs);
-  const available = { ...workspace.connectionScans?.evidence, ...supplied };
+  runs = deduplicateScanRuns(runs, previous?.runs);
+  const available = { ...previous?.evidence, ...supplied };
   const needed = new Set(
     runs.flatMap((run) => run.results.flatMap((result) => [...scanResultEvidenceIds(result)])),
   );
   const evidence = Object.fromEntries(
-    [...needed]
-      .filter((id) => !workspace.chainData.transactions[id] && available[id])
-      .map((id) => [id, available[id]]),
+    [...needed].filter((id) => !transactions[id] && available[id]).map((id) => [id, available[id]]),
   );
   const records = { runs, evidence };
   assertConnectionScanBudget(records);
@@ -407,8 +403,9 @@ export function compactConnectionScanRecords(
 
 /** Normalize validated imports and compact repeated finding paths with their proof. */
 export function latestConnectionScanRecords(
-  workspace: Workspace,
+  previous: ConnectionScanRecords | undefined,
+  transactions: Record<string, Transaction>,
 ): ConnectionScanRecords | undefined {
-  const runs = workspace.connectionScans?.runs;
-  return runs?.length ? compactConnectionScanRecords(workspace, runs) : undefined;
+  const runs = previous?.runs;
+  return runs?.length ? compactConnectionScanRecords(previous, transactions, runs) : undefined;
 }
