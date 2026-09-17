@@ -1,11 +1,10 @@
 import { HDKey, HARDENED_OFFSET } from '@scure/bip32';
-import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import {
   parseExtendedPublicKey,
   derivePublicChild,
-  bitcoinNetwork,
   outputScript,
   scriptHash,
+  scriptToAddress,
   type Network,
   type ScriptType,
 } from '../../Bitcoin/index';
@@ -70,10 +69,8 @@ function deriveRange(
   for (let index = start; index < start + count; index++) {
     const child = derivePublicChild(parent, index);
     const script = outputScript(child.publicKey!, scriptType);
-    const address =
-      scriptType === 'p2tr'
-        ? bitcoinAddress.toBech32(script.slice(2), 1, bitcoinNetwork(network).bech32)
-        : bitcoinAddress.fromOutputScript(script, bitcoinNetwork(network));
+    const address = scriptToAddress(script, network);
+    if (!address) throw new Error('Derived public-key script has no address encoding.');
     result.push({
       address,
       scripthash: scriptHash(script),

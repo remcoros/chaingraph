@@ -1,6 +1,4 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { type Network, outputAddress, addressToScriptHash } from '../../Bitcoin';
+import { type Network, isProvablyUnspendable, outputScriptHash } from '../../Bitcoin';
 import type { Transaction } from '../../ChainData';
 import { type ScanBudget, type ScanNeighbors, ScanBudgetExceeded } from './connectionScan';
 import type { ScanDirection, ScanObservation } from './connectionScans';
@@ -17,7 +15,6 @@ import {
 import type { TransactionFetchScope } from '../../ChainData/transactionScheduler';
 import {
   fetchScanUtxo,
-  isProvablyUnspendable,
   isVerifiedCoinbase,
   scanLookupFailure,
   ScanEvidenceConflict,
@@ -369,14 +366,7 @@ export function createConnectionScanFetch(
         if (observation) return { nodeIds: [], observation };
       }
       if (indexed && !indexed.unresolved.length) return unknownSpend();
-      const hex = output.scriptPubKey.hex;
-      const address = outputAddress(output);
-      const hash =
-        hex !== undefined
-          ? bytesToHex(sha256(hexToBytes(hex)).reverse())
-          : address
-            ? addressToScriptHash(address, options.network)
-            : undefined;
+      const hash = outputScriptHash(output, options.network);
       if (!hash) return unknownSpend();
       const history = await historyFor(hash, budget);
       checkpoint(budget);

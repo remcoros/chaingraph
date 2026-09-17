@@ -1,10 +1,8 @@
 import { z } from 'zod';
-import { address as bitcoinAddress } from 'bitcoinjs-lib';
-import { hexToBytes } from '@noble/hashes/utils.js';
 import {
   addressToScriptHash,
-  bitcoinNetwork,
   MAX_MONEY_SATS,
+  outputScriptAddress,
   sats,
   type Network,
 } from '../Bitcoin';
@@ -207,10 +205,8 @@ export function validateTransactionAddresses(transaction: Transaction, network: 
       }
     });
     if (hex === undefined) continue;
-    let canonical: string;
-    try {
-      canonical = bitcoinAddress.fromOutputScript(hexToBytes(hex), bitcoinNetwork(network));
-    } catch {
+    const canonical = outputScriptAddress(output, network);
+    if (!canonical) {
       // Bare multisig/P2PK can report participant addresses that do not encode
       // the whole output script. Keep their network checks without imposing a
       // single-address script model on them or on nonstandard scripts.

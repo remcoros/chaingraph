@@ -9,12 +9,8 @@ import {
 import { createConnectionScanFetch } from './connectionScanFetch';
 import { TransactionFetchScope } from '../../ChainData/transactionScheduler';
 import type { ScanBudget } from './connectionScan';
-import {
-  fetchScanUtxo,
-  isProvablyUnspendable,
-  isVerifiedCoinbase,
-  scanLookupFailure,
-} from './connectionScanEvidence';
+import { fetchScanUtxo, isVerifiedCoinbase, scanLookupFailure } from './connectionScanEvidence';
+import { isProvablyUnspendable } from '../../Bitcoin';
 import type { Transaction } from '../../ChainData';
 
 const txid = 'a'.repeat(64);

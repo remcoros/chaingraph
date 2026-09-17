@@ -4,14 +4,12 @@ import {
   TRANSACTION_BATCH_CONCURRENCY,
   type TransactionFetchHints,
 } from './transactionScheduler';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { AddressBalanceObservation, AddressUtxoObservation } from './observations';
 import type { Transaction } from './transaction';
 import type { TransactionObservations } from './prevouts';
 import { validateTransactionAddresses } from './transactionValidation';
 import { withHistoryHeight } from './transactionStatus';
-import { type Network, outputAddress, addressToScriptHash } from '../Bitcoin';
+import { type Network, outputScriptHash, addressToScriptHash } from '../Bitcoin';
 
 import { parseVerboseTransaction } from './verboseTransaction';
 export interface BackendStatus {
@@ -895,12 +893,7 @@ export async function loadSpending(
   if (indexed && !indexed.unresolved.length)
     return { transactions: indexed.transactions, truncated: false, lookup: 'index' };
   const outputs = selected;
-  const hashes = outputs.map((output) => {
-    const hex = output.scriptPubKey.hex;
-    if (hex !== undefined) return bytesToHex(sha256(hexToBytes(hex)).reverse());
-    const address = outputAddress(output);
-    return address ? addressToScriptHash(address, w.network) : undefined;
-  });
+  const hashes = outputs.map((output) => outputScriptHash(output, w.network));
   const scripts = [...new Set(hashes.filter((h): h is string => h !== undefined))];
   if (!scripts.length && indexed)
     return { transactions: indexed.transactions, truncated: true, lookup: 'electrum-fallback' };

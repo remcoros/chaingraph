@@ -1,7 +1,4 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { address as bitcoinAddress, networks } from 'bitcoinjs-lib';
-import { addressToScriptHash, type Network, type TxOutput } from '../../Bitcoin';
+import { outputScriptAddress, outputScriptHash, type Network, type TxOutput } from '../../Bitcoin';
 
 export type WalletOutputEvidence = Readonly<{ address?: string; scripthash?: string }>;
 export type WalletOutputEvidenceResolver = (output: TxOutput | undefined) => WalletOutputEvidence;
@@ -13,32 +10,10 @@ export function walletOutputEvidence(
   network: Network,
 ): { address?: string; scripthash?: string } {
   if (!output) return {};
-  try {
-    const bitcoinNetwork = network === 'mainnet' ? networks.bitcoin : networks.testnet;
-    if (output.scriptPubKey.hex !== undefined) {
-      const script = hexToBytes(output.scriptPubKey.hex);
-      const scripthash = bytesToHex(sha256(script).reverse());
-      try {
-        return { scripthash, address: bitcoinAddress.fromOutputScript(script, bitcoinNetwork) };
-      } catch {
-        return { scripthash };
-      }
-    }
-    const reported =
-      output.scriptPubKey.address ??
-      (output.scriptPubKey.addresses?.length === 1 ? output.scriptPubKey.addresses[0] : undefined);
-    if (!reported) return {};
-    const scripthash = addressToScriptHash(reported, network);
-    return {
-      scripthash,
-      address: bitcoinAddress.fromOutputScript(
-        bitcoinAddress.toOutputScript(reported, bitcoinNetwork),
-        bitcoinNetwork,
-      ),
-    };
-  } catch {
-    return {};
-  }
+  const scripthash = outputScriptHash(output, network);
+  if (!scripthash) return {};
+  const address = outputScriptAddress(output, network);
+  return address ? { scripthash, address } : { scripthash };
 }
 
 /** Session-owned, snapshot-scoped decoding. Drop the resolver with its chain snapshot.

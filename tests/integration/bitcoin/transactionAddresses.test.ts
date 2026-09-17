@@ -80,6 +80,19 @@ describe('transaction output address boundaries', () => {
     ).toThrow('does not match its script');
   });
 
+  it('checks a Taproot address against its full raw witness-v1 program', () => {
+    const program = new Uint8Array(32).fill(1);
+    const matching = address.toBech32(program, 1, 'bc');
+    const conflicting = address.toBech32(new Uint8Array(32).fill(2), 1, 'bc');
+    const hex = bytesToHex(Uint8Array.of(0x51, 0x20, ...program));
+    expect(() =>
+      validateTransactionAddresses(transaction({ address: matching, hex }), 'mainnet'),
+    ).not.toThrow();
+    expect(() =>
+      validateTransactionAddresses(transaction({ address: conflicting, hex }), 'mainnet'),
+    ).toThrow('does not match its script');
+  });
+
   it('accepts equivalent uppercase witness addresses and valid address-only metadata', () => {
     const correct = payment('mainnet');
     expect(() =>

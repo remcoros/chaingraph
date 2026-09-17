@@ -62,9 +62,6 @@ export function isVerifiedCoinbase(tx: Transaction): boolean {
     input.prevout === undefined
   );
 }
-export function isProvablyUnspendable(output: TxOutputDetails): boolean {
-  return /^(?:6a)(?:[0-9a-f]{2})*$/i.test(output.scriptPubKey.hex ?? '');
-}
 /** Positive current observation only, tied to exact known script/value and selected network. */
 export async function fetchScanUtxo(
   network: Network,

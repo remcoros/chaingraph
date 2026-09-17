@@ -6,7 +6,7 @@ import { analysisTools } from './analysis';
 import { outpointReference } from '../entityReferences';
 import type { Wallet } from '../Wallets/wallets';
 import type { Transaction } from '../../ChainData';
-import { type TxOutput, outputScriptHex } from '../../Bitcoin';
+import { addressToScriptHash, type TxOutput, outputScriptHex } from '../../Bitcoin';
 
 import { createWorkspace } from '../createWorkspace';
 
@@ -308,6 +308,20 @@ describe('scoped analysis and honest evidence', () => {
     expect(result.title).toContain('overlapping coverage');
     expect(result.details).toContain('not necessarily distinct participants');
     expect(result.nodeIds).toEqual([outpointReference(tx.txid, 0)]);
+  });
+  it('uses raw output scripts instead of conflicting reported addresses for wallet intersections', () => {
+    const raw = outputScriptHex({ n: 0, value: 1, scriptPubKey: { address: addrA } }, 'mainnet')!;
+    const tx = transaction(
+      10,
+      [1],
+      [{ n: 0, value: 0.01, scriptPubKey: { hex: raw, address: addrB } }],
+    );
+    const w = workspace(tx);
+    w.wallets.definitions = [
+      wallet(1, addrA, addressToScriptHash(addrA, 'mainnet')),
+      wallet(2, addrB),
+    ];
+    expect(tool('wallet-intersections').run(w)).toEqual([]);
   });
   it('matches attached wallet inputs and avoids distinct-wallet priority for overlapping imports', () => {
     const tx = transaction(10, [1, 2]);

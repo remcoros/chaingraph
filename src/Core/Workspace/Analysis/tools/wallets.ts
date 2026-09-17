@@ -1,7 +1,5 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { outpointReference } from '../../entityReferences';
-import { type TxOutput, outputAddress } from '../../../Bitcoin';
+import { type TxOutput, outputAddress, outputScriptHash } from '../../../Bitcoin';
 
 import {
   choiceOption,
@@ -55,13 +53,10 @@ export const walletTool = defineTool({
     function matches(output?: TxOutput) {
       const ids = new Set<string>();
       if (!output) return ids;
-      const address = outputAddress(output);
+      const address = output.scriptPubKey.hex === undefined ? outputAddress(output) : undefined;
       for (const id of addresses.get(address ?? '') ?? []) ids.add(id);
-      const hex = output.scriptPubKey.hex;
-      if (hex !== undefined && /^(?:[0-9a-fA-F]{2})*$/.test(hex)) {
-        const hash = bytesToHex(sha256(hexToBytes(hex)).reverse());
-        for (const id of scripts.get(hash) ?? []) ids.add(id);
-      }
+      const hash = outputScriptHash(output, context.workspace.network);
+      for (const id of scripts.get(hash ?? '') ?? []) ids.add(id);
       return ids;
     }
     const findings = [];
