@@ -65,7 +65,7 @@ import {
   recoveryLimits,
   publishRecoveredAnalysis,
 } from '../../../../Core/Workspace/Analysis/analysisRecovery';
-import { useTransactionFetch } from '../../Store/TransactionFetch';
+import { useTransactionFetch } from '../../TransactionFetchProvider';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';
 

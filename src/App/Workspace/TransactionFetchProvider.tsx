@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { ChainDataAcquisition } from '../../../Core/Workspace/Session/chainDataAcquisition';
-import type { Network } from '../../../Core/Bitcoin';
-import type { FetchPriority } from '../../../Core/ChainData/transactionScheduler';
+import type { ChainDataAcquisition } from '../../Core/Workspace/Session/chainDataAcquisition';
+import type { Network } from '../../Core/Bitcoin';
+import type { FetchPriority } from '../../Core/ChainData/transactionScheduler';
 
 const TransactionFetchContext = createContext<ChainDataAcquisition | undefined>(undefined);
 
@@ -20,16 +20,12 @@ export function useTransactionFetch(priority: FetchPriority) {
   );
 }
 
-export function TransactionFetchShell({
+export function TransactionFetchProvider({
   acquisition,
   children,
 }: {
   acquisition: ChainDataAcquisition;
   children: ReactNode;
 }) {
-  return (
-    <TransactionFetchContext value={acquisition}>
-      <div className="app-shell">{children}</div>
-    </TransactionFetchContext>
-  );
+  return <TransactionFetchContext value={acquisition}>{children}</TransactionFetchContext>;
 }

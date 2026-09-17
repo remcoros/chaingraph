@@ -74,7 +74,7 @@ test locations. Source is grouped by product ownership.
 | `src/App/FrontPage/`, `Examples/`, `Help/`                     | Workspace entry, example creation and help                                          |
 | `src/App/Workspace/Dialogs/`, `Wallets/Dialogs/`               | Workspace lifecycle and wallet dialogs                                              |
 | `src/Core/Workspace/Session/`                                  | Unlocked sessions, undo/redo and save lifecycle                                     |
-| `src/App/Workspace/Store/`                                     | React subscriptions, autosave timer and fetch-scope context                         |
+| `src/App/Workspace/`                                           | React workspace subscriptions, autosave timer and fetch-scope context                |
 | `src/Core/Workspace/Persistence/`                              | Public facade, full-cycle document parser and public result/error contracts         |
 | `src/Core/Workspace/Persistence/Migrations/`                   | Historical document conversion and legacy membership                                |
 | `src/Core/Workspace/Persistence/Codec/`                        | Validation/restoration workflow, envelope, compression and worker execution         |

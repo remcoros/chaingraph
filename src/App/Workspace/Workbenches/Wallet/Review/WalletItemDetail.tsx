@@ -26,7 +26,7 @@ import {
   type WalletReviewFlowEntry,
 } from '../walletReviewContext';
 import { walletRowFinding, walletRowRelationship, type WalletRow } from '../walletRows';
-import { useTransactionFetch } from '../../../Store/TransactionFetch';
+import { useTransactionFetch } from '../../../TransactionFetchProvider';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';

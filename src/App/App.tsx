@@ -1,5 +1,5 @@
 import './component-styles';
-import { TransactionFetchShell } from './Workspace/Store/TransactionFetch';
+import { TransactionFetchProvider } from './Workspace/TransactionFetchProvider';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
 import { BookOpen, FolderOpen, Info, Library, Plus, X } from 'lucide-react';
 import { Modal } from './Dialogs';
@@ -32,7 +32,7 @@ export default function App() {
   const workspace = useWorkspace(app);
   const { activeWorkspace, workspaces, fileInput, workspaceTabs } = app;
   return (
-    <TransactionFetchShell acquisition={app.chainDataAcquisition}>
+    <div className="app-shell">
       <a
         className="skip-link"
         href={
@@ -150,7 +150,9 @@ export default function App() {
           onDelete={app.setDeleteEntry}
         />
       ) : (
-        <Workspace workspace={workspace} />
+        <TransactionFetchProvider acquisition={app.chainDataAcquisition}>
+          <Workspace workspace={workspace} />
+        </TransactionFetchProvider>
       )}
       <WorkspaceSettingsDialog workspace={workspace} />
       {app.examplesOpen && (
@@ -326,6 +328,6 @@ export default function App() {
         />
       )}
       <WorkspaceTour workspace={workspace} />
-    </TransactionFetchShell>
+    </div>
   );
 }

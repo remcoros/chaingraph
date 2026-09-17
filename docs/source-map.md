@@ -25,9 +25,8 @@ src/
       useWorkspace.tsx              composes UI controllers and workspace actions
       WorkspaceDialogs.tsx          workspace and wallet dialog wiring
       Dialogs/                      create, import, unlock and details UI
-      Store/
-        useWorkspaces.ts            React subscriptions and autosave timer
-        TransactionFetch.tsx        React adapter for session-bound transaction reads
+      useWorkspaces.ts              React subscriptions and autosave timer
+      TransactionFetchProvider.tsx  React provider for session-bound transaction reads
       Annotations/                  editing hooks, tag proposals and projections
       Selection/                    transient selection and scan-target picking
       GraphState/                   Graph projections, membership actions and panels

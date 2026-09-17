@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createChainDataAcquisition } from '../Core/Workspace/Session/chainDataAcquisition';
 import type { Workspace } from '../Core/Workspace/workspace';
 import { useBackendNetworks } from './useBackendNetworks';
-import { useWorkspaces } from './Workspace/Store/useWorkspaces';
+import { useWorkspaces } from './Workspace/useWorkspaces';
 import type { SavedWorkspace } from '../Core/Workspace/Persistence';
 import { appServices } from './appServices';
 export function useAppState() {
