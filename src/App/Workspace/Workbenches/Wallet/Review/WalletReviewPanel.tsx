@@ -708,6 +708,25 @@ export function WalletReviewPanel(
       </nav>
       <div className="wallet-review-body">
         <div className="wallet-record-filters" data-tour="wallet-filters">
+          {tab === 'review' && (
+            <MultiSelectFilter
+              active={active}
+              options={categories}
+              selectedIds={selectedTypes}
+              onChange={(ids) => {
+                setLimit(PAGE);
+                setTypeIds(ids);
+              }}
+              labels={{
+                trigger: 'Finding types',
+                title: 'Wallet finding types',
+                optionNoun: 'types',
+                countHelpTitle: 'Finding type counts',
+                countHelp:
+                  'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyze to look for new findings.',
+              }}
+            />
+          )}
           {tab !== 'addresses' && (
             <label>
               <span className="sr-only">{tab === 'review' ? 'Show' : 'Review'}</span>
@@ -761,27 +780,6 @@ export function WalletReviewPanel(
               ))}
             </select>
           </label>
-          {tab === 'review' && (
-            <MultiSelectFilter
-              active={active}
-              options={categories}
-              selectedIds={selectedTypes}
-              onChange={(ids) => {
-                setLimit(PAGE);
-                setTypeIds(ids);
-              }}
-              labels={{
-                trigger: 'Finding types',
-                title: 'Wallet finding types',
-                optionNoun: 'types',
-                reset: 'All types',
-                clear: 'Clear types',
-                countHelpTitle: 'Finding type counts',
-                countHelp:
-                  'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyze to look for new findings.',
-              }}
-            />
-          )}
           <label className="wallet-record-search">
             <span className="sr-only">Search</span>
             <input

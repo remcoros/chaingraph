@@ -141,7 +141,7 @@ export function walletReviewCategories(
       (reason) => reason !== 'counterparty' && reason !== 'funding-source',
     ).map((reason) => ({
       id: reason,
-      label: reason === 'current-utxo' ? 'All current UTXOs' : REASON_LABELS[reason],
+      label: REASON_LABELS[reason],
       description: reasonDescriptions[reason],
     })),
     ...(items.some((item) => item.reason === 'counterparty' || item.reason === 'funding-source') ||

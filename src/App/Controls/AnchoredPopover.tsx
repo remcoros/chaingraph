@@ -21,6 +21,7 @@ export function AnchoredPopover({
   id,
   anchor,
   title,
+  headingAccessory,
   width = 300,
   className = '',
   onClose,
@@ -29,6 +30,7 @@ export function AnchoredPopover({
   id: string;
   anchor: HTMLElement;
   title: string;
+  headingAccessory?: ReactNode;
   width?: number;
   className?: string;
   onClose: () => void;
@@ -91,7 +93,10 @@ export function AnchoredPopover({
         style={{ left, width: shown, ...position }}
       >
         <div className="anchored-popover-heading">
-          <strong>{title}</strong>
+          <div className="anchored-popover-title">
+            <strong>{title}</strong>
+            {headingAccessory}
+          </div>
           <button
             type="button"
             className="icon-button"

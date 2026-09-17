@@ -904,8 +904,6 @@ function AnalysisWorkbenchView({
               trigger: 'Finding types',
               title: 'Analysis finding types',
               optionNoun: 'types',
-              reset: 'All types',
-              clear: 'Clear types',
               countHelpTitle: 'Finding type counts',
               countHelp:
                 'Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status.',

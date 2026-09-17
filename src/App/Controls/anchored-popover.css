@@ -24,6 +24,12 @@
   font-size: 12px;
   margin-bottom: 8px;
 }
+.anchored-popover-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+}
 .anchored-popover-body {
   display: flex;
   flex-direction: column;
