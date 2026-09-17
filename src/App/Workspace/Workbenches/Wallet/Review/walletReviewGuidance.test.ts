@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
+import { createElement, Fragment, type ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
 import { addressReference } from '../../../../../Core/Workspace/entityReferences';
@@ -20,6 +22,10 @@ import {
   TX_FUNDING,
   TX_SPENDING,
 } from '../../../../../../tests/fixtures/bitcoin';
+
+function guidanceText(guidance: ReactNode) {
+  return renderToStaticMarkup(createElement(Fragment, null, guidance));
+}
 
 function fixture() {
   const workspace = createWorkspace('Public review guidance', 'mainnet');
@@ -135,7 +141,9 @@ describe('guided wallet review', () => {
     const legacyRow = reviewRow(review.items.find((item) => item.key === key)!);
     expect(matchesWalletStatus({ ...legacyRow, changed: true }, 'open')).toBe(false);
     expect(matchesWalletStatus({ ...legacyRow, changed: true }, 'decided')).toBe(true);
-    expect(walletReviewGuidance(legacyRow, { tagCount: 0 })).toContain('Saved output decision');
+    expect(guidanceText(walletReviewGuidance(legacyRow, { tagCount: 0 }))).toContain(
+      'Saved output decision',
+    );
     expect(review.items.find((item) => item.reason === 'destination-address')?.status).toBe('open');
     expect(
       walletReviewCategories(workspace, []).find(
@@ -150,30 +158,40 @@ describe('guided wallet review', () => {
     const source = reviewRow(items.find((item) => item.reason === 'source-address')!);
     expect(source.ownership).toBe('external');
     expect(walletSubjectTitle(source)).toBe('Source address');
-    expect(walletReviewGuidance(source, { tagCount: 0 })).toContain('sender or source');
-    expect(walletReviewGuidance(source, { tagCount: 1 })).not.toContain('has no label or tags');
-    expect(walletReviewGuidance(source, { label: 'Exchange', tagCount: 0 })).toContain(
-      'Mark reviewed',
+    expect(guidanceText(walletReviewGuidance(source, { tagCount: 0 }))).toContain(
+      'sender or source',
     );
+    expect(guidanceText(walletReviewGuidance(source, { tagCount: 1 }))).not.toContain(
+      'has no label or tags',
+    );
+    expect(
+      guidanceText(walletReviewGuidance(source, { label: 'Exchange', tagCount: 0 })),
+    ).toContain('Mark reviewed');
     const destination = reviewRow(items.find((item) => item.reason === 'destination-address')!);
-    expect(walletReviewGuidance(destination, { tagCount: 0 })).toContain('recipient or purpose');
+    expect(guidanceText(walletReviewGuidance(destination, { tagCount: 0 }))).toContain(
+      'recipient or purpose',
+    );
     const own = reviewRow(items.find((item) => item.reason === 'wallet-address')!);
-    expect(walletReviewGuidance(own, { tagCount: 0 })).toContain('what you use it for');
+    expect(guidanceText(walletReviewGuidance(own, { tagCount: 0 }))).toContain(
+      'what you use it for',
+    );
     const utxo = reviewRow(items.find((item) => item.reason === 'current-utxo')!);
-    expect(walletReviewGuidance(utxo, { tagCount: 0 })).toContain('where you received it');
+    expect(guidanceText(walletReviewGuidance(utxo, { tagCount: 0 }))).toContain(
+      'where you received it',
+    );
   });
 
   it('does not tell users to label completed or deferred decisions as if they were new', () => {
     const { workspace, wallet, options } = fixture();
     const row = reviewRow(buildWalletReview(workspace, wallet, options).items[0]);
-    expect(walletReviewGuidance({ ...row, status: 'unknown' }, { tagCount: 0 })).toContain(
-      'Previously reviewed',
-    );
-    expect(walletReviewGuidance({ ...row, status: 'later' }, { tagCount: 0 })).toContain(
-      'Set aside',
-    );
-    expect(walletReviewGuidance({ ...row, changed: true }, { tagCount: 0 })).toContain(
-      'details changed',
-    );
+    expect(
+      guidanceText(walletReviewGuidance({ ...row, status: 'unknown' }, { tagCount: 0 })),
+    ).toContain('Previously reviewed');
+    expect(
+      guidanceText(walletReviewGuidance({ ...row, status: 'later' }, { tagCount: 0 })),
+    ).toContain('Set aside');
+    expect(
+      guidanceText(walletReviewGuidance({ ...row, changed: true }, { tagCount: 0 })),
+    ).toContain('details changed');
   });
 });

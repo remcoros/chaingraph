@@ -12,6 +12,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import type { GraphLeftTab, GraphMobilePanel } from '../../Core/Workspace/view';
 
@@ -25,13 +26,13 @@ export interface TourStep {
   id: string;
   label: string;
   title: string;
-  text: string;
-  tip: string;
+  text: ReactNode;
+  tip: ReactNode;
   icon: LucideIcon;
   target: string;
   fallbackTarget?: string;
   revealTarget?: boolean | 'start';
-  missingTargetText?: string;
+  missingTargetText?: ReactNode;
   when?: (context: TourContext) => boolean;
   /** Preview with a temporary public example when the workspace has no wallet. */
   requiresWallet?: boolean;
@@ -45,6 +46,7 @@ export interface TourStep {
     flowOpen?: boolean;
   };
 }
+
 export function availableTourSteps(steps: readonly TourStep[], context: TourContext) {
   return steps.filter((step) => !step.when || step.when(context));
 }
@@ -68,7 +70,13 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'review' },
-    text: 'Open "Wallet", then pick one or use "Add wallet". "Refresh" pulls in its history, "Check UTXOs" confirms what is still unspent, and "Analyze" runs the local analysis.',
+    text: (
+      <>
+        Open <strong>Wallet</strong>, then pick one or use <strong>Add wallet</strong>.{' '}
+        <strong>Refresh</strong> pulls in its history, <strong>Check UTXOs</strong> confirms what is
+        still unspent, and <strong>Analyze</strong> runs the local analysis.
+      </>
+    ),
     missingTargetText:
       'No wallet yet. Add a watch-only public key once the tour is done. For now, a temporary public example shows the three activity views.',
     tip: 'This is a preview only. The tour will not refresh, check UTXOs, run analysis or save anything.',
@@ -83,7 +91,14 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'sources' },
-    text: '"To review" gathers the observations that need your attention. "Sources" and "Destinations" list addresses tied directly to your wallet transactions. Select an address to note whether its counterparty is known or still uncertain.',
+    text: (
+      <>
+        <strong>To review</strong> gathers the observations that need your attention.{' '}
+        <strong>Sources</strong> and <strong>Destinations</strong> list addresses tied directly to
+        your wallet transactions. Select an address to note whether its counterparty is known or
+        still uncertain.
+      </>
+    ),
     missingTargetText:
       'These lists fill in once you add a wallet. Try the public demo wallet after the tour to see them in action.',
     tip: 'A wallet match tells you which side is yours. A counterparty link is a note, not proof of ownership, and it will not split CoinJoin funds for you. A missing input just means that source evidence is incomplete.',
@@ -98,10 +113,22 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'review' },
-    text: 'Try "Labels: Unlabeled", a tag, or "Search" to narrow things down. Click a row for one item, tick checkboxes for several, or use "Select all" to grab every match.',
+    text: (
+      <>
+        Try <strong>Labels: Unlabeled</strong>, a tag, or <strong>Search</strong> to narrow things
+        down. Click a row for one item, tick checkboxes for several, or use{' '}
+        <strong>Select all</strong> to grab every match.
+      </>
+    ),
     missingTargetText:
       'Add a wallet after the tour to see these filters. If a list comes up empty, clear its filters or load more wallet history first.',
-    tip: '"Label", "Tags" and the icon picker work on one item or a whole batch; "Notes" is for one item at a time. Annotations carry across Wallet and Graph on the same entities.',
+    tip: (
+      <>
+        <strong>Label</strong>, <strong>Tags</strong> and the icon picker work on one item or a
+        whole batch; <strong>Notes</strong> is for one item at a time. Annotations carry across
+        Wallet and Graph on the same entities.
+      </>
+    ),
   },
   {
     id: 'wallet-decisions',
@@ -114,10 +141,28 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
       '[data-tour="wallet-preview"] [data-tour="wallet-filters"], [data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'review' },
-    text: '"Mark reviewed" closes out a review decision, and "Review later" sets it aside for now. Use "Show" to jump to the item in Graph, then "Back to Wallet" whenever you want to return to your list and selection.',
-    missingTargetText:
-      'No review item to preview right now. After the tour, pick a row in "To review" to see its actions, or use the Review filter to revisit anything marked "Reviewed" or "Review later".',
-    tip: '"Label", "Tags", "Notes" and the icon picker capture what you know. The item’s Transaction flow shows its loaded inputs and outputs, but a review decision is your judgment call, not proof of ownership.',
+    text: (
+      <>
+        <strong>Mark reviewed</strong> closes out a review decision, and{' '}
+        <strong>Review later</strong> sets it aside for now. Use <strong>Show</strong> to jump to
+        the item in Graph, then <strong>Back to Wallet</strong> whenever you want to return to your
+        list and selection.
+      </>
+    ),
+    missingTargetText: (
+      <>
+        No review item to preview right now. After the tour, pick a row in{' '}
+        <strong>To review</strong> to see its actions, or use the Review filter to revisit anything
+        marked <strong>Reviewed</strong> or <strong>Review later</strong>.
+      </>
+    ),
+    tip: (
+      <>
+        <strong>Label</strong>, <strong>Tags</strong>, <strong>Notes</strong> and the icon picker
+        capture what you know. The item’s Transaction flow shows its loaded inputs and outputs, but
+        a review decision is your judgment call, not proof of ownership.
+      </>
+    ),
   },
   {
     id: 'lookup',
@@ -127,7 +172,12 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="chain-lookup"]',
     view: { panel: 'graph' },
     text: 'Paste a transaction ID, a txid:vout outpoint, or a Bitcoin address, and the backend queries the matching network through your own nodes.',
-    tip: '"Previous: off" loads just the transaction you asked for. Pick one or two levels back for more ancestry, then expand individual paths whenever you want to go further.',
+    tip: (
+      <>
+        <strong>Previous: off</strong> loads just the transaction you asked for. Pick one or two
+        levels back for more ancestry, then expand individual paths whenever you want to go further.
+      </>
+    ),
   },
   {
     id: 'graph',
@@ -136,8 +186,21 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     icon: Box,
     target: '[data-tour="graph-stage"]',
     view: { panel: 'graph' },
-    text: 'Cubes are transactions, spheres are outputs, and arrows show which way the funds move. Drag empty space to orbit, scroll to zoom, and right-drag to pan. Switch to "Flat" for a 2D layout.',
-    tip: 'Hover a node to trace or edit it. Choose "Value" under "Size by" to compare amounts at a glance. "Fit" frames everything currently visible, and "Hide panels" collapses both side panels without moving the camera.',
+    text: (
+      <>
+        Cubes are transactions, spheres are outputs, and arrows show which way the funds move. Drag
+        empty space to orbit, scroll to zoom, and right-drag to pan. Switch to <strong>Flat</strong>{' '}
+        for a 2D layout.
+      </>
+    ),
+    tip: (
+      <>
+        Hover a node to trace or edit it. Choose <strong>Value</strong> under{' '}
+        <strong>Size by</strong> to compare amounts at a glance. <strong>Fit</strong> frames
+        everything currently visible, and <strong>Hide panels</strong> collapses both side panels
+        without moving the camera.
+      </>
+    ),
   },
   {
     id: 'flow',
@@ -173,7 +236,13 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     icon: Tags,
     target: '[data-tour="wallet-panel"]',
     view: { panel: 'left', leftTab: 'tags' },
-    text: 'Tag a shop, an exchange, some wallet activity, or just a working hypothesis. Add or create a tag while inspecting an entity, then open the "Tags" panel to see everything wearing it.',
+    text: (
+      <>
+        Tag a shop, an exchange, some wallet activity, or just a working hypothesis. Add or create a
+        tag while inspecting an entity, then open the <strong>Tags</strong> panel to see everything
+        wearing it.
+      </>
+    ),
     tip: 'Tags and wallet matches can both highlight the graph. Sharing a tag records a grouping you made.',
   },
   {
@@ -204,6 +273,12 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="workspace-actions"]',
     view: { panel: 'graph' },
     text: 'Changes save automatically, encrypted, right in this browser. The workspace name stays public, but its description, wallets and annotations are encrypted.',
-    tip: '"Export" an encrypted copy before clearing browser data, or to move between devices. Keep that password somewhere safe. You can restart this tour anytime from "Help".',
+    tip: (
+      <>
+        <strong>Export</strong> an encrypted copy before clearing browser data, or to move between
+        devices. Keep that password somewhere safe. You can restart this tour anytime from{' '}
+        <strong>Help</strong>.
+      </>
+    ),
   },
 ];

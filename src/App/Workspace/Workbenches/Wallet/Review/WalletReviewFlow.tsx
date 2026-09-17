@@ -164,8 +164,8 @@ export function WalletReviewFlow({
           </p>
           <p>
             Arrows connect transactions to the outputs they create or spend. They do not show which
-            input funded each output or who owns the coins. Choose “Show on graph” (the magnifying
-            glass) to open a transaction or outpoint in Graph.
+            input funded each output or who owns the coins. Choose <strong>Show on graph</strong>{' '}
+            (the magnifying glass) to open a transaction or outpoint in Graph.
           </p>
         </WalletHelp>
       </div>
