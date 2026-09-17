@@ -8,7 +8,7 @@ COPY index.html tokens.css tsconfig.json vite.config.ts LICENSE THIRD_PARTY_NOTI
 COPY src ./src
 COPY server ./server
 COPY public ./public
-COPY scripts/licenses.mjs ./scripts/
+COPY scripts/check-react-compiler.mjs scripts/licenses.mjs ./scripts/
 # Public repository metadata only. Never pass credentials as build arguments.
 ARG CHAINGRAPH_SOURCE_URL=""
 RUN CHAINGRAPH_SOURCE_URL="$CHAINGRAPH_SOURCE_URL" npm run build \

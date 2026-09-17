@@ -24,3 +24,6 @@
 **/*.pem
 **/*.key
 **/*.test.ts
+**/*.test.tsx
+**/*.benchmark.ts
+**/*.benchmark.tsx
