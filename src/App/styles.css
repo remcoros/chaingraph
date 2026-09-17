@@ -2073,6 +2073,13 @@ small,
   border-radius: 10px;
   overflow: hidden;
   background: var(--color-surface);
+  transition:
+    background var(--dur-ui) var(--ease-ui),
+    border-color var(--dur-ui) var(--ease-ui);
+}
+.workspace-template:hover {
+  background: var(--color-hover);
+  border-color: var(--color-faint);
 }
 .workspace-template-open {
   flex: 1;
@@ -2086,6 +2093,10 @@ small,
   padding: 16px;
   background: transparent;
   white-space: normal;
+}
+.workspace-template-open:hover {
+  background: transparent;
+  border-color: transparent;
 }
 .workspace-template-open:focus-visible {
   outline-offset: -3px;

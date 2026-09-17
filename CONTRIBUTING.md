@@ -119,11 +119,10 @@ application dependencies. Core ChainData consumes Bitcoin and provides shared
 chain models, validation, observation rules and workspace-independent RPC queries.
 Account-wallet policy belongs to Workspace Wallets; entity references belong to
 the Workspace root, not Bitcoin.
-Shared amount/reference formatting lives in Core Formatting. Infra cannot import
-App. ChainData owns Bitcoin RPC decoding and fetch scheduling; Session owns
-workspace-bound request lifetime and accepted publication. Live queries use
-named-file imports and are not re-exported by the model/validation index, so
-canonical document parsing does not load the transport or scheduler.
+Shared amount/reference formatting lives in Core Formatting. ChainData owns Bitcoin RPC
+decoding and fetch scheduling; Session owns workspace-bound request lifetime and accepted 
+publication. Live queries use named-file imports and are not re-exported by the model/validation 
+index, so canonical document parsing does not load the transport or scheduler.
 
 App Selection and the shared wallet UTXO hook cannot import workbench internals.
 Wallet and Analysis reach Graph through `GraphHandoff` in

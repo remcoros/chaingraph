@@ -72,6 +72,7 @@ src/
       scripts.ts                    public-key scripts and address/script hashing
       outputs.ts                    output script interpretation and content comparison
       transaction.ts                native input/output shapes
+    Browser/                        generic mechanisms such as file downloads
     ChainData/                      chain models, observation rules and live queries
       index.ts                      public models, validation and query functions
       transaction.ts                one Transaction with its latest observed status
@@ -148,8 +149,6 @@ src/
         connectionScanRunner.ts     worker lifecycle and shared fetch budget
         connectionScan.worker.ts    search worker
         connectionScanRetry.ts      bounded endpoint rechecks
-  Infra/
-    Browser/                        generic mechanisms such as file downloads
 server/                             stateless read-only Core/Electrum proxy
 tests/
   integration/                      intentional cross-module and storage/UI checks
@@ -182,12 +181,10 @@ dependency on test helpers or App.
 ## Dependency direction
 
 App consumes Core capabilities and concept-owned models. Persistence also
-consumes those models and validity rules, never App or Session implementation. Session depends on the
-public WorkspacePersistence contract; App composition supplies the facade.
+consumes those models and validity rules, never App or Session implementation. 
+Session depends on the public WorkspacePersistence contract; App composition supplies the facade.
 Canonical document validation loads neither Persistence nor live query code.
-Domain and Infra/Bitcoin have been removed. Core Bitcoin owns native mechanisms;
-Core ChainData owns shared application chain data, typed RPC queries and scheduling,
-and consumes Bitcoin. Workspace consumes both and owns workspace references and
+Core Bitcoin owns native mechanisms; Core ChainData owns shared application chain data, typed RPC queries and scheduling, and consumes Bitcoin. Workspace consumes both and owns workspace references and
 wallet constraints. Neither Bitcoin nor ChainData imports workspace models or
 session execution. ChainData's existing index stays model/validation-only; live
 query callers use named-file imports.

@@ -1037,6 +1037,9 @@ export function FlowPanelTransactionView({
                       <strong className="mono transaction-identity-id">
                         <ResponsiveIdentifier value={current.tx.txid} />
                       </strong>
+                      <span>
+                        <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
+                      </span>
                     </span>
                     <span className="transaction-identity-body">
                       <TransactionBlockTime
@@ -1111,8 +1114,7 @@ export function FlowPanelTransactionView({
                       }
                     >
                       <Smile size={13} />
-                    </button>
-                    <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
+                    </button>                    
                   </div>
                   {(currentNotOnGraph ||
                     props.hiddenNodeIds?.includes(transactionReference(current.tx.txid))) && (

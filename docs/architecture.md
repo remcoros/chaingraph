@@ -43,8 +43,7 @@ native mechanisms, Core ChainData owns shared application chain data, and
 Workspace owns entity references and account-wallet constraints. Bitcoin
 has no application dependencies; ChainData consumes Bitcoin, not Workspace.
 Shared display formatting now lives in Core Formatting; UI-specific display
-choices, such as entity-removal titles, belong in App. External adapters remain
-in Infra when they are not owned by a concept. ChainData owns typed Bitcoin RPC
+choices, such as entity-removal titles, belong in App. ChainData owns typed Bitcoin RPC
 queries, response decoding and fetch scheduling alongside the models they serve.
 It remains workspace-independent: Session creates/closes request scopes and owns
 accepted workspace publication. Live query files are independently imported and
@@ -87,8 +86,8 @@ test locations. Source is grouped by product ownership.
 | `src/App/Workspace/Workbenches/Analysis/`                      | Analysis controls and reports                                                       |
 | `src/App/Controls/`                                            | Reused App-owned controls, evidence display and metadata editors                    |
 | `src/Core/Bitcoin/`                                            | Native network encodings, public-key derivation, scripts and outpoints              |
+| `src/Core/Browser/`                                           | Generic browser mechanisms not owned by workspace persistence                       |
 | `src/Core/ChainData/`                                          | Chain models, validity, observation merging, typed RPC queries and fetch scheduling |
-| `src/Infra/Browser/`                                           | Generic browser mechanisms not owned by workspace persistence                       |
 | `server/app.ts`, `rpc-schema.ts`                               | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist   |
 | `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`       | Upstream adapters, chain identity, network configuration and concurrency            |
 

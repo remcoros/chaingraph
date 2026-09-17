@@ -28,9 +28,8 @@ app/workspace dependency; ChainData consumes Bitcoin, never Workspace or its run
 ChainData also owns workspace-independent RPC queries, decoding and scheduling.
 Its model/validation index does not export live queries; callers use named files.
 Canonical schema imports must not pull execution into document validation.
-Do not reintroduce Domain or invent
-new owners. Ask when ownership is unresolved. External adapters
-live under `src/Infra/`. Follow direct imports from the affected area.
+Do not reintroduce Domain or invent new owners. Ask when ownership is unresolved. 
+Follow direct imports from the affected area.
 
 ## Product boundaries
 

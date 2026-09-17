@@ -31,7 +31,7 @@ import type { Workspace } from '../../Core/Workspace/workspace';
 import { useTour } from '../Help/useTour';
 import type { useAppState } from '../useAppState';
 import type { WorkbenchEntryTarget, WorkbenchMode, WorkbenchSwitchOptions } from './workbenchTypes';
-import { download } from '../../Infra/Browser/download';
+import { download } from '../../Core/Browser/download';
 import { isModalOpen } from '../Controls/useDialogFocus';
 import { useGraphProjection } from './Workbenches/Graph/useGraphProjection';
 import { useAddressEvidence } from './Workbenches/Graph/Address/useAddressEvidence';

@@ -572,10 +572,17 @@
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper));
   text-align: center;
   box-shadow: 0 2px 5px #00000006;
+  transition:
+    background var(--dur-ui) var(--ease-ui),
+    border-color var(--dur-ui) var(--ease-ui);
 }
 .flow-panel-identity.is-selected {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 11%, var(--color-paper));
+}
+.flow-panel-identity:hover {
+  background: var(--color-hover);
+  border-color: var(--color-faint);
 }
 .flow-panel-identity::before,
 .flow-panel-identity::after {
@@ -610,6 +617,10 @@
   background: transparent;
   font-size: 11px;
   text-align: left;
+}
+.transaction-identity-select:hover {
+  background: transparent;
+  border-color: transparent;
 }
 .transaction-identity-titlebar {
   display: flex;
@@ -657,12 +668,18 @@
   font-size: 11px;
 }
 .transaction-identity-tools {
-  display: flex;
+  display: none;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 1px;
   padding: 3px;
   border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-rule));
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper));
+  border-radius: 0 0 8px 8px;
+}
+.flow-panel-identity:hover .transaction-identity-tools,
+.flow-panel-identity:focus-within .transaction-identity-tools {
+  display: flex;
 }
 .transaction-identity-footer {
   display: flex;
@@ -685,7 +702,10 @@
   overflow-wrap: anywhere;
   text-align: right;
 }
-.transaction-identity-tools .icon-button {
+.flow-panel-identity .icon-button {
+  padding:0;
+}
+.flow-panel-identity .icon-button .icon-button {
   min-height: 27px;
   min-width: 27px;
   padding: 5px;

@@ -8,7 +8,7 @@ import type { Workspace } from '../../../Core/Workspace/workspace';
 import { emptyAnnotation } from '../../../Core/Workspace/Annotations/emptyAnnotation';
 import { exportLabels, importLabels } from '../../../Core/Workspace/Annotations/labels';
 
-import { download } from '../../../Infra/Browser/download';
+import { download } from '../../../Core/Browser/download';
 import type { AppState } from '../../useAppState';
 import { useMetadataEditRequest, type MetadataEditRequest } from './useMetadataEditRequest';
 

@@ -122,34 +122,6 @@
       "excludeFiles": ["src/Core/Workspace/Persistence/Integration/**"]
     },
     {
-      "files": ["src/Infra/**"],
-      "rules": {
-        "eslint/no-restricted-imports": [
-          "error",
-          {
-            "patterns": [
-              {
-                "group": ["**/App/**"],
-                "message": "Infra carries transport and generic mechanisms. It must not import App."
-              },
-              {
-                "group": ["**/Persistence/**", "!**/Persistence/index", "!**/Persistence/index.ts"],
-                "message": "Import the Persistence public index, never its private implementation files."
-              },
-              {
-                "group": ["**/Formatting/**", "!**/Formatting/index", "!**/Formatting/index.ts"],
-                "message": "Import Formatting through its public index, not its implementation files."
-              },
-              {
-                "group": ["**/Domain/**"],
-                "message": "Domain has been removed. Import the actual Core or App owner."
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
       "files": ["src/App/Workspace/Store/**"],
       "rules": {
         "eslint/no-restricted-imports": [
@@ -404,8 +376,7 @@
                   "react-dom",
                   "react-dom/*",
                   "**/App/**",
-                  "**/Workspace/**",
-                  "**/Infra/**",
+                  "**/Workspace/**",                  
                   "**/Domain/**"
                 ],
                 "message": "Formatting takes display values and has no UI, workspace, transport or Domain dependency."
@@ -433,8 +404,7 @@
                   "react-dom",
                   "react-dom/*",
                   "**/App/**",
-                  "**/Workspace/**",
-                  "**/Infra/**",
+                  "**/Workspace/**",                  
                   "**/Domain/**",
                   "**/ChainData",
                   "**/ChainData/**",
@@ -466,11 +436,10 @@
                   "react-dom",
                   "react-dom/*",
                   "**/App/**",
-                  "**/Workspace/**",
-                  "**/Infra/**",
+                  "**/Workspace/**",                  
                   "**/Domain/**"
                 ],
-                "message": "ChainData owns workspace-independent chain models and queries, without App, Workspace, Infra or React dependencies."
+                "message": "ChainData owns workspace-independent chain models and queries, without App, Workspace or React dependencies."
               },
               {
                 "group": ["**/Domain/**"],
