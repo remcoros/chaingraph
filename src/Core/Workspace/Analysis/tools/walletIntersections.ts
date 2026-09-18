@@ -1,5 +1,6 @@
 import { outpointReference } from '../../entityReferences';
 import { type TxOutput, outputAddress, outputScriptHash } from '../../../Bitcoin';
+import { toolGroups } from '../toolGroups';
 
 import {
   choiceOption,
@@ -13,7 +14,8 @@ import {
 export const walletTool = defineTool({
   id: 'wallet-intersections',
   name: 'Imported-wallet intersections',
-  group: 'Imported wallets',
+  group: toolGroups.importedWallets,
+  displayOrder: 10,
   kind: 'observation',
   description:
     'Find transactions whose inputs or outputs match more than one wallet you have imported. This can reveal connections between your wallet records, including coins spent together. It also flags overlapping imports, where the same coins appear in more than one wallet record.',

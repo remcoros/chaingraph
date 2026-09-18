@@ -1,4 +1,5 @@
 import { analysisTools } from '../../../../../Core/Workspace/Analysis/analysis';
+import { analysisToolGroups } from '../../../../../Core/Workspace/Analysis/toolRegistry';
 import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
 import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
@@ -18,6 +19,12 @@ export interface WalletReviewCategory {
   heuristic?: boolean;
   algorithm?: string;
   kind?: 'observation' | 'hypothesis';
+}
+
+export interface WalletReviewCategoryGroup {
+  id: string;
+  label: string;
+  options: WalletReviewCategory[];
 }
 
 const reasonDescriptions: Record<ReviewReason, string> = {
@@ -129,14 +136,16 @@ function categoryIds(
 
 /** Every supported category is present, including zero counts. Supply candidates
  * after other filters but before category selection; overlapping counts are intentional. */
-export function walletReviewCategories(
+export function walletReviewCategoryGroups(
   workspace: WalletReviewCategoryWorkspace,
   items: readonly WalletReviewItem[],
-): WalletReviewCategory[] {
+): WalletReviewCategoryGroup[] {
   const counts = new Map<string, number>();
   for (const item of items)
     for (const id of categoryIds(workspace, item)) counts.set(id, (counts.get(id) ?? 0) + 1);
-  const definitions: Omit<WalletReviewCategory, 'count'>[] = [
+  const counted = (definitions: readonly Omit<WalletReviewCategory, 'count'>[]) =>
+    definitions.map((category) => ({ ...category, count: counts.get(category.id) ?? 0 }));
+  const reviewItems: Omit<WalletReviewCategory, 'count'>[] = [
     ...REVIEW_REASONS.filter(
       (reason) => reason !== 'counterparty' && reason !== 'funding-source',
     ).map((reason) => ({
@@ -157,17 +166,32 @@ export function walletReviewCategories(
           },
         ]
       : []),
-    ...metadataCategories,
-    ...analysisTools.map((tool) => ({
-      id: `heuristic:${tool.id}`,
-      label: tool.name,
-      description: tool.description,
-      heuristic: true,
-      algorithm: tool.id,
-      kind: tool.kind,
+  ];
+  return [
+    { id: 'review-items', label: 'Review items', options: counted(reviewItems) },
+    { id: 'labels-and-tags', label: 'Labels and tags', options: counted(metadataCategories) },
+    ...analysisToolGroups.map((group) => ({
+      id: group.id,
+      label: group.label,
+      options: counted(
+        group.tools.map((tool) => ({
+          id: `heuristic:${tool.id}`,
+          label: tool.name,
+          description: tool.description,
+          heuristic: true,
+          algorithm: tool.id,
+          kind: tool.kind,
+        })),
+      ),
     })),
   ];
-  return definitions.map((category) => ({ ...category, count: counts.get(category.id) ?? 0 }));
+}
+
+export function walletReviewCategories(
+  workspace: WalletReviewCategoryWorkspace,
+  items: readonly WalletReviewItem[],
+): WalletReviewCategory[] {
+  return walletReviewCategoryGroups(workspace, items).flatMap((group) => group.options);
 }
 
 /** Union (OR), never an intersection. An empty selection intentionally matches nothing. */

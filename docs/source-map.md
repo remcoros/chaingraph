@@ -137,6 +137,9 @@ src/
         tagMembership.ts            entity/address tag membership semantics
       Analysis/                     algorithms, findings, recovery and invalidation
         finding.ts                  retained finding types and schema
+        toolRegistry.ts             registered tools and functional scan order
+        toolGroups.ts               filter grouping and presentation order
+        tools/                      one definition and implementation per analysis tool
       ConnectionScan/
         connectionScans.ts          run/result types and schemas
         records.ts                  retained proof, validation and compaction

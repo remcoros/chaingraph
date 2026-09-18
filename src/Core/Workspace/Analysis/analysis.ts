@@ -1,8 +1,6 @@
-import { equalOutputTool, ciohTool, reuseTool } from './tools/privacy';
-import { valueFlowTool, structureTool, scriptTool } from './tools/value';
-import { walletTool } from './tools/wallets';
+import { analysisToolRegistry } from './toolRegistry';
 
-export { equalOutputCount, equalOutputGroups } from './tools/privacy';
+export { equalOutputCount, equalOutputGroups } from './toolRegistry';
 export { defaultsFor } from './tools/shared';
 export type {
   AnalysisTool,
@@ -14,12 +12,4 @@ export type {
 } from './tools/shared';
 
 // Pure client-side tools. Omitted transaction IDs include loaded history; [] means an empty scope.
-export const analysisTools = [
-  equalOutputTool,
-  ciohTool,
-  reuseTool,
-  valueFlowTool,
-  structureTool,
-  scriptTool,
-  walletTool,
-];
+export const analysisTools = analysisToolRegistry;

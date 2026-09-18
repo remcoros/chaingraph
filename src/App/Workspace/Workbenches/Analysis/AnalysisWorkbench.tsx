@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { analysisTools } from '../../../../Core/Workspace/Analysis/analysis';
 import {
+  analysisToolGroups,
+  analysisToolsInDisplayOrder,
+} from '../../../../Core/Workspace/Analysis/toolRegistry';
+import {
   analysisScopeChoice,
   mergeScanFindings,
   scanAnalysis,
@@ -50,7 +54,11 @@ import {
   type PreviousOutputIndex,
 } from '../../../../Core/ChainData';
 
-import { MultiSelectFilter } from '../../../Controls/MultiSelectFilter';
+import {
+  MultiSelectFilter,
+  type MultiSelectFilterGroup,
+  type MultiSelectFilterOption,
+} from '../../../Controls/MultiSelectFilter';
 import { WalletHelp } from '../../../Controls/Display/WalletHelp';
 import {
   findingReview,
@@ -69,7 +77,7 @@ import { useTransactionFetch } from '../../TransactionFetchProvider';
 import { ResponsiveIdentifier } from '../../../Controls/Display/ResponsiveIdentifier';
 import './analysis-workbench.css';
 
-const allTypes = () => analysisTools.map((tool) => tool.id);
+const allTypes = () => analysisToolsInDisplayOrder.map((tool) => tool.id);
 const priorityIcons = { high: ChevronsUp, medium: ChevronUp, low: Minus };
 function PriorityIcon({ priority }: { priority: ReviewPriority }) {
   const Icon = priorityIcons[priority];
@@ -369,37 +377,54 @@ function AnalysisWorkbenchView({
       reviewPriorities.indexOf(findingReview(b).priority),
   );
   const hasLegacy = currentFindings.some((finding) => !findingToolId(finding));
-  const categories = analysisTools.map((tool) => {
-    const report = scan?.reports.find((report) => report.toolId === tool.id);
-    const stale =
-      changed ||
-      currentFindings.some((finding) => findingToolId(finding) === tool.id && finding.stale);
-    const status = report
-      ? stale
-        ? 'Needs rerun'
-        : report.status === 'complete'
-          ? 'Scanned'
-          : report.status === 'skipped'
-            ? 'Not scanned: skipped'
-            : 'Not scanned: error'
-      : 'Not scanned this session';
-    return {
-      id: tool.id,
-      label: tool.name,
-      description: tool.description,
-      count: filtered.types.get(tool.id) ?? 0,
-      note: status + '. A zero count is not proof of absence.',
-    };
-  });
+  const categoriesById = new Map<string, MultiSelectFilterOption>(
+    analysisTools.map((tool) => {
+      const report = scan?.reports.find((report) => report.toolId === tool.id);
+      const stale =
+        changed ||
+        currentFindings.some((finding) => findingToolId(finding) === tool.id && finding.stale);
+      const status = report
+        ? stale
+          ? 'Needs rerun'
+          : report.status === 'complete'
+            ? 'Scanned'
+            : report.status === 'skipped'
+              ? 'Not scanned: skipped'
+              : 'Not scanned: error'
+        : 'Not scanned this session';
+      return [
+        tool.id,
+        {
+          id: tool.id,
+          label: tool.name,
+          description: tool.description,
+          count: filtered.types.get(tool.id) ?? 0,
+          note: status + '. A zero count is not proof of absence.',
+        },
+      ];
+    }),
+  );
+  const categoryGroups: MultiSelectFilterGroup[] = analysisToolGroups.map((group) => ({
+    id: group.id,
+    label: group.label,
+    options: group.tools.map((tool) => categoriesById.get(tool.id)!),
+  }));
   if (hasLegacy)
-    categories.push({
-      id: 'unregistered',
-      label: 'Older unregistered findings',
-      description:
-        'Stored findings whose check is no longer registered. Rerun to use current checks.',
-      count: filtered.types.get('unregistered') ?? 0,
-      note: 'Not scanned.',
+    categoryGroups.push({
+      id: 'other-findings',
+      label: 'Other findings',
+      options: [
+        {
+          id: 'unregistered',
+          label: 'Older unregistered findings',
+          description:
+            'Stored findings whose check is no longer registered. Rerun to use current checks.',
+          count: filtered.types.get('unregistered') ?? 0,
+          note: 'Not scanned.',
+        },
+      ],
     });
+  const categories = categoryGroups.flatMap((group) => group.options);
   const filteredResults =
     kind !== 'all' ||
     priorities.length !== reviewPriorities.length ||
@@ -700,7 +725,7 @@ function AnalysisWorkbenchView({
           </div>
           <div className="analysis-settings">
             <div className="scan-settings-grid">
-              {analysisTools.map((item) => (
+              {analysisToolsInDisplayOrder.map((item) => (
                 <fieldset key={item.id}>
                   <legend>
                     <span className="scan-settings-title">
@@ -894,7 +919,7 @@ function AnalysisWorkbenchView({
         <div className="scan-results-heading">
           <MultiSelectFilter
             active={active}
-            options={categories}
+            groups={categoryGroups}
             selectedIds={types.filter((id) => categories.some((category) => category.id === id))}
             onChange={(ids) => {
               setTypes(ids);

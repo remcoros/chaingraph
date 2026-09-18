@@ -11,6 +11,12 @@ export interface MultiSelectFilterOption {
   note?: string;
 }
 
+export interface MultiSelectFilterGroup {
+  id: string;
+  label: string;
+  options: readonly MultiSelectFilterOption[];
+}
+
 export interface MultiSelectFilterLabels {
   trigger?: string;
   title?: string;
@@ -28,15 +34,27 @@ const DEFAULT_LABELS: Required<MultiSelectFilterLabels> = {
     'Show items that match any selected option and your other filters. An item can match several options, so counts may overlap.',
 };
 
+export function visibleMultiSelectFilterGroups(
+  groups: readonly MultiSelectFilterGroup[],
+  showEmpty: boolean,
+): MultiSelectFilterGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      options: group.options.filter((option) => showEmpty || option.count > 0),
+    }))
+    .filter((group) => group.options.length > 0);
+}
+
 export function MultiSelectFilter({
   active,
-  options,
+  groups,
   selectedIds,
   onChange,
   labels,
 }: {
   active: boolean;
-  options: readonly MultiSelectFilterOption[];
+  groups: readonly MultiSelectFilterGroup[];
   selectedIds: readonly string[];
   onChange: (ids: string[]) => void;
   labels?: MultiSelectFilterLabels;
@@ -46,9 +64,10 @@ export function MultiSelectFilter({
   const [showEmpty, setShowEmpty] = useState(false);
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const id = useId();
+  const options = groups.flatMap((group) => group.options);
   const allSelected = selectedIds.length === options.length;
   const someSelected = selectedIds.length > 0 && !allSelected;
-  const visibleOptions = options.filter((option) => showEmpty || option.count > 0);
+  const visibleGroups = visibleMultiSelectFilterGroups(groups, showEmpty);
   // Adjusting during render rather than in an effect: losing the control closes
   // its popover in the same pass, with no extra render showing it still open.
   if (open && !active) setOpen(false);
@@ -106,32 +125,45 @@ export function MultiSelectFilter({
                 {showEmpty ? 'Hide empty' : 'Show all'}
               </button>
             </div>
-            {visibleOptions.map((option) => (
-              <div key={option.id}>
-                <div className="multi-select-filter-option">
-                  <label>
-                    <input
-                      type="checkbox"
-                      aria-label={option.label}
-                      checked={selectedIds.includes(option.id)}
-                      onChange={(event) =>
-                        onChange(
-                          event.target.checked
-                            ? [...selectedIds, option.id]
-                            : selectedIds.filter((entry) => entry !== option.id),
-                        )
-                      }
-                    />
-                    <span title={option.label}>{option.label}</span>
-                    <span className="multi-select-filter-count">{option.count}</span>
-                  </label>
-                  <HelpTooltip title={option.label} active={active && open}>
-                    <p>{option.description}</p>
-                    {option.note && <p className="muted">{option.note}</p>}
-                  </HelpTooltip>
+            {visibleGroups.map((group) => {
+              const headingId = `${id}-${group.id}`;
+              return (
+                <div
+                  className="multi-select-filter-group"
+                  role="group"
+                  aria-labelledby={headingId}
+                  key={group.id}
+                >
+                  <div className="multi-select-filter-group-title" id={headingId}>
+                    {group.label}
+                  </div>
+                  {group.options.map((option) => (
+                    <div className="multi-select-filter-option" key={option.id}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          aria-label={option.label}
+                          checked={selectedIds.includes(option.id)}
+                          onChange={(event) =>
+                            onChange(
+                              event.target.checked
+                                ? [...selectedIds, option.id]
+                                : selectedIds.filter((entry) => entry !== option.id),
+                            )
+                          }
+                        />
+                        <span title={option.label}>{option.label}</span>
+                        <span className="multi-select-filter-count">{option.count}</span>
+                      </label>
+                      <HelpTooltip title={option.label} active={active && open}>
+                        <p>{option.description}</p>
+                        {option.note && <p className="muted">{option.note}</p>}
+                      </HelpTooltip>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </fieldset>
         </AnchoredPopover>
       )}

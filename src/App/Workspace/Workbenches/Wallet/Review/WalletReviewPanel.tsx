@@ -36,8 +36,8 @@ import {
   type WalletTab,
 } from '../walletRows';
 import {
-  walletReviewCategories,
   matchesReviewCategories,
+  walletReviewCategoryGroups,
   walletReviewCategoryScanState,
   type WalletReviewCategoryWorkspace,
 } from './reviewCategories';
@@ -170,11 +170,11 @@ function walletCategoryScanState(
   return walletReviewCategoryScanState({ analysis: { findings: findings } }, currentAnalysis);
 }
 
-function walletCategories(
+function walletCategoryGroups(
   workspace: WalletReviewCategoryWorkspace,
   items: readonly WalletReviewItem[],
 ) {
-  return walletReviewCategories(workspace, items);
+  return walletReviewCategoryGroups(workspace, items);
 }
 
 function matchesWalletCategory(
@@ -407,11 +407,11 @@ export function WalletReviewPanel(
     () => walletCategoryScanState(workspace.analysis.findings, currentAnalysis),
     [workspace.analysis.findings, currentAnalysis],
   );
-  const categories = useMemo(
+  const categoryGroups = useMemo(
     () =>
       tab !== 'review'
         ? []
-        : walletCategories(
+        : walletCategoryGroups(
             {
               annotations: {
                 entities: workspace.annotations.entities,
@@ -421,21 +421,24 @@ export function WalletReviewPanel(
               wallets: { reviews: workspace.wallets.reviews },
             },
             statusFiltered.flatMap((row) => row.reviews),
-          ).map((category) => {
-            const tool = scanState.tools.find((entry) => entry.id === category.algorithm);
-            const note = !category.heuristic
-              ? undefined
-              : tool?.status === 'not-scanned'
-                ? 'No scan results are available for this type yet.'
-                : tool?.status === 'saved-findings'
-                  ? 'These findings were saved earlier; the details of that scan are unavailable.'
-                  : tool?.status === 'skipped'
-                    ? 'The last scan skipped this check.'
-                    : tool?.status === 'error'
-                      ? 'The last scan could not finish this check. Choose Analyze to try again.'
-                      : `Last scan: ${currentAnalysis?.scope.label ?? 'selection unavailable'}.`;
-            return { ...category, note };
-          }),
+          ).map((group) => ({
+            ...group,
+            options: group.options.map((category) => {
+              const tool = scanState.tools.find((entry) => entry.id === category.algorithm);
+              const note = !category.heuristic
+                ? undefined
+                : tool?.status === 'not-scanned'
+                  ? 'No scan results are available for this type yet.'
+                  : tool?.status === 'saved-findings'
+                    ? 'These findings were saved earlier; the details of that scan are unavailable.'
+                    : tool?.status === 'skipped'
+                      ? 'The last scan skipped this check.'
+                      : tool?.status === 'error'
+                        ? 'The last scan could not finish this check. Choose Analyze to try again.'
+                        : `Last scan: ${currentAnalysis?.scope.label ?? 'selection unavailable'}.`;
+              return { ...category, note };
+            }),
+          })),
     [
       tab,
       workspace.annotations.entities,
@@ -446,6 +449,10 @@ export function WalletReviewPanel(
       scanState,
       currentAnalysis,
     ],
+  );
+  const categories = useMemo(
+    () => categoryGroups.flatMap((group) => group.options),
+    [categoryGroups],
   );
   const selectedTypes = useMemo(
     () => typeIds ?? categories.map((category) => category.id),
@@ -711,7 +718,7 @@ export function WalletReviewPanel(
           {tab === 'review' && (
             <MultiSelectFilter
               active={active}
-              options={categories}
+              groups={categoryGroups}
               selectedIds={selectedTypes}
               onChange={(ids) => {
                 setLimit(PAGE);

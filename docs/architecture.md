@@ -512,8 +512,10 @@ separate wallet components mounted for every workspace or run analysis in the ba
 
 ## Analysis
 
-`analysisTools` in `src/Core/Workspace/Analysis/analysis.ts` is the extension point. A tool
-declares metadata, evidence category, source reference and typed parameters;
+`analysisTools` in `src/Core/Workspace/Analysis/analysis.ts` is the public registry view.
+`toolRegistry.ts` composes one file per tool and owns functional scan order;
+`toolGroups.ts` separately owns filter grouping and display order, so presentation changes
+do not change execution. A tool declares metadata, source reference and typed parameters;
 `analyze(workspace, transactionIds?, options)` returns findings, scope,
 summary, coverage and a no-match explanation. Findings carry a stable identity,
 algorithm version, explanation, affected nodes and supporting transactions.

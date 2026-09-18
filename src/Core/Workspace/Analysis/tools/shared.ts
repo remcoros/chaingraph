@@ -3,6 +3,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { outpointReference } from '../../entityReferences';
 import type { AnalysisFinding } from '../finding';
 import type { Workspace } from '../../workspace';
+import type { AnalysisToolGroup } from '../toolGroups';
 
 import {
   type Transaction,
@@ -36,11 +37,12 @@ export interface AnalysisRunReport {
   emptyReason?: string;
   stats: { label: string; value: number }[];
 }
-export interface AnalysisTool {
-  id: string;
+export interface AnalysisTool<Id extends string = string> {
+  id: Id;
   name: string;
   description: string;
-  group: 'Privacy patterns' | 'Value and structure' | 'Imported wallets';
+  group: AnalysisToolGroup;
+  displayOrder: number;
   kind: Exclude<AnalysisKind, 'incomplete'>;
   parameters: readonly AnalysisParameter[];
   source: { title: string; url: string };
@@ -54,13 +56,18 @@ export interface AnalysisContext {
   createdAt: string;
   options: AnalysisOptions;
 }
-export type ToolDefinition = Omit<AnalysisTool, 'run' | 'analyze'> & {
+export type ToolDefinition<Id extends string = string> = Omit<
+  AnalysisTool<Id>,
+  'run' | 'analyze'
+> & {
   execute: (context: AnalysisContext) => Omit<AnalysisRunReport, 'toolId' | 'scopeTxids'>;
 };
 
-export function defineTool(definition: ToolDefinition): AnalysisTool {
+export function defineTool<const Id extends string>(
+  definition: ToolDefinition<Id>,
+): AnalysisTool<Id> {
   const { execute, ...metadata } = definition;
-  const analyze: AnalysisTool['analyze'] = (workspace, txids, options = {}) => {
+  const analyze: AnalysisTool<Id>['analyze'] = (workspace, txids, options = {}) => {
     const ids = txids === undefined ? undefined : new Set(txids);
     const transactions = Object.values(workspace.chainData.transactions)
       .filter((tx) => ids === undefined || ids.has(tx.txid))

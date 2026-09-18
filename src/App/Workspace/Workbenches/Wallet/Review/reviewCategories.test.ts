@@ -5,6 +5,7 @@ import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analys
 import {
   matchesReviewCategories,
   walletReviewCategories,
+  walletReviewCategoryGroups,
   walletReviewCategoryScanState,
 } from './reviewCategories';
 import {
@@ -60,7 +61,16 @@ describe('discoverable wallet finding categories', () => {
 
   it('includes actionable review types and registry tools, not output-only compatibility types', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
+    const groups = walletReviewCategoryGroups(workspace, []);
     const catalog = walletReviewCategories(workspace, []);
+    expect(groups.map((group) => group.label)).toEqual([
+      'Review items',
+      'Labels and tags',
+      'Privacy patterns',
+      'Value and structure',
+      'Imported wallets',
+    ]);
+    expect(groups.flatMap((group) => group.options)).toEqual(catalog);
     expect(catalog.map((category) => category.id)).toEqual([
       ...REVIEW_REASONS.filter(
         (reason) => reason !== 'counterparty' && reason !== 'funding-source',

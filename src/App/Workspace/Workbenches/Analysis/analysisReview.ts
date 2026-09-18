@@ -56,7 +56,7 @@ export function filterAnalysisFindings(findings: AnalysisFinding[], filters: Fin
     filters.types.includes(findingToolId(finding) ?? 'unregistered');
   const matchesPriority = (finding: AnalysisFinding) =>
     filters.priorities.includes(findingReview(finding).priority);
-  const types = new Map(analysisTools.map((tool) => [tool.id, 0]));
+  const types = new Map<string, number>(analysisTools.map((tool) => [tool.id, 0]));
   const priorities = { high: 0, medium: 0, low: 0 };
   for (const finding of evidence) {
     const id = findingToolId(finding) ?? 'unregistered';
