@@ -11,7 +11,7 @@ import {
 } from '../../../../App/Workspace/Workbenches/Wallet/WalletWorkbench';
 
 describe('session wallet preparation', () => {
-  it('renders a remounted warm wallet immediately, including after pagination', () => {
+  it('renders a remounted warm wallet immediately', () => {
     const workspace = largeWalletFixture(2, 2);
     const wallet = workspace.wallets.definitions[0];
     const preparationCache = new WalletPreparationCache();
@@ -38,7 +38,7 @@ describe('session wallet preparation', () => {
     expect(renderToStaticMarkup(createElement(WalletWorkbenchView, props))).toContain(
       'Preparing wallet',
     );
-    preparationCache.prepare(workspace, wallet, undefined, 2);
+    preparationCache.prepare(workspace, wallet);
     const html = renderToStaticMarkup(createElement(WalletWorkbenchView, props));
     expect(html).not.toContain('Preparing wallet');
     expect(html).toContain('aria-label="Wallet sections"');
@@ -181,9 +181,6 @@ describe('session wallet preparation', () => {
     });
     expect(refreshed.review).not.toBe(checked.review);
     expect(refreshed.relationships).toBe(checked.relationships);
-    expect(cache.peek(workspace, wallet, undefined, 2)).toBeUndefined();
-    cache.prepare(workspace, wallet, undefined, 2);
-    expect(cache.peek(workspace, wallet)).toBe(beforeCheck);
   });
 
   it('retains separate unlocked sessions, clears on lock, and survives a failed save', async () => {

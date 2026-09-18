@@ -293,7 +293,6 @@ export function WalletReviewPanel(
   const [selectedKey, setSelectedKey] = useState<string>();
   const selection = useRecordSelection();
   const [limit, setLimit] = useState(PAGE);
-  const [itemPage, setItemPage] = useState(1);
   const [query, setQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -323,7 +322,7 @@ export function WalletReviewPanel(
   const filterScope = filterScopeFor(status);
   const { utxos, loading: utxoLoading, error: utxoError, check } = props.walletUtxos;
   const { selectionIndex, walletAddresses, relationships, review, currentUtxos, invalidCount } =
-    preparation.prepare(workspace, wallet, utxos, itemPage);
+    preparation.prepare(workspace, wallet, utxos);
   const fetchTransaction = useTransactionFetch('background');
   const counterparties = useWalletCounterparties({
     workspace,
@@ -420,7 +419,7 @@ export function WalletReviewPanel(
               analysis: { findings: workspace.analysis.findings },
               wallets: { reviews: workspace.wallets.reviews },
             },
-            statusFiltered.flatMap((row) => row.reviews),
+            review.items,
           ).map((group) => ({
             ...group,
             options: group.options.map((category) => {
@@ -445,7 +444,7 @@ export function WalletReviewPanel(
       workspace.annotations.tags,
       workspace.analysis.findings,
       workspace.wallets.reviews,
-      statusFiltered,
+      review.items,
       scanState,
       currentAnalysis,
     ],
@@ -730,7 +729,7 @@ export function WalletReviewPanel(
                 optionNoun: 'types',
                 countHelpTitle: 'Finding type counts',
                 countHelp:
-                  'Show items that match any selected type and your other filters. An item can match several types, so counts may overlap. A zero means no matching items are listed. These choices filter the list; choose Analyze to look for new findings.',
+                  'Counts show all known items of each type, independent of these filters. An item can match several types, so counts may overlap. These choices filter the list; choose Analyze to look for new findings.',
               }}
             />
           )}
@@ -839,11 +838,6 @@ export function WalletReviewPanel(
           >
             {allSelection.allSelected ? 'Unselect all' : 'Select all'} ({filteredRows.length})
           </button>
-          {tab === 'review' && review.omittedItems > 0 && (
-            <button onClick={() => setItemPage((current) => current + 1)}>
-              Show more review items ({review.omittedItems})
-            </button>
-          )}
           <span className="wallet-review-notice" role="status" title={notice}>
             {notice}
           </span>

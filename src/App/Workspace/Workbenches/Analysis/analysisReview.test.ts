@@ -75,7 +75,7 @@ describe('Analysis review priority and faceted results', () => {
     ).toBe('medium');
     expect(findingReview(finding('wallet-intersections')).priority).toBe('low');
   });
-  it('matches types and priorities with OR, facets with AND, and counts against other facets including zero', () => {
+  it('matches types and priorities with OR while keeping stable type totals', () => {
     const values = [
       finding('value-flow', 'observation', 'fee-threshold'),
       finding('value-flow', 'incomplete'),
@@ -95,13 +95,13 @@ describe('Analysis review priority and faceted results', () => {
     expect(all.priorities).toEqual({ high: 1, medium: 1, low: 1 });
     const high = filterAnalysisFindings(values, { ...options, priorities: ['high'] });
     expect(high.findings).toHaveLength(1);
-    expect(high.types.get('value-flow')).toBe(1);
-    expect(high.types.get('cioh')).toBe(0);
+    expect(high.types).toEqual(all.types);
     expect(high.priorities).toEqual(all.priorities);
     expect(filterAnalysisFindings(values, { ...options, types: [] }).findings).toEqual([]);
     expect(filterAnalysisFindings(values, { ...options, priorities: [] }).findings).toEqual([]);
     const missing = filterAnalysisFindings(values, { ...options, kind: 'incomplete' });
     expect(missing.findings).toHaveLength(1);
+    expect(missing.types).toEqual(all.types);
     expect(missing.priorities).toEqual({ high: 0, medium: 0, low: 1 });
     expect(filterAnalysisFindings([...values].reverse(), options).types).toEqual(all.types);
   });

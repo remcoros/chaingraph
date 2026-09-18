@@ -24,7 +24,6 @@ interface PreparedWallet {
   reviewDependencies?: Dependencies;
   // Keep the initial view and the latest dated UTXO projection separately.
   withoutUtxos?: PreparedReview;
-  expandedWithoutUtxos?: PreparedReview;
   withUtxos?: PreparedReview;
 }
 
@@ -60,8 +59,8 @@ function reviewDependencies(workspace: Workspace, wallet: Wallet): Dependencies 
 
 /** Prepared views belong to one unlocked session, never its encrypted payload.
  * Dependencies are immutable source references, not the workspace wrapper or view.
- * Only the current chain snapshot, initial page, latest expanded page and latest
- * UTXO observation per wallet are retained.
+ * Only the current chain snapshot, initial view and latest UTXO observation per
+ * wallet are retained.
  */
 export class WalletPreparationCache {
   private chain?: {
@@ -86,7 +85,6 @@ export class WalletPreparationCache {
     workspace: Workspace,
     wallet: Wallet,
     utxos?: WalletUtxoCheck,
-    page = 1,
   ): WalletPreparation | undefined {
     if (this.disposed || !this.matchesChain(workspace)) return undefined;
     const cached = this.wallets.get(wallet.id);
@@ -96,24 +94,15 @@ export class WalletPreparationCache {
       !same(cached.reviewDependencies ?? [], reviewDependencies(workspace, wallet))
     )
       return undefined;
-    const review = utxos
-      ? cached.withUtxos
-      : page === 1
-        ? cached.withoutUtxos
-        : cached.expandedWithoutUtxos;
-    return review && same(review.dependencies, [utxos, page]) ? review.value : undefined;
+    const review = utxos ? cached.withUtxos : cached.withoutUtxos;
+    return review && same(review.dependencies, [utxos]) ? review.value : undefined;
   }
 
-  prepare(
-    workspace: Workspace,
-    wallet: Wallet,
-    utxos?: WalletUtxoCheck,
-    page = 1,
-  ): WalletPreparation {
+  prepare(workspace: Workspace, wallet: Wallet, utxos?: WalletUtxoCheck): WalletPreparation {
     if (this.disposed) throw new Error('Wallet preparation session is closed.');
     const liveWallets = new Set(workspace.wallets.definitions.map((entry) => entry.id));
     for (const id of this.wallets.keys()) if (!liveWallets.has(id)) this.wallets.delete(id);
-    const hit = this.peek(workspace, wallet, utxos, page);
+    const hit = this.peek(workspace, wallet, utxos);
     if (hit) return hit;
     if (!this.matchesChain(workspace)) {
       this.wallets.clear();
@@ -146,11 +135,10 @@ export class WalletPreparationCache {
     if (!same(cached.reviewDependencies ?? [], metadata)) {
       cached.withUtxos = undefined;
       cached.withoutUtxos = undefined;
-      cached.expandedWithoutUtxos = undefined;
       cached.reviewDependencies = metadata;
     }
     // A check may finish before the first wallet render. Also retain the no-check view.
-    if ((utxos || page !== 1) && !cached.withoutUtxos) this.prepare(workspace, wallet);
+    if (utxos && !cached.withoutUtxos) this.prepare(workspace, wallet);
     const reconciledUtxos = reconcileWalletUtxos(
       utxos?.records ?? [],
       chain.selectionIndex.transactions,
@@ -171,16 +159,14 @@ export class WalletPreparationCache {
         utxoCheckedAddresses: utxos?.checkedAddresses,
         utxoTotalAddresses: utxos?.totalAddresses,
         utxoPartial: utxos?.nextCursor !== undefined || (utxos?.failed ?? 0) > 0,
-        page,
         relationships: cached.relationships,
         prevouts: chain.selectionIndex.prevouts,
         evidence: chain.evidence,
       }),
     };
-    const result = { dependencies: [utxos, page], value };
+    const result = { dependencies: [utxos], value };
     if (utxos) cached.withUtxos = result;
-    else if (page === 1) cached.withoutUtxos = result;
-    else cached.expandedWithoutUtxos = result;
+    else cached.withoutUtxos = result;
     return value;
   }
 

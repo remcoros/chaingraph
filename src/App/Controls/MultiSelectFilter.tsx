@@ -31,7 +31,7 @@ const DEFAULT_LABELS: Required<MultiSelectFilterLabels> = {
   optionNoun: 'options',
   countHelpTitle: 'Option counts',
   countHelp:
-    'Show items that match any selected option and your other filters. An item can match several options, so counts may overlap.',
+    'Counts show all known items for each option. An item can match several options, so counts may overlap.',
 };
 
 export function visibleMultiSelectFilterGroups(

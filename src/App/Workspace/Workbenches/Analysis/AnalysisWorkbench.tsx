@@ -931,7 +931,7 @@ function AnalysisWorkbenchView({
               optionNoun: 'types',
               countHelpTitle: 'Finding type counts',
               countHelp:
-                'Filters results only; Scan still runs every check. Types match with OR. Counts match the evidence and priority filters, ignoring type selection. Help shows scan status.',
+                'Filters results only; Scan still runs every check. Types match with OR. Counts show all known findings of each type in this result scope. Help shows scan status.',
             }}
           />
           <div className="scan-priorities" aria-label="Review priority filters">

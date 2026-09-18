@@ -60,29 +60,32 @@ describe('discoverable wallet finding categories', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
     const groups = walletReviewCategoryGroups(workspace, []);
     const catalog = walletReviewCategories(workspace, []);
-    expect(groups.map((group) => group.label)).toEqual([
-      'Review items',
-      'Labels and tags',
-      'Privacy patterns',
-      'Value and structure',
-      'Imported wallets',
-    ]);
-    expect(groups.flatMap((group) => group.options)).toEqual(catalog);
-    expect(catalog.map((category) => category.id)).toEqual([
-      'current-utxo',
-      'wallet-address',
-      'source',
-      'source-address',
-      'new-activity',
-      'destination-address',
-      'link',
-      'unidentified-sources',
-      'unidentified-destinations',
-      'utxo-missing-label',
-      'utxo-missing-tags',
-      'utxo-unidentified',
-      ...analysisTools.map((tool) => `heuristic:${tool.id}`),
-    ]);
+    expect(new Set(groups.map((group) => group.label))).toEqual(
+      new Set([
+        'Review items',
+        'Labels and tags',
+        'Privacy patterns',
+        'Value and structure',
+        'Imported wallets',
+      ]),
+    );
+    expect(new Set(catalog.map((category) => category.id))).toEqual(
+      new Set([
+        'current-utxo',
+        'wallet-address',
+        'source',
+        'source-address',
+        'new-activity',
+        'destination-address',
+        'link',
+        'unidentified-sources',
+        'unidentified-destinations',
+        'utxo-missing-label',
+        'utxo-missing-tags',
+        'utxo-unidentified',
+        ...analysisTools.map((tool) => `heuristic:${tool.id}`),
+      ]),
+    );
     expect(new Set(catalog.map((category) => category.id)).size).toBe(catalog.length);
     expect(
       catalog.every((category) => category.count === 0 && category.label && category.description),

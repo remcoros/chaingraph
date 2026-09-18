@@ -103,27 +103,12 @@ export interface WalletReviewCoverage {
 
 export interface WalletReview {
   items: WalletReviewItem[];
-  /** Candidates beyond the current bound, reachable by requesting a later page. */
-  omittedItems: number;
-  /** Unresolved candidates beyond the bound, so a count can be shown as partial. */
-  omittedPendingItems: number;
   coverage: WalletReviewCoverage;
   /** Loaded ancestry was missing for some current UTXOs, so sources are incomplete. */
   missingSourceTransactions: number;
 }
 
 const reasonOrder = new Map(REVIEW_REASONS.map((reason, index) => [reason, index]));
-const MAX_ITEMS_PER_REASON: Record<ReviewReason, number> = {
-  'current-utxo': 400,
-  'wallet-address': 200,
-  source: 200,
-  'source-address': 200,
-  'funding-source': 200,
-  'new-activity': 100,
-  'destination-address': 100,
-  counterparty: 100,
-  link: 20,
-};
 
 /** Only these statuses complete a review. `later` stays pending work. */
 export function isCompletedReview(
@@ -230,8 +215,6 @@ export function buildWalletReview(
     utxoCheckedAddresses?: number;
     utxoTotalAddresses?: number;
     utxoPartial?: boolean;
-    /** Multiplies the per-reason bound for an explicit continuation. */
-    page?: number;
     /** Reuse projections of the same wallet, transactions and network. */
     relationships?: WalletAddressRelationships;
     prevouts?: PreviousOutputIndex;
@@ -307,7 +290,7 @@ export function buildWalletReview(
     });
   const reconciledUtxos = reconcileWalletUtxos(verifiedRecords, loaded, workspace.network);
   const verifiedUtxos = reconciledUtxos.current;
-  const candidates = new Map<ReviewReason, ReviewSubject[]>();
+  const candidates: ReviewSubject[] = [];
   const push = (subject: ReviewSubject) => {
     const source = directSources.get(subject.nodeId);
     const destination = directDestinations.get(subject.nodeId);
@@ -323,9 +306,7 @@ export function buildWalletReview(
         walletOutputIds: [...new Set(related.flatMap((entry) => entry.walletOutputIds))].sort(),
       };
     }
-    const list = candidates.get(subject.reason);
-    if (list) list.push(subject);
-    else candidates.set(subject.reason, [subject]);
+    candidates.push(subject);
   };
 
   for (const record of verifiedUtxos) {
@@ -576,30 +557,7 @@ export function buildWalletReview(
     });
   }
 
-  // Bounded processing must never claim completion. Unresolved candidates are
-  // selected before settled ones, and anything left over is reported with a real
-  // continuation instead of being silently dropped.
-  const page = Math.max(1, Math.trunc(options.page ?? 1));
-  const settled = (subject: ReviewSubject) => {
-    const decision = workspace.wallets.reviews?.[subject.key];
-    return isCompletedReview(decision) && decision!.evidence === subject.evidence;
-  };
-  const items: WalletReviewItem[] = [];
-  let omittedItems = 0;
-  let omittedPendingItems = 0;
-  for (const reason of REVIEW_REASONS) {
-    const list = candidates.get(reason) ?? [];
-    const limit = MAX_ITEMS_PER_REASON[reason] * page;
-    if (list.length <= limit) {
-      for (const subject of list) items.push(decorate(workspace, subject));
-      continue;
-    }
-    const pending = list.filter((subject) => !settled(subject));
-    const chosen = [...pending, ...list.filter(settled)].slice(0, limit);
-    omittedItems += list.length - chosen.length;
-    omittedPendingItems += Math.max(0, pending.length - limit);
-    for (const subject of chosen) items.push(decorate(workspace, subject));
-  }
+  const items = candidates.map((subject) => decorate(workspace, subject));
 
   items.sort(
     (a, b) =>
@@ -612,8 +570,6 @@ export function buildWalletReview(
   const loadedTransactions = [...history].filter((id) => loaded.has(id)).length;
   return {
     items,
-    omittedItems,
-    omittedPendingItems,
     missingSourceTransactions,
     coverage: {
       scannedAt: wallet.scannedAt,

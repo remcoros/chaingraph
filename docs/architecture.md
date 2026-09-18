@@ -477,8 +477,10 @@ Wallet, Graph and the Inspector; `tagColors.ts` owns the 16 presets.
 optional verified UTXO check, in a fixed reason order: current UTXOs, used
 addresses, receipts, source addresses, refresh activity, counterparties, then
 active findings over verified wallet outputs. Counterparties come only from
-transactions the wallet funded through loaded prevouts. Counts are bounded per
-reason and coverage reports unloaded sources instead of filling them in.
+transactions the wallet funded through loaded prevouts. The queue includes every
+item supported by the loaded evidence; coverage reports unloaded sources instead
+of filling them in. The Wallet UI renders matching rows 40 at a time without
+changing the queue, filter counts or batch-selection scope.
 
 Encrypted `walletReviews` maps `walletId|reason|subject` to `reviewed`,
 `unknown` (legacy) or `later`, a timestamp and an evidence fingerprint. Refresh
@@ -496,7 +498,7 @@ bounded batches with explicit continuation. `walletSelectionIndex.ts` builds
 per-snapshot indexes of scripts, outputs, spends and prevouts so row selection
 does not rescan; `walletWorkbenchRows.ts` is the shared row contract for all six
 tabs. `reviewCategoryDefinitions.ts` owns Wallet filter copy, grouping and display
-order; `reviewCategories.ts` owns matching, OR semantics and pre-filter counts.
+order; `reviewCategories.ts` owns matching, OR semantics and stable total counts.
 Wallet **Analyze** reuses the Analysis registry and merge path; it is distinct
 from history refresh.
 

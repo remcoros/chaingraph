@@ -430,6 +430,20 @@ describe('wallet review queue', () => {
     expect(find(build(fixture({ analysis: { findings: [finding] } })).items, 'link')).toHaveLength(
       1,
     );
+    const many = fixture({
+      analysis: {
+        findings: Array.from({ length: 45 }, (_, index) => ({
+          ...finding,
+          id: `cioh:${index}`,
+        })),
+      },
+    });
+    const manyItems = build(many).items;
+    expect(find(manyItems, 'link')).toHaveLength(45);
+    expect(
+      walletReviewCategories(many, manyItems).find((category) => category.id === 'heuristic:cioh')
+        ?.count,
+    ).toBe(45);
     expect(
       find(build(fixture({ analysis: { findings: [{ ...finding, stale: true }] } })).items, 'link'),
     ).toHaveLength(0);
@@ -940,7 +954,7 @@ describe('spend guidance', () => {
   });
 });
 
-describe('deferral and bounded queues', () => {
+describe('deferral and complete queues', () => {
   // RUX-002: Review later must not acknowledge refreshed activity.
   it('keeps a deferred new-activity item pending and discoverable', () => {
     const withActivity: Workspace = {
@@ -976,8 +990,7 @@ describe('deferral and bounded queues', () => {
     expect(isCompletedReview(undefined)).toBe(false);
   });
 
-  // RUX-003: a bound must never be reported as an empty queue.
-  it('keeps unresolved records reachable when reviewed candidates fill the bound', () => {
+  it('includes every review candidate beyond the former per-reason bound', () => {
     const utxos = Array.from({ length: 401 }, (_, index) => ({
       ...utxo,
       txid: id(1000 + index),
@@ -986,20 +999,19 @@ describe('deferral and bounded queues', () => {
     }));
     const workspace = fixture({ chainData: { transactions: {} } });
     const all = buildWalletReview(workspace, wallet, { utxos });
-    expect(find(all.items, 'current-utxo')).toHaveLength(400);
+    expect(find(all.items, 'current-utxo')).toHaveLength(401);
     expect(find(all.items, 'wallet-address')).toHaveLength(2);
-    expect(all.omittedItems).toBe(1);
-    expect(all.omittedPendingItems).toBe(1);
-    // Complete the first 400 coins and their used-address reviews.
-    const reviewed = applyReviewDecisions(workspace, wallet, all.items, 'reviewed');
+    const remainingNodeId = `out:${id(1400)}:0`;
+    const reviewed = applyReviewDecisions(
+      workspace,
+      wallet,
+      all.items.filter((item) => item.nodeId !== remainingNodeId),
+      'reviewed',
+    );
     const after = buildWalletReview(reviewed, wallet, { utxos });
     const open = after.items.filter((item) => item.status === 'open');
     expect(open).toHaveLength(1);
-    expect(open[0].nodeId).toBe(`out:${id(1400)}:0`);
-    expect(after.omittedPendingItems).toBe(0);
-    // The remaining settled records stay reachable through an explicit continuation.
-    expect(after.omittedItems).toBe(1);
-    expect(buildWalletReview(reviewed, wallet, { utxos, page: 2 }).omittedItems).toBe(0);
+    expect(open[0].nodeId).toBe(remainingNodeId);
   });
 
   it('does not hide a deferred record behind completed ones', () => {
@@ -1015,6 +1027,6 @@ describe('deferral and bounded queues', () => {
     const reviewed = applyReviewDecisions(deferred, wallet, first.items.slice(1), 'reviewed');
     const after = buildWalletReview(reviewed, wallet, { utxos });
     const pending = after.items.filter((item) => item.status !== 'reviewed');
-    expect(pending.map((item) => item.status).sort()).toEqual(['later', 'open']);
+    expect(pending.map((item) => item.status)).toEqual(['later']);
   });
 });

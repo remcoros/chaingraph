@@ -289,8 +289,10 @@ Six tabs share one list and detail panel: **To review**, **UTXOs**,
   completes it; **Review later** defers it to **Show → Review later** without
   losing it. Decisions are encrypted with the workspace and only reappear when
   the underlying observations change. **Finding types** groups filters by review,
-  metadata and analysis category with counts; selected types combine with OR.
-  Empty choices and empty groups are hidden until you choose **Show all**.
+  metadata and analysis category with total known counts; selected types combine
+  with OR. Search, review status and list pagination do not change those counts.
+  Empty choices and empty groups are hidden until you choose **Show all**. The
+  list shows 40 matching rows at a time; **Show more** reveals the next group.
 - **UTXOs** checks discovered addresses through your backend when no saved check
   is available, including mempool activity, 100 addresses per action. Successful
   address observations are encrypted with the workspace, not stored as a separate
@@ -338,7 +340,9 @@ loaded transaction; **Selection** follows the selected transaction, output,
 address or wallet; each wallet is also available directly. **Options** adjusts
 each tool's parameters and controls whether missing input data is loaded before
 scanning. **Finding types** uses the same ordered analysis categories as Wallet;
-empty choices and groups are available through **Show all**.
+counts cover all findings in the current result scope and do not change with the
+priority, evidence or list pagination controls. Empty choices and groups are
+available through **Show all**.
 
 | Tool                          | What it reports                                                                                    |
 | ----------------------------- | -------------------------------------------------------------------------------------------------- |

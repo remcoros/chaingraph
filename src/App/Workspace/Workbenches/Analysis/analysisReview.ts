@@ -47,7 +47,8 @@ export interface FindingFilters {
   kind: string;
 }
 
-/** OR within each facet, AND across facets. Counts ignore their own facet. */
+/** OR within each facet, AND across facets. Type counts are stable totals;
+ * priority counts respect evidence and type filters but ignore priority selection. */
 export function filterAnalysisFindings(findings: AnalysisFinding[], filters: FindingFilters) {
   const evidence = findings.filter(
     (finding) => filters.kind === 'all' || (finding.kind ?? 'hypothesis') === filters.kind,
@@ -58,9 +59,11 @@ export function filterAnalysisFindings(findings: AnalysisFinding[], filters: Fin
     filters.priorities.includes(findingReview(finding).priority);
   const types = new Map<string, number>(analysisTools.map((tool) => [tool.id, 0]));
   const priorities = { high: 0, medium: 0, low: 0 };
-  for (const finding of evidence) {
+  for (const finding of findings) {
     const id = findingToolId(finding) ?? 'unregistered';
-    if (matchesPriority(finding)) types.set(id, (types.get(id) ?? 0) + 1);
+    types.set(id, (types.get(id) ?? 0) + 1);
+  }
+  for (const finding of evidence) {
     if (matchesType(finding)) priorities[findingReview(finding).priority]++;
   }
   return {
