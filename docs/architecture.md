@@ -495,9 +495,10 @@ direction or ownership. `useWalletCounterparties` resolves missing inputs in
 bounded batches with explicit continuation. `walletSelectionIndex.ts` builds
 per-snapshot indexes of scripts, outputs, spends and prevouts so row selection
 does not rescan; `walletWorkbenchRows.ts` is the shared row contract for all six
-tabs, and `walletReviewCategories.ts` defines finding categories with OR
-semantics and pre-filter counts. Wallet **Analyze** reuses the Analysis registry
-and merge path; it is distinct from history refresh.
+tabs. `reviewCategoryDefinitions.ts` owns Wallet filter copy, grouping and display
+order; `reviewCategories.ts` owns matching, OR semantics and pre-filter counts.
+Wallet **Analyze** reuses the Analysis registry and merge path; it is distinct
+from history refresh.
 
 Each unlocked session owns a `WalletPreparationCache` in
 `src/Core/Workspace/Wallets/walletPreparation.ts`. It shares one transaction index and script decoder

@@ -8,10 +8,7 @@ import {
   walletReviewCategoryGroups,
   walletReviewCategoryScanState,
 } from './reviewCategories';
-import {
-  REVIEW_REASONS,
-  type WalletReviewItem,
-} from '../../../../../Core/Workspace/Wallets/walletReview';
+import type { WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
@@ -72,9 +69,13 @@ describe('discoverable wallet finding categories', () => {
     ]);
     expect(groups.flatMap((group) => group.options)).toEqual(catalog);
     expect(catalog.map((category) => category.id)).toEqual([
-      ...REVIEW_REASONS.filter(
-        (reason) => reason !== 'counterparty' && reason !== 'funding-source',
-      ),
+      'current-utxo',
+      'wallet-address',
+      'source',
+      'source-address',
+      'new-activity',
+      'destination-address',
+      'link',
       'unidentified-sources',
       'unidentified-destinations',
       'utxo-missing-label',

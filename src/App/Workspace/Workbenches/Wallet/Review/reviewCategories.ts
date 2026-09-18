@@ -3,12 +3,15 @@ import { analysisToolGroups } from '../../../../../Core/Workspace/Analysis/toolR
 import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
 import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
+import type { WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
-  REVIEW_REASONS,
-  REASON_LABELS,
-  type ReviewReason,
-  type WalletReviewItem,
-} from '../../../../../Core/Workspace/Wallets/walletReview';
+  previousOutputDecisionsCategory,
+  walletMetadataCategoryDefinitions,
+  walletReviewGroups,
+  walletReviewGroupsInDisplayOrder,
+  walletReviewReasonCategoryDefinitions,
+  type WalletReviewCategoryDefinition,
+} from './reviewCategoryDefinitions';
 
 export interface WalletReviewCategory {
   id: string;
@@ -26,59 +29,6 @@ export interface WalletReviewCategoryGroup {
   label: string;
   options: WalletReviewCategory[];
 }
-
-const reasonDescriptions: Record<ReviewReason, string> = {
-  'current-utxo':
-    'Coins in this wallet that were unspent at the last UTXO check. This includes coins you have already labelled or tagged, so you can review everything the check found.',
-  'wallet-address':
-    'Receiving and change addresses in this wallet that have been used. Add labels to remember what you used them for; unused addresses are left out of the review list.',
-  source:
-    'Earlier coins received by this wallet and later spent in transactions that created your current UTXOs. These receipts let you look back one step in your wallet’s history.',
-  'source-address':
-    'Addresses used to fund transactions that paid this wallet. They do not match its known addresses, but may still belong to you. Add a label if you recognize the sender or source.',
-  'funding-source':
-    'Your saved reviews of individual outputs that funded this wallet. These earlier decisions remain available to revisit; new source reviews are grouped by address.',
-  'new-activity':
-    'Transaction activity found during a wallet refresh and kept here for you to review. Some transactions may still need to be loaded before you can see their details.',
-  'destination-address':
-    'Addresses paid by transactions that spent coins from this wallet. They do not match its known addresses, but may still belong to you. Add a label if you recognize the recipient or purpose.',
-  counterparty:
-    'Your saved reviews of individual outputs created when this wallet spent coins. These earlier decisions remain available to revisit; new destination reviews are grouped by address.',
-  link: 'Analysis findings involving this wallet that are still current. Open a finding to see the pattern it detected and the transactions behind it, then decide whether it helps explain your wallet’s activity.',
-};
-
-const metadataCategories = [
-  {
-    id: 'unidentified-sources',
-    label: 'Unidentified direct sources',
-    description:
-      'Source addresses with no label or tags to help you recognize them. Use this list to record where incoming payments came from. Labels on individual coins do not label the address itself.',
-  },
-  {
-    id: 'unidentified-destinations',
-    label: 'Unidentified direct destinations',
-    description:
-      'Destination addresses with no label or tags to help you recognize them. Use this list to record who you paid or why you moved the coins. An address here may still belong to you.',
-  },
-  {
-    id: 'utxo-missing-label',
-    label: 'UTXOs missing labels',
-    description:
-      'Current unspent coins that have no label of their own. Add a short name to remember where a coin came from or what you are keeping it for. Coins with tags or notes can still appear here.',
-  },
-  {
-    id: 'utxo-missing-tags',
-    label: 'UTXOs missing tags',
-    description:
-      'Current unspent coins with no tags, either on the coin itself or inherited from its address. Tags help you group coins by source, purpose or another meaning you choose.',
-  },
-  {
-    id: 'utxo-unidentified',
-    label: 'UTXOs missing labels and tags',
-    description:
-      'Current unspent coins with neither a label of their own nor any tags, including tags inherited from their address. Use this list to start organizing your coins.',
-  },
-] as const;
 
 export type WalletReviewCategoryWorkspace = Pick<Workspace, 'annotations' | 'analysis'> & {
   wallets: Pick<Workspace['wallets'], 'reviews'>;
@@ -145,31 +95,30 @@ export function walletReviewCategoryGroups(
     for (const id of categoryIds(workspace, item)) counts.set(id, (counts.get(id) ?? 0) + 1);
   const counted = (definitions: readonly Omit<WalletReviewCategory, 'count'>[]) =>
     definitions.map((category) => ({ ...category, count: counts.get(category.id) ?? 0 }));
-  const reviewItems: Omit<WalletReviewCategory, 'count'>[] = [
-    ...REVIEW_REASONS.filter(
-      (reason) => reason !== 'counterparty' && reason !== 'funding-source',
-    ).map((reason) => ({
-      id: reason,
-      label: REASON_LABELS[reason],
-      description: reasonDescriptions[reason],
-    })),
+  const fixedDefinitions: WalletReviewCategoryDefinition[] = [
+    ...walletReviewReasonCategoryDefinitions,
     ...(items.some((item) => item.reason === 'counterparty' || item.reason === 'funding-source') ||
     Object.keys(workspace.wallets.reviews ?? {}).some(
       (key) => key.includes('|counterparty|') || key.includes('|funding-source|'),
     )
-      ? [
-          {
-            id: 'saved-output-reviews',
-            label: 'Previous output decisions',
-            description:
-              'Decisions you saved when reviews were made for individual outputs. You can revisit those decisions here. New source and destination reviews bring related activity together under each address.',
-          },
-        ]
+      ? [previousOutputDecisionsCategory]
       : []),
+    ...walletMetadataCategoryDefinitions,
   ];
-  return [
-    { id: 'review-items', label: 'Review items', options: counted(reviewItems) },
-    { id: 'labels-and-tags', label: 'Labels and tags', options: counted(metadataCategories) },
+  const groups: WalletReviewCategoryGroup[] = [
+    ...Object.values(walletReviewGroups).map((group) => ({
+      id: group.id,
+      label: group.label,
+      options: fixedDefinitions
+        .filter((definition) => definition.group.id === group.id)
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((definition) => ({
+          id: definition.id,
+          label: definition.label,
+          description: definition.description,
+          count: counts.get(definition.id) ?? 0,
+        })),
+    })),
     ...analysisToolGroups.map((group) => ({
       id: group.id,
       label: group.label,
@@ -185,6 +134,8 @@ export function walletReviewCategoryGroups(
       ),
     })),
   ];
+  const groupsById = new Map(groups.map((group) => [group.id, group]));
+  return walletReviewGroupsInDisplayOrder.map((group) => groupsById.get(group.id)!);
 }
 
 export function walletReviewCategories(

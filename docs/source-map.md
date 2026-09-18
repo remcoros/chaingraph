@@ -58,7 +58,7 @@ src/
           WalletWorkbench.tsx       wallet view and controller binding
           useWalletActivity.ts      discovery controls and monitoring lifecycle
           useWalletAnalysis.ts      wallet entry point into Core Analysis
-          Review/                   review panel, categories, rows and flows
+          Review/                   review panel, category definitions/matching, rows and flows
         Analysis/
           AnalysisWorkbench.tsx     controls, scope selection and reports
           useWorkspaceAnalysis.ts   analysis UI lifecycle and retained reports

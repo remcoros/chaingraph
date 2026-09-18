@@ -31,11 +31,11 @@ import {
 export const REVIEW_REASONS = [
   'current-utxo',
   'wallet-address',
-  'source',
   'source-address',
+  'destination-address',
+  'source',
   'funding-source',
   'new-activity',
-  'destination-address',
   'counterparty',
   'link',
 ] as const;
@@ -112,28 +112,7 @@ export interface WalletReview {
   missingSourceTransactions: number;
 }
 
-const REASON_ORDER: Record<ReviewReason, number> = {
-  'current-utxo': 0,
-  'wallet-address': 1,
-  'source-address': 2,
-  'destination-address': 3,
-  source: 4,
-  'funding-source': 5,
-  'new-activity': 6,
-  counterparty: 7,
-  link: 8,
-};
-export const REASON_LABELS: Record<ReviewReason, string> = {
-  'current-utxo': 'Current UTXOs; unspent in wallet',
-  'wallet-address': 'Wallet receive/change address',
-  source: 'Earlier wallet receipt',
-  'source-address': 'Source addresses (received by wallet)',
-  'funding-source': 'Saved output review',
-  'new-activity': 'New activity',
-  'destination-address': 'Destination addresses (sent by wallet)',
-  counterparty: 'Saved output review',
-  link: 'Analysis finding',
-};
+const reasonOrder = new Map(REVIEW_REASONS.map((reason, index) => [reason, index]));
 const MAX_ITEMS_PER_REASON: Record<ReviewReason, number> = {
   'current-utxo': 400,
   'wallet-address': 200,
@@ -624,7 +603,7 @@ export function buildWalletReview(
 
   items.sort(
     (a, b) =>
-      REASON_ORDER[a.reason] - REASON_ORDER[b.reason] ||
+      reasonOrder.get(a.reason)! - reasonOrder.get(b.reason)! ||
       Number(!!a.label) - Number(!!b.label) ||
       (b.amountSats ?? -1) - (a.amountSats ?? -1) ||
       a.key.localeCompare(b.key),

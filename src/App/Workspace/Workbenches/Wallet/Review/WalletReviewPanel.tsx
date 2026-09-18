@@ -19,7 +19,6 @@ import type { WalletUtxoRecord } from '../../../../../Core/Workspace/Wallets/wal
 import {
   applyReviewDecisions,
   isCompletedReview,
-  REASON_LABELS,
   spendGuidance,
   type WalletReviewItem,
 } from '../../../../../Core/Workspace/Wallets/walletReview';
@@ -41,6 +40,7 @@ import {
   walletReviewCategoryScanState,
   type WalletReviewCategoryWorkspace,
 } from './reviewCategories';
+import { walletReviewReasonDefinitions } from './reviewCategoryDefinitions';
 import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
 import { useRecordSelection } from '../useRecordSelection';
 import type { WalletUtxoController } from '../../../Wallets/WalletUtxos';
@@ -972,7 +972,9 @@ export function WalletReviewPanel(
                         aria-pressed={current || checked}
                       >
                         <span className="wallet-review-reason">
-                          {tab === 'review' ? REASON_LABELS[row.reviews[0].reason] : row.meta}
+                          {tab === 'review'
+                            ? walletReviewReasonDefinitions[row.reviews[0].reason].label
+                            : row.meta}
                           {(tab === 'review' || row.status !== 'open') && (
                             <span className={`wallet-review-status status-${row.status}`}>
                               {row.changed
