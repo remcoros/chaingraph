@@ -32,24 +32,31 @@ export function WorkspaceTemplateCards({
                         <span aria-hidden="true" className="workspace-template-icon">
                           {template.icon}
                         </span>
+                        <strong className="workspace-template-title">{template.name}</strong>
                         <span className="workspace-template-network">
                           {template.network === 'mainnet' ? 'Mainnet' : 'Testnet4'}
                         </span>
                         <ArrowUpRight size={16} aria-hidden="true" />
                       </span>
-                      <strong>{template.name}</strong>
                       <span className="small muted">{template.summary}</span>
-                      <span className="workspace-template-action">Create workspace →</span>
                     </button>
-                    <a
-                      className="workspace-template-source"
-                      href={template.sources[0].url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`View source for ${template.name}`}
-                    >
-                      View example source <ArrowUpRight size={12} aria-hidden="true" />
-                    </a>
+                    <div className="workspace-template-actions">
+                      <button
+                        className="workspace-template-action"
+                        onClick={() => onTemplate(template.id)}
+                      >
+                        Create workspace →
+                      </button>
+                      <a
+                        className="workspace-template-source"
+                        href={template.sources[0].url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Open ${template.name} on mempool.space`}
+                      >
+                        mempool.space <ArrowUpRight size={12} aria-hidden="true" />
+                      </a>
+                    </div>
                   </article>
                 ),
               )}

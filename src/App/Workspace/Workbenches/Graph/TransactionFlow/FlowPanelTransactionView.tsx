@@ -1,4 +1,5 @@
 import {
+  Fragment,
   memo,
   useId,
   useMemo,
@@ -118,6 +119,8 @@ function moveSelectedRowFirst(rows: Row[], selectedId?: string) {
 const TransactionFlowRow = memo(function TransactionFlowRow({
   row,
   inputs,
+  first,
+  last,
   selected,
   pinned,
   belowThreshold,
@@ -138,6 +141,8 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
 }: {
   row: Row;
   inputs: boolean;
+  first: boolean;
+  last: boolean;
   selected: boolean;
   pinned: boolean;
   belowThreshold: boolean;
@@ -184,7 +189,7 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   return (
     <div
       key={row.index}
-      className={`transaction-row ${icon ? 'has-annotation-icon' : ''} ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
+      className={`transaction-row ${first ? 'is-first' : ''} ${last ? 'is-last' : ''} ${icon ? 'has-annotation-icon' : ''} ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
       data-selected={selected}
     >
       {batchMode && row.id && (
@@ -606,33 +611,39 @@ function TransactionRows({
               </div>
             </div>
             <div className="transaction-rows">
-              {displayedRows.map((row) => (
-                <TransactionFlowRow
-                  key={row.index}
-                  row={row}
-                  inputs={inputs}
-                  selected={Boolean(matches(row))}
-                  pinned={row.id === selected?.id}
-                  belowThreshold={belowThreshold(row)}
-                  label={row.id ? workspace.annotations.entities[row.id]?.label : undefined}
-                  icon={row.id ? workspace.annotations.entities[row.id]?.icon : undefined}
-                  loaded={
-                    inputs
-                      ? !!workspace.chainData.transactions[row.previousTxid ?? '']
-                      : !!spends.get(row.id ?? '')?.length
-                  }
-                  spendCount={spends.get(row.id ?? '')?.length ?? 0}
-                  spendId={spends.get(row.id ?? '')?.[0]?.txid}
-                  hidden={!!row.id && hidden.has(row.id)}
-                  notOnGraph={!!row.id && admitted !== undefined && !admitted.has(row.id)}
-                  batchMode={selection?.mode ?? false}
-                  batchSelected={!!row.id && !!selection?.has(row.id)}
-                  canShowHidden={!!onSetHidden}
-                  renderMetadata={renderMetadata}
-                  disabledReason={disabledReason}
-                  inputLoading={inputLoading}
-                  actions={actions}
-                />
+              {displayedRows.map((row, index) => (
+                <Fragment key={row.index}>
+                  <TransactionFlowRow
+                    row={row}
+                    inputs={inputs}
+                    first={index === 0}
+                    last={index === displayedRows.length - 1}
+                    selected={Boolean(matches(row))}
+                    pinned={row.id === selected?.id}
+                    belowThreshold={belowThreshold(row)}
+                    label={row.id ? workspace.annotations.entities[row.id]?.label : undefined}
+                    icon={row.id ? workspace.annotations.entities[row.id]?.icon : undefined}
+                    loaded={
+                      inputs
+                        ? !!workspace.chainData.transactions[row.previousTxid ?? '']
+                        : !!spends.get(row.id ?? '')?.length
+                    }
+                    spendCount={spends.get(row.id ?? '')?.length ?? 0}
+                    spendId={spends.get(row.id ?? '')?.[0]?.txid}
+                    hidden={!!row.id && hidden.has(row.id)}
+                    notOnGraph={!!row.id && admitted !== undefined && !admitted.has(row.id)}
+                    batchMode={selection?.mode ?? false}
+                    batchSelected={!!row.id && !!selection?.has(row.id)}
+                    canShowHidden={!!onSetHidden}
+                    renderMetadata={renderMetadata}
+                    disabledReason={disabledReason}
+                    inputLoading={inputLoading}
+                    actions={actions}
+                  />
+                  {index < displayedRows.length - 1 && (
+                    <div className="transaction-row-separator" aria-hidden="true" />
+                  )}
+                </Fragment>
               ))}
             </div>
           </section>

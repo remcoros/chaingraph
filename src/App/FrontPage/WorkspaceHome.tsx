@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { FolderOpen, LockKeyhole, Plus, ShieldCheck, Upload, Trash2 } from 'lucide-react';
+import {
+  FolderOpen,
+  LockKeyhole,
+  PencilLine,
+  Plus,
+  Server,
+  ShieldCheck,
+  Tags,
+  Upload,
+  Trash2,
+  Wallet,
+  Waypoints,
+} from 'lucide-react';
 import type { Network } from '../../Core/Bitcoin';
 import { WorkspaceTemplateCards } from '../Examples/WorkspaceTemplateCards';
 import type { SavedWorkspace } from '../../Core/Workspace/Persistence';
@@ -42,7 +54,7 @@ export function WorkspaceHome({
   return (
     <main id="main-workspace" tabIndex={-1} className="welcome">
       <div className="welcome-copy">
-        <span className="eyebrow">YOUR BITCOIN. YOUR PERSPECTIVE.</span>
+        <span className="eyebrow">YOUR WALLET. YOUR PERSPECTIVE.</span>
         <h1>
           Follow the coins.
           <br />
@@ -63,12 +75,32 @@ export function WorkspaceHome({
           </button>
           {!!networks?.length && <button onClick={onExamples}>Example workspaces</button>}
         </div>
-        <div className="welcome-trust">
-          <LockKeyhole size={15} />
-          <span>Encrypted workspaces</span>
-          <span className="divider-dot">·</span>
-          <span>Fully self-hosted</span>
-        </div>
+        <ul className="welcome-trust">
+          <li>
+            <Server size={15} aria-hidden="true" />
+            <span>Fully self-hosted</span>
+          </li>
+          <li>
+            <LockKeyhole size={15} aria-hidden="true" />
+            <span>Encrypted workspaces</span>
+          </li>
+          <li>
+            <Waypoints size={15} aria-hidden="true" />
+            <span>2D and 3D visualizations</span>
+          </li>
+          <li>
+            <Wallet size={15} aria-hidden="true" />
+            <span>Wallet review/analysis</span>
+          </li>
+          <li>
+            <PencilLine size={15} aria-hidden="true" />
+            <span>Annotate your findings</span>
+          </li>
+          <li>
+            <Tags size={15} aria-hidden="true" />
+            <span>BIP329 labels import/export</span>
+          </li>
+        </ul>
       </div>
       <div className="welcome-side">
         <div className="section-title">
@@ -146,9 +178,8 @@ export function WorkspaceHome({
         <div className="welcome-note">
           <ShieldCheck size={20} />
           <p>
-            Connect to your own back-end and Bitcoin/Electrum node. Wallet discovery happens in your
-            browser; no xpub leaves the browser, but the backend still receives requests for
-            script-hash and transaction queries.
+            <strong>Make sure to connect to your own back-end and Bitcoin/Electrum node.</strong> Wallet/xpub discovery happens in your
+            browser, but the backend still receives requests for script-hash and transaction queries.
           </p>
         </div>
       </div>

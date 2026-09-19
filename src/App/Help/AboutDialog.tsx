@@ -34,7 +34,7 @@ export function AboutDialog({
 }) {
   const [tab, setTab] = useState<'guide' | 'about' | 'connection'>(initialTab);
   return (
-    <Modal title="Help and about Chaingraph" onClose={onClose}>
+    <Modal title="About Chaingraph" onClose={onClose}>
       <nav className="help-tabs" aria-label="Help sections">
         <button aria-pressed={tab === 'guide'} onClick={() => setTab('guide')}>
           <BookOpen size={15} />
@@ -51,53 +51,6 @@ export function AboutDialog({
       </nav>
       {tab === 'guide' ? (
         <div className="help-content">
-          <h3>Build an investigation</h3>
-          <ol className="workflow-guide">
-            <li>
-              <strong>Start with an output or wallet.</strong> Paste a transaction, txid:vout or
-              address. Example workspaces contain real transactions with starter labels and tags.
-            </li>
-            <li>
-              <strong>Follow one path at a time.</strong> Cubes are transactions; spheres are
-              outputs. Select an output in Graph and use its creating or spending transaction links
-              to inspect the loaded flow. The separate Trace workbench is disabled for now.
-            </li>
-            <li>
-              <strong>Narrow your view.</strong> Use Entities to filter labels, values, funding
-              details and loaded spends. Isolate selection, beside Lock to selection, follows one
-              connection around your selection; Paths can expand it to two. Turn it off or use Reset
-              filters to clear filters while preserving manual hiding.
-            </li>
-            <li>
-              <strong>Review the evidence.</strong> Open Analysis and Scan Current selection or
-              Loaded workspace. Every applicable tool runs together. Open affected outputs,
-              addresses and supporting transactions individually from a finding. Findings explain
-              assumptions and become stale when underlying data changes.
-            </li>
-            <li>
-              <strong>Label what you know.</strong> Add notes, bookmarks and workspace tags for
-              known sources and destinations. Export encrypted backups; your public workspace name
-              remains visible while locked.
-            </li>
-          </ol>
-          {onTour && (
-            <button
-              className="primary"
-              onClick={() => {
-                onClose();
-                onTour();
-              }}
-            >
-              Restart guided tour
-            </button>
-          )}
-          <h3>Wallet matches and tags</h3>
-          <p>
-            Wallet highlights match loaded scripts to addresses derived from your imported wallets.
-            A related transaction can include other participants. Manual tags group your
-            observations independently from analysis findings. Use Tags to group imported labels or
-            apply a counterparty to an address and its outputs.
-          </p>
           <h3>
             <Keyboard size={15} /> Keyboard and graph controls
           </h3>
@@ -134,6 +87,53 @@ export function AboutDialog({
           <p className="small muted">
             Flat view and the entity list provide alternatives to 3D navigation. Filters and view
             settings are saved in your encrypted workspace. Selection history stays in this session.
+          </p>
+          <h3>Build an investigation</h3>
+          <ol className="workflow-guide">
+            <li>
+              <strong>Start with an output or wallet.</strong> Paste a transaction, txid:vout or
+              address. Example workspaces contain real transactions with starter labels and tags.
+            </li>
+            <li>
+              <strong>Follow one path at a time.</strong> Cubes are transactions; spheres are
+              outputs. Select an output in Graph and use its creating or spending transaction links
+              to inspect the loaded flow.
+            </li>
+            <li>
+              <strong>Narrow your view.</strong> Use Entities to filter labels, values, funding
+              details and loaded spends. Isolate selection, beside Lock to selection, follows one
+              connection around your selection; Paths can expand it to two. Turn it off or use Reset
+              filters to clear filters while preserving manual hiding.
+            </li>
+            <li>
+              <strong>Review the evidence.</strong> Open Analysis and Scan Current selection or
+              Loaded workspace. Every applicable tool runs together. Open affected outputs,
+              addresses and supporting transactions individually from a finding. Findings explain
+              assumptions and become stale when underlying data changes.
+            </li>
+            <li>
+              <strong>Label what you know.</strong> Add notes, bookmarks and workspace tags for
+              known sources and destinations. Export encrypted backups; your public workspace name
+              remains visible while locked.
+            </li>
+          </ol>
+          {onTour && (
+            <button
+              className="primary"
+              onClick={() => {
+                onClose();
+                onTour();
+              }}
+            >
+              Restart guided tour
+            </button>
+          )}
+          <h3>Wallet matches and tags</h3>
+          <p>
+            Wallet highlights match loaded scripts to addresses derived from your imported wallets.
+            A related transaction can include other participants. Manual tags group your
+            observations independently from analysis findings. Use Tags to group imported labels or
+            apply a counterparty to an address and its outputs.
           </p>
         </div>
       ) : tab === 'connection' ? (
@@ -175,7 +175,7 @@ export function AboutDialog({
           )}
           <button onClick={onReconnect}>
             <RefreshCw size={15} />
-            Check connection again
+            Check connection
           </button>
           <p>
             Each network has separate Bitcoin and Fulcrum connections. Every workspace stays on its

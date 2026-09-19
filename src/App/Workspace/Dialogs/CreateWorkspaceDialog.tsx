@@ -114,7 +114,7 @@ export function CreateWorkspaceDialog({
     <Modal title="Create a workspace" onClose={close} fallbackFocusSelector=".help-menu > button">
       <p className="muted">
         {template
-          ? 'Start with real transactions, labels and tags. This is your own editable copy, saved like any other workspace.'
+          ? 'Start with real transactions, labels and tags.'
           : 'A private space for your wallets, transactions, labels, and investigations.'}
       </p>
       <PasswordControls
@@ -223,8 +223,7 @@ export function CreateWorkspaceDialog({
           describedBy={invalidField === 'confirm' ? errorId : undefined}
         />
         <p className="security-note">
-          <LockKeyhole size={16} /> Contents are encrypted; the name is public. Your password cannot
-          be recovered. Workspaces lock on reload; Chaingraph never stores your password.
+          <LockKeyhole size={16} /> <strong>Contents are encrypted. Chaingraph never stores your password, your password cannot be recovered.</strong>
         </p>
         {error && (
           <p id={errorId} role="alert" className="error-text">
