@@ -26,11 +26,16 @@ if (baseline) {
   ).trim()
     ? rendererDirectory
     : 'src/components/graph';
-  for (const file of ['compactLayout.ts', 'flowLayout.ts'])
-    await writeFile(
-      path.join(directory, file),
-      execFileSync('git', ['show', `${baseline}:${baselineDirectory}/${file}`]),
-    );
+  const files = execFileSync('git', ['ls-tree', '-r', '--name-only', baseline, baselineDirectory], {
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter((file) => file.endsWith('.ts'));
+  for (const file of files) {
+    const destination = path.join(directory, path.relative(baselineDirectory, file));
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, execFileSync('git', ['show', `${baseline}:${file}`]));
+  }
   layout = (await import(pathToFileURL(path.resolve(directory, 'compactLayout.ts')).href))
     .compactLayout;
 }
