@@ -377,8 +377,9 @@ loaded transaction; **Selection** follows the selected transaction, output,
 address or wallet; each wallet is also available directly. **Options** adjusts
 each tool's parameters and controls whether missing input data is loaded before
 scanning. Analysis keeps its **Finding types** filter for algorithm categories;
-Wallet calls its broader queue facet **Review reason**. Analysis counts cover all
-findings in the current result scope and do not change with the priority,
+Wallet calls its broader queue facet **Review reason**, which also includes the
+current Analysis tools. **Older or unknown findings** appears there only when
+applicable. Analysis counts cover all findings in the current result scope and do not change with the priority,
 evidence or list pagination controls. Empty choices and groups are available
 through **Show all**.
 

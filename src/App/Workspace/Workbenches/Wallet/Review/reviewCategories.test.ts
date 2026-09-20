@@ -79,7 +79,6 @@ describe('discoverable wallet finding categories', () => {
         'source-address',
         'wallet-transaction',
         'destination-address',
-        'link',
         'unidentified-sources',
         'unidentified-destinations',
         'utxo-missing-label',
@@ -274,7 +273,7 @@ describe('discoverable wallet finding categories', () => {
     expect(matchesReviewCategories(item, ['utxo-missing-tags'], workspace)).toBe(false);
   });
 
-  it('matches exact supported algorithms and does not equate saved findings with a completed scan', () => {
+  it('filters registered Analysis findings by tool and keeps older or unknown ones conditional', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
     const finding = {
       id: 'cioh:fixture',
@@ -290,7 +289,8 @@ describe('discoverable wallet finding categories', () => {
     const item = makeItem(1, { key: `wallet|link|${finding.id}`, reason: 'link' });
     const catalog = walletReviewCategories(workspace, [item]);
     expect(catalog.find((category) => category.id === 'heuristic:cioh')?.count).toBe(1);
-    expect(catalog.find((category) => category.id === 'link')?.count).toBe(1);
+    expect(catalog.find((category) => category.id === 'link')).toBeUndefined();
+    expect(catalog.find((category) => category.id === 'older-or-unknown-findings')).toBeUndefined();
     expect(
       matchesReviewCategories(
         { ...item, algorithm: 'unrelated-cioh-v2' },
@@ -298,6 +298,33 @@ describe('discoverable wallet finding categories', () => {
         workspace,
       ),
     ).toBe(false);
+    const supportedOlderVersion = makeItem(4, {
+      key: 'wallet|link|cioh-v1',
+      reason: 'link',
+      algorithm: 'cioh-v1',
+    });
+    expect(matchesReviewCategories(supportedOlderVersion, ['heuristic:cioh'], workspace)).toBe(
+      true,
+    );
+    const older = makeItem(2, {
+      key: 'wallet|link|older',
+      reason: 'link',
+      algorithm: 'retired-tool-v1',
+    });
+    const unknown = makeItem(3, { key: 'wallet|link|unknown', reason: 'link' });
+    const legacyCatalog = walletReviewCategories(workspace, [
+      item,
+      supportedOlderVersion,
+      older,
+      unknown,
+    ]);
+    expect(legacyCatalog.find((category) => category.id === 'heuristic:cioh')?.count).toBe(2);
+    expect(
+      legacyCatalog.find((category) => category.id === 'older-or-unknown-findings'),
+    ).toMatchObject({ label: 'Older or unknown findings', count: 2 });
+    expect(matchesReviewCategories(item, ['older-or-unknown-findings'], workspace)).toBe(false);
+    expect(matchesReviewCategories(older, ['older-or-unknown-findings'], workspace)).toBe(true);
+    expect(matchesReviewCategories(unknown, ['older-or-unknown-findings'], workspace)).toBe(true);
     expect(walletReviewCategoryScanState(workspace)).toMatchObject({
       status: 'saved-findings',
       partial: true,

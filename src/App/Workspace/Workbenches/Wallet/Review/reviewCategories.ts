@@ -5,6 +5,7 @@ import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMe
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
+  olderOrUnknownFindingsCategory,
   previousOutputDecisionsCategory,
   walletMetadataCategoryDefinitions,
   walletReviewGroups,
@@ -64,7 +65,7 @@ function categoryIds(
   workspace: WalletReviewCategoryWorkspace,
   item: WalletReviewItem,
 ): Set<string> {
-  const ids = new Set<string>([item.reason]);
+  const ids = new Set<string>(item.reason === 'link' ? [] : [item.reason]);
   if (item.reason === 'counterparty' || item.reason === 'funding-source')
     ids.add('saved-output-reviews');
   const { labelled, tagged } = effectiveMetadata(workspace, item);
@@ -78,9 +79,11 @@ function categoryIds(
     if (item.reason === 'destination-address') ids.add('unidentified-destinations');
   }
   const algorithm = algorithmFor(workspace, item);
-  for (const tool of analysisTools)
-    if (algorithm === tool.id || algorithm?.startsWith(`${tool.id}-v`))
-      ids.add(`heuristic:${tool.id}`);
+  const tool = analysisTools.find(
+    (candidate) => algorithm === candidate.id || algorithm?.startsWith(`${candidate.id}-v`),
+  );
+  if (tool) ids.add(`heuristic:${tool.id}`);
+  else if (item.reason === 'link') ids.add(olderOrUnknownFindingsCategory.id);
   return ids;
 }
 
@@ -97,6 +100,7 @@ export function walletReviewCategoryGroups(
     definitions.map((category) => ({ ...category, count: counts.get(category.id) ?? 0 }));
   const fixedDefinitions: WalletReviewCategoryDefinition[] = [
     ...walletReviewReasonCategoryDefinitions,
+    ...(counts.has(olderOrUnknownFindingsCategory.id) ? [olderOrUnknownFindingsCategory] : []),
     ...(items.some((item) => item.reason === 'counterparty' || item.reason === 'funding-source') ||
     Object.keys(workspace.wallets.reviews ?? {}).some(
       (key) => key.includes('|counterparty|') || key.includes('|funding-source|'),

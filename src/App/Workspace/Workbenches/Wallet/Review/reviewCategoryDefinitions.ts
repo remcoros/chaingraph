@@ -89,7 +89,7 @@ export const walletReviewReasonDefinitions = {
     label: 'Analysis finding',
     description:
       'Analysis findings involving this wallet that are still current. Open a finding to see the pattern it detected and the transactions behind it, then decide whether it helps explain your wallet’s activity.',
-    filter: { group: walletReviewGroups.reviewItems, displayOrder: 70 },
+    filter: false,
   },
   'funding-source': {
     id: 'funding-source',
@@ -130,6 +130,15 @@ export const previousOutputDecisionsCategory: WalletReviewCategoryDefinition = {
     'Decisions you saved when reviews were made for individual outputs. You can revisit those decisions here. New source and destination reviews bring related activity together under each address.',
   group: walletReviewGroups.reviewItems,
   displayOrder: 80,
+};
+
+export const olderOrUnknownFindingsCategory: WalletReviewCategoryDefinition = {
+  id: 'older-or-unknown-findings',
+  label: 'Older or unknown findings',
+  description:
+    'Stored analysis findings whose tool is no longer available or cannot be identified. Rerun analysis to use current tools.',
+  group: walletReviewGroups.reviewItems,
+  displayOrder: 70,
 };
 
 export const walletMetadataCategoryDefinitions = [
