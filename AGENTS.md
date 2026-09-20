@@ -60,6 +60,14 @@ Follow direct imports from the affected area.
   private hostnames and machine-specific paths. `npm run check:portability`
   catches the common cases; it is not a credential scan. Local recordings and
   browser output go under the ignored `artifacts/`.
+- When a user asks for another UI and gives a running backend or port hint,
+  reuse it through `CHAINGRAPH_PROXY_TARGET` with a unique strict Vite port;
+  verify listener ownership, the UI shell and proxied `/api/networks`. `npm run
+  dev` remains the contained-stack option and starts both Node and Vite
+  watchers. For `ENOSPC` or `EMFILE` watcher failures, tell the developer to
+  inspect the shared host settings `fs.inotify.max_user_instances` and
+  `fs.inotify.max_user_watches` plus process ownership. Do not change sysctls
+  or kill unknown listeners.
 - Prefer vetted Bitcoin primitives and WebCrypto over custom cryptography. Test
   vectors, tampering, network mismatch, cancellation and storage failures.
 - Keep workspace validation and encryption off the UI thread. Camera gestures

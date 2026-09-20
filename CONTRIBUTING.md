@@ -81,7 +81,9 @@ CHAINGRAPH_E2E_PORT=4176 CHAINGRAPH_GRAPH_TEST_PORT=4186 npm run test:e2e
 Defaults are 4173 (app) and 4184 (renderer fixture). Run one browser suite at a
 time per checkout.
 
-For a frontend-only preview against an existing backend:
+For an **additional UI** against a running backend, verify its listener and
+`/proc/<pid>/cwd`, choose an unused strict UI port, then reuse it with a
+frontend-only preview:
 
 ```sh
 CHAINGRAPH_PROXY_TARGET=http://127.0.0.1:4400 \
@@ -92,6 +94,12 @@ Vite preserves the browser-facing Host header so the backend can validate the
 request. Keep the browser and API on one origin through the proxy; do not weaken
 Origin checks to make a preview work. Browser storage is per origin, so each
 preview port has its own workspace list.
+
+`npm run dev` remains the contained-stack option and starts both Node and Vite
+watchers. If a watcher reports `ENOSPC` or `EMFILE`, inspect and report the
+shared host settings `fs.inotify.max_user_instances` and
+`fs.inotify.max_user_watches` and the process owners. Do not change sysctls or
+kill unknown listeners automatically.
 
 ## Review a change
 
