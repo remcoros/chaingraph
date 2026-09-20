@@ -100,6 +100,15 @@ export function useAddressNavigation({
     evidence.startAddressHistoryLoad(action.address, force);
   }
 
+  function openSelectedOutputAddress() {
+    if (!activeWorkspace || selected?.kind !== 'output') return;
+    const address = selectedAddressForHistory(selected, activeWorkspace.network);
+    if (!address) return;
+    const id = addressReference(address);
+    revealAddressGraphNodes(activeWorkspace.id, [id]);
+    revealLookup(id);
+  }
+
   function showRecentAddressUtxos() {
     const action = selectedAddressAction();
     if (!action) return;
@@ -296,6 +305,7 @@ export function useAddressNavigation({
 
   return {
     openAddressHistory,
+    openSelectedOutputAddress,
     showRecentAddressUtxos,
     showRecentAddressTransactions,
     openAddressHistoryTransaction,

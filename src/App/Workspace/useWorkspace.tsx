@@ -467,6 +467,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     recentTransactionTargets: addressNavigation.recentAddressTransactionTargets,
     actions: {
       openHistory: addressNavigation.openAddressHistory,
+      openOutputAddress: addressNavigation.openSelectedOutputAddress,
       refreshBalance: addressEvidence.refreshAddressBalance,
       loadUtxos: addressEvidence.loadAddressUtxos,
       showRecentUtxos: addressNavigation.showRecentAddressUtxos,

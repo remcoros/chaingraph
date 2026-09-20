@@ -135,6 +135,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     recentTransactionTargets: recentAddressTransactionTargets,
     actions: {
       openHistory: openAddressHistory,
+      openOutputAddress,
       loadUtxos: loadAddressUtxos,
       showRecentUtxos: showRecentAddressUtxos,
       showRecentTransactions: showRecentAddressTransactions,
@@ -209,6 +210,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     unconnectedForRemoval,
   ]);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
+  const hideSelectionIds = toolbarSelection.filter((id) => canvasIds.has(id));
+  const removeSelectionIds = toolbarSelection.filter((id) => admittedIds.has(id));
   const selectedSpenderTxids =
     selected?.kind === 'output' ? (flowIndex.spenders.get(selected.id) ?? []) : [];
   const openSpendingFromToolbar = () => {
@@ -254,9 +257,8 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
         graphFlowContext ? `Transaction ${graphFlowContext.transactionId.slice(3)}` : undefined
       }
       selectedKind={selected?.kind}
-      selectedCount={toolbarSelection.length}
-      canOpenAddressHistory={!!selectedInputOutputAddress}
-      onOpenAddressHistory={openAddressHistory}
+      canOpenAddress={!!selectedInputOutputAddress}
+      onOpenAddress={openOutputAddress}
       canShowRecentUtxos={!!selectedAddressForToolbar && (!!addressUtxos || canLoadChainData)}
       recentUtxoCount={recentUtxoCount}
       onShowRecentUtxos={showRecentAddressUtxos}
@@ -284,16 +286,9 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       canOpenSpendingTx={selectedSpenderTxids.length > 0 || canTraceAncestry}
       onOpenCreatingTx={() => void expand('funding', selectedId, { preserveCamera: true })}
       onOpenSpendingTx={openSpendingFromToolbar}
-      canShowSelection={toolbarSelection.some((id) => !canvasIds.has(id))}
-      canHideSelection={toolbarSelection.some((id) => canvasIds.has(id))}
-      canRemoveSelection={toolbarSelection.some((id) => admittedIds.has(id))}
-      onShowSelection={() => revealGraphNodes(toolbarSelection)}
-      onHideSelection={() =>
-        setEntityHidden(
-          toolbarSelection.filter((id) => canvasIds.has(id)),
-          true,
-        )
-      }
+      hideSelectionCount={hideSelectionIds.length}
+      removeSelectionCount={removeSelectionIds.length}
+      onHideSelection={() => setEntityHidden(hideSelectionIds, true)}
       onRemoveSelection={() => removeFromGraph(toolbarSelection)}
       canHideBranch={!!graphFlowContext && canvasIds.has(graphFlowContext.transactionId)}
       canRemoveBranch={!!graphFlowContext && admittedIds.has(graphFlowContext.transactionId)}
