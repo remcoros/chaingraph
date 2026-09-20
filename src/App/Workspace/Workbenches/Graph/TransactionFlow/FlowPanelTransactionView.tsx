@@ -1053,9 +1053,6 @@ export function FlowPanelTransactionView({
                       <strong className="mono transaction-identity-id">
                         <ResponsiveIdentifier value={current.tx.txid} />
                       </strong>
-                      <span>
-                        <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
-                      </span>
                     </span>
                     <span className="transaction-identity-body">
                       <TransactionBlockTime
@@ -1085,6 +1082,9 @@ export function FlowPanelTransactionView({
                       <TransactionFeeLabel transaction={current.tx} workspace={workspace} />
                     </span>
                   </button>
+                  <span className="transaction-identity-copy">
+                    <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
+                  </span>
                   <div
                     className="transaction-identity-tools"
                     role="group"
