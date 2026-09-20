@@ -508,6 +508,24 @@ describe('default renderer responsiveness and snapshots', () => {
     renderer.dispose();
   });
 
+  it('cancels a pending layout before restoring a saved snapshot', () => {
+    const { renderer, events } = setup();
+    renderer.update(frame());
+    WorkerMock.instances[0].reply();
+    renderer.flushSnapshot();
+    const snapshot = vi.mocked(events.snapshot!).mock.calls.at(-1)![0];
+    renderer.update(frame(10_000));
+    const pending = WorkerMock.instances[0];
+    vi.mocked(events.layout!).mockClear();
+
+    renderer.restoreSnapshot(snapshot);
+    pending.reply();
+
+    expect(pending.terminate).toHaveBeenCalledOnce();
+    expect(events.layout).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
   it('defers snapshots throughout a camera gesture and flushes the visible camera while a large layout is pending', () => {
     const { renderer, events } = setup();
     renderer.update(frame());
