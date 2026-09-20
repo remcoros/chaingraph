@@ -3,24 +3,34 @@ import { runInNewContext } from 'node:vm';
 import { build, transform } from 'esbuild';
 import { transformSync } from 'oxc-transform-react';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { createServer, type ViteDevServer } from 'vite';
+import { createServer, loadConfigFromFile, type ViteDevServer } from 'vite';
 
 let server: ViteDevServer;
 
 beforeAll(async () => {
   // Load the real dev config. SSR tests and production builds do not run the
   // client Fast Refresh transform that can break worker-only dependencies.
+  const loaded = await loadConfigFromFile(
+    { command: 'serve', mode: 'development' },
+    'vite.config.ts',
+  );
+  if (!loaded) throw new Error('Could not load the Vite development configuration.');
   server = await createServer({
-    configFile: 'vite.config.ts',
+    ...loaded.config,
+    configFile: false,
     mode: 'development',
     logLevel: 'silent',
-    server: { middlewareMode: true, watch: null },
-    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { ...loaded.config.server, middlewareMode: true, watch: null },
+    optimizeDeps: { ...loaded.config.optimizeDeps, noDiscovery: true, include: [] },
   });
 });
 
 afterAll(async () => {
   await server?.close();
+});
+
+it('runs the transform checks without watching the repository', () => {
+  expect(server.config.server.watch).toBeNull();
 });
 
 it('can evaluate the example worker tag palette without a React window runtime', async () => {
