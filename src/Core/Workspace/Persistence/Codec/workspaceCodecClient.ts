@@ -1,7 +1,11 @@
 import { CURRENT_WORKSPACE_VERSION, type Workspace } from '../../workspace';
 import { MAX_ENCRYPTED_FILE_BYTES, type EncryptedEnvelope } from './encryptedEnvelope';
 import { decryptAndValidateWorkspace, validateAndEncryptWorkspace } from './workspaceCodec';
-import { operationError, operationErrorCode } from '../workspacePersistenceError';
+import {
+  operationError,
+  operationErrorCode,
+  operationErrorDetail,
+} from '../workspacePersistenceError';
 
 const JOB_TIMEOUT_MS = 120_000;
 let pending: Promise<unknown> = Promise.resolve();
@@ -51,7 +55,7 @@ function workerJob(request: Request, signal?: AbortSignal): Promise<EncryptedEnv
         return;
       }
       if (result.type === 'workspace-operation-failed') {
-        finish(operationError(result.code));
+        finish(operationError(result.code, result.detail));
         return;
       }
       if (request.type === 'encrypt-workspace') {
@@ -125,7 +129,7 @@ function enqueue(request: Request, beforeStart?: () => Promise<void>, signal?: A
           return result;
         } catch (error) {
           signal?.throwIfAborted();
-          throw operationError(operationErrorCode(error));
+          throw operationError(operationErrorCode(error), operationErrorDetail(error));
         }
       }
       if (typeof Worker === 'undefined') throw operationError('worker-unavailable');

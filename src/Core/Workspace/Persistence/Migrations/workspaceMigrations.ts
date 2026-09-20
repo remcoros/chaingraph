@@ -23,15 +23,16 @@ export function migrateWorkspace(data: unknown): unknown {
   if (raw.version === CURRENT_WORKSPACE_VERSION) return data;
   if (
     Object.prototype.hasOwnProperty.call(raw, 'version') &&
-    ![1, 2, 3, 4, 5].includes(raw.version as number)
+    ![1, 2, 3, 4, 5, 6].includes(raw.version as number)
   )
     throw new WorkspaceSchemaVersionError();
-  const nested: Record<string, unknown> = raw.version === 5 ? raw : nestWorkspace(raw);
+  const nested: Record<string, unknown> =
+    raw.version === 5 || raw.version === 6 ? raw : nestWorkspace(raw);
   const chainData = nested.chainData as Record<string, unknown> | undefined;
   const scans = nested.connectionScans as Record<string, unknown> | undefined;
   const { inputContext, ...document } = nested;
   const view = document.view;
-  return {
+  return migrateWalletActivity({
     ...document,
     version: CURRENT_WORKSPACE_VERSION,
     ...(typeof view === 'object' &&
@@ -48,7 +49,38 @@ export function migrateWorkspace(data: unknown): unknown {
     ...(scans && {
       connectionScans: { ...scans, evidence: migrateTransactionPlacement(scans.evidence) },
     }),
-  };
+  });
+}
+
+/** Convert the v6 activity queue into the v7 summary without mutating decrypted input. */
+function migrateWalletActivity(document: Record<string, unknown>): Record<string, unknown> {
+  const wallets = document.wallets;
+  if (!wallets || typeof wallets !== 'object' || Array.isArray(wallets)) return document;
+  const definitions = (wallets as Record<string, unknown>).definitions;
+  if (!Array.isArray(definitions)) return document;
+
+  let changed = false;
+  const migrated = definitions.map((wallet) => {
+    if (!wallet || typeof wallet !== 'object' || Array.isArray(wallet)) return wallet;
+    const record = wallet as Record<string, unknown>;
+    const activity = record.lastActivity;
+    if (!activity || typeof activity !== 'object' || Array.isArray(activity)) return wallet;
+    const legacy = activity as Record<string, unknown>;
+    if (!Array.isArray(legacy.newTransactionIds) || Object.hasOwn(legacy, 'addedTransactionCount'))
+      return wallet;
+    changed = true;
+    const { newTransactionIds, ...summary } = legacy;
+    return {
+      ...record,
+      lastActivity: { ...summary, addedTransactionCount: newTransactionIds.length },
+    };
+  });
+  return changed
+    ? {
+        ...document,
+        wallets: { ...(wallets as Record<string, unknown>), definitions: migrated },
+      }
+    : document;
 }
 
 function nestWorkspace(raw: Record<string, unknown>) {

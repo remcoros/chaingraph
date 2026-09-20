@@ -213,6 +213,25 @@ describe('browser workspace read worker lifecycle', () => {
     }
   });
 
+  it('shows a validation path without worker error text', async () => {
+    setup();
+    const result = decryptWorkspaceOffThread(envelope, 'public fixture password');
+    const rejected = expect(result).rejects.toThrow(
+      'Validation issue at wallets.definitions.0.lastActivity.addedTransactionCount',
+    );
+    const worker = await latest();
+    worker.onmessage?.({
+      data: {
+        type: 'workspace-operation-failed',
+        id: worker.request!.id,
+        code: 'validation',
+        detail: 'wallets.definitions.0.lastActivity.addedTransactionCount',
+        message: 'private parser text',
+      },
+    } as MessageEvent);
+    await rejected;
+  });
+
   it('times out a stalled read and terminates the worker', async () => {
     setup();
     vi.useFakeTimers();

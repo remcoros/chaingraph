@@ -21,6 +21,7 @@ import { graphUnconnectedOutputIds } from './graphBranch';
 import type { Transaction } from '../../../Core/ChainData';
 import { buildGraph } from './graphEvidence';
 import { createWorkspace } from '../../../Core/Workspace/createWorkspace';
+import { CURRENT_WORKSPACE_VERSION } from '../../../Core/Workspace/workspace';
 import { parseWorkspace } from '../../../Core/Workspace/Persistence';
 import { createTemplateWorkspace } from '../../Examples/workspaceTemplates';
 import { showAllNodes } from './visibility';
@@ -321,7 +322,7 @@ describe('explicit canvas membership', () => {
       const legacy = version === undefined ? unversioned : { ...unversioned, version };
       const before = structuredClone(legacy);
       const parsed = parseWorkspace(legacy);
-      expect(parsed.version).toBe(6);
+      expect(parsed.version).toBe(CURRENT_WORKSPACE_VERSION);
       expect(ids(parsed)).toEqual(buildGraph(w).nodes.map((node) => node.id));
       expect(parsed.view.graphNodeIds).not.toContain(outpointReference(a, 1));
       expect(legacy).toEqual(before);

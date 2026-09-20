@@ -8,7 +8,7 @@ export function decodeWorkspaceDocument(data: unknown, verifyDerivation = true):
   const parsed = validateWorkspace(migrateWorkspace(data), verifyDerivation);
   if (
     parsed.view.graphNodeIds === undefined &&
-    [2, 3, 4, 5, CURRENT_WORKSPACE_VERSION].includes((data as { version?: number }).version ?? 0)
+    [2, 3, 4, 5, 6, CURRENT_WORKSPACE_VERSION].includes((data as { version?: number }).version ?? 0)
   )
     throw new Error('Workspace is missing explicit graph entity membership.');
   if (parsed.view.graphNodeIds === undefined)

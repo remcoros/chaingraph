@@ -1,6 +1,6 @@
 import type { Workspace } from '../../workspace';
 import { decryptAndValidateWorkspace, validateAndEncryptWorkspace } from './workspaceCodec';
-import { operationErrorCode } from '../workspacePersistenceError';
+import { operationErrorCode, operationErrorDetail } from '../workspacePersistenceError';
 
 // Each worker handles one job, then the caller terminates it. Decrypted data returns
 // only to browser memory; errors contain allowlisted codes, never raw exception text.
@@ -34,6 +34,7 @@ self.onmessage = async (
       type: 'workspace-operation-failed',
       id: request.id,
       code: operationErrorCode(error),
+      detail: operationErrorDetail(error),
     });
   }
 };

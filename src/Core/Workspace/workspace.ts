@@ -36,7 +36,7 @@ import { walletsSchema, type Wallet, type WalletReviewRecords } from './Wallets/
 import { analysisSchema, type AnalysisFinding } from './Analysis/finding';
 
 /** Decrypted workspace schema version, independent of the encrypted envelope version. */
-export const CURRENT_WORKSPACE_VERSION = 6 as const;
+export const CURRENT_WORKSPACE_VERSION = 7 as const;
 
 /** Canonical live and decrypted document. Runtime services belong to the unlocked session. */
 export interface WorkspaceDocument {

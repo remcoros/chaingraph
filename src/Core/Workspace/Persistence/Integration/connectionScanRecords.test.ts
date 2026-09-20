@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { legacyWorkspace } from '../../../../../tests/fixtures/legacyWorkspace';
 import { DEFAULT_SCAN_SETTINGS } from '../../ConnectionScan/connectionScan';
 import type { ScanResult, ScanRun } from '../../ConnectionScan/connectionScans';
-import type { Workspace } from '../../workspace';
+import { CURRENT_WORKSPACE_VERSION, type Workspace } from '../../workspace';
 import {
   addScanPath,
   prepareScanPath,
@@ -551,7 +551,7 @@ describe('compact connection scan records', () => {
       view: { ...workspace.view, graphNodeIds: [] },
     };
     const parsed = parseWorkspace(legacy);
-    expect(parsed.version).toBe(6);
+    expect(parsed.version).toBe(CURRENT_WORKSPACE_VERSION);
     expect(parsed.connectionScans).toBeUndefined();
     expect(parsed.view.graphNodeIds).toEqual([]);
     expect(legacy.version).toBe(2);

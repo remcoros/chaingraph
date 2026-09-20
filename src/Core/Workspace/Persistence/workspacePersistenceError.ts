@@ -33,10 +33,19 @@ const messages = {
 } as const;
 export type WorkspaceOperationCode = keyof typeof messages;
 
-/** Only allowlisted messages cross worker boundaries, never parser or platform exception text. */
+function validationPath(error: unknown): string | undefined {
+  const issue = (error as { issues?: { path?: unknown }[] } | undefined)?.issues?.[0];
+  return Array.isArray(issue?.path) && issue.path.length ? issue.path.join('.') : undefined;
+}
+
 export class WorkspacePersistenceError extends Error {
-  constructor(readonly code: WorkspaceOperationCode) {
-    super(messages[code]);
+  constructor(
+    readonly code: WorkspaceOperationCode,
+    detail?: string,
+  ) {
+    super(
+      `${messages[code]}${code === 'validation' && detail ? ` Validation issue at ${detail}.` : ''}`,
+    );
   }
 }
 export function operationErrorCode(error: unknown): WorkspaceOperationCode {
@@ -45,10 +54,14 @@ export function operationErrorCode(error: unknown): WorkspaceOperationCode {
     return error.code as WorkspaceOperationCode;
   return 'validation';
 }
-export function operationError(code: unknown): WorkspacePersistenceError {
+export function operationErrorDetail(error: unknown): string | undefined {
+  return validationPath(error);
+}
+export function operationError(code: unknown, detail?: string): WorkspacePersistenceError {
   return new WorkspacePersistenceError(
     typeof code === 'string' && Object.hasOwn(messages, code)
       ? (code as WorkspaceOperationCode)
       : 'validation',
+    detail,
   );
 }

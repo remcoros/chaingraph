@@ -40,7 +40,7 @@ describe('decrypted workspace schema boundary', () => {
     expect(legacy).toEqual({ name: 'Public fixture', custom: { preserved: true } });
   });
 
-  it.each([null, 0, 7, -1, 1.5, '1', undefined, {}, ['private fixture detail']])(
+  it.each([null, 0, 8, -1, 1.5, '1', undefined, {}, ['private fixture detail']])(
     'rejects an explicit unsupported schema version without exposing its value: %j',
     (version) => {
       const original = { ...createWorkspace('Public fixture', 'mainnet'), version };
@@ -109,11 +109,14 @@ describe('decrypted workspace schema boundary', () => {
     },
   );
 
-  it.each([2, 3, 4, 5] as const)(
+  it.each([2, 3, 4, 5, 6] as const)(
     'rejects missing v%s graph membership before accepting the document',
     (version) => {
       const current = createWorkspace('Public migration fixture', 'mainnet');
-      const payload = version === 5 ? current : legacyWorkspace(current, version);
+      const payload =
+        version === 5 || version === 6
+          ? { ...current, version }
+          : legacyWorkspace(current, version);
       delete payload.view.graphNodeIds;
       expect(() => parseWorkspace(payload)).toThrow('explicit graph entity membership');
     },

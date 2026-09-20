@@ -17,6 +17,37 @@ const wallet: Wallet = {
 const txid = 'a'.repeat(64);
 
 describe('capability results survive workspace format validation', () => {
+  it('migrates the immediately preceding v6 activity shape before validation', () => {
+    const current = createWorkspace('Activity migration', 'mainnet');
+    const legacy = {
+      ...current,
+      version: 6,
+      wallets: {
+        ...current.wallets,
+        definitions: [
+          {
+            ...wallet,
+            lastActivity: {
+              newTransactionIds: ['a'.repeat(64), 'b'.repeat(64)],
+              refreshedTransactionCount: 3,
+              missingTransactionCount: 1,
+            },
+          },
+        ],
+      },
+    };
+    const original = structuredClone(legacy);
+
+    const parsed = parseWorkspace(legacy);
+    expect(parsed.version).toBe(7);
+    expect(parsed.wallets.definitions[0].lastActivity).toEqual({
+      addedTransactionCount: 2,
+      refreshedTransactionCount: 3,
+      missingTransactionCount: 1,
+    });
+    expect(legacy).toEqual(original);
+  });
+
   it('merges into current edits and never resurrects a removed wallet', () => {
     const current = {
       ...createWorkspace('Refresh', 'mainnet'),

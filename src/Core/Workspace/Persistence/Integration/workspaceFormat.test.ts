@@ -2,7 +2,7 @@ import { createCipheriv, pbkdf2Sync } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildGraph } from '../../../../App/Workspace/GraphState/graphEvidence';
 import { createWorkspace } from '../../createWorkspace';
-import type { Workspace } from '../../workspace';
+import { CURRENT_WORKSPACE_VERSION, type Workspace } from '../../workspace';
 import {
   decryptWorkspace,
   encryptWorkspace,
@@ -79,7 +79,7 @@ describe('workspace format at persistence and import boundaries', () => {
     const original = structuredClone(legacy);
     const saved = await validateAndEncryptWorkspace(legacy as unknown as Workspace, password);
     expect(await decryptWorkspace(saved, password)).toMatchObject({
-      version: 6,
+      version: CURRENT_WORKSPACE_VERSION,
       view: { graphNodeIds: buildGraph(current).nodes.map((node) => node.id) },
       retainedField: 'public fixture metadata',
     });
