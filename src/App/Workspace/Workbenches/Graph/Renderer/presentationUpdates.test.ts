@@ -198,6 +198,7 @@ describe('incremental graph presentation', () => {
       { showTags: false },
       { nodes: input.nodes.slice(0, 2) },
       { links: [] },
+      { chronology: new Map([['tx', { kind: 'latest' }]]) },
       {
         flowContext: {
           transactionId: 'tx',

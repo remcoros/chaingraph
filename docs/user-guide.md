@@ -113,9 +113,13 @@ on opposite sides of their transaction, and shared outputs connect transaction
 branches. In 3D, substantial downstream groups receive distinct spatial branch
 directions while transaction order always advances along the graph's X axis.
 Each transaction's input and output groups stay on its X-facing sides; a shared
-output between visible transactions follows their connecting edge. New nodes
-extend the established branch without moving existing ones; **Repack** rearranges
-everything visible.
+output between visible transactions follows their connecting edge. Each
+transaction and its unconnected input/output group gets enough X space to form
+one readable event band. Block height orders compact sibling bands without
+turning block gaps into empty distance. Mempool transactions and transactions
+whose order is unknown use the most recent available band. New nodes extend the
+established branch without moving existing ones; **Repack** rearranges everything
+visible and applies newly observed ordering to all bands.
 
 The transaction flow panel has collapsed, normal and full-height views. Its two
 floating arrow buttons collapse, expand or restore its height; double arrows

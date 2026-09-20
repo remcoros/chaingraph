@@ -426,6 +426,24 @@ describe('default renderer responsiveness and snapshots', () => {
     },
   );
 
+  it('forwards compact chronology hints to the layout worker', () => {
+    const { renderer } = setup();
+    const data = frame(2);
+    data.nodes = data.nodes.map((node, index) => ({
+      ...node,
+      chronology:
+        index === 0
+          ? ({ kind: 'confirmed', order: 840_000 } as const)
+          : ({ kind: 'latest' } as const),
+    }));
+    renderer.update(data);
+    expect(WorkerMock.instances[0].postMessage.mock.calls[0][0].nodes).toMatchObject([
+      { id: 'n0', chronology: { kind: 'confirmed', order: 840_000 } },
+      { id: 'n1', chronology: { kind: 'latest' } },
+    ]);
+    renderer.dispose();
+  });
+
   it('does not use an unrelated selected outpoint as an expansion origin', () => {
     const { renderer } = setup();
     const original = frame(1);

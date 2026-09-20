@@ -1,4 +1,5 @@
 import type { GraphSnapshot } from '../../../../../Core/Workspace/view';
+export type RenderChronology = { kind: 'confirmed'; order: number } | { kind: 'latest' };
 /** Renderer-only contract. No workspace objects or mutable renderer objects cross it. */
 export interface RenderNode {
   id: string;
@@ -16,6 +17,8 @@ export interface RenderNode {
   flowActive?: boolean;
   /** Screen-space role accent, independent of physical geometry and layout. */
   marker?: { shape: 'brackets' | 'ring'; color: string };
+  /** Compact layout order. `latest` is a lane, not a claim that the event is recent. */
+  chronology?: RenderChronology;
   x?: number;
   y?: number;
   z?: number;

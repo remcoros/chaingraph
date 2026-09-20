@@ -194,7 +194,7 @@ describe('grouped flow and generic compact layout', () => {
     const placed = new Map(compactLayout(graph).positions),
       hub = placed.get('opened')!;
     expect(hub.y).toBeGreaterThan(50);
-    expect(Math.abs(hub.x)).toBeLessThan(15);
+    expect(hub.x).toBeGreaterThan(40);
     for (const [id, point] of graph.previous) expect(placed.get(id)).toEqual(point);
   });
 
@@ -474,6 +474,46 @@ describe('grouped flow and generic compact layout', () => {
     ).toEqual(result);
     const flat = compactLayout({ ...graph, dimensions: 2 }).positions;
     expect(flat.every(([, point]) => point.z === 0)).toBe(true);
+  });
+
+  it('keeps terminal output shells inside compact branch-local chronology bands', () => {
+    const confirmed = (order: number) => ({ kind: 'confirmed' as const, order });
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      previous: [],
+      nodes: [{ id: 'root', shape: 'box', chronology: confirmed(100) }],
+      links: [],
+    };
+    for (let index = 0; index < 20; index++) {
+      const id = `terminal-${index}`;
+      graph.nodes.push({ id, shape: 'sphere' });
+      graph.links.push({ source: 'root', target: id, directed: true });
+    }
+    for (const [id, chronology] of [
+      ['same-a', confirmed(200)],
+      ['same-b', confirmed(200)],
+      ['later', confirmed(9_000)],
+      ['latest', { kind: 'latest' as const }],
+    ] as const) {
+      const bridge = `bridge-${id}`;
+      graph.nodes.push({ id, shape: 'box', chronology }, { id: bridge, shape: 'sphere' });
+      graph.links.push(
+        { source: 'root', target: bridge, directed: true },
+        { source: bridge, target: id, directed: true },
+      );
+    }
+    const placed = new Map(compactLayout(graph).positions),
+      same = placed.get('same-a')!.x,
+      later = placed.get('later')!.x,
+      latest = placed.get('latest')!.x;
+    expect(placed.get('same-b')!.x).toBe(same);
+    expect(later).toBeGreaterThan(same);
+    expect(latest).toBeGreaterThan(later);
+    expect(later - same).toBeLessThan(200);
+    expect(
+      [...placed].filter(([id]) => id.startsWith('terminal-')).every(([, point]) => point.x < same),
+    ).toBe(true);
   });
 
   it('gives a large CoinJoin-like transaction graph a mass-aware 3D transaction skeleton', () => {

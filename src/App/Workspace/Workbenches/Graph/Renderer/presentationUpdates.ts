@@ -30,6 +30,7 @@ function sameContext(a: GraphPresentationInput, b: GraphPresentationInput) {
   return (
     a.nodes === b.nodes &&
     a.links === b.links &&
+    a.chronology === b.chronology &&
     a.dimensions === b.dimensions &&
     a.selectedId === b.selectedId &&
     sameList(a.batchSelectedIds, b.batchSelectedIds) &&

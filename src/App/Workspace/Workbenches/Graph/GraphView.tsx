@@ -29,7 +29,7 @@ import type { GraphFlowContext } from './Renderer/flowContext';
 import { VisibilityActions, type VisibilityProps } from '../../Selection/VisibilityActions';
 
 import { mergeGraphSnapshot } from './Renderer/graphSnapshot';
-import type { GraphAdapter, GraphAdapterFactory } from './Renderer/adapter';
+import type { GraphAdapter, GraphAdapterFactory, RenderChronology } from './Renderer/adapter';
 import { createDefaultAdapter } from './Renderer/defaultAdapter';
 import {
   buildGraphPresentationIndex,
@@ -381,6 +381,21 @@ export default function GraphView(props: GraphViewProps) {
     () => buildGraphPresentationIndex(props.nodes, props.links),
     [props.nodes, props.links],
   );
+  const chronology = useMemo(() => {
+    if (!props.transactions) return undefined;
+    const result = new Map<string, RenderChronology>();
+    for (const node of props.nodes) {
+      if (node.kind !== 'transaction' || !node.txid) continue;
+      const status = props.transactions[node.txid]?.status;
+      result.set(
+        node.id,
+        status?.kind === 'confirmed' && Number.isInteger(status.blockHeight)
+          ? { kind: 'confirmed', order: status.blockHeight! }
+          : { kind: 'latest' },
+      );
+    }
+    return result;
+  }, [props.nodes, props.transactions]);
   const presentationInput = useMemo<GraphPresentationInput>(
     () => ({
       nodes: props.nodes,
@@ -395,6 +410,7 @@ export default function GraphView(props: GraphViewProps) {
       showIcons: props.showIcons,
       nodePresentation: props.nodePresentation,
       flowContext: props.flowContext,
+      chronology,
     }),
     [
       props.nodes,
@@ -409,6 +425,7 @@ export default function GraphView(props: GraphViewProps) {
       props.showIcons,
       props.nodePresentation,
       props.flowContext,
+      chronology,
     ],
   );
   const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), []);

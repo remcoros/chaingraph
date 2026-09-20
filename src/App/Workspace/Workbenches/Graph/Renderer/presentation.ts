@@ -1,5 +1,5 @@
 import type { GraphLink, GraphNode } from '../../../GraphState/types';
-import type { GraphFrame, GraphHit, RenderNode } from './adapter';
+import type { GraphFrame, GraphHit, RenderChronology, RenderNode } from './adapter';
 import type { GraphFlowContext } from './flowContext';
 
 /** Callers interpret tags, wallets or findings and supply only visual overrides. */
@@ -105,6 +105,7 @@ export interface GraphPresentationInput {
   showIcons?: boolean;
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
   flowContext?: GraphFlowContext;
+  chronology?: ReadonlyMap<string, RenderChronology>;
 }
 
 /** Build once per update, then project only the nodes whose visual overrides changed. */
@@ -159,6 +160,7 @@ export function createGraphNodePresenter(
             color: roleColor,
           }
         : undefined,
+      chronology: input.chronology?.get(node.id),
       color: selected
         ? palette.accent
         : (override?.color ??

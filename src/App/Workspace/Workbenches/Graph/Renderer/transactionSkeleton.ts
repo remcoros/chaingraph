@@ -1,15 +1,19 @@
-import type { Position } from './flowLayout';
+import type { LayoutNode, Position } from './flowLayout';
 import { dot, flowFrame, normalized, scaled, subtract } from './flowOrientation';
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const GOLDEN_ANGLE = 2.399963229728653;
 const MAX_BRANCH_ANGLE = (82 * Math.PI) / 180;
 const MIN_CAUSAL_X = 0.08;
+const TEMPORAL_BAND_GAP = 24;
 
 export interface TransactionSkeletonNode {
   id: string;
   /** Retained coordinates are immutable anchors during incremental expansion. */
   position?: Position;
+  /** False only for a tentative position chosen while opening this transaction. */
+  retained?: boolean;
+  chronology?: LayoutNode['chronology'];
   incomingExtent: number;
   outgoingExtent: number;
   transverseExtent: number;
@@ -254,7 +258,7 @@ export function layoutTransactionSkeleton(
   for (const node of nodes) {
     if (node.position) {
       positions.set(node.id, { ...node.position, z: flat ? 0 : node.position.z });
-      anchored.add(node.id);
+      if (node.retained !== false) anchored.add(node.id);
     }
   }
   const adjacent = new Map(
@@ -484,16 +488,75 @@ export function layoutTransactionSkeleton(
       remaining.set(neighbor.id, remaining.get(neighbor.id)! - 1);
       if (remaining.get(neighbor.id) === 0) chronological.push(neighbor.id);
     }
-  if (chronological.length === nodes.length)
+  const applyCausalOrder = () => {
+    if (chronological.length !== nodes.length) return;
     for (const id of chronological) {
       if (anchored.has(id)) continue;
       const point = positions.get(id)!;
       const required = Math.max(
         -Infinity,
-        ...incoming.get(id)!.map((edge) => positions.get(edge.source)!.x + 24),
+        ...incoming
+          .get(id)!
+          .map(
+            (edge) =>
+              positions.get(edge.source)!.x +
+              byId.get(edge.source)!.outgoingExtent +
+              byId.get(id)!.incomingExtent +
+              edge.gap,
+          ),
       );
       if (point.x < required) positions.set(id, { ...point, x: required });
     }
+  };
+  applyCausalOrder();
+
+  // Confirmed height orders sibling events without mapping raw block gaps to
+  // distance. Equal-height events share one compact X band; unknown-order and
+  // mempool events share the last sibling band. Bands are branch-local, so
+  // separate 3D subtrees can reuse X instead of recreating one global cigar.
+  const bandOrder = (node: TransactionSkeletonNode) =>
+    node.chronology?.kind === 'confirmed'
+      ? node.chronology.order
+      : node.chronology?.kind === 'latest'
+        ? Infinity
+        : undefined;
+  for (const parentId of order)
+    for (const side of [-1, 1] as const) {
+      const siblings = children
+        .get(parentId)!
+        .filter((id) => {
+          const edge = spatialEdge.get(id)!;
+          return (
+            (edge.source === parentId ? 1 : -1) === side && bandOrder(byId.get(id)!) !== undefined
+          );
+        })
+        .sort((a, b) => bandOrder(byId.get(a)!)! - bandOrder(byId.get(b)!)! || compare(a, b));
+      if (!siblings.length) continue;
+      const bands: string[][] = [];
+      for (const id of siblings) {
+        const previous = bands.at(-1),
+          key = bandOrder(byId.get(id)!)!;
+        if (previous && Object.is(bandOrder(byId.get(previous[0])!)!, key)) previous.push(id);
+        else bands.push([id]);
+      }
+      let right = -Infinity;
+      for (const band of bands) {
+        const incomingExtent = Math.max(...band.map((id) => byId.get(id)!.incomingExtent)),
+          outgoingExtent = Math.max(...band.map((id) => byId.get(id)!.outgoingExtent)),
+          center = Math.max(
+            ...band.map((id) => positions.get(id)!.x),
+            right + TEMPORAL_BAND_GAP + incomingExtent,
+          );
+        for (const id of band)
+          if (!anchored.has(id)) {
+            const point = positions.get(id)!;
+            positions.set(id, { ...point, x: center });
+          }
+        right = Math.max(right, ...band.map((id) => positions.get(id)!.x + outgoingExtent));
+      }
+    }
+
+  applyCausalOrder();
   for (const [child, parent] of spatialParent) {
     const edge = spatialEdge.get(child)!,
       side = edge.source === parent ? 1 : -1;

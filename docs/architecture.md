@@ -430,6 +430,13 @@ edges. It estimates descendant mass from transaction count and visible local
 geometry, gives substantial sibling subtrees deterministic solid-angle cones,
 and carries each chosen branch direction through single-child runs while every
 factual spend still advances on world X.
+Each transaction and its terminal input/output envelope occupies a branch-local
+temporal band. Factual edges separate complete neighboring envelopes, rather
+than only their transaction centers. Confirmed block height orders compact
+sibling bands without converting missing blocks into distance; equal heights
+can share a band, and mempool or unknown-order siblings use the last band.
+Factual causality takes precedence when an unknown-order transaction is visibly
+upstream of a confirmed transaction.
 Reconnectors choose one primary spatial parent while every real cross edge and
 canonical transaction remains in the rendered graph. `groupedFlowLayout.ts`
 then places terminal inputs and outputs in rounded groups on opposite sides of
@@ -442,9 +449,10 @@ opened from a visible outpoint along that established outward ray with at least
 one group radius of clearance, and never reserves space for undisplayed
 siblings. Remaining associations use a stopped `d3-force-3d` simulation anchored
 to grouped positions. Only visible nodes affect spacing. **Repack** rebuilds the
-visible layout. A newer topology request terminates obsolete worker work; views
-with cached positions restore without simulation; worker failure keeps the
-scene and offers Retry. Flat mode uses the same hierarchy in a planar footprint.
+visible layout and applies newly observed chronology to all bands. A newer
+topology request terminates obsolete worker work; views with cached positions
+restore without simulation; worker failure keeps the scene and offers Retry.
+Flat mode uses the same hierarchy in a planar footprint.
 
 `flowContext.ts` marks the selected transaction's inputs and outputs with
 screen-space brackets/rings and colored edges; `flowSelection.ts` walks visible

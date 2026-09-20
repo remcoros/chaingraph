@@ -599,7 +599,15 @@ export class FlowRenderer implements GraphAdapter {
       this.snapshotNodes = undefined;
     }
     const signature = JSON.stringify([
-      this.nodes.map((n) => [n.id, n.shape, n.fx ?? n.x, n.fy ?? n.y, n.fz ?? n.z]),
+      this.nodes.map((n) => [
+        n.id,
+        n.shape,
+        n.chronology?.kind,
+        n.chronology?.kind === 'confirmed' ? n.chronology.order : undefined,
+        n.fx ?? n.x,
+        n.fy ?? n.y,
+        n.fz ?? n.z,
+      ]),
       this.links.map((l) => [l.source, l.target, l.directed]),
     ]);
     if (signature === this.topology) {
@@ -633,10 +641,11 @@ export class FlowRenderer implements GraphAdapter {
     const request: LayoutRequest = {
       revision: ++this.revision,
       dimensions: this.dimensions,
-      nodes: this.nodes.map(({ id, shape, radius, x, y, z, fx, fy, fz }) => ({
+      nodes: this.nodes.map(({ id, shape, radius, chronology, x, y, z, fx, fy, fz }) => ({
         id,
         shape,
         radius,
+        chronology,
         x,
         y,
         z,

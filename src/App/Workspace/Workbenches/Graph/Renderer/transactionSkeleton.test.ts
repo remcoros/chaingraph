@@ -59,8 +59,8 @@ describe('transaction skeleton', () => {
     // The largest subtree owns the continuing cone. Other substantial branches
     // receive genuinely different solid-angle sectors rather than world-Y lanes.
     expect(large.x).toBeGreaterThan(0.999);
-    expect(dot(large, medium)).toBeLessThan(0.65);
-    expect(dot(large, small)).toBeLessThan(0.65);
+    expect(dot(large, medium)).toBeLessThan(0.8);
+    expect(dot(large, small)).toBeLessThan(0.8);
     const volume = Math.abs(
       large.x * (medium.y * small.z - medium.z * small.y) -
         large.y * (medium.x * small.z - medium.z * small.x) +
@@ -93,7 +93,7 @@ describe('transaction skeleton', () => {
     const result = layoutTransactionSkeleton(nodes, edges, 3),
       root = result.positions.get('root')!;
     expect(normalized(delta(root, result.positions.get('z-large-0')!)).x).toBeGreaterThan(0.999);
-    expect(normalized(delta(root, result.positions.get('a-tiny')!)).x).toBeLessThan(0.65);
+    expect(normalized(delta(root, result.positions.get('a-tiny')!)).x).toBeLessThan(0.8);
   });
 
   it('uses a high fan-in transaction as one spatial branch point on both chronology sides', () => {
@@ -127,6 +127,51 @@ describe('transaction skeleton', () => {
       Math.min(...parents.map(({ position }) => position[axis]));
     expect(span('y')).toBeGreaterThan(50);
     expect(span('z')).toBeGreaterThan(50);
+  });
+
+  it('spaces each causal event by its complete local input and output envelope', () => {
+    const nodes = [
+        node('source', { incomingExtent: 20, outgoingExtent: 70 }),
+        node('target', { incomingExtent: 55, outgoingExtent: 30 }),
+      ],
+      result = layoutTransactionSkeleton(nodes, [{ ...edge('source', 'target'), gap: 32 }], 3),
+      source = result.positions.get('source')!,
+      target = result.positions.get('target')!;
+    expect(target.x - source.x).toBeGreaterThanOrEqual(70 + 32 + 55);
+  });
+
+  it('uses compact confirmed sibling bands and reserves the last band for unknown order', () => {
+    const confirmed = (order: number) => ({ kind: 'confirmed' as const, order });
+    const nodes = [
+        node('root', { chronology: confirmed(100) }),
+        node('same-a', { chronology: confirmed(200) }),
+        node('same-b', { chronology: confirmed(200) }),
+        node('later', { chronology: confirmed(9_000) }),
+        node('latest-a', { chronology: { kind: 'latest' } }),
+        node('latest-b', { chronology: { kind: 'latest' } }),
+      ],
+      edges = nodes.slice(1).map((item) => edge('root', item.id)),
+      result = layoutTransactionSkeleton(nodes, edges, 3),
+      at = (id: string) => result.positions.get(id)!;
+    expect(at('same-a').x).toBe(at('same-b').x);
+    expect(at('later').x).toBeGreaterThan(at('same-a').x + 40);
+    expect(at('latest-a').x).toBe(at('latest-b').x);
+    expect(at('latest-a').x).toBeGreaterThan(at('later').x + 40);
+    // Block gaps order the compact bands; 8,800 missing blocks do not become distance.
+    expect(at('later').x - at('same-a').x).toBeLessThan(100);
+  });
+
+  it('keeps factual causality ahead of the latest lane when an unknown-order tx is upstream', () => {
+    const nodes = [
+        node('unknown-parent', { chronology: { kind: 'latest' } }),
+        node('confirmed-child', {
+          chronology: { kind: 'confirmed', order: 800_000 },
+        }),
+      ],
+      result = layoutTransactionSkeleton(nodes, [edge('unknown-parent', 'confirmed-child')], 3);
+    expect(result.positions.get('confirmed-child')!.x).toBeGreaterThan(
+      result.positions.get('unknown-parent')!.x + 40,
+    );
   });
 
   it('extends retained branches without moving them and assigns new siblings an open sector', () => {

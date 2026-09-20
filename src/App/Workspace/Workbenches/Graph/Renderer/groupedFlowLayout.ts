@@ -447,6 +447,8 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
       return {
         id: hub.id,
         position: positions.get(hub.id),
+        retained: cached.has(hub.id),
+        chronology: hub.chronology,
         incomingExtent: sides.get(-1)!.outer,
         outgoingExtent: sides.get(1)!.outer,
         transverseExtent: Math.max(radius(hub), ...[...sides.values()].map((pack) => pack.radius)),

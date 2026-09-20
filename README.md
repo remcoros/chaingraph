@@ -10,9 +10,9 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 ## What you can do
 
-- **Explore transactions.** Look up a transaction, address or output in a 3D or
-  flat graph. Filter the view, follow funding and spending links, and inspect
-  bounded address history.
+- **Explore transactions.** Look up a transaction, address or output in a
+  chronologically ordered 3D or flat graph. Filter the view, follow funding and
+  spending links, and inspect bounded address history.
   <img src="docs/screenshots/readme-graph.png" />
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level

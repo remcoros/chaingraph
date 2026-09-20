@@ -108,6 +108,20 @@ describe('shared graph semantics and presentation', () => {
     ]);
   });
 
+  it('projects only transaction chronology into the neutral renderer frame', () => {
+    const chronology = new Map([
+      ['tx', { kind: 'confirmed' as const, order: 840_000 }],
+      ['spend', { kind: 'latest' as const }],
+    ]);
+    const frame = presentGraph({ ...input, chronology }, palette);
+    expect(frame.nodes.find((node) => node.id === 'tx')?.chronology).toEqual({
+      kind: 'confirmed',
+      order: 840_000,
+    });
+    expect(frame.nodes.find((node) => node.id === 'spend')?.chronology).toEqual({ kind: 'latest' });
+    expect(frame.nodes.find((node) => node.id === 'out')?.chronology).toBeUndefined();
+  });
+
   it('routes node and all edge kinds to the same entity for selection, trace and edit', () => {
     expect(resolveGraphHit({ type: 'node', id: 'tx' }, nodes, links)?.id).toBe('tx');
     for (const id of ['create', 'spending'])
