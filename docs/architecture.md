@@ -265,10 +265,15 @@ are recorded in encrypted `inputContext` (which outputs the flow uses) and
 `contextTransactionIds` (ancestry provenance), so `buildGraph` can show them
 without unrelated branches and removal can drop context nothing else needs.
 
-Spending discovery (`loadSpending`) uses the spender index when enabled, then
-Electrum script histories, checking at most 500 candidates per action with an
-explicit continuation. When no spender is found it asks `gettxout` including
-mempool and reports unspent-at-check, absent or unknown.
+Spending discovery (`loadSpending`) records structured exact-lookup provenance:
+complete exact coverage, no configured opt-in, or an exact lookup that could not
+be used. Complete rows, including an empty row, never query Electrum. Otherwise
+it uses bounded Electrum script histories, checking at most 500 candidates per
+action with an explicit continuation. A typed address-history-limit result keeps
+already verified spenders and lets Graph show persistent configuration guidance
+only when there was no opt-in, or bounded causal feedback when a configured
+lookup could not be used. For an exact output with no loaded spender it then asks
+`gettxout` including mempool and reports unspent-at-check, absent or unknown.
 
 Address history is a browser-owned observation. Direct address lookups retain a
 bounded Electrum history and whether transaction-detail loading reached its

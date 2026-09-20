@@ -62,7 +62,12 @@ describe('spending expansion', () => {
       { network: w.network, transactions: w.chainData.transactions },
       0,
     );
-    expect(first).toEqual({ transactions: [], truncated: true, nextOffset: 500 });
+    expect(first).toEqual({
+      transactions: [],
+      truncated: true,
+      nextOffset: 500,
+      provenance: { exact: 'not-configured', fallback: 'partial' },
+    });
     const firstIds = requests
       .filter((r) => r.method === 'getrawtransaction')
       .map((r) => r.params[0]);
@@ -87,6 +92,7 @@ describe('spending expansion', () => {
         },
       ],
       truncated: false,
+      provenance: { exact: 'not-attempted', fallback: 'complete' },
     });
     expect(requests.filter((r) => r.method === 'getrawtransaction')).toHaveLength(501);
   });
@@ -154,6 +160,7 @@ describe('spending expansion', () => {
     ).resolves.toEqual({
       transactions: [],
       truncated: true,
+      provenance: { exact: 'not-configured', fallback: 'partial' },
     });
   });
 

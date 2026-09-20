@@ -3,7 +3,10 @@ export class SafeError extends Error {
     message: string,
     public status = 502,
     public code?:
-      'network_not_configured' | 'core_prevout_unavailable' | 'core_spender_unavailable',
+      | 'network_not_configured'
+      | 'core_prevout_unavailable'
+      | 'core_spender_unavailable'
+      | 'address_history_limit',
   ) {
     super(message);
   }

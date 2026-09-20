@@ -70,10 +70,16 @@ and both levels share a 500-transaction budget.
 With a transaction selected, **Load previous txs** adds one earlier level. For an
 output, **Open creating tx** loads only the transaction that created it, and
 **Find spending txs** looks for transactions that spent it (or any output of a
-selected transaction). Spending searches check script histories through your
-backend, up to 500 candidate transactions per action; repeat the action to
-continue. If no spender is found, the app checks Core's current UTXO set and
-reports unspent, absent or unknown. Absent is not the same as spent.
+selected transaction). If the optional Core exact-output spender lookup is
+configured for that network, a complete reply is used directly, including an
+empty result. An empty result is not proof that the output is unspent. Otherwise
+the search checks script histories through your backend, up to 500 candidate
+transactions per action; repeat the action to continue. If that bounded fallback
+reaches the configured address-history limit, the feedback explains whether the
+Core lookup is not configured or could not be used, and keeps any verified
+spenders already loaded. For an exact output with no loaded spender, the app can
+check Core's current UTXO set and report an unspent observation, absent or
+unknown. Absent is not the same as spent.
 
 The refresh icon in the Inspector's top bar checks an output's **current UTXO
 status** on demand, including mempool spends. The result is timestamped and kept

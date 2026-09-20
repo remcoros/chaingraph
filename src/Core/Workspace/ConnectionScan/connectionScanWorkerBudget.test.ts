@@ -56,7 +56,13 @@ it('keeps admitted connections when concurrent roots compete with discovered evi
     .mockImplementation(async (_network, _points, _existing, _signal, _hints, examine) => {
       await competingRootSent;
       examine?.(spender.txid);
-      return { transactions: [spender], unresolved: [], inspected: 1, unavailableTxids: [] };
+      return {
+        exact: 'complete',
+        transactions: [spender],
+        unresolved: [],
+        inspected: 1,
+        unavailableTxids: [],
+      };
     });
   const utxo = vi.spyOn(connectionScanTransport, 'fetchUtxo').mockResolvedValue(undefined);
   try {

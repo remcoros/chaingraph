@@ -44,10 +44,13 @@ export function scanLookupFailure(error: unknown, context: 'transaction' | 'spen
       stopReason: 'unknown',
       observation: { finding: 'transaction-unavailable' },
     };
+  // Address-history limits are meaningful to the spending action but do not
+  // change the durable Connection Scan issue vocabulary.
+  const issueCode = failure === 'history-limit' ? 'lookup-failed' : failure;
   return {
     nodeIds: [],
     stopReason: 'failure',
-    observation: { finding: 'lookup-failed', issueCode: failure },
+    observation: { finding: 'lookup-failed', issueCode },
   };
 }
 export function isVerifiedCoinbase(tx: Transaction): boolean {

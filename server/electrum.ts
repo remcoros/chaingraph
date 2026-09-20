@@ -211,7 +211,11 @@ export class ElectrumClient {
         Array.isArray(result) &&
         result.length > this.config.maxHistory
       )
-        throw new SafeError('Address history exceeds configured transaction limit', 413);
+        throw new SafeError(
+          'Address history exceeds configured transaction limit',
+          413,
+          'address_history_limit',
+        );
       return result;
     }, signal);
   }

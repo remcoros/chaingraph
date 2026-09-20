@@ -30,6 +30,13 @@ later user action retries after expiry. Discovery advertises the application
 opt-in, not index health. Errors are sanitized and do not distinguish missing
 from syncing indexes using upstream exception text.
 
+If that fallback exceeds `MAX_ADDRESS_HISTORY_TXS`, Chaingraph keeps verified
+spenders already loaded. When the application opt-in is absent, persistent
+feedback points to `txospenderindex` and
+`CHAINGRAPH_USE_TXOSPENDERINDEX=true` for the affected network. When the opt-in
+is advertised but the exact lookup could not be used, feedback reports that
+bounded condition without diagnosing the upstream cause.
+
 An opted-in backend permits 64 KiB request bodies for batches up to 500 exact
 outpoints; the default body limit stays 16 KiB. Normal response, queue, concurrency
 and timeout settings still apply. Browser expansion uses at most 500 candidate

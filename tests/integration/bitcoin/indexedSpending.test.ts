@@ -31,6 +31,14 @@ const error = () =>
   new Response(JSON.stringify({ error: 'Lookup unavailable', code: 'core_spender_unavailable' }), {
     status: 503,
   });
+const historyLimit = () =>
+  new Response(
+    JSON.stringify({
+      error: 'Address history exceeds configured transaction limit',
+      code: 'address_history_limit',
+    }),
+    { status: 413 },
+  );
 let calls: Call[];
 let enabled: Network[];
 let indexReply: unknown;
@@ -69,8 +77,11 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('optional exact output spending lookup', () => {
-  it('does not issue any index RPC when disabled, including the other network', async () => {
-    expect(await fetchIndexedSpenders('mainnet', [point], {})).toBeUndefined();
+  it('records disabled exact lookup as a configuration fact without issuing an index RPC', async () => {
+    expect(await fetchIndexedSpenders('mainnet', [point], {})).toMatchObject({
+      exact: 'not-configured',
+      unresolved: [point],
+    });
     enabled = [];
     await backendNetworks();
     await loadSpending(
@@ -174,7 +185,7 @@ describe('optional exact output spending lookup', () => {
     expect(calls).toHaveLength(1);
     expect(spender.status).toBeUndefined();
   });
-  it('treats a complete empty row as a fresh lookup observation without history or deleting saved spends', async () => {
+  it('treats a complete empty row as exact evidence without history or deleting saved spends', async () => {
     indexReply = [point];
     const result = await fetchIndexedSpenders('testnet4', [point], { [spender.txid]: spender });
     expect(result).toMatchObject({ unresolved: [], transactions: [spender] });
@@ -189,7 +200,52 @@ describe('optional exact output spending lookup', () => {
       transactions: [],
       truncated: false,
       lookup: 'index',
+      provenance: { exact: 'complete' },
     });
+    expect(calls.some((call) => call.method === 'blockchain.scripthash.get_history')).toBe(false);
+  });
+  it('retains loaded verified spenders when direct lookup cannot be used and history is limited', async () => {
+    handler = (call) =>
+      call.method === 'gettxspendingprevout'
+        ? error()
+        : call.method === 'blockchain.scripthash.get_history'
+          ? historyLimit()
+          : undefined;
+    const result = await loadSpending(
+      root,
+      {
+        network: workspace().network,
+        transactions: { ...workspace().chainData.transactions, [spender.txid]: spender },
+      },
+      0,
+    );
+    expect(result).toMatchObject({
+      transactions: [spender],
+      truncated: true,
+      lookup: 'electrum-fallback',
+      provenance: { exact: 'unavailable', fallback: 'history-limit' },
+    });
+    expect(calls.map((call) => call.method)).toEqual([
+      'gettxspendingprevout',
+      'blockchain.scripthash.get_history',
+    ]);
+  });
+  it('records a history limit after a not-configured exact lookup without probing Core', async () => {
+    enabled = [];
+    await backendNetworks();
+    handler = (call) =>
+      call.method === 'blockchain.scripthash.get_history' ? historyLimit() : undefined;
+    const result = await loadSpending(
+      root,
+      { network: workspace().network, transactions: workspace().chainData.transactions },
+      0,
+    );
+    expect(result).toMatchObject({
+      transactions: [],
+      truncated: true,
+      provenance: { exact: 'not-configured', fallback: 'history-limit' },
+    });
+    expect(calls.map((call) => call.method)).toEqual(['blockchain.scripthash.get_history']);
   });
   it.each([
     null,

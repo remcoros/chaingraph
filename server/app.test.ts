@@ -376,7 +376,12 @@ describe('read-only proxy', () => {
         return false;
       },
     });
-    expect((await f.rpc('blockchain.scripthash.get_history', [hash])).status).toBe(413);
+    const history = await f.rpc('blockchain.scripthash.get_history', [hash]);
+    expect(history.status).toBe(413);
+    expect(await history.json()).toEqual({
+      error: 'Address history exceeds configured transaction limit',
+      code: 'address_history_limit',
+    });
     expect((await f.rpc('blockchain.transaction.get', [hash])).status).toBe(413);
   });
   it('sanitizes upstream errors containing secrets and enforces Core size/timeout limits', async () => {

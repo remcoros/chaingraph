@@ -202,7 +202,13 @@ describe('connection scan fetch adapter', () => {
     s.transport.fetchIndexedSpenders.mockImplementation(
       async (_network, points, _existing, _signal, _hints, examine) => {
         if (examine?.(id(2)) === false)
-          return { transactions: [], unresolved: points, inspected: 0, unavailableTxids: [id(2)] };
+          return {
+            exact: 'unavailable',
+            transactions: [],
+            unresolved: points,
+            inspected: 0,
+            unavailableTxids: [id(2)],
+          };
         throw new Error('must not reach this');
       },
     );
@@ -574,6 +580,7 @@ describe('scan stopping-point evidence', () => {
   it('keeps absent current UTXO and empty spender evidence unknown', async () => {
     const s = setup([tx(1)]);
     s.transport.fetchIndexedSpenders.mockResolvedValue({
+      exact: 'complete',
       transactions: [],
       unresolved: [],
       inspected: 0,
@@ -606,6 +613,7 @@ describe('scan stopping-point evidence', () => {
   it('rejects incorrect indexed spending transactions before retaining their payload', async () => {
     const s = setup([tx(1)]);
     s.transport.fetchIndexedSpenders.mockResolvedValue({
+      exact: 'complete',
       transactions: [tx(2)],
       unresolved: [],
       inspected: 1,
@@ -622,6 +630,7 @@ describe('scan stopping-point evidence', () => {
     const s = setup();
     s.transport.fetchTransaction.mockRejectedValue(new Error('Synthetic creator unavailable'));
     s.transport.fetchIndexedSpenders.mockResolvedValue({
+      exact: 'complete',
       transactions: [tx(2, 1)],
       unresolved: [],
       inspected: 1,

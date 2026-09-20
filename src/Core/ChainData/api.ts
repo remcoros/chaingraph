@@ -55,6 +55,7 @@ export type RpcFailureKind =
   | 'backend-unavailable'
   | 'rate-limited'
   | 'timeout'
+  | 'history-limit'
   | 'invalid-response'
   | 'lookup-failed'
   | 'conflicting-evidence';
@@ -63,6 +64,7 @@ export function classifyRpcFailure(error: unknown): RpcFailureKind {
   if (error instanceof RpcError) {
     if (error.code === 'network_not_configured') return 'backend-unavailable';
     if (error.status === 429) return 'rate-limited';
+    if (error.code === 'address_history_limit') return 'history-limit';
     // Optional spending-index capability loss still permits the existing history fallback.
     if (error.code === 'core_spender_unavailable') return 'lookup-failed';
     if (error.status === 503) return 'backend-unavailable';
@@ -668,6 +670,8 @@ const spenderReply = z
   )
   .max(500);
 export interface IndexedSpenders {
+  /** Whether Core supplied complete exact evidence for every requested outpoint. */
+  exact: 'not-configured' | 'complete' | 'unavailable';
   transactions: Transaction[];
   unresolved: SpendingOutpoint[];
   inspected: number;
@@ -689,7 +693,6 @@ export async function fetchIndexedSpenders(
     priority: 'background',
     observation: hints.observation ?? {},
   };
-  if (!spenderIndexNetworks.has(network)) return undefined;
   const scope = fetchHints.scope ?? transactionScheduler.standalone;
   scope.beginObservation(fetchHints.observation!);
   const unique = [...new Map(points.map((point) => [pointKey(point), point])).values()];
@@ -712,6 +715,14 @@ export async function fetchIndexedSpenders(
       )
       .map((tx) => [tx.txid, tx]),
   );
+  if (!spenderIndexNetworks.has(network))
+    return {
+      exact: 'not-configured',
+      transactions: [...transactions.values()],
+      unresolved: unique,
+      inspected: 0,
+      unavailableTxids: [],
+    };
   let rows: z.infer<typeof spenderReply>;
   try {
     rows = spenderReply.parse(
@@ -749,6 +760,7 @@ export async function fetchIndexedSpenders(
     )
       throw error;
     return {
+      exact: 'unavailable',
       transactions: [...transactions.values()],
       unresolved: unique,
       inspected: 0,
@@ -848,6 +860,7 @@ export async function fetchIndexedSpenders(
   signal?.throwIfAborted();
   const unresolvedKeys = new Set(unresolved.map(pointKey));
   return {
+    exact: unresolved.length ? 'unavailable' : 'complete',
     transactions: [...transactions.values()],
     unresolved,
     inspected,
@@ -855,6 +868,24 @@ export async function fetchIndexedSpenders(
       .filter(([, group]) => group.some((row) => unresolvedKeys.has(pointKey(row))))
       .map(([id]) => id),
   };
+}
+
+export interface SpendingLookupProvenance {
+  /** Core index configuration or exact-query coverage for this action. */
+  exact: 'not-configured' | 'complete' | 'unavailable' | 'not-attempted';
+  /** Present only when bounded Electrum history was needed. */
+  fallback?: 'complete' | 'partial' | 'history-limit';
+}
+
+export interface SpendingLoadResult {
+  transactions: Transaction[];
+  truncated: boolean;
+  nextOffset?: number;
+  /** Retained compatibility summary for existing callers. Prefer provenance for decisions. */
+  lookup?: 'index' | 'electrum-fallback';
+  failed?: number;
+  unavailableTxids?: string[];
+  provenance: SpendingLookupProvenance;
 }
 
 export async function loadSpending(
@@ -865,14 +896,7 @@ export async function loadSpending(
   offset = 0,
   hints: TransactionFetchHints = {},
   previousUnavailableTxids: readonly string[] = [],
-): Promise<{
-  transactions: Transaction[];
-  truncated: boolean;
-  nextOffset?: number;
-  lookup?: 'index' | 'electrum-fallback';
-  failed?: number;
-  unavailableTxids?: string[];
-}> {
+): Promise<SpendingLoadResult> {
   if (!z.array(spenderHash).max(500).safeParse(previousUnavailableTxids).success)
     throw new Error('Invalid spending continuation.');
   if (!Number.isSafeInteger(offset) || offset < 0)
@@ -899,23 +923,40 @@ export async function loadSpending(
         )
       : undefined;
   if (indexed && !indexed.unresolved.length)
-    return { transactions: indexed.transactions, truncated: false, lookup: 'index' };
+    return {
+      transactions: indexed.transactions,
+      truncated: false,
+      lookup: 'index',
+      provenance: { exact: indexed.exact },
+    };
   const outputs = selected;
   const hashes = outputs.map((output) => outputScriptHash(output, w.network));
   const scripts = [...new Set(hashes.filter((h): h is string => h !== undefined))];
   if (!scripts.length && indexed)
-    return { transactions: indexed.transactions, truncated: true, lookup: 'electrum-fallback' };
+    return {
+      transactions: indexed.transactions,
+      truncated: true,
+      lookup: 'electrum-fallback',
+      provenance: { exact: indexed.exact, fallback: 'partial' },
+    };
   if (!scripts.length)
     throw new Error(
       'Load the creating transaction first: these outputs have no script data to search.',
     );
   let failed = 0;
+  let historyLimit = false;
   const histories = await mapLimit(scripts, 4, async (hash) => {
     try {
       return await fetchHistory(w.network, hash, signal);
     } catch (error) {
       signal?.throwIfAborted();
-      if (!indexed && !previousUnavailableTxids.length) throw error;
+      if (classifyRpcFailure(error) === 'history-limit') {
+        historyLimit = true;
+      } else if (
+        (!indexed || indexed.exact === 'not-configured') &&
+        !previousUnavailableTxids.length
+      )
+        throw error;
       failed++;
       return [];
     }
@@ -968,15 +1009,23 @@ export async function loadSpending(
     ...new Set([...previousUnavailableTxids, ...(indexed?.unavailableTxids ?? [])]),
   ].filter((id) => !resolvedIds.has(id));
   failed += unavailableTxids.length;
+  const exact = indexed?.exact ?? 'not-attempted';
+  const fallback = historyLimit
+    ? 'history-limit'
+    : nextOffset !== undefined || hashes.some((h) => h === undefined) || failed > 0
+      ? 'partial'
+      : 'complete';
   return {
     transactions: [
       ...new Map([...(indexed?.transactions ?? []), ...matches].map((t) => [t.txid, t])).values(),
     ],
     truncated: nextOffset !== undefined || hashes.some((h) => h === undefined) || failed > 0,
-    ...(indexed || previousUnavailableTxids.length
+    ...((indexed !== undefined && indexed.exact !== 'not-configured') ||
+    previousUnavailableTxids.length
       ? { lookup: 'electrum-fallback' as const, ...(failed ? { failed } : {}) }
       : {}),
     ...(unavailableTxids.length ? { unavailableTxids } : {}),
     ...(!fallbackFailed && nextOffset !== undefined ? { nextOffset } : {}),
+    provenance: { exact, fallback },
   };
 }

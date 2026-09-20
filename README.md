@@ -124,7 +124,9 @@ automatically and can be exported as encrypted files for backup or transfer.
   signing and spending are out of scope.
 - Loaded data is a snapshot. Scans, history and expansion are bounded, and a
   partial result never proves that nothing else exists. A missing spend means
-  unknown, not unspent.
+  unknown, not unspent. When bounded spending history reaches its configured
+  limit, Chaingraph keeps any verified spenders already loaded and reports the
+  incomplete evidence.
 - Heuristics are hypotheses. Common-input ownership can be wrong, CoinJoin
   detection is incomplete, and no tool identifies a person or proves a wallet
   owns anything.

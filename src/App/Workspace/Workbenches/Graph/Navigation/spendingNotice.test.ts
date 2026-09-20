@@ -89,6 +89,50 @@ describe('spending lookup feedback', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('makes an exact-lookup fallback limit persistent without claiming loaded spenders failed', async () => {
+    const fetch = respond(null);
+    await expect(
+      spendingNotice(
+        {
+          transactions: [tx],
+          truncated: true,
+          provenance: { exact: 'unavailable', fallback: 'history-limit' },
+        },
+        tx,
+        'mainnet',
+        undefined,
+        signal(),
+      ),
+    ).resolves.toMatchObject({
+      kind: 'error',
+      lifetime: 'persistent',
+      message: expect.stringContaining('Exact-output lookup could not be used'),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('offers per-network Core index configuration when the fallback limit follows no opt-in', async () => {
+    const fetch = respond(null);
+    await expect(
+      spendingNotice(
+        {
+          transactions: [],
+          truncated: true,
+          provenance: { exact: 'not-configured', fallback: 'history-limit' },
+        },
+        tx,
+        'mainnet',
+        0,
+        signal(),
+      ),
+    ).resolves.toMatchObject({
+      kind: 'error',
+      lifetime: 'persistent',
+      message: expect.stringContaining('CHAINGRAPH_USE_TXOSPENDERINDEX=true'),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('does not fan out UTXO checks for transaction-wide searches', async () => {
     const fetch = respond(null);
     expect(await spendingNotice(empty, tx, 'mainnet', undefined, signal())).toContain(

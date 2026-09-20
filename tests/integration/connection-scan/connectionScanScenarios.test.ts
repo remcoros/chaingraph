@@ -86,7 +86,13 @@ async function scanScenario(
         ),
       );
       for (const value of transactions) beforeInspect?.(value.txid);
-      return { transactions, unresolved: [], inspected: transactions.length, unavailableTxids: [] };
+      return {
+        exact: 'complete',
+        transactions,
+        unresolved: [],
+        inspected: transactions.length,
+        unavailableTxids: [],
+      };
     },
     fetchHistory: async () => [],
     fetchUtxo: async () => undefined,

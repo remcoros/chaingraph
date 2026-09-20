@@ -21,7 +21,13 @@ const spender = (n: number, outputs: number[]): Transaction => ({
   vin: outputs.map(point),
   vout: [creator.vout[0]],
 });
-const empty = { transactions: [], unresolved: [], inspected: 0, unavailableTxids: [] };
+const empty = {
+  exact: 'complete' as const,
+  transactions: [],
+  unresolved: [],
+  inspected: 0,
+  unavailableTxids: [],
+};
 function setup(limit = 20) {
   const controller = new AbortController();
   const transport = {
