@@ -256,6 +256,8 @@ export function useGraphExpansion({
           traceSourceExists(active.chainData, traceSourceId)
         )
           setNotice(notice);
+        if (node.kind === 'output' && result.transactions.length === 1)
+          select(transactionReference(result.transactions[0].txid), options);
       }
       // Tracing extends the investigation without taking over its camera.
       // Initial framing, explicit Fit and Lock to selection own camera changes.
