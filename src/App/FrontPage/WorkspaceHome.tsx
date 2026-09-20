@@ -178,8 +178,9 @@ export function WorkspaceHome({
         <div className="welcome-note">
           <ShieldCheck size={20} />
           <p>
-            <strong>Make sure to connect to your own back-end and Bitcoin/Electrum node.</strong> Wallet/xpub discovery happens in your
-            browser, but the backend still receives requests for script-hash and transaction queries.
+            <strong>Make sure to connect to your own back-end and Bitcoin/Electrum node.</strong>{' '}
+            Wallet/xpub discovery happens in your browser, but the backend still receives requests
+            for script-hash and transaction queries.
           </p>
         </div>
       </div>

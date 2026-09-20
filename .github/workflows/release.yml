@@ -25,7 +25,6 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/release-check.mjs --tag "$RELEASE_TAG"
       - run: npm ci
-      - run: npm run format:check
       - run: npm run check
       - name: Verify runtime license notices
         run: npm run licenses && git diff --exit-code -- THIRD_PARTY_NOTICES.md

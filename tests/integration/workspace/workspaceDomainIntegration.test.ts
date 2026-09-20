@@ -153,9 +153,7 @@ describe('workspace graph and analysis', () => {
 
   it('rejects malformed workspace versions, network names and mismatched transaction keys', () => {
     const w = createWorkspace('Import boundary', 'mainnet');
-    expect(() =>
-      parseWorkspace({ ...w, version: CURRENT_WORKSPACE_VERSION + 1 }),
-    ).toThrow();
+    expect(() => parseWorkspace({ ...w, version: CURRENT_WORKSPACE_VERSION + 1 })).toThrow();
     expect(() => parseWorkspace({ ...w, network: 'testnet' })).toThrow();
     expect(() =>
       parseWorkspace({

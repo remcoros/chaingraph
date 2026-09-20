@@ -20,7 +20,7 @@
     "lint": "oxlint --config .oxlintrc.json src server scripts tests *.config.ts",
     "lint:fix": "oxlint --config .oxlintrc.json --fix src server scripts tests",
     "check:compiler": "node scripts/check-react-compiler.mjs",
-    "check": "npm run --silent check:portability && npm run --silent lint && npm run --silent build && npm run --silent test",
+    "check": "npm run --silent format:check && npm run --silent check:portability && npm run --silent lint && npm run --silent build && npm run --silent test",
     "check:portability": "node scripts/check-portability.mjs",
     "test:live": "node --use-system-ca --import tsx scripts/smoke-live.ts",
     "licenses": "node scripts/licenses.mjs",

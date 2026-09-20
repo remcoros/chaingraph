@@ -50,26 +50,23 @@ describe('decrypted workspace schema boundary', () => {
     undefined,
     {},
     ['private fixture detail'],
-  ])(
-    'rejects an explicit unsupported schema version without exposing its value: %j',
-    (version) => {
-      const original = { ...createWorkspace('Public fixture', 'mainnet'), version };
-      const snapshot = structuredClone(original);
-      let failure: unknown;
-      try {
-        parseWorkspace(original);
-      } catch (error) {
-        failure = error;
-      }
-      expect(failure).toBeInstanceOf(WorkspaceSchemaVersionError);
-      expect(failure).toMatchObject({
-        code: 'unsupported-workspace-version',
-        message:
-          'Unsupported workspace schema version. Open it with a compatible Chaingraph version.',
-      });
-      expect(original).toEqual(snapshot);
-    },
-  );
+  ])('rejects an explicit unsupported schema version without exposing its value: %j', (version) => {
+    const original = { ...createWorkspace('Public fixture', 'mainnet'), version };
+    const snapshot = structuredClone(original);
+    let failure: unknown;
+    try {
+      parseWorkspace(original);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(WorkspaceSchemaVersionError);
+    expect(failure).toMatchObject({
+      code: 'unsupported-workspace-version',
+      message:
+        'Unsupported workspace schema version. Open it with a compatible Chaingraph version.',
+    });
+    expect(original).toEqual(snapshot);
+  });
 
   it('validates migrated data before use, including the Bitcoin network', () => {
     const legacy = legacyWorkspace(createWorkspace('Public fixture', 'mainnet'));

@@ -18,7 +18,6 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run format:check
       - run: node scripts/release-check.mjs
       - run: npm run check
       - name: Verify runtime license notices

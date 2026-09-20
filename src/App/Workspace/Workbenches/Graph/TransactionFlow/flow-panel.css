@@ -783,8 +783,8 @@
 .transaction-flow-inputs .transaction-rows {
   border-right: 0;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: linear-gradient(var(--transaction-flow-rail), var(--transaction-flow-rail)) right / 2px
-    100% no-repeat;
+  background: linear-gradient(var(--transaction-flow-rail), var(--transaction-flow-rail)) right /
+    2px 100% no-repeat;
 }
 .transaction-flow-outputs .transaction-rows {
   border-left: 0;
@@ -897,18 +897,10 @@
   border-left: 2px solid var(--transaction-flow-rail);
   border-radius: 0 0 0 var(--radius-sm);
 }
-.transaction-flow-inputs
-  .transaction-row.is-selected
-  .transaction-row-content::before,
-.transaction-flow-inputs
-  .transaction-row.is-selected
-  .transaction-row-content::after,
-.transaction-flow-outputs
-  .transaction-row.is-selected
-  .transaction-row-content::before,
-.transaction-flow-outputs
-  .transaction-row.is-selected
-  .transaction-row-content::after {
+.transaction-flow-inputs .transaction-row.is-selected .transaction-row-content::before,
+.transaction-flow-inputs .transaction-row.is-selected .transaction-row-content::after,
+.transaction-flow-outputs .transaction-row.is-selected .transaction-row-content::before,
+.transaction-flow-outputs .transaction-row.is-selected .transaction-row-content::after {
   border-color: color-mix(in srgb, var(--color-accent) 36%, var(--transaction-flow-rail));
 }
 .transaction-row.has-annotation-icon .transaction-row-content {

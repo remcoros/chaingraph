@@ -223,7 +223,11 @@ export function CreateWorkspaceDialog({
           describedBy={invalidField === 'confirm' ? errorId : undefined}
         />
         <p className="security-note">
-          <LockKeyhole size={16} /> <strong>Contents are encrypted. Chaingraph never stores your password, your password cannot be recovered.</strong>
+          <LockKeyhole size={16} />{' '}
+          <strong>
+            Contents are encrypted. Chaingraph never stores your password, your password cannot be
+            recovered.
+          </strong>
         </p>
         {error && (
           <p id={errorId} role="alert" className="error-text">

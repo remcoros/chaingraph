@@ -31,7 +31,7 @@ bundle verified real-chain snapshots.
 
 ```sh
 npm run format:check          # Prettier
-npm run check                 # portability, types, build, domain/integration tests
+npm run check                 # formatting, portability, linting, build and domain/integration tests
 node scripts/release-check.mjs
 ```
 
