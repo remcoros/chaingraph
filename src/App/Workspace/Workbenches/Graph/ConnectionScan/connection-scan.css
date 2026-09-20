@@ -170,7 +170,7 @@
 }
 .connection-scan-result-heading {
   display: grid;
-  grid-template-columns: 15px minmax(0, 1fr) 28px;
+  grid-template-columns: 24px minmax(0, 1fr) 28px;
   align-items: center;
   gap: 6px;
 }
@@ -364,6 +364,7 @@
 }
 
 .connection-scan-result-heading > .wallet-help {
-  min-width: 15px;
+  min-width: 24px;
+  min-height: 24px;
   justify-self: start;
 }
