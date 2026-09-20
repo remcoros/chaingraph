@@ -1,7 +1,8 @@
 import './component-styles';
 import { TransactionFetchProvider } from './Workspace/TransactionFetchProvider';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
-import { BookOpen, FolderOpen, Info, Library, Plus, X } from 'lucide-react';
+import { BookOpen, FolderOpen, Info, Library, Plus } from 'lucide-react';
+import { ToastNotification } from './Controls/ToastNotification';
 import { Modal } from './Dialogs';
 import { CreateWorkspaceDialog } from './Workspace/Dialogs/CreateWorkspaceDialog';
 import { ImportWorkspaceDialog } from './Workspace/Dialogs/ImportWorkspaceDialog';
@@ -15,7 +16,6 @@ import { loadTemplateWorkspace } from './Examples/templateWorkspace';
 import { MAX_ENCRYPTED_FILE_BYTES } from '../Core/Workspace/Persistence';
 import { createWorkspace } from '../Core/Workspace/createWorkspace';
 
-import { ADDRESS_DISPLAY_NOTICE } from './Workspace/workspaceNotices';
 import { Workspace } from './Workspace/Workspace';
 import { useAppState } from './useAppState';
 import { useWorkspace } from './Workspace/useWorkspace';
@@ -31,10 +31,6 @@ export default function App() {
   const app = useAppState();
   const workspace = useWorkspace(app);
   const { activeWorkspace, workspaces, fileInput, workspaceTabs } = app;
-  const toastText = app.error || workspaces.storageError || app.notice?.visibleMessage;
-  const toastAccessibleText = app.error || workspaces.storageError || app.notice?.message;
-  const toastIsError = !!app.error || !!workspaces.storageError || app.notice?.kind === 'error';
-  const toastMessageIsTruncated = !!app.notice && app.notice.message !== app.notice.visibleMessage;
   return (
     <div className="app-shell">
       <a
@@ -207,50 +203,7 @@ export default function App() {
           </div>
         </Modal>
       )}
-      {toastText && (
-        <div
-          className={`toast ${toastIsError ? 'error' : ''}`}
-          role={toastIsError ? 'alert' : 'status'}
-        >
-          <span
-            className="feedback-message"
-            title={toastMessageIsTruncated ? toastAccessibleText : undefined}
-            aria-label={toastMessageIsTruncated ? toastAccessibleText : undefined}
-            tabIndex={toastMessageIsTruncated ? 0 : undefined}
-          >
-            {toastText}
-          </span>
-          {!app.error &&
-            !workspaces.storageError &&
-            app.notice?.message === ADDRESS_DISPLAY_NOTICE &&
-            activeWorkspace &&
-            !activeWorkspace.view.showAddresses && (
-              <button
-                onClick={() => {
-                  workspace.edit((current) => ({
-                    ...current,
-                    view: { ...current.view, showAddresses: true },
-                  }));
-                  app.setNotice('');
-                }}
-              >
-                Enable address display
-              </button>
-            )}
-          {!workspaces.storageError && (
-            <button
-              className="icon-button"
-              aria-label="Dismiss message"
-              onClick={() => {
-                app.setError('');
-                app.setNotice('');
-              }}
-            >
-              <X size={15} />
-            </button>
-          )}
-        </div>
-      )}
+      <ToastNotification app={app} workspace={workspace} />
       {activeWorkspace && !activeWorkspace.demo && !workspace.canLoadChainData && (
         <div
           className="connection-banner"
