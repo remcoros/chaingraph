@@ -11,12 +11,17 @@ import type { WorkspaceCore } from '../../../workspaceCore';
 import type { WorkspaceSelection } from '../../../Selection/useWorkspaceSelection';
 import type { Transaction } from '../../../../../Core/ChainData';
 
-import { mapLimit, MAX_SCAN_TRANSACTIONS } from '../../../../../Core/ChainData/api';
+import {
+  backendRpcFailureMessage,
+  mapLimit,
+  MAX_SCAN_TRANSACTIONS,
+} from '../../../../../Core/ChainData/api';
 
 import { type AddressHistoryLoadState, addressHistoryLoadKey } from './addressHistoryLoad';
 
 import type { ChainDataAcquisition } from '../../../../../Core/Workspace/Session/chainDataAcquisition';
 import type { WorkspaceOperation } from '../../../useWorkspaceOperation';
+import { createBackendErrorFeedback, createFeedback } from '../../../../feedback';
 
 interface Inputs {
   core: WorkspaceCore;
@@ -179,18 +184,26 @@ export function useAddressEvidence({
       let failed = false;
       void (async () => {
         let historyFailed = false;
+        let historyFailure: unknown;
         let balanceFailed = false;
-        const reportHistoryFailure = () => {
+        const reportHistoryFailure = (error: unknown) => {
           failed = true;
+          const backendMessage = backendRpcFailureMessage(error);
+          const feedback = backendMessage
+            ? createBackendErrorFeedback(backendMessage)
+            : createFeedback('Address history could not be loaded. Retry.', {
+                kind: 'error',
+                lifetime: 'persistent',
+              });
           setAddressHistoryLoads((loads) => ({
             ...loads,
             [key]: {
               ...loads[key],
               phase: 'history',
-              error: 'Address history could not be loaded. Retry.',
+              error: feedback,
             },
           }));
-          setNotice('Address history could not be loaded. Retry.');
+          setNotice(feedback);
         };
         const balancePromise = needsBalance
           ? getAddressBalance(address, controller.signal).catch(() => {
@@ -216,9 +229,10 @@ export function useAddressEvidence({
                     total: progress.total ?? 0,
                   }),
               });
-            } catch {
+            } catch (error) {
               controller.signal.throwIfAborted();
               historyFailed = true;
+              historyFailure = error;
             }
           }
           controller.signal.throwIfAborted();
@@ -227,7 +241,7 @@ export function useAddressEvidence({
           controller.signal.throwIfAborted();
           if (balance && activeWorkspaceRef.current?.id === ownerId)
             recordAddressObservations({ addressBalances: { [address]: balance } });
-          if (historyFailed) reportHistoryFailure();
+          if (historyFailed) reportHistoryFailure(historyFailure);
           else {
             if (balanceFailed)
               setNotice(
@@ -242,9 +256,9 @@ export function useAddressEvidence({
                   : 'Address history is partial: some transaction details are not loaded. Select a row to load one.',
               );
           }
-        } catch {
+        } catch (error) {
           if (controller.signal.aborted) return;
-          reportHistoryFailure();
+          reportHistoryFailure(error);
         }
       })().finally(() => {
         addressHistoryJobsRef.current.delete(key);

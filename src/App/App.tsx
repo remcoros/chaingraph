@@ -31,6 +31,10 @@ export default function App() {
   const app = useAppState();
   const workspace = useWorkspace(app);
   const { activeWorkspace, workspaces, fileInput, workspaceTabs } = app;
+  const toastText = app.error || workspaces.storageError || app.notice?.visibleMessage;
+  const toastAccessibleText = app.error || workspaces.storageError || app.notice?.message;
+  const toastIsError = !!app.error || !!workspaces.storageError || app.notice?.kind === 'error';
+  const toastMessageIsTruncated = !!app.notice && app.notice.message !== app.notice.visibleMessage;
   return (
     <div className="app-shell">
       <a
@@ -203,15 +207,22 @@ export default function App() {
           </div>
         </Modal>
       )}
-      {(app.error || workspaces.storageError || app.notice) && (
+      {toastText && (
         <div
-          className={`toast ${app.error || workspaces.storageError ? 'error' : ''}`}
-          role={app.error || workspaces.storageError ? 'alert' : 'status'}
+          className={`toast ${toastIsError ? 'error' : ''}`}
+          role={toastIsError ? 'alert' : 'status'}
         >
-          <span>{app.error || workspaces.storageError || app.notice}</span>
+          <span
+            className="feedback-message"
+            title={toastMessageIsTruncated ? toastAccessibleText : undefined}
+            aria-label={toastMessageIsTruncated ? toastAccessibleText : undefined}
+            tabIndex={toastMessageIsTruncated ? 0 : undefined}
+          >
+            {toastText}
+          </span>
           {!app.error &&
             !workspaces.storageError &&
-            app.notice === ADDRESS_DISPLAY_NOTICE &&
+            app.notice?.message === ADDRESS_DISPLAY_NOTICE &&
             activeWorkspace &&
             !activeWorkspace.view.showAddresses && (
               <button

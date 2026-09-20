@@ -5,6 +5,15 @@ import { useBackendNetworks } from './useBackendNetworks';
 import { useWorkspaces } from './Workspace/useWorkspaces';
 import type { SavedWorkspace } from '../Core/Workspace/Persistence';
 import { appServices } from './appServices';
+import {
+  createFeedback,
+  type Feedback,
+  type FeedbackInput,
+  type FeedbackOptions,
+} from './feedback';
+
+type SetNotice = (feedback: FeedbackInput, options?: FeedbackOptions) => void;
+
 export function useAppState() {
   const workspaces = useWorkspaces(appServices.workspaceStore);
   const activeWorkspace = workspaces.active?.data;
@@ -47,13 +56,22 @@ export function useAppState() {
   const connected = !!status?.connected && !statusError;
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
   const [examplesOpen, setExamplesOpen] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNoticeValue] = useState<Feedback>();
   const [noticeSequence, setNoticeSequence] = useState(0);
+  const setNotice = useCallback<SetNotice>((feedback, options) => {
+    setNoticeValue(
+      typeof feedback === 'string'
+        ? feedback
+          ? createFeedback(feedback, options)
+          : undefined
+        : feedback,
+    );
+  }, []);
   useEffect(() => {
-    if (!notice || /partial|incomplete|cancelled|could not/i.test(notice)) return;
-    const timer = setTimeout(() => setNotice(''), 8000);
+    if (!notice || notice.lifetime !== 'timed') return;
+    const timer = setTimeout(() => setNotice(undefined), 8000);
     return () => clearTimeout(timer);
-  }, [notice, noticeSequence]);
+  }, [notice, noticeSequence, setNotice]);
   const [error, setError] = useState('');
   const [pendingGraphWorkspace, setPendingGraphWorkspace] = useState<string>();
   const fileInput = useRef<HTMLInputElement>(null);

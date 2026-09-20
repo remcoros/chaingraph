@@ -14,6 +14,7 @@ import type {
   AddressUtxoObservation,
 } from '../../../../../Core/ChainData';
 import type { GraphNode } from '../../../GraphState/types';
+import type { Feedback } from '../../../../feedback';
 
 export interface FlowPanelAddressViewProps {
   workspace: Workspace;
@@ -25,7 +26,7 @@ export interface FlowPanelAddressViewProps {
     phase: 'history' | 'details' | 'balance';
     done: number;
     total: number;
-    error?: string;
+    error?: Feedback;
   };
   addressBalance?: AddressBalanceObservation;
   addressUtxos?: AddressUtxoObservation;
@@ -485,7 +486,24 @@ export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewPro
           </div>
           {showCoverage && (
             <div className="address-history-coverage">
-              {loading?.error && <span className="address-history-error">{loading.error}</span>}
+              {loading?.error && (
+                <span
+                  className="address-history-error feedback-message"
+                  title={
+                    loading.error.message !== loading.error.visibleMessage
+                      ? loading.error.message
+                      : undefined
+                  }
+                  aria-label={
+                    loading.error.message !== loading.error.visibleMessage
+                      ? loading.error.message
+                      : undefined
+                  }
+                  tabIndex={loading.error.message !== loading.error.visibleMessage ? 0 : undefined}
+                >
+                  {loading.error.visibleMessage}
+                </span>
+              )}
               {loading && !loading.error && (
                 <span className="address-history-loading">
                   {loading.phase === 'history'

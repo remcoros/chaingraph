@@ -5,6 +5,7 @@ import {
   fetchHistory,
   fetchAddressBalance,
   fetchAddressUtxos,
+  backendRpcFailureMessage,
   loadAddress,
   mapLimit,
   MAX_SCAN_TRANSACTIONS,
@@ -88,6 +89,22 @@ describe('browser-side wallet scanner', () => {
         'Invalid or oversized address history',
       );
     }
+  });
+
+  it('retains the safe backend history failure message for presentation', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 413,
+        json: async () => ({ error: 'Address history exceeds configured transaction limit' }),
+      })),
+    );
+
+    const error = await fetchHistory('mainnet', txid(2)).catch((cause: unknown) => cause);
+    expect(backendRpcFailureMessage(error)).toBe(
+      'Address history exceeds configured transaction limit',
+    );
   });
   it('scans both branches, extends after activity, deduplicates transactions and uses bounded concurrency', async () => {
     const receive = deriveAddresses(zpub, 'mainnet', 'p2wpkh', 0, 0, 40);

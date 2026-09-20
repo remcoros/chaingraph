@@ -1,5 +1,6 @@
 import type { Workspace } from '../../Core/Workspace/workspace';
 import type { AppState } from '../useAppState';
+import type { Feedback, FeedbackOptions } from '../feedback';
 
 /**
  * The services every workspace concept needs: the workspace being worked on, the
@@ -22,7 +23,7 @@ export interface WorkspaceCore {
     group?: string,
     description?: string,
   ) => void;
-  setNotice: AppState['setNotice'];
+  setNotice: (feedback: string | Feedback | undefined, options?: FeedbackOptions) => void;
   setError: AppState['setError'];
   setOperation: React.Dispatch<React.SetStateAction<string>>;
 }

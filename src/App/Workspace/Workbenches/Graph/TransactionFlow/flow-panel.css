@@ -241,6 +241,10 @@
 .address-history-error {
   color: var(--color-error);
 }
+.address-history-error.feedback-message {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .address-history-section-summary {
   position: relative;
   z-index: 1;

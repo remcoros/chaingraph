@@ -46,6 +46,7 @@ class RpcError extends Error {
     readonly code?: string,
     readonly status?: number,
     readonly failure?: RpcFailureKind,
+    readonly backendMessage = false,
   ) {
     super(message);
   }
@@ -69,6 +70,11 @@ export function classifyRpcFailure(error: unknown): RpcFailureKind {
     return error.failure ?? 'lookup-failed';
   }
   return error instanceof z.ZodError ? 'invalid-response' : 'lookup-failed';
+}
+
+/** Only errors from the bounded backend payload may be repeated in UI feedback. */
+export function backendRpcFailureMessage(error: unknown): string | undefined {
+  return error instanceof RpcError && error.backendMessage ? error.message : undefined;
 }
 export async function rpc<T>(
   network: Network,
@@ -109,6 +115,8 @@ export async function rpc<T>(
       typeof payload.error === 'string' ? payload.error : 'Upstream request failed.',
       typeof payload.code === 'string' ? payload.code : undefined,
       response.status,
+      undefined,
+      typeof payload.error === 'string',
     );
   if (!Object.hasOwn(payload, 'result'))
     throw new RpcError(
