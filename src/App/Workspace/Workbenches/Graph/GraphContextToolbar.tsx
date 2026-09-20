@@ -67,6 +67,7 @@ const countLabel = (count: number) => count.toLocaleString('en-US');
 export function GraphContextToolbar(props: GraphContextToolbarProps) {
   const recentUtxoCount = Math.max(0, props.recentUtxoCount ?? 0);
   const recentTransactionCount = Math.max(0, props.recentTransactionCount ?? 0);
+  const hiddenCount = props.hiddenCount ?? 0;
   const hasTransactionDetails = !!props.sides && props.selectedKind !== 'output';
   const selectionActions =
     props.hideSelectionCount || props.removeSelectionCount ? (
@@ -300,16 +301,16 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
             <Eye size={17} aria-hidden="true" />
             <span>Show ins/outs</span>
           </button>
-          {(props.hiddenCount ?? 0) > 0 && props.onRestoreHidden && (
+          {hiddenCount > 0 && props.onRestoreHidden && (
             <button
               className="graph-context-action graph-context-wide-action"
               type="button"
               onClick={props.onRestoreHidden}
-              aria-label={`Show ${countLabel(props.hiddenCount)} hidden nodes`}
-              title={`Show ${countLabel(props.hiddenCount)} hidden nodes`}
+              aria-label={`Show ${countLabel(hiddenCount)} hidden nodes`}
+              title={`Show ${countLabel(hiddenCount)} hidden nodes`}
             >
               <Eye size={16} aria-hidden="true" />
-              <span>Show hidden ({countLabel(props.hiddenCount)})</span>
+              <span>Show hidden ({countLabel(hiddenCount)})</span>
             </button>
           )}
           {props.unconnectedCount > 0 && (

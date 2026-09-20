@@ -1,5 +1,5 @@
 .graph-context-toolbar {
-  width: 156px;
+  width: 140px;
   max-width: 100%;
   box-sizing: border-box;
   padding: 6px;
@@ -130,9 +130,6 @@
 }
 
 @media (pointer: coarse) {
-  .graph-context-toolbar {
-    width: 172px;
-  }
   .graph-context-toolbar button {
     min-height: 36px;
   }
