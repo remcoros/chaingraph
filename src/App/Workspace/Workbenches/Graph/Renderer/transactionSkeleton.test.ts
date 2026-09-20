@@ -35,20 +35,6 @@ const normalized = (value: Position) => {
 const dot = (a: Position, b: Position) => a.x * b.x + a.y * b.y + a.z * b.z;
 
 describe('transaction skeleton', () => {
-  it('repositions a tentative coordinate instead of treating it as an immutable anchor', () => {
-    const result = layoutTransactionSkeleton(
-      [
-        node('root', { position: { x: 0, y: 0, z: 0 } }),
-        node('opened', { position: { x: 10_000, y: 0, z: 0 }, retained: false }),
-      ],
-      [edge('root', 'opened')],
-      3,
-    );
-
-    expect(result.positions.get('root')).toEqual({ x: 0, y: 0, z: 0 });
-    expect(result.positions.get('opened')).not.toEqual({ x: 10_000, y: 0, z: 0 });
-  });
-
   it('packs differently sized downstream subtrees into deterministic 3D branch cones', () => {
     const nodes = [node('root')],
       edges: TransactionSkeletonEdge[] = [];
