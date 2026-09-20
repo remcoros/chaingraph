@@ -89,7 +89,7 @@ function spatialOrder(
 }
 
 /** Animate all visible upstream/downstream transaction bridges first. Only
- * terminal branches at active nodes are sampled to fill the remaining target. */
+ * terminal branches reached by the trace are sampled to fill the remaining target. */
 export function chooseFlowLinks(
   index: ReturnType<typeof indexFlowLinks>,
   selected: readonly string[],
@@ -100,6 +100,7 @@ export function chooseFlowLinks(
 ): RenderLink[] {
   const chosen = new Map<string, RenderLink>();
   const roots = { incoming: new Set<string>(), outgoing: new Set<string>() };
+  const terminalGroups: Record<Side, RenderLink[][]> = { incoming: [], outgoing: [] };
   const active = [...new Set([...(hovered ? [hovered] : []), ...selected])];
   const shown = (link: RenderLink) =>
     !positions || (positions.has(link.source) && positions.has(link.target));
@@ -147,13 +148,16 @@ export function chooseFlowLinks(
       if (visited.has(transaction)) continue;
       visited.add(transaction);
       const edges = (side === 'incoming' ? index.incoming : index.outgoing).get(transaction) ?? [];
+      const terminals: RenderLink[] = [];
       for (const direct of edges) {
         if (!shown(direct)) continue;
         const point = halves(side === 'incoming' ? direct.source : direct.target);
         const continuations = side === 'incoming' ? point.creates : point.spends;
+        let followed = false;
         for (const other of continuations) {
           const next = side === 'incoming' ? other.source : other.target;
           if (next === transaction) continue;
+          followed = true;
           add(direct);
           add(other);
           bridgeSegments.add(direct.id);
@@ -163,30 +167,23 @@ export function chooseFlowLinks(
           branchCount++;
           if (!visited.has(next)) queue.push(next);
         }
+        if (!followed) terminals.push(direct);
       }
+      if (terminals.length)
+        terminalGroups[side].push(spatialOrder(terminals, side, positions, dimensions));
     }
     bridgeCounts[side] = branchCount;
   }
   for (const side of ['incoming', 'outgoing'] as const) {
     const forcedTerminals = new Set<string>();
-    const candidates = active.map((id) => {
-      const links = index.transactions.has(id)
-        ? ((side === 'incoming' ? index.incoming : index.outgoing).get(id) ?? [])
-        : index.outpoints.has(id)
-          ? []
-          : (index.adjacent.get(id) ?? []).filter((link) =>
-              side === 'incoming' ? link.target === id : link.source === id,
-            );
-      const terminal = links.filter((link) => shown(link) && !chosen.has(link.id));
-      for (const link of links)
+    for (const group of terminalGroups[side])
+      for (const link of group)
         if (chosen.has(link.id) && !bridgeSegments.has(link.id)) forcedTerminals.add(link.id);
-      return spatialOrder(terminal, side, positions, dimensions);
-    });
     let spare = Math.max(0, FLOW_BRANCH_TARGET - bridgeCounts[side] - forcedTerminals.size);
     // Fair sharing between hovered/selected nodes, and between spatial sectors.
     for (let offset = 0; spare > 0; offset++) {
       let found = false;
-      for (const group of candidates) {
+      for (const group of terminalGroups[side]) {
         const link = group[offset];
         if (!link) continue;
         found = true;

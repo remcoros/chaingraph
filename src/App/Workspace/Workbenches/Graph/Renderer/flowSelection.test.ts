@@ -60,19 +60,42 @@ describe('visible transaction flow structure', () => {
     expect(chosen.filter((link) => link.id.startsWith('leaf-'))).toHaveLength(44);
   });
 
+  it('includes terminal outputs at every visible downstream transaction reached from an outpoint', () => {
+    const links = [
+      edge('creates-selected', 'creator', 'selected', 'outgoing'),
+      edge('spends-selected', 'selected', 'spender', 'incoming'),
+      edge('creates-a', 'spender', 'output-a', 'outgoing'),
+      edge('creates-b', 'spender', 'output-b', 'outgoing'),
+      edge('spends-a', 'output-a', 'next', 'incoming'),
+      edge('creates-c', 'next', 'output-c', 'outgoing'),
+    ];
+
+    expect(ids(chooseFlowLinks(indexFlowLinks(links), ['selected']))).toEqual(
+      new Set([
+        'creates-selected',
+        'spends-selected',
+        'creates-a',
+        'creates-b',
+        'spends-a',
+        'creates-c',
+      ]),
+    );
+  });
+
   it('traverses upstream and downstream without turning into unrelated sibling branches', () => {
     const required = [
       ...bridge('pa', 'parent', 'a'),
       ...bridge('ab', 'a', 'b'),
       ...bridge('bc', 'b', 'child'),
     ];
+    const reachableTerminal = edge('leaf-at-child', 'child', 'terminal', 'outgoing');
     const unrelated = [
       ...bridge('sibling', 'parent', 'other-child'),
       ...bridge('coinput', 'other-parent', 'child'),
-      edge('leaf-at-child', 'child', 'terminal', 'outgoing'),
+      reachableTerminal,
     ];
     expect(ids(chooseFlowLinks(indexFlowLinks([...required, ...unrelated]), ['a']))).toEqual(
-      ids(required),
+      ids([...required, reachableTerminal]),
     );
   });
 
