@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildGraph } from '../../../src/App/Workspace/GraphState/graphEvidence';
 import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
 import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
+import { CURRENT_WORKSPACE_VERSION } from '../../../src/Core/Workspace/workspace';
 import { parseTransaction, type Transaction } from '../../../src/Core/ChainData';
 import { outputAddress } from '../../../src/Core/Bitcoin';
 import { analysisTools } from '../../../src/Core/Workspace/Analysis/analysis';
@@ -152,7 +153,9 @@ describe('workspace graph and analysis', () => {
 
   it('rejects malformed workspace versions, network names and mismatched transaction keys', () => {
     const w = createWorkspace('Import boundary', 'mainnet');
-    expect(() => parseWorkspace({ ...w, version: 7 })).toThrow();
+    expect(() =>
+      parseWorkspace({ ...w, version: CURRENT_WORKSPACE_VERSION + 1 }),
+    ).toThrow();
     expect(() => parseWorkspace({ ...w, network: 'testnet' })).toThrow();
     expect(() =>
       parseWorkspace({

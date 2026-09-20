@@ -40,7 +40,17 @@ describe('decrypted workspace schema boundary', () => {
     expect(legacy).toEqual({ name: 'Public fixture', custom: { preserved: true } });
   });
 
-  it.each([null, 0, 8, -1, 1.5, '1', undefined, {}, ['private fixture detail']])(
+  it.each([
+    null,
+    0,
+    CURRENT_WORKSPACE_VERSION + 1,
+    -1,
+    1.5,
+    '1',
+    undefined,
+    {},
+    ['private fixture detail'],
+  ])(
     'rejects an explicit unsupported schema version without exposing its value: %j',
     (version) => {
       const original = { ...createWorkspace('Public fixture', 'mainnet'), version };
