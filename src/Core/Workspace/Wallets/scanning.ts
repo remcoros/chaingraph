@@ -226,7 +226,7 @@ export async function scanWallet(
   }
   const truncated = pending.length > MAX_SCAN_TRANSACTIONS;
   options.signal?.throwIfAborted();
-  const newTransactionIds = transactions.filter((tx) => !existing[tx.txid]).map((tx) => tx.txid);
+  const addedTransactionCount = transactions.filter((tx) => !existing[tx.txid]).length;
   // Absence from a refreshed history is an observation, not authorization to
   // erase the user's graph or conclude that an output is unspent.
   const missingTransactionCount = [...oldHeights.keys()].filter(
@@ -242,8 +242,8 @@ export async function scanWallet(
       scanGap: options.gap,
       pendingTransactionIds: pending.slice(MAX_SCAN_TRANSACTIONS),
       lastActivity: {
-        newTransactionIds,
-        refreshedTransactionCount: transactions.length - newTransactionIds.length,
+        addedTransactionCount,
+        refreshedTransactionCount: transactions.length - addedTransactionCount,
         missingTransactionCount,
       },
     },

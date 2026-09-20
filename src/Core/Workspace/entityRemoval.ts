@@ -46,12 +46,7 @@ function protectedContext(workspace: Workspace): Set<string> {
       addresses.add(canonicalAddress(address.address));
       for (const item of address.history ?? []) protectedIds.add(item.tx_hash);
     }
-    for (const id of [
-      ...(wallet.pendingTransactionIds ?? []),
-      ...(wallet.unreviewedTransactionIds ?? []),
-      ...(wallet.lastActivity?.newTransactionIds ?? []),
-    ])
-      protectedIds.add(id);
+    for (const id of wallet.pendingTransactionIds ?? []) protectedIds.add(id);
   }
   if (addresses.size)
     for (const id of contextIds(workspace)) {

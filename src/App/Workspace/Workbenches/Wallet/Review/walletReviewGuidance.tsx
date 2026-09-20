@@ -112,8 +112,12 @@ export function walletReviewGuidance(
     ) : (
       <>An earlier wallet receipt led to your current coins. {finish}</>
     );
-  if (reason === 'new-activity')
-    return 'Found during a wallet refresh; check the transaction and record any context you recognize.';
+  if (reason === 'wallet-transaction')
+    return missingContext ? (
+      'This wallet transaction has no label or tags. Add the context you recognize.'
+    ) : (
+      <>This wallet transaction already has recorded context. {finish}</>
+    );
   return missingContext ? (
     'Add a label or tag to record what this transaction was for.'
   ) : (

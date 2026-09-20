@@ -62,12 +62,6 @@ export function applyWalletScan(
       ...promoted.wallets,
       definitions: current.wallets.definitions.map((wallet) => {
         if (wallet.id !== scanned.id) return wallet;
-        const unreviewed = [
-          ...new Set([
-            ...(wallet.unreviewedTransactionIds ?? []),
-            ...(scanned.lastActivity?.newTransactionIds ?? []),
-          ]),
-        ];
         return {
           ...wallet,
           // Preserve evidence identity for a quiet check, including histories and
@@ -82,8 +76,6 @@ export function applyWalletScan(
           scanGap: scanned.scanGap,
           pendingTransactionIds: scanned.pendingTransactionIds,
           lastActivity: scanned.lastActivity,
-          unreviewedTransactionIds: unreviewed.slice(-10000),
-          activityOverflow: wallet.activityOverflow || unreviewed.length > 10000,
         };
       }),
     },
@@ -92,9 +84,8 @@ export function applyWalletScan(
 }
 
 /** Refresh a retained undo snapshot with the latest scan-owned metadata.
- * Quiet checks and activity acknowledgment are not undoable: undo may restore
- * user edits (names, colors, tags, annotations, views) but must not roll back
- * scan timestamps, bounds, work queues, or review state. Wallet membership stays
+ * Undo may restore user edits (names, colors, tags, annotations, views) but must
+ * not roll back scan timestamps, bounds or work queues. Wallet membership stays
  * with the snapshot so an explicit Undo can still restore a user-deleted wallet. */
 export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Workspace {
   const latestById = new Map(latest.wallets.definitions.map((wallet) => [wallet.id, wallet]));
@@ -109,9 +100,7 @@ export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Works
       wallet.scanLimit === current.scanLimit &&
       wallet.scanGap === current.scanGap &&
       wallet.pendingTransactionIds === current.pendingTransactionIds &&
-      wallet.lastActivity === current.lastActivity &&
-      wallet.unreviewedTransactionIds === current.unreviewedTransactionIds &&
-      wallet.activityOverflow === current.activityOverflow
+      wallet.lastActivity === current.lastActivity
     )
       return wallet;
     changed = true;
@@ -123,8 +112,6 @@ export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Works
       scanGap: current.scanGap,
       pendingTransactionIds: current.pendingTransactionIds,
       lastActivity: current.lastActivity,
-      unreviewedTransactionIds: current.unreviewedTransactionIds,
-      activityOverflow: current.activityOverflow,
     };
   });
   return changed
@@ -146,5 +133,5 @@ export function walletCheckAge(scannedAt?: string, now = Date.now()): string {
 export function walletActivitySummary(wallet: Wallet): string {
   const activity = wallet.lastActivity;
   if (!activity) return 'Refresh to check for new transactions.';
-  return `${activity.newTransactionIds.length} new to workspace · ${activity.refreshedTransactionCount} ${activity.refreshedTransactionCount === 1 ? 'transaction' : 'transactions'} refreshed`;
+  return `${activity.addedTransactionCount} added to workspace · ${activity.refreshedTransactionCount} ${activity.refreshedTransactionCount === 1 ? 'transaction' : 'transactions'} refreshed`;
 }

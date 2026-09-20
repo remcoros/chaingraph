@@ -58,8 +58,6 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
     setEntityHidden,
     showAllHidden,
   } = workspace.graph.actions;
-  const { showWalletActivity } = workspace.wallet.actions;
-
   if (!activeWorkspace) return null;
   return (
     <EntitiesPanelDetail
@@ -111,7 +109,6 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
       onEditWallet={(walletId) => dialogs.openWalletRename(activeWorkspace.id, walletId)}
       busy={!!operation}
       onRefreshAll={() => void walletDiscovery.run()}
-      onShowActivity={showWalletActivity}
       gapLimit={walletDiscovery.gapLimit}
       setGapLimit={walletDiscovery.setGapLimit}
       addressesPerBranch={walletDiscovery.addressesPerBranch}

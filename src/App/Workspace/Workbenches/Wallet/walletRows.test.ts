@@ -217,12 +217,13 @@ describe('shared Wallet rows', () => {
       scope: 'transactions',
       subjectIds: [transactionReference(A)],
     });
+    const transactionA = rows.transactions.find((row) => row.nodeId === transactionReference(A))!;
+    const transactionB = rows.transactions.find((row) => row.nodeId === transactionReference(B))!;
+    expect(transactionA.reviews).toContain(item);
     expect(
-      rows.transactions.find((row) => row.nodeId === transactionReference(A))?.reviews,
-    ).toEqual([item]);
-    expect(
-      rows.transactions.find((row) => row.nodeId === transactionReference(B))?.reviews,
-    ).toEqual([]);
+      transactionA.reviews.filter((review) => review.reason === 'wallet-transaction'),
+    ).toHaveLength(1);
+    expect(transactionB.reviews.map((review) => review.reason)).toEqual(['wallet-transaction']);
     expect(reviewRow(item).key).toBe(reviewProjectionKey(item));
     expect(reviewRow(item).key).not.toBe(item.key);
   });
@@ -268,10 +269,10 @@ describe('shared Wallet rows', () => {
         at: '2026-09-09T12:00:00Z',
         evidence: 'old-evidence',
       },
-      [`${wallet.id}|new-activity|${B}`]: {
+      [`${wallet.id}|wallet-transaction|${B}`]: {
         status: 'unknown',
         at: '2026-09-09T12:00:00Z',
-        evidence: 'old-activity',
+        evidence: 'old-transaction',
       },
     };
     const rows = buildWalletRecordRows(

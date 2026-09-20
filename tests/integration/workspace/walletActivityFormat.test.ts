@@ -40,7 +40,7 @@ describe('capability results survive workspace format validation', () => {
       ...wallet,
       scannedAt: '2026-09-08T10:00:00.000Z',
       lastActivity: {
-        newTransactionIds: [txid],
+        addedTransactionCount: 1,
         refreshedTransactionCount: 0,
         missingTransactionCount: 0,
       },
@@ -63,49 +63,25 @@ describe('capability results survive workspace format validation', () => {
     const removed = { ...current, wallets: { ...current.wallets, definitions: [] } };
     expect(applyWalletScan(removed, scanned, [tx])).toBe(removed);
   });
-  it('retains unreviewed activity across quiet checks and respects acknowledgment during I/O', () => {
+  it('replaces the last scan summary without maintaining a second transaction queue', () => {
     const current = {
       ...createWorkspace('Activity', 'mainnet'),
       wallets: {
         ...createWorkspace('Activity', 'mainnet').wallets,
-        definitions: [{ ...wallet, unreviewedTransactionIds: [txid] }],
+        definitions: [wallet],
       },
     };
     const scanned = {
       ...wallet,
       lastActivity: {
-        newTransactionIds: [],
+        addedTransactionCount: 0,
         refreshedTransactionCount: 0,
         missingTransactionCount: 0,
       },
     };
-    expect(
-      applyWalletScan(current, scanned, []).wallets.definitions[0].unreviewedTransactionIds,
-    ).toEqual([txid]);
-    const acknowledged = {
-      ...current,
-      wallets: { ...current.wallets, definitions: [{ ...wallet, unreviewedTransactionIds: [] }] },
-    };
-    expect(
-      applyWalletScan(acknowledged, { ...scanned, unreviewedTransactionIds: [txid] }, []).wallets
-        .definitions[0].unreviewedTransactionIds,
-    ).toEqual([]);
-    const many = Array.from({ length: 10000 }, (_, i) => i.toString(16).padStart(64, '0'));
-    const bounded = applyWalletScan(
-      {
-        ...current,
-        wallets: {
-          ...current.wallets,
-          definitions: [{ ...wallet, unreviewedTransactionIds: many }],
-        },
-      },
-      { ...scanned, lastActivity: { ...scanned.lastActivity, newTransactionIds: [txid] } },
-      [],
+    expect(applyWalletScan(current, scanned, []).wallets.definitions[0].lastActivity).toEqual(
+      scanned.lastActivity,
     );
-    expect(bounded.wallets.definitions[0].unreviewedTransactionIds).toHaveLength(10000);
-    expect(bounded.wallets.definitions[0].unreviewedTransactionIds?.at(-1)).toBe(txid);
-    expect(bounded.wallets.definitions[0].activityOverflow).toBe(true);
-    expect(parseWorkspace(bounded).wallets.definitions[0].activityOverflow).toBe(true);
   });
   it('bounds imported activity records and supports older wallets', () => {
     const workspace = {
@@ -114,13 +90,13 @@ describe('capability results survive workspace format validation', () => {
     };
     expect(parseWorkspace(workspace).wallets.definitions[0].lastActivity).toBeUndefined();
     const activity = {
-      newTransactionIds: [txid],
+      addedTransactionCount: 1,
       refreshedTransactionCount: 0,
       missingTransactionCount: 0,
     };
     for (const invalid of [
-      { ...activity, newTransactionIds: ['bad'] },
-      { ...activity, newTransactionIds: Array(501).fill(txid) },
+      { ...activity, addedTransactionCount: -1 },
+      { ...activity, addedTransactionCount: 501 },
       { ...activity, refreshedTransactionCount: 501 },
       { ...activity, missingTransactionCount: -1 },
     ])

@@ -267,7 +267,7 @@ describe('workspace persistence state transitions', () => {
     // undo history, and undo must never roll that metadata back.
     const scannedAt = new Date().toISOString();
     const lastActivity = {
-      newTransactionIds: [] as string[],
+      addedTransactionCount: 0,
       refreshedTransactionCount: 0,
       missingTransactionCount: 2,
     };
@@ -306,46 +306,6 @@ describe('workspace persistence state transitions', () => {
       pendingTransactionIds: ['b'.repeat(64)],
       lastActivity,
     });
-  });
-
-  it('does not unacknowledge reviewed activity when undoing an earlier user edit', () => {
-    const store = createBrowserWorkspaceStore({ storage: memoryStorage() });
-    const wallet = {
-      id: crypto.randomUUID(),
-      name: 'Watch only',
-      key: 'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs',
-      scriptType: 'p2wpkh' as const,
-      color: '#aabbcc',
-      addresses: [],
-      unreviewedTransactionIds: ['c'.repeat(64)],
-    };
-    const w = {
-      ...createWorkspace('Review activity', 'mainnet'),
-      wallets: { ...createWorkspace('Review activity', 'mainnet').wallets, definitions: [wallet] },
-    };
-    store.open(w, password);
-    store.update(w.id, (current) => ({ ...current, name: 'Renamed investigation' }));
-    // Reviewing new activity is a non-undoable acknowledgment.
-    store.update(
-      w.id,
-      (current) => ({
-        ...current,
-        wallets: {
-          ...current.wallets,
-          definitions: current.wallets.definitions.map((item) => ({
-            ...item,
-            unreviewedTransactionIds: [],
-            activityOverflow: false,
-          })),
-        },
-      }),
-      false,
-    );
-    expect(store.getSnapshot().unlocked[0].history).toHaveLength(1);
-    store.undo(w.id);
-    const restored = store.getSnapshot().unlocked[0];
-    expect(restored.data.name).toBe('Review activity');
-    expect(restored.data.wallets.definitions[0].unreviewedTransactionIds).toEqual([]);
   });
 
   it('retains undo history when a wallet refresh changes chain data', () => {

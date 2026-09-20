@@ -66,7 +66,7 @@ export function useWalletActivity({
         onProgress: (p) => setOperation(p.message),
       });
       snapshot = result.snapshot;
-      added += result.wallet.lastActivity?.newTransactionIds.length ?? 0;
+      added += result.wallet.lastActivity?.addedTransactionCount ?? 0;
       refreshed += result.wallet.lastActivity?.refreshedTransactionCount ?? 0;
       missing += result.wallet.lastActivity?.missingTransactionCount ?? 0;
       partial = partial || !result.wallet.scanComplete;

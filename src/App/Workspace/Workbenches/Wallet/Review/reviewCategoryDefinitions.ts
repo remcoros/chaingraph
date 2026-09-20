@@ -42,11 +42,11 @@ interface ReviewReasonDefinition<Reason extends ReviewReason> {
 }
 
 export const walletReviewReasonDefinitions = {
-  'new-activity': {
-    id: 'new-activity',
-    label: 'New activity',
+  'wallet-transaction': {
+    id: 'wallet-transaction',
+    label: 'Wallet transaction',
     description:
-      'Transaction activity found during a wallet refresh and kept here for you to review. Some transactions may still need to be loaded before you can see their details.',
+      'Transactions in this wallet\u2019s known history. Review each transaction and record any context you want to keep.',
     filter: { group: walletReviewGroups.reviewItems, displayOrder: 10 },
   },
   'current-utxo': {

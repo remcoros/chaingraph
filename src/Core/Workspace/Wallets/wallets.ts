@@ -61,10 +61,8 @@ export interface Wallet {
   scanLimit?: number;
   scanGap?: number;
   pendingTransactionIds?: string[];
-  unreviewedTransactionIds?: string[];
-  activityOverflow?: boolean;
   lastActivity?: {
-    newTransactionIds: string[];
+    addedTransactionCount: number;
     refreshedTransactionCount: number;
     missingTransactionCount: number;
   };
@@ -96,11 +94,9 @@ const walletSchema = z.object({
   scanLimit: z.number().int().min(1).max(0x80000000).optional(),
   scanGap: z.number().int().min(1).max(100).optional(),
   pendingTransactionIds: z.array(txid).max(10000).optional(),
-  unreviewedTransactionIds: z.array(txid).max(10000).optional(),
-  activityOverflow: z.boolean().optional(),
   lastActivity: z
     .object({
-      newTransactionIds: z.array(txid).max(500),
+      addedTransactionCount: z.number().int().min(0).max(500),
       refreshedTransactionCount: z.number().int().min(0).max(500),
       missingTransactionCount: z.number().int().min(0).max(100_000_000),
     })

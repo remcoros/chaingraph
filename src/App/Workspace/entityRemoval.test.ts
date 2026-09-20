@@ -316,7 +316,7 @@ describe('automatic ancestor cleanup after transaction removal', () => {
     const key =
       'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
     const derived = deriveAddresses(key, 'mainnet', 'p2wpkh', 0, 0, 1);
-    for (const source of ['history', 'activity', 'owned-output', 'owned-script'] as const) {
+    for (const source of ['history', 'owned-output', 'owned-script'] as const) {
       const w = automaticBranch();
       const wallet: Wallet = {
         id: crypto.randomUUID(),
@@ -329,7 +329,6 @@ describe('automatic ancestor cleanup after transaction removal', () => {
           history: source === 'history' ? [{ tx_hash: parent, height: 100 }] : [],
         })),
       };
-      if (source === 'activity') wallet.unreviewedTransactionIds = [parent];
       if (source === 'owned-output')
         w.chainData.transactions[parent].vout[0].scriptPubKey = { address: derived[0].address };
       if (source === 'owned-script')

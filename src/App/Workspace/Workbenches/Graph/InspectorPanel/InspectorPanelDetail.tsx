@@ -44,8 +44,6 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
   const { expand } = workspace.graph.navigation;
   const { revealGraphNodes, centerNode, setEntityHidden, updateFilters, refreshTransaction } =
     workspace.graph.actions;
-  const { showWalletActivity } = workspace.wallet.actions;
-
   if (!activeWorkspace) return null;
   return shownRightTab === 'scan' ||
     shownRightTab === 'addresses' ||
@@ -60,7 +58,6 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       busy={!!operation}
       canLoadChainData={canLoadChainData}
       onScan={() => void walletDiscovery.run(wallet)}
-      onShowActivity={() => showWalletActivity(wallet)}
       onEdit={() => dialogs.openWalletRename(activeWorkspace.id, wallet.id)}
       onShowWallet={() => {
         updateFilters({ walletId: wallet.id, preserveContext: true });

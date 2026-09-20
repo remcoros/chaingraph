@@ -30,7 +30,6 @@ interface WalletActionRuntime {
 interface Inputs {
   activeWorkspace: Workspace | undefined;
   workspaces: WorkspaceCore['workspaces'];
-  edit: WorkspaceCore['edit'];
   setNotice: WorkspaceCore['setNotice'];
   select: WorkspaceSelection['select'];
   setSelectedId: WorkspaceSelection['setSelectedId'];
@@ -47,7 +46,6 @@ interface Inputs {
 export function createWalletActions({
   activeWorkspace,
   workspaces,
-  edit,
   setNotice,
   select,
   setSelectedId,
@@ -60,17 +58,7 @@ export function createWalletActions({
   shownRightTab,
   setGraphFilters,
 }: Inputs) {
-  const {
-    showOnGraph,
-    showRecordTab,
-    showPanel,
-    revealEntities,
-    revealGraphNodes,
-    updateFilters,
-    loadGraphTransactions,
-    graph,
-    recoveryGraph,
-  } = handoff;
+  const { showOnGraph, showRecordTab, showPanel, loadGraphTransactions, recoveryGraph } = handoff;
   const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
 
@@ -199,32 +187,5 @@ export function createWalletActions({
     }
     runtime.switchWorkbench('analysis', { interaction: 'handoff', focus: 'workbench' });
   }
-  function showWalletActivity(target: Wallet) {
-    const ids = new Set(target.unreviewedTransactionIds ?? []);
-    const activityNodes = graph.nodes
-      .filter((node) => node.kind === 'transaction' && node.txid && ids.has(node.txid))
-      .map((node) => node.id);
-    revealGraphNodes(activityNodes);
-    updateFilters({
-      includeIds: activityNodes,
-      preserveContext: true,
-    });
-    revealEntities();
-    showPanel('graph');
-    edit(
-      (current) => ({
-        ...current,
-        wallets: {
-          ...current.wallets,
-          definitions: current.wallets.definitions.map((wallet) =>
-            wallet.id === target.id
-              ? { ...wallet, unreviewedTransactionIds: [], activityOverflow: false }
-              : wallet,
-          ),
-        },
-      }),
-      false,
-    );
-  }
-  return { selectWalletRecord, openWalletRecord, analyzeFromWallet, showWalletActivity };
+  return { selectWalletRecord, openWalletRecord, analyzeFromWallet };
 }

@@ -19,7 +19,6 @@ import {
   ChevronDown,
   Crosshair,
   EyeOff,
-  Eye,
   Pencil,
   RefreshCw,
   TriangleAlert,
@@ -146,7 +145,6 @@ export function WalletInspector({
   busy,
   canLoadChainData,
   onScan,
-  onShowActivity,
   onShowWallet,
   onEdit,
   onRemove,
@@ -156,7 +154,6 @@ export function WalletInspector({
   busy: boolean;
   canLoadChainData: boolean;
   onScan: () => void;
-  onShowActivity: () => void;
   onShowWallet?: () => void;
   onEdit: () => void;
   onRemove: () => void;
@@ -212,18 +209,6 @@ export function WalletInspector({
           >
             {walletCheckAge(wallet.scannedAt)}
           </p>
-          {!!wallet.unreviewedTransactionIds?.length && (
-            <button onClick={onShowActivity} title="Transactions loaded since your last review">
-              <Eye size={13} aria-hidden="true" /> Show new activity (
-              {wallet.unreviewedTransactionIds.length})
-            </button>
-          )}
-          {wallet.activityOverflow && (
-            <p className="wallet-inspector-notice">
-              Showing the latest 10,000 unreviewed transactions. Earlier records remain in the
-              graph.
-            </p>
-          )}
           {!!wallet.lastActivity?.missingTransactionCount && (
             <p className="wallet-inspector-notice">
               {wallet.lastActivity.missingTransactionCount} previously recorded transactions were
@@ -296,8 +281,8 @@ export function WalletInspector({
             {wallet.lastActivity && (
               <>
                 <div>
-                  <dt>New to workspace</dt>
-                  <dd>{wallet.lastActivity.newTransactionIds.length}</dd>
+                  <dt>Added to workspace</dt>
+                  <dd>{wallet.lastActivity.addedTransactionCount}</dd>
                 </div>
                 <div>
                   <dt>Transactions refreshed</dt>

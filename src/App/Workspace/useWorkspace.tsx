@@ -613,7 +613,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const walletCommands = createWalletActions({
     activeWorkspace,
     workspaces,
-    edit,
     setNotice,
     select,
     setSelectedId,
@@ -659,7 +658,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       walletCommands.openWalletRecord(walletActionRuntime(), ...args),
     analyzeFromWallet: (...args: Tail<Parameters<typeof walletCommands.analyzeFromWallet>>) =>
       walletCommands.analyzeFromWallet(walletActionRuntime(), ...args),
-    showWalletActivity: walletCommands.showWalletActivity,
   };
   const analysisActions = {
     showFindingOnGraph: (...args: Tail<Parameters<typeof analysisCommands.showFindingOnGraph>>) =>

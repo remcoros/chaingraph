@@ -57,7 +57,6 @@ describe('WalletInspector', () => {
         busy: false,
         canLoadChainData: false,
         onScan() {},
-        onShowActivity() {},
         onEdit() {},
         onRemove() {},
       }),

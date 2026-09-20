@@ -123,10 +123,8 @@ describe('release review data integrity fixes', () => {
           definitions: current.wallets.definitions.map((wallet) => ({
             ...wallet,
             scannedAt: new Date().toISOString(),
-            unreviewedTransactionIds: [],
             pendingTransactionIds: [],
             scanGap: 20,
-            activityOverflow: false,
             color: '#ccbbaa',
           })),
         },

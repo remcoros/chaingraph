@@ -12,7 +12,6 @@ import {
   Wallet as WalletIcon,
 } from 'lucide-react';
 import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
-import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { GraphLeftTab, GraphFilters } from '../../../../../Core/Workspace/view';
 import type { GraphNode } from '../../../GraphState/types';
@@ -40,7 +39,6 @@ interface Props {
   onEditWallet?: (walletId: string) => void;
   busy: boolean;
   onRefreshAll: () => void;
-  onShowActivity: (wallet: Wallet) => void;
   gapLimit: number;
   setGapLimit: (gapLimit: number) => void;
   addressesPerBranch: number;
@@ -91,7 +89,6 @@ export function EntitiesPanelDetail({
   onEditWallet,
   busy,
   onRefreshAll,
-  onShowActivity,
   gapLimit,
   setGapLimit,
   addressesPerBranch,
@@ -213,16 +210,6 @@ export function EntitiesPanelDetail({
                     </button>
                   )}
                 </div>
-                {!!item.unreviewedTransactionIds?.length && (
-                  <button
-                    className="wallet-activity-link"
-                    title="Transactions loaded since your last review"
-                    onClick={() => onShowActivity(item)}
-                  >
-                    Show new activity · {item.unreviewedTransactionIds.length}
-                    {item.activityOverflow ? '+' : ''}
-                  </button>
-                )}
               </div>
             ))}
             {activeWorkspace.wallets.definitions.length === 0 && (

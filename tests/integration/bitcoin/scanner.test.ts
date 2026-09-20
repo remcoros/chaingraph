@@ -435,7 +435,7 @@ describe('browser-side wallet scanner', () => {
     );
     const result = await scanWallet(imported, 'mainnet', existing, { gap: 10, maxIndex: 30 });
     expect(result.wallet.lastActivity).toEqual({
-      newTransactionIds: [txid(4)],
+      addedTransactionCount: 1,
       refreshedTransactionCount: 2,
       missingTransactionCount: 1,
     });

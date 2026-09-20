@@ -273,7 +273,7 @@ describe('wallet selected review context', () => {
     const activity = buildWalletReviewContext(
       fixture(),
       wallet,
-      item(`tx:${id(3)}`, { reason: 'new-activity' }),
+      item(`tx:${id(3)}`, { reason: 'wallet-transaction' }),
     );
     expect(activity.role).toBe('wallet-related-transaction');
     expect(activity.selected).toBeUndefined();
@@ -399,7 +399,7 @@ describe('wallet selected review context', () => {
     const spendingContext = buildWalletReviewContext(
       workspace,
       wallet,
-      item(`tx:${shared.txid}`, { reason: 'new-activity' }),
+      item(`tx:${shared.txid}`, { reason: 'wallet-transaction' }),
     );
     expect(spendingContext.inputs[0]).toMatchObject({
       ownership: 'wallet',

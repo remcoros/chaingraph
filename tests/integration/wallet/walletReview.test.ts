@@ -728,20 +728,18 @@ describe('address-level relationship reviews', () => {
     },
   );
 
-  it('changes only the address decision key, without acknowledging activity or other output reviews', () => {
+  it('changes only the address decision key, without changing transaction or output reviews', () => {
     const workspace = addressFixture();
-    workspace.wallets.definitions = [{ ...wallet, unreviewedTransactionIds: [id(1)] }];
     const items = build(workspace).items;
     const prior = applyReviewDecisions(
       workspace,
       workspace.wallets.definitions[0],
-      [find(items, 'current-utxo')[0], find(items, 'new-activity')[0]],
+      [find(items, 'current-utxo')[0], find(items, 'wallet-transaction')[0]],
       'later',
     );
     const item = sourceAddress(prior);
     const decided = applyReviewDecisions(prior, prior.wallets.definitions[0], [item], 'reviewed');
     expect(decided.wallets.definitions).toBe(prior.wallets.definitions);
-    expect(decided.wallets.definitions[0].unreviewedTransactionIds).toEqual([id(1)]);
     for (const [key, decision] of Object.entries(prior.wallets.reviews!))
       expect(decided.wallets.reviews![key]).toEqual(decision);
     expect(
@@ -749,9 +747,9 @@ describe('address-level relationship reviews', () => {
     ).toEqual([item.key]);
   });
 
-  it('rejects a new group decision at the limit rather than pruning unrelated saved output reviews', () => {
+  it('rejects any new decision at the limit rather than pruning older decisions', () => {
     const workspace = addressFixture();
-    const item = sourceAddress(workspace);
+    const item = find(build(workspace).items, 'wallet-transaction')[0];
     workspace.wallets.reviews = Object.fromEntries(
       Array.from({ length: MAX_WALLET_REVIEWS }, (_, index) => [
         reviewKey(wallet.id, 'source', `${id(index)}:0`),
@@ -882,26 +880,58 @@ describe('review decisions', () => {
     expect(reopened.wallets.reviews?.[changed.key]).toBeUndefined();
   });
 
-  it('does not reset unrelated decisions when new activity arrives', () => {
+  it('keeps transaction decisions independent and leaves wallet facts unchanged', () => {
     const workspace = fixture();
-    const first = build(workspace).items[0];
+    const transactions = find(build(workspace).items, 'wallet-transaction');
+    expect(transactions).toHaveLength(2);
+    const [first, second] = transactions;
     const decided = applyReviewDecisions(workspace, wallet, [first], 'reviewed');
-    const withActivity: Workspace = {
-      ...decided,
-      wallets: {
-        ...decided.wallets,
-        definitions: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
+    const rebuilt = build(decided);
+    expect(rebuilt.items.find((item) => item.key === first.key)?.status).toBe('reviewed');
+    expect(rebuilt.items.find((item) => item.key === second.key)?.status).toBe('open');
+    const completed = applyReviewDecisions(decided, wallet, [second], 'reviewed');
+    expect(completed.wallets.definitions).toBe(workspace.wallets.definitions);
+    expect(completed.wallets.reviews?.[first.key].status).toBe('reviewed');
+    expect(completed.wallets.reviews?.[second.key].status).toBe('reviewed');
+  });
+
+  it('derives transaction review from wallet facts and requeues when details are loaded', () => {
+    const txid = id(3);
+    const workspace = fixture();
+    const factualWallet: Wallet = {
+      ...wallet,
+      addresses: wallet.addresses.map((address, index) =>
+        index === 0
+          ? {
+              ...address,
+              history: [...(address.history ?? []), { tx_hash: txid, height: 800002 }],
+            }
+          : address,
+      ),
+    };
+    workspace.wallets.definitions = [factualWallet];
+    const unloaded = find(
+      buildWalletReview(workspace, factualWallet).items,
+      'wallet-transaction',
+    ).find((item) => item.txid === txid)!;
+    expect(unloaded.detail).toContain('not loaded');
+    const reviewed = applyReviewDecisions(workspace, factualWallet, [unloaded], 'reviewed');
+    const loaded: Workspace = {
+      ...reviewed,
+      chainData: {
+        ...reviewed.chainData,
+        transactions: {
+          ...reviewed.chainData.transactions,
+          [txid]: { ...receipt, txid },
+        },
       },
     };
-    const rebuilt = build(withActivity);
-    expect(rebuilt.items.find((item) => item.key === first.key)?.status).toBe('reviewed');
-    const activity = find(rebuilt.items, 'new-activity');
-    expect(activity).toHaveLength(1);
-    expect(activity[0].status).toBe('open');
-    // Deciding an activity item also acknowledges the wallet's unreviewed queue.
-    const acknowledged = applyReviewDecisions(withActivity, wallet, activity, 'reviewed');
-    expect(acknowledged.wallets.definitions[0].unreviewedTransactionIds).toEqual([]);
-    expect(acknowledged.wallets.reviews?.[first.key].status).toBe('reviewed');
+    const enriched = find(
+      buildWalletReview(loaded, factualWallet).items,
+      'wallet-transaction',
+    ).find((item) => item.txid === txid)!;
+    expect(enriched).toMatchObject({ status: 'reviewed', changed: true });
+    expect(enriched.evidence).not.toBe(unloaded.evidence);
   });
 
   it('keeps decisions scoped to their wallet and prunes removed wallets', () => {
@@ -980,32 +1010,27 @@ describe('spend guidance', () => {
 });
 
 describe('deferral and complete queues', () => {
-  // RUX-002: Review later must not acknowledge refreshed activity.
-  it('keeps a deferred new-activity item pending and discoverable', () => {
-    const withActivity: Workspace = {
-      ...fixture(),
-      wallets: {
-        ...fixture().wallets,
-        definitions: [{ ...wallet, unreviewedTransactionIds: [id(2)] }],
-      },
-    };
-    const activity = find(build(withActivity).items, 'new-activity');
-    expect(activity).toHaveLength(1);
-    const deferred = applyReviewDecisions(withActivity, wallet, activity, 'later');
-    // The wallet's own activity queue still holds it, so the item still exists.
-    expect(deferred.wallets.definitions[0].unreviewedTransactionIds).toEqual([id(2)]);
-    const rebuilt = find(build(deferred).items, 'new-activity');
-    expect(rebuilt).toHaveLength(1);
-    expect(rebuilt[0].status).toBe('later');
-    expect(deferred.wallets.reviews?.[activity[0].key].status).toBe('later');
-    // Completing it afterwards does acknowledge it.
-    const completed = applyReviewDecisions(deferred, wallet, rebuilt, 'reviewed');
-    expect(completed.wallets.definitions[0].unreviewedTransactionIds).toEqual([]);
-    expect(find(build(completed).items, 'new-activity')).toMatchObject([
-      { status: 'reviewed', scope: 'transactions', subjectIds: [`tx:${id(2)}`] },
-    ]);
-    // Unrelated decisions survive both steps.
-    expect(Object.keys(completed.wallets.reviews ?? {})).toHaveLength(1);
+  it('keeps a deferred wallet transaction discoverable and makes reopen return it to open', () => {
+    const workspace = fixture();
+    const transaction = find(build(workspace).items, 'wallet-transaction').find(
+      (item) => item.txid === id(2),
+    )!;
+    const deferred = applyReviewDecisions(workspace, wallet, [transaction], 'later');
+    const rebuilt = find(build(deferred).items, 'wallet-transaction').find(
+      (item) => item.key === transaction.key,
+    )!;
+    expect(rebuilt).toMatchObject({ status: 'later', subjectIds: [`tx:${id(2)}`] });
+    const completed = applyReviewDecisions(deferred, wallet, [rebuilt], 'reviewed');
+    const reviewed = find(build(completed).items, 'wallet-transaction').find(
+      (item) => item.key === transaction.key,
+    )!;
+    expect(reviewed.status).toBe('reviewed');
+    const reopened = applyReviewDecisions(completed, wallet, [reviewed], 'reopen');
+    expect(
+      find(build(reopened).items, 'wallet-transaction').find(
+        (item) => item.key === transaction.key,
+      ),
+    ).toMatchObject({ status: 'open', subjectIds: [`tx:${id(2)}`] });
   });
 
   it('treats only reviewed and unknown as completed reviews', () => {

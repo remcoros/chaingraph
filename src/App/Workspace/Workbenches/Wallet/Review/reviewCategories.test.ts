@@ -77,7 +77,7 @@ describe('discoverable wallet finding categories', () => {
         'wallet-address',
         'source',
         'source-address',
-        'new-activity',
+        'wallet-transaction',
         'destination-address',
         'link',
         'unidentified-sources',

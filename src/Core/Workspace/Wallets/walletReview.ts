@@ -4,7 +4,12 @@ import {
 } from './walletOutputEvidence';
 import { formatBitcoinAmount, short } from '../../Formatting';
 import { stableKey } from '../Analysis/tools/shared';
-import { verifiedWalletAddresses, verifyWalletUtxo, type WalletUtxoRecord } from './walletRecords';
+import {
+  listWalletTransactions,
+  verifiedWalletAddresses,
+  verifyWalletUtxo,
+  type WalletUtxoRecord,
+} from './walletRecords';
 import { listTagsForNode } from '../Annotations/tagMembership';
 import { outpointReference, transactionReference } from '../entityReferences';
 import { type Wallet, MAX_WALLET_REVIEWS } from './wallets';
@@ -34,7 +39,7 @@ export const REVIEW_REASONS = [
   'destination-address',
   'source',
   'funding-source',
-  'new-activity',
+  'wallet-transaction',
   'counterparty',
   'link',
 ] as const;
@@ -220,7 +225,7 @@ function decorate(workspace: Workspace, item: CompleteReviewSubject): WalletRevi
 
 function nativeReviewScope(reason: ReviewReason): ReviewScope | undefined {
   if (reason === 'current-utxo' || reason === 'source') return 'utxos';
-  if (reason === 'new-activity') return 'transactions';
+  if (reason === 'wallet-transaction') return 'transactions';
   if (reason === 'wallet-address') return 'addresses';
   if (reason === 'source-address' || reason === 'destination-address') return 'relationships';
   if (reason === 'funding-source' || reason === 'counterparty') return 'previous-output-decisions';
@@ -507,29 +512,35 @@ export function buildWalletReview(
     });
   }
 
-  const activityIds = new Set(wallet.unreviewedTransactionIds ?? []);
-  const activityKeyPrefix = `${wallet.id}|new-activity|`;
-  for (const key of Object.keys(workspace.wallets.reviews ?? {})) {
-    if (!key.startsWith(activityKeyPrefix)) continue;
-    const txid = canonicalTransactionId(key.slice(activityKeyPrefix.length));
-    if (txid && history.has(txid)) activityIds.add(txid);
-  }
-  for (const txid of activityIds) {
-    const nodeId = transactionReference(txid);
-    const transaction = loaded.get(txid);
+  for (const record of listWalletTransactions(workspace, wallet)) {
+    const nodeId = transactionReference(record.txid);
+    const transaction = record.transaction;
     push({
-      key: reviewKey(wallet.id, 'new-activity', txid),
-      reason: 'new-activity',
-      title: 'New activity since your last review',
+      key: reviewKey(wallet.id, 'wallet-transaction', record.txid),
+      reason: 'wallet-transaction',
+      title: `Transaction ${short(record.txid)}`,
       detail: transaction
-        ? `Discovered by a wallet refresh with ${transaction.vin.length} input${
+        ? `Wallet history includes this transaction with ${transaction.vin.length} input${
             transaction.vin.length === 1 ? '' : 's'
-          } and ${transaction.vout.length} output${transaction.vout.length === 1 ? '' : 's'}.`
-        : 'Discovered in an address history. Open it in Graph to load the transaction.',
+          } and ${transaction.vout.length} output${transaction.vout.length === 1 ? '' : 's'}. Wallet association does not make every input or output yours.`
+        : 'Reported in wallet history, but not loaded. Open it in Graph to load the transaction before deciding.',
       nodeId,
       nodeIds: [nodeId],
-      txid,
-      evidence: fingerprint(`activity|${txid}`),
+      txid: record.txid,
+      evidence: fingerprint(
+        JSON.stringify([
+          'wallet-transaction',
+          record.txid,
+          transaction
+            ? {
+                vin: transaction.vin,
+                vout: transaction.vout,
+                size: transaction.size,
+                vsize: transaction.vsize,
+              }
+            : 'unloaded',
+        ]),
+      ),
     });
   }
 
@@ -660,17 +671,12 @@ export function buildWalletReview(
   };
 }
 
-function withReviews(
-  workspace: Workspace,
-  reviews: Record<string, ReviewDecision>,
-): Workspace['wallets']['reviews'] {
+function withReviews(reviews: Record<string, ReviewDecision>): Workspace['wallets']['reviews'] {
   const keys = Object.keys(reviews);
   if (keys.length <= MAX_WALLET_REVIEWS) return keys.length ? reviews : undefined;
-  // Keep the newest decisions rather than failing an ordinary review action.
-  const kept = keys
-    .sort((a, b) => Date.parse(reviews[b].at) - Date.parse(reviews[a].at))
-    .slice(0, MAX_WALLET_REVIEWS);
-  return Object.fromEntries(kept.map((key) => [key, reviews[key]]));
+  throw new Error(
+    `A workspace holds at most ${MAX_WALLET_REVIEWS.toLocaleString('en-US')} review decisions. Reopen an existing review before adding another.`,
+  );
 }
 
 /** One workspace update for any number of items, so Undo restores the whole batch. */
@@ -683,8 +689,9 @@ export function applyReviewDecisions(
 ): Workspace {
   const uniqueItems = [...new Map(items.map((item) => [item.key, item])).values()];
   if (!uniqueItems.length) return workspace;
+  if (uniqueItems.some((item) => !item.key.startsWith(`${wallet.id}|`)))
+    throw new Error('A wallet review decision cannot change another wallet.');
   const reviews = { ...workspace.wallets.reviews };
-  const acknowledged = new Set<string>();
   let changed = false;
   for (const item of uniqueItems) {
     if (status === 'reopen') {
@@ -698,42 +705,13 @@ export function applyReviewDecisions(
     if (previous?.status === status && previous.evidence === item.evidence) continue;
     reviews[item.key] = { status, at: now, evidence: item.evidence };
     changed = true;
-    // Deferral is not completion: refreshed activity stays in the wallet queue so
-    // the item remains discoverable instead of disappearing from every view.
-    if (item.reason === 'new-activity' && item.txid && status !== 'later')
-      acknowledged.add(item.txid);
   }
   if (!changed) return workspace;
-  if (
-    uniqueItems.some(
-      (item) =>
-        item.reason === 'wallet-address' ||
-        item.reason === 'source-address' ||
-        item.reason === 'destination-address',
-    ) &&
-    Object.keys(reviews).length > MAX_WALLET_REVIEWS
-  )
-    throw new Error(
-      `A workspace holds at most ${MAX_WALLET_REVIEWS.toLocaleString('en-US')} review decisions. Reopen an existing review before adding an address decision.`,
-    );
-  const wallets = acknowledged.size
-    ? workspace.wallets.definitions.map((entry) =>
-        entry.id === wallet.id
-          ? {
-              ...entry,
-              unreviewedTransactionIds: (entry.unreviewedTransactionIds ?? []).filter(
-                (id) => !acknowledged.has(id),
-              ),
-            }
-          : entry,
-      )
-    : workspace.wallets.definitions;
   return {
     ...workspace,
     wallets: {
       ...workspace.wallets,
-      definitions: wallets,
-      reviews: withReviews(workspace, reviews),
+      reviews: withReviews(reviews),
     },
   };
 }

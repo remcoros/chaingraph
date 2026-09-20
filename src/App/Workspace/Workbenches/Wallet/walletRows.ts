@@ -292,7 +292,7 @@ export function buildWalletRecordRows(
                 txid: record.txid,
                 contextTransactionIds: [record.txid],
               },
-              reviewKey(wallet.id, 'new-activity', record.txid),
+              reviewKey(wallet.id, 'wallet-transaction', record.txid),
             );
           })
         : [],
