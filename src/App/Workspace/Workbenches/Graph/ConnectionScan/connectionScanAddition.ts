@@ -75,13 +75,20 @@ function prepareScanPrimaryPath(
   const base = prepareScanPath(workspace, result, prefixLength);
   const terminal = base.nodeIds.at(-1)!;
   const creatorId = terminal.startsWith('out:') ? `tx:${terminal.split(':')[1]}` : undefined;
-  if (!creatorId || base.nodeIds.includes(creatorId)) return { ...base, creatorId: undefined };
+  if (!creatorId || base.nodeIds.includes(creatorId))
+    return {
+      ...base,
+      blockedByConflict:
+        base.blockedByConflict ||
+        Object.keys(base.transactions).some((txid) => addedTransactionConflicts(workspace, txid)),
+      creatorId: undefined,
+    };
 
   const prepared = prepareScanPath(workspace, additionResult(result, base.nodeIds, creatorId));
   let blockedByConflict = base.blockedByConflict || prepared.blockedByConflict;
-  const creatorTxid = creatorId.slice(3);
-  const creator = prepared.transactions[creatorTxid];
-  if (creator) blockedByConflict ||= addedTransactionConflicts(workspace, creatorTxid);
+  blockedByConflict ||= Object.keys(prepared.transactions).some((txid) =>
+    addedTransactionConflicts(workspace, txid),
+  );
   return { ...prepared, blockedByConflict, creatorId };
 }
 

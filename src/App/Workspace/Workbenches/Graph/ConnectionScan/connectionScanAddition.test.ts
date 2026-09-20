@@ -168,6 +168,69 @@ describe('scan path addition with terminal creator', () => {
     expect(() => addScanPathAddition(workspace, result)).toThrow(/conflicts/);
   });
 
+  it('blocks a transaction-ended path whose added terminal creator contradicts an external spender', () => {
+    const { workspace, run, creatorResult, creator } = fixture();
+    const retained = replaceScanRun(workspace, run, { [id(2)]: creator });
+    retained.chainData.transactions[id(4)] = {
+      ...transaction(4, 2),
+      vin: [{ txid: id(2), vout: 1, prevout: { value: 2, scriptPubKey: { hex: '51' } } }],
+    };
+
+    expect(prepareScanPathAddition(retained, creatorResult).creatorId).toBeUndefined();
+    expect(prepareScanPathAddition(retained, creatorResult).blockedByConflict).toBe(true);
+    expect(() => addScanPathAddition(retained, creatorResult)).toThrow(/conflicts/);
+  });
+
+  it('checks every prepared primary transaction, not only the displayed terminal creator', () => {
+    const { workspace, result, creator } = fixture();
+    const earlierCreator = transaction(3, 2);
+    workspace.chainData.transactions = {
+      [id(4)]: transaction(4, 3),
+    };
+    workspace.view.graphNodeIds = [tx(4)];
+    const primary: ScanResult = {
+      ...result,
+      id: 'scan:outside-primary',
+      path: [tx(4), out(3), tx(3), out(2)],
+      endpoint: out(2),
+      directions: ['upstream', 'upstream', 'upstream'],
+      hops: 1,
+    };
+    const terminalCreator: ScanResult = {
+      ...primary,
+      id: 'scan:outside-primary-creator',
+      path: [...primary.path, tx(2)],
+      endpoint: tx(2),
+      directions: [...primary.directions, 'upstream'],
+      hops: 2,
+    };
+    const retained = replaceScanRun(
+      workspace,
+      {
+        id: 'outside-primary',
+        source: tx(4),
+        targetIds: [out(2), tx(2)],
+        startedAt: '2026-09-10T12:00:00.000Z',
+        settings: { ...DEFAULT_SCAN_SETTINGS },
+        status: 'complete',
+        examined: 4,
+        stopReasons: [],
+        results: [primary, terminalCreator],
+      },
+      { [id(3)]: earlierCreator, [id(2)]: creator },
+    );
+    retained.chainData.transactions[id(5)] = {
+      ...transaction(5, 3),
+      vin: [{ txid: id(3), vout: 1, prevout: { value: 2, scriptPubKey: { hex: '51' } } }],
+    };
+
+    const plan = prepareScanPathAddition(retained, primary);
+    expect(plan.creatorId).toBe(tx(2));
+    expect(Object.keys(plan.transactions)).toEqual([id(4), id(3), id(2)]);
+    expect(plan.blockedByConflict).toBe(true);
+    expect(() => addScanPathAddition(retained, primary)).toThrow(/conflicts/);
+  });
+
   it('preserves original endpoint conflict findings and natural endpoint evidence checks', () => {
     const { workspace, result, creator } = fixture();
     workspace.chainData.transactions[id(2)] = creator;
