@@ -122,6 +122,9 @@
   .entity-icon-toggle {
     min-height: 36px;
   }
+  .entity-type-toggle .entity-icon-toggle {
+    min-height: 30px;
+  }
 }
 .entity-browser input,
 .entity-browser select {
