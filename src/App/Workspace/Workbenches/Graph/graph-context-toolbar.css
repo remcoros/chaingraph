@@ -5,6 +5,7 @@
   padding: 6px;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
+  background: var(--color-surface);
   background: color-mix(in srgb, var(--color-surface) 96%, transparent);
   box-shadow: 0 3px 14px #0003;
   color: var(--color-ink);
