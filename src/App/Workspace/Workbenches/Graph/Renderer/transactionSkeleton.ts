@@ -256,9 +256,9 @@ export function layoutTransactionSkeleton(
   const directions = new Map<string, Position>();
   const anchored = new Set<string>();
   for (const node of nodes) {
-    if (node.position) {
+    if (node.position && node.retained !== false) {
       positions.set(node.id, { ...node.position, z: flat ? 0 : node.position.z });
-      if (node.retained !== false) anchored.add(node.id);
+      anchored.add(node.id);
     }
   }
   const adjacent = new Map(
