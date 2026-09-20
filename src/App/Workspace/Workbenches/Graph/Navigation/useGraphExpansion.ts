@@ -11,7 +11,7 @@ import type { WorkspaceCore } from '../../../workspaceCore';
 import type { WorkspaceSelection } from '../../../Selection/useWorkspaceSelection';
 import { setNodesHidden } from '../../../GraphState/visibility';
 import { buildGraph } from '../../../GraphState/graphEvidence';
-import { openFlowPanel } from '../../../GraphState/panelState';
+import { setFlowPanelTransaction } from '../../../GraphState/panelState';
 
 import { ancestryNotice } from './ancestryNotice';
 import { loadAncestors } from './ancestry';
@@ -123,9 +123,7 @@ export function useGraphExpansion({
                 hiddenNodeIds: current.view.hiddenNodeIds?.filter((hidden) => hidden !== id),
                 panels: {
                   ...current.view.panels,
-                  flow: openFlowPanel(current.view.panels?.flow, {
-                    transactionId: transaction.txid,
-                  }),
+                  flow: setFlowPanelTransaction(current.view.panels?.flow, transaction.txid),
                 },
               },
             }),
@@ -217,9 +215,10 @@ export function useGraphExpansion({
                   ...admitted.view,
                   panels: {
                     ...admitted.view.panels,
-                    flow: openFlowPanel(admitted.view.panels?.flow, {
-                      transactionId: result.transactions[0].txid,
-                    }),
+                    flow: setFlowPanelTransaction(
+                      admitted.view.panels?.flow,
+                      result.transactions[0].txid,
+                    ),
                   },
                 },
               }

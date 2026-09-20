@@ -1,7 +1,7 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react';
 
 import { addGraphNodes } from '../../../GraphState/graphMembership';
-import { openFlowPanel } from '../../../GraphState/panelState';
+import { setFlowPanelTransaction } from '../../../GraphState/panelState';
 import type { GraphFilters } from '../../../../../Core/Workspace/view';
 import {
   addressReference,
@@ -219,9 +219,7 @@ export function useAddressNavigation({
             ...admitted.view,
             panels: {
               ...latest.view.panels,
-              flow: openFlowPanel(latest.view.panels?.flow, {
-                transactionId: transaction.txid,
-              }),
+              flow: setFlowPanelTransaction(latest.view.panels?.flow, transaction.txid),
             },
           },
         };

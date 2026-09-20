@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { graphPanelsInView, resolveGraphPanelState } from './useGraphPanels';
+// @vitest-environment jsdom
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
+import type { WorkspaceOperations } from '../../../../Core/Workspace/Session/WorkspaceStore';
+import { graphPanelsInView, resolveGraphPanelState, useGraphPanels } from './useGraphPanels';
+
+afterEach(cleanup);
 
 describe('graph panel state', () => {
   it('resolves a complete runtime state from an empty saved view', () => {
@@ -49,5 +55,33 @@ describe('graph panel state', () => {
         hasSelectedWallet: false,
       }).right.tab,
     ).toBe('inspect');
+  });
+
+  it('keeps a collapsed right panel collapsed when selection routes it to Inspector', () => {
+    let workspace = createWorkspace('Collapsed panel fixture', 'mainnet');
+    workspace.view.panels = {
+      right: { tab: 'transactions', collapsed: true },
+    };
+    const operations: WorkspaceOperations = {
+      edit: (update) => {
+        workspace = update(workspace);
+      },
+      undo: () => {},
+      redo: () => {},
+      lock: () => Promise.resolve(),
+      persist: () => Promise.resolve(),
+      pauseAutosave: () => {},
+    };
+    const view = renderHook(() =>
+      useGraphPanels({
+        workspace,
+        workspaceId: workspace.id,
+        getWorkspace: () => operations,
+      }),
+    );
+
+    act(() => view.result.current.revealInspector());
+
+    expect(workspace.view.panels?.right).toEqual({ tab: 'inspect', collapsed: true });
   });
 });

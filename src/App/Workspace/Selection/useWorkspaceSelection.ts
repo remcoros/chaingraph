@@ -61,7 +61,7 @@ interface Inputs {
   currentRef: AppState['activeWorkspaceRef'];
   sessions: AppState['workspaces'];
   setGraphFilters: Dispatch<SetStateAction<GraphFilters>>;
-  /** Shows a newly selected entity, supplied by the workbench that displays it. */
+  /** Routes a newly selected entity without overriding the workbench's panel presentation. */
   revealSelected: () => void;
 }
 

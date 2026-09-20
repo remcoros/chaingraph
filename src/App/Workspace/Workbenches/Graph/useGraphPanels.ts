@@ -46,7 +46,7 @@ export interface GraphPanels extends GraphPanelState {
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleSidePanels: () => void;
-  /** Shows a newly selected entity, without interrupting a scan in progress. */
+  /** Routes a newly selected entity to Inspector without changing panel collapse. */
   revealInspector: () => void;
   revealEntities: () => void;
   showPanel: (panel: GraphMobilePanel) => void;
@@ -163,8 +163,8 @@ export function useGraphPanels({
         setPanels((current) => ({
           ...current,
           right: {
+            ...current.right,
             tab: current.right.tab === 'scan' ? 'scan' : 'inspect',
-            collapsed: false,
           },
         })),
       revealEntities: () =>

@@ -21,7 +21,6 @@ import { FlowPanel } from './TransactionFlow/FlowPanel';
 import { selectedWalletFilterIds } from './Filters/graphFilters';
 import { hasActiveFilters } from './Filters/filterPresentation';
 import { applyBatchIcon } from '../../../../Core/Workspace/Annotations/batchMetadata';
-import { openFlowPanel } from '../../GraphState/panelState';
 import {
   FilterChips,
   GraphConnectionsAction,
@@ -75,7 +74,6 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     left: { collapsed: leftPanelCollapsed },
     right: { collapsed: rightPanelCollapsed },
     flow: shownFlowPanel,
-    setPanels,
     setFlowPanel,
     toggleSidePanels,
   } = workspace.graph.panels;
@@ -212,7 +210,6 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     if (selectedSpenderTxids.length === 1)
       select(transactionReference(selectedSpenderTxids[0]), { preserveCamera: true });
     else if (selectedSpenderTxids.length > 1) {
-      setPanels((current) => ({ ...current, flow: openFlowPanel(current.flow) }));
       setNotice('Choose a spending transaction in the transaction flow panel.');
     } else void expand('spending', selectedId, { preserveCamera: true });
   };
