@@ -105,13 +105,13 @@ export function InspectorPanel({
           {rightPanelCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>
         <button
-          className={shownRightTab === 'inspect' ? 'active' : ''}
+          className={`wallet-panel-tab wallet-panel-tab-wide ${shownRightTab === 'inspect' ? 'active' : ''}`}
           onClick={() => setRightTab('inspect')}
         >
           <InspectorTabIcon size={15} aria-hidden="true" /> {inspectorTab.label}
         </button>
         <button
-          className={shownRightTab === 'scan' ? 'active' : ''}
+          className={`wallet-panel-tab wallet-panel-tab-wide ${shownRightTab === 'scan' ? 'active' : ''}`}
           aria-pressed={shownRightTab === 'scan'}
           onClick={() => setRightTab('scan')}
         >
@@ -120,21 +120,21 @@ export function InspectorPanel({
         {wallet && (
           <>
             <button
-              className={shownRightTab === 'addresses' ? 'active' : ''}
+              className={`wallet-panel-tab ${shownRightTab === 'addresses' ? 'active' : ''}`}
               aria-pressed={shownRightTab === 'addresses'}
               onClick={() => setRightTab('addresses')}
             >
               <MapPin size={15} aria-hidden="true" /> Addresses
             </button>
             <button
-              className={shownRightTab === 'transactions' ? 'active' : ''}
+              className={`wallet-panel-tab ${shownRightTab === 'transactions' ? 'active' : ''}`}
               aria-pressed={shownRightTab === 'transactions'}
               onClick={() => setRightTab('transactions')}
             >
               <ArrowLeftRight size={15} aria-hidden="true" /> Transactions
             </button>
             <button
-              className={shownRightTab === 'utxos' ? 'active' : ''}
+              className={`wallet-panel-tab ${shownRightTab === 'utxos' ? 'active' : ''}`}
               aria-pressed={shownRightTab === 'utxos'}
               onClick={() => setRightTab('utxos')}
             >
