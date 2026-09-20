@@ -5,7 +5,7 @@ import {
   ArrowRight,
   Box,
   Pencil,
-  Search,
+  Network,
   Wallet,
   CircleHelp,
   TriangleAlert,
@@ -165,7 +165,7 @@ export function WalletReviewFlow({
           <p>
             Arrows connect transactions to the outputs they create or spend. They do not show which
             input funded each output or who owns the coins. Choose <strong>Show on graph</strong>{' '}
-            (the magnifying glass) to open a transaction or outpoint in Graph.
+            (the network icon) to open a transaction or outpoint in Graph.
           </p>
         </WalletHelp>
       </div>
@@ -197,7 +197,7 @@ function ShowOnGraph({
       disabled={!!unavailable}
       onClick={() => onShowInGraph(id)}
     >
-      <Search size={13} aria-hidden="true" />
+      <Network size={13} aria-hidden="true" />
     </button>
   );
 }

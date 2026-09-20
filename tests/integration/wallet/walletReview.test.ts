@@ -416,7 +416,7 @@ describe('wallet review queue', () => {
     expect(find(review.items, 'destination-address')).toHaveLength(1);
   });
 
-  it('surfaces only active findings that cover verified wallet outputs', () => {
+  it('projects active findings by explicit factual subjects and keeps one linked decision', () => {
     const finding = {
       id: 'cioh:aa',
       algorithm: 'cioh-v2',
@@ -424,17 +424,36 @@ describe('wallet review queue', () => {
       description: 'Co-spent outputs',
       nodeIds: [`out:${id(1)}:0`],
       txids: [id(2)],
+      subjects: [`out:${id(1)}:0`, `tx:${id(2)}`, `addr:${MINE_A}`, `addr:${THEIRS}`],
       createdAt: '2026-09-08T10:00:00.000Z',
       kind: 'hypothesis' as const,
     };
-    expect(find(build(fixture({ analysis: { findings: [finding] } })).items, 'link')).toHaveLength(
-      1,
+    const projected = find(build(fixture({ analysis: { findings: [finding] } })).items, 'link');
+    expect(projected.map((item) => item.scope)).toEqual([
+      'utxos',
+      'transactions',
+      'addresses',
+      'relationships',
+    ]);
+    expect(new Set(projected.map((item) => item.key))).toEqual(
+      new Set([reviewKey(wallet.id, 'link', finding.id)]),
     );
+    expect(projected.find((item) => item.scope === 'relationships')?.subjectIds).toEqual([
+      `addr:${THEIRS}`,
+    ]);
+    const decided = applyReviewDecisions(
+      fixture({ analysis: { findings: [finding] } }),
+      wallet,
+      projected,
+      'reviewed',
+    );
+    expect(Object.keys(decided.wallets.reviews ?? {})).toEqual([projected[0].key]);
     const many = fixture({
       analysis: {
         findings: Array.from({ length: 45 }, (_, index) => ({
           ...finding,
           id: `cioh:${index}`,
+          subjects: [`out:${id(1)}:0`],
         })),
       },
     });
@@ -455,7 +474,13 @@ describe('wallet review queue', () => {
     ).toHaveLength(0);
     expect(
       find(
-        build(fixture({ analysis: { findings: [{ ...finding, nodeIds: [`out:${id(7)}:0`] }] } }))
+        build(fixture({ analysis: { findings: [{ ...finding, subjects: undefined }] } })).items,
+        'link',
+      ),
+    ).toHaveLength(0);
+    expect(
+      find(
+        build(fixture({ analysis: { findings: [{ ...finding, subjects: [`tx:${id(7)}`] }] } }))
           .items,
         'link',
       ),
@@ -976,6 +1001,9 @@ describe('deferral and complete queues', () => {
     // Completing it afterwards does acknowledge it.
     const completed = applyReviewDecisions(deferred, wallet, rebuilt, 'reviewed');
     expect(completed.wallets.definitions[0].unreviewedTransactionIds).toEqual([]);
+    expect(find(build(completed).items, 'new-activity')).toMatchObject([
+      { status: 'reviewed', scope: 'transactions', subjectIds: [`tx:${id(2)}`] },
+    ]);
     // Unrelated decisions survive both steps.
     expect(Object.keys(completed.wallets.reviews ?? {})).toHaveLength(1);
   });

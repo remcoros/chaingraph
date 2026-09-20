@@ -1,4 +1,4 @@
-import { outpointReference } from '../../entityReferences';
+import { addressReference, outpointReference } from '../../entityReferences';
 import { outputAddress } from '../../../Bitcoin';
 import { toolGroups } from '../toolGroups';
 import { booleanOption, defineTool, finding, numberOption, spendableOutputs } from './shared';
@@ -65,6 +65,7 @@ export const reuseTool = defineTool({
           `${address} appears on ${group.nodes.length} outputs across ${group.txids.size} transaction${group.txids.size === 1 ? '' : 's'} in the scoped loaded history. ${group.txids.size === 1 ? 'These repeats occur within one transaction.' : 'The same address recurs in separate transactions.'} Outputs may already be spent; the occurrence count is not a balance. Inspect the linked outputs and label their context.`,
           group.nodes,
           [...group.txids],
+          [addressReference(address)],
           [...group.txids],
           group.txids.size > 1 ? 'repeated-address' : undefined,
           {

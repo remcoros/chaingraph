@@ -2,12 +2,12 @@ import { Amount } from '../../../../Controls/Display/Amount';
 import { useCallback, useId, useMemo, useState, type ReactNode } from 'react';
 import {
   ChevronRight,
+  Circle,
   CircleCheck,
   Clock3,
   Filter,
   Info,
   Network,
-  Search,
   TriangleAlert,
   Undo2,
 } from 'lucide-react';
@@ -143,6 +143,8 @@ export function WalletItemDetail({
   onIsolateInGraph,
   relatedSelection,
   resolveInputs = true,
+  reviewMode = true,
+  onOpenReviewItem,
 }: Pick<
   WalletWorkbenchContext,
   | 'active'
@@ -164,6 +166,8 @@ export function WalletItemDetail({
   onDecide: (items: readonly WalletReviewItem[], action: WalletDecisionAction) => void;
   relatedSelection?: ReactNode;
   resolveInputs?: boolean;
+  reviewMode?: boolean;
+  onOpenReviewItem?: (row: WalletRow, item: WalletReviewItem) => void;
 }) {
   const fetchTransaction = useTransactionFetch('visible');
   const [chosenContext, setChosenContext] = useState('');
@@ -193,7 +197,7 @@ export function WalletItemDetail({
         entry.address === row.address &&
         entry.history?.some((transaction) => !selectionIndex.transactions.has(transaction.tx_hash)),
     );
-  const contextReview = row.reviews.find((item) => item.key === row.key);
+  const contextReview = reviewMode ? row.reviews[0] : undefined;
   const contextReviewNodeId = contextReview?.nodeId;
   const contextReviewTxid = contextReview?.txid;
   const contextReviewNodeIds = contextReview?.nodeIds;
@@ -273,26 +277,31 @@ export function WalletItemDetail({
   );
   const changed = row.reviews.find((item) => item.changed);
   const outpoints = row.outpointIds ?? [];
-  const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
+  const actionableReviews = reviewMode
+    ? row.reviews.filter((item) => !item.legacyOutputReview)
+    : [];
   const subjectTitle = walletSubjectTitle(row);
   const missingContext = !annotation?.label?.trim() && tags.length === 0;
   const completed = !changed && (row.status === 'reviewed' || row.status === 'unknown');
-  const finding = walletRowFinding(workspace, row);
+  const finding = reviewMode ? walletRowFinding(workspace, row) : undefined;
   const addressReuse = finding?.algorithm.replace(/-v\d+$/, '') === 'address-reuse';
-  const guidedActions: ('label' | 'tags')[] = completed
+  const guidedActions: ('label' | 'tags')[] = !reviewMode
     ? []
-    : finding
-      ? tags.length === 0
-        ? ['tags']
-        : []
-      : [
-          ...(!annotation?.label?.trim() ? ['label' as const] : []),
-          ...(tags.length === 0 ? ['tags' as const] : []),
-        ];
-  const title =
-    finding?.title ||
-    annotation?.label?.trim() ||
-    (missingContext ? `${subjectTitle} without label or tags` : subjectTitle);
+    : completed
+      ? []
+      : finding
+        ? tags.length === 0
+          ? ['tags']
+          : []
+        : [
+            ...(!annotation?.label?.trim() ? ['label' as const] : []),
+            ...(tags.length === 0 ? ['tags' as const] : []),
+          ];
+  const title = reviewMode
+    ? finding?.title ||
+      annotation?.label?.trim() ||
+      (missingContext ? `${subjectTitle} without label or tags` : subjectTitle)
+    : annotation?.label?.trim() || subjectTitle;
   const calloutTone =
     changed || (!completed && (missingContext || addressReuse))
       ? 'attention'
@@ -315,6 +324,7 @@ export function WalletItemDetail({
         : row.status === 'later'
           ? 'Review later'
           : 'Not reviewed';
+  const linkedReviews = [...new Map(row.reviews.map((item) => [item.key, item])).values()];
   const related = useMemo(
     () =>
       selectedWalletRelatedRecords(
@@ -348,7 +358,7 @@ export function WalletItemDetail({
               )}
               {title}
             </h2>
-            {row.reviews.length > 0 && (
+            {reviewMode && row.reviews.length > 0 && (
               <span className={`wallet-subject-status status-${changed ? 'changed' : row.status}`}>
                 {statusLabel}
               </span>
@@ -366,6 +376,23 @@ export function WalletItemDetail({
               }
             />
           </div>
+        </div>
+        <div className="wallet-detail-graph-actions" aria-label="Graph actions">
+          <button
+            disabled={busy}
+            aria-label="Show on graph"
+            title={`Show and zoom to this ${row.kind === 'output' ? 'outpoint' : row.kind} in Graph`}
+            onClick={() => onShowInGraph(row.nodeId, row.utxo)}
+          >
+            <Network size={13} /> Show on graph
+          </button>
+          <button
+            disabled={busy}
+            title="Show only this selection and its connected graph context"
+            onClick={() => onIsolateInGraph(row.nodeId, row.utxo)}
+          >
+            <Filter size={13} /> Isolate
+          </button>
         </div>
       </header>
       <div
@@ -386,7 +413,7 @@ export function WalletItemDetail({
           onChange={onChange}
           onNotice={onNotice}
         />
-        {actionableReviews.length > 0 && (
+        {reviewMode && actionableReviews.length > 0 && (
           <div className="wallet-action-group" aria-label="Review decision">
             <WalletDecisionButtons items={row.reviews} busy={busy} onDecide={onDecide} />
             {actionableReviews.length > 1 && (
@@ -396,37 +423,22 @@ export function WalletItemDetail({
         )}
         {relatedSelection && (
           <div
-            className={`wallet-action-group${!completed && finding ? ' wallet-guided-related' : ''}`}
+            className={`wallet-action-group${reviewMode && !completed && finding ? ' wallet-guided-related' : ''}`}
           >
             {relatedSelection}
           </div>
         )}
-        <div className="wallet-action-group" aria-label="Graph actions">
-          <button
-            disabled={busy}
-            aria-label="Show in Graph"
-            title={`Show and zoom to this ${row.kind === 'output' ? 'outpoint' : row.kind} in Graph`}
-            onClick={() => onShowInGraph(row.nodeId, row.utxo)}
-          >
-            <Network size={14} /> Show
-          </button>
-          <button
-            disabled={busy}
-            title="Show only this selection and its connected graph context"
-            onClick={() => onIsolateInGraph(row.nodeId, row.utxo)}
-          >
-            <Filter size={14} /> Isolate
-          </button>
+      </div>
+      {reviewMode && (
+        <div
+          className={`wallet-review-callout tone-${calloutTone}`}
+          role="note"
+          aria-label="Review guidance"
+        >
+          <GuidanceIcon size={18} aria-hidden="true" />
+          <p>{guidance}</p>
         </div>
-      </div>
-      <div
-        className={`wallet-review-callout tone-${calloutTone}`}
-        role="note"
-        aria-label="Review guidance"
-      >
-        <GuidanceIcon size={18} aria-hidden="true" />
-        <p>{guidance}</p>
-      </div>
+      )}
       <section className="wallet-subject-card" aria-label={`${subjectTitle} details`}>
         <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
           <div className="wallet-subject-identifier">
@@ -524,6 +536,47 @@ export function WalletItemDetail({
           </div>
         )}
       </section>
+      {!reviewMode && (
+        <section className="wallet-linked-reviews" aria-label="Review items">
+          <h3>Review items</h3>
+          {linkedReviews.length ? (
+            <ul>
+              {linkedReviews.map((item) => {
+                const state = item.changed
+                  ? 'Evidence changed'
+                  : item.status === 'later'
+                    ? 'Review later'
+                    : item.status === 'reviewed'
+                      ? 'Reviewed'
+                      : item.status === 'unknown'
+                        ? 'Source unknown'
+                        : 'To review';
+                const StateIcon = item.changed
+                  ? TriangleAlert
+                  : item.status === 'later'
+                    ? Clock3
+                    : item.status === 'reviewed' || item.status === 'unknown'
+                      ? CircleCheck
+                      : Circle;
+                return (
+                  <li key={item.key}>
+                    <button
+                      title={`${item.title}. ${state}`}
+                      onClick={() => onOpenReviewItem?.(row, item)}
+                    >
+                      <StateIcon size={14} aria-hidden="true" />
+                      <span>{item.title}</span>
+                      <small>{state}</small>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="muted">None</p>
+          )}
+        </section>
+      )}
       {context ? (
         <section
           className={`wallet-flow-disclosure${flowOpen ? ' is-open' : ''}`}
@@ -632,7 +685,7 @@ export function WalletItemDetail({
                         aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
                         onClick={() => onShowInGraph(id)}
                       >
-                        <Search size={13} />
+                        <Network size={13} />
                       </button>
                     </div>
                     {description && (

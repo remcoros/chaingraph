@@ -283,16 +283,17 @@ check has run, it says so and offers one.
 Six tabs share one list and detail panel: **To review**, **UTXOs**,
 **Transactions**, **Addresses**, **Sources** and **Destinations**.
 
-- **To review** queues current UTXOs and used addresses first, then earlier
-  receipts, sources, refreshed activity, destinations and analysis findings.
-  Each item explains why it is here and shows its evidence. **Mark reviewed**
-  completes it; **Review later** defers it to **Show → Review later** without
-  losing it. Decisions are encrypted with the workspace and only reappear when
-  the underlying observations change. **Finding types** groups filters by review,
-  metadata and analysis category with total known counts; selected types combine
-  with OR. Search, review status and list pagination do not change those counts.
-  Empty choices and empty groups are hidden until you choose **Show all**. The
-  list shows 40 matching rows at a time; **Show more** reveals the next group.
+- **To review** is the decision queue. **Review state** selects outstanding,
+  deferred, completed or all items. **Review scope** narrows the queue to UTXOs,
+  transactions, addresses, sources and destinations, or retained previous output
+  decisions. **Review reason** combines selected reasons with OR. Scope and reason
+  counts use the selected review state independently of the other facet, so counts
+  can overlap. Each item explains why it is here and shows its evidence. **Mark
+  reviewed** completes it; **Review later** defers it without losing it. One
+  analysis finding can appear in several scopes, but all of its rows share one
+  decision. Batch actions report selected rows and distinct review items, then
+  apply each decision once. The list shows 40 matching rows at a time; **Show
+  more** reveals the next group.
 - **UTXOs** checks discovered addresses through your backend when no saved check
   is available, including mempool activity, 100 addresses per action. Successful
   address observations are encrypted with the workspace, not stored as a separate
@@ -313,6 +314,14 @@ Six tabs share one list and detail panel: **To review**, **UTXOs**,
   who funded transactions that paid you, and who was paid by transactions
   spending your outputs. Your own addresses are excluded. Missing inputs are
   resolved in bounded background batches with **Load next** and **Retry**.
+
+The five factual tabs always list known wallet records, whether or not analysis
+has run. Their compact **To review (N)** toggle shows only records with outstanding
+linked work; it never changes or deletes the factual list. A selected record's
+quiet **Review items** section says **None** or lists every linked item and its
+state. Choosing one opens **To review**, clears the ordinary filters, shows all
+items linked to that exact record and selects the chosen item. The contextual
+relation is shown above the queue and is not text search.
 
 Select a row to label, tag or set an icon for it, then use **Show** to open it in
 Graph or **Isolate** to open it with only its connected context. **Select
@@ -339,10 +348,11 @@ Open **Analysis**, choose a scope and press **Scan**. **Workspace** uses every
 loaded transaction; **Selection** follows the selected transaction, output,
 address or wallet; each wallet is also available directly. **Options** adjusts
 each tool's parameters and controls whether missing input data is loaded before
-scanning. **Finding types** uses the same ordered analysis categories as Wallet;
-counts cover all findings in the current result scope and do not change with the
-priority, evidence or list pagination controls. Empty choices and groups are
-available through **Show all**.
+scanning. Analysis keeps its **Finding types** filter for algorithm categories;
+Wallet calls its broader queue facet **Review reason**. Analysis counts cover all
+findings in the current result scope and do not change with the priority,
+evidence or list pagination controls. Empty choices and groups are available
+through **Show all**.
 
 | Tool                          | What it reports                                                                                    |
 | ----------------------------- | -------------------------------------------------------------------------------------------------- |

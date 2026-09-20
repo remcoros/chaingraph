@@ -1,4 +1,4 @@
-import { outpointReference } from '../../entityReferences';
+import { outpointReference, transactionReference } from '../../entityReferences';
 import { type TxOutput, outputAddress, outputScriptHash } from '../../../Bitcoin';
 import { toolGroups } from '../toolGroups';
 
@@ -108,6 +108,7 @@ export const walletTool = defineTool({
               )
               .map((input) => input.txid),
           ],
+          [transactionReference(tx.txid)],
           [tx.txid],
           !overlap && inputWallets.size > 1 ? 'distinct-wallet-inputs' : undefined,
           {

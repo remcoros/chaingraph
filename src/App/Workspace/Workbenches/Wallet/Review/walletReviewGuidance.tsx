@@ -19,7 +19,7 @@ export function walletReviewGuidance(
   finding?: AnalysisFinding,
   canSelectRelated = false,
 ): ReactNode {
-  const reason = row.reviews.find((item) => item.key === row.key)?.reason;
+  const reason = row.reviews[0]?.reason;
   if (reason === 'funding-source' || reason === 'counterparty')
     return 'Saved output decision. Use the source or destination address for new reviews.';
   if (row.changed)

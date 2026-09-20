@@ -27,6 +27,7 @@ import {
 
 import { addressToScriptHash, type Network } from '../Bitcoin/index';
 import { inspectExtendedPublicKey, verifyDerivedAddresses } from './Wallets/walletDerivation';
+import { canonicalEntityReference } from './entityReferences';
 const text = z.string().max(10000);
 const timestamp = z.iso.datetime({ offset: true });
 import { chainDataSchema, type ChainDataDocument } from './chainData';
@@ -114,6 +115,13 @@ export function validateWorkspace(data: unknown, verifyDerivation = true): Works
     parsed.view.hiddenNodeIds = parseHiddenNodeIds(parsed.view.hiddenNodeIds, parsed.network);
   if (parsed.annotations.tags !== undefined)
     parsed.annotations.tags = parseWorkspaceTags(parsed.annotations.tags, parsed.network);
+  for (const finding of parsed.analysis.findings) {
+    if (!finding.subjects) continue;
+    const subjects = finding.subjects.map((id) => canonicalEntityReference(id, parsed.network));
+    if (new Set(subjects).size !== subjects.length)
+      throw new Error('Analysis finding contains duplicate subjects.');
+    finding.subjects = subjects;
+  }
   if (
     Object.entries(parsed.chainData.transactions).some(
       ([id, transaction]) => id !== transaction.txid,

@@ -79,6 +79,7 @@ export const valueFlowTool = defineTool({
             `${inputs.length - absent.length}/${tx.vin.length} input values available. ${absent.some((input) => input.resolution.status === 'conflict') ? 'Conflicting observations need review before a fee can be calculated.' : 'Load missing data to calculate the fee.'} Unknown inputs are never zero.`,
             absent.length ? absent.map((input) => input.nodeId) : [transactionReference(tx.txid)],
             evidence,
+            [transactionReference(tx.txid)],
             [tx.txid],
             undefined,
             {
@@ -117,6 +118,7 @@ export const valueFlowTool = defineTool({
             'An amount is invalid or outputs are unavailable. Refresh the affected transaction before reviewing its fee.',
             [transactionReference(tx.txid)],
             evidence,
+            [transactionReference(tx.txid)],
             [tx.txid],
             undefined,
             {
@@ -146,6 +148,7 @@ export const valueFlowTool = defineTool({
             `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. These records disagree. Refresh the affected transaction before reviewing its fee.`,
             [transactionReference(tx.txid)],
             evidence,
+            [transactionReference(tx.txid)],
             [tx.txid],
             undefined,
             {
@@ -179,6 +182,7 @@ export const valueFlowTool = defineTool({
           `Known inputs total ${formatAmount(inputTotal)}; outputs total ${formatAmount(outputTotal)}. The difference is the fee. ${rate === undefined ? 'Fee rate is unknown because virtual size is unavailable.' : `Fee rate: ${rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} sat/vB (${tx.vsize} vB).`}${exceeds ? ` This meets your ${threshold} sat/vB review threshold; it does not establish overpayment at the time.` : ''}`,
           [transactionReference(tx.txid)],
           evidence,
+          [transactionReference(tx.txid)],
           [tx.txid],
           exceeds ? 'fee-threshold' : undefined,
           {

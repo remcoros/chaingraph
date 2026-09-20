@@ -88,6 +88,8 @@ function item(
     detail: '',
     nodeId,
     nodeIds: [nodeId],
+    subjectIds: [nodeId],
+    scope: 'utxos',
     txid: shared.txid,
     label: '',
     tags: [],

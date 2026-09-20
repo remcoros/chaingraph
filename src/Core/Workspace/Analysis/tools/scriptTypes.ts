@@ -115,6 +115,7 @@ export const scriptTool = defineTool({
               )
               .map((input) => input.txid),
           ],
+          [transactionReference(tx.txid)],
           [tx.txid],
           undefined,
           {

@@ -145,7 +145,7 @@
 }
 .wallet-review-tabs,
 .wallet-review-body {
-  width: min(100%, max(860px, calc(100vw - 575px)));
+  width: min(1200px, 100%);
   margin-inline: auto;
 }
 .wallet-review-body {
@@ -170,9 +170,10 @@
 }
 .wallet-review-grid {
   display: grid;
-  grid-template-columns: clamp(240px, 26%, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 30%) minmax(0, 1fr);
   align-items: start;
-  gap: 24px;
+  gap: 16px;
+  margin-top: 4px;
 }
 .wallet-review-list {
   display: flex;
@@ -556,7 +557,32 @@
 .wallet-workbench .wallet-record-filters {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
+}
+.wallet-review-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-rule));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-surface));
+  font-size: 12px;
+}
+.wallet-review-context > span {
+  min-width: 0;
+}
+.wallet-review-only-toggle {
+  min-height: 34px;
+  white-space: nowrap;
+}
+.wallet-review-only-toggle[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-raised);
 }
 .wallet-workbench .wallet-record-search {
   flex: 1 1 220px;
@@ -595,11 +621,6 @@
 .wallet-first-use {
   padding: 9px 12px;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-.wallet-review-grid {
-  grid-template-columns: clamp(240px, 26%, 320px) minmax(0, 1fr);
-  gap: 16px;
-  margin-top: 4px;
 }
 .wallet-review-list {
   border: 1px solid var(--color-rule);
@@ -1294,6 +1315,50 @@
   border-radius: 8px;
   background: var(--color-paper);
 }
+.wallet-linked-reviews {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-rule);
+}
+.wallet-linked-reviews > p {
+  margin: 0;
+  font-size: 12px;
+}
+.wallet-linked-reviews ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wallet-linked-reviews button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 7px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+.wallet-linked-reviews button:hover {
+  border-color: var(--color-rule);
+  background: var(--color-paper);
+}
+.wallet-linked-reviews button > svg {
+  color: var(--color-muted);
+}
+.wallet-linked-reviews button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wallet-linked-reviews button > small {
+  color: var(--color-muted);
+  font-size: 10px;
+}
 .wallet-subject-header {
   display: flex;
   align-items: flex-start;
@@ -1467,9 +1532,22 @@
   gap: 8px;
   margin: 0 0 6px;
 }
-.wallet-detail-heading > div {
+.wallet-detail-heading > div:first-child {
   flex: 1;
   min-width: 0;
+}
+.wallet-detail-graph-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+.wallet-detail-graph-actions button {
+  min-height: 30px;
+  padding: 3px 7px;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.4;
 }
 .wallet-review-detail .wallet-detail-heading h2 {
   font-size: 15px;

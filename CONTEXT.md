@@ -56,6 +56,20 @@ note, tag or bookmark.
 A recorded analysis result with its scope and supporting information. Findings
 distinguish observations, heuristic hypotheses and incomplete results.
 
+**Analysis subject**:
+A factual transaction, outpoint or address that a finding concerns. Supporting
+evidence can include additional entities without making them subjects of the
+finding.
+
+**Review item**:
+A decision task derived from current wallet observations or an applicable
+analysis finding. One item can be projected into several review scopes while
+retaining one decision.
+
+**Review scope**:
+The kind of factual Wallet record a review item concerns: UTXOs, transactions,
+addresses, sources and destinations, or retained previous output decisions.
+
 **Connection scan**:
 A bounded search for observed connections between transactions and outputs,
 with retained results and supporting information. A graph is one way to choose

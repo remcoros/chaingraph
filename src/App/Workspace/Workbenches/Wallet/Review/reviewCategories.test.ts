@@ -17,6 +17,8 @@ const makeItem = (n: number, overrides: Partial<WalletReviewItem> = {}): WalletR
   key: `wallet|current-utxo|${id(n)}:0`,
   nodeId: `out:${id(n)}:0`,
   nodeIds: [`out:${id(n)}:0`],
+  subjectIds: [`out:${id(n)}:0`],
+  scope: 'utxos',
   reason: 'current-utxo',
   title: 'Checked output',
   detail: '',

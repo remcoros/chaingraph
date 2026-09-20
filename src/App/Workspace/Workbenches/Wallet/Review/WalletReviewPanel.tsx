@@ -19,7 +19,9 @@ import type { WalletUtxoRecord } from '../../../../../Core/Workspace/Wallets/wal
 import {
   applyReviewDecisions,
   isCompletedReview,
+  REVIEW_SCOPES,
   spendGuidance,
+  type ReviewScope,
   type WalletReviewItem,
 } from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
@@ -27,6 +29,7 @@ import {
   buildWalletRelationshipRows,
   matchesWalletStatus,
   reviewRow,
+  reviewProjectionKey,
   walletSelectAll,
   walletRowWithContext,
   resolveWalletRow,
@@ -91,6 +94,17 @@ const STATUS_LABELS = {
   decided: 'Reviewed',
   all: 'All items',
 } as const;
+const SCOPE_LABELS: Record<ReviewScope, string> = {
+  utxos: 'UTXOs',
+  transactions: 'Transactions',
+  addresses: 'Addresses',
+  relationships: 'Related addresses',
+  'previous-output-decisions': 'Prior output reviews',
+};
+
+function isOutstandingReview(item: WalletReviewItem): boolean {
+  return !item.legacyOutputReview && (item.changed || item.status === 'open');
+}
 
 // Even programmatic events in a preview cannot reach workspace edits or network actions.
 const noop = () => {};
@@ -297,6 +311,12 @@ export function WalletReviewPanel(
   const [labelFilter, setLabelFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
   const [typeIds, setTypeIds] = useState<string[]>();
+  const [scopeFilter, setScopeFilter] = useState<'all' | ReviewScope>('all');
+  const [reviewOnly, setReviewOnly] = useState(false);
+  const [exactReview, setExactReview] = useState<{
+    nodeId: string;
+    reference: string;
+  }>();
   const [notice, setNotice] = useState('');
   const detailRef = useRef<HTMLElement>(null);
   // The row this workbench settled on and the filters it was chosen under.
@@ -318,6 +338,9 @@ export function WalletReviewPanel(
       tagFilter,
       reviewStatus,
       typeIds,
+      scopeFilter,
+      reviewOnly,
+      exactReview?.nodeId,
     ]);
   const filterScope = filterScopeFor(status);
   const { utxos, loading: utxoLoading, error: utxoError, check } = props.walletUtxos;
@@ -397,9 +420,21 @@ export function WalletReviewPanel(
       }),
     [rows, rowTags, workspace.annotations.entities, search, labelFilter, tagFilter],
   );
+  const relationFiltered = useMemo(
+    () =>
+      tab === 'review' && exactReview
+        ? metadataFiltered.filter((row) =>
+            row.reviews.some((item) => item.subjectIds.includes(exactReview.nodeId)),
+          )
+        : metadataFiltered,
+    [tab, exactReview, metadataFiltered],
+  );
   const statusFiltered = useMemo(
-    () => metadataFiltered.filter((row) => matchesWalletStatus(row, status)),
-    [metadataFiltered, status],
+    () =>
+      tab === 'review'
+        ? relationFiltered.filter((row) => matchesWalletStatus(row, status))
+        : relationFiltered,
+    [tab, relationFiltered, status],
   );
   const currentAnalysis = walletAnalysis.scan ?? props.sessionAnalysis;
   const scanState = useMemo(
@@ -419,7 +454,7 @@ export function WalletReviewPanel(
               analysis: { findings: workspace.analysis.findings },
               wallets: { reviews: workspace.wallets.reviews },
             },
-            review.items,
+            statusFiltered.flatMap((row) => row.reviews),
           ).map((group) => ({
             ...group,
             options: group.options.map((category) => {
@@ -444,7 +479,7 @@ export function WalletReviewPanel(
       workspace.annotations.tags,
       workspace.analysis.findings,
       workspace.wallets.reviews,
-      review.items,
+      statusFiltered,
       scanState,
       currentAnalysis,
     ],
@@ -458,33 +493,38 @@ export function WalletReviewPanel(
     [typeIds, categories],
   );
   const allTypes = categories.every((category) => selectedTypes.includes(category.id));
-  const filteredRows = useMemo(
-    () =>
-      tab === 'review' && !allTypes
-        ? statusFiltered.filter((row) =>
-            row.reviews.some((item) =>
-              matchesWalletCategory(item, selectedTypes, {
-                annotations: {
-                  entities: workspace.annotations.entities,
-                  tags: workspace.annotations.tags,
-                },
-                analysis: { findings: workspace.analysis.findings },
-                wallets: { reviews: workspace.wallets.reviews },
-              }),
-            ),
-          )
-        : statusFiltered,
-    [
-      tab,
-      allTypes,
-      statusFiltered,
-      selectedTypes,
-      workspace.annotations.entities,
-      workspace.annotations.tags,
-      workspace.analysis.findings,
-      workspace.wallets.reviews,
-    ],
-  );
+  const filteredRows = useMemo(() => {
+    if (tab !== 'review')
+      return reviewOnly
+        ? statusFiltered.filter((row) => row.reviews.some(isOutstandingReview))
+        : statusFiltered;
+    return statusFiltered.filter(
+      (row) =>
+        (scopeFilter === 'all' || row.reviews.some((item) => item.scope === scopeFilter)) &&
+        (allTypes ||
+          row.reviews.some((item) =>
+            matchesWalletCategory(item, selectedTypes, {
+              annotations: {
+                entities: workspace.annotations.entities,
+                tags: workspace.annotations.tags,
+              },
+              analysis: { findings: workspace.analysis.findings },
+              wallets: { reviews: workspace.wallets.reviews },
+            }),
+          )),
+    );
+  }, [
+    tab,
+    allTypes,
+    reviewOnly,
+    scopeFilter,
+    statusFiltered,
+    selectedTypes,
+    workspace.annotations.entities,
+    workspace.annotations.tags,
+    workspace.analysis.findings,
+    workspace.wallets.reviews,
+  ]);
   const displayedRows = filteredRows.slice(0, limit);
   const initialReviewLoading =
     !props.tourPreview &&
@@ -533,14 +573,17 @@ export function WalletReviewPanel(
       return count ? [`${count} ${noun}${count === 1 ? '' : kind === 'address' ? 'es' : 's'}`] : [];
     })
     .join(' · ');
-  const selectedReviews = [
-    ...new Map(
-      selectedRows
-        .flatMap((row) => row.reviews)
-        .filter((item) => !item.legacyOutputReview)
-        .map((item) => [item.key, item]),
-    ).values(),
-  ];
+  const selectedReviews =
+    tab === 'review'
+      ? [
+          ...new Map(
+            selectedRows
+              .flatMap((row) => row.reviews)
+              .filter((item) => !item.legacyOutputReview)
+              .map((item) => [item.key, item]),
+          ).values(),
+        ]
+      : [];
   const hiddenSelected = selectedRows.filter((row) => !filteredKeys.has(row.key)).length;
   const missingSelected = selection.ids.filter((id) => !rowKeys.has(id)).length;
   const batching = selection.ids.length > 0;
@@ -571,15 +614,32 @@ export function WalletReviewPanel(
       Object.fromEntries(
         (['all', 'open', 'later', 'decided'] as const).map((value) => [
           value,
-          metadataFiltered.filter((row) => matchesWalletStatus(row, value)).length,
+          relationFiltered.filter((row) => matchesWalletStatus(row, value)).length,
         ]),
       ),
-    [metadataFiltered],
+    [relationFiltered],
   );
   const statusCounts = (value: WalletStatusFilter) => statusTotals[value];
   const openReviewCount = useMemo(
     () => rowsByTab.review.filter((row) => matchesWalletStatus(row, 'open')).length,
     [rowsByTab.review],
+  );
+  const outstandingRecordCount = useMemo(
+    () => metadataFiltered.filter((row) => row.reviews.some(isOutstandingReview)).length,
+    [metadataFiltered],
+  );
+  const scopeCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        REVIEW_SCOPES.map((scope) => [
+          scope,
+          statusFiltered.filter((row) => row.reviews.some((item) => item.scope === scope)).length,
+        ]),
+      ) as Record<ReviewScope, number>,
+    [statusFiltered],
+  );
+  const hasPreviousOutputDecisions = review.items.some(
+    (item) => item.scope === 'previous-output-decisions',
   );
 
   useEffect(() => {
@@ -597,17 +657,24 @@ export function WalletReviewPanel(
     setLabelFilter('all');
     setTagFilter('all');
     setStatus(next === 'review' ? 'open' : 'all');
+    setScopeFilter('all');
+    setReviewOnly(false);
+    setExactReview(undefined);
+    setTypeIds(undefined);
     setNotice('');
   }
 
   function decide(items: readonly WalletReviewItem[], action: WalletDecisionAction) {
-    onChange((current) => applyReviewDecisions(current, wallet, items, action));
+    const uniqueItems = [...new Map(items.map((item) => [item.key, item])).values()];
+    onChange((current) => applyReviewDecisions(current, wallet, uniqueItems, action));
     selection.clear();
     if (action === 'reopen') {
       setLimit(PAGE);
       setStatus('open');
       const reopened =
-        tab === 'review' ? rows.find((row) => row.key === items[0]?.key) : selectedRow;
+        tab === 'review' && uniqueItems[0]
+          ? rows.find((row) => row.key === reviewProjectionKey(uniqueItems[0]))
+          : selectedRow;
       setSelectedKey(reopened?.key);
       setShown({
         row: reopened,
@@ -615,7 +682,7 @@ export function WalletReviewPanel(
         selectedKey: reopened?.key,
       });
     } else if (selectedRow) {
-      const decided = new Set(items.map((item) => item.key));
+      const decided = new Set(uniqueItems.map((item) => item.key));
       const index = filteredRows.findIndex((row) => row.key === selectedRow.key);
       const following =
         index < 0
@@ -627,8 +694,39 @@ export function WalletReviewPanel(
       setShown({ row: undefined, scope: undefined, selectedKey: undefined });
     }
     setNotice(
-      `${action === 'reopen' ? 'Reopened' : action === 'reviewed' ? 'Reviewed' : 'Set aside'} ${items.length} review item${items.length === 1 ? '' : 's'}.`,
+      `${action === 'reopen' ? 'Reopened' : action === 'reviewed' ? 'Reviewed' : 'Set aside'} ${uniqueItems.length} review item${uniqueItems.length === 1 ? '' : 's'}.`,
     );
+  }
+
+  function openLinkedReview(row: WalletRow, item: WalletReviewItem) {
+    setTab('review');
+    setLimit(PAGE);
+    setStatus('all');
+    setScopeFilter('all');
+    setTypeIds(undefined);
+    setReviewOnly(false);
+    setQuery('');
+    setLabelFilter('all');
+    setTagFilter('all');
+    setExactReview({ nodeId: row.nodeId, reference: row.identifier });
+    selection.clear();
+    setSelectedKey(reviewProjectionKey(item));
+    setShown({ row: undefined, scope: undefined, selectedKey: undefined });
+    setNotice('');
+  }
+
+  function clearExactReview() {
+    setLimit(PAGE);
+    setStatus('open');
+    setScopeFilter('all');
+    setTypeIds(undefined);
+    setQuery('');
+    setLabelFilter('all');
+    setTagFilter('all');
+    setExactReview(undefined);
+    selection.clear();
+    setSelectedKey(undefined);
+    setShown({ row: undefined, scope: undefined, selectedKey: undefined });
   }
 
   const related = (row: WalletRow) => ({
@@ -713,31 +811,66 @@ export function WalletReviewPanel(
         ))}
       </nav>
       <div className="wallet-review-body">
+        {tab === 'review' && exactReview && (
+          <div className="wallet-review-context" role="status">
+            <span>
+              Review items for{' '}
+              <strong>
+                <ResponsiveIdentifier value={exactReview.reference} />
+              </strong>
+            </span>
+            <button className="text-button" onClick={clearExactReview}>
+              Clear
+            </button>
+          </div>
+        )}
         <div className="wallet-record-filters" data-tour="wallet-filters">
           {tab === 'review' && (
-            <MultiSelectFilter
-              active={active}
-              groups={categoryGroups}
-              selectedIds={selectedTypes}
-              onChange={(ids) => {
-                setLimit(PAGE);
-                setTypeIds(ids);
-              }}
-              labels={{
-                trigger: 'Finding types',
-                title: 'Wallet finding types',
-                optionNoun: 'types',
-                countHelpTitle: 'Finding type counts',
-                countHelp:
-                  'Counts show all known items of each type, independent of these filters. An item can match several types, so counts may overlap. These choices filter the list; choose Analyze to look for new findings.',
-              }}
-            />
+            <>
+              <MultiSelectFilter
+                active={active}
+                groups={categoryGroups}
+                selectedIds={selectedTypes}
+                onChange={(ids) => {
+                  setLimit(PAGE);
+                  setTypeIds(ids);
+                }}
+                labels={{
+                  trigger: 'Review reason',
+                  title: 'Review reasons',
+                  optionNoun: 'reasons',
+                  countHelpTitle: 'Review reason counts',
+                  countHelp:
+                    'Counts use the selected review state, independent of scope and other reasons. A review item can match several reasons, so counts may overlap. Selecting several reasons matches any of them.',
+                }}
+              />
+              <label>
+                <span>Scope</span>
+                <select
+                  aria-label="Scope"
+                  value={scopeFilter}
+                  onChange={(event) => {
+                    setLimit(PAGE);
+                    setScopeFilter(event.target.value as 'all' | ReviewScope);
+                  }}
+                >
+                  <option value="all">All review items ({statusFiltered.length})</option>
+                  {REVIEW_SCOPES.filter(
+                    (scope) => scope !== 'previous-output-decisions' || hasPreviousOutputDecisions,
+                  ).map((scope) => (
+                    <option key={scope} value={scope}>
+                      {SCOPE_LABELS[scope]} ({scopeCounts[scope]})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           )}
-          {tab !== 'addresses' && (
+          {tab === 'review' && (
             <label>
-              <span className="sr-only">{tab === 'review' ? 'Show' : 'Review'}</span>
+              <span>State</span>
               <select
-                aria-label={tab === 'review' ? 'Review filter' : 'Review state filter'}
+                aria-label="State"
                 value={status}
                 onChange={(event) => {
                   setLimit(PAGE);
@@ -751,6 +884,18 @@ export function WalletReviewPanel(
                 ))}
               </select>
             </label>
+          )}
+          {tab !== 'review' && (
+            <button
+              className="wallet-review-only-toggle"
+              aria-pressed={reviewOnly}
+              onClick={() => {
+                setLimit(PAGE);
+                setReviewOnly((value) => !value);
+              }}
+            >
+              To review ({outstandingRecordCount})
+            </button>
           )}
           <label>
             <span>Labels</span>
@@ -804,8 +949,9 @@ export function WalletReviewPanel(
           {(query ||
             labelFilter !== 'all' ||
             tagFilter !== 'all' ||
-            status !== 'all' ||
-            typeIds !== undefined) && (
+            (tab === 'review' &&
+              (status !== 'all' || scopeFilter !== 'all' || typeIds !== undefined)) ||
+            (tab !== 'review' && reviewOnly)) && (
             <button
               className="text-button"
               aria-label="Clear wallet filters"
@@ -815,7 +961,9 @@ export function WalletReviewPanel(
                 setLabelFilter('all');
                 setTagFilter('all');
                 setStatus('all');
+                setScopeFilter('all');
                 setTypeIds(undefined);
+                setReviewOnly(false);
               }}
             >
               Clear filters
@@ -967,9 +1115,9 @@ export function WalletReviewPanel(
                       >
                         <span className="wallet-review-reason">
                           {tab === 'review'
-                            ? walletReviewReasonDefinitions[row.reviews[0].reason].label
+                            ? `${walletReviewReasonDefinitions[row.reviews[0].reason].label}`
                             : row.meta}
-                          {(tab === 'review' || row.status !== 'open') && (
+                          {tab === 'review' && (
                             <span className={`wallet-review-status status-${row.status}`}>
                               {row.changed
                                 ? 'Evidence changed'
@@ -1058,7 +1206,7 @@ export function WalletReviewPanel(
             {!filteredRows.length && (
               <p className="wallet-empty-note">
                 {tab === 'review' && !selectedTypes.length
-                  ? 'No finding types selected. Choose types or reset to all.'
+                  ? 'No review reasons selected. Choose reasons or reset to all.'
                   : query || labelFilter !== 'all' || tagFilter !== 'all'
                     ? 'No records match these filters.'
                     : tab === 'utxos' && !utxos
@@ -1132,7 +1280,7 @@ export function WalletReviewPanel(
                       title="Show these selections in Graph and zoom to the first"
                       onClick={() => props.onShowSelection(selectedIds, false)}
                     >
-                      <Network size={14} /> Show
+                      <Network size={14} /> Show on graph
                     </button>
                     <button
                       disabled={!selectedIds.length || busy || missingSelected > 0}
@@ -1150,7 +1298,7 @@ export function WalletReviewPanel(
                   <span>
                     {selectedRows.length} {selectedRows.length === 1 ? 'row' : 'rows'} ·{' '}
                     {selectedReviews.length} review{' '}
-                    {selectedReviews.length === 1 ? 'decision' : 'decisions'}
+                    {selectedReviews.length === 1 ? 'item' : 'items'}
                   </span>
                   <button className="text-button" onClick={selection.clear}>
                     Clear selection
@@ -1182,6 +1330,8 @@ export function WalletReviewPanel(
                 tags={rowTags.get(selectedRow.nodeId)}
                 onNotice={setNotice}
                 onDecide={decide}
+                reviewMode={tab === 'review'}
+                onOpenReviewItem={openLinkedReview}
                 resolveInputs={tab !== 'sources' || (counterpartyReady && !counterparties.loading)}
                 relatedSelection={relatedSelection}
               />

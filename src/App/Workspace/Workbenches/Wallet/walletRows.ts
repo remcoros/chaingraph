@@ -75,7 +75,7 @@ export function walletRowFinding(
   workspace: { analysis: Pick<Workspace['analysis'], 'findings'> },
   row: WalletRow,
 ) {
-  const review = row.reviews.find((item) => item.reason === 'link' && item.key === row.key);
+  const review = row.reviews.find((item) => item.reason === 'link');
   return review
     ? workspace.analysis.findings.find((finding) => review.key.endsWith(`|link|${finding.id}`))
     : undefined;
@@ -134,7 +134,7 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
       ? 'address'
       : 'output';
   return {
-    key: item.key,
+    key: reviewProjectionKey(item),
     nodeId: item.nodeId,
     identifier: item.nodeId.replace(/^(out|tx|addr):/, ''),
     title: item.title,
@@ -162,6 +162,10 @@ export function reviewRow(item: WalletReviewItem): WalletRow {
   };
 }
 
+export function reviewProjectionKey(item: Pick<WalletReviewItem, 'key' | 'scope'>): string {
+  return `review:${JSON.stringify([item.key, item.scope])}`;
+}
+
 export function buildWalletRelationshipRows(
   workspace: { wallets: Pick<Workspace['wallets'], 'reviews'> },
   groups: WalletAddressRelationships,
@@ -171,7 +175,7 @@ export function buildWalletRelationshipRows(
   const project = (direction: 'source' | 'destination'): WalletRow[] => {
     const reason = direction === 'source' ? 'source-address' : 'destination-address';
     const addresses = direction === 'source' ? counterparties.sources : counterparties.destinations;
-    const directionItems = items.filter((item) => item.reason === reason);
+    const directionItems = items.filter((item) => item.reason === 'link' || item.reason === reason);
     return addresses.map((group) =>
       decorateWalletRow(
         {
@@ -203,7 +207,7 @@ export function decorateWalletRow(
   items: readonly WalletReviewItem[],
   fallbackReviewKey?: string,
 ): WalletRow {
-  const reviews = items.filter((item) => item.nodeId === row.nodeId);
+  const reviews = items.filter((item) => item.subjectIds.includes(row.nodeId));
   const fallback = fallbackReviewKey ? workspace.wallets.reviews?.[fallbackReviewKey] : undefined;
   const changed = reviews.some((item) => item.changed);
   const status =
@@ -231,9 +235,11 @@ export function buildWalletRecordRows(
 ): Record<'utxos' | 'transactions' | 'addresses', WalletRow[]> {
   const byNode = new Map<string, WalletReviewItem[]>();
   for (const item of reviewItems) {
-    const items = byNode.get(item.nodeId) ?? [];
-    items.push(item);
-    byNode.set(item.nodeId, items);
+    for (const subjectId of item.subjectIds) {
+      const items = byNode.get(subjectId) ?? [];
+      items.push(item);
+      byNode.set(subjectId, items);
+    }
   }
   const decorate = (row: Omit<WalletRow, 'reviews' | 'status' | 'changed'>, key?: string) =>
     decorateWalletRow(row, workspace, byNode.get(row.nodeId) ?? [], key);

@@ -14,6 +14,8 @@ export interface AnalysisFinding {
   guidance?: { kind: 'tip' | 'privacy' | 'next-step'; text: string };
   nodeIds: string[];
   txids: string[];
+  /** Factual entities this finding concerns. Evidence may be broader than these subjects. */
+  subjects?: string[];
   createdAt: string;
   excluded?: boolean;
   kind?: 'observation' | 'hypothesis' | 'incomplete';
@@ -39,6 +41,7 @@ export const analysisSchema = z.object({
           .optional(),
         nodeIds: z.array(z.string().max(200)).max(30000),
         txids: z.array(txid).max(10000),
+        subjects: z.array(z.string().max(200)).min(1).max(30000).optional(),
         createdAt: timestamp,
         excluded: z.boolean().optional(),
         kind: z.enum(['observation', 'hypothesis', 'incomplete']).optional(),

@@ -169,6 +169,7 @@ export function finding(
   description: string,
   nodeIds: string[],
   txids: string[],
+  subjects: string[],
   scopeTxids = txids,
   reviewRule?: AnalysisFinding['reviewRule'],
   explanation?: { summary: string; guidance?: AnalysisFinding['guidance'] },
@@ -183,6 +184,7 @@ export function finding(
     ...(explanation ? { details: description, guidance: explanation.guidance } : {}),
     nodeIds: [...new Set(nodeIds)],
     txids: [...new Set(txids)],
+    subjects: [...new Set(subjects)],
     scopeTxids: [...new Set(scopeTxids)],
     createdAt: context.createdAt,
   };

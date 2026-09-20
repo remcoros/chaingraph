@@ -768,7 +768,7 @@ export default function TagsPanel({
                       title="Show on graph"
                       onClick={() => onShow(tag)}
                     >
-                      <Network size={14} aria-hidden="true" /> Show
+                      <Network size={14} aria-hidden="true" /> Show on graph
                     </button>
                     {targetIds.length > 0 && (
                       <button

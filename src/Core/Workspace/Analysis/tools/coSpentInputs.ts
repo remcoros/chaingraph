@@ -141,6 +141,7 @@ export const ciohTool = defineTool({
           `${nodeIds.length} outputs are linked by co-spending across ${txids.length} transaction${txids.length === 1 ? '' : 's'}, including connections through shared addresses or scripts. ${skipEqual ? `Transactions with ${threshold}+ equal outputs were excluded.` : 'Equal-output exclusion was disabled.'} PayJoin and other collaborative transactions can still invalidate the assumption of shared ownership. ${unavailable ? `${unavailable} output${unavailable === 1 ? '' : 's'} in this group ${unavailable === 1 ? 'lacks' : 'lack'} usable previous-output details. ` : ''}Compare the supporting transactions and your labels before treating this as one wallet.`,
           nodeIds,
           txids,
+          nodeIds,
           txids,
           undefined,
           {

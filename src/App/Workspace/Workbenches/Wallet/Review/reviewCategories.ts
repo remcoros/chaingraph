@@ -84,8 +84,8 @@ function categoryIds(
   return ids;
 }
 
-/** Every supported category is present, including zero counts. Supply every known
- * candidate before UI filters; overlapping counts are intentional. */
+/** Every supported category is present, including zero counts. The caller chooses
+ * the count population; overlapping counts are intentional. */
 export function walletReviewCategoryGroups(
   workspace: WalletReviewCategoryWorkspace,
   items: readonly WalletReviewItem[],

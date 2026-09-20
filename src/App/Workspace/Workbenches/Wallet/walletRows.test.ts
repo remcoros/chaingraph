@@ -3,7 +3,11 @@ import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
 import { deriveAddresses } from '../../../../Core/Workspace/Wallets/walletDerivation';
-import { addressReference, outpointReference } from '../../../../Core/Workspace/entityReferences';
+import {
+  addressReference,
+  outpointReference,
+  transactionReference,
+} from '../../../../Core/Workspace/entityReferences';
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import {
   buildWalletRecordRows,
@@ -14,6 +18,7 @@ import {
   buildWalletRelationshipRows,
   resolveWalletRow,
   reviewRow,
+  reviewProjectionKey,
   walletSelectAll,
   type WalletRow,
 } from './walletRows';
@@ -189,6 +194,37 @@ describe('shared Wallet rows', () => {
     expect(rows.addresses).toHaveLength(2);
     expect(rows.transactions).toEqual([]);
     expect(rows.utxos).toEqual([]);
+  });
+
+  it('links factual rows through exact subjects while queue projections keep distinct row keys', () => {
+    const { workspace, wallet } = fixture();
+    workspace.analysis.findings = [
+      {
+        id: 'value-flow:subject',
+        algorithm: 'value-flow-v2',
+        title: 'Network fee',
+        description: 'Review this transaction fee.',
+        nodeIds: [transactionReference(A), outpointReference(A, 0)],
+        txids: [A],
+        subjects: [transactionReference(A)],
+        createdAt: '2026-09-20T10:00:00.000Z',
+      },
+    ];
+    const items = buildWalletReview(workspace, wallet).items;
+    const item = items.find((entry) => entry.reason === 'link')!;
+    const rows = buildWalletRecordRows(workspace, wallet, [], items);
+    expect(item).toMatchObject({
+      scope: 'transactions',
+      subjectIds: [transactionReference(A)],
+    });
+    expect(
+      rows.transactions.find((row) => row.nodeId === transactionReference(A))?.reviews,
+    ).toEqual([item]);
+    expect(
+      rows.transactions.find((row) => row.nodeId === transactionReference(B))?.reviews,
+    ).toEqual([]);
+    expect(reviewRow(item).key).toBe(reviewProjectionKey(item));
+    expect(reviewRow(item).key).not.toBe(item.key);
   });
 
   it('selects exact one-hop transaction contexts for grouped addresses without widening output scope', () => {

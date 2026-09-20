@@ -144,9 +144,9 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     text: (
       <>
         <strong>Mark reviewed</strong> closes out a review decision, and{' '}
-        <strong>Review later</strong> sets it aside for now. Use <strong>Show</strong> to jump to
-        the item in Graph, then <strong>Back to Wallet</strong> whenever you want to return to your
-        list and selection.
+        <strong>Review later</strong> sets it aside for now. Use <strong>Show on graph</strong> to
+        jump to the item in Graph, then <strong>Back to Wallet</strong> whenever you want to return
+        to your list and selection.
       </>
     ),
     missingTargetText: (

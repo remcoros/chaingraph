@@ -17,10 +17,11 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level
   extended public key. Chaingraph derives addresses in the browser, scans their
-  activity through your node, and gives you a review queue for UTXOs, used
-  addresses, sources and destinations. Successful address UTXO checks are saved
-  inside the encrypted workspace with their dates and coverage; refresh them
-  explicitly after reopening when you need a new observation.
+  activity through your node, and keeps factual UTXO, transaction, address,
+  source and destination lists alongside a linked review queue. Successful
+  address UTXO checks are saved inside the encrypted workspace with their dates
+  and coverage; refresh them explicitly after reopening when you need a new
+  observation.
   <img src="docs/screenshots/readme-wallet.png" />
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,

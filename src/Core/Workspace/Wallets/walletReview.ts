@@ -7,7 +7,6 @@ import { stableKey } from '../Analysis/tools/shared';
 import { verifiedWalletAddresses, verifyWalletUtxo, type WalletUtxoRecord } from './walletRecords';
 import { listTagsForNode } from '../Annotations/tagMembership';
 import { outpointReference, transactionReference } from '../entityReferences';
-import type { AnalysisFinding } from '../Analysis/finding';
 import { type Wallet, MAX_WALLET_REVIEWS } from './wallets';
 import type { Workspace } from '../workspace';
 
@@ -41,6 +40,14 @@ export const REVIEW_REASONS = [
 ] as const;
 export type ReviewReason = (typeof REVIEW_REASONS)[number];
 export type ReviewStatus = 'reviewed' | 'unknown' | 'later';
+export const REVIEW_SCOPES = [
+  'utxos',
+  'transactions',
+  'addresses',
+  'relationships',
+  'previous-output-decisions',
+] as const;
+export type ReviewScope = (typeof REVIEW_SCOPES)[number];
 
 export interface ReviewDecision {
   status: ReviewStatus;
@@ -53,10 +60,14 @@ export interface WalletReviewItem {
   /** Stable per wallet, reason and subject, so decisions survive a refresh. */
   key: string;
   reason: ReviewReason;
+  /** Factual Wallet section this queue projection concerns. */
+  scope: ReviewScope;
   title: string;
   detail: string;
   /** Primary entity for Inspect, Show in Graph and Analyze. */
   nodeId: string;
+  /** Exact factual records linked to this projection. */
+  subjectIds: string[];
   nodeIds: string[];
   txid?: string;
   amountSats?: number;
@@ -109,6 +120,7 @@ export interface WalletReview {
 }
 
 const reasonOrder = new Map(REVIEW_REASONS.map((reason, index) => [reason, index]));
+const scopeOrder = new Map(REVIEW_SCOPES.map((scope, index) => [scope, index]));
 
 /** Only these statuses complete a review. `later` stays pending work. */
 export function isCompletedReview(
@@ -185,9 +197,16 @@ function tagNamesFor(workspace: Workspace, nodeId: string, address?: string): st
   }).map((tag) => tag.name);
 }
 
-type ReviewSubject = Omit<WalletReviewItem, 'status' | 'changed' | 'label' | 'tags' | 'decidedAt'>;
+type ReviewSubject = Omit<
+  WalletReviewItem,
+  'status' | 'changed' | 'label' | 'tags' | 'decidedAt' | 'scope' | 'subjectIds'
+> & {
+  scope?: ReviewScope;
+  subjectIds?: string[];
+};
+type CompleteReviewSubject = ReviewSubject & { scope: ReviewScope; subjectIds: string[] };
 
-function decorate(workspace: Workspace, item: ReviewSubject): WalletReviewItem {
+function decorate(workspace: Workspace, item: CompleteReviewSubject): WalletReviewItem {
   const decision = workspace.wallets.reviews?.[item.key];
   return {
     ...item,
@@ -199,8 +218,13 @@ function decorate(workspace: Workspace, item: ReviewSubject): WalletReviewItem {
   };
 }
 
-function findingCoversWallet(finding: AnalysisFinding, owned: Map<string, OwnedOutput>): boolean {
-  return finding.nodeIds.some((id) => owned.has(id));
+function nativeReviewScope(reason: ReviewReason): ReviewScope | undefined {
+  if (reason === 'current-utxo' || reason === 'source') return 'utxos';
+  if (reason === 'new-activity') return 'transactions';
+  if (reason === 'wallet-address') return 'addresses';
+  if (reason === 'source-address' || reason === 'destination-address') return 'relationships';
+  if (reason === 'funding-source' || reason === 'counterparty') return 'previous-output-decisions';
+  return undefined;
 }
 
 /** Derive the review queue from loaded observations and verified UTXO checks.
@@ -290,8 +314,10 @@ export function buildWalletReview(
     });
   const reconciledUtxos = reconcileWalletUtxos(verifiedRecords, loaded, workspace.network);
   const verifiedUtxos = reconciledUtxos.current;
-  const candidates: ReviewSubject[] = [];
+  const candidates: CompleteReviewSubject[] = [];
   const push = (subject: ReviewSubject) => {
+    const scope = subject.scope ?? nativeReviewScope(subject.reason);
+    if (!scope) throw new Error('A review item must declare its factual scope.');
     const source = directSources.get(subject.nodeId);
     const destination = directDestinations.get(subject.nodeId);
     const related = [source, destination].filter((entry): entry is WalletRelationship => !!entry);
@@ -306,7 +332,11 @@ export function buildWalletReview(
         walletOutputIds: [...new Set(related.flatMap((entry) => entry.walletOutputIds))].sort(),
       };
     }
-    candidates.push(subject);
+    candidates.push({
+      ...subject,
+      scope,
+      subjectIds: [...new Set(subject.subjectIds ?? [subject.nodeId])],
+    });
   };
 
   for (const record of verifiedUtxos) {
@@ -477,7 +507,14 @@ export function buildWalletReview(
     });
   }
 
-  for (const txid of wallet.unreviewedTransactionIds ?? []) {
+  const activityIds = new Set(wallet.unreviewedTransactionIds ?? []);
+  const activityKeyPrefix = `${wallet.id}|new-activity|`;
+  for (const key of Object.keys(workspace.wallets.reviews ?? {})) {
+    if (!key.startsWith(activityKeyPrefix)) continue;
+    const txid = canonicalTransactionId(key.slice(activityKeyPrefix.length));
+    if (txid && history.has(txid)) activityIds.add(txid);
+  }
+  for (const txid of activityIds) {
     const nodeId = transactionReference(txid);
     const transaction = loaded.get(txid);
     push({
@@ -534,27 +571,53 @@ export function buildWalletReview(
     });
   }
 
+  const walletAddressIds = new Set(addresses.map((entry) => `addr:${entry.address}`));
+  const relationshipGroups = [...groups.sources, ...groups.destinations].filter(
+    (group) => group.ownership === 'external',
+  );
   for (const finding of workspace.analysis.findings) {
     if (finding.excluded || finding.stale) continue;
-    if (!findingCoversWallet(finding, owned)) continue;
-    const nodeIds = finding.nodeIds.filter((id) => owned.has(id));
-    push({
-      key: reviewKey(wallet.id, 'link', finding.id),
-      reason: 'link',
-      title: finding.title,
-      detail: finding.description,
-      nodeId: nodeIds[0] ?? finding.nodeIds[0],
-      nodeIds: finding.nodeIds,
-      address: owned.get(nodeIds[0])?.address,
-      transactionIds: finding.txids,
-      txid: finding.txids[0],
-      algorithm: finding.algorithm,
-      evidence: fingerprint(
-        `link|${finding.algorithm}|${[...finding.nodeIds].sort().join(',')}|${[...finding.txids]
-          .sort()
-          .join(',')}`,
-      ),
-    });
+    if (!finding.subjects?.length) continue;
+    const subjectsByScope = new Map<ReviewScope, Set<string>>();
+    const addSubject = (scope: ReviewScope, subject: string) => {
+      const entries = subjectsByScope.get(scope) ?? new Set<string>();
+      entries.add(subject);
+      subjectsByScope.set(scope, entries);
+    };
+    for (const subject of finding.subjects) {
+      if (owned.has(subject)) addSubject('utxos', subject);
+      if (subject.startsWith('tx:') && history.has(subject.slice(3)))
+        addSubject('transactions', subject);
+      if (walletAddressIds.has(subject)) addSubject('addresses', subject);
+      for (const group of relationshipGroups)
+        if (group.id === subject || group.outpointIds.includes(subject))
+          addSubject('relationships', group.id);
+    }
+    const key = reviewKey(wallet.id, 'link', finding.id);
+    const findingEvidence = fingerprint(
+      `link|${finding.algorithm}|${[...finding.subjects].sort().join(',')}|${[...finding.nodeIds]
+        .sort()
+        .join(',')}|${[...finding.txids].sort().join(',')}`,
+    );
+    for (const [scope, projectedSubjects] of subjectsByScope) {
+      const subjectIds = [...projectedSubjects].sort();
+      const nodeId = subjectIds[0];
+      push({
+        key,
+        reason: 'link',
+        scope,
+        subjectIds,
+        title: finding.title,
+        detail: finding.description,
+        nodeId,
+        nodeIds: finding.nodeIds,
+        address: nodeId.startsWith('addr:') ? nodeId.slice(5) : owned.get(nodeId)?.address,
+        transactionIds: finding.txids,
+        txid: finding.txids[0],
+        algorithm: finding.algorithm,
+        evidence: findingEvidence,
+      });
+    }
   }
 
   const items = candidates.map((subject) => decorate(workspace, subject));
@@ -562,6 +625,7 @@ export function buildWalletReview(
   items.sort(
     (a, b) =>
       reasonOrder.get(a.reason)! - reasonOrder.get(b.reason)! ||
+      scopeOrder.get(a.scope)! - scopeOrder.get(b.scope)! ||
       Number(!!a.label) - Number(!!b.label) ||
       (b.amountSats ?? -1) - (a.amountSats ?? -1) ||
       a.key.localeCompare(b.key),
@@ -617,11 +681,12 @@ export function applyReviewDecisions(
   status: ReviewStatus | 'reopen',
   now = new Date().toISOString(),
 ): Workspace {
-  if (!items.length) return workspace;
+  const uniqueItems = [...new Map(items.map((item) => [item.key, item])).values()];
+  if (!uniqueItems.length) return workspace;
   const reviews = { ...workspace.wallets.reviews };
   const acknowledged = new Set<string>();
   let changed = false;
-  for (const item of items) {
+  for (const item of uniqueItems) {
     if (status === 'reopen') {
       if (reviews[item.key] !== undefined) {
         delete reviews[item.key];
@@ -640,7 +705,7 @@ export function applyReviewDecisions(
   }
   if (!changed) return workspace;
   if (
-    items.some(
+    uniqueItems.some(
       (item) =>
         item.reason === 'wallet-address' ||
         item.reason === 'source-address' ||

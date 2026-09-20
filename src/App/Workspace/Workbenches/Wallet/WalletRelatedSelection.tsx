@@ -41,7 +41,7 @@ export function WalletRelatedSelection({
           setOpen((wasOpen) => !wasOpen);
         }}
       >
-        <CheckSquare size={13} /> Select related <ChevronDown size={12} />
+        <CheckSquare size={13} /> Related <ChevronDown size={12} />
       </button>
       {open && active && trigger && (
         <AnchoredPopover

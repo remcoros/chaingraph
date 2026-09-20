@@ -74,7 +74,7 @@ test locations. Source is grouped by product ownership.
 | `src/App/FrontPage/`, `Examples/`, `Help/`                     | Workspace entry, example creation and help                                          |
 | `src/App/Workspace/Dialogs/`, `Wallets/Dialogs/`               | Workspace lifecycle and wallet dialogs                                              |
 | `src/Core/Workspace/Session/`                                  | Unlocked sessions, undo/redo and save lifecycle                                     |
-| `src/App/Workspace/`                                           | React workspace subscriptions, autosave timer and fetch-scope context                |
+| `src/App/Workspace/`                                           | React workspace subscriptions, autosave timer and fetch-scope context               |
 | `src/Core/Workspace/Persistence/`                              | Public facade, full-cycle document parser and public result/error contracts         |
 | `src/Core/Workspace/Persistence/Migrations/`                   | Historical document conversion and legacy membership                                |
 | `src/Core/Workspace/Persistence/Codec/`                        | Validation/restoration workflow, envelope, compression and worker execution         |
@@ -86,7 +86,7 @@ test locations. Source is grouped by product ownership.
 | `src/App/Workspace/Workbenches/Analysis/`                      | Analysis controls and reports                                                       |
 | `src/App/Controls/`                                            | Reused App-owned controls, evidence display and metadata editors                    |
 | `src/Core/Bitcoin/`                                            | Native network encodings, public-key derivation, scripts and outpoints              |
-| `src/Core/Browser/`                                           | Generic browser mechanisms not owned by workspace persistence                       |
+| `src/Core/Browser/`                                            | Generic browser mechanisms not owned by workspace persistence                       |
 | `src/Core/ChainData/`                                          | Chain models, validity, observation merging, typed RPC queries and fetch scheduling |
 | `server/app.ts`, `rpc-schema.ts`                               | HTTP routes, Host/Origin checks, limits, cancellation and read-only RPC allowlist   |
 | `server/core.ts`, `electrum.ts`, `config.ts`, `limit.ts`       | Upstream adapters, chain identity, network configuration and concurrency            |
@@ -474,13 +474,18 @@ Wallet, Graph and the Inspector; `tagColors.ts` owns the 16 presets.
 ## Wallet workbench
 
 `walletReview.ts` derives one wallet's queue from loaded observations and an
-optional verified UTXO check, in a fixed reason order: current UTXOs, used
-addresses, receipts, source addresses, refresh activity, counterparties, then
-active findings over verified wallet outputs. Counterparties come only from
-transactions the wallet funded through loaded prevouts. The queue includes every
-item supported by the loaded evidence; coverage reports unloaded sources instead
-of filling them in. The Wallet UI renders matching rows 40 at a time without
-changing the queue, filter counts or batch-selection scope.
+optional verified UTXO check. Native items declare their factual review scope.
+Active analysis findings enter Wallet Review only through their explicit
+`subjects`; broader `nodeIds` and `txids` remain evidence. Wallet-relative
+projection maps applicable subjects to UTXOs, transactions, addresses, or the
+combined sources-and-destinations scope. One finding may produce one row per
+applicable scope, but those rows retain one `walletId|link|findingId` decision.
+Older subjectless findings remain visible in Analysis and do not enter Wallet
+Review until rerun. Counterparties come only from transactions the wallet funded
+through loaded prevouts. The queue includes every item supported by the loaded
+evidence; coverage reports unloaded sources instead of filling them in. The
+Wallet UI renders matching rows 40 at a time without changing the queue, filter
+counts or batch-selection scope.
 
 Encrypted `walletReviews` maps `walletId|reason|subject` to `reviewed`,
 `unknown` (legacy) or `later`, a timestamp and an evidence fingerprint. Refresh
@@ -489,6 +494,13 @@ date. Address items key on the verified derivation slot so new receipts do not
 undo a recorded purpose. Annotation edits never complete or change an item.
 Removing a wallet prunes its decisions.
 
+Factual Wallet rows are not review tasks. `walletRows.ts` links queue items to
+records through exact `subjectIds`; factual details expose those links and their
+states without owning decision controls. Their **To review** toggle filters records
+with outstanding linked work. Exact navigation to the queue uses a transient
+relation context instead of search text. Scope projections use distinct row keys,
+while all decision mutations deduplicate the persisted review key.
+
 `walletRelationships.ts` projects one-hop counterparties: inputs funding
 transactions that paid verified wallet scripts, and outputs of transactions
 spending verified wallet outputs, grouped by canonical address and excluding the
@@ -496,7 +508,7 @@ wallet's own. Raw script hex is authoritative; histories alone never prove
 direction or ownership. `useWalletCounterparties` resolves missing inputs in
 bounded batches with explicit continuation. `walletSelectionIndex.ts` builds
 per-snapshot indexes of scripts, outputs, spends and prevouts so row selection
-does not rescan; `walletWorkbenchRows.ts` is the shared row contract for all six
+does not rescan; `walletRows.ts` is the shared row contract for all six
 tabs. `reviewCategoryDefinitions.ts` owns Wallet filter copy, grouping and display
 order; `reviewCategories.ts` owns matching, OR semantics and stable total counts.
 Wallet **Analyze** reuses the Analysis registry and merge path; it is distinct
@@ -521,7 +533,8 @@ separate wallet components mounted for every workspace or run analysis in the ba
 do not change execution. A tool declares metadata, source reference and typed parameters;
 `analyze(workspace, transactionIds?, options)` returns findings, scope,
 summary, coverage and a no-match explanation. Findings carry a stable identity,
-algorithm version, explanation, affected nodes and supporting transactions.
+algorithm version, explanation, explicit factual subjects, affected evidence
+nodes and supporting transactions.
 Tools are pure and make no requests. `analysisScan.ts` resolves the selected
 transaction, output, address or wallet (or the whole workspace) into loaded
 transaction IDs and runs the registry with independent reports and cancellation

@@ -83,6 +83,7 @@ export const equalOutputTool = defineTool({
             `${outputs.length} spendable outputs share ${formatAmount(amount)}. Batching and collaborative transactions can both produce repeated amounts; this does not identify a CoinJoin. Compare the highlighted outputs with the remaining outputs and input history.`,
             outputs.map((output) => outpointReference(tx.txid, output.n)),
             [tx.txid],
+            outputs.map((output) => outpointReference(tx.txid, output.n)),
             [tx.txid],
             undefined,
             {

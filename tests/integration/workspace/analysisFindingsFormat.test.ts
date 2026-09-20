@@ -39,6 +39,9 @@ describe('capability results survive workspace format validation', () => {
       expect(report.toolId).toBe(candidate.id);
       expect(report.scopeTxids).toEqual([tx.txid]);
       expect(report.findings.every((result) => result.id.length <= 100)).toBe(true);
+      expect(report.findings.every((result) => result.subjects && result.subjects.length > 0)).toBe(
+        true,
+      );
       expect(candidate.run(w).map((result) => result.id)).toEqual(
         report.findings.map((result) => result.id),
       );
@@ -52,5 +55,30 @@ describe('capability results survive workspace format validation', () => {
     expect(() => tool('equal-outputs').run(w, undefined, { minEqualOutputs: 1 })).toThrow();
     expect(() => tool('value-flow').run(w, undefined, { highFeeRate: NaN })).toThrow();
     expect(() => tool('cioh').run(w, undefined, { skipEqualOutputs: 'true' })).toThrow();
+  });
+
+  it('canonicalizes persisted finding subjects and rejects duplicate or invalid subjects', () => {
+    const tx = transaction(10, [1], [output(0)]),
+      w = workspace(tx),
+      finding = tool('value-flow').run(w)[0];
+    const upper = `tx:${tx.txid.toUpperCase()}`;
+    expect(
+      parseWorkspace({
+        ...w,
+        analysis: { findings: [{ ...finding, subjects: [upper] }] },
+      }).analysis.findings[0].subjects,
+    ).toEqual([`tx:${tx.txid}`]);
+    expect(() =>
+      parseWorkspace({
+        ...w,
+        analysis: { findings: [{ ...finding, subjects: [upper, `tx:${tx.txid}`] }] },
+      }),
+    ).toThrow('duplicate subjects');
+    expect(() =>
+      parseWorkspace({
+        ...w,
+        analysis: { findings: [{ ...finding, subjects: ['not-an-entity'] }] },
+      }),
+    ).toThrow('Expected a transaction, output, or network-valid address reference');
   });
 });

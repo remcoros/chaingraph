@@ -100,6 +100,7 @@ export const structureTool = defineTool({
             ...outputs.map((output) => outpointReference(tx.txid, output.n)),
           ],
           [tx.txid],
+          [transactionReference(tx.txid)],
           [tx.txid],
           undefined,
           {
