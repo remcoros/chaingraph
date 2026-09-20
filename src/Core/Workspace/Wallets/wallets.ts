@@ -13,6 +13,7 @@ export interface DerivedAddress {
 }
 
 export const MAX_WALLET_REVIEWS = 20_000;
+export const MAX_WALLET_HISTORY_ENTRIES = 50_000;
 
 export interface WalletReviewRecord {
   status: 'reviewed' | 'unknown' | 'later';
@@ -42,6 +43,27 @@ export function assertWalletReviewBudget(value: unknown): void {
     throw new Error(
       `A workspace holds at most ${MAX_WALLET_REVIEWS.toLocaleString('en-US')} review decisions.`,
     );
+}
+
+/** Reject aggregate address history before document schema parsing expands untrusted records. */
+export function assertWalletHistoryBudget(value: unknown): void {
+  if (!Array.isArray(value)) return;
+  let entries = 0;
+  for (const wallet of value) {
+    if (!wallet || typeof wallet !== 'object' || Array.isArray(wallet)) continue;
+    const addresses = (wallet as { addresses?: unknown }).addresses;
+    if (!Array.isArray(addresses)) continue;
+    for (const address of addresses) {
+      if (!address || typeof address !== 'object' || Array.isArray(address)) continue;
+      const history = (address as { history?: unknown }).history;
+      if (!Array.isArray(history)) continue;
+      entries += history.length;
+      if (entries > MAX_WALLET_HISTORY_ENTRIES)
+        throw new Error(
+          `A workspace holds at most ${MAX_WALLET_HISTORY_ENTRIES.toLocaleString('en-US')} wallet address history entries.`,
+        );
+    }
+  }
 }
 
 /** A wallet binds a derivation to shared chain subjects and owns discovery coverage. */
