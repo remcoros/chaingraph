@@ -110,8 +110,12 @@ The graph contains only what you add. Clicking a transaction, input or output in
 the transaction view adds that node; **Load previous**, **Open creating tx** and
 **Find spending txs** add what they find. Inputs and outputs form rounded groups
 on opposite sides of their transaction, and shared outputs connect transaction
-branches. New nodes are placed near their source without moving existing ones;
-**Repack** rearranges everything visible.
+branches. In 3D, substantial downstream groups receive distinct spatial branch
+directions while transaction order always advances along the graph's X axis.
+Each transaction's input and output groups stay on its X-facing sides; a shared
+output between visible transactions follows their connecting edge. New nodes
+extend the established branch without moving existing ones; **Repack** rearranges
+everything visible.
 
 The transaction flow panel has collapsed, normal and full-height views. Its two
 floating arrow buttons collapse, expand or restore its height; double arrows

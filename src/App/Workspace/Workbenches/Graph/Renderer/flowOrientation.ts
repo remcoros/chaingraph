@@ -108,30 +108,6 @@ function sideGeometry(
 export function sideCenter(points: readonly Position[], flat: boolean): Position {
   return sideGeometry(points, flat).center;
 }
-export function inferredAxis(
-  hub: Position,
-  sides: readonly { side: -1 | 1; points: Position[] }[],
-  bridgeDirections: Position[],
-  flat: boolean,
-): Position {
-  const established = sides
-    .map((side) => ({ ...side, ...sideGeometry(side.points, flat) }))
-    .filter((side) => side.fitted);
-  const vectors = established.length
-    ? established.map((side) => scaled(normalized(subtract(side.center, hub), flat), side.side))
-    : bridgeDirections.length
-      ? bridgeDirections.map((direction) => normalized(direction, flat))
-      : sides
-          .filter((side) => side.points.length)
-          .map((side) =>
-            scaled(normalized(subtract(sideCenter(side.points, flat), hub), flat), side.side),
-          );
-  const sum = vectors.reduce(
-    (value, vector) => ({ x: value.x + vector.x, y: value.y + vector.y, z: value.z + vector.z }),
-    { x: 0, y: 0, z: 0 },
-  );
-  return normalized(sum, flat);
-}
 /** Exit a visible group along the requested ray, rather than jumping to a remote lane. */
 export function rayExit(
   origin: Position,

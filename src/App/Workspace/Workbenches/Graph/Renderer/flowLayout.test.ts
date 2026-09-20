@@ -1,4 +1,3 @@
-import { inferredAxis } from './flowOrientation';
 import { compactLayout } from './compactLayout';
 import { describe, expect, it } from 'vitest';
 import type { LayoutRequest, Position } from './flowLayout';
@@ -57,7 +56,7 @@ function spatialVolume(points: Position[]) {
 }
 describe('grouped flow and generic compact layout', () => {
   it.each([1, -1] as const)(
-    'continues a rotated clicked branch in direction %d and orients later side shells',
+    'continues a rotated clicked branch in direction %d but keeps later side shells on world X',
     (side) => {
       const graph: LayoutRequest = {
         revision: 1,
@@ -92,7 +91,7 @@ describe('grouped flow and generic compact layout', () => {
       expect(
         (hop.x * clicked.x + hop.y * clicked.y + hop.z * clicked.z) /
           (length * Math.hypot(clicked.x, clicked.y, clicked.z)),
-      ).toBeGreaterThan(0.98);
+      ).toBeGreaterThan(0.97);
       // Sparse groups retain bounded clearance beyond the clicked glyph.
       expect(length).toBeGreaterThan(50);
       expect(length).toBeLessThan(65);
@@ -112,12 +111,8 @@ describe('grouped flow and generic compact layout', () => {
         placed = new Map(sides);
       for (const [id, point] of opened) expect(placed.get(id)).toEqual(point);
       for (const [id, point] of sides) {
-        const along =
-          (((point.x - hub.x) * hop.x + (point.y - hub.y) * hop.y + (point.z - hub.z) * hop.z) *
-            side) /
-          length;
-        if (id.startsWith('input')) expect(along).toBeLessThan(-8);
-        if (id.startsWith('output')) expect(along).toBeGreaterThan(8);
+        if (id.startsWith('input')) expect(point.x).toBeLessThan(hub.x - 8);
+        if (id.startsWith('output')) expect(point.x).toBeGreaterThan(hub.x + 8);
       }
       expect(
         compactLayout({
@@ -134,9 +129,7 @@ describe('grouped flow and generic compact layout', () => {
       const later = new Map(compactLayout(graph).positions);
       for (const [id, point] of sides) expect(later.get(id)).toEqual(point);
       const extra = later.get('a-earlier-input')!;
-      expect(
-        ((extra.x - hub.x) * hop.x + (extra.y - hub.y) * hop.y + (extra.z - hub.z) * hop.z) * side,
-      ).toBeLessThan(0);
+      expect(extra.x).toBeLessThan(hub.x);
     },
   );
 
@@ -355,7 +348,7 @@ describe('grouped flow and generic compact layout', () => {
     expect(Object.values(placed.get('opened')!).every(Number.isFinite)).toBe(true);
   });
 
-  it('continues an established tilted branch when a connector and transaction are added together', () => {
+  it('keeps newly shown transaction sides on temporal X beside an older tilted output', () => {
     const graph: LayoutRequest = {
       revision: 1,
       dimensions: 3,
@@ -380,27 +373,11 @@ describe('grouped flow and generic compact layout', () => {
     const placed = new Map(compactLayout(graph).positions),
       opened = placed.get('opened')!,
       output = placed.get('new-output')!;
-    expect(Math.abs(opened.x)).toBeLessThan(1e-8);
-    expect(opened.y).toBeGreaterThan(30);
-    expect(opened.z).toBeGreaterThan(40);
-    expect((output.y - opened.y) * 0.6 + (output.z - opened.z) * 0.8).toBeGreaterThan(8);
+    expect(opened.x).toBeGreaterThan(50);
+    expect(Math.hypot(opened.y, opened.z)).toBeLessThan(1e-8);
+    expect(output.x).toBeGreaterThan(opened.x + 8);
+    expect(Math.hypot(output.y - opened.y, output.z - opened.z)).toBeLessThan(1e-8);
     for (const [id, point] of graph.previous) expect(placed.get(id)).toEqual(point);
-  });
-
-  it('does not let an incomplete coplanar shell override an established bridge direction', () => {
-    const r = Math.sqrt(300),
-      hub = { x: 0, y: 0, z: 0 },
-      bridge = [{ x: 1, y: 0, z: 0 }];
-    const points = [
-      { x: 50 - r, y: 0, z: 10 },
-      { x: 50 + r, y: 0, z: 10 },
-      { x: 50, y: -r, z: 10 },
-      { x: 50, y: r, z: 10 },
-    ];
-    expect(inferredAxis(hub, [{ side: 1, points }], bridge, false)).toEqual(bridge[0]);
-    expect(inferredAxis(hub, [{ side: 1, points: points.slice(0, 3) }], bridge, false)).toEqual(
-      bridge[0],
-    );
   });
 
   it.each([2, 3] as const)(
@@ -499,7 +476,115 @@ describe('grouped flow and generic compact layout', () => {
     expect(flat.every(([, point]) => point.z === 0)).toBe(true);
   });
 
-  it('orders reconverging transaction paths consistently on a fresh layout', () => {
+  it('gives a large CoinJoin-like transaction graph a mass-aware 3D transaction skeleton', () => {
+    const graph: LayoutRequest = {
+      revision: 1,
+      dimensions: 3,
+      previous: [],
+      nodes: [],
+      links: [],
+    };
+    const transactions: string[] = [],
+      connections: { source: string; output: string; target: string }[] = [];
+    const addTransaction = (id: string, terminals: number) => {
+      transactions.push(id);
+      graph.nodes.push({ id, shape: 'box' });
+      for (let index = 0; index < terminals; index++) {
+        const input = `${id}-input-${index}`,
+          output = `${id}-output-${index}`;
+        graph.nodes.push(
+          { id: input, shape: 'sphere', radius: 3.2 },
+          { id: output, shape: 'sphere', radius: 3.2 },
+        );
+        graph.links.push(
+          { source: input, target: id, directed: true },
+          { source: id, target: output, directed: true },
+        );
+      }
+    };
+    const connect = (source: string, outputIndex: number, target: string) => {
+      const output = `${source}-output-${outputIndex}`;
+      graph.links.push({ source: output, target, directed: true });
+      connections.push({ source, output, target });
+    };
+    addTransaction('root', 28);
+    const branchLengths = [6, 5, 4, 3];
+    for (let branch = 0; branch < branchLengths.length; branch++) {
+      let parent = 'root';
+      for (let generation = 0; generation < branchLengths[branch]; generation++) {
+        const id = `branch-${branch}-${generation}`;
+        addTransaction(id, 16 - branch * 2);
+        connect(parent, parent === 'root' ? branch : 0, id);
+        parent = id;
+      }
+    }
+    addTransaction('reconnection', 12);
+    connect('branch-0-5', 1, 'reconnection');
+    connect('branch-1-4', 1, 'reconnection');
+
+    const result = compactLayout(graph).positions,
+      placed = new Map(result),
+      transactionPoints = transactions.map((id) => placed.get(id)!);
+    const span = (axis: keyof Position) =>
+      Math.max(...transactionPoints.map((point) => point[axis])) -
+      Math.min(...transactionPoints.map((point) => point[axis]));
+    expect(span('y')).toBeGreaterThan(500);
+    expect(span('z')).toBeGreaterThan(500);
+    expect(span('x') / Math.max(span('y'), span('z'))).toBeLessThan(1.5);
+
+    const root = placed.get('root')!;
+    const branchDirections = branchLengths.map((_, branch) => {
+      const point = placed.get(`branch-${branch}-0`)!;
+      const value = { x: point.x - root.x, y: point.y - root.y, z: point.z - root.z };
+      const length = Math.hypot(value.x, value.y, value.z);
+      return { x: value.x / length, y: value.y / length, z: value.z / length };
+    });
+    for (let left = 0; left < branchDirections.length; left++)
+      for (let right = left + 1; right < branchDirections.length; right++)
+        expect(
+          branchDirections[left].x * branchDirections[right].x +
+            branchDirections[left].y * branchDirections[right].y +
+            branchDirections[left].z * branchDirections[right].z,
+        ).toBeLessThan(0.8);
+
+    // Every canonical outpoint remains on its real edge and between its visible
+    // creating and spending transactions, even when that edge leaves world X.
+    for (const connection of connections) {
+      const source = placed.get(connection.source)!,
+        output = placed.get(connection.output)!,
+        target = placed.get(connection.target)!,
+        path = { x: target.x - source.x, y: target.y - source.y, z: target.z - source.z },
+        fromSource = {
+          x: output.x - source.x,
+          y: output.y - source.y,
+          z: output.z - source.z,
+        },
+        squared = path.x * path.x + path.y * path.y + path.z * path.z,
+        progress =
+          (fromSource.x * path.x + fromSource.y * path.y + fromSource.z * path.z) / squared;
+      expect(target.x).toBeGreaterThan(source.x);
+      expect(output.x).toBeGreaterThan(source.x);
+      expect(output.x).toBeLessThan(target.x);
+      expect(progress).toBeGreaterThan(0.05);
+      expect(progress).toBeLessThan(0.95);
+    }
+
+    const branch = placed.get('branch-1-0')!,
+      terminalInput = placed.get('branch-1-0-input-2')!,
+      terminalOutput = placed.get('branch-1-0-output-2')!;
+    expect(terminalInput.x).toBeLessThan(branch.x);
+    expect(terminalOutput.x).toBeGreaterThan(branch.x);
+    expect(result).toHaveLength(graph.nodes.length);
+    expect(
+      compactLayout({
+        ...graph,
+        nodes: [...graph.nodes].reverse(),
+        links: [...graph.links].reverse(),
+      }).positions,
+    ).toEqual(result);
+  });
+
+  it('keeps reconverging transaction chronology ordered on X without duplicating the join', () => {
     const graph: LayoutRequest = {
       revision: 1,
       previous: [],
@@ -522,8 +607,42 @@ describe('grouped flow and generic compact layout', () => {
     }
     const placed = compactLayout(graph).positions;
     const byId = new Map(placed);
-    for (const link of graph.links)
-      expect(byId.get(link.target)!.x).toBeGreaterThan(byId.get(link.source)!.x);
+    const branch = ['a', 'b', 'c'].map((id) => byId.get(id)!);
+    const first = {
+        x: branch[1].x - branch[0].x,
+        y: branch[1].y - branch[0].y,
+        z: branch[1].z - branch[0].z,
+      },
+      second = {
+        x: branch[2].x - branch[1].x,
+        y: branch[2].y - branch[1].y,
+        z: branch[2].z - branch[1].z,
+      };
+    expect(first.x * second.x + first.y * second.y + first.z * second.z).toBeGreaterThan(0);
+    for (const [source, target] of [
+      ['a', 'b'],
+      ['b', 'c'],
+      ['c', 'd'],
+      ['a', 'd'],
+    ]) {
+      const from = byId.get(source)!,
+        through = byId.get(`${source}-${target}`)!,
+        to = byId.get(target)!,
+        path = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z },
+        output = {
+          x: through.x - from.x,
+          y: through.y - from.y,
+          z: through.z - from.z,
+        },
+        progress =
+          (path.x * output.x + path.y * output.y + path.z * output.z) /
+          (path.x * path.x + path.y * path.y + path.z * path.z);
+      expect(to.x).toBeGreaterThan(from.x);
+      expect(through.x).toBeGreaterThan(from.x);
+      expect(through.x).toBeLessThan(to.x);
+      expect(progress).toBeGreaterThan(0);
+      expect(progress).toBeLessThan(1);
+    }
     expect(
       compactLayout({
         ...graph,

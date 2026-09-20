@@ -424,20 +424,27 @@ bounded renderer-neutral snapshot inside the encrypted view.
 instanced renderer. Picking uses exact mesh hits first, then a 25% padded
 fallback shared by hover and tap.
 
-Layout runs in `flowLayout.worker.ts`. `groupedFlowLayout.ts` places the
-transaction skeleton first (topological X order for fresh components), then
-terminal inputs and outputs in rounded groups on opposite sides, sized by
-member radii; up to eight members use balanced singleton/pair/ring footprints,
-larger sides use collision-aware packing lifted onto a rounded shell. Shared
-outpoints are single nodes bridging transactions. Incremental placement keeps
-every cached coordinate exact, leaves a new branch along the clicked outpoint's
-outward ray with at least one group radius of clearance, and never reserves
-space for undisplayed siblings. Remaining associations use a stopped
-`d3-force-3d` simulation anchored to grouped positions. Only visible nodes
-affect spacing. **Repack** rebuilds the visible layout. A newer topology request
-terminates obsolete worker work; views with cached positions restore without
-simulation; worker failure keeps the scene and offers Retry. Flat mode keeps a
-planar footprint.
+Layout runs in `flowLayout.worker.ts`. `transactionSkeleton.ts` derives one
+spatial hierarchy from the visible transaction DAG without changing its factual
+edges. It estimates descendant mass from transaction count and visible local
+geometry, gives substantial sibling subtrees deterministic solid-angle cones,
+and carries each chosen branch direction through single-child runs while every
+factual spend still advances on world X.
+Reconnectors choose one primary spatial parent while every real cross edge and
+canonical transaction remains in the rendered graph. `groupedFlowLayout.ts`
+then places terminal inputs and outputs in rounded groups on opposite sides of
+each transaction along world X, sized by member radii; up to eight members use
+balanced singleton/pair/ring footprints, and larger sides use collision-aware
+packing lifted onto a rounded shell. Shared outpoints are single nodes bridging
+their creating and spending transactions in the connection's local frame.
+Incremental placement keeps every cached coordinate exact, leaves a transaction
+opened from a visible outpoint along that established outward ray with at least
+one group radius of clearance, and never reserves space for undisplayed
+siblings. Remaining associations use a stopped `d3-force-3d` simulation anchored
+to grouped positions. Only visible nodes affect spacing. **Repack** rebuilds the
+visible layout. A newer topology request terminates obsolete worker work; views
+with cached positions restore without simulation; worker failure keeps the
+scene and offers Retry. Flat mode uses the same hierarchy in a planar footprint.
 
 `flowContext.ts` marks the selected transaction's inputs and outputs with
 screen-space brackets/rings and colored edges; `flowSelection.ts` walks visible
