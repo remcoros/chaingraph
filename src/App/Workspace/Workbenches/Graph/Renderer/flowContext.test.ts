@@ -97,6 +97,9 @@ describe('contextual transaction flow', () => {
     expect(fromB.links.find((l) => l.id === 'address')).toMatchObject({
       arrowLength: 0,
       directed: false,
+      source: 'addr:test',
+      target: 'out:a:0',
+      traceAssociation: true,
     });
     const neutral = presentGraph(input, palette);
     expect(neutral.nodes.every((n) => !n.marker)).toBe(true);

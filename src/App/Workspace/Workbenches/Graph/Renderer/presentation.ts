@@ -199,10 +199,11 @@ export function presentGraph(
       const selected = link.source === input.selectedId || link.target === input.selectedId;
       const role = input.flowContext?.links.get(link.id);
       const emphasized = selected || Boolean(role);
+      const addressAssociation = link.kind === 'address';
       return {
         id: link.id,
-        source: link.source,
-        target: link.target,
+        source: addressAssociation ? link.target : link.source,
+        target: addressAssociation ? link.source : link.target,
         color:
           role === 'input'
             ? (palette.input ?? '#83baff')
@@ -212,8 +213,9 @@ export function presentGraph(
                 ? palette.accent
                 : palette.muted,
         width: bridge ? 1 : emphasized ? 0.65 : 0,
-        arrowLength: link.kind === 'address' ? 0 : bridge ? 5.5 : emphasized ? 4.5 : 3.6,
-        directed: link.kind !== 'address',
+        arrowLength: addressAssociation ? 0 : bridge ? 5.5 : emphasized ? 4.5 : 3.6,
+        directed: !addressAssociation,
+        traceAssociation: addressAssociation,
         flowSide:
           link.kind === 'spends' ? 'incoming' : link.kind === 'creates' ? 'outgoing' : undefined,
       };

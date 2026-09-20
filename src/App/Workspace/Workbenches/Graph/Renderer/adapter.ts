@@ -32,6 +32,8 @@ export interface RenderLink {
   arrowLength: number;
   /** Stable source-to-target layout direction; independent of selection styling. */
   directed?: boolean;
+  /** Selection-seeded particle segment, directional without becoming a layout arrow. */
+  traceAssociation?: boolean;
   /** Stable side of transaction flow, independent of the currently hovered endpoint. */
   flowSide?: 'incoming' | 'outgoing';
 }

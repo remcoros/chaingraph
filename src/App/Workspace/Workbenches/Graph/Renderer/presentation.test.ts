@@ -147,6 +147,12 @@ describe('shared graph semantics and presentation', () => {
     );
     expect(selected.nodes[1]).toMatchObject({ color: palette.accent, highlight: true });
     expect(selected.links.map((link) => link.arrowLength)).toEqual([5.5, 5.5, 0]);
+    expect(selected.links[2]).toMatchObject({
+      source: 'addr',
+      target: 'out',
+      directed: false,
+      traceAssociation: true,
+    });
     expect(selected.links.map((link) => link.width)).toEqual([1, 1, 0.65]);
     expect(
       presentGraph({ ...input, glow: false }, palette).nodes.every((node) => !node.highlight),

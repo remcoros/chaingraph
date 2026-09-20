@@ -22,6 +22,16 @@ const bridge = (id: string, source: string, target: string) => [
   edge(`${id}:create`, source, id, 'outgoing'),
   edge(`${id}:spend`, id, target, 'incoming'),
 ];
+const association = (id: string, address: string, output: string): RenderLink => ({
+  id,
+  source: address,
+  target: output,
+  traceAssociation: true,
+  directed: false,
+  color: '#88aacc',
+  width: 0,
+  arrowLength: 0,
+});
 const ids = (links: RenderLink[]) => new Set(links.map((link) => link.id));
 
 describe('visible transaction flow structure', () => {
@@ -79,6 +89,19 @@ describe('visible transaction flow structure', () => {
         'spends-a',
         'creates-c',
       ]),
+    );
+  });
+
+  it('traces visible address outputs into their spending transactions and terminal outputs', () => {
+    const links = [
+      association('address-spent', 'address', 'spent-output'),
+      association('address-utxo', 'address', 'utxo'),
+      edge('spends-output', 'spent-output', 'spender', 'incoming'),
+      edge('creates-next', 'spender', 'next-output', 'outgoing'),
+    ];
+
+    expect(ids(chooseFlowLinks(indexFlowLinks(links), ['address']))).toEqual(
+      new Set(['address-spent', 'address-utxo', 'spends-output', 'creates-next']),
     );
   });
 

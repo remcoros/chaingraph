@@ -20,6 +20,7 @@ export function indexFlowLinks(links: readonly RenderLink[]) {
   const adjacent = new Map<string, RenderLink[]>();
   const incoming = new Map<string, RenderLink[]>();
   const outgoing = new Map<string, RenderLink[]>();
+  const associations = new Map<string, RenderLink[]>();
   const outpoints = new Map<string, Outpoint>();
   const transactions = new Set<string>();
   const append = (map: Map<string, RenderLink[]>, id: string, link: RenderLink) => {
@@ -28,9 +29,13 @@ export function indexFlowLinks(links: readonly RenderLink[]) {
     map.set(id, group);
   };
   for (const link of links) {
-    if (!link.directed || byId.has(link.id)) continue;
+    if ((!link.directed && !link.traceAssociation) || byId.has(link.id)) continue;
     byId.set(link.id, link);
     for (const id of new Set([link.source, link.target])) append(adjacent, id, link);
+    if (link.traceAssociation) {
+      append(associations, link.source, link);
+      continue;
+    }
     if (!link.flowSide) continue;
     const creates = link.flowSide === 'outgoing';
     const transaction = creates ? link.source : link.target;
@@ -42,11 +47,11 @@ export function indexFlowLinks(links: readonly RenderLink[]) {
     outpoints.set(output, point);
   }
   // Sorting once keeps traversal and tie-breaking independent of input order.
-  for (const map of [adjacent, incoming, outgoing])
+  for (const map of [adjacent, incoming, outgoing, associations])
     for (const group of map.values()) group.sort((a, b) => compare(a.id, b.id));
   for (const point of outpoints.values())
     for (const group of [point.creates, point.spends]) group.sort((a, b) => compare(a.id, b.id));
-  return { byId, adjacent, incoming, outgoing, outpoints, transactions };
+  return { byId, adjacent, incoming, outgoing, associations, outpoints, transactions };
 }
 
 /** Spread spare animation slots across world-space sectors of a terminal sphere.
@@ -125,10 +130,21 @@ export function chooseFlowLinks(
       roots.outgoing.add(link.target);
     }
   };
+  const seedAssociation = (id: string) => {
+    for (const link of index.associations.get(id) ?? []) {
+      if (!shown(link)) continue;
+      add(link);
+      for (const spend of halves(link.target).spends) {
+        add(spend);
+        roots.outgoing.add(spend.target);
+      }
+    }
+  };
   const hoveredEdge = hoveredLink ? index.byId.get(hoveredLink) : undefined;
   if (hoveredEdge && shown(hoveredEdge)) {
     add(hoveredEdge);
-    if (hoveredEdge.flowSide)
+    if (hoveredEdge.traceAssociation) seedAssociation(hoveredEdge.source);
+    else if (hoveredEdge.flowSide)
       seedOutpoint(hoveredEdge.flowSide === 'incoming' ? hoveredEdge.source : hoveredEdge.target);
   }
   for (const id of active) {
@@ -136,6 +152,7 @@ export function chooseFlowLinks(
       roots.incoming.add(id);
       roots.outgoing.add(id);
     } else if (index.outpoints.has(id)) seedOutpoint(id);
+    else if (index.associations.has(id)) seedAssociation(id);
   }
   const bridgeCounts = { incoming: 0, outgoing: 0 };
   const bridgeSegments = new Set<string>();
@@ -176,14 +193,33 @@ export function chooseFlowLinks(
   }
   for (const side of ['incoming', 'outgoing'] as const) {
     const forcedTerminals = new Set<string>();
-    for (const group of terminalGroups[side])
+    const fallbackGroups = active
+      .filter(
+        (id) =>
+          !index.transactions.has(id) && !index.outpoints.has(id) && !index.associations.has(id),
+      )
+      .map((id) =>
+        spatialOrder(
+          (index.adjacent.get(id) ?? []).filter(
+            (link) =>
+              shown(link) &&
+              !chosen.has(link.id) &&
+              (side === 'incoming' ? link.target === id : link.source === id),
+          ),
+          side,
+          positions,
+          dimensions,
+        ),
+      );
+    const candidates = [...terminalGroups[side], ...fallbackGroups];
+    for (const group of candidates)
       for (const link of group)
         if (chosen.has(link.id) && !bridgeSegments.has(link.id)) forcedTerminals.add(link.id);
     let spare = Math.max(0, FLOW_BRANCH_TARGET - bridgeCounts[side] - forcedTerminals.size);
     // Fair sharing between hovered/selected nodes, and between spatial sectors.
     for (let offset = 0; spare > 0; offset++) {
       let found = false;
-      for (const group of terminalGroups[side]) {
+      for (const group of candidates) {
         const link = group[offset];
         if (!link) continue;
         found = true;

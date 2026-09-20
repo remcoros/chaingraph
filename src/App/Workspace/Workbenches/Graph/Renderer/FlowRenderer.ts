@@ -788,6 +788,7 @@ export class FlowRenderer implements GraphAdapter {
           link.source !== before.source ||
           link.target !== before.target ||
           link.directed !== before.directed ||
+          link.traceAssociation !== before.traceAssociation ||
           link.flowSide !== before.flowSide ||
           link.color !== before.color ||
           link.width !== before.width ||
