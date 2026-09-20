@@ -4,7 +4,6 @@ import {
   ArrowRightToLine,
   Box,
   CircleMinus,
-  Coins,
   Eye,
   EyeOff,
   GitBranch,
@@ -29,12 +28,12 @@ export interface GraphContextToolbarProps {
   selectedKind?: 'transaction' | 'output' | 'address';
   canOpenAddress?: boolean;
   onOpenAddress?: () => void;
-  canShowRecentUtxos?: boolean;
-  recentUtxoCount?: number;
-  onShowRecentUtxos?: () => void;
-  canShowRecentTransactions?: boolean;
-  recentTransactionCount?: number;
-  onShowRecentTransactions?: () => void;
+  canShowOutputs?: boolean;
+  outputCount?: number;
+  onShowOutputs?: () => void;
+  canShowLastTransactions?: boolean;
+  lastTransactionCount?: number;
+  onShowLastTransactions?: () => void;
   sides?: Record<GraphContextSide, GraphContextSideCounts>;
   onAddSide: (side: GraphContextSide) => void;
   onHideSide: (side: GraphContextSide) => void;
@@ -65,13 +64,17 @@ export interface GraphContextToolbarProps {
 const countLabel = (count: number) => count.toLocaleString('en-US');
 
 export function GraphContextToolbar(props: GraphContextToolbarProps) {
-  const recentUtxoCount = Math.max(0, props.recentUtxoCount ?? 0);
-  const recentTransactionCount = Math.max(0, props.recentTransactionCount ?? 0);
+  const outputCount = Math.max(0, props.outputCount ?? 0);
+  const lastTransactionCount = Math.max(0, props.lastTransactionCount ?? 0);
   const hiddenCount = props.hiddenCount ?? 0;
   const hasTransactionDetails = !!props.sides && props.selectedKind !== 'output';
   const selectionActions =
     props.hideSelectionCount || props.removeSelectionCount ? (
-      <div className="graph-context-action-grid graph-context-selection-actions" role="group" aria-label="Selected nodes">
+      <div
+        className="graph-context-action-grid graph-context-selection-actions"
+        role="group"
+        aria-label="Selected nodes"
+      >
         {props.hideSelectionCount > 0 && (
           <button
             className="graph-context-action"
@@ -213,34 +216,31 @@ export function GraphContextToolbar(props: GraphContextToolbarProps) {
             <button
               className="graph-context-action"
               type="button"
-              aria-label={`Show recent UTXOs (${recentUtxoCount})`}
-              title={`Show recent UTXOs (${recentUtxoCount})`}
+              aria-label={`Show outputs (${outputCount})`}
+              title={`Show outputs (${outputCount})`}
               disabled={
-                props.busy ||
-                recentUtxoCount === 0 ||
-                !props.canShowRecentUtxos ||
-                !props.onShowRecentUtxos
+                props.busy || outputCount === 0 || !props.canShowOutputs || !props.onShowOutputs
               }
-              onClick={props.onShowRecentUtxos}
+              onClick={props.onShowOutputs}
             >
-              <Coins size={15} aria-hidden="true" />
-              <span>({countLabel(recentUtxoCount)})</span>
+              <ArrowRightFromLine size={15} aria-hidden="true" />
+              <span>({countLabel(outputCount)})</span>
             </button>
             <button
               className="graph-context-action"
               type="button"
-              aria-label={`Show recent transactions (${recentTransactionCount})`}
-              title={`Show recent transactions (${recentTransactionCount})`}
+              aria-label={`Show last 5 transactions (${lastTransactionCount})`}
+              title={`Show last 5 transactions (${lastTransactionCount})`}
               disabled={
                 props.busy ||
-                recentTransactionCount === 0 ||
-                !props.canShowRecentTransactions ||
-                !props.onShowRecentTransactions
+                lastTransactionCount === 0 ||
+                !props.canShowLastTransactions ||
+                !props.onShowLastTransactions
               }
-              onClick={props.onShowRecentTransactions}
+              onClick={props.onShowLastTransactions}
             >
               <Box size={15} aria-hidden="true" />
-              <span>({countLabel(recentTransactionCount)})</span>
+              <span>({countLabel(lastTransactionCount)})</span>
             </button>
           </div>
           {selectionActions}

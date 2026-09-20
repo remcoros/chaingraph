@@ -1,17 +1,19 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
 import {
+  addressHistoryOutputIds,
   addressBalanceSats,
   indexAddressHistoryTransactions,
+  LAST_ADDRESS_TRANSACTION_LIMIT,
+  lastAddressHistoryEntries,
   listAddressHistory,
-  recentAddressHistoryEntries,
   recentAddressUtxos,
-  RECENT_ADDRESS_GRAPH_LIMIT,
   shouldLoadAddressHistory,
 } from './addressHistory';
 import { paginateAddressHistorySections } from '../TransactionFlow/addressHistorySections';
 import { addressToScriptHash } from '../../../../../Core/Bitcoin';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { outpointReference } from '../../../../../Core/Workspace/entityReferences';
 import type { Transaction } from '../../../../../Core/ChainData';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
@@ -157,8 +159,8 @@ describe('address history projection', () => {
     ).toBe(false);
   });
 
-  it('orders recent graph items with pending and newest heights first', () => {
-    const entries = recentAddressHistoryEntries({
+  it('orders the last five graph transactions with pending and newest heights first', () => {
+    const entries = lastAddressHistoryEntries({
       address: address(4),
       entries: [
         {
@@ -193,6 +195,7 @@ describe('address history projection', () => {
       source: 'address history',
     });
     expect(entries.map(({ txid }) => txid)).toEqual([id(2), id(3), id(1)]);
+    expect(LAST_ADDRESS_TRANSACTION_LIMIT).toBe(5);
 
     const utxos = recentAddressUtxos({
       network: 'mainnet',
@@ -207,7 +210,51 @@ describe('address history projection', () => {
     expect(
       recentAddressUtxos({ network: 'mainnet', checkedAt: new Date().toISOString(), utxos: [] }, 0),
     ).toEqual([]);
-    expect(RECENT_ADDRESS_GRAPH_LIMIT).toBe(10);
+  });
+
+  it('limits the explicit transaction action to the last five entries', () => {
+    const entries = lastAddressHistoryEntries({
+      address: address(4),
+      entries: [6, 5, 4, 3, 2, 1].map((value) => ({
+        txid: id(value),
+        mempool: false,
+        direction: 'unknown' as const,
+        onGraph: false,
+        hidden: false,
+      })),
+      knownCount: 6,
+      loadedCount: 0,
+      unloadedCount: 6,
+      complete: true,
+      source: 'address history',
+    });
+
+    expect(entries.map(({ txid }) => txid)).toEqual([id(6), id(5), id(4), id(3), id(2)]);
+  });
+
+  it('lists every loaded output directly matching an address, including spent outputs', () => {
+    const target = address(1);
+    const anotherReceipt: Transaction = {
+      txid: id(7),
+      vin: [{ coinbase: '00' }],
+      vout: [
+        { n: 0, value: 1, scriptPubKey: { address: target } },
+        { n: 1, value: 1, scriptPubKey: { address: address(8) } },
+        { n: 2, value: 1, scriptPubKey: { address: target } },
+      ],
+    };
+    const workspace = createWorkspace('Address outputs', 'mainnet');
+    workspace.chainData.transactions = {
+      [received.txid]: received,
+      [spent.txid]: spent,
+      [anotherReceipt.txid]: anotherReceipt,
+    };
+
+    expect(addressHistoryOutputIds(listAddressHistory(workspace, target), 'mainnet')).toEqual([
+      outpointReference(received.txid, 0),
+      outpointReference(anotherReceipt.txid, 0),
+      outpointReference(anotherReceipt.txid, 2),
+    ]);
   });
 
   it('keeps expanded sections represented within a bounded pending-first page', () => {

@@ -1,9 +1,6 @@
 import { formatBitcoinAmount } from '../../../../Core/Formatting';
 import { Amount } from '../../../Controls/Display/Amount';
-import {
-  RECENT_ADDRESS_GRAPH_LIMIT,
-  selectedAddress as selectedAddressForHistory,
-} from './Address/addressHistory';
+import { selectedAddress as selectedAddressForHistory } from './Address/addressHistory';
 import { GraphLegend } from './GraphLegend';
 import { GraphContextToolbar, type GraphContextSideCounts } from './GraphContextToolbar';
 import { GraphControls } from './GraphControls';
@@ -32,10 +29,7 @@ import {
 } from './Filters/GraphFilterControls';
 import { GraphWalletFilter } from './Filters/GraphWalletFilter';
 import { transactionNodeIds } from '../../GraphState/visibility';
-import {
-  outpointReference,
-  transactionReference,
-} from '../../../../Core/Workspace/entityReferences';
+import { transactionReference } from '../../../../Core/Workspace/entityReferences';
 import type { WorkspaceController } from '../../useWorkspace';
 import { InspectorPanel } from './InspectorPanel';
 import { EntitiesPanel } from './EntitiesPanel';
@@ -45,7 +39,6 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     activeWorkspace,
     edit,
     setNotice,
-    canLoadChainData,
     selectedTransaction: tx,
     canTraceAncestry,
     operation: workspaceOperation,
@@ -131,14 +124,14 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     balance: addressBalance,
     utxos: addressUtxos,
     historyLoad: addressHistoryLoad,
-    recentUtxoTargets: recentAddressUtxoTargets,
-    recentTransactionTargets: recentAddressTransactionTargets,
+    outputIds: addressOutputIds,
+    lastTransactionTargets: lastAddressTransactionTargets,
     actions: {
       openHistory: openAddressHistory,
       openOutputAddress,
       loadUtxos: loadAddressUtxos,
-      showRecentUtxos: showRecentAddressUtxos,
-      showRecentTransactions: showRecentAddressTransactions,
+      showOutputs: showAddressOutputs,
+      showLastTransactions: showLastAddressTransactions,
       openHistoryTransaction: openAddressHistoryTransaction,
     },
   } = workspace.graph.address;
@@ -231,25 +224,13 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     activeWorkspace && selected?.kind === 'address'
       ? selectedAddressForHistory(selected, activeWorkspace.network)
       : undefined;
-  const recentUtxoCount = selectedAddressForToolbar
-    ? addressUtxos
-      ? recentAddressUtxoTargets.filter(
-          (utxo) => !canvasIds.has(outpointReference(utxo.txid, utxo.vout)),
-        ).length
-      : canLoadChainData
-        ? RECENT_ADDRESS_GRAPH_LIMIT
-        : 0
+  const addressOutputCount = selectedAddressForToolbar
+    ? addressOutputIds.filter((id) => !canvasIds.has(id)).length
     : 0;
-  const recentTransactionNeedsFetch =
-    !addressHistory ||
-    addressHistory.source === 'loaded transactions' ||
-    addressHistory.entries.length === 0;
-  const recentTransactionCount = selectedAddressForToolbar
-    ? recentTransactionNeedsFetch && canLoadChainData
-      ? RECENT_ADDRESS_GRAPH_LIMIT
-      : recentAddressTransactionTargets.filter(
-          (entry) => !canvasIds.has(transactionReference(entry.txid)),
-        ).length
+  const lastAddressTransactionCount = selectedAddressForToolbar
+    ? lastAddressTransactionTargets.filter(
+        (entry) => !canvasIds.has(transactionReference(entry.txid)),
+      ).length
     : 0;
   const graphContextToolbar = activeWorkspace ? (
     <GraphContextToolbar
@@ -259,14 +240,12 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
       selectedKind={selected?.kind}
       canOpenAddress={!!selectedInputOutputAddress}
       onOpenAddress={openOutputAddress}
-      canShowRecentUtxos={!!selectedAddressForToolbar && (!!addressUtxos || canLoadChainData)}
-      recentUtxoCount={recentUtxoCount}
-      onShowRecentUtxos={showRecentAddressUtxos}
-      canShowRecentTransactions={
-        !!selectedAddressForToolbar && (!!addressHistory?.entries.length || canLoadChainData)
-      }
-      recentTransactionCount={recentTransactionCount}
-      onShowRecentTransactions={showRecentAddressTransactions}
+      canShowOutputs={!!selectedAddressForToolbar}
+      outputCount={addressOutputCount}
+      onShowOutputs={showAddressOutputs}
+      canShowLastTransactions={!!selectedAddressForToolbar}
+      lastTransactionCount={lastAddressTransactionCount}
+      onShowLastTransactions={showLastAddressTransactions}
       sides={contextSides}
       onAddSide={(side) => revealGraphNodes(contextSideIds?.[side] ?? [])}
       onHideSide={(side) =>

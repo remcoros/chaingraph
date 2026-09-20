@@ -1,5 +1,8 @@
 import { addressToScriptHash, sats } from '../../../../../Core/Bitcoin';
-import { canonicalAddress } from '../../../../../Core/Workspace/entityReferences';
+import {
+  canonicalAddress,
+  outpointReference,
+} from '../../../../../Core/Workspace/entityReferences';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import {
   indexPreviousOutputs,
@@ -46,12 +49,15 @@ export function shouldLoadAddressHistory(history: AddressHistory | undefined): b
   return !history || history.knownCount === 0 || history.source === 'loaded transactions';
 }
 
-export const RECENT_ADDRESS_GRAPH_LIMIT = 10;
+/** The explicit transaction action reveals at most this many address-history entries. */
+export const LAST_ADDRESS_TRANSACTION_LIMIT = 5;
+
+const RECENT_ADDRESS_UTXO_LIMIT = 10;
 
 /** History projections are already ordered newest-first, including pending entries. */
-export function recentAddressHistoryEntries(
+export function lastAddressHistoryEntries(
   history: AddressHistory | undefined,
-  limit = RECENT_ADDRESS_GRAPH_LIMIT,
+  limit = LAST_ADDRESS_TRANSACTION_LIMIT,
 ): AddressHistoryEntry[] {
   return history?.entries.slice(0, Math.max(0, limit)) ?? [];
 }
@@ -59,7 +65,7 @@ export function recentAddressHistoryEntries(
 /** Electrum does not promise list order, so order UTXOs by height explicitly. */
 export function recentAddressUtxos(
   observation: AddressUtxoObservation | undefined,
-  limit = RECENT_ADDRESS_GRAPH_LIMIT,
+  limit = RECENT_ADDRESS_UTXO_LIMIT,
 ): AddressUtxoObservation['utxos'] {
   return [...(observation?.utxos ?? [])]
     .sort(
@@ -70,6 +76,35 @@ export function recentAddressUtxos(
         b.vout - a.vout,
     )
     .slice(0, Math.max(0, limit));
+}
+
+/**
+ * Concrete output nodes that directly match the selected address in loaded
+ * transaction evidence. Observed history determines navigability, but never
+ * makes an unloaded output safe to add to the graph.
+ */
+export function addressHistoryOutputIds(
+  history: AddressHistory | undefined,
+  network: Workspace['network'],
+): string[] {
+  if (!history) return [];
+  let target: string;
+  try {
+    target = addressToScriptHash(history.address, network);
+  } catch {
+    return [];
+  }
+  const evidence = createWalletOutputEvidenceResolver(network);
+  const ids = new Set<string>();
+  for (const entry of history.entries) {
+    const transaction = entry.transaction;
+    if (!transaction || transaction.txid.toLowerCase() !== entry.txid) continue;
+    for (const output of transaction.vout) {
+      if (evidence(output).scripthash !== target) continue;
+      ids.add(outpointReference(transaction.txid, output.n));
+    }
+  }
+  return [...ids];
 }
 
 interface AddressHistoryTransactionMatch {

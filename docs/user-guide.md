@@ -159,11 +159,15 @@ selects the address so its transaction and UTXO tabs are available in the flow
 panel. UTXOs and balance are fetched only when that tab or an explicit refresh
 requires them, and each observation includes its last-checked time.
 
-When an address is selected, those two toolbar buttons become **Show recent
-UTXOs (10)** and **Show recent transactions (10)**. They use cached observations
-when available, fetch only the bounded recent details that are missing, and add
-or reveal up to ten graph items without changing the current selection. The
-address-history button remains available for selected inputs and outputs.
+When an address is selected, two adjacent icon-and-count toolbar buttons reveal
+outputs and the last five transactions. The output action adds or reveals every
+loaded output whose script directly matches the address, including outputs that
+were later spent. The transaction action uses cached observations, fetches only
+missing details for that bounded set, then adds or reveals five or fewer
+transaction nodes without changing the current selection. The output total is
+limited to loaded address-history detail; an incomplete address history remains
+incomplete evidence. The address-history button remains available for selected
+inputs and outputs.
 
 Floating controls over the canvas provide **Fit**, zoom, **Center** on the
 selection, **Lock** (keep the selection centered as it changes), selection
