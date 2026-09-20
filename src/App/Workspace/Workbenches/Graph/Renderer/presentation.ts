@@ -1,6 +1,8 @@
 import type { GraphLink, GraphNode } from '../../../GraphState/types';
 import type { GraphFrame, GraphHit, RenderChronology, RenderNode } from './adapter';
 import type { GraphFlowContext } from './flowContext';
+import { OUTPUT_GROUP_VOLUME_FILL } from './outputGroupGlyph';
+import { groupParallelOutputs, type OutputGroupProjection } from './outputGroups';
 
 /** Callers interpret tags, wallets or findings and supply only visual overrides. */
 export interface NodePresentation {
@@ -64,6 +66,17 @@ function valueRadius(satoshis: number | undefined): number {
   return 1.6 + 0.9 * Math.log10(1 + satoshis / 10_000);
 }
 
+function presentationRadius(
+  sizeBy: GraphPresentationInput['sizeBy'],
+  value: number | undefined,
+  degree: number,
+) {
+  return sizeBy === 'value'
+    ? valueRadius(value)
+    : DEFAULT_NODE_RADIUS *
+        Math.cbrt(sizeBy === 'degree' ? Math.min(14, 1 + Math.sqrt(degree)) : 1);
+}
+
 /** Reusable topology for one immutable pair of graph node/link arrays. */
 export interface GraphPresentationIndex {
   readonly nodes: readonly GraphNode[];
@@ -71,6 +84,7 @@ export interface GraphPresentationIndex {
   readonly links: readonly GraphLink[];
   readonly bridges: ReadonlySet<string>;
   readonly degrees: ReadonlyMap<string, number>;
+  readonly outputGroups: OutputGroupProjection;
 }
 
 export function buildGraphPresentationIndex(
@@ -89,7 +103,14 @@ export function buildGraphPresentationIndex(
   const bridges = new Set<string>();
   for (const link of links)
     if (link.kind === 'spends' && created.has(link.source)) bridges.add(link.source);
-  return { nodes, sourceLinks, links, bridges, degrees };
+  return {
+    nodes,
+    sourceLinks,
+    links,
+    bridges,
+    degrees,
+    outputGroups: groupParallelOutputs(nodes, links),
+  };
 }
 
 export interface GraphPresentationInput {
@@ -106,6 +127,8 @@ export interface GraphPresentationInput {
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
   flowContext?: GraphFlowContext;
   chronology?: ReadonlyMap<string, RenderChronology>;
+  /** Renderer-only compaction for repeated output bridges. Enabled unless explicitly disabled. */
+  groupOutputs?: boolean;
 }
 
 /** Build once per update, then project only the nodes whose visual overrides changed. */
@@ -124,13 +147,7 @@ export function createGraphNodePresenter(
     const role = input.flowContext?.nodes.get(node.id);
     const roleColor =
       role === 'input' ? (palette.input ?? '#83baff') : (palette.flowOutput ?? palette.output);
-    const radius =
-      input.sizeBy === 'value'
-        ? valueRadius(node.value)
-        : DEFAULT_NODE_RADIUS *
-          Math.cbrt(
-            input.sizeBy === 'degree' ? Math.min(14, 1 + Math.sqrt(degrees.get(node.id) || 0)) : 1,
-          );
+    const radius = presentationRadius(input.sizeBy, node.value, degrees.get(node.id) || 0);
     const scale = override?.scale;
     // Explicit coordinates are transient layout hints, never renderer-owned state.
     const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
@@ -189,38 +206,132 @@ export function presentGraph(
       ? index
       : buildGraphPresentationIndex(input.nodes, input.links);
   const { links, bridges } = topology;
+  const outputGroups =
+    input.groupOutputs === false
+      ? {
+          groups: [],
+          byMember: new Map<string, never>(),
+          groupedLinkIds: new Set<string>(),
+        }
+      : topology.outputGroups;
   const presentNode = createGraphNodePresenter(input, palette, topology);
+  const presentLink = (link: GraphLink) => {
+    const bridge =
+      (link.kind === 'creates' && bridges.has(link.target)) ||
+      (link.kind === 'spends' && bridges.has(link.source));
+    const selected = link.source === input.selectedId || link.target === input.selectedId;
+    const role = input.flowContext?.links.get(link.id);
+    const emphasized = selected || Boolean(role);
+    const addressAssociation = link.kind === 'address';
+    return {
+      id: link.id,
+      source: addressAssociation ? link.target : link.source,
+      target: addressAssociation ? link.source : link.target,
+      color:
+        role === 'input'
+          ? (palette.input ?? '#83baff')
+          : role === 'output'
+            ? (palette.flowOutput ?? palette.output)
+            : selected
+              ? palette.accent
+              : palette.muted,
+      width: bridge ? 1 : emphasized ? 0.65 : 0,
+      arrowLength: addressAssociation ? 0 : bridge ? 5.5 : emphasized ? 4.5 : 3.6,
+      directed: !addressAssociation,
+      traceAssociation: addressAssociation,
+      flowSide:
+        link.kind === 'spends'
+          ? ('incoming' as const)
+          : link.kind === 'creates'
+            ? ('outgoing' as const)
+            : undefined,
+    };
+  };
+  const groupedNodes = new Map(
+    outputGroups.groups.map((group) => {
+      const members = group.members.map(presentNode);
+      const colors = new Set(members.map((member) => member.color));
+      const markers = members.map((member) => member.marker).filter(Boolean);
+      const marker =
+        markers.length === members.length &&
+        markers.every(
+          (candidate) =>
+            candidate!.shape === markers[0]!.shape && candidate!.color === markers[0]!.color,
+        )
+          ? markers[0]
+          : undefined;
+      const selected = members.some((member) => member.selected);
+      // Preserve the rendered volume of the particles this glyph replaces.
+      // Applying the size curve to aggregated facts would make logarithmic value
+      // sizing, uniform sizing and per-node scale overrides visibly too small.
+      const radius = Math.cbrt(
+        members.reduce((sum, member) => sum + member.radius ** 3, 0) / OUTPUT_GROUP_VOLUME_FILL,
+      );
+      return [
+        group.id,
+        {
+          id: group.id,
+          shape: 'output-group' as const,
+          group: {
+            kind: 'multiple-outputs' as const,
+            memberIds: group.members.map((member) => member.id),
+          },
+          color: selected ? palette.accent : colors.size === 1 ? members[0].color : palette.output,
+          radius,
+          selected,
+          flowActive: members.some((member) => member.flowActive),
+          highlight: members.some((member) => member.highlight),
+          marker,
+        },
+      ] as const;
+    }),
+  );
+  const renderedNodes: RenderNode[] = [];
+  const insertedGroups = new Set<string>();
+  for (const node of input.nodes) {
+    const group = outputGroups.byMember.get(node.id);
+    if (!group) renderedNodes.push(presentNode(node));
+    else if (!insertedGroups.has(group.id)) {
+      insertedGroups.add(group.id);
+      renderedNodes.push(groupedNodes.get(group.id)!);
+    }
+  }
+  const renderedLinks = links
+    .filter((link) => !outputGroups.groupedLinkIds.has(link.id))
+    .map(presentLink);
+  for (const group of outputGroups.groups) {
+    const creates = group.creates.map(presentLink);
+    const spends = group.spends.map(presentLink);
+    const combine = (
+      candidates: ReturnType<typeof presentLink>[],
+      id: string,
+      source: string,
+      target: string,
+      flowSide: 'incoming' | 'outgoing',
+    ) => ({
+      id,
+      source,
+      target,
+      color: candidates.some((link) => link.color === palette.accent)
+        ? palette.accent
+        : new Set(candidates.map((link) => link.color)).size === 1
+          ? candidates[0].color
+          : palette.output,
+      width: Math.max(...candidates.map((link) => link.width)),
+      arrowLength: Math.max(...candidates.map((link) => link.arrowLength)),
+      directed: true,
+      traceAssociation: false,
+      flowSide,
+    });
+    renderedLinks.push(
+      combine(creates, `${group.id}:creates`, group.source, group.id, 'outgoing'),
+      combine(spends, `${group.id}:spends`, group.id, group.target, 'incoming'),
+    );
+  }
   return {
     dimensions: input.dimensions,
     background: palette.background,
-    nodes: input.nodes.map(presentNode),
-    links: links.map((link) => {
-      const bridge =
-        (link.kind === 'creates' && bridges.has(link.target)) ||
-        (link.kind === 'spends' && bridges.has(link.source));
-      const selected = link.source === input.selectedId || link.target === input.selectedId;
-      const role = input.flowContext?.links.get(link.id);
-      const emphasized = selected || Boolean(role);
-      const addressAssociation = link.kind === 'address';
-      return {
-        id: link.id,
-        source: addressAssociation ? link.target : link.source,
-        target: addressAssociation ? link.source : link.target,
-        color:
-          role === 'input'
-            ? (palette.input ?? '#83baff')
-            : role === 'output'
-              ? (palette.flowOutput ?? palette.output)
-              : selected
-                ? palette.accent
-                : palette.muted,
-        width: bridge ? 1 : emphasized ? 0.65 : 0,
-        arrowLength: addressAssociation ? 0 : bridge ? 5.5 : emphasized ? 4.5 : 3.6,
-        directed: !addressAssociation,
-        traceAssociation: addressAssociation,
-        flowSide:
-          link.kind === 'spends' ? 'incoming' : link.kind === 'creates' ? 'outgoing' : undefined,
-      };
-    }),
+    nodes: renderedNodes,
+    links: renderedLinks,
   };
 }

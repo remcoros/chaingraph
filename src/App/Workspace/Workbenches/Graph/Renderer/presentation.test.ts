@@ -4,8 +4,10 @@ import {
   presentGraph,
   resolveGraphHit,
   type GraphPalette,
+  type GraphPresentationInput,
 } from './presentation';
 import type { GraphNode, GraphLink } from '../../../GraphState/types';
+import { OUTPUT_GROUP_VOLUME_FILL } from './outputGroupGlyph';
 const nodes: GraphNode[] = [
   { id: 'tx', kind: 'transaction', label: 'Transaction', value: 10000 },
   { id: 'out', kind: 'output', label: 'Output', value: 10000, cluster: 'finding' },
@@ -26,7 +28,153 @@ const palette: GraphPalette = {
   background: '#000000',
 };
 const input = { nodes, links, dimensions: 2 as const, sizeBy: 'uniform' as const, glow: true };
+
+function parallelOutputBridge(count: number, addressMember?: number) {
+  const bridgeNodes: GraphNode[] = [
+    { id: 'source', kind: 'transaction', label: 'Source transaction' },
+    ...Array.from({ length: count }, (_, index) => ({
+      id: `output-${index + 1}`,
+      kind: 'output' as const,
+      label: `Output ${index + 1}`,
+    })),
+    { id: 'target', kind: 'transaction', label: 'Target transaction' },
+  ];
+  const bridgeLinks: GraphLink[] = bridgeNodes.flatMap((node) =>
+    node.kind === 'output'
+      ? [
+          { id: `create-${node.id}`, source: 'source', target: node.id, kind: 'creates' as const },
+          { id: `spend-${node.id}`, source: node.id, target: 'target', kind: 'spends' as const },
+        ]
+      : [],
+  );
+  if (addressMember !== undefined) {
+    bridgeNodes.push({ id: 'address', kind: 'address', label: 'Address' });
+    bridgeLinks.push({
+      id: 'address-link',
+      source: `output-${addressMember}`,
+      target: 'address',
+      kind: 'address',
+    });
+  }
+  return { nodes: bridgeNodes, links: bridgeLinks };
+}
+
 describe('shared graph semantics and presentation', () => {
+  it('compacts three parallel output bridges without changing canonical graph data', () => {
+    const bridge = parallelOutputBridge(3);
+    const index = buildGraphPresentationIndex(bridge.nodes, bridge.links);
+    const frame = presentGraph({ ...input, ...bridge, selectedId: 'output-2' }, palette, index);
+    const group = frame.nodes.find((node) => node.shape === 'output-group');
+
+    expect(frame.nodes.map((node) => node.id)).toEqual([
+      'source',
+      'outputs:source>target',
+      'target',
+    ]);
+    expect(group).toMatchObject({
+      color: palette.accent,
+      selected: true,
+      group: {
+        kind: 'multiple-outputs',
+        memberIds: ['output-1', 'output-2', 'output-3'],
+      },
+    });
+    expect(frame.links).toMatchObject([
+      { source: 'source', target: 'outputs:source>target', directed: true },
+      { source: 'outputs:source>target', target: 'target', directed: true },
+    ]);
+    expect(index.nodes).toBe(bridge.nodes);
+    expect(index.sourceLinks).toBe(bridge.links);
+    expect(index.nodes).toHaveLength(5);
+    expect(index.links).toHaveLength(6);
+  });
+
+  it('restores individual outputs when grouping is off and leaves small or connected sets alone', () => {
+    const bridge = parallelOutputBridge(3);
+    const ungrouped = presentGraph({ ...input, ...bridge, groupOutputs: false }, palette);
+    expect(ungrouped.nodes.filter((node) => node.shape === 'sphere')).toHaveLength(3);
+    expect(ungrouped.nodes.some((node) => node.shape === 'output-group')).toBe(false);
+    expect(ungrouped.links).toHaveLength(6);
+
+    const two = parallelOutputBridge(2);
+    expect(presentGraph({ ...input, ...two }, palette).nodes).toHaveLength(4);
+    const associated = parallelOutputBridge(3, 1);
+    const associatedFrame = presentGraph({ ...input, ...associated }, palette);
+    expect(associatedFrame.nodes.some((node) => node.shape === 'output-group')).toBe(false);
+    expect(associatedFrame.links).toHaveLength(7);
+  });
+
+  it('carries batch emphasis from any canonical member onto its output group', () => {
+    const bridge = parallelOutputBridge(3);
+    const group = presentGraph(
+      { ...input, ...bridge, batchSelectedIds: ['output-3'] },
+      palette,
+    ).nodes.find((node) => node.shape === 'output-group');
+    expect(group).toMatchObject({ selected: false, flowActive: true });
+  });
+
+  it('preserves the combined rendered volume under every size mode', () => {
+    const bridge = parallelOutputBridge(3);
+    bridge.nodes = bridge.nodes.map((node, index) =>
+      node.kind === 'output' ? { ...node, value: [10_000, 20_000, 30_000][index - 1] } : node,
+    );
+    const radius = (sizeBy: GraphPresentationInput['sizeBy']) =>
+      presentGraph({ ...input, ...bridge, sizeBy }, palette).nodes.find(
+        (node) => node.shape === 'output-group',
+      )!.radius;
+    const individualRadii = presentGraph(
+      {
+        ...input,
+        ...bridge,
+        groupOutputs: false,
+        sizeBy: 'value',
+      },
+      palette,
+    )
+      .nodes.filter((node) => node.shape === 'sphere')
+      .map((node) => node.radius);
+    const individualDegreeRadius = presentGraph(
+      {
+        ...input,
+        ...bridge,
+        groupOutputs: false,
+        sizeBy: 'degree',
+      },
+      palette,
+    ).nodes.find((node) => node.shape === 'sphere')!.radius;
+
+    expect(radius('uniform')).toBeCloseTo(Math.cbrt((3 * 3.2 ** 3) / OUTPUT_GROUP_VOLUME_FILL));
+    expect(radius('uniform')).toBeGreaterThan(8.5);
+    expect(radius('value')).toBeCloseTo(
+      Math.cbrt(
+        individualRadii.reduce((sum, memberRadius) => sum + memberRadius ** 3, 0) /
+          OUTPUT_GROUP_VOLUME_FILL,
+      ),
+    );
+    expect(radius('degree')).toBeCloseTo(
+      Math.cbrt((3 * individualDegreeRadius ** 3) / OUTPUT_GROUP_VOLUME_FILL),
+    );
+
+    const scaledInput = {
+      ...input,
+      ...bridge,
+      nodePresentation: new Map([['output-1', { scale: 2 }]]),
+    };
+    const scaled = presentGraph(scaledInput, palette).nodes.find(
+      (node) => node.shape === 'output-group',
+    )!.radius;
+    const scaledMembers = presentGraph(
+      { ...scaledInput, groupOutputs: false },
+      palette,
+    ).nodes.filter((node) => node.shape === 'sphere');
+    expect(scaled).toBeCloseTo(
+      Math.cbrt(
+        scaledMembers.reduce((sum, member) => sum + member.radius ** 3, 0) /
+          OUTPUT_GROUP_VOLUME_FILL,
+      ),
+    );
+  });
+
   it('reuses topology across display and selection changes without retaining stale visuals', () => {
     const index = buildGraphPresentationIndex(nodes, links);
     const before = structuredClone(index);

@@ -3,11 +3,13 @@ import type { GraphFlowContext } from './Renderer/flowContext';
 export function GraphLegend({
   dimensions,
   showAddresses,
+  groupOutputs,
   demo,
   flowContext,
 }: {
   dimensions: 2 | 3;
   showAddresses: boolean;
+  groupOutputs: boolean;
   demo: boolean;
   flowContext?: GraphFlowContext;
 }) {
@@ -27,6 +29,12 @@ export function GraphLegend({
           <i className="entity-dot output" />
           {flowContext ? 'Other outputs' : 'Output'}
         </span>
+        {groupOutputs && (
+          <span>
+            <i className="graph-output-group-key" />
+            Multiple outputs
+          </span>
+        )}
         {flowContext && (
           <>
             <span>

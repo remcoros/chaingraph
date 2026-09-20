@@ -201,6 +201,19 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
     unconnectedForRemoval,
   ]);
   const toolbarSelection = selection.ids.length ? selection.ids : selectedId ? [selectedId] : [];
+  const selectOutputGroup = (ids: readonly string[]) => {
+    if (connectionScanTargets.picking) {
+      const selectedTargets = new Set(connectionScanTargets.draft?.ids);
+      for (const id of ids)
+        if (!selectedTargets.has(id)) {
+          connectionScanTargets.toggle(id);
+          selectedTargets.add(id);
+        }
+      return;
+    }
+    selection.setMode(true);
+    selection.replace(ids);
+  };
   const hideSelectionIds = toolbarSelection.filter((id) => canvasIds.has(id));
   const removeSelectionIds = toolbarSelection.filter((id) => admittedIds.has(id));
   const selectedSpenderTxids =
@@ -578,17 +591,19 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   navigation={graphNavigation}
                   contextToolbar={graphContextToolbar}
                   navigationStatus={graphNavigationStatus}
-                  legend={
+                  legend={({ groupOutputs }) => (
                     <GraphLegend
                       flowContext={graphFlowContext}
                       dimensions={appliedGraphRequest.dimensions}
                       showAddresses={appliedGraphRequest.showAddresses}
+                      groupOutputs={groupOutputs}
                       demo={activeWorkspace.demo}
                     />
-                  }
-                  toolbar={({ motionToggle }) => (
+                  )}
+                  toolbar={({ motionToggle, groupOutputsToggle }) => (
                     <GraphControls
                       motionToggle={motionToggle}
+                      groupOutputsToggle={groupOutputsToggle}
                       smallAmountHiddenCount={amountGraph.hiddenCount}
                       view={activeWorkspace.view}
                       panelsCollapsed={panelsCollapsed}
@@ -604,6 +619,7 @@ export function GraphWorkbench({ workspace }: { workspace: WorkspaceController }
                   focusRequest={focusRequest}
                   selectedId={graphSelectedId}
                   onSelect={select}
+                  onSelectOutputGroup={selectOutputGroup}
                   selectionMode={connectionScanTargets.picking || selection.mode}
                   selectionPurpose={connectionScanTargets.picking ? 'scan-target' : 'batch'}
                   batchSelectedIds={highlightedSelection}

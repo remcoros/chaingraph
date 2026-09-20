@@ -36,6 +36,7 @@ function sameContext(a: GraphPresentationInput, b: GraphPresentationInput) {
     sameList(a.batchSelectedIds, b.batchSelectedIds) &&
     a.sizeBy === b.sizeBy &&
     a.glow === b.glow &&
+    (a.groupOutputs !== false) === (b.groupOutputs !== false) &&
     (a.showLabels !== false) === (b.showLabels !== false) &&
     (a.showTags !== false) === (b.showTags !== false) &&
     (a.showIcons !== false) === (b.showIcons !== false) &&
@@ -112,6 +113,22 @@ export class GraphPresentationUpdates {
     const before = previous.input.nodePresentation;
     const after = input.nodePresentation;
     if (before === after) return;
+    const changedOverrideIds = new Set([...(before?.keys() ?? []), ...(after?.keys() ?? [])]);
+    const groupedAppearanceChanged = [...changedOverrideIds].some(
+      (id) =>
+        previous.input.groupOutputs !== false &&
+        previous.index.outputGroups.byMember.has(id) &&
+        !sameOverride(before?.get(id), after?.get(id)),
+    );
+    if (groupedAppearanceChanged) {
+      const frame = presentGraph(input, palette, previous.index);
+      adapter.update(frame);
+      previous.frame = frame;
+      previous.rendered = new Map(frame.nodes.map((node) => [node.id, node]));
+      previous.input = input;
+      previous.palette = palette;
+      return;
+    }
     const changed: RenderNode[] = [];
     let needsFullFrame = !adapter.updateNodeAppearance;
     let presentNode: ReturnType<typeof createGraphNodePresenter> | undefined;

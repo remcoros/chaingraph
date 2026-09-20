@@ -39,6 +39,7 @@ import {
   validateGraphSnapshot,
   type GraphSnapshot,
 } from '../../../../../Core/Workspace/view';
+import { createOutputGroupGeometry } from './outputGroupGeometry';
 
 // One draw call for all halos; the ordinary node meshes retain graph picking.
 function makeHalos() {
@@ -84,6 +85,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     box: new BoxGeometry(1.6, 1.6, 1.6),
     sphere: new SphereGeometry(1, 8, 8),
     octahedron: new OctahedronGeometry(1.4),
+    'output-group': createOutputGroupGeometry(),
   };
   const materials = new Map<string, MeshLambertMaterial>();
   const meshes = new Map<string, Mesh<BufferGeometry, MeshLambertMaterial>>();
@@ -109,6 +111,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   let earlyFitPending = false;
   let earlyFitTicks = 0;
   let pendingFocus: { id: string; preserveZoom?: boolean } | undefined;
+  let groupForMember = new Map<string, string>();
   let dead = false;
   let initialSnapshot: GraphSnapshot | undefined;
   const retainedPositions = new Map<string, GraphSnapshot['nodes'][number]>();
@@ -429,7 +432,10 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   };
   const emitHover = () => {
     if (!dead && !pointers.size && point.pointerType !== 'touch')
-      events.hover({ hit: hit?.type === 'node' ? hit : undefined, point: { ...point } });
+      events.hover({
+        hit: hit?.type === 'node' || hit?.type === 'output-group' ? hit : undefined,
+        point: { ...point },
+      });
   };
   const pickTouch = (): GraphHit | undefined => {
     const width = canvas.clientWidth,
@@ -441,7 +447,13 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       graph.camera(),
     );
     const picked = raycaster.intersectObjects([...meshes.values()], false)[0]?.object;
-    if (picked) for (const [id, mesh] of meshes) if (mesh === picked) return { type: 'node', id };
+    if (picked)
+      for (const node of graph.graphData().nodes) {
+        if (meshes.get(node.id) !== picked) continue;
+        return node.group
+          ? { type: 'output-group', id: node.id, memberIds: node.group.memberIds }
+          : { type: 'node', id: node.id };
+      }
     let closest: { id: string; distance: number } | undefined;
     for (const link of graph.graphData().links) {
       if (typeof link.source === 'string' || typeof link.target === 'string') continue;
@@ -526,15 +538,25 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       .linkLabel('')
       .linkHoverPrecision(2)
       .onNodeHover((node) => {
-        if (node) hit = { type: 'node', id: node.id };
-        else if (hit?.type === 'node') hit = undefined;
+        if (node)
+          hit = node.group
+            ? { type: 'output-group', id: node.id, memberIds: node.group.memberIds }
+            : { type: 'node', id: node.id };
+        else if (hit?.type === 'node' || hit?.type === 'output-group') hit = undefined;
         emitHover();
       })
       .onLinkHover((link) => {
         if (link) hit = undefined;
         emitHover();
       })
-      .onNodeClick((node, event) => select({ type: 'node', id: node.id }, event))
+      .onNodeClick((node, event) =>
+        select(
+          node.group
+            ? { type: 'output-group', id: node.id, memberIds: node.group.memberIds }
+            : { type: 'node', id: node.id },
+          event,
+        ),
+      )
       .onLinkClick((link, event) => select({ type: 'link', id: link.id }, event))
       .onBackgroundClick((event) => select(undefined, event))
       .onEngineTick(() => {
@@ -653,6 +675,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
   }
   function focus(id: string, options?: { preserveZoom?: boolean }, transition = duration()) {
     if (dead) return;
+    id = groupForMember.get(id) ?? id;
     // An explicit request owns the next camera move even when its frame has not
     // arrived yet. Never substitute the origin for uninitialized coordinates.
     pendingFocus = { id, preserveZoom: options?.preserveZoom };
@@ -701,6 +724,11 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     },
     update(frame: GraphFrame) {
       if (dead) return;
+      groupForMember = new Map(
+        frame.nodes.flatMap((node) =>
+          (node.group?.memberIds ?? []).map((memberId) => [memberId, node.id] as const),
+        ),
+      );
       if (initialSnapshot && initialSnapshot.dimensions !== frame.dimensions) {
         // The mode preference may have reached storage before its new layout settled.
         initialSnapshot = undefined;

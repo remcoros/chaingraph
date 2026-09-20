@@ -42,9 +42,10 @@ import { chooseFlowLinks, indexFlowLinks } from './flowSelection';
 import { makeEdgePickIndex } from './flowEdgePicking';
 import { placeFlowCaptions } from './flowCaptions';
 import { createNodePickMesh, intersectNodes, syncNodePickMesh } from './nodePicking';
+import { createOutputGroupGeometry } from './outputGroupGeometry';
 import './flowRenderer.css';
 
-const shapes = ['box', 'sphere', 'octahedron'] as const;
+const shapes = ['box', 'sphere', 'octahedron', 'output-group'] as const;
 const vector = (p: Position) => new Vector3(p.x, p.y, p.z);
 const point = (p: Vector3) => ({
   x: Math.round(p.x * 1000) / 1000,
@@ -79,6 +80,7 @@ export class FlowRenderer implements GraphAdapter {
     box: new BoxGeometry(1.6, 1.6, 1.6),
     sphere: new SphereGeometry(1, 16, 12),
     octahedron: new OctahedronGeometry(1.4),
+    'output-group': createOutputGroupGeometry(),
   };
   private material = new MeshLambertMaterial();
   private batches: NodeBatch[] = [];
@@ -93,6 +95,7 @@ export class FlowRenderer implements GraphAdapter {
   private layouts: LayoutScheduler;
   private requestedFrame?: GraphFrame;
   private requestedNodes = new Map<string, RenderNode>();
+  private groupForMember = new Map<string, string>();
   private nodeInstances = new Map<string, { batch: NodeBatch; index: number }>();
   private fullColorUploads = new WeakSet<NonNullable<InstancedMesh['instanceColor']>>();
   private displayedNodes: RenderNode[] = [];
@@ -198,7 +201,7 @@ export class FlowRenderer implements GraphAdapter {
         this.pickRaf = 0;
         if (this.dead || this.lost || this.pointers.size) return;
         const hit = this.pick(e.clientX, e.clientY);
-        const hovered = hit?.type === 'node' ? hit.id : undefined;
+        const hovered = hit?.type === 'node' || hit?.type === 'output-group' ? hit.id : undefined;
         const hoveredLink = hit?.type === 'link' ? hit.id : undefined;
         if (this.hovered !== hovered || this.hoveredLink !== hoveredLink) {
           this.hovered = hovered;
@@ -208,7 +211,7 @@ export class FlowRenderer implements GraphAdapter {
         }
         this.canvas.style.cursor = hit ? 'pointer' : 'grab';
         this.events.hover({
-          hit: hovered ? { type: 'node', id: hovered } : undefined,
+          hit: hit?.type === 'node' || hit?.type === 'output-group' ? hit : undefined,
           point: this.pointer(e),
         });
       });
@@ -563,6 +566,10 @@ export class FlowRenderer implements GraphAdapter {
     if (selected?.shape === 'sphere') this.selectedOutpoint = selected.id;
     else if (selected && this.cache.has(selected.id)) this.selectedOutpoint = undefined;
     this.nodes = frame.nodes.map((n) => ({ ...n }));
+    this.groupForMember.clear();
+    for (const node of this.nodes)
+      for (const memberId of node.group?.memberIds ?? [])
+        this.groupForMember.set(memberId, node.id);
     // Keep an owned frame so metadata patches survive pending layouts and Repack
     // without mutating the caller's immutable presentation.
     this.requestedFrame = { ...frame, nodes: this.nodes };
@@ -641,9 +648,10 @@ export class FlowRenderer implements GraphAdapter {
     const request: LayoutRequest = {
       revision: ++this.revision,
       dimensions: this.dimensions,
-      nodes: this.nodes.map(({ id, shape, radius, chronology, x, y, z, fx, fy, fz }) => ({
+      nodes: this.nodes.map(({ id, shape, group, radius, chronology, x, y, z, fx, fy, fz }) => ({
         id,
         shape,
+        weight: group?.memberIds.length,
         radius,
         chronology,
         x,
@@ -874,6 +882,7 @@ export class FlowRenderer implements GraphAdapter {
   }
   focus(id: string, options?: { preserveZoom?: boolean }) {
     if (this.dead) return;
+    id = this.groupForMember.get(id) ?? id;
     this.pendingFocus = { id, preserveZoom: options?.preserveZoom };
     this.events.dismiss();
     this.fulfillCamera();
@@ -923,7 +932,10 @@ export class FlowRenderer implements GraphAdapter {
     const h = intersectNodes(this.raycaster, this.batches);
     if (h) {
       const b = this.batches.find((b) => b.mesh === h.object || b.pickMesh === h.object)!;
-      return { type: 'node', id: b.nodes[h.instanceId!].id };
+      const node = b.nodes[h.instanceId!];
+      return node.group
+        ? { type: 'output-group', id: node.id, memberIds: node.group.memberIds }
+        : { type: 'node', id: node.id };
     }
     if (!includeLinks) return;
     if (!this.edgePick) {

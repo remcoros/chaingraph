@@ -256,6 +256,22 @@
   background: var(--color-output);
   border-radius: 50%;
 }
+.graph-card-kind-output-group::before {
+  width: 4px;
+  height: 4px;
+  margin: 0 9px 0 4px;
+  background: var(--color-output);
+  border-radius: 50%;
+  box-shadow:
+    0 -5px var(--color-output),
+    5px 3px var(--color-output),
+    -5px 3px var(--color-output);
+}
+.graph-card-summary {
+  display: block;
+  font-size: 14px;
+  line-height: 1.4;
+}
 .graph-viewport .graph-legend {
   flex-wrap: wrap;
   row-gap: 5px;
@@ -265,6 +281,19 @@
   width: 11px;
   height: 11px;
   flex: 0 0 11px;
+}
+.graph-output-group-key {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin: 0 4px;
+  flex: 0 0 3px;
+  border-radius: 50%;
+  background: var(--color-output);
+  box-shadow:
+    0 -4px var(--color-output),
+    4px 3px var(--color-output),
+    -4px 3px var(--color-output);
 }
 .graph-flow-key.input {
   border: 2px solid var(--color-flow-input, #83baff);

@@ -7,7 +7,9 @@ export interface RenderNode {
   text?: string;
   /** Keep explicit captions per node, ahead of automatic text and independent of glow. */
   captionPriority?: boolean;
-  shape: 'box' | 'sphere' | 'octahedron';
+  shape: 'box' | 'sphere' | 'octahedron' | 'output-group';
+  /** Renderer-only aggregation. Every member remains a canonical graph entity. */
+  group?: { kind: 'multiple-outputs'; memberIds: readonly string[] };
   color: string;
   radius: number;
   highlight: boolean;
@@ -51,7 +53,10 @@ export interface GraphFrame {
   dimensions: 2 | 3;
   background: string;
 }
-export type GraphHit = { type: 'node' | 'link'; id: string };
+export type GraphHit =
+  | { type: 'node'; id: string }
+  | { type: 'link'; id: string }
+  | { type: 'output-group'; id: string; memberIds: readonly string[] };
 export interface GraphPointer {
   /** CSS pixels relative to the adapter container, including for background events. */
   x: number;

@@ -4,7 +4,7 @@ export type LayoutNode = Pick<
   RenderNode,
   'id' | 'shape' | 'chronology' | 'x' | 'y' | 'z' | 'fx' | 'fy' | 'fz'
 > &
-  Partial<Pick<RenderNode, 'radius'>>;
+  Partial<Pick<RenderNode, 'radius'>> & { weight?: number };
 export interface LayoutRequest {
   revision: number;
   dimensions?: 2 | 3;

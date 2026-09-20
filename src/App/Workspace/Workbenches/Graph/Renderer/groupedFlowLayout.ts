@@ -14,6 +14,8 @@ import { layoutTransactionSkeleton } from './transactionSkeleton';
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const radius = (node: LayoutNode) => Math.max(2.4, node.radius ?? 5);
+const outputGlyph = (node: LayoutNode) => node.shape === 'sphere' || node.shape === 'output-group';
+const weight = (node: LayoutNode) => Math.max(1, node.weight ?? 1);
 type Side = -1 | 1;
 type Leaf = { node: LayoutNode; hub: string; side: Side };
 type Bridge = { node: LayoutNode; source: string; target: string };
@@ -155,7 +157,7 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
     bridges: Bridge[] = [];
   const hubs = new Map<string, LayoutNode>();
   for (const node of nodes) {
-    if (node.shape !== 'sphere') continue;
+    if (!outputGlyph(node)) continue;
     const links = incident.get(node.id)!.filter((link) => link.directed);
     if (links.length === 1 && links[0].directed) {
       const link = links[0],
@@ -269,7 +271,7 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
           const id = link.source === hub.id ? link.target : link.source;
           const point = cached.get(id),
             node = byId.get(id);
-          return point && node?.shape === 'sphere' ? [{ id, point, radius: radius(node) }] : [];
+          return point && node && outputGlyph(node) ? [{ id, point, radius: radius(node) }] : [];
         })
         .sort((a, b) => compare(a.id, b.id));
       const remote = new Map(
@@ -455,14 +457,14 @@ export function groupedFlowLayout(request: LayoutRequest): [string, Position][] 
         localMass:
           1 +
           [...sides.values()].reduce((sum, pack) => sum + pack.leaves.length, 0) +
-          new Set(neighbors.get(hub.id)!.map((neighbor) => neighbor.bridge.node.id)).size,
+          neighbors.get(hub.id)!.reduce((sum, neighbor) => sum + weight(neighbor.bridge.node), 0),
       };
     }),
     [...bridgeGroups.values()].map((peers) => ({
       source: peers[0].source,
       target: peers[0].target,
       gap: bridgeGap(peers[0].source, peers[0].target),
-      weight: peers.length,
+      weight: peers.reduce((sum, peer) => sum + weight(peer.node), 0),
     })),
     flat ? 2 : 3,
   );

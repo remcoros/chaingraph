@@ -59,6 +59,47 @@ function harness(partial = true) {
 }
 
 describe('incremental graph presentation', () => {
+  it('rebuilds the aggregate when one grouped output appearance changes', () => {
+    const grouped: GraphPresentationInput = {
+      ...input,
+      nodes: [
+        { id: 'source', kind: 'transaction', label: 'Source' },
+        { id: 'output-1', kind: 'output', label: 'Output 1' },
+        { id: 'output-2', kind: 'output', label: 'Output 2' },
+        { id: 'output-3', kind: 'output', label: 'Output 3' },
+        { id: 'target', kind: 'transaction', label: 'Target' },
+      ],
+      links: [1, 2, 3].flatMap((index) => [
+        {
+          id: `create-${index}`,
+          source: 'source',
+          target: `output-${index}`,
+          kind: 'creates' as const,
+        },
+        {
+          id: `spend-${index}`,
+          source: `output-${index}`,
+          target: 'target',
+          kind: 'spends' as const,
+        },
+      ]),
+    };
+    const h = harness();
+    h.render(grouped);
+    const changed = {
+      ...grouped,
+      nodePresentation: new Map([['output-2', { color: '#ff0000' }]]),
+    };
+    h.render(changed);
+
+    expect(h.update).toHaveBeenCalledTimes(2);
+    expect(h.updateNodeAppearance).not.toHaveBeenCalled();
+    expect(h.frame()).toEqual(presentGraph(changed, palette));
+    expect(h.frame().nodes.find((node) => node.shape === 'output-group')?.color).toBe(
+      palette.output,
+    );
+  });
+
   it('skips bookmark-equivalent, cloned and invisible override changes', () => {
     const h = harness();
     const next = {
@@ -193,6 +234,7 @@ describe('incremental graph presentation', () => {
       { dimensions: 3 },
       { sizeBy: 'degree' },
       { glow: false },
+      { groupOutputs: false },
       { showLabels: false },
       { showIcons: false },
       { showTags: false },

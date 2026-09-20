@@ -385,12 +385,29 @@ annotations for confirmation; inputs and outputs are never deleted individually.
 ### Presentation and adapter contract
 
 `src/App/Workspace/Workbenches/Graph/Renderer/presentation.ts` projects the visible domain graph into a `GraphFrame`:
-nodes with stable IDs, shapes (cube, sphere, octahedron), colors, radii,
+nodes with stable IDs, shapes (cube, sphere, octahedron, grouped output), colors, radii,
 highlights, optional captions and coordinate hints; links with endpoints,
 colors, widths, arrows and a `directed`/`flowSide` hint. Callers supply
 `NodePresentation` overrides for tags, wallet matches and findings; selection
 color wins, then tag color, then wallet color. Value sizing uses
 `1.6 + 0.9 * log10(1 + sats / 10000)`.
+
+`outputGroups.ts` derives an optional presentation-only compaction when at least
+three visible output-only bridges connect the same creating and spending
+transactions. It replaces those render nodes and links with one deterministic
+group glyph and two render links. The canonical graph remains unchanged, and
+the group hit carries the exact canonical member IDs into the existing multiple
+selection owner. Outputs with another visible relationship, including an address
+association, stay individual. The transient GraphView toggle is on by default;
+disabling it restores the individual projection and hides the legend key. Group
+sizing first resolves every member under the selected sizing mode and then uses
+the cube root of the sum of their cubed radii. The compact glyph therefore
+preserves the combined rendered volume, including member scale overrides,
+rather than applying a nonlinear sizing curve to aggregated facts.
+`outputGroupGlyph.ts` supplies the same geometric measurements to presentation
+and geometry creation. The radius calculation divides by the sparse glyph's
+filled-volume ratio before taking the cube root, while collision bounds remain
+normalized to the glyph's true outer radius.
 
 The browser remembers its accent preference separately from encrypted workspaces.
 `accentTheme.ts` applies it before mounting the app; `GraphView.tsx` observes the
@@ -409,7 +426,7 @@ as do adapters without the patch method.
 
 `Renderer/adapter.ts` defines `update`, `resize`, `focus`, `fit`, `dispose`,
 optional `flushSnapshot`, `zoom`, `repack`, `setMotion`, and events for
-hover/select (`{ type, id }` plus pointer coordinates and modifiers), activity
+hover/select (node, link or grouped-output hits plus pointer coordinates and modifiers), activity
 (pauses autosave), layout status and WebGL errors/recovery. Adapters own
 picking, camera, gestures, layout and GPU resources. `GraphView.tsx` owns
 semantic hit lookup, selection routing, hover cards, keyboard details, floating

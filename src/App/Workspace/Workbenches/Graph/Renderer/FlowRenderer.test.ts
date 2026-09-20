@@ -8,7 +8,7 @@ import {
   ShaderMaterial,
   Vector3,
 } from 'three';
-import type { GraphAdapterEvents, GraphFrame } from './adapter';
+import type { GraphAdapterEvents, GraphFrame, GraphHit } from './adapter';
 import type { LayoutRequest, LayoutResult } from './flowLayout';
 import { cachedLayout, LayoutScheduler } from './layoutScheduler';
 
@@ -444,6 +444,31 @@ describe('default renderer responsiveness and snapshots', () => {
     renderer.dispose();
   });
 
+  it('forwards grouped output mass and focuses canonical members on the group glyph', () => {
+    const { renderer } = setup();
+    const data = frame();
+    data.nodes = data.nodes.map((node, index) =>
+      index === 1
+        ? {
+            ...node,
+            shape: 'output-group',
+            group: {
+              kind: 'multiple-outputs',
+              memberIds: ['output-1', 'output-2', 'output-3'],
+            },
+          }
+        : node,
+    );
+    renderer.update(data);
+    const request = WorkerMock.instances[0].postMessage.mock.calls[0][0];
+    expect(request.nodes[1]).toMatchObject({ shape: 'output-group', weight: 3 });
+    WorkerMock.instances[0].reply();
+
+    renderer.focus('output-2');
+    expect(renderer.controls.target.toArray()).toEqual([20, 4, 2]);
+    renderer.dispose();
+  });
+
   it('does not use an unrelated selected outpoint as an expansion origin', () => {
     const { renderer } = setup();
     const original = frame(1);
@@ -852,6 +877,38 @@ describe('partial node appearance updates', () => {
     renderer.repack();
     WorkerMock.instances[1].reply();
     expect(colorAt(renderer, 3)).toBe('#44aaff');
+    renderer.dispose();
+  });
+});
+
+describe('renderer picking', () => {
+  it('forwards an output group hit to hover consumers without rewriting it as a node', () => {
+    const animation = animationHarness();
+    const { renderer, events } = setup();
+    const hit: GraphHit = {
+      type: 'output-group',
+      id: 'outputs:source>target',
+      memberIds: ['output-1', 'output-2', 'output-3'],
+    };
+    vi.spyOn(
+      renderer as unknown as { pick(x: number, y: number): GraphHit | undefined },
+      'pick',
+    ).mockReturnValue(hit);
+
+    renderer.canvas.dispatchEvent(
+      Object.assign(new Event('pointermove'), {
+        pointerId: 1,
+        pointerType: 'mouse',
+        clientX: 40,
+        clientY: 60,
+      }),
+    );
+    animation.step(16);
+
+    expect(events.hover).toHaveBeenLastCalledWith({
+      hit,
+      point: expect.objectContaining({ x: 40, y: 60, pointerType: 'mouse' }),
+    });
     renderer.dispose();
   });
 });

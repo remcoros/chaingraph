@@ -10,6 +10,7 @@ import {
   Minus,
   RotateCw,
   LoaderCircle,
+  Orbit,
   Pause,
   Play,
 } from 'lucide-react';
@@ -29,7 +30,12 @@ import type { GraphFlowContext } from './Renderer/flowContext';
 import { VisibilityActions, type VisibilityProps } from '../../Selection/VisibilityActions';
 
 import { mergeGraphSnapshot } from './Renderer/graphSnapshot';
-import type { GraphAdapter, GraphAdapterFactory, RenderChronology } from './Renderer/adapter';
+import type {
+  GraphAdapter,
+  GraphAdapterFactory,
+  GraphHit,
+  RenderChronology,
+} from './Renderer/adapter';
 import { createDefaultAdapter } from './Renderer/defaultAdapter';
 import {
   buildGraphPresentationIndex,
@@ -48,7 +54,9 @@ export interface GraphViewProps extends VisibilityProps {
   onActivity?: (active: boolean) => void;
   onRegisterSnapshotFlush?: (flush: (() => void) | undefined) => void;
   /** Shared React chrome. Toolbar content takes layout space above the canvas. */
-  toolbar?: ReactNode | ((controls: { motionToggle?: ReactNode }) => ReactNode);
+  toolbar?:
+    | ReactNode
+    | ((controls: { motionToggle?: ReactNode; groupOutputsToggle: ReactNode }) => ReactNode);
   /** Shared controls floating over the viewport, outside the renderer event surface. */
   navigation?: ReactNode;
   /** Filter/visibility context below every floating control group. */
@@ -56,13 +64,15 @@ export interface GraphViewProps extends VisibilityProps {
   /** Contextual actions float along the right edge without remounting the renderer. */
   contextToolbar?: ReactNode;
   renderMetadata?: (nodeId: string) => ReactNode;
-  legend?: ReactNode;
+  legend?: ReactNode | ((state: { groupOutputs: boolean }) => ReactNode);
   nodePresentation?: ReadonlyMap<string, NodePresentation>;
   flowContext?: GraphFlowContext;
   nodes: GraphNode[];
   links: GraphLink[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  /** Selects every canonical output represented by one renderer-only group. */
+  onSelectOutputGroup?: (ids: readonly string[]) => void;
   /** Shared multiple-selection state; the renderer stays free of selection logic. */
   selectionMode?: boolean;
   selectionPurpose?: 'batch' | 'scan-target';
@@ -87,7 +97,8 @@ export interface GraphViewProps extends VisibilityProps {
   filtering?: boolean;
 }
 
-type HoverCard = { type: 'node'; id: string; x: number; y: number };
+type HoverTarget = Extract<GraphHit, { type: 'node' | 'output-group' }>;
+type HoverCard = HoverTarget & { x: number; y: number };
 
 export default function GraphView(props: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -137,6 +148,7 @@ export default function GraphView(props: GraphViewProps) {
     motion: false,
   });
   const [motionEnabled, setMotionEnabled] = useState(true);
+  const [groupOutputs, setGroupOutputs] = useState(true);
   const savedSnapshot = useRef(props.snapshot);
   const lastFitToken = useRef(props.fitToken);
   const immutableNodeSource = useRef<GraphSnapshot['nodes'] | undefined>(undefined);
@@ -174,7 +186,7 @@ export default function GraphView(props: GraphViewProps) {
       }
     }, 450);
   }
-  function showCard(type: HoverCard['type'], id: string, keyboard = false) {
+  function showCard(hit: HoverTarget, keyboard = false) {
     if (
       !keyboard &&
       (pointer.current.touch ||
@@ -184,7 +196,7 @@ export default function GraphView(props: GraphViewProps) {
     )
       return;
     keepCardOpen();
-    visibleNode.current = id;
+    visibleNode.current = hit.id;
     const element = containerRef.current;
     if (!element) return;
     const { width, height } = element.getBoundingClientRect();
@@ -192,18 +204,17 @@ export default function GraphView(props: GraphViewProps) {
     const x = keyboard ? (width - widthOfCard) / 2 : pointer.current.x + 12;
     const y = keyboard ? 40 : pointer.current.y + 12;
     setHover((previous) =>
-      !keyboard && previous?.type === type && previous.id === id
+      !keyboard && previous?.type === hit.type && previous.id === hit.id
         ? previous
         : {
-            type,
-            id,
+            ...hit,
             x: Math.max(12, Math.min(x, width - widthOfCard - 12)),
             y: Math.max(12, Math.min(y, height - 280)),
           },
     );
     if (keyboard) requestAnimationFrame(() => cardRef.current?.focus());
   }
-  function requestCard(id: string) {
+  function requestCard(hit: HoverTarget) {
     if (
       pointer.current.touch ||
       cardEntered.current ||
@@ -212,12 +223,12 @@ export default function GraphView(props: GraphViewProps) {
     )
       return;
     keepCardOpen();
-    if (visibleNode.current === id || pendingNode.current === id) return;
+    if (visibleNode.current === hit.id || pendingNode.current === hit.id) return;
     cancelCardOpen();
-    pendingNode.current = id;
+    pendingNode.current = hit.id;
     openTimer.current = setTimeout(() => {
       pendingNode.current = undefined;
-      showCard('node', id);
+      showCard(hit);
     }, 320);
   }
   function dismissCard(returnFocus = false) {
@@ -239,7 +250,7 @@ export default function GraphView(props: GraphViewProps) {
       if (event.key === 'Escape') dismissCard();
       if ((event.key === 'Enter' || event.key === ' ') && current.current.selectedId) {
         event.preventDefault();
-        showCard('node', current.current.selectedId, true);
+        showCard({ type: 'node', id: current.current.selectedId }, true);
       }
     };
     setError(false);
@@ -249,11 +260,16 @@ export default function GraphView(props: GraphViewProps) {
       adapter = adapterFactory(element, {
         hover: ({ hit, point }) => {
           pointer.current = { x: point.x, y: point.y, touch: point.pointerType === 'touch' };
-          if (hit?.type === 'node') requestCard(hit.id);
+          if (hit?.type === 'node' || hit?.type === 'output-group') requestCard(hit);
           else scheduleCardClose();
         },
         select: ({ hit, point }) => {
           if (!hit) {
+            dismissCard();
+            return;
+          }
+          if (hit.type === 'output-group') {
+            current.current.onSelectOutputGroup?.(hit.memberIds);
             dismissCard();
             return;
           }
@@ -411,6 +427,7 @@ export default function GraphView(props: GraphViewProps) {
       nodePresentation: props.nodePresentation,
       flowContext: props.flowContext,
       chronology,
+      groupOutputs,
     }),
     [
       props.nodes,
@@ -426,6 +443,7 @@ export default function GraphView(props: GraphViewProps) {
       props.nodePresentation,
       props.flowContext,
       chronology,
+      groupOutputs,
     ],
   );
   const presentationUpdates = useMemo(() => new GraphPresentationUpdates(), []);
@@ -466,7 +484,9 @@ export default function GraphView(props: GraphViewProps) {
     else graphRef.current?.cancelFocus?.();
   }, [adapterFactory, props.focusRequest]);
 
-  const hoveredNode = hover ? props.nodes.find((node) => node.id === hover.id) : undefined;
+  const hoveredNode =
+    hover?.type === 'node' ? props.nodes.find((node) => node.id === hover.id) : undefined;
+  const hoveredGroup = hover?.type === 'output-group' ? hover : undefined;
   const hoveredIdentifier = hoveredNode
     ? hoveredNode.kind === 'output' && hoveredNode.txid
       ? `${hoveredNode.txid}:${hoveredNode.vout}`
@@ -512,7 +532,7 @@ export default function GraphView(props: GraphViewProps) {
       ? (loadedSpenders.get(`${hoveredNode.txid}:${hoveredNode.vout}`) ?? 0)
       : 0;
   const hasHover = hover !== undefined;
-  const hasHoveredNode = hoveredNode !== undefined;
+  const hasHoveredItem = hoveredNode !== undefined || hoveredGroup !== undefined;
   const traceReason = props.busy
     ? 'Another operation is running.'
     : hoveredNode?.kind === 'output' && transaction
@@ -521,7 +541,7 @@ export default function GraphView(props: GraphViewProps) {
 
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Reports what the renderer measured, which is only known after it has drawn.
-    if (hasHover && !hasHoveredNode) dismissCard();
+    if (hasHover && !hasHoveredItem) dismissCard();
     const card = cardRef.current;
     const container = containerRef.current;
     if (!card || !container) return;
@@ -540,7 +560,7 @@ export default function GraphView(props: GraphViewProps) {
     observer.observe(card);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [hasHover, hasHoveredNode]);
+  }, [hasHover, hasHoveredItem]);
 
   return (
     <div className="graph-view" data-testid="graph-view" onPointerLeave={scheduleCardClose}>
@@ -564,12 +584,84 @@ export default function GraphView(props: GraphViewProps) {
                     )}
                   </button>
                 ) : undefined,
+                groupOutputsToggle: (
+                  <button
+                    type="button"
+                    className={`icon-button ${groupOutputs ? 'active' : ''}`}
+                    aria-label="Group outputs going from/to the same transaction"
+                    aria-pressed={groupOutputs}
+                    title="Group outputs going from/to the same transaction"
+                    onClick={() => {
+                      dismissCard();
+                      setGroupOutputs((enabled) => !enabled);
+                    }}
+                  >
+                    <Orbit size={16} aria-hidden="true" />
+                  </button>
+                ),
               })
             : props.toolbar}
         </div>
       )}
       <div className="graph-viewport">
         <div ref={containerRef} className="graph-canvas" aria-hidden={error} />
+        {!error && hover && hoveredGroup && (
+          <section
+            ref={cardRef}
+            className="graph-hover-card"
+            role="dialog"
+            aria-label="Multiple outputs"
+            tabIndex={-1}
+            style={{ left: hover.x, top: hover.y }}
+            onPointerEnter={() => {
+              cardEntered.current = true;
+              keepCardOpen();
+            }}
+            onPointerLeave={() => {
+              cardEntered.current = false;
+              scheduleCardClose();
+            }}
+            onFocus={keepCardOpen}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) scheduleCardClose();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                dismissCard(true);
+              }
+            }}
+          >
+            <div className="graph-card-heading">
+              <span className="graph-card-kind graph-card-kind-output-group">Multiple outputs</span>
+              <button
+                type="button"
+                className="graph-card-close"
+                aria-label="Close graph details"
+                onClick={() => dismissCard(true)}
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <strong className="graph-card-summary">
+              {hoveredGroup.memberIds.length.toLocaleString('en-US')} outputs
+            </strong>
+            {props.onSelectOutputGroup && (
+              <div className="graph-card-actions" role="group" aria-label="Output group actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    props.onSelectOutputGroup?.(hoveredGroup.memberIds);
+                    dismissCard();
+                  }}
+                >
+                  <CheckSquare size={15} />
+                  {props.selectionPurpose === 'scan-target' ? 'Add outputs' : 'Select outputs'}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
         {!error && hover && hoveredNode && (
           <section
             ref={cardRef}
@@ -905,7 +997,7 @@ export default function GraphView(props: GraphViewProps) {
             </div>
           )}
         </div>
-        {props.legend}
+        {typeof props.legend === 'function' ? props.legend({ groupOutputs }) : props.legend}
       </div>
     </div>
   );

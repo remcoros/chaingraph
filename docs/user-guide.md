@@ -119,7 +119,17 @@ one readable event band. Block height orders compact sibling bands without
 turning block gaps into empty distance. Mempool transactions and transactions
 whose order is unknown use the most recent available band. New nodes extend the
 established branch without moving existing ones; **Repack** rearranges everything
-visible and applies newly observed ordering to all bands.
+visible and applies newly observed ordering to all bands. By default, three or
+more outputs that connect the same creating and spending transactions appear as
+one **Multiple outputs** symbol and one connection path. Hover the symbol to see
+its output count, or select it to create a multiple selection containing those
+outputs. The orbit-style graph control turns this compaction on or off; its
+legend key is shown only while compaction is enabled. **Size by** treats the
+symbol as the combined group: every output is sized under the active mode, then
+the group preserves their combined rendered volume. This also preserves the
+effect of per-output presentation scaling. The sparse four-circle glyph receives
+an additional shape compensation so its visible material does not look smaller
+than the solid output spheres it replaces.
 
 The transaction flow panel has collapsed, normal and full-height views. Its two
 floating arrow buttons collapse, expand or restore its height; double arrows

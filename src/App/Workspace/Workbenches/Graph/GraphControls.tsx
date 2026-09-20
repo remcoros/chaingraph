@@ -9,9 +9,11 @@ export function GraphControls({
   onTogglePanels,
   smallAmountHiddenCount,
   motionToggle,
+  groupOutputsToggle,
 }: {
   view: Workspace['view'];
   motionToggle?: ReactNode;
+  groupOutputsToggle?: ReactNode;
   onChange: (update: (view: Workspace['view']) => Workspace['view']) => void;
   smallAmountHiddenCount?: number;
   panelsCollapsed?: boolean;
@@ -102,6 +104,7 @@ export function GraphControls({
       </span>
       <div className="graph-annotation-toggles" role="group" aria-label="Graph display">
         {motionToggle}
+        {groupOutputsToggle}
         {(
           [
             ['showLabels', 'Show labels', Type],
