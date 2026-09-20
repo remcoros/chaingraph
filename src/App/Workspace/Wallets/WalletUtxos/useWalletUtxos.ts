@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../../../Core/Workspace/workspace';
 import type { ChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
@@ -81,7 +81,7 @@ export function useWalletUtxos({
         };
   const request = useRef<AbortController | undefined>(undefined);
   const attempted = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeScope.current = scope;
   }, [scope]);
 
