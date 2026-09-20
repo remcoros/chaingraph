@@ -38,8 +38,14 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
     view?: { inputContext?: unknown };
   };
   // Budgets run before schema parsing, on the v5 groups, including invalid input.
+  const chainData =
+    document.chainData &&
+    typeof document.chainData === 'object' &&
+    !Array.isArray(document.chainData)
+      ? document.chainData
+      : {};
   const raw = {
-    ...document.chainData,
+    ...chainData,
     wallets: document.wallets?.definitions,
     walletReviews: document.wallets?.reviews,
     tags: document.annotations?.tags,

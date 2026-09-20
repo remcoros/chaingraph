@@ -16,3 +16,7 @@ it('rejects aggregate wallet address history before schema parsing', () => {
     }),
   ).toThrow(`at most ${MAX_WALLET_HISTORY_ENTRIES.toLocaleString('en-US')} wallet address history`);
 });
+
+it('does not enumerate a malformed chain-data scalar before schema validation rejects it', () => {
+  expect(() => assertWorkspaceBudget({ chainData: 'not a chain-data record' })).not.toThrow();
+});
