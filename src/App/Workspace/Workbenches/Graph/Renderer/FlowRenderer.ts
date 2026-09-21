@@ -491,6 +491,8 @@ export class FlowRenderer implements GraphAdapter {
   restoreSnapshot(snapshot: GraphSnapshot) {
     const parsed = validateGraphSnapshot(snapshot);
     if (!parsed.success) return;
+    this.layouts.cancel();
+    this.pending = undefined;
     this.modes.clear();
     this.topology = '';
     this.dimensions = parsed.data.dimensions;

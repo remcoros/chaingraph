@@ -30,9 +30,15 @@ export function migrateTransactionPlacement(records: unknown): unknown {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return [id, value];
       const { confirmations, blockHeight, mempool, blockhash, blocktime, time, ...transaction } =
         value;
-      const status = statusFromPlacement(
-        placement.parse({ confirmations, blockHeight, mempool, blockhash, blocktime, time }),
-      );
+      const parsed = placement.safeParse({
+        confirmations,
+        blockHeight,
+        mempool,
+        blockhash,
+        blocktime,
+        time,
+      });
+      const status = parsed.success ? statusFromPlacement(parsed.data) : undefined;
       return [id, { ...transaction, ...(status ? { status } : {}) }];
     }),
   );

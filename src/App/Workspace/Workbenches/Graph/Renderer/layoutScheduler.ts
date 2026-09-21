@@ -64,7 +64,8 @@ export class LayoutScheduler {
     }
   }
 
-  private cancel() {
+  /** Discard an unfinished layout when the caller restores a different frame. */
+  cancel() {
     this.worker?.terminate();
     this.worker = undefined;
     this.revision = undefined;

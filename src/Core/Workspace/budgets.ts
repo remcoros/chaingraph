@@ -2,7 +2,7 @@ import { assertTagBudget } from './Annotations/annotations';
 import { assertConnectionScanBudget } from './ConnectionScan/records';
 import { assertGraphNodeBudget, assertHiddenNodeBudget } from './view';
 
-import { assertWalletReviewBudget } from './Wallets/wallets';
+import { assertWalletHistoryBudget, assertWalletReviewBudget } from './Wallets/wallets';
 
 const MAX_GRAPH_RECORDS = 50_000;
 
@@ -38,8 +38,14 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
     view?: { inputContext?: unknown };
   };
   // Budgets run before schema parsing, on the v5 groups, including invalid input.
+  const chainData =
+    document.chainData &&
+    typeof document.chainData === 'object' &&
+    !Array.isArray(document.chainData)
+      ? document.chainData
+      : {};
   const raw = {
-    ...document.chainData,
+    ...chainData,
     wallets: document.wallets?.definitions,
     walletReviews: document.wallets?.reviews,
     tags: document.annotations?.tags,
@@ -125,6 +131,7 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
     validateScanBytes,
   );
   assertTagBudget(raw.tags);
+  assertWalletHistoryBudget(raw.wallets);
   assertWalletReviewBudget(raw.walletReviews);
   const view = (data as { view?: unknown }).view;
   if (view && typeof view === 'object') {

@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 let openFocusTraps = 0;
+const openDialogs: symbol[] = [];
 
 /**
  * Whether a focus-trapping dialog is currently mounted. Callers that own global
@@ -23,9 +24,17 @@ export function useDialogFocus(
   trapFocus = true,
 ) {
   const ref = useRef<HTMLDivElement>(null);
+  const [dialog] = useState(Symbol('dialog'));
   // Capture the invoker before children mount and React applies autoFocus.
   const [previous] = useState(() => document.activeElement as HTMLElement | null);
   const requestClose = useEffectEvent(() => onClose());
+  useEffect(() => {
+    openDialogs.push(dialog);
+    return () => {
+      const index = openDialogs.lastIndexOf(dialog);
+      if (index >= 0) openDialogs.splice(index, 1);
+    };
+  }, [dialog]);
   useEffect(() => {
     if (!trapFocus) return;
     openFocusTraps += 1;
@@ -42,6 +51,7 @@ export function useDialogFocus(
       )?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (openDialogs.at(-1) !== dialog) return;
         e.preventDefault();
         requestClose();
       }
@@ -98,6 +108,6 @@ export function useDialogFocus(
           : null;
       target?.focus({ preventScroll: true });
     };
-  }, [previous, fallbackFocusSelector, trapFocus]);
+  }, [dialog, previous, fallbackFocusSelector, trapFocus]);
   return ref;
 }

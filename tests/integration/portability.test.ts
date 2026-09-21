@@ -54,7 +54,7 @@ it('rejects a tracked environment file without reading it, and never follows ext
   const result = check(directory);
   expect(result.status).toBe(1);
   expect(result.output).toContain('.env.audit: runtime environment file must not be tracked');
-  expect(result.output).toContain('external-link: absolute symlink target is machine-specific');
+  expect(result.output).toContain('external-link: symlink target escapes the repository');
   expect(result.output).not.toContain('NONPUBLIC_FIXTURE_VALUE');
   expect(result.output).not.toContain('EACCES');
 });
@@ -69,4 +69,14 @@ it('accepts portable references and public attribution while leaving untracked l
   await symlink('notes.md', join(directory, 'relative-link'));
   execFileSync('git', ['add', '--', 'relative-link'], { cwd: directory });
   expect(check(directory).status).toBe(0);
+});
+
+it('rejects a relative symlink whose target lexically escapes the repository', async () => {
+  const directory = await repository({ 'notes.md': 'Portable notes' });
+  await symlink('../home/fixture-account/config', join(directory, 'external-link'));
+  execFileSync('git', ['add', '--', 'external-link'], { cwd: directory });
+  const result = check(directory);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('external-link: symlink target escapes the repository');
+  expect(result.output).not.toContain('fixture-account');
 });

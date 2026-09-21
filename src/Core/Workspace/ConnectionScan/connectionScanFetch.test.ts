@@ -197,6 +197,22 @@ describe('connection scan fetch adapter', () => {
     });
     expect(s.transport.fetchHistory).not.toHaveBeenCalled();
   });
+  it('rejects contradictory history spenders instead of choosing one arbitrarily', async () => {
+    const s = setup([tx(1)]);
+    s.transport.fetchHistory.mockResolvedValue([
+      { tx_hash: id(2), height: 1 },
+      { tx_hash: id(3), height: 1 },
+    ]);
+    s.transport.fetchTransaction.mockImplementation(async (_network, txid) =>
+      txid === id(2) ? tx(2, 1) : tx(3, 1),
+    );
+
+    expect(await s.resolveNeighbors(`out:${id(1)}:0`, 'downstream', budget())).toEqual({
+      nodeIds: [],
+      stopReason: 'failure',
+      observation: { finding: 'conflicting-evidence' },
+    });
+  });
   it('gates indexed candidates before downloading', async () => {
     const s = setup([tx(1)]);
     s.transport.fetchIndexedSpenders.mockImplementation(

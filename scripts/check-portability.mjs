@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { lstat, readFile, readlink } from 'node:fs/promises';
-import { basename, isAbsolute } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 
 // Scan tracked files only. Never echo matched contents or open runtime environment files.
 const files = execFileSync('git', ['ls-files', '-z'], {
@@ -26,8 +26,13 @@ for (const file of files) {
   }
   if (info.isSymbolicLink()) {
     const target = await readlink(file);
-    if (isAbsolute(target) || /^[A-Za-z]:[\\/]/.test(target))
-      findings.push(`${file}: absolute symlink target is machine-specific`);
+    const resolvedTarget = resolve(dirname(file), target);
+    if (
+      isAbsolute(target) ||
+      /^[A-Za-z]:[\\/]/.test(target) ||
+      relative(process.cwd(), resolvedTarget).startsWith('..')
+    )
+      findings.push(`${file}: symlink target escapes the repository`);
     continue; // Inspect the link, never read a possibly private external target.
   }
   if (!info.isFile()) continue;

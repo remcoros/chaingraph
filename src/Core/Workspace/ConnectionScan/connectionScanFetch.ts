@@ -371,13 +371,16 @@ export function createConnectionScanFetch(
       const history = await historyFor(hash, budget);
       checkpoint(budget);
       const candidates = new Map(history.map((row) => [row.tx_hash, row.height]));
+      const matches: string[] = [];
       for (const id of [...candidates.keys()].sort()) {
         if (id === point.txid) continue;
         failureContext = 'transaction';
         const tx = await load(id, budget, candidates.get(id));
         if (tx?.vin.some((input) => input.txid === point.txid && input.vout === point.vout))
-          return { nodeIds: [`tx:${id}`] };
+          matches.push(id);
       }
+      if (matches.length > 1) return conflict();
+      if (matches.length) return { nodeIds: [`tx:${matches[0]}`] };
       return unknownSpend();
     } catch (error) {
       if (error instanceof ScanBudgetExceeded) throw error;

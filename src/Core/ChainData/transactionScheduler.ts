@@ -11,6 +11,24 @@ export const TRANSACTION_BATCH_CONCURRENCY = 4;
 const rank = { navigation: 0, visible: 1, background: 2 };
 const abortError = () => new DOMException('Transaction request cancelled.', 'AbortError');
 
+interface Consumer {
+  priority: FetchPriority;
+  resolve: (value: Transaction) => void;
+  reject: (reason: unknown) => void;
+  detach: () => void;
+}
+interface Job {
+  scope: TransactionFetchScope;
+  network: Network;
+  key: string;
+  observation?: object;
+  priority: FetchPriority;
+  state: 'queued' | 'active';
+  controller: AbortController;
+  consumers: Set<Consumer>;
+  load: (signal: AbortSignal) => Promise<Transaction>;
+}
+
 /** One unlocked session owns its in-flight transaction requests. */
 export class TransactionFetchScope {
   private readonly lifetime = new AbortController();
@@ -59,8 +77,17 @@ export class TransactionFetchScope {
     return before !== undefined && (after === undefined || after < before);
   }
   close() {
+    if (this.closed) return;
     this.closed = true;
     this.lifetime.abort();
+    for (const job of this.jobs) {
+      job.controller.abort();
+      for (const consumer of job.consumers) {
+        consumer.detach();
+        consumer.reject(abortError());
+      }
+      job.consumers.clear();
+    }
     this.jobs.clear();
   }
 }
@@ -70,24 +97,6 @@ export interface TransactionFetchHints {
   /** Unique per refresh operation. Never join a read that started before this observation. */
   observation?: object;
 }
-interface Consumer {
-  priority: FetchPriority;
-  resolve: (value: Transaction) => void;
-  reject: (reason: unknown) => void;
-  detach: () => void;
-}
-interface Job {
-  scope: TransactionFetchScope;
-  network: Network;
-  key: string;
-  observation?: object;
-  priority: FetchPriority;
-  state: 'queued' | 'active';
-  controller: AbortController;
-  consumers: Set<Consumer>;
-  load: (signal: AbortSignal) => Promise<Transaction>;
-}
-
 /** Transaction orchestration only. A job includes fallback/header RPCs, never nested scheduler work. */
 export class TransactionScheduler {
   private jobs = new Set<Job>();

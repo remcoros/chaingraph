@@ -236,6 +236,20 @@ describe('bounded transaction scheduler', () => {
     h.scheduler.dispose(second);
   });
 
+  it('rejects active and queued requests when its scope is closed directly', async () => {
+    const h = harness();
+    const pending = ['active', 'queued'].map((id) =>
+      h.request(id).catch((error: Error) => error.name),
+    );
+    await tick();
+    expect(h.calls).toHaveLength(2);
+    h.scope.close();
+    expect(await Promise.all(pending)).toEqual(['AbortError', 'AbortError']);
+    expect(h.calls.every((call) => call.signal.aborted)).toBe(true);
+    expect(h.scope.jobs.size).toBe(0);
+    h.calls.forEach((call) => call.resolve(tx));
+  });
+
   it('does not cache resolved results or retain completed jobs', async () => {
     const h = harness();
     for (let i = 0; i < 35; i++) {
