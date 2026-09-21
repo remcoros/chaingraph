@@ -26,9 +26,13 @@ if (!changelog.includes(`## [${pkg.version}]`)) {
 }
 for (const file of [
   'Dockerfile',
+  'docker-bake.hcl',
   '.dockerignore',
+  '.github/workflows/release.yml',
   'compose.yaml',
+  'REPRODUCIBILITY.md',
   'docs/deployment.md',
+  'docs/release-process.md',
   'LICENSE',
 ]) {
   await readFile(file);

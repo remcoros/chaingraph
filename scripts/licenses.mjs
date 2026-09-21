@@ -1,10 +1,14 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+
+const lexicalCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
 const sections = [
   '# Third-party notices\n\nChaingraph application code is MIT-licensed. The following notices belong to installed runtime dependencies and locally served fonts. Generated with `npm run licenses` from the lockfile and installed package license files. Research-only projects are not included because their source is not shipped.\n',
 ];
-for (const [folder, pkg] of Object.entries(lock.packages).sort(([a], [b]) => a.localeCompare(b))) {
+for (const [folder, pkg] of Object.entries(lock.packages).sort(([a], [b]) =>
+  lexicalCompare(a, b),
+)) {
   if (!folder || pkg.dev) continue;
   let names;
   try {
@@ -12,7 +16,9 @@ for (const [folder, pkg] of Object.entries(lock.packages).sort(([a], [b]) => a.l
   } catch {
     continue;
   }
-  const files = names.filter((n) => /^(licen[sc]e|copying|ofl)(\.|$)/i.test(n));
+  const files = names
+    .filter((n) => /^(licen[sc]e|copying|ofl)(\.|$)/i.test(n))
+    .sort(lexicalCompare);
   if (!files.length) continue;
   sections.push(
     `## ${folder.replace(/^node_modules\//, '')} ${pkg.version}\n\nDeclared license: ${pkg.license ?? 'see notice below'}\n`,

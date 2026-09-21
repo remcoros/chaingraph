@@ -19,6 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/release-check.mjs
+      - run: docker buildx bake --check release-platform
       - run: npm run check
       - name: Verify runtime license notices
         run: npm run licenses && git diff --exit-code -- THIRD_PARTY_NOTICES.md

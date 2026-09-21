@@ -18,7 +18,7 @@
 !public/
 !public/**
 !scripts/
-!scripts/licenses.mjs
+!scripts/check-react-compiler.mjs
 **/.env
 **/.env.*
 **/*.pem
