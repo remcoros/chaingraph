@@ -33,6 +33,7 @@ bundle verified real-chain snapshots.
 npm run format:check          # Prettier
 npm run check                 # formatting, portability, linting, build and domain/integration tests
 node scripts/release-check.mjs
+docker buildx bake --check release-platform
 ```
 
 Routine push/PR CI runs exactly these plus a license-notice diff, without a
@@ -112,7 +113,7 @@ clicks and scrolling, not just green assertions.
 
 Keep alternative designs in separate branches and compare working previews
 before adopting a redesign. Do not push or publish because a local check
-passed; the [release process](docs/deployment.md#release-process) describes the
+passed; the [release process](docs/release-process.md) describes the
 tag workflow.
 
 ## Layer boundaries

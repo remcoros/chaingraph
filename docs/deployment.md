@@ -88,7 +88,7 @@ docker compose --env-file /dev/null logs --tail 50
 docker compose --env-file /dev/null down
 ```
 
-If you chose `CHAINGRAPH_CONFIG_DIR`, export it in the shell used for each Compose command. The runtime uses Node 24, UID/GID 1000, system CA certificates, a read-only filesystem, a bounded temporary directory and no Linux capabilities. The image contains compiled browser assets and a bundled server, without development dependencies. Its health check verifies that the UI is served; upstream readiness is reported separately. An unavailable configured upstream does not prevent opening saved workspaces or creating workspaces from bundled examples. Live lookups require the matching upstream to be available.
+If you chose `CHAINGRAPH_CONFIG_DIR`, export it in the shell used for each Compose command. The runtime uses Node 24, UID/GID 1000, Node's bundled public CA roots, a read-only filesystem, a bounded temporary directory and no Linux capabilities. The image contains compiled browser assets and a bundled server, without development dependencies. Its health check verifies that the UI is served; upstream readiness is reported separately. An unavailable configured upstream does not prevent opening saved workspaces or creating workspaces from bundled examples. Live lookups require the matching upstream to be available.
 
 For cookie authentication, remove both RPC user/password settings from that network's file and set `BITCOIN_RPC_COOKIE_FILE` to a read-only bind-mounted cookie path. Mount the containing directory when Bitcoin rotates the cookie by replacement. Give each pair its own path if both use cookies. Ensure UID 1000 can read it; do not broaden permissions to world-readable.
 
@@ -111,39 +111,21 @@ Shared server settings come from the process environment, separately from networ
 
 For example, `SERVER_PORT=4300 CHAINGRAPH_NETWORK_CONFIG_DIR=./config npm start` serves a built native application using that dedicated directory. The dev launcher adds its loopback frontend origin and keeps upstream settings out of Vite's environment.
 
-## Release process
+## Use a verified public release
 
-`package.json` is the version authority; keep both package-lock version fields and the changelog in sync. Check locally before creating a tag (replace the version):
+A public Chaingraph release has a PGP-signed `vX.Y.Z` source tag and two GitHub
+Release assets named `chaingraph-vX.Y.Z.release.json` and
+`chaingraph-vX.Y.Z.release.json.asc`. The signed JSON mapping is the canonical
+link from the source tag and commit to the immutable OCI index and its explicit
+`linux/amd64` and `linux/arm64` image manifests. Mutable GHCR tags and GitHub
+OIDC provenance are supplementary.
 
-```sh
-node scripts/release-check.mjs --tag v0.1.0
-npm ci
-npm run check
-docker build --load -t chaingraph:0.1.0 .
-```
-
-When a matching `vX.Y.Z` tag is pushed to GitHub, `.github/workflows/release.yml` validates the version, runs non-browser checks and the narrow production runtime check against the container, then publishes `ghcr.io/remcoros/chaingraph` for linux/amd64 and linux/arm64. Stable releases receive full version, minor and latest tags; prereleases receive their prerelease version. The workflow attaches OCI metadata, provenance and an SBOM. After publication, a separate job creates a GitHub Release with the matching changelog entry and immutable image digest. Reruns preserve an existing Release and any edited notes. Only that final job receives repository contents write permission. Check package visibility in GitHub before expecting unauthenticated pulls.
-
-Routine push/PR checks launch no browser. The release workflow installs Chromium only for `npm run test:production`; it does not run the full E2E suite. That command first runs `npm run test:production:http` for built assets, production CSP/security headers and configured-network discovery, then checks real bundled encryption-worker execution under CSP, WebGL context initialization, and encrypted workspace save, reload/unlock and export. The container check uses public synthetic network configuration and mocked browser upstream responses. It does not establish live upstream health, full worker coverage, panel usability or mobile behavior.
-
-To run the HTTP portion locally against an already running built app or container:
-
-```sh
-CHAINGRAPH_SMOKE_URL=http://127.0.0.1:3000 npm run test:production:http
-```
-
-When the production browser runtime check is part of the agreed validation scope, install Chromium and run the combined command against that same server:
-
-```sh
-npx playwright install chromium
-CHAINGRAPH_SMOKE_URL=http://127.0.0.1:3000 npm run test:production
-```
-
-Use the manual **Browser QA** workflow for a production runtime check (default) or the small E2E smoke suite. It has no push, PR or scheduled trigger and cannot publish a release. Broader navigation, copy, layout and responsive review belongs in separately scoped exploratory QA. The E2E suite is a minimal smoke check, not a full-suite release gate. Run browser checks serially within each checkout. Failure diagnostics stay under `artifacts/` and are retained by the browser/release workflows for seven days. Passing non-browser checks does not establish visual usability.
-
-Supply `CHAINGRAPH_SOURCE_URL=https://github.com/remcoros/chaingraph` as a public build argument to include the project's GitHub link in the UI; the release workflow supplies the repository automatically. `VCS_REF` records the source commit in image metadata. Credentials must only be provided at runtime, never as build arguments, because build provenance may expose build arguments.
-
-After a release exists, set `CHAINGRAPH_IMAGE` to its GHCR tag or preferably its verified digest. Keep the same `CHAINGRAPH_CONFIG_DIR`, then pull and start it:
+Follow the concise [release validation steps](../README.md#validating-a-release)
+before using the mapping's digest. Advanced users can
+[rebuild and compare a native OCI descriptor](../REPRODUCIBILITY.md). For normal
+deployment, set `CHAINGRAPH_IMAGE` to the verified
+`image.name@image.indexDigest` reference from the signed mapping. Keep the same
+`CHAINGRAPH_CONFIG_DIR`, then pull and start it:
 
 ```sh
 # CHAINGRAPH_IMAGE and any CHAINGRAPH_CONFIG_DIR override are exported in this shell.
@@ -151,6 +133,4 @@ docker compose --env-file /dev/null pull chaingraph
 docker compose --env-file /dev/null up -d --no-build --wait
 ```
 
-Pulling matters when a tag already exists in the local image cache. Preserve browser exports before upgrades. Rollback selects and pulls the previous image; future workspace format changes may require restoring a compatible encrypted export. No backend database migration or Docker volume backup is needed. The Compose default runtime configuration directory is `./config`; select another directory explicitly with `CHAINGRAPH_CONFIG_DIR`.
-
-Local image checks do not prove a future GitHub publication or native ARM behavior. Record those separately when the actual tag is published and the ARM image is exercised.
+Pulling matters when a tag already exists in the local image cache. Preserve browser exports before upgrades. Rollback selects and pulls a previous verified digest; future workspace format changes may require restoring a compatible encrypted export. No backend database migration or Docker volume backup is needed. The Compose default runtime configuration directory is `./config`; select another directory explicitly with `CHAINGRAPH_CONFIG_DIR`.

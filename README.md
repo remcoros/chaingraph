@@ -90,6 +90,67 @@ read-only filesystem, and Compose publishes the port on loopback only. HTTPS,
 private certificate authorities, cookie authentication and upgrades are covered
 in the [deployment guide](docs/deployment.md).
 
+### Validating a release
+
+Each public container release has a signed source tag and a signed mapping that
+names its exact immutable image digest. Do not install from a mutable image tag.
+
+#### 1. Import the release key once
+
+If you have already imported and checked this key, skip to step 2. Otherwise,
+download the Chaingraph public key and inspect it:
+
+```sh
+curl -fsSLo chaingraph-release-key.asc https://github.com/remcoros.gpg
+gpg --show-keys --keyid-format long --with-fingerprint chaingraph-release-key.asc
+```
+
+It must show this primary fingerprint:
+
+```text
+pub   ed25519/2F5B10B929CAC959 2024-10-28 [SC]
+      Key fingerprint = 9D1B D304 339B 2D31 CFA5  637A 2F5B 10B9 29CA C959
+uid                            Remco Ros (github.com/remcoros) <remcoros@live.nl>
+```
+
+Compare that fingerprint with a copy you trust. Only if it matches, import the
+key:
+
+```sh
+gpg --import chaingraph-release-key.asc
+```
+
+#### 2. Verify a release
+
+Verify both the source tag and the release mapping:
+
+```sh
+TAG=v0.1.0
+git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+git verify-tag "$TAG"
+ASSET="chaingraph-$TAG.release.json"
+BASE_URL="https://github.com/remcoros/chaingraph/releases/download/$TAG"
+curl -fsSLO "$BASE_URL/$ASSET" "$BASE_URL/$ASSET.asc"
+gpg --verify "$ASSET.asc" "$ASSET"
+```
+
+Both checks should include output like this. The date and timezone will differ:
+
+```text
+gpg: Signature made ...
+gpg:                using EDDSA key 9D1BD304339B2D31CFA5637A2F5B10B929CAC959
+gpg: Good signature from "Remco Ros (github.com/remcoros) <remcoros@live.nl>" [unknown]
+Primary key fingerprint: 9D1B D304 339B 2D31 CFA5  637A 2F5B 10B9 29CA C959
+```
+
+GnuPG may warn that the key is not certified with a trusted signature. That
+means you have not marked it trusted locally; still require the fingerprint
+above. Confirm that the mapping's source commit equals
+`git rev-parse "$TAG^{commit}"`, then deploy `image.name@image.indexDigest` from
+the mapping as `CHAINGRAPH_IMAGE`. The [deployment guide](docs/deployment.md)
+covers that path. Advanced users can
+[rebuild and compare a native OCI descriptor](REPRODUCIBILITY.md).
+
 ## Using Chaingraph
 
 The [user guide](docs/user-guide.md) walks through workspaces, wallets, the
@@ -143,7 +204,9 @@ formats, migration and storage.
 The source map below identifies each concept and its tests.
 
 - [User guide](docs/user-guide.md)
-- [Deployment and releases](docs/deployment.md)
+- [Self-hosted deployment](docs/deployment.md)
+- [Container release reproduction](REPRODUCIBILITY.md)
+- [Container release process](docs/release-process.md)
 - [Architecture](docs/architecture.md)
 - [Source map](docs/source-map.md)
 - [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md)
