@@ -240,7 +240,7 @@ a {
 }
 .selection-facts dt {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--color-muted);
 }
 .selection-facts dd {
   margin: 0;
@@ -260,7 +260,7 @@ a {
   min-width: 0;
 }
 .selection-observation-time {
-  color: var(--muted);
+  color: var(--color-muted);
   font-size: 10px;
 }
 .selection-facts code {
@@ -375,11 +375,11 @@ a {
   justify-content: space-between;
   gap: 16px;
   padding: 9px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-rule);
   font-size: 12px;
 }
 .network-connection-row span {
-  color: var(--muted);
+  color: var(--color-muted);
   text-align: right;
 }
 

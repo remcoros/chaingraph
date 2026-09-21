@@ -5,11 +5,10 @@
   height: auto;
   gap: 0 4px;
 }
-.right-panel .has-wallet-tabs > button:not(.panel-collapse-toggle) {
+.right-panel .has-wallet-tabs > .wallet-panel-tab {
   grid-column: span 2;
 }
-.right-panel .has-wallet-tabs > button:nth-child(2),
-.right-panel .has-wallet-tabs > button:nth-child(3) {
+.right-panel .has-wallet-tabs > .wallet-panel-tab-wide {
   grid-column: span 3;
 }
 .wallet-records {

@@ -1,6 +1,7 @@
 .anchored-popover-backdrop {
   position: fixed;
   inset: 0;
+  /* Stay below the global skip link so keyboard users can reach main content. */
   z-index: 130;
 }
 .anchored-popover {

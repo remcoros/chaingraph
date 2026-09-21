@@ -983,6 +983,10 @@
   justify-content: flex-start;
   flex-shrink: 0;
 }
+.transaction-row-content:hover .transaction-row-tools,
+.transaction-row-content:focus-within .transaction-row-tools {
+  display: flex;
+}
 .transaction-row-tools .transaction-row-edit {
   margin-top: auto;
 }
@@ -1190,8 +1194,6 @@
 .transaction-row-main .entity-hidden-badge {
   font-size: 9px;
 }
-.transaction-row-main > span,
-.transaction-row-main strong,
 .flow-panel {
   font-size: 12px;
 }

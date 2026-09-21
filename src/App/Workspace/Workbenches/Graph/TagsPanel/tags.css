@@ -78,10 +78,13 @@
   margin-top: var(--space-sm);
 }
 .tag-card-actions > button,
-.tags-panel .tag-form-actions > button:not(.text-button),
-.tag-pagination > button {
+.tags-panel .tag-form-actions > button:not(.text-button) {
   flex: 1 1 0;
   min-width: max-content;
+}
+.tag-pagination > button {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .tag-form {
   display: grid;
