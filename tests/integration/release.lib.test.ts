@@ -50,8 +50,8 @@ describe('release library', () => {
             const invocation = [command, ...args].join(' ');
             if (invocation === 'git rev-parse --show-toplevel') return response(directory);
             if (
-              invocation === 'git remote get-url origin' ||
-              invocation === 'git remote get-url --push origin'
+              invocation === 'git remote get-url --all origin' ||
+              invocation === 'git remote get-url --push --all origin'
             ) {
               return response('https://github.com/remcoros/chaingraph.git\n');
             }
@@ -74,6 +74,42 @@ describe('release library', () => {
         },
       }),
     ).rejects.toThrow('GitHub default branch main must be protected.');
+  });
+
+  it.each([
+    {
+      fetchUrls: 'https://evilgithub.com/remcoros/chaingraph.git\n',
+      name: 'a lookalike fetch host',
+      pushUrls: 'https://github.com/remcoros/chaingraph.git\n',
+    },
+    {
+      fetchUrls: 'https://github.com/remcoros/chaingraph.git\n',
+      name: 'an additional push destination',
+      pushUrls:
+        'git@github.com:remcoros/chaingraph.git\ngit@evilgithub.com:remcoros/chaingraph.git\n',
+    },
+  ])('refuses $name on origin', async ({ fetchUrls, pushUrls }) => {
+    const directory = '/synthetic/chaingraph';
+    const response = (stdout = '', status = 0, stderr = '') => ({ stderr, status, stdout });
+
+    await expect(
+      runReleaseCli(['0.2.0', '--dry-run'], {
+        cwd: directory,
+        runner: {
+          run(command: string, args: string[]) {
+            const invocation = [command, ...args].join(' ');
+            if (invocation === 'git rev-parse --show-toplevel') return response(directory);
+            if (invocation === 'git remote get-url --all origin') return response(fetchUrls);
+            if (invocation === 'git remote get-url --push --all origin') {
+              return response(pushUrls);
+            }
+            throw new Error(`Unexpected command: ${invocation}`);
+          },
+        },
+      }),
+    ).rejects.toThrow(
+      'Every Git remote origin URL must target github.com/remcoros/chaingraph for fetch and push.',
+    );
   });
 
   it('accepts stable and prerelease versions without build metadata', () => {
@@ -294,8 +330,8 @@ describe('release library', () => {
             commands.push(invocation);
             if (invocation === 'git rev-parse --show-toplevel') return response(directory);
             if (
-              invocation === 'git remote get-url origin' ||
-              invocation === 'git remote get-url --push origin'
+              invocation === 'git remote get-url --all origin' ||
+              invocation === 'git remote get-url --push --all origin'
             ) {
               return response('git@github.com:remcoros/chaingraph.git\n');
             }
@@ -379,8 +415,8 @@ describe('release library', () => {
             commands.push(invocation);
             if (invocation === 'git rev-parse --show-toplevel') return response(directory);
             if (
-              invocation === 'git remote get-url origin' ||
-              invocation === 'git remote get-url --push origin'
+              invocation === 'git remote get-url --all origin' ||
+              invocation === 'git remote get-url --push --all origin'
             ) {
               return response('https://github.com/remcoros/chaingraph.git\n');
             }

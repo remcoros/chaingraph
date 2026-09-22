@@ -27,6 +27,8 @@ export const RELEASE_CONFIG = Object.freeze({
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
+const CANONICAL_ORIGIN =
+  /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)remcoros\/chaingraph(?:\.git)?\/?$/i;
 
 export const RELEASE_HELP = `Usage:
   npm run release -- <X.Y.Z> [--dry-run] [--json]
@@ -319,16 +321,21 @@ function assertClean(runtime) {
 
 function assertCanonicalOrigin(runtime) {
   for (const args of [
-    ['remote', 'get-url', 'origin'],
-    ['remote', 'get-url', '--push', 'origin'],
+    ['remote', 'get-url', '--all', 'origin'],
+    ['remote', 'get-url', '--push', '--all', 'origin'],
   ]) {
     const result = run(runtime, 'git', args, { allowFailure: true });
+    const urls = result.stdout
+      .split('\n')
+      .map((url) => url.trim())
+      .filter(Boolean);
     if (
       result.status !== 0 ||
-      !/github\.com[/:]remcoros\/chaingraph(?:\.git)?\/?$/i.test(result.stdout.trim())
+      urls.length === 0 ||
+      urls.some((url) => !CANONICAL_ORIGIN.test(url))
     ) {
       throw new Error(
-        'Git remote origin must exist and target github.com/remcoros/chaingraph for fetch and push.',
+        'Every Git remote origin URL must target github.com/remcoros/chaingraph for fetch and push.',
       );
     }
   }
