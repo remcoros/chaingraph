@@ -8,13 +8,18 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 > Chaingraph is not a custodial wallet or a public service. It never touches private keys, cannot sign or spend, and does not identify people.
 
+<p float="left" align="middle">
+<img src="docs/screenshots/readme-frontpage.png" width="99%" />
+<img src="docs/screenshots/readme-graph.png" width="49%" />
+<img src="docs/screenshots/readme-wallet.png" width="49%" />
+</p>
+
 ## What you can do
 
 - **Explore transactions.** Look up a transaction, address or output in a
   chronologically ordered 3D or flat graph. Filter the view, follow funding and
   spending links, compact repeated outputs between the same visible transaction
   pair, and inspect bounded address history.
-  <img src="docs/screenshots/readme-graph.png" />
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level
   extended public key. Chaingraph derives addresses in the browser, scans their
@@ -23,7 +28,6 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
   address UTXO checks are saved inside the encrypted workspace with their dates
   and coverage; refresh them explicitly after reopening when you need a new
   observation.
-  <img src="docs/screenshots/readme-wallet.png" />
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
   outputs and addresses. Undo and redo edits without rolling back accepted chain
@@ -44,7 +48,7 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 ## Requirements
 
-- A Bitcoin Core node and an Electrum server (Fulcrum is what Chaingraph is
+- A **Bitcoin Core** node and an **Electrum server** (Fulcrum is what Chaingraph is
   tested with) for mainnet, testnet4, or both. Each network uses its own pair.
 - Node.js 24 or newer for a native install, or Docker with Compose v2.
 - A modern browser with WebGL. Encrypted workspaces need a secure context, so
@@ -56,7 +60,7 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 ```sh
 npm ci
-cp -n .env.example .env.testnet4     # or .env.mainnet, or both
+cp -n .env.example .env.testnet4  # or .env.mainnet, or both
 chmod 600 .env.testnet4
 # Edit the file with your Bitcoin Core RPC and Electrum connection details.
 npm run dev
@@ -71,7 +75,7 @@ For a production build served from one origin:
 
 ```sh
 npm run build
-npm start                            # http://127.0.0.1:3000, or SERVER_PORT
+npm start      # http://127.0.0.1:3000, or SERVER_PORT
 ```
 
 ### Run with Docker
@@ -110,7 +114,7 @@ It must show this primary fingerprint:
 ```text
 pub   ed25519/2F5B10B929CAC959 2024-10-28 [SC]
       Key fingerprint = 9D1B D304 339B 2D31 CFA5  637A 2F5B 10B9 29CA C959
-uid                            Remco Ros (github.com/remcoros) <remcoros@live.nl>
+uid                     Remco Ros (github.com/remcoros) <remcoros@live.nl>
 ```
 
 Compare that fingerprint with a copy you trust. Only if it matches, import the
