@@ -762,6 +762,15 @@ function verifyTagSignature(runtime, tag) {
   }
 }
 
+function verifyRemoteTagMatchesLocal(runtime, tag) {
+  const ref = `refs/tags/${tag}`;
+  const remoteOid = remoteRefOid(runtime, ref);
+  const localOid = output(runtime, 'git', ['rev-parse', ref]);
+  if (!remoteOid || remoteOid !== localOid) {
+    throw new Error('The remote release tag does not match the verified local tag object.');
+  }
+}
+
 async function createOrPushTag(runtime, options, reporter, commit) {
   const localTag = gitRefExists(runtime, `refs/tags/${options.tag}`);
   const remoteTag = remoteTagExists(runtime, options.tag);
@@ -773,7 +782,10 @@ async function createOrPushTag(runtime, options, reporter, commit) {
     const taggedCommit = output(runtime, 'git', ['rev-parse', `${options.tag}^{commit}`]);
     if (taggedCommit !== commit)
       throw new Error('The existing release tag targets another commit.');
-    if (remoteTag) return true;
+    if (remoteTag) {
+      verifyRemoteTagMatchesLocal(runtime, options.tag);
+      return true;
+    }
   }
 
   reporter.add(
@@ -808,6 +820,7 @@ async function createOrPushTag(runtime, options, reporter, commit) {
   run(runtime, 'git', ['push', 'origin', `refs/tags/${options.tag}`], {
     inherit: !options.json,
   });
+  verifyRemoteTagMatchesLocal(runtime, options.tag);
   return true;
 }
 
@@ -1099,6 +1112,7 @@ async function resumeRelease(runtime, options, reporter, repository, pull) {
     if (pull.mergeCommit?.oid !== commit) {
       throw new Error('The release tag does not target the release PR merge commit.');
     }
+    verifyRemoteTagMatchesLocal(runtime, options.tag);
     warnStaleDate(runtime, reporter, validatePreparedCommit(runtime, options, commit));
     const status = await finishRelease(runtime, options, reporter, commit);
     const result = reporter.finish(status, {

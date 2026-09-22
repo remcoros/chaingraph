@@ -435,6 +435,93 @@ describe('release library', () => {
     }
   });
 
+  it('refuses a remote tag object that differs from the verified local tag', async () => {
+    const directory = '/synthetic/chaingraph';
+    const pullHead = '2'.repeat(40);
+    const mergeCommit = '3'.repeat(40);
+    const localTagOid = '4'.repeat(40);
+    const remoteTagOid = '5'.repeat(40);
+    const branch = 'release/v0.2.0';
+    const changelog =
+      '# Changelog\n\n## [Unreleased]\n\n## [0.2.0] - 2026-09-22\n\nRelease notes.\n';
+    const response = (stdout = '', status = 0, stderr = '') => ({ stderr, status, stdout });
+
+    await expect(
+      runReleaseCli(['0.2.0', '--dry-run'], {
+        cwd: directory,
+        isTTY: false,
+        runner: {
+          run(command: string, args: string[]) {
+            const invocation = [command, ...args].join(' ');
+            if (invocation === 'git rev-parse --show-toplevel') return response(directory);
+            if (
+              invocation === 'git remote get-url --all origin' ||
+              invocation === 'git remote get-url --push --all origin'
+            ) {
+              return response('https://github.com/remcoros/chaingraph.git\n');
+            }
+            if (
+              invocation ===
+              'gh repo view remcoros/chaingraph --json nameWithOwner,defaultBranchRef'
+            ) {
+              return response(
+                JSON.stringify({
+                  defaultBranchRef: { name: 'main' },
+                  nameWithOwner: RELEASE_CONFIG.repository,
+                }),
+              );
+            }
+            if (invocation === 'gh api repos/remcoros/chaingraph/branches/main --method GET') {
+              return response(JSON.stringify({ protected: true }));
+            }
+            if (invocation.startsWith('gh pr list ')) {
+              return response(
+                JSON.stringify([
+                  {
+                    baseRefName: 'main',
+                    headRefName: branch,
+                    headRefOid: pullHead,
+                    isDraft: false,
+                    mergeCommit: { oid: mergeCommit },
+                    mergedAt: '2026-09-22T10:00:00Z',
+                    number: 42,
+                    state: 'MERGED',
+                    url: 'https://github.com/remcoros/chaingraph/pull/42',
+                  },
+                ]),
+              );
+            }
+            if (invocation === 'gh pr diff 42 --name-only --repo remcoros/chaingraph') {
+              return response('CHANGELOG.md\npackage.json\npackage-lock.json\n');
+            }
+            if (invocation === `git show ${pullHead}:package.json`) {
+              return response(JSON.stringify({ version: '0.2.0' }));
+            }
+            if (invocation === `git show ${pullHead}:package-lock.json`) {
+              return response(
+                JSON.stringify({ packages: { '': { version: '0.2.0' } }, version: '0.2.0' }),
+              );
+            }
+            if (invocation === `git show ${pullHead}:CHANGELOG.md`) return response(changelog);
+            if (invocation === 'git show-ref --verify --quiet refs/tags/v0.2.0') {
+              return response();
+            }
+            if (invocation === 'git ls-remote origin refs/tags/v0.2.0') {
+              return response(`${remoteTagOid}\trefs/tags/v0.2.0\n`);
+            }
+            if (invocation === 'git verify-tag --raw v0.2.0') {
+              return response(`[GNUPG:] VALIDSIG ${RELEASE_CONFIG.signingFingerprint}\n`);
+            }
+            if (invocation === 'git rev-parse v0.2.0^{commit}') return response(mergeCommit);
+            if (invocation === 'git rev-parse refs/tags/v0.2.0') return response(localTagOid);
+            throw new Error(`Unexpected command: ${invocation}`);
+          },
+        },
+        write: () => {},
+      }),
+    ).rejects.toThrow('The remote release tag does not match the verified local tag object.');
+  });
+
   it('keeps preparation dry-runs read-only through the command seam', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'chaingraph-release-test-'));
     const commands: string[] = [];
