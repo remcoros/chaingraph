@@ -26,6 +26,8 @@ jobs:
         name: Verify signed source tag
         shell: bash
         env:
+          # Keep this in sync with README.md. Key rotation is a reviewed source change.
+          RELEASE_PRIMARY_FINGERPRINT: 9D1BD304339B2D31CFA5637A2F5B10B929CAC959
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -37,7 +39,30 @@ jobs:
             "https://github.com/${GITHUB_REPOSITORY_OWNER}.gpg" \
             --output "$RUNNER_TEMP/release-owner-keys.asc"
           gpg --batch --homedir "$key_home" --import "$RUNNER_TEMP/release-owner-keys.asc"
-          GNUPGHOME="$key_home" git verify-tag "$RELEASE_TAG"
+          mapfile -t primary_fingerprints < <(
+            gpg --batch --homedir "$key_home" --with-colons --fingerprint |
+              awk -F: '$1 == "pub" { want_fingerprint = 1; next }
+                want_fingerprint && $1 == "fpr" { print $10; want_fingerprint = 0 }'
+          )
+          if [ "${#primary_fingerprints[@]}" -ne 1 ] ||
+            [ "${primary_fingerprints[0]:-}" != "$RELEASE_PRIMARY_FINGERPRINT" ]; then
+            echo "The repository owner key set does not match the pinned release key." >&2
+            exit 1
+          fi
+          if ! verification=$(GNUPGHOME="$key_home" git verify-tag --raw "$RELEASE_TAG" 2>&1); then
+            printf '%s\n' "$verification" >&2
+            exit 1
+          fi
+          printf '%s\n' "$verification"
+          mapfile -t valid_primary_fingerprints < <(
+            awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print (NF >= 12 ? $12 : $3) }' \
+              <<< "$verification"
+          )
+          if [ "${#valid_primary_fingerprints[@]}" -ne 1 ] ||
+            [ "${valid_primary_fingerprints[0]:-}" != "$RELEASE_PRIMARY_FINGERPRINT" ]; then
+            echo "The tag signature does not match the pinned release key." >&2
+            exit 1
+          fi
           commit=$(git rev-parse "$RELEASE_TAG^{commit}")
           test "$(git rev-parse HEAD)" = "$commit"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
