@@ -2,7 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
-const source = process.env.CHAINGRAPH_SOURCE_URL ?? '';
+const defaultSource = 'https://github.com/remcoros/chaingraph';
+const source = process.env.CHAINGRAPH_SOURCE_URL ?? defaultSource;
 if (source && !/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/.test(source))
   throw new Error('CHAINGRAPH_SOURCE_URL must be an HTTPS GitHub repository URL.');
 export default defineConfig({

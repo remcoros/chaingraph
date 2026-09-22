@@ -13,14 +13,14 @@ COPY server ./server
 COPY public ./public
 COPY scripts/check-react-compiler.mjs ./scripts/
 # Public repository metadata only. Never pass credentials as build arguments.
-ARG CHAINGRAPH_SOURCE_URL=""
+ARG CHAINGRAPH_SOURCE_URL="https://github.com/remcoros/chaingraph"
 RUN CHAINGRAPH_SOURCE_URL="$CHAINGRAPH_SOURCE_URL" npm run build \
     && npm exec --no -- esbuild server/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=build/server.cjs
 
 FROM node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS runtime
 WORKDIR /app
 ENV NODE_ENV=production SERVER_HOST=0.0.0.0 SERVER_PORT=3000 CHAINGRAPH_NETWORK_CONFIG_DIR=/run/chaingraph
-ARG CHAINGRAPH_SOURCE_URL=""
+ARG CHAINGRAPH_SOURCE_URL="https://github.com/remcoros/chaingraph"
 ARG VCS_REF=""
 LABEL org.opencontainers.image.title="Chaingraph" \
       org.opencontainers.image.description="Self-hosted Bitcoin wallet and chain analysis workbench" \
