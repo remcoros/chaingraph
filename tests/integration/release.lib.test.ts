@@ -306,6 +306,135 @@ describe('release library', () => {
     expect(events.join('\n')).toContain('Press Ctrl+C to stop watching');
   });
 
+  it('requires a default-branch push check before tagging', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'chaingraph-release-check-test-'));
+    const pullHead = '2'.repeat(40);
+    const mergeCommit = '3'.repeat(40);
+    const branch = 'release/v0.2.0';
+    const changelog =
+      '# Changelog\n\n## [Unreleased]\n\n## [0.2.0] - 2026-09-22\n\nRelease notes.\n';
+    const response = (stdout = '', status = 0, stderr = '') => ({ stderr, status, stdout });
+    try {
+      await Promise.all([
+        writeFile(join(directory, 'package.json'), JSON.stringify({ version: '0.2.0' })),
+        writeFile(
+          join(directory, 'package-lock.json'),
+          JSON.stringify({ packages: { '': { version: '0.2.0' } }, version: '0.2.0' }),
+        ),
+        writeFile(join(directory, 'CHANGELOG.md'), changelog),
+      ]);
+
+      await expect(
+        runReleaseCli(['0.2.0', '--dry-run'], {
+          cwd: directory,
+          isTTY: false,
+          now: () => new Date('2026-09-22T12:00:00.000Z'),
+          runner: {
+            run(command: string, args: string[]) {
+              const invocation = [command, ...args].join(' ');
+              if (invocation === 'git rev-parse --show-toplevel') return response(directory);
+              if (
+                invocation === 'git remote get-url --all origin' ||
+                invocation === 'git remote get-url --push --all origin'
+              ) {
+                return response('https://github.com/remcoros/chaingraph.git\n');
+              }
+              if (
+                invocation ===
+                'gh repo view remcoros/chaingraph --json nameWithOwner,defaultBranchRef'
+              ) {
+                return response(
+                  JSON.stringify({
+                    defaultBranchRef: { name: 'main' },
+                    nameWithOwner: RELEASE_CONFIG.repository,
+                  }),
+                );
+              }
+              if (invocation === 'gh api repos/remcoros/chaingraph/branches/main --method GET') {
+                return response(JSON.stringify({ protected: true }));
+              }
+              if (invocation.startsWith('gh pr list ')) {
+                return response(
+                  JSON.stringify([
+                    {
+                      baseRefName: 'main',
+                      headRefName: branch,
+                      headRefOid: pullHead,
+                      isDraft: false,
+                      mergeCommit: { oid: mergeCommit },
+                      mergedAt: '2026-09-22T10:00:00Z',
+                      number: 42,
+                      state: 'MERGED',
+                      url: 'https://github.com/remcoros/chaingraph/pull/42',
+                    },
+                  ]),
+                );
+              }
+              if (invocation === 'gh pr diff 42 --name-only --repo remcoros/chaingraph') {
+                return response('CHANGELOG.md\npackage.json\npackage-lock.json\n');
+              }
+              if (invocation === `git show ${pullHead}:package.json`) {
+                return response(JSON.stringify({ version: '0.2.0' }));
+              }
+              if (invocation === `git show ${pullHead}:package-lock.json`) {
+                return response(
+                  JSON.stringify({ packages: { '': { version: '0.2.0' } }, version: '0.2.0' }),
+                );
+              }
+              if (invocation === `git show ${pullHead}:CHANGELOG.md`) return response(changelog);
+              if (invocation === 'git show-ref --verify --quiet refs/tags/v0.2.0') {
+                return response('', 1);
+              }
+              if (invocation === 'git ls-remote origin refs/tags/v0.2.0') return response();
+              if (invocation === 'git branch --show-current') return response('main');
+              if (invocation === 'git status --porcelain=v1 --untracked-files=all') {
+                return response();
+              }
+              if (invocation === 'git rev-parse HEAD') return response(mergeCommit);
+              if (invocation === 'git ls-remote origin refs/heads/main') {
+                return response(`${mergeCommit}\trefs/heads/main\n`);
+              }
+              if (invocation === 'node scripts/release-check.mjs --tag v0.2.0') {
+                return response();
+              }
+              if (
+                invocation ===
+                `gh run list --workflow check.yml --commit ${mergeCommit} --limit 20 --json databaseId,status,conclusion,headBranch,headSha,url,event --repo remcoros/chaingraph`
+              ) {
+                return response(
+                  JSON.stringify([
+                    {
+                      conclusion: 'success',
+                      databaseId: 101,
+                      event: 'pull_request',
+                      headBranch: branch,
+                      headSha: mergeCommit,
+                      status: 'completed',
+                      url: 'https://github.com/remcoros/chaingraph/actions/runs/101',
+                    },
+                    {
+                      conclusion: 'success',
+                      databaseId: 102,
+                      event: 'push',
+                      headBranch: 'other-branch',
+                      headSha: mergeCommit,
+                      status: 'completed',
+                      url: 'https://github.com/remcoros/chaingraph/actions/runs/102',
+                    },
+                  ]),
+                );
+              }
+              throw new Error(`Unexpected command: ${invocation}`);
+            },
+          },
+          write: () => {},
+        }),
+      ).rejects.toThrow(`No Check workflow run exists for ${mergeCommit}.`);
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
   it('keeps preparation dry-runs read-only through the command seam', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'chaingraph-release-test-'));
     const commands: string[] = [];

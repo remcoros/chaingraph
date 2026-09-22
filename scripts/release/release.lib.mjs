@@ -698,7 +698,7 @@ async function preparePullRequest(runtime, options, reporter, repository) {
   return 0;
 }
 
-function findCheckRun(runtime, commit) {
+function findCheckRun(runtime, commit, defaultBranch) {
   const runs = parseJson(
     ghOutput(runtime, [
       'run',
@@ -710,15 +710,20 @@ function findCheckRun(runtime, commit) {
       '--limit',
       '20',
       '--json',
-      'databaseId,status,conclusion,headSha,url,event',
+      'databaseId,status,conclusion,headBranch,headSha,url,event',
     ]),
     'gh run list',
-  ).filter((candidate) => candidate.headSha === commit);
-  return runs.find((candidate) => candidate.event === 'push') ?? runs[0] ?? null;
+  ).filter(
+    (candidate) =>
+      candidate.headSha === commit &&
+      candidate.headBranch === defaultBranch &&
+      candidate.event === 'push',
+  );
+  return runs[0] ?? null;
 }
 
-async function requireSuccessfulCheck(runtime, options, reporter, commit) {
-  let check = findCheckRun(runtime, commit);
+async function requireSuccessfulCheck(runtime, options, reporter, commit, defaultBranch) {
+  let check = findCheckRun(runtime, commit, defaultBranch);
   if (!check) throw new Error(`No Check workflow run exists for ${commit}.`);
   if (check.status !== 'completed') {
     const watch = await yesNo(
@@ -731,7 +736,7 @@ async function requireSuccessfulCheck(runtime, options, reporter, commit) {
       runGh(runtime, ['run', 'watch', String(check.databaseId), '--exit-status', '--compact'], {
         inherit: !options.json,
       });
-      check = findCheckRun(runtime, commit);
+      check = findCheckRun(runtime, commit, defaultBranch);
     } else {
       reporter.add('waiting', `Check must complete successfully before tagging: ${check.url}`);
       return false;
@@ -1115,7 +1120,9 @@ async function resumeRelease(runtime, options, reporter, repository, pull) {
       throw new Error('The local release tag does not target the release PR merge commit.');
     }
     warnStaleDate(runtime, reporter, validatePreparedCommit(runtime, options, commit));
-    if (!(await requireSuccessfulCheck(runtime, options, reporter, commit))) {
+    if (
+      !(await requireSuccessfulCheck(runtime, options, reporter, commit, repository.defaultBranch))
+    ) {
       const result = reporter.finish('waiting-for-check', {
         commit,
         next: `Re-run npm run release -- ${options.version} after Check succeeds.`,
@@ -1166,7 +1173,9 @@ async function resumeRelease(runtime, options, reporter, repository, pull) {
   run(runtime, 'node', ['scripts/release-check.mjs', '--tag', options.tag], {
     inherit: !options.json,
   });
-  if (!(await requireSuccessfulCheck(runtime, options, reporter, commit))) {
+  if (
+    !(await requireSuccessfulCheck(runtime, options, reporter, commit, repository.defaultBranch))
+  ) {
     const result = reporter.finish('waiting-for-check', {
       commit,
       next: `Re-run npm run release -- ${options.version} after Check succeeds.`,
