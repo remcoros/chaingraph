@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
+import { validatePreparedChangelog } from './release/release.lib.mjs';
+
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
 const args = process.argv.slice(2);
@@ -21,7 +23,9 @@ if (args.length && args[1] !== `v${pkg.version}`) {
   throw new Error(`Tag must exactly match v${pkg.version}.`);
 }
 const changelog = await readFile('CHANGELOG.md', 'utf8');
-if (!changelog.includes(`## [${pkg.version}]`)) {
+if (args.length) {
+  validatePreparedChangelog(changelog, pkg.version);
+} else if (!changelog.includes(`## [${pkg.version}]`)) {
   throw new Error('CHANGELOG.md needs an entry for this version.');
 }
 for (const file of [

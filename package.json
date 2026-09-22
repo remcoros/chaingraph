@@ -22,6 +22,7 @@
     "check:compiler": "node scripts/check-react-compiler.mjs",
     "check": "npm run --silent format:check && npm run --silent check:portability && npm run --silent lint && npm run --silent build && npm run --silent test",
     "check:portability": "node scripts/check-portability.mjs",
+    "release": "node scripts/release.mjs",
     "test:live": "node --use-system-ca --import tsx scripts/smoke-live.ts",
     "licenses": "node scripts/licenses.mjs",
     "format": "prettier --write src server scripts tests *.ts *.css *.json",

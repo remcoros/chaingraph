@@ -20,23 +20,67 @@ repository owner's account so automation can verify the tag.
 Mutable GHCR tags and GitHub OIDC provenance are supplementary. They are not
 canonical release authority.
 
-## Prepare and tag the release
+## Guided release command
 
-Check the release source locally before creating the tag:
+Run the release command with a version without a leading `v`:
 
 ```sh
-export RELEASE_TAG=v0.1.0
-export RELEASE_SIGNING_KEY=replace-with-the-full-trusted-fingerprint
-npm ci
-node scripts/release-check.mjs --tag "$RELEASE_TAG"
-npm run check
-npm run licenses
-git diff --exit-code -- THIRD_PARTY_NOTICES.md
-docker buildx bake --check release-platform
-git tag -s -u "$RELEASE_SIGNING_KEY" -m "Chaingraph $RELEASE_TAG" "$RELEASE_TAG"
-git verify-tag --raw "$RELEASE_TAG"
-git push origin "$RELEASE_TAG"
+npm run release -- 0.2.0
 ```
+
+The command is resumable. It derives its state from Git, GitHub and the
+registry, so re-run the same command after a pull request merge, a workflow
+wait or a signing checkpoint. Its ignored status report is written to
+`artifacts/releases/vX.Y.Z/status.json`; that report is evidence for the
+operator, not release authority.
+
+Use `--dry-run` to inspect the next action without changing Git or GitHub
+release state. Use `--json` for an agent-readable report. Actions that push,
+sign, publish or abort still require an interactive `y/N` confirmation.
+
+Stable versions and SemVer prereleases are supported. Leading `v` prefixes,
+build metadata and inferred version bumps are deliberately rejected.
+
+## Prepare the release pull request
+
+Start from a clean local checkout whose `origin` fetch and push URLs target
+`github.com/remcoros/chaingraph`. The GitHub repository must have a protected
+default branch, and the local default branch must exactly match its remote. The
+command:
+
+1. Creates `release/vX.Y.Z`.
+2. Updates `package.json` and both package-lock version fields when needed.
+3. Dates the version section in `CHANGELOG.md` using the current UTC date and
+   leaves a fresh `Unreleased` section above it.
+4. Installs the locked dependency tree, regenerates `THIRD_PARTY_NOTICES.md`
+   and runs the metadata check, the full non-browser repository check and the
+   Buildx Bake check.
+5. Shows the release notes, complete diff and exact changed-file set.
+6. After a normal `y/N` confirmation, stages only the release allowlist,
+   commits, pushes without force and opens a draft pull request.
+
+The preparation allowlist is `CHANGELOG.md`, `package.json`,
+`package-lock.json` and `THIRD_PARTY_NOTICES.md`. Any other tracked or untracked
+change stops the command. Refine release notes with normal follow-up commits.
+Do not amend or force-push the preparation branch. The command never marks the
+pull request ready, approves it or merges it.
+
+The command warns when the UTC date becomes stale before merge or tagging.
+Update it in a follow-up commit when the delay is material. Crossing midnight
+alone does not invalidate an otherwise reviewed preparation.
+
+## Tag from the protected default branch
+
+After the preparation pull request merges, fetch the protected default branch,
+switch to it and fast-forward it to the remote. Re-run the same command. It
+requires the current commit to be the release pull request merge commit and the
+normal `Check` workflow to have succeeded for that exact commit. It also
+revalidates the version, changelog and changed-file boundary.
+
+The command then shows the release commit and asks for `y/N` confirmation. It
+creates an annotated tag signed by the pinned release key, verifies the tag's
+`VALIDSIG` primary-key fingerprint and pushes that tag. A failed push leaves
+the verified local tag available for a safe retry.
 
 The tag workflow re-verifies the signed annotated tag, version, normal checks,
 license notices, Bake definition and narrow production runtime check. Native
@@ -53,24 +97,44 @@ optional supplementary evidence and is not part of the signed release mapping.
 
 The workflow derives the two platform digests from the published index, writes
 the small release mapping, and creates a draft GitHub Release with that unsigned
-mapping attached. It has no release signing key. Complete the release locally:
+mapping attached. It has no release signing key.
+
+After pushing the tag, the command waits for the matching Release workflow to
+appear and watches it through completion. Press `Ctrl+C` to stop the local
+watcher; this does not cancel the GitHub workflow. Re-run the same release
+command later to resume. As soon as the successful workflow creates its draft
+release, the command downloads the mapping and verifies its source tag, source
+commit, image name, index digest and exact amd64 and arm64 manifest membership.
+It asks for `y/N` confirmation before invoking GPG. The private key and PIN
+remain under GPG control. It verifies the detached signature against the pinned
+primary-key fingerprint before uploading it, and it never replaces an existing
+signature asset.
+
+After one more `y/N` confirmation, the command publishes the draft and verifies
+that the public mutable container tags resolve to the signed index.
+Stable releases verify the full version, minor version and `latest` tags.
+Prereleases verify only their full prerelease version. See
+[REPRODUCIBILITY.md](../REPRODUCIBILITY.md) for independent manual inspection.
+
+## Abort an unmerged preparation
+
+To remove an abandoned, unmerged preparation, run:
 
 ```sh
-mapping="chaingraph-$RELEASE_TAG.release.json"
-release_dir="release-$RELEASE_TAG"
-mkdir "$release_dir"
-gh release download "$RELEASE_TAG" --pattern "$mapping" --dir "$release_dir"
-gpg --local-user "$RELEASE_SIGNING_KEY" --armor --detach-sign "$release_dir/$mapping"
-gpg --verify "$release_dir/$mapping.asc" "$release_dir/$mapping"
-gh release upload "$RELEASE_TAG" "$release_dir/$mapping.asc"
-gh release edit "$RELEASE_TAG" --draft=false
+npm run release -- abort 0.2.0
 ```
 
-Before signing, inspect the mapping, confirm its source tag and commit, and
-inspect its immutable index with `docker buildx imagetools inspect` as described
-in [REPRODUCIBILITY.md](../REPRODUCIBILITY.md). Do not publish a draft with a
-missing or mismatched signature. The workflow refuses to replace an existing
-draft or public release.
+The command first reports exactly what it will close or delete, then asks for
+`y/N` confirmation. It closes the open pull request, deletes the exact remote
+release branch, switches to and fast-forwards the default branch, and deletes
+the exact local release branch. The operation is resumable after partial
+failure, and ignored artifacts are preserved.
+
+Abort refuses to proceed if the release pull request merged, a local or remote
+tag exists, any GitHub Release exists, the branch or base is unexpected, files
+outside the preparation allowlist changed, local commits were not pushed, or
+the worktree is dirty. After merge, either continue the release or use a normal
+reviewed revert pull request. The tool never reverts the default branch.
 
 ## Workflow validation
 
