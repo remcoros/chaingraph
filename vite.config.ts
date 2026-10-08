@@ -23,7 +23,7 @@ export default defineConfig({
         /\/src\/(App|Shared)\/.*\.[jt]sx$/,
         /\/src\/(App|Shared)\/(?:.*\/)?use[A-Z0-9][^/]*\.[jt]s$/,
       ],
-      compiler: { logDiagnostics: true },
+      compiler: { reportDiagnostics: true },
     }),
   ],
   envDir: false,
