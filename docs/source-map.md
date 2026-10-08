@@ -226,6 +226,6 @@ Core algorithms and write the same findings collection. Wallet review owns its
 decisions and consumes those findings. A connection scan finds bounded observed
 paths; it does not assign ownership or prove that no other path exists.
 
-For domain vocabulary, see [CONTEXT.md](../CONTEXT.md). For unfinished work in the
+For domain vocabulary, see [GLOSSARY.md](../GLOSSARY.md). For unfinished work in the
 broader observation/runtime refactor, use the current working log rather than
 treating this location map as a claim that every planned behavior is done.
