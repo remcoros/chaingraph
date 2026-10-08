@@ -391,6 +391,7 @@ export function ConnectionScanPanel(props: Props) {
       source: startSource,
       targetIds,
       settings: frozenSettings,
+      // oxlint-disable-next-line react/purity -- Timestamp is created only by the scan submit handler, never during render.
       startedAt: new Date().toISOString(),
       status: 'running',
       examined: 0,

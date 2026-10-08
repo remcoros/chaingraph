@@ -72,13 +72,22 @@ it('keeps every worker source dependency free of React development instrumentati
 });
 
 it.each(['/src/App/App.tsx', '/src/App/useAppState.ts'])(
-  'preserves React compilation and Fast Refresh for %s',
+  'preserves React compilation for %s',
   async (path) => {
     const result = await server.transformRequest(path);
     expect(result?.code).toMatch(/react[/_]compiler-runtime/);
-    expect(result?.code).toMatch(/\$Refresh(?:Reg|Sig)\$/);
   },
 );
+
+it('preserves Fast Refresh for JSX modules', async () => {
+  const result = await server.transformRequest('/src/App/App.tsx');
+  expect(result?.code).toMatch(/\$Refresh(?:Reg|Sig)\$/);
+});
+
+it('keeps Fast Refresh instrumentation out of non-JSX hook modules', async () => {
+  const result = await server.transformRequest('/src/App/useAppState.ts');
+  expect(result?.code).not.toMatch(/\$Refresh(?:Reg|Sig)\$/);
+});
 
 it('does not silently drop memoization for hook modules outside the filename convention', async () => {
   for (const path of readdirSync('src', { recursive: true })) {
