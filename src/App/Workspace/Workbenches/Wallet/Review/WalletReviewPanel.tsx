@@ -65,7 +65,10 @@ import { WalletRelatedSelection } from '../WalletRelatedSelection';
 import { matchRelatedEntities } from '../walletRelatedSelection';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
-import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
+import {
+  TransactionTimestamp,
+  TransactionTimestampWithFee,
+} from '../../../../Controls/Display/TransactionBlockTime';
 import { walletRecordBlockObservation } from '../../../../../Core/Workspace/Wallets/walletRecordBlockObservation';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { buildTagIndex } from '../../../Annotations/tagProjection';
@@ -1063,6 +1066,8 @@ export function WalletReviewPanel(
             aria-label={tab === 'review' ? 'Review queue' : `${tabLabel} records`}
           >
             {displayedRows.map((row) => {
+              const Timestamp =
+                row.kind === 'transaction' ? TransactionTimestampWithFee : TransactionTimestamp;
               const annotation = workspace.annotations.entities[row.nodeId];
               const checked = selectionKeys.has(row.key);
               const current = !batching && selectedRow?.key === row.key;
@@ -1178,10 +1183,8 @@ export function WalletReviewPanel(
                       )}
                       <div className="wallet-row-values muted">
                         {row.kind !== 'address' && row.txid && (
-                          <TransactionBlockTime
-                            timestampOnly
+                          <Timestamp
                             workspace={workspace}
-                            showFee={row.kind === 'transaction'}
                             transaction={
                               row.utxo
                                 ? walletRecordBlockObservation(

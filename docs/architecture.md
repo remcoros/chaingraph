@@ -666,6 +666,12 @@ BTC with eight decimals grouped 2/3/3 by thin spaces; `Amount.tsx` adds tabular
 digits and the sats tooltip. Nothing else formats money. Fee rates stay sat/vB.
 See [references.md](references.md#product-direction).
 
+**Transaction metadata.** `TransactionBlockTime.tsx` provides explicit block,
+separated block and timestamp variants, with named fee variants. They compose
+one private markup frame rather than combining display-mode flags. Status,
+timestamp and fee interpretation remain in their existing display helpers.
+Missing timestamps stay absent, and incomplete fee evidence stays unknown.
+
 **Tags and wallet matches.** `tags.ts` indexes tag membership (canonical
 transaction/output/address references, address members projecting onto loaded
 outputs) and wallet-script matches (raw script over decoded address;

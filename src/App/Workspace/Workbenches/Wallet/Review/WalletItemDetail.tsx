@@ -31,7 +31,10 @@ import { useWalletFlowInputs } from './useWalletFlowInputs';
 import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';
 import { CopyButton } from '../../../../Controls/CopyButton';
-import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
+import {
+  TransactionBlockTime,
+  TransactionBlockTimeWithFee,
+} from '../../../../Controls/Display/TransactionBlockTime';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
@@ -458,6 +461,7 @@ function WalletDetailFrame({
     walletAddresses,
   );
   const outpoints = row.outpointIds ?? [];
+  const BlockTime = row.kind === 'output' ? TransactionBlockTime : TransactionBlockTimeWithFee;
   const subjectTitle = walletSubjectTitle(row);
   const related = useMemo(
     () =>
@@ -582,10 +586,9 @@ function WalletDetailFrame({
             <div>
               <dt>{row.kind === 'output' ? 'Creating transaction block' : 'Transaction block'}</dt>
               <dd>
-                <TransactionBlockTime
+                <BlockTime
                   transaction={workspace.chainData.transactions[row.txid]}
                   workspace={workspace}
-                  showFee={row.kind !== 'output'}
                 />
               </dd>
             </div>

@@ -1,6 +1,6 @@
 import { Amount } from '../../../../Controls/Display/Amount';
 import {
-  TransactionBlockTime,
+  TransactionTimestamp,
   TransactionFeeLabel,
 } from '../../../../Controls/Display/TransactionBlockTime';
 import {
@@ -309,12 +309,7 @@ const EntityRow = memo(function EntityRow({
                   {status.label}
                 </small>
                 <span className="entity-row-time">
-                  <TransactionBlockTime
-                    transaction={transaction}
-                    workspace={workspace}
-                    showFee={false}
-                    timestampOnly
-                  />
+                  <TransactionTimestamp transaction={transaction} />
                 </span>
               </span>
             )}

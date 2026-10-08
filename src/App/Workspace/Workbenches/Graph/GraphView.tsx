@@ -1,5 +1,8 @@
 import { Amount } from '../../../Controls/Display/Amount';
-import { TransactionBlockTime } from '../../../Controls/Display/TransactionBlockTime';
+import {
+  TransactionBlockTime,
+  TransactionBlockTimeWithFee,
+} from '../../../Controls/Display/TransactionBlockTime';
 import {
   ArrowLeftFromLine,
   CheckSquare,
@@ -776,11 +779,14 @@ export default function GraphView(props: GraphViewProps) {
                 <div className="graph-card-block">
                   <dt>Block</dt>
                   <dd>
-                    <TransactionBlockTime
-                      transaction={transaction}
-                      workspace={props.workspace}
-                      showFee={hoveredNode.kind === 'transaction'}
-                    />
+                    {hoveredNode.kind === 'transaction' ? (
+                      <TransactionBlockTimeWithFee
+                        transaction={transaction}
+                        workspace={props.workspace}
+                      />
+                    ) : (
+                      <TransactionBlockTime transaction={transaction} />
+                    )}
                   </dd>
                 </div>
               )}

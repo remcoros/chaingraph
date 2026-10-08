@@ -2,7 +2,10 @@ import { useState, useRef, type ReactNode, type RefObject } from 'react';
 import { Box, Bookmark, Layers } from 'lucide-react';
 import { Amount } from '../../../../Controls/Display/Amount';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
-import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
+import {
+  TransactionTimestamp,
+  TransactionTimestampWithFee,
+} from '../../../../Controls/Display/TransactionBlockTime';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
 import { addressBalanceSats, type AddressHistory } from '../Address/addressHistory';
 import { paginateAddressHistorySections } from './addressHistorySections';
@@ -293,12 +296,7 @@ export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewPro
                   <span>#{utxo.height}</span>
                   <span aria-hidden="true">·</span>
                   {timestampTransaction ? (
-                    <TransactionBlockTime
-                      transaction={timestampTransaction}
-                      workspace={workspace}
-                      showFee={false}
-                      timestampOnly
-                    />
+                    <TransactionTimestamp transaction={timestampTransaction} />
                   ) : (
                     <span>Timestamp not loaded</span>
                   )}
@@ -387,10 +385,9 @@ export function FlowPanelAddressView({ panel }: { panel: FlowPanelAddressViewPro
               <span>#{entry.height}</span>
               <span aria-hidden="true">·</span>
               {entry.transaction ? (
-                <TransactionBlockTime
+                <TransactionTimestampWithFee
                   transaction={entry.transaction}
                   workspace={workspace}
-                  timestampOnly
                 />
               ) : (
                 <span>Timestamp not loaded</span>

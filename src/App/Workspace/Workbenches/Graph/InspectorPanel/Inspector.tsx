@@ -691,11 +691,7 @@ export function NodeInspector({
             <div>
               <dt>Block</dt>
               <dd>
-                <TransactionBlockTime
-                  transaction={tx}
-                  workspace={activeWorkspace}
-                  showFee={false}
-                />
+                <TransactionBlockTime transaction={tx} workspace={activeWorkspace} />
               </dd>
             </div>
           )}

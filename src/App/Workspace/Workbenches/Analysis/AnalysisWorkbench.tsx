@@ -1,6 +1,6 @@
 import type { WorkspaceController } from '../../useWorkspace';
 import { Amount } from '../../../Controls/Display/Amount';
-import { TransactionBlockTime } from '../../../Controls/Display/TransactionBlockTime';
+import { TransactionBlockTimeWithFee } from '../../../Controls/Display/TransactionBlockTime';
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -164,7 +164,7 @@ function EvidenceReference({
         )}
       </div>
       {prefix === 'tx' && (
-        <TransactionBlockTime
+        <TransactionBlockTimeWithFee
           transaction={workspace.chainData.transactions[txid]}
           workspace={workspace}
         />

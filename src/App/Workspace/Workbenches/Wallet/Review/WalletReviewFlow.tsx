@@ -18,7 +18,7 @@ import type { GraphNode } from '../../../GraphState/types';
 import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from './walletFlowVisibility';
-import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
+import { TransactionBlockTimeWithFee } from '../../../../Controls/Display/TransactionBlockTime';
 import { isOpReturn } from '../../../../../Core/Bitcoin';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
@@ -116,7 +116,7 @@ export function WalletReviewFlow({
               workspace={workspace}
               node={{ id: context.transactionNodeId!, kind: 'transaction', label: '' }}
             />
-            <TransactionBlockTime transaction={context.transaction} workspace={workspace} />
+            <TransactionBlockTimeWithFee transaction={context.transaction} workspace={workspace} />
             <ShowOnGraph
               id={context.transactionNodeId!}
               kind="transaction"

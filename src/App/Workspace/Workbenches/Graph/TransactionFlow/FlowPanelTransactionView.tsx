@@ -31,7 +31,7 @@ import {
 import { SmallAmountControl } from '../SmallAmountControl';
 import { isSmallAmount } from '../smallAmounts';
 import {
-  TransactionBlockTime,
+  TransactionBlockTimeSeparated,
   TransactionFeeLabel,
 } from '../../../../Controls/Display/TransactionBlockTime';
 import {
@@ -1055,11 +1055,9 @@ export function FlowPanelTransactionView({
                       </strong>
                     </span>
                     <span className="transaction-identity-body">
-                      <TransactionBlockTime
+                      <TransactionBlockTimeSeparated
                         transaction={current.tx}
                         workspace={workspace}
-                        showFee={false}
-                        separateStatusAndTime
                       />
                       {workspace.annotations.entities[transactionReference(current.tx.txid)]
                         ?.label && (

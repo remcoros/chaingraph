@@ -1,4 +1,7 @@
-import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
+import {
+  TransactionBlockTime,
+  TransactionBlockTimeWithFee,
+} from '../../../../Controls/Display/TransactionBlockTime';
 import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphNode } from '../../../GraphState/types';
@@ -121,17 +124,15 @@ function ScriptInspectorBody({
   const outputHex =
     raw?.outputs[outputIndex]?.script ?? transaction?.vout[outputIndex]?.scriptPubKey.hex;
   const input = raw?.inputs[inputIndex];
+  const BlockTime =
+    selected.kind === 'transaction' ? TransactionBlockTimeWithFee : TransactionBlockTime;
   return (
     <div className="script-inspector-body">
       <p className="small mono" title={transaction?.txid}>
         {related.find(({ tx }) => tx.txid === transaction?.txid)?.role} transaction:{' '}
         <ResponsiveIdentifier value={transaction?.txid ?? ''} />
       </p>
-      <TransactionBlockTime
-        transaction={transaction}
-        workspace={workspace}
-        showFee={selected.kind === 'transaction'}
-      />
+      <BlockTime transaction={transaction} workspace={workspace} />
       {related.length > 1 && (
         <label>
           Inspect transaction

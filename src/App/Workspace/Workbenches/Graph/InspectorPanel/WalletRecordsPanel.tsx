@@ -1,5 +1,8 @@
 import { Amount } from '../../../../Controls/Display/Amount';
-import { TransactionBlockTime } from '../../../../Controls/Display/TransactionBlockTime';
+import {
+  TransactionBlockTime,
+  TransactionBlockTimeWithFee,
+} from '../../../../Controls/Display/TransactionBlockTime';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { walletRecordBlockObservation } from '../../../../../Core/Workspace/Wallets/walletRecordBlockObservation';
 import { WalletAddressesPanel } from './WalletAddressesPanel';
@@ -199,6 +202,7 @@ export function WalletRecordsPanel({
       />
       <div className="wallet-record-list">
         {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((row) => {
+          const BlockTime = row.utxo ? TransactionBlockTime : TransactionBlockTimeWithFee;
           const annotation = workspace.annotations.entities[row.id];
           const identifier = row.utxo ? `${row.txid}:${row.utxo.vout}` : row.txid;
           return (
@@ -221,9 +225,8 @@ export function WalletRecordsPanel({
                 </span>
               )}
               <span className="wallet-record-meta">
-                <TransactionBlockTime
+                <BlockTime
                   workspace={workspace}
-                  showFee={!row.utxo}
                   transaction={walletRecordBlockObservation(
                     row.txid,
                     row.transaction,
