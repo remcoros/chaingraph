@@ -507,6 +507,11 @@ them for wallet records with preserve-by-default semantics and affected counts.
 One batch is one workspace update, one autosave and one Undo step.
 `MetadataEditors` and `MetadataPopover` provide the shared quick editors used by
 Wallet, Graph and the Inspector; `tagColors.ts` owns the 16 presets.
+Single-record controls accept one entity ID. Batch controls accept an explicit
+ID list, even for a batch of one, and retain their preserve-existing policy until
+the user selects replacement. The label and tag variants share private forms
+and the existing annotation operations. `SingleMetadataBar` exposes notes and
+direct replacement; `BatchMetadataBar` exposes batch scope and replacement controls.
 
 ## Wallet workbench
 

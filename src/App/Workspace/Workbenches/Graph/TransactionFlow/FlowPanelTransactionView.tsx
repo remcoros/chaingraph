@@ -58,7 +58,7 @@ import { CopyButton } from '../../../../Controls/CopyButton';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
 import { SelectionCheckbox } from '../../../Selection/SelectionToolbar';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
-import { BatchTagEditor, MetadataPopover } from '../../../../Controls/Metadata/MetadataEditors';
+import { EntityTagEditor, MetadataPopover } from '../../../../Controls/Metadata/MetadataEditors';
 import { IconPalette } from '../../../../Controls/Metadata/IconPicker';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import type { GraphNode } from '../../../GraphState/types';
@@ -1170,11 +1170,10 @@ export function FlowPanelTransactionView({
             point={quickEditor.point}
             onClose={() => setQuickEditor(undefined)}
           >
-            <BatchTagEditor
+            <EntityTagEditor
               id={quickEditorId}
               workspace={workspace}
-              ids={[quickEditor.nodeId]}
-              single
+              entityId={quickEditor.nodeId}
               onClose={() => setQuickEditor(undefined)}
               onApply={(_summary, update) => props.onApplyTags(update)}
             />

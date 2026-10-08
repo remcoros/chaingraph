@@ -28,7 +28,7 @@ import {
 import { walletRowFinding, walletRowRelationship, type WalletRow } from '../walletRows';
 import { useTransactionFetch } from '../../../TransactionFetchProvider';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
-import { BatchMetadataBar } from './BatchMetadataBar';
+import { SingleMetadataBar } from './BatchMetadataBar';
 import { WalletReference } from '../WalletReference';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import {
@@ -534,11 +534,10 @@ function WalletDetailFrame({
         aria-label="Selected item actions"
         data-tour="wallet-item-actions"
       >
-        <BatchMetadataBar
+        <SingleMetadataBar
           active={active || !!tourPreview}
           workspace={workspace}
-          ids={[row.nodeId]}
-          single
+          id={row.nodeId}
           guidedActions={guidedActions}
           scopeLabel=""
           disabled={

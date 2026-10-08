@@ -13,7 +13,7 @@ import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMe
 import { tagNodeIds, tagsFromLabels } from '../../../Annotations/tagProjection';
 
 import {
-  BatchTagEditor,
+  EntityTagEditor,
   ColorPicker,
   MetadataPopover,
 } from '../../../../Controls/Metadata/MetadataEditors';
@@ -337,11 +337,10 @@ function TagAssignmentPicker({
     scope === 'address' && selected.address ? addressReference(selected.address) : selected.id;
   return (
     <MetadataPopover anchor={anchor} compact onClose={onClose}>
-      <BatchTagEditor
+      <EntityTagEditor
         id={id}
         workspace={workspace}
-        ids={[target]}
-        single
+        entityId={target}
         onClose={onClose}
         onApply={(_summary, update) => onChange(update)}
         membershipHint={(tag) => {
@@ -380,7 +379,7 @@ function TagAssignmentPicker({
             </button>
           </div>
         )}
-      </BatchTagEditor>
+      </EntityTagEditor>
     </MetadataPopover>
   );
 }

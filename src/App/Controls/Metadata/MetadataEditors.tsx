@@ -20,12 +20,19 @@ import './metadata-editors.css';
 export interface MetadataEditorProps {
   workspace: Workspace;
   ids: string[];
-  single?: boolean;
   id?: string;
   onClose: () => void;
   /** Return false when the owner could not apply the update. */
   onApply: (summary: string, update: (workspace: Workspace) => Workspace) => boolean | void;
 }
+
+type EntityEditorProps = Omit<MetadataEditorProps, 'ids'> & { entityId: string };
+
+type TagEditorProps = MetadataEditorProps & {
+  children?: ReactNode;
+  footer?: ReactNode;
+  membershipHint?: (tag: WorkspaceTag) => ReactNode;
+};
 
 export function ColorPicker({
   value,
@@ -52,19 +59,60 @@ export function ColorPicker({
   );
 }
 
-export function BatchLabelEditor({
+export function EntityLabelEditor({ entityId, ...props }: EntityEditorProps) {
+  return (
+    <LabelEditor
+      {...props}
+      ids={[entityId]}
+      initialValue={props.workspace.annotations.entities[entityId]?.label ?? ''}
+      replace
+      heading="Edit label"
+      description="Saves automatically after applying."
+    />
+  );
+}
+
+export function BatchLabelEditor(props: MetadataEditorProps) {
+  const [replace, setReplace] = useState(false);
+  return (
+    <LabelEditor
+      {...props}
+      initialValue=""
+      replace={replace}
+      heading={`Label ${props.ids.length} records`}
+    >
+      <label className="metadata-replace">
+        <input
+          type="checkbox"
+          checked={replace}
+          onChange={(event) => setReplace(event.target.checked)}
+        />
+        Replace existing labels
+      </label>
+    </LabelEditor>
+  );
+}
+
+function LabelEditor({
   workspace,
   ids,
-  single = false,
   id,
   onClose,
   onApply,
-}: MetadataEditorProps) {
+  initialValue,
+  replace,
+  heading,
+  description,
+  children,
+}: MetadataEditorProps & {
+  initialValue: string;
+  replace: boolean;
+  heading: string;
+  description?: string;
+  children?: ReactNode;
+}) {
   const ref = useDialogFocus(onClose, undefined, false);
-  const [value, setValue] = useState(
-    single ? (workspace.annotations.entities[ids[0]]?.label ?? '') : '',
-  );
-  const [replace, setReplace] = useState(single);
+  const [value, setValue] = useState(initialValue);
   const [error, setError] = useState('');
   const plan = planBatchLabel(workspace, ids, replace);
   return (
@@ -77,7 +125,7 @@ export function BatchLabelEditor({
       aria-label="Label selected records"
     >
       <div className="metadata-editor-heading">
-        <strong>{single ? 'Edit label' : `Label ${ids.length} records`}</strong>
+        <strong>{heading}</strong>
         <button className="icon-button" aria-label="Close label editor" onClick={onClose}>
           <X size={15} />
         </button>
@@ -121,20 +169,9 @@ export function BatchLabelEditor({
             onChange={(event) => setValue(event.target.value)}
           />
         </label>
-        {!single && (
-          <label className="metadata-replace">
-            <input
-              type="checkbox"
-              checked={replace}
-              onChange={(event) => setReplace(event.target.checked)}
-            />
-            Replace existing labels
-          </label>
-        )}
+        {children}
         <p className="small muted">
-          {single
-            ? 'Saves automatically after applying.'
-            : `${plan.targets.length} of ${ids.length} records change.`}
+          {description ?? `${plan.targets.length} of ${ids.length} records change.`}
           {plan.preserved ? ` ${plan.preserved} already labelled and kept as they are.` : ''}
         </p>
         <div className="button-row">
@@ -155,20 +192,38 @@ export function BatchLabelEditor({
   );
 }
 
-export function BatchTagEditor({
+export function EntityTagEditor({
+  entityId,
+  ...props
+}: Omit<TagEditorProps, 'ids'> & { entityId: string }) {
+  return <TagEditor {...props} ids={[entityId]} />;
+}
+
+export function BatchTagEditor(props: TagEditorProps) {
+  return (
+    <TagEditor
+      {...props}
+      membershipCount={(assigned, total) => (
+        <small className="muted">
+          {assigned} of {total} selected
+        </small>
+      )}
+    />
+  );
+}
+
+function TagEditor({
   workspace,
   ids,
-  single = false,
   id,
   onClose,
   onApply,
   children,
   footer,
   membershipHint,
-}: MetadataEditorProps & {
-  children?: ReactNode;
-  footer?: ReactNode;
-  membershipHint?: (tag: WorkspaceTag) => ReactNode;
+  membershipCount,
+}: TagEditorProps & {
+  membershipCount?: (assigned: number, total: number) => ReactNode;
 }) {
   const ref = useDialogFocus(onClose, undefined, false);
   const search = useRef<HTMLInputElement>(null);
@@ -294,11 +349,7 @@ export function BatchTagEditor({
               <span className="metadata-tag-dot" style={{ backgroundColor: tag.color }} />
               <span className="metadata-tag-name">
                 {tag.name}
-                {!single && (
-                  <small className="muted">
-                    {assigned} of {ids.length} selected
-                  </small>
-                )}
+                {membershipCount?.(assigned, ids.length)}
                 {membershipHint?.(tag)}
               </span>
               {fullyAssigned && (

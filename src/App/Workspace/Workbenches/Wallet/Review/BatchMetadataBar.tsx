@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, type ComponentType, type ReactNode } from 'react';
 import { Tag, TextCursorInput } from 'lucide-react';
 import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
 import {
   BatchLabelEditor,
+  EntityLabelEditor,
   BatchTagEditor,
   EntityNoteEditor,
   MetadataPopover,
+  type MetadataEditorProps,
 } from '../../../../Controls/Metadata/MetadataEditors';
 import {
   applyBatchIcon,
@@ -13,12 +15,8 @@ import {
 } from '../../../../../Core/Workspace/Annotations/batchMetadata';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 
-export interface BatchMetadataBarProps {
+interface MetadataBarProps {
   workspace: Workspace;
-  /** Explicitly selected records. Filters never widen this set. */
-  ids: string[];
-  scopeLabel: string;
-  single?: boolean;
   active?: boolean;
   disabled?: boolean;
   guidance?: string;
@@ -28,14 +26,78 @@ export interface BatchMetadataBarProps {
   onClear?: () => void;
 }
 
+export interface BatchMetadataBarProps extends MetadataBarProps {
+  /** Explicitly selected records. Filters never widen this set. */
+  ids: string[];
+  scopeLabel: string;
+}
+
+/** A single entity always replaces its own metadata and can edit notes. */
+export function SingleMetadataBar({
+  id,
+  scopeLabel = '',
+  ...props
+}: MetadataBarProps & { id: string; scopeLabel?: string }) {
+  return (
+    <MetadataBar
+      {...props}
+      ids={[id]}
+      scope={scopeLabel}
+      className="single-metadata-bar"
+      groupLabel="Edit entity metadata"
+      LabelEditor={SingleLabelForBar}
+      noteId={id}
+      replaceIcons
+    />
+  );
+}
+
+/** The private frame receives one ID only from SingleMetadataBar. */
+function SingleLabelForBar({ ids, ...props }: MetadataEditorProps) {
+  return <EntityLabelEditor {...props} entityId={ids[0]} />;
+}
+
 /** Direct label, tag and icon editing for a chosen set of records. Each action is
  * one workspace update, so autosave and Undo treat the batch as a single step.
  */
-export function BatchMetadataBar({
+export function BatchMetadataBar(props: BatchMetadataBarProps) {
+  const [replaceIcons, setReplaceIcons] = useState(false);
+  return (
+    <MetadataBar
+      {...props}
+      scope={
+        <>
+          <strong>{props.ids.length}</strong> {props.scopeLabel}
+        </>
+      }
+      className="batch-selection-bar"
+      groupLabel="Batch metadata editing"
+      LabelEditor={BatchLabelEditor}
+      replaceIcons={replaceIcons}
+      replacementControl={
+        <label className="batch-replace">
+          <input
+            type="checkbox"
+            checked={replaceIcons}
+            onChange={(event) => setReplaceIcons(event.target.checked)}
+          />
+          Replace icons
+        </label>
+      }
+    />
+  );
+}
+
+function MetadataBar({
   workspace,
   ids,
-  scopeLabel,
-  single = false,
+  scope,
+  className,
+  groupLabel,
+  LabelEditor,
+  noteId,
+  replaceIcons,
+  replacementControl,
   active = true,
   disabled,
   guidance,
@@ -43,9 +105,17 @@ export function BatchMetadataBar({
   onChange,
   onNotice,
   onClear,
-}: BatchMetadataBarProps) {
+}: MetadataBarProps & {
+  ids: string[];
+  scope: ReactNode;
+  className: string;
+  groupLabel: string;
+  LabelEditor: ComponentType<MetadataEditorProps>;
+  noteId?: string;
+  replaceIcons: boolean;
+  replacementControl?: ReactNode;
+}) {
   const [openState, setOpen] = useState<'label' | 'tags' | 'notes' | undefined>();
-  const [replaceIcons, setReplaceIcons] = useState(false);
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
   const [previousScopeKey, setPreviousScopeKey] = useState(scopeKey);
@@ -62,20 +132,8 @@ export function BatchMetadataBar({
     (id) => (workspace.annotations.entities[id]?.icon ?? '') !== firstIcon,
   );
   return (
-    <div
-      className={`batch-bar ${single ? 'single-metadata-bar' : 'batch-selection-bar'}`}
-      role="group"
-      aria-label={single ? 'Edit entity metadata' : 'Batch metadata editing'}
-    >
-      <span className="batch-scope">
-        {single ? (
-          scopeLabel
-        ) : (
-          <>
-            <strong>{ids.length}</strong> {scopeLabel}
-          </>
-        )}
-      </span>
+    <div className={`batch-bar ${className}`} role="group" aria-label={groupLabel}>
+      <span className="batch-scope">{scope}</span>
       <div className="batch-actions">
         <div className="batch-popover-anchor">
           <button
@@ -92,10 +150,9 @@ export function BatchMetadataBar({
           </button>
           {open === 'label' && trigger && (
             <MetadataPopover anchor={trigger} onClose={() => setOpen(undefined)}>
-              <BatchLabelEditor
+              <LabelEditor
                 workspace={workspace}
                 ids={ids}
-                single={single}
                 onClose={() => setOpen(undefined)}
                 onApply={(summary, update) => {
                   onChange(update);
@@ -132,7 +189,7 @@ export function BatchMetadataBar({
             </MetadataPopover>
           )}
         </div>
-        {single && ids.length === 1 && (
+        {noteId && (
           <div className="batch-popover-anchor">
             <button
               aria-haspopup="dialog"
@@ -150,7 +207,7 @@ export function BatchMetadataBar({
                 <EntityNoteEditor
                   key={scopeKey}
                   workspace={workspace}
-                  id={ids[0]}
+                  id={noteId}
                   onChange={onChange}
                   onClose={() => setOpen(undefined)}
                 />
@@ -175,14 +232,14 @@ export function BatchMetadataBar({
             disabled={disabled}
             fieldLabel="Set icon"
             onChange={(icon) => {
-              const plan = planBatchIcon(workspace, ids, single || replaceIcons);
+              const plan = planBatchIcon(workspace, ids, replaceIcons);
               if (!plan.targets.length) {
                 onNotice(
                   'Every selected record already has an icon. Enable Replace to change them.',
                 );
                 return;
               }
-              onChange((current) => applyBatchIcon(current, ids, icon, single || replaceIcons));
+              onChange((current) => applyBatchIcon(current, ids, icon, replaceIcons));
               onNotice(
                 `${icon ? 'Icon set on' : 'Icon cleared on'} ${plan.targets.length} record${
                   plan.targets.length === 1 ? '' : 's'
@@ -191,16 +248,7 @@ export function BatchMetadataBar({
             }}
           />
         </div>
-        {!single && (
-          <label className="batch-replace">
-            <input
-              type="checkbox"
-              checked={replaceIcons}
-              onChange={(event) => setReplaceIcons(event.target.checked)}
-            />
-            Replace icons
-          </label>
-        )}
+        {replacementControl}
         {onClear && (
           <button className="text-button" onClick={onClear}>
             Clear selection
