@@ -1,4 +1,13 @@
-import { useEffect, useEffectEvent, useId, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type Ref,
+} from 'react';
 import { X } from 'lucide-react';
 import { useDialogFocus } from '../useDialogFocus';
 import { MetadataPopover } from './MetadataEditors';
@@ -19,21 +28,9 @@ interface Props {
   mixed?: boolean;
   disabled?: boolean;
 }
-export function IconPicker({
-  value,
-  onChange,
-  openToken,
-  onOpenHandled,
-  fieldLabel,
-  caption,
-  ariaLabel,
-  compact = false,
-  mixed = false,
-  disabled = false,
-}: Props) {
+export function IconPicker({ openToken, onOpenHandled, disabled = false, ...props }: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const [triggerElement, setTriggerElement] = useState<HTMLButtonElement | null>(null);
   const handleOpenHandled = useEffectEvent(() => onOpenHandled?.());
   useEffect(() => {
     if (!openToken || disabled) return;
@@ -45,6 +42,38 @@ export function IconPicker({
   // Adjusting during render rather than in an effect: being disabled closes the
   // palette in the same pass, with no extra render showing it still open.
   if (open && disabled) setOpen(false);
+  return (
+    <IconPickerControl
+      {...props}
+      ref={trigger}
+      disabled={disabled}
+      open={open && !disabled}
+      onOpenChange={setOpen}
+    />
+  );
+}
+
+/** A toolbar owns the open state together with its other metadata editors. */
+export function IconPickerControl({
+  value,
+  onChange,
+  fieldLabel,
+  caption,
+  ariaLabel,
+  compact = false,
+  mixed = false,
+  disabled = false,
+  open,
+  onOpenChange,
+  ref,
+}: Omit<Props, 'openToken' | 'onOpenHandled'> & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  ref?: Ref<HTMLButtonElement>;
+}) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [triggerElement, setTriggerElement] = useState<HTMLButtonElement | null>(null);
+  useImperativeHandle(ref, () => trigger.current!, []);
   const id = useId();
   const label = mixed
     ? 'Mixed'
@@ -72,7 +101,7 @@ export function IconPicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => onOpenChange(!open)}
       >
         <span className="icon-picker-preview" aria-hidden="true">
           {mixed ? '◐' : value || '∅'}
@@ -80,12 +109,12 @@ export function IconPicker({
         {compact && <span>{caption ?? 'Icon'}</span>}
       </button>
       {open && triggerElement && (
-        <MetadataPopover anchor={triggerElement} compact onClose={() => setOpen(false)}>
+        <MetadataPopover anchor={triggerElement} compact onClose={() => onOpenChange(false)}>
           <IconPalette
             id={id}
             value={mixed ? '' : value}
             onChange={onChange}
-            onClose={() => setOpen(false)}
+            onClose={() => onOpenChange(false)}
           />
         </MetadataPopover>
       )}

@@ -512,6 +512,11 @@ ID list, even for a batch of one, and retain their preserve-existing policy unti
 the user selects replacement. The label and tag variants share private forms
 and the existing annotation operations. `SingleMetadataBar` exposes notes and
 direct replacement; `BatchMetadataBar` exposes batch scope and replacement controls.
+Each metadata toolbar owns one open-editor state, including its icon palette.
+`IconPickerControl` accepts that state and replaces capture-event coordination
+between the toolbar and picker. The standalone `IconPicker` retains local state
+and programmatic opening for Inspector fields. Both use the same trigger and
+palette, with the existing focus and annotation operations.
 
 ## Wallet workbench
 

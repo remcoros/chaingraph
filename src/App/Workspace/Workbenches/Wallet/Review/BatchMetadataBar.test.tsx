@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import { BatchMetadataBar, SingleMetadataBar } from './BatchMetadataBar';
@@ -71,4 +71,54 @@ it('keeps a batch of one distinct from a single-entity edit', () => {
   expect(props.onChange.mock.calls[0][0](props.workspace).annotations.entities[props.id].icon).toBe(
     '◇',
   );
+});
+
+it('allows only one editor through click activation without capture events', () => {
+  const props = fixture();
+  render(<SingleMetadataBar {...props} />);
+  for (const [button, dialog] of [
+    ['Label', 'Label selected records'],
+    ['Set icon: Star', 'Choose node icon'],
+    ['Tags', 'Tag selected records'],
+    ['Set icon: Star', 'Choose node icon'],
+    ['Notes', 'Edit notes'],
+  ]) {
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: dialog })).toBeTruthy();
+  }
+});
+
+it('returns focus to the icon trigger after Escape and after choosing an icon', () => {
+  const props = fixture();
+  render(<SingleMetadataBar {...props} />);
+  const trigger = screen.getByRole('button', { name: 'Set icon: Star' });
+  act(() => trigger.focus());
+  fireEvent.click(trigger);
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('button', { name: 'Diamond' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+
+it('closes the icon palette on scope, active and disabled changes without reopening', () => {
+  const props = fixture();
+  const { rerender } = render(<SingleMetadataBar {...props} />);
+  const nextId = `tx:${'b'.repeat(64)}`;
+  fireEvent.click(screen.getByRole('button', { name: 'Set icon: Star' }));
+  rerender(<SingleMetadataBar {...props} id={nextId} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Set icon: None' }));
+  rerender(<SingleMetadataBar {...props} id={nextId} active={false} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  rerender(<SingleMetadataBar {...props} id={nextId} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Set icon: None' }));
+  rerender(<SingleMetadataBar {...props} id={nextId} disabled />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  rerender(<SingleMetadataBar {...props} id={nextId} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
 });

@@ -8,7 +8,7 @@ import {
   BatchTagEditor,
   MetadataPopover,
 } from '../../Controls/Metadata/MetadataEditors';
-import { IconPicker } from '../../Controls/Metadata/IconPicker';
+import { IconPickerControl } from '../../Controls/Metadata/IconPicker';
 import type { EntitySelection } from './useEntitySelection';
 import './selection-toolbar.css';
 
@@ -48,7 +48,7 @@ export function SelectionToolbar({
   onIsolate,
   onUndo,
 }: SelectionToolbarProps) {
-  const [editor, setEditor] = useState<'label' | 'tag'>();
+  const [editor, setEditor] = useState<'label' | 'tag' | 'icon'>();
   const [replaceIcons, setReplaceIcons] = useState(false);
   const [undoable, setUndoable] = useState<{
     summary: string;
@@ -146,15 +146,10 @@ export function SelectionToolbar({
           >
             <Tag size={13} /> Tags
           </button>
-          <span
-            className="selection-toolbar-icon"
-            onPointerDownCapture={() => setEditor(undefined)}
-            onKeyDownCapture={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') setEditor(undefined);
-            }}
-          >
-            <IconPicker
-              key={scopeKey}
+          <span className="selection-toolbar-icon">
+            <IconPickerControl
+              open={editor === 'icon'}
+              onOpenChange={(open) => setEditor(open ? 'icon' : undefined)}
               value={firstIcon}
               mixed={mixedIcons}
               compact

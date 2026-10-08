@@ -1,6 +1,6 @@
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { Tag, TextCursorInput } from 'lucide-react';
-import { IconPicker } from '../../../../Controls/Metadata/IconPicker';
+import { IconPickerControl } from '../../../../Controls/Metadata/IconPicker';
 import {
   BatchLabelEditor,
   EntityLabelEditor,
@@ -115,15 +115,16 @@ function MetadataBar({
   replaceIcons: boolean;
   replacementControl?: ReactNode;
 }) {
-  const [openState, setOpen] = useState<'label' | 'tags' | 'notes' | undefined>();
+  const [openState, setOpen] = useState<'label' | 'tags' | 'notes' | 'icon' | undefined>();
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
   const [previousScopeKey, setPreviousScopeKey] = useState(scopeKey);
-  const open = active && previousScopeKey === scopeKey ? openState : undefined;
+  const iconDisabled = disabled && openState === 'icon';
+  const open = active && previousScopeKey === scopeKey && !iconDisabled ? openState : undefined;
   if (previousScopeKey !== scopeKey) {
     setPreviousScopeKey(scopeKey);
     if (openState !== undefined) setOpen(undefined);
-  } else if (!active && openState !== undefined) {
+  } else if ((!active || iconDisabled) && openState !== undefined) {
     setOpen(undefined);
   }
   if (!active || !ids.length) return null;
@@ -215,17 +216,10 @@ function MetadataBar({
             )}
           </div>
         )}
-        <div
-          className="batch-icon"
-          // The icon palette is a batch editor too: opening it closes the others
-          // instead of stacking a second focus trap over this bar.
-          onPointerDownCapture={() => setOpen(undefined)}
-          onKeyDownCapture={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') setOpen(undefined);
-          }}
-        >
-          <IconPicker
-            key={scopeKey}
+        <div className="batch-icon">
+          <IconPickerControl
+            open={open === 'icon'}
+            onOpenChange={(open) => setOpen(open ? 'icon' : undefined)}
             value={firstIcon}
             mixed={mixedIcons}
             compact
