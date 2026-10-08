@@ -56,7 +56,8 @@ import { BatchMetadataBar } from './BatchMetadataBar';
 import { WalletOverview } from '../WalletOverview';
 import { MultiSelectFilter } from '../../../../Controls/MultiSelectFilter';
 import {
-  WalletItemDetail,
+  WalletReviewItemDetail,
+  WalletRecordDetail,
   WalletDecisionButtons,
   type WalletDecisionAction,
 } from './WalletItemDetail';
@@ -1321,20 +1322,34 @@ export function WalletReviewPanel(
                 )}
               </>
             ) : selectedRow ? (
-              <WalletItemDetail
-                key={`${tab}:${selectedRow.key}`}
-                {...props}
-                row={selectedRow}
-                selectionIndex={selectionIndex}
-                walletAddresses={walletAddresses}
-                tags={rowTags.get(selectedRow.nodeId)}
-                onNotice={setNotice}
-                onDecide={decide}
-                reviewMode={tab === 'review'}
-                onOpenReviewItem={openLinkedReview}
-                resolveInputs={tab !== 'sources' || (counterpartyReady && !counterparties.loading)}
-                relatedSelection={relatedSelection}
-              />
+              tab === 'review' ? (
+                <WalletReviewItemDetail
+                  key={`${tab}:${selectedRow.key}`}
+                  {...props}
+                  row={selectedRow}
+                  selectionIndex={selectionIndex}
+                  walletAddresses={walletAddresses}
+                  tags={rowTags.get(selectedRow.nodeId)}
+                  onNotice={setNotice}
+                  onDecide={decide}
+                  relatedSelection={relatedSelection}
+                />
+              ) : (
+                <WalletRecordDetail
+                  key={`${tab}:${selectedRow.key}`}
+                  {...props}
+                  row={selectedRow}
+                  selectionIndex={selectionIndex}
+                  walletAddresses={walletAddresses}
+                  tags={rowTags.get(selectedRow.nodeId)}
+                  onNotice={setNotice}
+                  onOpenReviewItem={openLinkedReview}
+                  resolveInputs={
+                    tab !== 'sources' || (counterpartyReady && !counterparties.loading)
+                  }
+                  relatedSelection={relatedSelection}
+                />
+              )
             ) : (
               <p className="wallet-empty-note">
                 {initialReviewLoading

@@ -124,28 +124,7 @@ export function WalletDecisionButtons({
   );
 }
 
-export function WalletItemDetail({
-  row,
-  selectionIndex,
-  walletAddresses,
-  tags = [],
-  workspace,
-  wallet,
-  active,
-  tourPreview,
-  busy,
-  canLoadChainData,
-  updateEvidence,
-  onChange,
-  onNotice,
-  onDecide,
-  onShowInGraph,
-  onIsolateInGraph,
-  relatedSelection,
-  resolveInputs = true,
-  reviewMode = true,
-  onOpenReviewItem,
-}: Pick<
+type WalletDetailProps = Pick<
   WalletWorkbenchContext,
   | 'active'
   | 'tourPreview'
@@ -163,11 +142,215 @@ export function WalletItemDetail({
   workspace: Workspace;
   wallet: Wallet;
   onNotice: (message: string) => void;
-  onDecide: (items: readonly WalletReviewItem[], action: WalletDecisionAction) => void;
   relatedSelection?: ReactNode;
   resolveInputs?: boolean;
-  reviewMode?: boolean;
-  onOpenReviewItem?: (row: WalletRow, item: WalletReviewItem) => void;
+};
+
+/** Review decisions and guidance belong to the queue, not factual records. */
+export function WalletReviewItemDetail({
+  onDecide,
+  ...props
+}: WalletDetailProps & {
+  onDecide: (items: readonly WalletReviewItem[], action: WalletDecisionAction) => void;
+}) {
+  const { row, workspace, tags = [], relatedSelection, busy } = props;
+  const annotation = workspace.annotations.entities[row.nodeId];
+  const changed = row.reviews.find((item) => item.changed);
+  const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
+  const subjectTitle = walletSubjectTitle(row);
+  const missingContext = !annotation?.label?.trim() && tags.length === 0;
+  const completed = !changed && (row.status === 'reviewed' || row.status === 'unknown');
+  const finding = walletRowFinding(workspace, row);
+  const addressReuse = finding?.algorithm.replace(/-v\d+$/, '') === 'address-reuse';
+  const guidedActions: ('label' | 'tags')[] = completed
+    ? []
+    : finding
+      ? tags.length === 0
+        ? ['tags']
+        : []
+      : [
+          ...(!annotation?.label?.trim() ? ['label' as const] : []),
+          ...(tags.length === 0 ? ['tags' as const] : []),
+        ];
+  const title =
+    finding?.title ||
+    annotation?.label?.trim() ||
+    (missingContext ? `${subjectTitle} without label or tags` : subjectTitle);
+  const calloutTone =
+    changed || (!completed && (missingContext || addressReuse))
+      ? 'attention'
+      : completed
+        ? 'complete'
+        : 'info';
+  const GuidanceIcon = calloutTone === 'attention' ? TriangleAlert : completed ? CircleCheck : Info;
+  const guidance = walletReviewGuidance(
+    row,
+    { label: annotation?.label, tagCount: tags.length },
+    finding,
+    !!relatedSelection,
+  );
+  const statusLabel = changed
+    ? 'Evidence changed'
+    : row.status === 'unknown'
+      ? 'Source unknown'
+      : row.status === 'reviewed'
+        ? 'Reviewed'
+        : row.status === 'later'
+          ? 'Review later'
+          : 'Not reviewed';
+  return (
+    <WalletDetailFrame
+      {...props}
+      title={title}
+      contextReview={row.reviews[0]}
+      guidedActions={guidedActions}
+      status={
+        row.reviews.length > 0 && (
+          <span className={`wallet-subject-status status-${changed ? 'changed' : row.status}`}>
+            {statusLabel}
+          </span>
+        )
+      }
+      decisions={
+        actionableReviews.length > 0 && (
+          <div className="wallet-action-group" aria-label="Review decision">
+            <WalletDecisionButtons items={row.reviews} busy={busy} onDecide={onDecide} />
+            {actionableReviews.length > 1 && (
+              <span className="small muted">{actionableReviews.length} decisions</span>
+            )}
+          </div>
+        )
+      }
+      relatedSelection={
+        relatedSelection && (
+          <div
+            className={`wallet-action-group${!completed && finding ? ' wallet-guided-related' : ''}`}
+          >
+            {relatedSelection}
+          </div>
+        )
+      }
+      guidance={
+        <div
+          className={`wallet-review-callout tone-${calloutTone}`}
+          role="note"
+          aria-label="Review guidance"
+        >
+          <GuidanceIcon size={18} aria-hidden="true" />
+          <p>{guidance}</p>
+        </div>
+      }
+    />
+  );
+}
+
+/** Factual records link to review tasks but do not own decision controls. */
+export function WalletRecordDetail({
+  onOpenReviewItem,
+  ...props
+}: WalletDetailProps & {
+  onOpenReviewItem: (row: WalletRow, item: WalletReviewItem) => void;
+}) {
+  const { row, workspace, relatedSelection } = props;
+  const annotation = workspace.annotations.entities[row.nodeId];
+  return (
+    <WalletDetailFrame
+      {...props}
+      title={annotation?.label?.trim() || walletSubjectTitle(row)}
+      relatedSelection={
+        relatedSelection && <div className="wallet-action-group">{relatedSelection}</div>
+      }
+    >
+      <WalletLinkedReviews row={row} onOpenReviewItem={onOpenReviewItem} />
+    </WalletDetailFrame>
+  );
+}
+
+function WalletLinkedReviews({
+  row,
+  onOpenReviewItem,
+}: {
+  row: WalletRow;
+  onOpenReviewItem: (row: WalletRow, item: WalletReviewItem) => void;
+}) {
+  const linkedReviews = [...new Map(row.reviews.map((item) => [item.key, item])).values()];
+  return (
+    <section className="wallet-linked-reviews" aria-label="Review items">
+      <h3>Review items</h3>
+      {linkedReviews.length ? (
+        <ul>
+          {linkedReviews.map((item) => {
+            const state = item.changed
+              ? 'Evidence changed'
+              : item.status === 'later'
+                ? 'Review later'
+                : item.status === 'reviewed'
+                  ? 'Reviewed'
+                  : item.status === 'unknown'
+                    ? 'Source unknown'
+                    : 'To review';
+            const StateIcon = item.changed
+              ? TriangleAlert
+              : item.status === 'later'
+                ? Clock3
+                : item.status === 'reviewed' || item.status === 'unknown'
+                  ? CircleCheck
+                  : Circle;
+            return (
+              <li key={item.key}>
+                <button
+                  title={`${item.title}. ${state}`}
+                  onClick={() => onOpenReviewItem(row, item)}
+                >
+                  <StateIcon size={14} aria-hidden="true" />
+                  <span>{item.title}</span>
+                  <small>{state}</small>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="muted">None</p>
+      )}
+    </section>
+  );
+}
+
+/** Shared evidence and flow state stay in one owner across both detail variants. */
+function WalletDetailFrame({
+  row,
+  selectionIndex,
+  walletAddresses,
+  tags = [],
+  workspace,
+  wallet,
+  active,
+  tourPreview,
+  busy,
+  canLoadChainData,
+  updateEvidence,
+  onChange,
+  onNotice,
+  onShowInGraph,
+  onIsolateInGraph,
+  relatedSelection,
+  resolveInputs = true,
+  contextReview,
+  title,
+  status,
+  decisions,
+  guidance,
+  guidedActions,
+  children,
+}: WalletDetailProps & {
+  contextReview?: WalletReviewItem;
+  title: string;
+  status?: ReactNode;
+  decisions?: ReactNode;
+  guidance?: ReactNode;
+  guidedActions?: readonly ('label' | 'tags')[];
+  children?: ReactNode;
 }) {
   const fetchTransaction = useTransactionFetch('visible');
   const [chosenContext, setChosenContext] = useState('');
@@ -197,7 +380,6 @@ export function WalletItemDetail({
         entry.address === row.address &&
         entry.history?.some((transaction) => !selectionIndex.transactions.has(transaction.tx_hash)),
     );
-  const contextReview = reviewMode ? row.reviews[0] : undefined;
   const contextReviewNodeId = contextReview?.nodeId;
   const contextReviewTxid = contextReview?.txid;
   const contextReviewNodeIds = contextReview?.nodeIds;
@@ -275,56 +457,8 @@ export function WalletItemDetail({
     context?.selected,
     walletAddresses,
   );
-  const changed = row.reviews.find((item) => item.changed);
   const outpoints = row.outpointIds ?? [];
-  const actionableReviews = reviewMode
-    ? row.reviews.filter((item) => !item.legacyOutputReview)
-    : [];
   const subjectTitle = walletSubjectTitle(row);
-  const missingContext = !annotation?.label?.trim() && tags.length === 0;
-  const completed = !changed && (row.status === 'reviewed' || row.status === 'unknown');
-  const finding = reviewMode ? walletRowFinding(workspace, row) : undefined;
-  const addressReuse = finding?.algorithm.replace(/-v\d+$/, '') === 'address-reuse';
-  const guidedActions: ('label' | 'tags')[] = !reviewMode
-    ? []
-    : completed
-      ? []
-      : finding
-        ? tags.length === 0
-          ? ['tags']
-          : []
-        : [
-            ...(!annotation?.label?.trim() ? ['label' as const] : []),
-            ...(tags.length === 0 ? ['tags' as const] : []),
-          ];
-  const title = reviewMode
-    ? finding?.title ||
-      annotation?.label?.trim() ||
-      (missingContext ? `${subjectTitle} without label or tags` : subjectTitle)
-    : annotation?.label?.trim() || subjectTitle;
-  const calloutTone =
-    changed || (!completed && (missingContext || addressReuse))
-      ? 'attention'
-      : completed
-        ? 'complete'
-        : 'info';
-  const GuidanceIcon = calloutTone === 'attention' ? TriangleAlert : completed ? CircleCheck : Info;
-  const guidance = walletReviewGuidance(
-    row,
-    { label: annotation?.label, tagCount: tags.length },
-    finding,
-    !!relatedSelection,
-  );
-  const statusLabel = changed
-    ? 'Evidence changed'
-    : row.status === 'unknown'
-      ? 'Source unknown'
-      : row.status === 'reviewed'
-        ? 'Reviewed'
-        : row.status === 'later'
-          ? 'Review later'
-          : 'Not reviewed';
-  const linkedReviews = [...new Map(row.reviews.map((item) => [item.key, item])).values()];
   const related = useMemo(
     () =>
       selectedWalletRelatedRecords(
@@ -358,11 +492,7 @@ export function WalletItemDetail({
               )}
               {title}
             </h2>
-            {reviewMode && row.reviews.length > 0 && (
-              <span className={`wallet-subject-status status-${changed ? 'changed' : row.status}`}>
-                {statusLabel}
-              </span>
-            )}
+            {status}
           </div>
           <div className="wallet-header-reference">
             <WalletReference
@@ -413,32 +543,10 @@ export function WalletItemDetail({
           onChange={onChange}
           onNotice={onNotice}
         />
-        {reviewMode && actionableReviews.length > 0 && (
-          <div className="wallet-action-group" aria-label="Review decision">
-            <WalletDecisionButtons items={row.reviews} busy={busy} onDecide={onDecide} />
-            {actionableReviews.length > 1 && (
-              <span className="small muted">{actionableReviews.length} decisions</span>
-            )}
-          </div>
-        )}
-        {relatedSelection && (
-          <div
-            className={`wallet-action-group${reviewMode && !completed && finding ? ' wallet-guided-related' : ''}`}
-          >
-            {relatedSelection}
-          </div>
-        )}
+        {decisions}
+        {relatedSelection}
       </div>
-      {reviewMode && (
-        <div
-          className={`wallet-review-callout tone-${calloutTone}`}
-          role="note"
-          aria-label="Review guidance"
-        >
-          <GuidanceIcon size={18} aria-hidden="true" />
-          <p>{guidance}</p>
-        </div>
-      )}
+      {guidance}
       <section className="wallet-subject-card" aria-label={`${subjectTitle} details`}>
         <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
           <div className="wallet-subject-identifier">
@@ -536,47 +644,7 @@ export function WalletItemDetail({
           </div>
         )}
       </section>
-      {!reviewMode && (
-        <section className="wallet-linked-reviews" aria-label="Review items">
-          <h3>Review items</h3>
-          {linkedReviews.length ? (
-            <ul>
-              {linkedReviews.map((item) => {
-                const state = item.changed
-                  ? 'Evidence changed'
-                  : item.status === 'later'
-                    ? 'Review later'
-                    : item.status === 'reviewed'
-                      ? 'Reviewed'
-                      : item.status === 'unknown'
-                        ? 'Source unknown'
-                        : 'To review';
-                const StateIcon = item.changed
-                  ? TriangleAlert
-                  : item.status === 'later'
-                    ? Clock3
-                    : item.status === 'reviewed' || item.status === 'unknown'
-                      ? CircleCheck
-                      : Circle;
-                return (
-                  <li key={item.key}>
-                    <button
-                      title={`${item.title}. ${state}`}
-                      onClick={() => onOpenReviewItem?.(row, item)}
-                    >
-                      <StateIcon size={14} aria-hidden="true" />
-                      <span>{item.title}</span>
-                      <small>{state}</small>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="muted">None</p>
-          )}
-        </section>
-      )}
+      {children}
       {context ? (
         <section
           className={`wallet-flow-disclosure${flowOpen ? ' is-open' : ''}`}

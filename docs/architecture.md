@@ -538,6 +538,12 @@ with outstanding linked work. Exact navigation to the queue uses a transient
 relation context instead of search text. Scope projections use distinct row keys,
 while all decision mutations deduplicate the persisted review key.
 
+`WalletReviewItemDetail` owns queue guidance and decision controls;
+`WalletRecordDetail` owns navigation to linked review items. Both compose one
+private detail frame for identity, metadata, related evidence and transaction
+flow. The frame owns flow state and input loading; it has no review-mode flag
+and does not receive decision callbacks.
+
 `walletRelationships.ts` projects one-hop counterparties: inputs funding
 transactions that paid verified wallet scripts, and outputs of transactions
 spending verified wallet outputs, grouped by canonical address and excluding the
