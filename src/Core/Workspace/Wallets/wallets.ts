@@ -18,9 +18,13 @@ export const MAX_WALLET_HISTORY_ENTRIES = 50_000;
 export const MAX_WALLET_NAME_LENGTH = 255;
 
 export interface WalletReviewRecord {
-  status: 'reviewed' | 'unknown' | 'later';
+  /** Absent on retained pre-goal acknowledgments. */
+  kind?: 'annotation-goal' | 'finding';
+  status: 'reviewed' | 'unknown' | 'later' | 'cannot-identify' | 'not-needed';
   at: string;
   evidence: string;
+  /** Saved material support baseline for a retained pre-v8 finding assessment. */
+  supportEvidence?: string;
 }
 
 export type WalletReviewRecords = Record<string, WalletReviewRecord>;
@@ -28,11 +32,23 @@ export type WalletReviewRecords = Record<string, WalletReviewRecord>;
 export const walletReviewsSchema = z
   .record(
     z.string().max(200),
-    z.object({
-      status: z.enum(['reviewed', 'unknown', 'later']),
-      at: z.iso.datetime({ offset: true }),
-      evidence: z.string().max(80),
-    }),
+    z
+      .object({
+        kind: z.enum(['annotation-goal', 'finding']).optional(),
+        status: z.enum(['reviewed', 'unknown', 'later', 'cannot-identify', 'not-needed']),
+        at: z.iso.datetime({ offset: true }),
+        evidence: z.string().max(80),
+        supportEvidence: z.string().max(80).optional(),
+      })
+      .refine(
+        (record) =>
+          record.kind === 'annotation-goal'
+            ? ['cannot-identify', 'not-needed', 'later'].includes(record.status)
+            : record.kind === 'finding'
+              ? ['reviewed', 'later'].includes(record.status)
+              : ['reviewed', 'unknown', 'later'].includes(record.status),
+        'Review records must preserve the distinction between annotation dispositions and finding assessments.',
+      ),
   )
   .refine(
     (value) => Object.keys(value).length <= MAX_WALLET_REVIEWS,
@@ -81,6 +97,8 @@ export interface Wallet {
   color: string;
   addresses: WalletAddress[];
   scannedAt?: string;
+  /** Completion of history, coin checks and any required analysis, distinct from scan time. */
+  refreshedAt?: string;
   scanComplete?: boolean;
   scanLimit?: number;
   scanGap?: number;
@@ -114,6 +132,7 @@ const walletSchema = z.object({
     )
     .max(10000),
   scannedAt: timestamp.optional(),
+  refreshedAt: timestamp.optional(),
   scanComplete: z.boolean().optional(),
   scanLimit: z.number().int().min(1).max(0x80000000).optional(),
   scanGap: z.number().int().min(1).max(100).optional(),

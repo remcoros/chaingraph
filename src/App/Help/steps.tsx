@@ -39,7 +39,7 @@ export interface TourStep {
   /** Presentation only. App adapts these hints without changing saved workspace state. */
   view?: {
     workbench?: 'graph' | 'wallet';
-    walletTab?: 'review' | 'sources';
+    walletTab?: 'review' | 'sources' | 'transactions';
     panel?: GraphMobilePanel;
     leftTab?: GraphLeftTab;
     rightTab?: 'inspect';
@@ -69,12 +69,12 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="wallet-preview"] [data-tour="wallet-overview"]',
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
-    view: { workbench: 'wallet', walletTab: 'review' },
+    view: { workbench: 'wallet', walletTab: 'transactions' },
     text: (
       <>
         Open <strong>Wallet</strong>, then pick one or use <strong>Add wallet</strong>.{' '}
-        <strong>Refresh</strong> pulls in its history, <strong>Check UTXOs</strong> confirms what is
-        still unspent, and <strong>Analyze</strong> runs the local analysis.
+        <strong>Refresh</strong> updates history, coins and local analysis together. Automatic
+        refresh keeps checking while your workspace is unlocked.
       </>
     ),
     missingTargetText:
@@ -93,10 +93,10 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     view: { workbench: 'wallet', walletTab: 'sources' },
     text: (
       <>
-        <strong>To review</strong> gathers the observations that need your attention.{' '}
-        <strong>Sources</strong> and <strong>Destinations</strong> list addresses tied directly to
-        your wallet transactions. Select an address to note whether its counterparty is known or
-        still uncertain.
+        <strong>Review</strong> gathers unmet context goals and finding assessments. Under{' '}
+        <strong>Addresses</strong>, <strong>Sources</strong> and <strong>Destinations</strong>
+        show observed relationships. Record reusable identities in <strong>Counterparties</strong>
+        or from transaction details.
       </>
     ),
     missingTargetText:
@@ -112,7 +112,7 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     target: '[data-tour="wallet-preview"] [data-tour="wallet-filters"]',
     fallbackTarget: '[data-tour="wallet-empty"]',
     revealTarget: 'start',
-    view: { workbench: 'wallet', walletTab: 'review' },
+    view: { workbench: 'wallet', walletTab: 'transactions' },
     text: (
       <>
         Try <strong>Labels: Unlabeled</strong>, a tag, or <strong>Search</strong> to narrow things
@@ -136,17 +136,18 @@ export const WORKBENCH_TOUR: readonly TourStep[] = [
     label: 'Review and follow',
     title: 'Decide, then follow the context',
     icon: GitBranch,
-    target: '[data-tour="wallet-preview"] [data-tour="wallet-item-actions"]',
+    target: '[data-tour="wallet-preview"] [data-tour="wallet-review-goals"]',
     fallbackTarget:
       '[data-tour="wallet-preview"] [data-tour="wallet-filters"], [data-tour="wallet-empty"]',
     revealTarget: 'start',
     view: { workbench: 'wallet', walletTab: 'review' },
     text: (
       <>
-        <strong>Mark reviewed</strong> closes out a review decision, and{' '}
-        <strong>Review later</strong> sets it aside for now. Use <strong>Show on graph</strong> to
-        jump to the item in Graph, then <strong>Back to Wallet</strong> whenever you want to return
-        to your list and selection.
+        Click a field to edit it. <strong>Needs review</strong> opens its question and decisions.
+        Answered questions disappear. <strong>Mark reviewed</strong> records a finding assessment;
+        <strong>Review later</strong> postpones it. Use <strong>Show on graph</strong> to jump to
+        the item in Graph, then <strong>Back to Wallet</strong> whenever you want to return to your
+        list and selection.
       </>
     ),
     missingTargetText: (

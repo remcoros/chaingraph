@@ -11,6 +11,36 @@ import {
 } from './view';
 
 describe('saved presentation contract', () => {
+  it('keeps ordinary browsing separate from a resumable review position for each wallet', () => {
+    const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
+    const wallet = {
+      first: {
+        activeTab: 'review',
+        browsing: {
+          tab: 'transactions',
+          query: 'savings',
+          selectedKey: 'tx:first',
+          scrollTop: 480,
+        },
+        review: { status: 'open', query: '', selectedKey: 'tx:later', scrollTop: 60 },
+      },
+      second: { browsing: { tab: 'utxos', query: 'reserved' } },
+    };
+    expect(viewSchema.parse({ ...base, wallet }).wallet).toEqual(wallet);
+    expect(viewSchema.parse(base).wallet).toBeUndefined();
+    expect(
+      viewSchema.safeParse({ ...base, wallet: { first: { browsing: { tab: 'invalid' } } } })
+        .success,
+    ).toBe(false);
+  });
+  it('keeps automatic refresh optional for existing documents and validates persisted choices', () => {
+    const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
+    expect(viewSchema.parse(base).automaticWalletRefresh).toBeUndefined();
+    expect(
+      viewSchema.parse({ ...base, automaticWalletRefresh: false }).automaticWalletRefresh,
+    ).toBe(false);
+    expect(viewSchema.safeParse({ ...base, automaticWalletRefresh: 'false' }).success).toBe(false);
+  });
   it('keeps saved filter and panel types aligned with their schemas', () => {
     expectTypeOf<
       NonNullable<z.output<typeof viewSchema>['filters']>
@@ -47,4 +77,16 @@ describe('saved presentation contract', () => {
     expect(validateGraphCamera(invalid).success).toBe(false);
     expect(validateGraphSnapshot({ ...snapshot, camera: invalid }).success).toBe(false);
   });
+});
+
+it('validates the saved refresh interval without requiring it in older workspaces', () => {
+  const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
+  expect(viewSchema.parse(base).walletRefreshIntervalSeconds).toBeUndefined();
+  expect(
+    viewSchema.parse({ ...base, walletRefreshIntervalSeconds: 120 }).walletRefreshIntervalSeconds,
+  ).toBe(120);
+  for (const interval of [0, 9, 10.5, 86401, '60'])
+    expect(viewSchema.safeParse({ ...base, walletRefreshIntervalSeconds: interval }).success).toBe(
+      false,
+    );
 });

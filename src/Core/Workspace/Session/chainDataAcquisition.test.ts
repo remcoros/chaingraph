@@ -66,6 +66,106 @@ function fixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('fresh transaction observation acceptance', () => {
+  const wallet = {
+    id: '30000000-0000-4000-8000-000000000001',
+    name: 'Public wallet',
+    key: PUBLIC_ZPUB,
+    scriptType: 'p2wpkh' as const,
+    color: '#27c4a7',
+    addresses: [],
+  };
+  function addWallet(f: ReturnType<typeof fixture>) {
+    f.session.edit(
+      (current) => ({
+        ...current,
+        wallets: { ...current.wallets, definitions: [wallet] },
+      }),
+      false,
+    );
+  }
+  async function finishDiscovery(f: ReturnType<typeof fixture>) {
+    await vi.waitFor(() => expect(f.pending).toHaveLength(2));
+    for (const reply of f.pending.slice()) reply(new Response(JSON.stringify({ result: [] })));
+    await vi.waitFor(() => expect(f.pending).toHaveLength(4));
+    expect(f.current().wallets.definitions[0].scannedAt).toBeDefined();
+  }
+  it('publishes completed discovery before checking coins and retains it when the coin stage is cancelled', async () => {
+    const f = fixture();
+    addWallet(f);
+    const controller = new AbortController();
+    const result = f.acquisition.observe.walletRefresh(wallet, {
+      gap: 1,
+      maxIndex: 1,
+      signal: controller.signal,
+    });
+    const cancelled = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    await finishDiscovery(f);
+    controller.abort();
+    await cancelled;
+    expect(f.current().wallets.definitions[0].addresses).toHaveLength(2);
+    expect(f.current().chainData.addressUtxos).toBeUndefined();
+    expect(f.session.history).toHaveLength(0);
+  });
+  it('retains successful coin checks and dated prior observations when another address fails', async () => {
+    const f = fixture();
+    addWallet(f);
+    const result = f.acquisition.observe.walletRefresh(wallet, { gap: 1, maxIndex: 1 });
+    await finishDiscovery(f);
+    const addresses = f.current().wallets.definitions[0].addresses;
+    const oldTime = '2026-09-01T10:00:00.000Z';
+    f.session.edit(
+      (current) => ({
+        ...current,
+        chainData: {
+          ...current.chainData,
+          addressUtxos: {
+            [addresses[1].address]: { network: 'mainnet', checkedAt: oldTime, utxos: [] },
+          },
+        },
+      }),
+      false,
+    );
+    f.pending[2](new Response(JSON.stringify({ result: [] })));
+    f.pending[3](new Response('{}', { status: 429 }));
+    const completed = await result;
+    expect(completed.coins.errors).toHaveLength(1);
+    expect(
+      completed.snapshot.chainData.addressUtxos?.[addresses[0].address]?.checkedAt,
+    ).toBeDefined();
+    expect(completed.snapshot.chainData.addressUtxos?.[addresses[1].address]?.checkedAt).toBe(
+      oldTime,
+    );
+  });
+  it.each(['close', 'replace-addresses'] as const)(
+    'rejects a late completed coin batch after %s while preserving its discovery checkpoint',
+    async (change) => {
+      const f = fixture();
+      addWallet(f);
+      const result = f.acquisition.observe.walletRefresh(wallet, { gap: 1, maxIndex: 1 });
+      const cancelled = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+      await finishDiscovery(f);
+      if (change === 'close') f.session.fetchScope.close();
+      else {
+        f.session.edit(
+          (current) => ({
+            ...current,
+            wallets: {
+              ...current.wallets,
+              definitions: current.wallets.definitions.map((entry) => ({
+                ...entry,
+                addresses: [...entry.addresses],
+              })),
+            },
+          }),
+          false,
+        );
+        for (const reply of f.pending.slice(2)) reply(new Response(JSON.stringify({ result: [] })));
+      }
+      await cancelled;
+      expect(f.current().wallets.definitions[0].scannedAt).toBeDefined();
+      expect(f.current().chainData.addressUtxos).toBeUndefined();
+    },
+  );
   it('retains a completed watched-address check when a later address is cancelled', async () => {
     const f = fixture();
     f.session.edit((current) => ({
@@ -125,7 +225,7 @@ describe('fresh transaction observation acceptance', () => {
         ...current,
         wallets: { ...current.wallets, definitions: [wallet] },
       }));
-      const result = f.acquisition.observe.walletScan(wallet, { gap: 1, maxIndex: 1 });
+      const result = f.acquisition.observe.walletRefresh(wallet, { gap: 1, maxIndex: 1 });
       const cancelled = expect(result).rejects.toMatchObject({ name: 'AbortError' });
       await vi.waitFor(() => expect(f.pending).toHaveLength(2));
       if (change === 'close') f.session.fetchScope.close();

@@ -2,8 +2,10 @@ import {
   createWalletOutputEvidenceResolver,
   type WalletOutputEvidenceResolver,
 } from './walletOutputEvidence';
-import { formatBitcoinAmount, short } from '../../Formatting';
+import { short } from '../../Formatting';
 import { stableKey } from '../Analysis/tools/shared';
+import { walletFindingEvidence } from './walletReviewEvidence';
+import type { AnalysisFinding } from '../Analysis/finding';
 import {
   listWalletTransactions,
   verifiedWalletAddresses,
@@ -12,9 +14,19 @@ import {
 } from './walletRecords';
 import { listTagsForNode } from '../Annotations/tagMembership';
 import { outpointReference, transactionReference } from '../entityReferences';
-import { type Wallet, MAX_WALLET_REVIEWS } from './wallets';
+import { counterpartyReference } from '../annotationReferences';
+import {
+  createCounterpartyLookup,
+  listCounterpartiesForRelationship,
+  type CounterpartyLookup,
+} from '../Counterparties/counterparties';
+import {
+  type Wallet,
+  type WalletAddress,
+  type WalletReviewRecord,
+  MAX_WALLET_REVIEWS,
+} from './wallets';
 import type { Workspace } from '../workspace';
-
 import { addressToScriptHash } from '../../Bitcoin';
 import { reconcileWalletUtxos } from './WalletUtxos/walletUtxoObservation';
 import {
@@ -26,12 +38,9 @@ import {
   type WalletRelationship,
   type WalletRelationshipContext,
 } from './walletRelationships';
-import {
-  indexPreviousOutputs,
-  resolvePreviousOutput,
-  type PreviousOutputIndex,
-} from '../../ChainData';
+import { indexPreviousOutputs, type PreviousOutputIndex, type Transaction } from '../../ChainData';
 
+/** Reasons are factual presentation roles; annotation requirements are separate goals. */
 export const REVIEW_REASONS = [
   'current-utxo',
   'wallet-address',
@@ -44,7 +53,9 @@ export const REVIEW_REASONS = [
   'link',
 ] as const;
 export type ReviewReason = (typeof REVIEW_REASONS)[number];
-export type ReviewStatus = 'reviewed' | 'unknown' | 'later';
+export type ReviewStatus = WalletReviewRecord['status'];
+export type ReviewDecision = WalletReviewRecord;
+export type WalletAnnotationGoal = 'activity-context' | 'coin-context' | 'counterparty-context';
 export const REVIEW_SCOPES = [
   'utxos',
   'transactions',
@@ -54,24 +65,18 @@ export const REVIEW_SCOPES = [
 ] as const;
 export type ReviewScope = (typeof REVIEW_SCOPES)[number];
 
-export interface ReviewDecision {
-  status: ReviewStatus;
-  at: string;
-  /** Fingerprint of the observations this decision was made against. */
-  evidence: string;
-}
-
 export interface WalletReviewItem {
-  /** Stable per wallet, reason and subject, so decisions survive a refresh. */
   key: string;
+  kind: 'annotation-goal' | 'finding';
+  goal?: WalletAnnotationGoal;
   reason: ReviewReason;
-  /** Factual Wallet section this queue projection concerns. */
   scope: ReviewScope;
+  /** Grouped tasks retain every factual scope; flat projections keep their single scope. */
+  scopes?: ReviewScope[];
   title: string;
   detail: string;
-  /** Primary entity for Inspect, Show in Graph and Analyze. */
   nodeId: string;
-  /** Exact factual records linked to this projection. */
+  /** Factual records linked to this projection, independent of its edit target. */
   subjectIds: string[];
   nodeIds: string[];
   txid?: string;
@@ -80,22 +85,34 @@ export interface WalletReviewItem {
   label: string;
   tags: string[];
   evidence: string;
-  status: ReviewStatus | 'open';
+  status: ReviewStatus | 'open' | 'resolved';
+  /** Derived from human context, never saved as an acknowledgment. */
+  satisfied: boolean;
+  /** Exact human annotation references supplying context, without copying metadata. */
+  contextSubjects: string[];
   decidedAt?: string;
-  /** A decision exists, but the observations behind the item changed. */
   changed: boolean;
-  /** One-hop roles are independent of the persisted review reason. */
   relationshipKinds?: ('source' | 'destination')[];
   ownership?: WalletRelationship['ownership'];
   transactionIds?: string[];
   walletOutputIds?: string[];
-  /** Constituent evidence only. Address review nodeIds contain only the address edit target. */
   outpointIds?: string[];
   contexts?: WalletRelationshipContext[];
-  /** A saved output-only decision retained separately from its address group. */
+  /** Only legacy UI fixtures may use this field; prior decisions are not active items. */
   legacyOutputReview?: boolean;
-  /** Registry algorithm associated with a saved finding. */
   algorithm?: string;
+}
+
+export interface WalletReviewGroup {
+  key: string;
+  transactionId?: string;
+  /** One canonical task per key, even when findings have multiple factual scopes. */
+  items: WalletReviewItem[];
+  subjectIds: string[];
+}
+
+export interface WalletLegacyReviewDecision extends WalletReviewRecord {
+  key: string;
 }
 
 export interface WalletReviewCoverage {
@@ -111,37 +128,45 @@ export interface WalletReviewCoverage {
   utxoTotalAddresses?: number;
   utxoCount?: number;
   utxoBalanceSats?: number;
-  /** Historical unspent checks that conflict with exact loaded spenders. */
   utxoLoadedSpenders?: number;
-  /** The check covered only part of the discovered addresses. */
   utxoPartial: boolean;
 }
 
 export interface WalletReview {
   items: WalletReviewItem[];
+  groups: WalletReviewGroup[];
+  /** Original object acknowledgments retained verbatim and never replayed as goals. */
+  legacyDecisions: WalletLegacyReviewDecision[];
   coverage: WalletReviewCoverage;
-  /** Loaded ancestry was missing for some current UTXOs, so sources are incomplete. */
   missingSourceTransactions: number;
 }
 
-const reasonOrder = new Map(REVIEW_REASONS.map((reason, index) => [reason, index]));
-const scopeOrder = new Map(REVIEW_SCOPES.map((scope, index) => [scope, index]));
-
-/** Only these statuses complete a review. `later` stays pending work. */
-export function isCompletedReview(
-  decision?: Pick<ReviewDecision, 'status'> | ReviewDecision,
-): boolean {
-  return decision?.status === 'reviewed' || decision?.status === 'unknown';
+export function isCompletedReview(decision?: { status: WalletReviewItem['status'] }): boolean {
+  return (
+    decision?.status === 'reviewed' ||
+    decision?.status === 'unknown' ||
+    decision?.status === 'resolved' ||
+    decision?.status === 'cannot-identify' ||
+    decision?.status === 'not-needed'
+  );
 }
 
+/** Retained for finding keys and reading existing object decision identities. */
 export function reviewKey(walletId: string, reason: ReviewReason, subject: string): string {
   return `${walletId}|${reason}|${subject}`;
+}
+
+export function walletGoalKey(
+  walletId: string,
+  goal: WalletAnnotationGoal,
+  subject: string,
+): string {
+  return `${walletId}|goal-v1:${goal}|${stableKey(subject)}`;
 }
 
 function fingerprint(value: string): string {
   return stableKey(value).slice(0, 16);
 }
-
 interface OwnedOutput {
   nodeId: string;
   txid: string;
@@ -155,13 +180,11 @@ interface OwnedOutput {
  */
 function walletOwnedOutputs(
   workspace: Workspace,
-  wallet: Wallet,
+  addresses: readonly WalletAddress[],
   prevouts?: PreviousOutputIndex,
   evidence: WalletOutputEvidenceResolver = createWalletOutputEvidenceResolver(workspace.network),
 ): Map<string, OwnedOutput> {
-  const hashes = new Set(
-    verifiedWalletAddresses(wallet, workspace.network).map((address) => address.scripthash),
-  );
+  const hashes = new Set(addresses.map((address) => address.scripthash));
   const owned = new Map<string, OwnedOutput>();
   if (!hashes.size) return owned;
   for (const [outpoint, resolution] of prevouts ??
@@ -204,37 +227,188 @@ function tagNamesFor(workspace: Workspace, nodeId: string, address?: string): st
 
 type ReviewSubject = Omit<
   WalletReviewItem,
-  'status' | 'changed' | 'label' | 'tags' | 'decidedAt' | 'scope' | 'subjectIds'
-> & {
-  scope?: ReviewScope;
-  subjectIds?: string[];
-};
-type CompleteReviewSubject = ReviewSubject & { scope: ReviewScope; subjectIds: string[] };
+  'label' | 'tags' | 'status' | 'decidedAt' | 'changed' | 'satisfied'
+> & { satisfied?: boolean };
 
-function decorate(workspace: Workspace, item: CompleteReviewSubject): WalletReviewItem {
-  const decision = workspace.wallets.reviews?.[item.key];
+function decorate(workspace: Workspace, item: ReviewSubject): WalletReviewItem {
+  const stored = workspace.wallets.reviews?.[item.key];
+  const decision =
+    item.kind === 'finding'
+      ? stored &&
+        (stored.status === 'reviewed' || stored.status === 'later' || stored.status === 'unknown')
+        ? stored
+        : undefined
+      : stored?.kind === 'annotation-goal'
+        ? stored
+        : undefined;
+  const satisfied = item.satisfied === true;
   return {
     ...item,
     label: annotationOf(workspace, item.nodeId)?.label ?? '',
     tags: tagNamesFor(workspace, item.nodeId, item.address),
-    status: decision?.status ?? 'open',
+    satisfied,
+    status: satisfied ? 'resolved' : (decision?.status ?? 'open'),
     decidedAt: decision?.at,
-    changed: !!decision && decision.evidence !== item.evidence,
+    changed:
+      !satisfied && !!decision && (decision.supportEvidence ?? decision.evidence) !== item.evidence,
   };
 }
 
-function nativeReviewScope(reason: ReviewReason): ReviewScope | undefined {
-  if (reason === 'current-utxo' || reason === 'source') return 'utxos';
-  if (reason === 'wallet-transaction') return 'transactions';
-  if (reason === 'wallet-address') return 'addresses';
-  if (reason === 'source-address' || reason === 'destination-address') return 'relationships';
-  if (reason === 'funding-source' || reason === 'counterparty') return 'previous-output-decisions';
-  return undefined;
+function humanContext(workspace: Workspace, nodeId: string, address?: string): string[] {
+  const annotation = annotationOf(workspace, nodeId);
+  return annotation?.label.trim() ||
+    annotation?.note.trim() ||
+    tagNamesFor(workspace, nodeId, address).length
+    ? [nodeId]
+    : [];
 }
 
-/** Derive the review queue from loaded observations and verified UTXO checks.
- * No network requests, heuristics or ownership claims are produced here.
- */
+function transactionHumanContext(workspace: Workspace, txid: string): string[] {
+  const nodeId = transactionReference(txid);
+  const annotation = annotationOf(workspace, nodeId);
+  // A transaction tag does not silently label its outputs.
+  return annotation?.label.trim() || annotation?.note.trim() ? [nodeId] : [];
+}
+
+function counterpartyContext(
+  workspace: Workspace,
+  txid: string,
+  direction: 'received' | 'sent',
+  outputIds: string[],
+  counterparties: CounterpartyLookup,
+  related: WalletRelationship[] = [],
+): string[] {
+  const subjects = listCounterpartiesForRelationship(
+    workspace,
+    {
+      transactionId: txid,
+      direction,
+      walletOutputIds: outputIds,
+    },
+    counterparties,
+  ).map((party) => counterpartyReference(party.id));
+  // Reusable annotations supply only the exact observed role and its provenance.
+  // An identified input address does not identify its co-inputs or allocate its value.
+  const references = [
+    ...(direction === 'received' ? outputIds : []),
+    ...related.flatMap((output) => [
+      output.id,
+      ...(output.address ? [`addr:${output.address}`] : []),
+    ]),
+  ];
+  for (const reference of new Set(references)) {
+    const parties = counterparties.forEntity(reference);
+    if (parties.length)
+      subjects.push(reference, ...parties.map((party) => counterpartyReference(party.id)));
+  }
+  return [...new Set(subjects)];
+}
+
+function coinContext(
+  workspace: Workspace,
+  output: OwnedOutput,
+  owned: Map<string, OwnedOutput>,
+  loaded: Map<string, Transaction>,
+  counterparties: CounterpartyLookup,
+  receivingRelationships: Map<string, WalletRelationship[]>,
+): string[] {
+  const receiptContext = (receipt: OwnedOutput): string[] => {
+    const directParties = counterparties.forEntity(receipt.nodeId);
+    const direct = [
+      ...humanContext(workspace, receipt.nodeId, receipt.address),
+      ...(directParties.length
+        ? [receipt.nodeId, ...directParties.map((party) => counterpartyReference(party.id))]
+        : []),
+    ];
+    // A payment purpose does not describe the origin of its change outputs.
+    if (!receivingRelationships.has(receipt.txid)) return direct;
+    return [
+      ...direct,
+      ...transactionHumanContext(workspace, receipt.txid),
+      ...counterpartyContext(
+        workspace,
+        receipt.txid,
+        'received',
+        [receipt.nodeId],
+        counterparties,
+        receivingRelationships.get(receipt.txid),
+      ),
+    ];
+  };
+  const context = receiptContext(output);
+  // Exact one-hop wallet receipt links provide context, never input-to-output value allocation.
+  for (const input of loaded.get(output.txid)?.vin ?? []) {
+    const txid = canonicalTransactionId(input.txid);
+    if (input.coinbase !== undefined || !txid || !validOutputIndex(input.vout)) continue;
+    const receipt = owned.get(outpointReference(txid, input.vout));
+    if (receipt) context.push(...receiptContext(receipt));
+  }
+  return [...new Set(context)];
+}
+
+function transactionEvidence(
+  transaction: Transaction | undefined,
+  prevouts: PreviousOutputIndex,
+  inspect: WalletOutputEvidenceResolver,
+): unknown {
+  if (!transaction) return 'unloaded';
+  return {
+    inputs: transaction.vin.map((input) => {
+      if (input.coinbase !== undefined) return ['coinbase', input.coinbase];
+      const txid = canonicalTransactionId(input.txid);
+      if (!txid || !validOutputIndex(input.vout)) return ['unknown-input'];
+      const previous = prevouts.get(`${txid}:${input.vout}`);
+      return previous?.status === 'loaded' || previous?.status === 'attached'
+        ? [txid, input.vout, previous.output.value, inspect(previous.output).scripthash]
+        : [txid, input.vout, 'missing'];
+    }),
+    outputs: transaction.vout.map((output) => [
+      output.n,
+      output.value,
+      inspect(output).scripthash,
+      inspect(output).scripthash ? undefined : output.scriptPubKey?.hex,
+    ]),
+  };
+}
+
+function buildGroups(
+  items: WalletReviewItem[],
+  transactionOrder: Map<string, number>,
+): WalletReviewGroup[] {
+  const canonical = new Map<string, WalletReviewItem>();
+  for (const item of items) {
+    const previous = canonical.get(item.key);
+    if (previous)
+      canonical.set(item.key, {
+        ...previous,
+        scopes: [...new Set([...(previous.scopes ?? [previous.scope]), item.scope])],
+        subjectIds: [...new Set([...previous.subjectIds, ...item.subjectIds])],
+        nodeIds: [...new Set([...previous.nodeIds, ...item.nodeIds])],
+      });
+    else canonical.set(item.key, { ...item, scopes: [item.scope] });
+  }
+  const groups = new Map<string, WalletReviewGroup>();
+  for (const item of canonical.values()) {
+    const transactionId = [...(item.transactionIds ?? (item.txid ? [item.txid] : []))].sort(
+      (a, b) =>
+        (transactionOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+          (transactionOrder.get(b) ?? Number.MAX_SAFE_INTEGER) || a.localeCompare(b),
+    )[0];
+    const key = transactionId ? transactionReference(transactionId) : `task:${item.key}`;
+    const group = groups.get(key) ?? { key, transactionId, items: [], subjectIds: [] };
+    group.items.push(item);
+    group.subjectIds = [...new Set([...group.subjectIds, ...item.subjectIds])];
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort(
+    (a, b) =>
+      (transactionOrder.get(a.transactionId ?? '') ?? Number.MAX_SAFE_INTEGER) -
+        (transactionOrder.get(b.transactionId ?? '') ?? Number.MAX_SAFE_INTEGER) ||
+      a.key.localeCompare(b.key),
+  );
+}
+
+/** Derive annotation goals and explicit finding assessments from one accepted snapshot. */
 export function buildWalletReview(
   workspace: Workspace,
   wallet: Wallet,
@@ -244,58 +418,78 @@ export function buildWalletReview(
     utxoCheckedAddresses?: number;
     utxoTotalAddresses?: number;
     utxoPartial?: boolean;
-    /** Reuse projections of the same wallet, transactions and network. */
     relationships?: WalletAddressRelationships;
     prevouts?: PreviousOutputIndex;
     evidence?: WalletOutputEvidenceResolver;
+    transactionRecords?: ReturnType<typeof listWalletTransactions>;
+    addressRecords?: readonly WalletAddress[];
+    findingEvidence?: (finding: AnalysisFinding) => string;
   } = {},
 ): WalletReview {
-  const addresses = verifiedWalletAddresses(wallet, workspace.network);
+  const addresses = options.addressRecords ?? verifiedWalletAddresses(wallet, workspace.network);
   const prevouts =
     options.prevouts ??
     indexPreviousOutputs({
       network: workspace.network,
       transactions: workspace.chainData.transactions,
     });
-  const evidence = options.evidence ?? createWalletOutputEvidenceResolver(workspace.network);
-  const owned = walletOwnedOutputs(workspace, wallet, prevouts, evidence);
-  const groups =
-    options.relationships ?? groupWalletRelationships(workspace, wallet, prevouts, evidence);
-  const relationships = {
-    sources: [...groups.sources.flatMap((group) => group.outpoints), ...groups.sourceExceptions],
-    destinations: [
-      ...groups.destinations.flatMap((group) => group.outpoints),
-      ...groups.destinationExceptions,
-    ],
-  };
+  const inspect = options.evidence ?? createWalletOutputEvidenceResolver(workspace.network);
+  const owned = walletOwnedOutputs(workspace, addresses, prevouts, inspect);
   const loaded = loadedWalletTransactions(workspace);
-  const directSources = new Map(relationships.sources.map((entry) => [entry.id, entry]));
-  const directDestinations = new Map(relationships.destinations.map((entry) => [entry.id, entry]));
-  const history = new Set<string>();
-  for (const address of addresses)
-    for (const entry of address.history ?? [])
-      if (/^[0-9a-f]{64}$/i.test(entry.tx_hash)) history.add(entry.tx_hash.toLowerCase());
-  for (const output of owned.values()) history.add(output.txid);
-
-  // Exact recorded spends only. A missing spend is unknown, never proof of unspent.
-  const walletFundedTransactions = new Set<string>();
-  for (const [txid, transaction] of loaded)
-    for (const input of transaction.vin) {
-      const parent = canonicalTransactionId(input.txid);
-      if (input.coinbase !== undefined || !parent || !validOutputIndex(input.vout)) continue;
-      const id = outpointReference(parent, input.vout);
-      if (owned.has(id)) {
-        walletFundedTransactions.add(txid);
-        history.add(txid);
+  const relationships =
+    options.relationships ?? groupWalletRelationships(workspace, wallet, prevouts, inspect);
+  const counterparties = createCounterpartyLookup(workspace);
+  const outputsByTransaction = new Map<string, string[]>();
+  for (const output of owned.values()) {
+    const ids = outputsByTransaction.get(output.txid) ?? [];
+    ids.push(output.nodeId);
+    outputsByTransaction.set(output.txid, ids);
+  }
+  const spentByTransaction = new Map<string, string[]>();
+  for (const transaction of loaded.values()) {
+    const ids = transaction.vin.flatMap((input) => {
+      const txid = canonicalTransactionId(input.txid);
+      if (input.coinbase !== undefined || !txid || !validOutputIndex(input.vout)) return [];
+      const id = outpointReference(txid, input.vout);
+      return owned.has(id) ? [id] : [];
+    });
+    if (ids.length) spentByTransaction.set(transaction.txid, [...new Set(ids)]);
+  }
+  const relatedByTransaction = {
+    received: new Map<string, WalletRelationship[]>(),
+    sent: new Map<string, WalletRelationship[]>(),
+  };
+  for (const direction of ['received', 'sent'] as const) {
+    const outputs =
+      direction === 'received'
+        ? [
+            ...relationships.sources.flatMap((group) => group.outpoints),
+            ...relationships.sourceExceptions,
+          ]
+        : [
+            ...relationships.destinations.flatMap((group) => group.outpoints),
+            ...relationships.destinationExceptions,
+          ];
+    for (const output of outputs) {
+      if (output.ownership === 'wallet') continue;
+      for (const context of output.contexts) {
+        const entries = relatedByTransaction[direction].get(context.transactionId) ?? [];
+        if (!entries.some((entry) => entry.id === output.id)) entries.push(output);
+        relatedByTransaction[direction].set(context.transactionId, entries);
       }
     }
-
+  }
+  const records = options.transactionRecords ?? listWalletTransactions(workspace, wallet);
+  const receivingRelationships = new Map(
+    records
+      .filter((record) => record.direction === 'received')
+      .map((record) => [record.txid, relatedByTransaction.received.get(record.txid) ?? []]),
+  );
+  const transactionOrder = new Map(records.map((record, index) => [record.txid, index]));
+  const history = new Set(records.map((record) => record.txid));
   const walletHashes = new Set(addresses.map((address) => address.scripthash));
   const verifiedRecords = (options.utxos ?? [])
-    .map((record) => ({
-      ...record,
-      txid: canonicalTransactionId(record.txid) ?? record.txid,
-    }))
+    .map((record) => ({ ...record, txid: canonicalTransactionId(record.txid) ?? record.txid }))
     .filter((record) => {
       try {
         if (
@@ -309,286 +503,175 @@ export function buildWalletReview(
         )
           return false;
         const transaction = loaded.get(record.txid);
-        return (
-          !transaction ||
-          verifyWalletUtxo(record, { ...transaction, txid: record.txid }, workspace.network)
-        );
+        return !transaction || verifyWalletUtxo(record, transaction, workspace.network);
       } catch {
         return false;
       }
     });
-  const reconciledUtxos = reconcileWalletUtxos(verifiedRecords, loaded, workspace.network);
-  const verifiedUtxos = reconciledUtxos.current;
-  const candidates: CompleteReviewSubject[] = [];
-  const push = (subject: ReviewSubject) => {
-    const scope = subject.scope ?? nativeReviewScope(subject.reason);
-    if (!scope) throw new Error('A review item must declare its factual scope.');
-    const source = directSources.get(subject.nodeId);
-    const destination = directDestinations.get(subject.nodeId);
-    const related = [source, destination].filter((entry): entry is WalletRelationship => !!entry);
-    if (related.length) {
-      subject = {
-        ...subject,
-        relationshipKinds: [
-          ...(source ? ['source' as const] : []),
-          ...(destination ? ['destination' as const] : []),
-        ],
-        transactionIds: [...new Set(related.flatMap((entry) => entry.transactionIds))].sort(),
-        walletOutputIds: [...new Set(related.flatMap((entry) => entry.walletOutputIds))].sort(),
-      };
-    }
-    candidates.push({
+  const reconciled = reconcileWalletUtxos(verifiedRecords, loaded, workspace.network);
+  const currentUtxos = reconciled.current;
+  const subjects: ReviewSubject[] = [];
+  const pushGoal = (
+    subject: Omit<ReviewSubject, 'key' | 'kind' | 'satisfied'> & { goal: WalletAnnotationGoal },
+    identity: string,
+  ) =>
+    subjects.push({
       ...subject,
-      scope,
-      subjectIds: [...new Set(subject.subjectIds ?? [subject.nodeId])],
+      key: walletGoalKey(wallet.id, subject.goal, identity),
+      kind: 'annotation-goal',
+      satisfied: subject.contextSubjects.length > 0,
     });
-  };
 
-  for (const record of verifiedUtxos) {
-    const nodeId = outpointReference(record.txid, record.vout);
-    push({
-      key: reviewKey(wallet.id, 'current-utxo', `${record.txid}:${record.vout}`),
-      reason: 'current-utxo',
-      title: `Unspent output ${short(record.txid)}:${record.vout}`,
-      detail: 'Unspent at the last check. Give it a label or tag so a future spend has context.',
+  for (const record of records) {
+    const nodeId = transactionReference(record.txid);
+    const contexts = humanContext(workspace, nodeId);
+    pushGoal(
+      {
+        goal: 'activity-context',
+        reason: 'wallet-transaction',
+        scope: 'transactions',
+        nodeId,
+        nodeIds: [nodeId],
+        subjectIds: [nodeId],
+        txid: record.txid,
+        transactionIds: [record.txid],
+        title: `Describe transaction ${short(record.txid)}`,
+        detail: 'Add a label, note or tag describing this transaction.',
+        evidence: fingerprint(
+          JSON.stringify([
+            'activity-context',
+            record.txid,
+            transactionEvidence(record.transaction, prevouts, inspect),
+          ]),
+        ),
+        contextSubjects: [...new Set(contexts)],
+      },
       nodeId,
-      nodeIds: [nodeId],
-      txid: record.txid,
-      amountSats: record.valueSats,
-      address: record.address,
-      evidence: fingerprint(`utxo|${record.txid}|${record.vout}|${record.valueSats}`),
-    });
-  }
-
-  const addressOutputs = new Map<string, string[]>();
-  for (const output of owned.values()) {
-    if (!output.address) continue;
-    const ids = addressOutputs.get(output.address) ?? [];
-    ids.push(output.nodeId);
-    addressOutputs.set(output.address, ids);
-  }
-  const checkedAddresses = new Set(verifiedUtxos.map((record) => record.address));
-  for (const address of addresses) {
-    const outpoints = addressOutputs.get(address.address) ?? [];
-    if (!outpoints.length && !address.history?.length && !checkedAddresses.has(address.address))
-      continue;
-    const nodeId = `addr:${address.address}`;
-    push({
-      key: reviewKey(wallet.id, 'wallet-address', address.address),
-      reason: 'wallet-address',
-      title: `${address.branch === 0 ? 'Receive' : 'Change'} address ${short(address.address)}`,
-      detail: `Used ${address.branch === 0 ? 'receiving' : 'change'} address in this wallet.`,
-      nodeId,
-      nodeIds: [nodeId],
-      address: address.address,
-      ownership: 'wallet',
-      outpointIds: outpoints,
-      evidence: fingerprint(
-        `wallet-address|${address.scripthash}|${address.branch}|${address.index}`,
-      ),
-    });
+    );
   }
 
   let missingSourceTransactions = 0;
-  const sources = new Map<string, { output: OwnedOutput; utxos: string[] }>();
-  for (const record of verifiedUtxos) {
-    const creating = loaded.get(record.txid);
-    if (!creating) {
-      missingSourceTransactions++;
-      continue;
-    }
-    for (const input of creating.vin) {
-      const parent = canonicalTransactionId(input.txid);
-      if (input.coinbase !== undefined || !parent || !validOutputIndex(input.vout)) continue;
-      const predecessor = owned.get(outpointReference(parent, input.vout));
-      if (!predecessor) continue;
-      const entry = sources.get(predecessor.nodeId) ?? { output: predecessor, utxos: [] };
-      entry.utxos.push(`${record.txid}:${record.vout}`);
-      sources.set(predecessor.nodeId, entry);
-    }
-  }
-  for (const { output, utxos } of [...sources.values()].sort(
-    (a, b) => b.output.valueSats - a.output.valueSats,
-  )) {
-    // Metadata decorates the evidence; only an explicit decision completes review.
-    push({
-      key: reviewKey(wallet.id, 'source', `${output.txid}:${output.vout}`),
-      reason: 'source',
-      title: `Receipt of ${formatBitcoinAmount(output.valueSats)}`,
-      detail: `This wallet output was spent into ${utxos.length} current UTXO${
-        utxos.length === 1 ? '' : 's'
-      }. Recording where it came from explains today's balance.`,
-      nodeId: output.nodeId,
-      nodeIds: [output.nodeId, ...utxos.map((point) => `out:${point}`)],
-      txid: output.txid,
-      amountSats: output.valueSats,
-      address: output.address,
-      evidence: fingerprint(`source|${output.nodeId}|${utxos.sort().join(',')}`),
-    });
-  }
-
-  for (const direction of ['source', 'destination'] as const) {
-    const reason = direction === 'source' ? 'source-address' : 'destination-address';
-    for (const group of direction === 'source' ? groups.sources : groups.destinations) {
-      if (group.ownership !== 'external') continue;
-      push({
-        key: reviewKey(wallet.id, reason, group.id),
-        reason,
-        title: `${direction === 'source' ? 'Source' : 'Destination'} address ${short(group.address)}`,
-        detail: `${group.count} distinct observed output${group.count === 1 ? '' : 's'} ${
-          direction === 'source'
-            ? 'used as inputs of loaded transactions paying verified wallet scripts'
-            : 'created by loaded transactions spending verified wallet outputs'
-        }. Review and metadata apply to this address only. The observed value total is not a flow allocation or balance, and an address does not identify a controller.`,
-        nodeId: group.id,
-        nodeIds: [group.id],
-        address: group.address,
-        amountSats: group.amountSats,
-        relationshipKinds: [direction],
-        ownership: group.ownership,
-        transactionIds: group.transactionIds,
-        walletOutputIds: group.walletOutputIds,
-        outpointIds: group.outpointIds,
-        contexts: group.contexts,
+  for (const record of currentUtxos) {
+    const nodeId = outpointReference(record.txid, record.vout);
+    const output = owned.get(nodeId) ?? {
+      nodeId,
+      txid: record.txid,
+      vout: record.vout,
+      valueSats: record.valueSats,
+      address: record.address,
+    };
+    if (!loaded.has(record.txid)) missingSourceTransactions++;
+    pushGoal(
+      {
+        goal: 'coin-context',
+        reason: 'current-utxo',
+        scope: 'utxos',
+        nodeId,
+        nodeIds: [nodeId],
+        subjectIds: [nodeId],
+        txid: record.txid,
+        transactionIds: [record.txid],
+        address: record.address,
+        amountSats: record.valueSats,
+        ownership: 'wallet',
+        title: `Describe coin ${short(record.txid)}:${record.vout}`,
+        detail: 'Where this coin came from or what it is for.',
         evidence: fingerprint(
           JSON.stringify([
-            reason,
-            group.id,
-            group.ownership,
-            group.outpoints.map((output) => [
+            'coin-context',
+            nodeId,
+            record.valueSats,
+            transactionEvidence(loaded.get(record.txid), prevouts, inspect),
+          ]),
+        ),
+        contextSubjects: coinContext(
+          workspace,
+          output,
+          owned,
+          loaded,
+          counterparties,
+          receivingRelationships,
+        ),
+      },
+      nodeId,
+    );
+  }
+
+  // The question concerns a wallet receipt/payment, not the identity of every co-input.
+  for (const record of records) {
+    const transaction = loaded.get(record.txid);
+    if (!transaction || record.direction === 'transfer') continue;
+    const receiptIds = outputsByTransaction.get(record.txid) ?? [];
+    const spentIds = spentByTransaction.get(record.txid) ?? [];
+    const direction =
+      record.direction === 'received'
+        ? 'received'
+        : record.direction === 'sent' || spentIds.length
+          ? 'sent'
+          : 'received';
+    const walletOutputIds = direction === 'received' ? receiptIds : spentIds;
+    if (!walletOutputIds.length) continue;
+    if (direction === 'received' && transaction.vin.every((input) => input.coinbase !== undefined))
+      continue;
+    const related = relatedByTransaction[direction].get(record.txid) ?? [];
+    const contextSubjects = counterpartyContext(
+      workspace,
+      record.txid,
+      direction,
+      walletOutputIds,
+      counterparties,
+      related,
+    );
+    const nodeId = transactionReference(record.txid);
+    pushGoal(
+      {
+        goal: 'counterparty-context',
+        reason: direction === 'received' ? 'source-address' : 'destination-address',
+        scope: 'relationships',
+        nodeId,
+        nodeIds: [nodeId],
+        subjectIds: [
+          ...new Set([
+            nodeId,
+            ...walletOutputIds,
+            ...related.map((output) => (output.address ? `addr:${output.address}` : output.id)),
+          ]),
+        ],
+        txid: record.txid,
+        transactionIds: [record.txid],
+        relationshipKinds: [direction === 'received' ? 'source' : 'destination'],
+        walletOutputIds,
+        outpointIds: related.map((output) => output.id),
+        contexts: [{ transactionId: record.txid, walletOutputIds }],
+        title: direction === 'received' ? 'Who sent this?' : 'Who received this?',
+        detail: `${record.direction === 'unknown' ? 'The wallet-relative direction is incomplete; this goal concerns only verified receipt or spending anchors. ' : ''}Assign a counterparty to the wallet relationship, or deliberately record that you cannot identify it or need no annotation. An association does not identify every input or output address.`,
+        evidence: fingerprint(
+          JSON.stringify([
+            'counterparty-context',
+            direction,
+            record.txid,
+            walletOutputIds,
+            related.map((output) => [
               output.id,
               output.amountSats,
-              output.ownership,
               output.missing,
-              output.contexts,
+              output.address,
+              output.ownership,
             ]),
           ]),
         ),
-      });
-    }
-  }
-
-  // Address groups get independent decisions. Keep replaced output reviews only
-  // when a saved decision exists, without copying it onto the entire address.
-  for (const source of relationships.sources) {
-    const key = reviewKey(wallet.id, 'funding-source', source.id.slice(4));
-    const saved = workspace.wallets.reviews?.[key];
-    if (!saved) continue;
-    const resolution = resolvePreviousOutput(
-      { network: workspace.network, transactions: workspace.chainData.transactions },
-      source,
-      prevouts,
+        contextSubjects,
+      },
+      `${direction}|${record.txid}`,
     );
-    const output =
-      resolution.status === 'loaded' || resolution.status === 'attached'
-        ? resolution.output
-        : undefined;
-    push({
-      key,
-      reason: 'funding-source',
-      title: `${source.address ? 'Saved funding-output review' : 'Funding output without address'} ${short(source.txid)}:${source.vout}`,
-      detail: source.address
-        ? 'Saved output-only review. This decision does not review the entire source address or its other outputs. The whole output value is not an allocation to a particular wallet output.'
-        : source.missing
-          ? 'This exact input is referenced by a loaded transaction paying the wallet, but its previous output is missing. No address or input value is established.'
-          : 'This direct input has no verified address representation. Review this output exception only; its observed value is not an allocation to a particular wallet output.',
-      legacyOutputReview: true,
-      nodeId: source.id,
-      nodeIds: [source.id, ...source.walletOutputIds],
-      txid: source.txid,
-      address: source.address,
-      amountSats: source.amountSats,
-      evidence: fingerprint(
-        JSON.stringify([
-          'funding-source',
-          source.id,
-          source.amountSats,
-          source.missing,
-          source.ownership,
-          evidence(output).scripthash,
-          source.contexts,
-        ]),
-      ),
-    });
-  }
-
-  for (const record of listWalletTransactions(workspace, wallet)) {
-    const nodeId = transactionReference(record.txid);
-    const transaction = record.transaction;
-    push({
-      key: reviewKey(wallet.id, 'wallet-transaction', record.txid),
-      reason: 'wallet-transaction',
-      title: `Transaction ${short(record.txid)}`,
-      detail: transaction
-        ? `Wallet history includes this transaction with ${transaction.vin.length} input${
-            transaction.vin.length === 1 ? '' : 's'
-          } and ${transaction.vout.length} output${transaction.vout.length === 1 ? '' : 's'}. Wallet association does not make every input or output yours.`
-        : 'Reported in wallet history, but not loaded. Open it in Graph to load the transaction before deciding.',
-      nodeId,
-      nodeIds: [nodeId],
-      txid: record.txid,
-      evidence: fingerprint(
-        JSON.stringify([
-          'wallet-transaction',
-          record.txid,
-          transaction
-            ? {
-                vin: transaction.vin,
-                vout: transaction.vout,
-                size: transaction.size,
-                vsize: transaction.vsize,
-              }
-            : 'unloaded',
-        ]),
-      ),
-    });
-  }
-
-  // Only exact wallet spends establish outgoing context. A no-match output may
-  // still use an undiscovered wallet script; incoming batch peers are not included.
-  const counterparties: { nodeId: string; txid: string; valueSats: number; address?: string }[] =
-    [];
-  for (const txid of walletFundedTransactions) {
-    const transaction = loaded.get(txid);
-    if (!transaction) continue;
-    for (const output of transaction.vout) {
-      const nodeId = outpointReference(txid, output.n);
-      if (owned.has(nodeId)) continue;
-      counterparties.push({
-        nodeId,
-        txid,
-        valueSats: Math.round(output.value * 100_000_000),
-        address: evidence(output).address,
-      });
-    }
-  }
-  for (const entry of counterparties.sort((a, b) => b.valueSats - a.valueSats)) {
-    const key = reviewKey(wallet.id, 'counterparty', entry.nodeId.slice(4));
-    if (!workspace.wallets.reviews?.[key]) continue;
-    push({
-      key,
-      reason: 'counterparty',
-      title: `${entry.address ? 'Saved destination-output review' : 'Destination output without address'} ${short(entry.txid)}:${entry.nodeId.split(':')[2]}`,
-      detail: entry.address
-        ? 'Saved output-only review. This decision does not review the entire destination address or its other outputs. No controller is identified.'
-        : 'This output was created by a transaction spending verified wallet outputs, but no address is established. It remains an explicit output exception, not an identified counterparty.',
-      legacyOutputReview: true,
-      nodeId: entry.nodeId,
-      nodeIds: [entry.nodeId],
-      txid: entry.txid,
-      amountSats: entry.valueSats,
-      address: entry.address,
-      evidence: fingerprint(`counterparty|${entry.nodeId}|${entry.valueSats}`),
-    });
   }
 
   const walletAddressIds = new Set(addresses.map((entry) => `addr:${entry.address}`));
-  const relationshipGroups = [...groups.sources, ...groups.destinations].filter(
+  const relationshipGroups = [...relationships.sources, ...relationships.destinations].filter(
     (group) => group.ownership === 'external',
   );
   for (const finding of workspace.analysis.findings) {
-    if (finding.excluded || finding.stale) continue;
-    if (!finding.subjects?.length) continue;
+    if (finding.excluded || finding.stale || !finding.subjects?.length) continue;
     const subjectsByScope = new Map<ReviewScope, Set<string>>();
     const addSubject = (scope: ReviewScope, subject: string) => {
       const entries = subjectsByScope.get(scope) ?? new Set<string>();
@@ -604,17 +687,17 @@ export function buildWalletReview(
         if (group.id === subject || group.outpointIds.includes(subject))
           addSubject('relationships', group.id);
     }
+    if (!subjectsByScope.size) continue;
     const key = reviewKey(wallet.id, 'link', finding.id);
-    const findingEvidence = fingerprint(
-      `link|${finding.algorithm}|${[...finding.subjects].sort().join(',')}|${[...finding.nodeIds]
-        .sort()
-        .join(',')}|${[...finding.txids].sort().join(',')}`,
-    );
+    const findingEvidence = options.findingEvidence
+      ? options.findingEvidence(finding)
+      : walletFindingEvidence(workspace, finding, prevouts);
     for (const [scope, projectedSubjects] of subjectsByScope) {
       const subjectIds = [...projectedSubjects].sort();
       const nodeId = subjectIds[0];
-      push({
+      subjects.push({
         key,
+        kind: 'finding',
         reason: 'link',
         scope,
         subjectIds,
@@ -627,24 +710,22 @@ export function buildWalletReview(
         txid: finding.txids[0],
         algorithm: finding.algorithm,
         evidence: findingEvidence,
+        contextSubjects: [],
       });
     }
   }
-
-  const items = candidates.map((subject) => decorate(workspace, subject));
-
-  items.sort(
-    (a, b) =>
-      reasonOrder.get(a.reason)! - reasonOrder.get(b.reason)! ||
-      scopeOrder.get(a.scope)! - scopeOrder.get(b.scope)! ||
-      Number(!!a.label) - Number(!!b.label) ||
-      (b.amountSats ?? -1) - (a.amountSats ?? -1) ||
-      a.key.localeCompare(b.key),
-  );
-
-  const loadedTransactions = [...history].filter((id) => loaded.has(id)).length;
+  const items = subjects.map((subject) => decorate(workspace, subject));
+  const activeKeys = new Set(items.map((item) => item.key));
+  const legacyDecisions = Object.entries(workspace.wallets.reviews ?? {})
+    .filter(
+      ([key, record]) => key.startsWith(`${wallet.id}|`) && !record.kind && !activeKeys.has(key),
+    )
+    .map(([key, record]) => ({ key, ...record }))
+    .sort((a, b) => b.at.localeCompare(a.at) || a.key.localeCompare(b.key));
   return {
     items,
+    groups: buildGroups(items, transactionOrder),
+    legacyDecisions,
     missingSourceTransactions,
     coverage: {
       scannedAt: wallet.scannedAt,
@@ -652,15 +733,15 @@ export function buildWalletReview(
       discoveredAddresses: addresses.length,
       usedAddresses: addresses.filter((address) => address.history?.length).length,
       knownTransactions: history.size,
-      loadedTransactions,
+      loadedTransactions: records.filter((record) => !!record.transaction).length,
       pendingTransactions: wallet.pendingTransactionIds?.length ?? 0,
       utxoCheckedAt: options.utxoCheckedAt,
       utxoCheckedAddresses: options.utxoCheckedAddresses,
       utxoTotalAddresses: options.utxoTotalAddresses,
-      utxoCount: options.utxos ? verifiedUtxos.length : undefined,
-      utxoLoadedSpenders: reconciledUtxos.withLoadedSpender.length,
+      utxoCount: options.utxos ? currentUtxos.length : undefined,
+      utxoLoadedSpenders: reconciled.withLoadedSpender.length,
       utxoBalanceSats: options.utxos
-        ? verifiedUtxos.reduce((total, record) => total + record.valueSats, 0)
+        ? currentUtxos.reduce((total, record) => total + record.valueSats, 0)
         : undefined,
       utxoPartial:
         options.utxoPartial === true ||
@@ -671,15 +752,15 @@ export function buildWalletReview(
   };
 }
 
-function withReviews(reviews: Record<string, ReviewDecision>): Workspace['wallets']['reviews'] {
-  const keys = Object.keys(reviews);
-  if (keys.length <= MAX_WALLET_REVIEWS) return keys.length ? reviews : undefined;
+function withReviews(reviews: Record<string, WalletReviewRecord>): Workspace['wallets']['reviews'] {
+  if (Object.keys(reviews).length <= MAX_WALLET_REVIEWS)
+    return Object.keys(reviews).length ? reviews : undefined;
   throw new Error(
     `A workspace holds at most ${MAX_WALLET_REVIEWS.toLocaleString('en-US')} review decisions. Reopen an existing review before adding another.`,
   );
 }
 
-/** One workspace update for any number of items, so Undo restores the whole batch. */
+/** One undoable intention. Goal satisfaction is derived; only deliberate dispositions are saved. */
 export function applyReviewDecisions(
   workspace: Workspace,
   wallet: Wallet,
@@ -691,6 +772,17 @@ export function applyReviewDecisions(
   if (!uniqueItems.length) return workspace;
   if (uniqueItems.some((item) => !item.key.startsWith(`${wallet.id}|`)))
     throw new Error('A wallet review decision cannot change another wallet.');
+  if (
+    status !== 'reopen' &&
+    uniqueItems.some((item) =>
+      item.kind === 'annotation-goal'
+        ? !['cannot-identify', 'not-needed', 'later'].includes(status)
+        : !['reviewed', 'later'].includes(status),
+    )
+  )
+    throw new Error(
+      'Choose an annotation disposition or a finding assessment for the selected task.',
+    );
   const reviews = { ...workspace.wallets.reviews };
   let changed = false;
   for (const item of uniqueItems) {
@@ -702,34 +794,36 @@ export function applyReviewDecisions(
       continue;
     }
     const previous = reviews[item.key];
-    if (previous?.status === status && previous.evidence === item.evidence) continue;
-    reviews[item.key] = { status, at: now, evidence: item.evidence };
+    if (
+      previous?.status === status &&
+      previous.evidence === item.evidence &&
+      previous.kind === item.kind
+    )
+      continue;
+    reviews[item.key] = { kind: item.kind, status, at: now, evidence: item.evidence };
     changed = true;
   }
-  if (!changed) return workspace;
-  return {
-    ...workspace,
-    wallets: {
-      ...workspace.wallets,
-      reviews: withReviews(reviews),
-    },
-  };
+  return changed
+    ? { ...workspace, wallets: { ...workspace.wallets, reviews: withReviews(reviews) } }
+    : workspace;
 }
 
-/** Drop decisions for wallets that no longer exist, keeping the record bounded. */
 export function pruneWalletReviews(workspace: Workspace): Workspace {
   if (!workspace.wallets.reviews) return workspace;
   const ids = new Set(workspace.wallets.definitions.map((wallet) => wallet.id));
   const kept = Object.entries(workspace.wallets.reviews).filter(([key]) =>
     ids.has(key.slice(0, key.indexOf('|'))),
   );
-  if (kept.length === Object.keys(workspace.wallets.reviews).length) return workspace;
-  return {
-    ...workspace,
-    wallets: { ...workspace.wallets, reviews: kept.length ? Object.fromEntries(kept) : undefined },
-  };
+  return kept.length === Object.keys(workspace.wallets.reviews).length
+    ? workspace
+    : {
+        ...workspace,
+        wallets: {
+          ...workspace.wallets,
+          reviews: kept.length ? Object.fromEntries(kept) : undefined,
+        },
+      };
 }
-
 /** An evidence-based sentence, or nothing. No score, probability or guarantee. */
 export function spendGuidance(
   workspace: Workspace,

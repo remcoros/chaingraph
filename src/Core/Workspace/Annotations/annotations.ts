@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { canonicalEntityReference } from '../entityReferences';
+import { canonicalAnnotationReference } from '../annotationReferences';
 import type { Network } from '../../Bitcoin/index';
 export const MAX_ANNOTATION_NOTE_LENGTH = 10_000;
 export const MAX_TAG_NAME_LENGTH = 100;
@@ -71,7 +71,7 @@ export function parseWorkspaceTags(tags: unknown, network: Network): WorkspaceTa
     names.add(nameKey);
     return {
       ...tag,
-      nodeIds: [...new Set(tag.nodeIds.map((id) => canonicalEntityReference(id, network)))],
+      nodeIds: [...new Set(tag.nodeIds.map((id) => canonicalAnnotationReference(id, network)))],
     };
   });
 }

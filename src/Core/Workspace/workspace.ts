@@ -14,6 +14,7 @@ import {
   type GraphFilters,
   type GraphPanelsState,
   type GraphSnapshot,
+  type WalletPresentation,
 } from './view';
 
 import { assertWorkspaceBudget, WorkspaceValidationError } from './budgets';
@@ -34,9 +35,14 @@ import { chainDataSchema, type ChainDataDocument } from './chainData';
 import { walletsSchema, type Wallet, type WalletReviewRecords } from './Wallets/wallets';
 
 import { analysisSchema, type AnalysisFinding } from './Analysis/finding';
+import {
+  counterpartiesSchema,
+  validateCounterparties,
+  type CounterpartyRecords,
+} from './Counterparties/counterpartyRecords';
 
 /** Decrypted workspace schema version, independent of the encrypted envelope version. */
-export const CURRENT_WORKSPACE_VERSION = 7 as const;
+export const CURRENT_WORKSPACE_VERSION = 8 as const;
 
 /** Canonical live and decrypted document. Runtime services belong to the unlocked session. */
 export interface WorkspaceDocument {
@@ -58,6 +64,8 @@ export interface WorkspaceDocument {
     tags?: WorkspaceTag[];
   };
   analysis: { findings: AnalysisFinding[] };
+  /** Explicit human identities and scoped relationships, independent of wallet lifetime. */
+  counterparties?: CounterpartyRecords;
   /** Compact scan records and retained path evidence, encrypted with this workspace. */
   connectionScans?: ConnectionScanRecords;
   demo: boolean;
@@ -85,6 +93,9 @@ export interface WorkspaceDocument {
     panels?: GraphPanelsState;
     prefetchDepth?: 0 | 1 | 2;
     selectedWallet?: string;
+    wallet?: Record<string, WalletPresentation>;
+    automaticWalletRefresh?: boolean;
+    walletRefreshIntervalSeconds?: number;
   };
 }
 
@@ -105,6 +116,7 @@ const workspaceSchema: z.ZodType<Workspace> = z.object({
   wallets: walletsSchema,
   annotations: annotationsSchema,
   analysis: analysisSchema,
+  counterparties: counterpartiesSchema.optional(),
 });
 export function validateWorkspace(data: unknown, verifyDerivation = true): Workspace {
   assertWorkspaceBudget(data, true);
@@ -115,6 +127,8 @@ export function validateWorkspace(data: unknown, verifyDerivation = true): Works
     parsed.view.hiddenNodeIds = parseHiddenNodeIds(parsed.view.hiddenNodeIds, parsed.network);
   if (parsed.annotations.tags !== undefined)
     parsed.annotations.tags = parseWorkspaceTags(parsed.annotations.tags, parsed.network);
+  if (parsed.counterparties) parsed.counterparties = validateCounterparties(parsed);
+  else validateCounterparties(parsed);
   for (const finding of parsed.analysis.findings) {
     if (!finding.subjects) continue;
     const subjects = finding.subjects.map((id) => canonicalEntityReference(id, parsed.network));

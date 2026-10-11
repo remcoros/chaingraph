@@ -1,5 +1,6 @@
 import { assertTagBudget } from './Annotations/annotations';
 import { assertConnectionScanBudget } from './ConnectionScan/records';
+import { assertCounterpartyBudget } from './Counterparties/counterpartyRecords';
 import { assertGraphNodeBudget, assertHiddenNodeBudget } from './view';
 
 import { assertWalletHistoryBudget, assertWalletReviewBudget } from './Wallets/wallets';
@@ -36,6 +37,7 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
     wallets?: { definitions?: unknown; reviews?: unknown };
     annotations?: { tags?: unknown };
     view?: { inputContext?: unknown };
+    counterparties?: unknown;
   };
   // Budgets run before schema parsing, on the v5 groups, including invalid input.
   const chainData =
@@ -131,6 +133,7 @@ export function assertWorkspaceBudget(data: unknown, validateScanBytes = false) 
     validateScanBytes,
   );
   assertTagBudget(raw.tags);
+  assertCounterpartyBudget(document.counterparties);
   assertWalletHistoryBudget(raw.wallets);
   assertWalletReviewBudget(raw.walletReviews);
   const view = (data as { view?: unknown }).view;

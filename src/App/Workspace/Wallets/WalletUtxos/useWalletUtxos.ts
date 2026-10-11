@@ -1,8 +1,11 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../../../Core/Workspace/workspace';
 import type { ChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
-import { fetchWalletUtxos } from '../../../../Core/Workspace/Wallets/WalletUtxos/fetchWalletUtxos';
+import {
+  fetchWalletUtxos,
+  type WalletUtxoBatch,
+} from '../../../../Core/Workspace/Wallets/WalletUtxos/fetchWalletUtxos';
 import {
   readWalletUtxoCheck,
   type WalletUtxoCheck,
@@ -21,11 +24,13 @@ export function useWalletUtxos({
   wallet,
   transactions,
   enabled,
+  completedCheck,
 }: {
   workspace?: Workspace;
   wallet?: Wallet;
   transactions: ChainDataAcquisition;
   enabled: boolean;
+  completedCheck?: { wallet: Wallet; coins: WalletUtxoBatch };
 }): WalletUtxoController {
   const scope = useMemo(
     () => ({
@@ -59,7 +64,7 @@ export function useWalletUtxos({
         : undefined,
     [network, observations, addresses],
   );
-  const activeScope = useRef(scope);
+  const activeScope = useRef({ scope, enabled });
   const [state, setState] = useState<{
     scope: object;
     loading: boolean;
@@ -67,6 +72,7 @@ export function useWalletUtxos({
     failed: number;
     nextCursor?: number;
     completed: boolean;
+    refresh?: typeof completedCheck;
   }>({ scope, loading: false, error: '', failed: 0, completed: false });
   const current =
     state.scope === scope
@@ -78,52 +84,64 @@ export function useWalletUtxos({
           failed: 0,
           completed: false,
           nextCursor: undefined,
+          refresh: undefined,
         };
   const request = useRef<AbortController | undefined>(undefined);
-  const attempted = useRef(false);
+  const refreshed =
+    completedCheck?.wallet.id === wallet?.id &&
+    completedCheck?.wallet.key === wallet?.key &&
+    completedCheck?.wallet.scriptType === wallet?.scriptType &&
+    completedCheck?.wallet.addresses === wallet?.addresses
+      ? completedCheck
+      : undefined;
+  const checked = current.completed && current.refresh === refreshed;
   useLayoutEffect(() => {
-    activeScope.current = scope;
-  }, [scope]);
+    activeScope.current = { scope, enabled };
+  }, [scope, enabled]);
 
   async function check(cursor = 0) {
     if (!workspace || !wallet || !enabled) return;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    attempted.current = true;
-    const failed = cursor ? current.failed : 0;
-    setState({ ...current, scope, failed, loading: true, error: '' });
+    const failed = cursor ? (checked ? current.failed : (refreshed?.coins.errors.length ?? 0)) : 0;
+    setState({ ...current, scope, refresh: refreshed, failed, loading: true, error: '' });
     const isCurrent = () =>
-      !controller.signal.aborted && activeScope.current === scope && request.current === controller;
+      !controller.signal.aborted &&
+      activeScope.current.scope === scope &&
+      activeScope.current.enabled &&
+      request.current === controller;
     try {
       const batch = await fetchWalletUtxos(workspace.network, wallet, {
         cursor,
         signal: controller.signal,
         readAddressUtxos: transactions.read.addressUtxos,
       });
-      if (!isCurrent()) return;
-      const accepted = transactions.observe.addresses(
-        { addressUtxos: batch.observations },
-        (latest) =>
-          latest.wallets.definitions.some(
-            (item) =>
-              item.id === wallet.id &&
-              item.key === wallet.key &&
-              item.scriptType === wallet.scriptType &&
-              item.addresses === wallet.addresses,
-          ),
-      );
-      if (accepted)
-        setState({
-          scope,
-          loading: false,
-          completed: true,
-          nextCursor: batch.nextCursor,
-          failed: failed + batch.errors.length,
-          error: batch.errors.length
-            ? 'Some address checks failed. Previous observations were retained. Retry to check again.'
-            : '',
-        });
+      if (isCurrent()) {
+        const accepted = transactions.observe.addresses(
+          { addressUtxos: batch.observations },
+          (latest) =>
+            latest.wallets.definitions.some(
+              (item) =>
+                item.id === wallet.id &&
+                item.key === wallet.key &&
+                item.scriptType === wallet.scriptType &&
+                item.addresses === wallet.addresses,
+            ),
+        );
+        if (accepted)
+          setState({
+            scope,
+            loading: false,
+            completed: true,
+            refresh: refreshed,
+            nextCursor: batch.nextCursor,
+            failed: failed + batch.errors.length,
+            error: batch.errors.length
+              ? 'Some address checks failed. Previous observations were retained. Retry to check again.'
+              : '',
+          });
+      }
     } catch (cause) {
       if (isCurrent())
         setState({
@@ -136,30 +154,23 @@ export function useWalletUtxos({
     if (request.current === controller) {
       request.current = undefined;
       // Rejected publication must not leave the action looking busy.
-      if (activeScope.current === scope) setState((value) => ({ ...value, loading: false }));
+      if (activeScope.current.scope === scope) setState((value) => ({ ...value, loading: false }));
     }
   }
 
-  const startAutomaticCheck = useEffectEvent(() => {
-    // A retained check remains explicitly dated. Reopening does not silently renew it.
-    if (enabled && !attempted.current && !retained) void check();
-  });
   useEffect(() => {
     request.current?.abort();
     request.current = undefined;
-    attempted.current = false;
     return () => {
       request.current?.abort();
       request.current = undefined;
     };
   }, [scope]);
   useEffect(() => {
-    startAutomaticCheck();
     return () => {
       if (request.current) {
         request.current.abort();
         request.current = undefined;
-        attempted.current = false;
         setState((value) => ({ ...value, loading: false }));
       }
     };
@@ -170,12 +181,26 @@ export function useWalletUtxos({
       retained
         ? {
             ...retained,
-            failed: retained.failed + current.failed,
+            failed:
+              retained.failed + (checked ? current.failed : (refreshed?.coins.errors.length ?? 0)),
             // Keep an in-progress refresh's bounded continuation even when older pages exist.
-            nextCursor: current.completed ? current.nextCursor : retained.nextCursor,
+            nextCursor: checked
+              ? current.nextCursor
+              : refreshed
+                ? refreshed.coins.nextCursor
+                : retained.nextCursor,
           }
         : undefined,
-    [retained, current.failed, current.completed, current.nextCursor],
+    [retained, current.failed, current.nextCursor, checked, refreshed],
   );
-  return { utxos, loading: current.loading, error: current.error, check };
+  return {
+    utxos,
+    loading: current.loading,
+    error:
+      current.error ||
+      (!checked && refreshed?.coins.errors.length
+        ? 'Some address checks failed. Previous observations were retained. Retry to check again.'
+        : ''),
+    check,
+  };
 }

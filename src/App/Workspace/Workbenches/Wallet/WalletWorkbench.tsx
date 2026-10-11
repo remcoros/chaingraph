@@ -29,7 +29,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
   } = workspace.wallet;
   const analysis = workspace.analysis;
   const { invalidate: invalidateSelection, setSelectedWallet, setSelectedId } = workspace.selection;
-  const { openWalletRecord, analyzeFromWallet } = workspace.wallet.actions;
+  const { openWalletRecord } = workspace.wallet.actions;
 
   if (!activeWorkspace) return null;
   return (
@@ -42,6 +42,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
       aria-label="Wallet workspace"
     >
       <WalletWorkbenchView
+        operation={workspaceOperation}
         walletUtxos={walletUtxos}
         preparationCache={workspaces.getUnlocked(activeWorkspace.id)?.walletPreparation}
         tourPreview={
@@ -58,17 +59,6 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         workspace={activeWorkspace}
         sessionAnalysis={analysis.sessions.get(activeWorkspace.id)?.scan}
         updateEvidence={(id, update, undo) => workspaces.getUnlocked(id)?.edit(update, undo)}
-        onAnalysisComplete={(scan) => {
-          analysis.sessions.set(activeWorkspace.id, {
-            scopeMode: analysis.sessions.get(activeWorkspace.id)?.scopeMode,
-            options: scan.options,
-            scan,
-            selectedId: scan.findings[0]?.id,
-            kind: 'all',
-            limit: 40,
-          });
-          analysis.noteWalletAnalysis();
-        }}
         wallet={wallet ?? activeWorkspace.wallets.definitions[0]}
         canLoadChainData={canLoadChainData}
         busy={!!operation}
@@ -91,6 +81,20 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           if (direction === 'import') workspace.annotations.openLabelImport(scope);
           else workspace.annotations.openLabelExport(scope);
         }}
+        refresh={walletDiscovery.refresh}
+        discovery={walletDiscovery}
+        onPresentationChange={(walletId, update) => {
+          workspaces.getUnlocked(activeWorkspace.id)?.edit((current) => {
+            const previous = current.view.wallet?.[walletId] ?? {};
+            const next = update(previous);
+            return next === previous
+              ? current
+              : {
+                  ...current,
+                  view: { ...current.view, wallet: { ...current.view.wallet, [walletId]: next } },
+                };
+          }, false);
+        }}
         onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets.definitions[0])}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'show')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
@@ -98,7 +102,6 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           if (ids.length) openWalletRecord(ids[0], undefined, isolate ? 'isolate' : 'show', ids);
         }}
         onInspect={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'inspect')}
-        onAnalyze={analyzeFromWallet}
       />
     </section>
   );

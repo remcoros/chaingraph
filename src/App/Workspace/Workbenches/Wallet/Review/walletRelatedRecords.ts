@@ -6,7 +6,7 @@ import type { Workspace } from '../../../../../Core/Workspace/workspace';
 
 import { relatedTransactions } from '../../../Selection/relatedTransactions';
 import { walletOutputEvidence } from '../../../../../Core/Workspace/Wallets/walletRelationships';
-import { walletRowFinding, type WalletRow } from '../walletRows';
+import { walletRowFindings, type WalletRow } from '../walletRows';
 import type { WalletSelectionIndex } from '../../../../../Core/Workspace/Wallets/walletSelectionIndex';
 
 export interface WalletRelatedRecords {
@@ -26,11 +26,11 @@ export function walletRelatedRecords(
   const inputs = new Set<string>();
   const outputs = new Set(row.outpointIds ?? []);
   const transactions = new Set(row.contextTransactionIds);
-  const finding = walletRowFinding(workspace, row);
-  for (const id of finding?.nodeIds ?? []) {
-    if (id.startsWith('out:')) outputs.add(id);
+  const findings = walletRowFindings(workspace, row);
+  for (const finding of findings) {
+    for (const id of finding.nodeIds) if (id.startsWith('out:')) outputs.add(id);
+    for (const txid of finding.txids) transactions.add(txid);
   }
-  for (const txid of finding?.txids ?? []) transactions.add(txid);
   if (row.kind === 'transaction' && row.txid) {
     const transaction = workspace.chainData.transactions[row.txid];
     transactions.delete(row.txid);
@@ -159,20 +159,21 @@ export function walletRelatedDescription(
     if (row.kind === 'address' && row.address && addressFor(id) === row.address)
       return 'Received at this address';
   }
-  const finding = walletRowFinding(workspace, row);
+  const findings = walletRowFindings(workspace, row);
   if (
-    finding?.nodeIds.includes(id) ||
-    (id.startsWith('tx:') && finding?.txids.includes(id.slice(3)))
+    findings.some(
+      (finding) =>
+        finding.nodeIds.includes(id) ||
+        (id.startsWith('tx:') && finding.txids.includes(id.slice(3))),
+    )
   )
-    return 'Included in this finding';
+    return 'Finding evidence';
   if (id.startsWith('tx:') && !workspace.chainData.transactions[id.slice(3)])
-    return 'Relationship details unavailable until this transaction is loaded';
+    return 'Transaction not loaded';
   if (id.startsWith('out:')) {
     const evidence = index.prevouts.get(id.slice(4));
-    if (evidence?.status === 'conflict')
-      return 'Conflicting output details prevent checking the relationship';
-    if (!evidence || evidence.status === 'missing')
-      return 'Relationship details unavailable until this output is loaded';
+    if (evidence?.status === 'conflict') return 'Conflicting output data';
+    if (!evidence || evidence.status === 'missing') return 'Output not loaded';
   }
-  return 'Relationship details unavailable in loaded data';
+  return 'Relationship unknown';
 }

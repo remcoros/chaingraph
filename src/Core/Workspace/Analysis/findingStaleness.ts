@@ -12,11 +12,13 @@ function inputStructure(transaction: Transaction) {
   return transaction.vin.map(({ prevout: _prevout, ...input }) => input);
 }
 
-/** Analysis owns these dependencies. A new confirmation is not new structure. */
-export function findingInputs(
+type FindingScope = Pick<AnalysisFinding, 'algorithm' | 'txids' | 'scopeTxids'>;
+
+function collectFindingInputs(
   workspace: WorkspaceDocument,
-  finding: Pick<AnalysisFinding, 'algorithm' | 'txids' | 'scopeTxids'>,
-  previousOutputs?: PreviousOutputIndex,
+  finding: FindingScope,
+  previousOutputs: PreviousOutputIndex | undefined,
+  includeWalletNames: boolean,
 ) {
   const tool = finding.algorithm.replace(/-v\d+$/, '');
   const scope = tool === 'address-reuse' ? (finding.scopeTxids ?? finding.txids) : finding.txids;
@@ -54,7 +56,7 @@ export function findingInputs(
           wallets: workspace.wallets.definitions
             .map((wallet) => ({
               id: wallet.id,
-              name: wallet.name,
+              ...(includeWalletNames ? { name: wallet.name } : {}),
               key: wallet.key,
               scriptType: wallet.scriptType,
               addresses: wallet.addresses.map(({ address, scripthash }) => ({
@@ -66,6 +68,26 @@ export function findingInputs(
         }
       : {}),
   });
+}
+
+/** Analysis computation includes names used in explanations. A new confirmation
+ * is not new structure. Keep this dependency contract for scan publication. */
+export function findingInputs(
+  workspace: WorkspaceDocument,
+  finding: FindingScope,
+  previousOutputs?: PreviousOutputIndex,
+): string {
+  return collectFindingInputs(workspace, finding, previousOutputs, true);
+}
+
+/** Assessments concern the relationship evidence, not prose-only wallet names.
+ * The same Analysis-owned collector supplies both support projections. */
+export function findingAssessmentInputs(
+  workspace: WorkspaceDocument,
+  finding: FindingScope,
+  previousOutputs?: PreviousOutputIndex,
+): string {
+  return collectFindingInputs(workspace, finding, previousOutputs, false);
 }
 
 /** Keep saved explanations, exclusions and IDs; only the owner marks changed support stale. */

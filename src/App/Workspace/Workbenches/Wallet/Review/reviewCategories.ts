@@ -1,13 +1,13 @@
 import { analysisTools } from '../../../../../Core/Workspace/Analysis/analysis';
 import { analysisToolGroups } from '../../../../../Core/Workspace/Analysis/toolRegistry';
 import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
-import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
-import type { WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
+import type {
+  WalletReviewGroup,
+  WalletReviewItem,
+} from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
   olderOrUnknownFindingsCategory,
-  previousOutputDecisionsCategory,
-  walletMetadataCategoryDefinitions,
   walletReviewGroups,
   walletReviewGroupsInDisplayOrder,
   walletReviewReasonCategoryDefinitions,
@@ -35,25 +35,11 @@ export type WalletReviewCategoryWorkspace = Pick<Workspace, 'annotations' | 'ana
   wallets: Pick<Workspace['wallets'], 'reviews'>;
 };
 
-function effectiveMetadata(workspace: WalletReviewCategoryWorkspace, item: WalletReviewItem) {
-  const label = (workspace.annotations.entities[item.nodeId]?.label ?? item.label).trim();
-  const tags = listTagsForNode(workspace, {
-    id: item.nodeId,
-    kind: item.nodeId.startsWith('tx:')
-      ? 'transaction'
-      : item.nodeId.startsWith('addr:')
-        ? 'address'
-        : 'output',
-    address: item.address,
-  });
-  return { labelled: !!label, tagged: tags.some((tag) => !!tag.name.trim()) };
-}
-
 function algorithmFor(
   workspace: Pick<WalletReviewCategoryWorkspace, 'analysis'>,
   item: WalletReviewItem,
 ): string | undefined {
-  if (item.reason !== 'link') return undefined;
+  if (item.kind !== 'finding' || item.reason !== 'link') return undefined;
   return (
     item.algorithm ??
     workspace.analysis.findings.find((finding) => item.key.endsWith(`|link|${finding.id}`))
@@ -65,49 +51,59 @@ function categoryIds(
   workspace: WalletReviewCategoryWorkspace,
   item: WalletReviewItem,
 ): Set<string> {
-  const ids = new Set<string>(item.reason === 'link' ? [] : [item.reason]);
-  if (item.reason === 'counterparty' || item.reason === 'funding-source')
-    ids.add('saved-output-reviews');
-  const { labelled, tagged } = effectiveMetadata(workspace, item);
-  if (item.reason === 'current-utxo') {
-    if (!labelled) ids.add('utxo-missing-label');
-    if (!tagged) ids.add('utxo-missing-tags');
-    if (!labelled && !tagged) ids.add('utxo-unidentified');
-  }
-  if (!labelled && !tagged && item.nodeId.startsWith('addr:') && item.ownership === 'external') {
-    if (item.reason === 'source-address') ids.add('unidentified-sources');
-    if (item.reason === 'destination-address') ids.add('unidentified-destinations');
+  const ids = new Set<string>();
+  if (item.legacyOutputReview) return ids;
+  if (item.kind === 'annotation-goal') {
+    if (item.goal === 'activity-context') ids.add('wallet-transaction');
+    else if (item.goal === 'coin-context') ids.add('current-utxo');
+    else if (item.goal === 'counterparty-context') {
+      if (item.relationshipKinds?.includes('source')) ids.add('source-address');
+      if (item.relationshipKinds?.includes('destination')) ids.add('destination-address');
+    }
+    return ids;
   }
   const algorithm = algorithmFor(workspace, item);
   const tool = analysisTools.find(
     (candidate) => algorithm === candidate.id || algorithm?.startsWith(`${candidate.id}-v`),
   );
   if (tool) ids.add(`heuristic:${tool.id}`);
-  else if (item.reason === 'link') ids.add(olderOrUnknownFindingsCategory.id);
+  else if (item.kind === 'finding' && item.reason === 'link')
+    ids.add(olderOrUnknownFindingsCategory.id);
   return ids;
 }
 
-/** Every supported category is present, including zero counts. The caller chooses
- * the count population; overlapping counts are intentional. */
+/** Count transaction groups, not questions, coins or repeated finding scopes.
+ * The caller supplies the population and may retain resolved goals for history. */
 export function walletReviewCategoryGroups(
   workspace: WalletReviewCategoryWorkspace,
   items: readonly WalletReviewItem[],
+  taskGroups?: readonly Pick<WalletReviewGroup, 'key' | 'items'>[],
 ): WalletReviewCategoryGroup[] {
-  const counts = new Map<string, number>();
-  for (const item of items)
-    for (const id of categoryIds(workspace, item)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const groupKeys = new Map<string, Set<string>>();
+  for (const group of taskGroups ?? [])
+    for (const item of group.items) {
+      const keys = groupKeys.get(item.key) ?? new Set<string>();
+      keys.add(group.key);
+      groupKeys.set(item.key, keys);
+    }
+  const matches = new Map<string, Set<string>>();
+  for (const item of items) {
+    const transactionId = item.txid ?? item.transactionIds?.[0];
+    const keys =
+      groupKeys.get(item.key) ??
+      new Set([transactionId ? `tx:${transactionId}` : `task:${item.key}`]);
+    for (const id of categoryIds(workspace, item)) {
+      const matchingGroups = matches.get(id) ?? new Set<string>();
+      for (const key of keys) matchingGroups.add(key);
+      matches.set(id, matchingGroups);
+    }
+  }
+  const counts = new Map([...matches].map(([id, keys]) => [id, keys.size]));
   const counted = (definitions: readonly Omit<WalletReviewCategory, 'count'>[]) =>
     definitions.map((category) => ({ ...category, count: counts.get(category.id) ?? 0 }));
   const fixedDefinitions: WalletReviewCategoryDefinition[] = [
     ...walletReviewReasonCategoryDefinitions,
     ...(counts.has(olderOrUnknownFindingsCategory.id) ? [olderOrUnknownFindingsCategory] : []),
-    ...(items.some((item) => item.reason === 'counterparty' || item.reason === 'funding-source') ||
-    Object.keys(workspace.wallets.reviews ?? {}).some(
-      (key) => key.includes('|counterparty|') || key.includes('|funding-source|'),
-    )
-      ? [previousOutputDecisionsCategory]
-      : []),
-    ...walletMetadataCategoryDefinitions,
   ];
   const groups: WalletReviewCategoryGroup[] = [
     ...Object.values(walletReviewGroups).map((group) => ({
@@ -145,8 +141,9 @@ export function walletReviewCategoryGroups(
 export function walletReviewCategories(
   workspace: WalletReviewCategoryWorkspace,
   items: readonly WalletReviewItem[],
+  groups?: readonly Pick<WalletReviewGroup, 'key' | 'items'>[],
 ): WalletReviewCategory[] {
-  return walletReviewCategoryGroups(workspace, items).flatMap((group) => group.options);
+  return walletReviewCategoryGroups(workspace, items, groups).flatMap((group) => group.options);
 }
 
 /** Union (OR), never an intersection. An empty selection intentionally matches nothing. */

@@ -4,7 +4,7 @@ import {
   applyBatchTag as writeBatchTag,
   createBatchTag as writeNewBatchTag,
 } from './batchEdits';
-import { canonicalEntityReference } from '../entityReferences';
+import { canonicalAnnotationReference } from '../annotationReferences';
 import {
   clampAnnotationText,
   MAX_ANNOTATION_NOTE_LENGTH,
@@ -28,10 +28,15 @@ function canonical(workspace: Workspace, ids: readonly string[]): string[] {
   const unique = new Set<string>();
   for (const id of ids) {
     try {
-      unique.add(canonicalEntityReference(id, workspace.network));
+      const reference = canonicalAnnotationReference(id, workspace.network);
+      if (
+        reference.startsWith('party:') &&
+        !workspace.counterparties?.definitions.some((party) => party.id === reference.slice(6))
+      )
+        continue;
+      unique.add(reference);
     } catch {
-      // A reference that is not a transaction, output or valid address for this
-      // network cannot be an edit target.
+      // Malformed, wrong-network or unavailable metadata subjects are not edit targets.
     }
   }
   return [...unique];

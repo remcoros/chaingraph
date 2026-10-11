@@ -27,6 +27,16 @@ import type { Network } from '../../Bitcoin/network';
 import { scanWallet } from '../Wallets/scanning';
 import { applyWalletScan } from '../Wallets/walletActivity';
 import type { Wallet } from '../Wallets/wallets';
+import { fetchWalletUtxos, type WalletUtxoBatch } from '../Wallets/WalletUtxos/fetchWalletUtxos';
+import {
+  analysisInputFingerprint,
+  analysisScanScope,
+  analysisScanMatches,
+  scanAnalysis,
+  scanDefaults,
+  mergeScanFindings,
+  type AnalysisScan,
+} from '../Analysis/analysisScan';
 
 export interface RecordTransactionOptions {
   promotionIds?: string[];
@@ -60,11 +70,17 @@ export interface ChainDataAcquisition {
     addressHistory: (address: string, signal?: AbortSignal) => Promise<AddressHistoryObservation>;
   };
   observe: {
-    /** Wallet discovery rules stay with Wallets; Session owns the request and completed publication. */
-    walletScan: (
+    /** One refresh intention: accepted discovery, bounded coin batches, then changed-evidence analysis. */
+    walletRefresh: (
       wallet: Wallet,
       options: Pick<Parameters<typeof scanWallet>[3], 'gap' | 'maxIndex' | 'signal' | 'onProgress'>,
-    ) => Promise<Awaited<ReturnType<typeof scanWallet>> & { snapshot: Workspace }>;
+    ) => Promise<
+      Awaited<ReturnType<typeof scanWallet>> & {
+        snapshot: Workspace;
+        coins: WalletUtxoBatch;
+        analysis?: AnalysisScan;
+      }
+    >;
     /** Retain completed watched-address checks if a later address fails or is cancelled. */
     watchedAddresses: (
       addresses: readonly string[],
@@ -118,6 +134,7 @@ export function createChainDataAcquisition({
   getUnlocked,
   fetchScope,
 }: Inputs): ChainDataAcquisition {
+  const analyzedInputs = new Map<string, string>();
   // Capture the original session token, not only its persistent workspace ID.
   const currentSession = (id: string) => {
     const session = getUnlocked(id);
@@ -378,7 +395,7 @@ export function createChainDataAcquisition({
       addressHistory: getAddressHistory,
     },
     observe: {
-      walletScan: async (wallet, options) => {
+      walletRefresh: async (wallet, options) => {
         const session = requireSession(options.signal);
         const isBound = (current: Workspace) =>
           current.wallets.definitions.some(
@@ -406,7 +423,108 @@ export function createChainDataAcquisition({
           (current) => applyWalletScan(current, result.wallet, result.transactions),
           false,
         );
-        return { ...result, snapshot: requireSession(options.signal).data };
+        // Discovery is an accepted checkpoint even if checking coins later fails or is cancelled.
+        const discovered = requireSession(options.signal).data.wallets.definitions.find(
+          (entry) => entry.id === wallet.id,
+        )!;
+        const acceptsCoins = (current: Workspace) =>
+          isBound(current) &&
+          current.wallets.definitions.some(
+            (entry) => entry.id === wallet.id && entry.addresses === discovered.addresses,
+          );
+        let coins: WalletUtxoBatch | undefined;
+        let cursor = 0;
+        do {
+          if (!acceptsCoins(requireSession(options.signal).data))
+            throw new DOMException('Wallet changed during refresh.', 'AbortError');
+          const batch = await fetchWalletUtxos(session.data.network, discovered, {
+            cursor,
+            signal: requestSignal(options.signal),
+            readAddressUtxos: getAddressUtxos,
+            onProgress: (loaded, total) =>
+              options.onProgress?.({
+                done: loaded,
+                total,
+                message: `Checking coins ${loaded}/${total}`,
+              }),
+          });
+          if (!acceptsCoins(requireSession(options.signal).data))
+            throw new DOMException('Wallet changed during refresh.', 'AbortError');
+          recordAddressObservations({ addressUtxos: batch.observations }, acceptsCoins);
+          coins = coins
+            ? {
+                ...batch,
+                records: [...coins.records, ...batch.records],
+                observations: { ...coins.observations, ...batch.observations },
+                successfulAddresses: coins.successfulAddresses + batch.successfulAddresses,
+                errors: [...coins.errors, ...batch.errors],
+              }
+            : batch;
+          cursor = batch.nextCursor ?? batch.totalAddresses;
+        } while (coins.nextCursor !== undefined);
+        const snapshot = requireSession(options.signal).data;
+        const scope = analysisScanScope(snapshot, undefined, discovered);
+        const fingerprint = analysisInputFingerprint(snapshot, scope.txids);
+        let analysis: AnalysisScan | undefined;
+        if (scope.txids.length && analyzedInputs.get(wallet.id) !== fingerprint) {
+          options.onProgress?.({ done: 0, message: 'Updating wallet analysis' });
+          analysis = await scanAnalysis(
+            snapshot,
+            scope,
+            scanDefaults(),
+            requestSignal(options.signal),
+          );
+          const latest = requireSession(options.signal);
+          if (!acceptsCoins(latest.data) || !analysisScanMatches(analysis, latest.data))
+            throw new DOMException('Wallet evidence changed during analysis.', 'AbortError');
+          const completed = analysis;
+          latest.edit(
+            (current) =>
+              analysisScanMatches(completed, current)
+                ? {
+                    ...current,
+                    analysis: {
+                      ...current.analysis,
+                      findings: mergeScanFindings(current.analysis.findings, completed),
+                    },
+                  }
+                : current,
+            false,
+          );
+          // Retry failed tools on the next refresh rather than marking their input complete.
+          if (!analysis.reports.some((report) => report.status === 'error'))
+            analyzedInputs.set(wallet.id, fingerprint);
+        }
+        const completedSession = requireSession(options.signal);
+        if (!acceptsCoins(completedSession.data))
+          throw new DOMException('Wallet changed during refresh.', 'AbortError');
+        if (
+          result.wallet.scanComplete &&
+          !coins.errors.length &&
+          !analysis?.reports.some((report) => report.status === 'error')
+        ) {
+          const refreshedAt = new Date().toISOString();
+          completedSession.edit(
+            (current) => ({
+              ...current,
+              wallets: {
+                ...current.wallets,
+                definitions: current.wallets.definitions.map((entry) =>
+                  entry.id === wallet.id ? { ...entry, refreshedAt } : entry,
+                ),
+              },
+            }),
+            false,
+          );
+        }
+        const completedSnapshot = requireSession(options.signal).data;
+        return {
+          ...result,
+          wallet: completedSnapshot.wallets.definitions.find((entry) => entry.id === wallet.id)!,
+          coins,
+          analysis,
+          snapshot: completedSnapshot,
+        };
       },
       watchedAddresses: async (addresses, options = {}) => {
         const session = requireSession(options.signal);

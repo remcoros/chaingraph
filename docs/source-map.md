@@ -56,9 +56,11 @@ src/
           Renderer/                 Three.js, layout, camera and picking
         Wallet/
           WalletWorkbench.tsx       wallet view and controller binding
+          WalletMetadataFields.tsx  common reading fields and inline metadata editors
+          WalletCounterparties.tsx  exact identity selectors, list and detail UI
           useWalletActivity.ts      discovery controls and monitoring lifecycle
-          useWalletAnalysis.ts      wallet entry point into Core Analysis
           Review/                   review panel, category definitions/matching, rows and flows
+            WalletReviewInteractions.tsx  field review indicators, checklist and decision controls
         Analysis/
           AnalysisWorkbench.tsx     controls, scope selection and reports
           useWorkspaceAnalysis.ts   analysis UI lifecycle and retained reports
@@ -92,7 +94,9 @@ src/
       createWorkspace.ts            creation without storage
       workspace.ts                  canonical document schema, type and validation
       chainData.ts                  workspace chain collection and retention membership
-      entityReferences.ts           workspace references, independent of Graph rendering
+      entityReferences.ts           factual workspace references, independent of Graph rendering
+      annotationReferences.ts       human metadata subjects including counterparty identities
+      Counterparties/               reusable identities and exact activity associations
       view.ts                       saved panels, filters, geometry and membership
       budgets.ts                    aggregate resource limits and validation errors
       Persistence/

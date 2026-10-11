@@ -105,13 +105,13 @@ export function WalletReviewFlow({
                 <Pencil size={10} aria-hidden="true" /> Editing transaction
               </span>
             )}
+            <WalletReference value={context.transactionId!} kind="transaction ID" />
             {(transactionAnnotation?.label || transactionAnnotation?.icon) && (
               <strong title={transactionAnnotation.label}>
                 {transactionAnnotation.icon && <span>{transactionAnnotation.icon} </span>}
                 {transactionAnnotation.label}
               </strong>
             )}
-            <WalletReference value={context.transactionId!} kind="transaction ID" />
             <FlowTags
               workspace={workspace}
               node={{ id: context.transactionNodeId!, kind: 'transaction', label: '' }}
@@ -138,7 +138,6 @@ export function WalletReviewFlow({
       </div>
       {context.currentOutputs.length > 0 && (
         <div className="wallet-flow-descendants">
-          <span>This receipt was spent in transactions creating these wallet outputs:</span>
           <FlowColumn
             key={`${context.transactionNodeId}:descendants`}
             title="Related wallet outputs"
@@ -151,11 +150,7 @@ export function WalletReviewFlow({
         </div>
       )}
       <div className="wallet-flow-footnote">
-        <span>
-          {context.missingPrevouts > 0
-            ? `${context.missingPrevouts} previous-output details unavailable`
-            : 'Previous-output details available'}
-        </span>
+        {context.missingPrevouts > 0 && <span>{context.missingPrevouts} inputs need details</span>}
         <WalletHelp title="Wallet flow evidence" active={active}>
           <p>
             “Your wallet” identifies an address discovered in your wallet. “No wallet match” means
@@ -364,12 +359,6 @@ function FlowColumn({
                   {editingAddress ? 'address' : kind}
                 </span>
               )}
-              {(primaryAnnotation?.label || primaryAnnotation?.icon) && (
-                <strong title={primaryAnnotation.label}>
-                  {primaryAnnotation.icon && <span>{primaryAnnotation.icon} </span>}
-                  {primaryAnnotation.label}
-                </strong>
-              )}
               {opReturn && <OpReturnData hex={entry.scriptPubKey?.hex} />}
               {entry.coinbase ? (
                 <strong>Newly mined coins</strong>
@@ -384,6 +373,12 @@ function FlowColumn({
                         : 'transaction ID'
                   }
                 />
+              )}
+              {(primaryAnnotation?.label || primaryAnnotation?.icon) && (
+                <strong title={primaryAnnotation.label}>
+                  {primaryAnnotation.icon && <span>{primaryAnnotation.icon} </span>}
+                  {primaryAnnotation.label}
+                </strong>
               )}
               {addressPrimary ? (
                 <AnnotationLine

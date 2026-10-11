@@ -8,6 +8,7 @@ import type { Workspace } from './workspace';
 
 import { outputAddress } from '../Bitcoin';
 import { buildWalletMatches } from './Wallets/walletMatches';
+import { counterpartyLinkReferences } from './Counterparties/counterpartyRecords';
 
 export interface EntityRemovalPlan {
   nodeId: string;
@@ -15,6 +16,7 @@ export interface EntityRemovalPlan {
   affectedNodeIds: string[];
   annotationCount: number;
   tagMembershipCount: number;
+  counterpartyLinkCount: number;
   requiresConfirmation: boolean;
   removedTransactionIds: string[];
   automaticContextCount: number;
@@ -41,6 +43,8 @@ function protectedContext(workspace: Workspace): Set<string> {
       retainReference(id);
   for (const tag of workspace.annotations.tags ?? [])
     for (const id of tag.nodeIds) retainReference(id);
+  for (const link of workspace.counterparties?.links ?? [])
+    for (const id of counterpartyLinkReferences(link)) retainReference(id);
   for (const wallet of workspace.wallets.definitions) {
     for (const address of wallet.addresses) {
       addresses.add(canonicalAddress(address.address));
@@ -151,13 +155,18 @@ export function planEntityRemoval(
         affected.add(id);
         tagMembershipCount++;
       }
+  const counterpartyLinkCount = (workspace.counterparties?.links ?? []).filter((link) =>
+    counterpartyLinkReferences(link).some(belongs),
+  ).length;
   return {
     nodeId,
     kind: transaction ? 'transaction' : 'watched-address',
     affectedNodeIds: [...affected],
     annotationCount,
     tagMembershipCount,
-    requiresConfirmation: annotationCount > 0 || tagMembershipCount > 0,
+    counterpartyLinkCount,
+    requiresConfirmation:
+      annotationCount > 0 || tagMembershipCount > 0 || counterpartyLinkCount > 0,
     removedTransactionIds: [...removed],
     automaticContextCount: transaction ? removed.size - 1 : 0,
   };
@@ -175,6 +184,14 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
     ...tag,
     nodeIds: tag.nodeIds.filter((id) => !affected.has(id)),
   }));
+  const counterparties = workspace.counterparties
+    ? {
+        ...workspace.counterparties,
+        links: workspace.counterparties.links.filter(
+          (link) => !counterpartyLinkReferences(link).some((id) => affected.has(id)),
+        ),
+      }
+    : undefined;
   if (plan.kind === 'watched-address')
     return {
       ...workspace,
@@ -185,6 +202,7 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
         ),
       },
       annotations: { ...workspace.annotations, entities: annotations, tags: tags },
+      ...(counterparties ? { counterparties } : {}),
     };
   const removed = new Set(plan.removedTransactionIds);
   const transactions = { ...workspace.chainData.transactions };
@@ -231,6 +249,7 @@ export function removeWorkspaceEntity(workspace: Workspace, reference: string): 
       transactions: transactions,
     },
     annotations: { ...workspace.annotations, entities: annotations, tags: tags },
+    ...(counterparties ? { counterparties } : {}),
     analysis: {
       ...workspace.analysis,
       findings: workspace.analysis.findings.filter(

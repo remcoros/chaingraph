@@ -18,6 +18,7 @@ it('distinguishes historical checks from current candidates and preserves the ch
   };
   workspace.wallets.definitions = [wallet];
   const check = vi.fn();
+  const exchange = vi.fn();
   const props: ComponentProps<typeof WalletOverview> = {
     workspace,
     wallet,
@@ -40,22 +41,31 @@ it('distinguishes historical checks from current candidates and preserves the ch
       totalAddresses: 1,
       failed: 0,
     },
-    utxoLoading: false,
     canLoadChainData: true,
     busy: false,
     active: true,
-    analyzing: false,
     analysisStatus: '',
     onSelectWallet: vi.fn(),
     onAddWallet: vi.fn(),
-    onRefresh: vi.fn(),
-    onCheck: check,
-    onAnalyze: vi.fn(),
+    onRefresh: check,
+    onExchangeLabels: exchange,
   };
   render(createElement(WalletOverview, props));
-  expect(screen.getByText('UTXOs at last check')).toBeDefined();
+  expect(screen.getByText('Coins at last check')).toBeDefined();
   expect(screen.getByText(/0 remaining candidates/)).toBeDefined();
-  expect(screen.getByText(/Historical checks retained; use Check UTXOs/)).toBeDefined();
-  fireEvent.click(screen.getByRole('button', { name: 'Check current UTXOs' }));
+  expect(screen.getByText(/Balance needs refresh/)).toBeDefined();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh wallet' }));
   expect(check).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Wallet actions' }));
+  expect(
+    screen.getByRole('menuitem', { name: 'Wallet details…' }).querySelector('svg'),
+  ).toBeTruthy();
+  expect(screen.queryByRole('menuitem', { name: 'Rerun analysis' })).toBeNull();
+  fireEvent.click(screen.getByRole('menuitem', { name: /Import wallet metadata/ }));
+  expect(exchange).toHaveBeenLastCalledWith('import');
+  expect(screen.queryByRole('menu')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Wallet actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: /Export wallet metadata/ }));
+  expect(exchange).toHaveBeenLastCalledWith('export');
+  expect(screen.queryByRole('menu')).toBeNull();
 });

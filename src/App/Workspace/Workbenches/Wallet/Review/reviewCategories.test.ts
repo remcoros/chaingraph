@@ -1,4 +1,5 @@
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import { analysisTools } from '../../../../../Core/Workspace/Analysis/analysis';
 import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
@@ -8,19 +9,36 @@ import {
   walletReviewCategoryGroups,
   walletReviewCategoryScanState,
 } from './reviewCategories';
-import type { WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
+import { walletReviewReasonDefinitions } from './reviewCategoryDefinitions';
+import {
+  buildWalletReview,
+  type WalletReviewItem,
+} from '../../../../../Core/Workspace/Wallets/walletReview';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { applyBatchLabel } from '../../../../../Core/Workspace/Annotations/batchMetadata';
+import { saveCounterparty } from '../../../../../Core/Workspace/Counterparties/counterparties';
+import { addressToScriptHash } from '../../../../../Core/Bitcoin';
+import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
+import type { Transaction } from '../../../../../Core/ChainData';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const address = bitcoinAddress.toBech32(new Uint8Array(20).fill(1), 0, 'bc');
+const external = bitcoinAddress.toBech32(new Uint8Array(20).fill(2), 0, 'bc');
+const script = (value: string) => bytesToHex(bitcoinAddress.toOutputScript(value));
 const makeItem = (n: number, overrides: Partial<WalletReviewItem> = {}): WalletReviewItem => ({
-  key: `wallet|current-utxo|${id(n)}:0`,
+  kind: 'annotation-goal',
+  goal: 'coin-context',
+  satisfied: false,
+  contextSubjects: [],
+  key: `wallet|goal:coin-context|out:${id(n)}:0`,
+  txid: id(n),
+  transactionIds: [id(n)],
   nodeId: `out:${id(n)}:0`,
   nodeIds: [`out:${id(n)}:0`],
   subjectIds: [`out:${id(n)}:0`],
   scope: 'utxos',
   reason: 'current-utxo',
-  title: 'Checked output',
+  title: 'Coin context',
   detail: '',
   label: '',
   tags: [],
@@ -30,60 +48,71 @@ const makeItem = (n: number, overrides: Partial<WalletReviewItem> = {}): WalletR
   ...overrides,
 });
 
-describe('discoverable wallet finding categories', () => {
-  it('never counts wallet matches or unknown ownership as unidentified counterparties', () => {
-    const workspace = createWorkspace('Categories', 'mainnet');
-    const items = [
-      makeItem(1, {
-        reason: 'source-address',
-        nodeId: `addr:${address}`,
+function receiptFixture() {
+  const workspace = createWorkspace('Categories', 'mainnet');
+  const wallet: Wallet = {
+    id: '30000000-0000-4000-8000-000000000001',
+    name: 'Fixture wallet',
+    key: '',
+    color: '#27c4a7',
+    scriptType: 'p2wpkh',
+    addresses: [
+      {
         address,
-        ownership: 'wallet',
-      }),
-      makeItem(2, {
-        reason: 'destination-address',
-        nodeId: `addr:${address}`,
+        scripthash: addressToScriptHash(address, 'mainnet'),
+        path: 'account/0/0',
+        branch: 0,
+        index: 0,
+      },
+    ],
+  };
+  const parent: Transaction = {
+    txid: id(9),
+    vin: [{ coinbase: '00' }],
+    vout: [{ n: 0, value: 1, scriptPubKey: { hex: script(external) } }],
+  };
+  const receipt: Transaction = {
+    txid: id(1),
+    vin: [{ txid: parent.txid, vout: 0 }],
+    vout: [{ n: 0, value: 0.9, scriptPubKey: { hex: script(address) } }],
+  };
+  workspace.wallets.definitions = [wallet];
+  workspace.chainData.transactions = { [parent.txid]: parent, [receipt.txid]: receipt };
+  const options = {
+    utxos: [
+      {
+        txid: receipt.txid,
+        vout: 0,
+        valueSats: 90_000_000,
+        height: 0,
         address,
-        ownership: 'unknown',
-      }),
-    ];
-    expect(
-      items.some((item) =>
-        matchesReviewCategories(
-          item,
-          ['unidentified-sources', 'unidentified-destinations'],
-          workspace,
-        ),
-      ),
-    ).toBe(false);
-  });
+        scripthash: wallet.addresses[0].scripthash,
+      },
+    ],
+  };
+  return { workspace, wallet, receipt, options };
+}
 
-  it('includes actionable review types and registry tools, not output-only compatibility types', () => {
+function counts(workspace: ReturnType<typeof createWorkspace>, items: WalletReviewItem[]) {
+  return Object.fromEntries(
+    walletReviewCategories(workspace, items).map((category) => [category.id, category.count]),
+  );
+}
+
+describe('discoverable wallet review reasons', () => {
+  it('offers context goals and registry tools without mandatory field or legacy acknowledgment filters', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
     const groups = walletReviewCategoryGroups(workspace, []);
     const catalog = walletReviewCategories(workspace, []);
     expect(new Set(groups.map((group) => group.label))).toEqual(
-      new Set([
-        'Review items',
-        'Labels and tags',
-        'Privacy patterns',
-        'Value and structure',
-        'Imported wallets',
-      ]),
+      new Set(['Review items', 'Privacy patterns', 'Value and structure', 'Imported wallets']),
     );
     expect(new Set(catalog.map((category) => category.id))).toEqual(
       new Set([
-        'current-utxo',
-        'wallet-address',
-        'source',
-        'source-address',
         'wallet-transaction',
+        'current-utxo',
+        'source-address',
         'destination-address',
-        'unidentified-sources',
-        'unidentified-destinations',
-        'utxo-missing-label',
-        'utxo-missing-tags',
-        'utxo-unidentified',
         ...analysisTools.map((tool) => `heuristic:${tool.id}`),
       ]),
     );
@@ -91,6 +120,12 @@ describe('discoverable wallet finding categories', () => {
     expect(
       catalog.every((category) => category.count === 0 && category.label && category.description),
     ).toBe(true);
+    expect(catalog.find((category) => category.id === 'current-utxo')).toMatchObject({
+      label: 'Coin description',
+    });
+    expect(catalog.find((category) => category.id === 'source-address')).toMatchObject({
+      label: 'Sender',
+    });
     for (const tool of analysisTools)
       expect(catalog.find((category) => category.id === `heuristic:${tool.id}`)).toMatchObject({
         algorithm: tool.id,
@@ -106,48 +141,47 @@ describe('discoverable wallet finding categories', () => {
     ).toBe(true);
   });
 
-  it('counts overlapping missing label, tags and neither before an OR selection', () => {
+  it('counts transaction groups once per reason while matching selected reasons as a union', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
-    const items = [makeItem(1), makeItem(2), makeItem(3), makeItem(4)];
-    workspace.annotations.entities = {
-      [items[0].nodeId]: {
-        label: ' \n ',
-        note: 'A note is not a label',
-        icon: 'gift',
-        bookmarked: false,
-      },
-      [items[1].nodeId]: { label: 'Label only', note: '', icon: '', bookmarked: false },
-      [items[3].nodeId]: { label: 'Both', note: '', icon: '', bookmarked: false },
-    };
-    items[2].address = address;
-    workspace.annotations.tags = [
-      {
-        id: 'fixture-tag',
-        name: 'Known context',
-        color: '#27c4a7',
-        nodeIds: [`addr:${address}`, items[3].nodeId],
-      },
-    ];
-    const counts = Object.fromEntries(
-      walletReviewCategories(workspace, items).map((category) => [category.id, category.count]),
-    );
-    expect(counts).toMatchObject({
-      'current-utxo': 4,
-      'utxo-missing-label': 2,
-      'utxo-missing-tags': 2,
-      'utxo-unidentified': 1,
+    const coin = makeItem(1);
+    const secondCoin = makeItem(2, {
+      key: `${coin.key}:second`,
+      txid: id(1),
+      transactionIds: [id(1)],
     });
-    const missingAny = items.filter((item) =>
-      matchesReviewCategories(item, ['utxo-missing-label', 'utxo-missing-tags'], workspace),
-    );
-    expect(missingAny.map((item) => item.nodeId)).toEqual(
-      items.slice(0, 3).map((item) => item.nodeId),
-    );
+    const activity = makeItem(3, {
+      goal: 'activity-context',
+      reason: 'wallet-transaction',
+      txid: id(1),
+      transactionIds: [id(1)],
+    });
+    const receipt = makeItem(4, {
+      goal: 'counterparty-context',
+      reason: 'source-address',
+      relationshipKinds: ['source'],
+      txid: id(1),
+      transactionIds: [id(1)],
+    });
+    const payment = makeItem(5, {
+      goal: 'counterparty-context',
+      reason: 'destination-address',
+      relationshipKinds: ['destination'],
+    });
+    const items = [coin, secondCoin, activity, receipt, payment];
+    const catalog = walletReviewCategories(workspace, items);
+    expect(counts(workspace, items)).toMatchObject({
+      'current-utxo': 1,
+      'wallet-transaction': 1,
+      'source-address': 1,
+      'destination-address': 1,
+    });
     expect(
       items.filter((item) =>
-        matchesReviewCategories(item, new Set(['utxo-unidentified']), workspace),
+        matchesReviewCategories(item, ['current-utxo', 'destination-address'], workspace),
       ),
-    ).toEqual([items[0]]);
+    ).toEqual([coin, secondCoin, payment]);
+    expect(matchesReviewCategories(receipt, new Set(['source-address']), workspace)).toBe(true);
+    expect(matchesReviewCategories(receipt, ['destination-address'], workspace)).toBe(false);
     expect(items.filter((item) => matchesReviewCategories(item, [], workspace))).toEqual([]);
     expect(
       items.filter((item) => matchesReviewCategories(item, ['unsupported'], workspace)),
@@ -156,121 +190,140 @@ describe('discoverable wallet finding categories', () => {
       items.every((item) =>
         matchesReviewCategories(
           item,
-          walletReviewCategories(workspace, []).map((category) => category.id),
+          catalog.map((category) => category.id),
           workspace,
         ),
       ),
     ).toBe(true);
-    expect(
-      Object.fromEntries(
-        walletReviewCategories(workspace, items).map((category) => [category.id, category.count]),
-      ),
-    ).toEqual(counts);
   });
 
-  it('counts only primary address groups, not earlier receipts, UTXOs, legacy outputs or missing exceptions', () => {
+  it('uses supplied Core groups for findings with multiple transaction contexts and repeated scopes', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
-    const items = [
-      makeItem(1, { reason: 'source', relationshipKinds: ['source'], status: 'unknown' }),
-      makeItem(2, { reason: 'funding-source', status: 'reviewed' }),
-      makeItem(3, { reason: 'source' }),
-      makeItem(4, { relationshipKinds: ['source', 'destination'] }),
-      makeItem(5, { reason: 'counterparty', status: 'later' }),
-      makeItem(6, {
-        reason: 'source-address',
-        nodeId: `addr:${address}`,
-        address,
-        ownership: 'external',
-      }),
-      makeItem(7, {
-        reason: 'destination-address',
-        nodeId: `addr:${address}`,
-        address,
-        ownership: 'external',
-      }),
-    ];
-    const catalog = walletReviewCategories(workspace, items);
-    expect(catalog.find((category) => category.id === 'unidentified-sources')?.count).toBe(1);
-    expect(catalog.find((category) => category.id === 'unidentified-destinations')?.count).toBe(1);
-    expect(matchesReviewCategories(items[2], ['unidentified-sources'], workspace)).toBe(false);
-    expect(matchesReviewCategories(items[0], ['unidentified-sources'], workspace)).toBe(false);
-    expect(matchesReviewCategories(items[5], ['unidentified-sources'], workspace)).toBe(true);
-    expect(matchesReviewCategories(items[6], ['unidentified-destinations'], workspace)).toBe(true);
-    expect(items[0].status).toBe('unknown');
-    workspace.annotations.entities[items[1].nodeId] = {
-      label: 'Recorded',
-      note: '',
-      icon: '',
-      bookmarked: false,
-    };
-    expect(matchesReviewCategories(items[1], ['unidentified-sources'], workspace)).toBe(false);
-    expect(matchesReviewCategories(items[1], ['funding-source'], workspace)).toBe(true);
-    expect(matchesReviewCategories(items[5], ['unidentified-sources'], workspace)).toBe(true);
-    workspace.annotations.entities[`addr:${address}`] = {
-      label: 'Address label',
-      note: '',
-      icon: '',
-      bookmarked: false,
-    };
-    expect(matchesReviewCategories(items[5], ['unidentified-sources'], workspace)).toBe(false);
-    expect(matchesReviewCategories(items[6], ['unidentified-destinations'], workspace)).toBe(false);
-    expect(matchesReviewCategories(items[5], ['source-address'], workspace)).toBe(true);
-  });
-
-  it('uses address metadata independently from all constituent output labels and tags', () => {
-    const workspace = createWorkspace('Categories', 'mainnet');
-    const item = makeItem(1, {
-      reason: 'source-address',
-      ownership: 'external',
-      nodeId: `addr:${address}`,
-      address,
-      outpointIds: [`out:${id(1)}:0`, `out:${id(2)}:0`],
+    const first = makeItem(1, {
+      key: 'wallet|link|first',
+      kind: 'finding',
+      goal: undefined,
+      reason: 'link',
+      algorithm: 'cioh-v2',
+      txid: id(1),
+      transactionIds: [id(1), id(2)],
     });
-    workspace.annotations.entities[`out:${id(1)}:0`] = {
-      label: 'One output',
-      note: '',
-      icon: '',
-      bookmarked: false,
-    };
-    workspace.annotations.tags = [
-      {
-        id: 'tag',
-        name: 'Output tag',
-        color: '#27c4a7',
-        nodeIds: [`out:${id(1)}:0`, `out:${id(2)}:0`],
-      },
-    ];
-    expect(matchesReviewCategories(item, ['unidentified-sources'], workspace)).toBe(true);
-    workspace.annotations.tags[0].nodeIds.push(item.nodeId);
-    expect(matchesReviewCategories(item, ['unidentified-sources'], workspace)).toBe(false);
-    expect(item.status).toBe('open');
-    workspace.annotations.tags = [];
-    workspace.annotations.entities[item.nodeId] = {
-      label: '  ',
-      note: 'Note only',
-      icon: 'gift',
-      bookmarked: false,
-    };
-    expect(matchesReviewCategories(item, ['unidentified-sources'], workspace)).toBe(true);
+    const projection = { ...first, scope: 'relationships' as const };
+    const second = makeItem(3, {
+      key: 'wallet|link|second',
+      kind: 'finding',
+      goal: undefined,
+      reason: 'link',
+      algorithm: 'cioh-v2',
+      txid: id(3),
+      transactionIds: [id(2), id(3)],
+    });
+    const groups = [{ key: `tx:${id(2)}`, items: [first, second] }];
+    expect(
+      walletReviewCategories(workspace, [first, projection, second], groups).find(
+        (category) => category.id === 'heuristic:cioh',
+      )?.count,
+    ).toBe(1);
+    expect(
+      walletReviewCategories(workspace, [first, projection]).find(
+        (category) => category.id === 'heuristic:cioh',
+      )?.count,
+    ).toBe(1);
   });
 
-  it('uses effective address tags but does not inherit address labels or tags from a transaction', () => {
+  it('uses linked receipt context without creating missing-label or optional-tag tasks', () => {
+    const { workspace, wallet, receipt, options } = receiptFixture();
+    const edited = applyBatchLabel(workspace, [`tx:${receipt.txid}`], 'Recognized receipt');
+    const review = buildWalletReview(edited, wallet, options);
+    const coin = review.items.find((item) => item.goal === 'coin-context')!;
+    expect(coin).toMatchObject({
+      satisfied: true,
+      status: 'resolved',
+      contextSubjects: [`tx:${receipt.txid}`],
+      tags: [],
+    });
+    expect(edited.annotations.entities[coin.nodeId]).toBeUndefined();
+    expect(edited.wallets.reviews).toBeUndefined();
+    const openItems = review.items.filter(
+      (item) => !item.satisfied && (item.changed || item.status === 'open'),
+    );
+    expect(
+      walletReviewCategories(edited, openItems, review.groups).find(
+        (category) => category.id === 'current-utxo',
+      )?.count,
+    ).toBe(0);
+    expect(
+      walletReviewCategories(edited, review.items, review.groups).find(
+        (category) => category.id === 'current-utxo',
+      )?.count,
+    ).toBe(1);
+    expect(matchesReviewCategories(coin, ['current-utxo'], edited)).toBe(true);
+    expect(
+      matchesReviewCategories(
+        coin,
+        ['utxo-missing-label', 'utxo-missing-tags', 'utxo-unidentified'],
+        edited,
+      ),
+    ).toBe(false);
+  });
+
+  it('recognizes resolved relationship goals from explicit counterparties without labeling every address', () => {
+    const { workspace, wallet, receipt, options } = receiptFixture();
+    const partyId = '40000000-0000-4000-8000-000000000001';
+    const edited = saveCounterparty(
+      workspace,
+      { id: partyId, name: 'Fixture sender' },
+      {
+        kind: 'wallet-transaction',
+        walletId: wallet.id,
+        transactionId: receipt.txid,
+        direction: 'received',
+        walletOutputIds: [`out:${receipt.txid}:0`],
+      },
+    );
+    const review = buildWalletReview(edited, wallet, options);
+    const relationship = review.items.find((item) => item.goal === 'counterparty-context')!;
+    expect(relationship).toMatchObject({
+      satisfied: true,
+      status: 'resolved',
+      contextSubjects: [`party:${partyId}`],
+    });
+    expect(edited.annotations.entities[`addr:${external}`]).toBeUndefined();
+    expect(edited.wallets.reviews).toBeUndefined();
+    expect(matchesReviewCategories(relationship, ['source-address'], edited)).toBe(true);
+    expect(matchesReviewCategories(relationship, ['unidentified-sources'], edited)).toBe(false);
+    const openItems = review.items.filter((item) => !item.satisfied);
+    expect(openItems.some((item) => item.goal === 'activity-context')).toBe(true);
+    expect(
+      walletReviewCategories(edited, openItems, review.groups)
+        .filter((category) => category.id !== 'wallet-transaction')
+        .every((category) => category.count === 0),
+    ).toBe(true);
+  });
+
+  it('retains truthful legacy definitions without adding prior acknowledgments to active categories', () => {
     const workspace = createWorkspace('Categories', 'mainnet');
-    const item = makeItem(1, { address });
-    workspace.annotations.entities[`addr:${address}`] = {
-      label: 'Address label',
-      note: '',
-      icon: '',
-      bookmarked: false,
+    workspace.wallets.reviews = {
+      'wallet|funding-source|old': {
+        status: 'unknown',
+        at: '2026-09-01T00:00:00.000Z',
+        evidence: 'saved',
+      },
     };
-    workspace.annotations.tags = [
-      { id: 'tx-tag', name: 'Transaction context', color: '#27c4a7', nodeIds: [`tx:${id(1)}`] },
-    ];
-    expect(matchesReviewCategories(item, ['utxo-unidentified'], workspace)).toBe(true);
-    workspace.annotations.tags[0].nodeIds = [`addr:${address}`];
-    expect(matchesReviewCategories(item, ['utxo-unidentified'], workspace)).toBe(false);
-    expect(matchesReviewCategories(item, ['utxo-missing-label'], workspace)).toBe(true);
-    expect(matchesReviewCategories(item, ['utxo-missing-tags'], workspace)).toBe(false);
+    for (const reason of ['wallet-address', 'source', 'funding-source', 'counterparty'] as const) {
+      expect(walletReviewReasonDefinitions[reason].filter).toBe(false);
+      expect(walletReviewReasonDefinitions[reason].description).toContain('original meaning');
+      const legacy = makeItem(1, { goal: undefined, reason, legacyOutputReview: true });
+      expect(matchesReviewCategories(legacy, [reason, 'saved-output-reviews'], workspace)).toBe(
+        false,
+      );
+    }
+    expect(
+      walletReviewCategories(workspace, []).some(
+        (category) => category.id === 'saved-output-reviews',
+      ),
+    ).toBe(false);
+    expect(workspace.wallets.reviews['wallet|funding-source|old'].status).toBe('unknown');
   });
 
   it('filters registered Analysis findings by tool and keeps older or unknown ones conditional', () => {
@@ -286,7 +339,12 @@ describe('discoverable wallet finding categories', () => {
       kind: 'hypothesis' as const,
     };
     workspace.analysis.findings = [finding];
-    const item = makeItem(1, { key: `wallet|link|${finding.id}`, reason: 'link' });
+    const item = makeItem(1, {
+      key: `wallet|link|${finding.id}`,
+      kind: 'finding',
+      goal: undefined,
+      reason: 'link',
+    });
     const catalog = walletReviewCategories(workspace, [item]);
     expect(catalog.find((category) => category.id === 'heuristic:cioh')?.count).toBe(1);
     expect(catalog.find((category) => category.id === 'link')).toBeUndefined();
@@ -300,6 +358,8 @@ describe('discoverable wallet finding categories', () => {
     ).toBe(false);
     const supportedOlderVersion = makeItem(4, {
       key: 'wallet|link|cioh-v1',
+      kind: 'finding',
+      goal: undefined,
       reason: 'link',
       algorithm: 'cioh-v1',
     });
@@ -308,10 +368,17 @@ describe('discoverable wallet finding categories', () => {
     );
     const older = makeItem(2, {
       key: 'wallet|link|older',
+      kind: 'finding',
+      goal: undefined,
       reason: 'link',
       algorithm: 'retired-tool-v1',
     });
-    const unknown = makeItem(3, { key: 'wallet|link|unknown', reason: 'link' });
+    const unknown = makeItem(3, {
+      key: 'wallet|link|unknown',
+      kind: 'finding',
+      goal: undefined,
+      reason: 'link',
+    });
     const legacyCatalog = walletReviewCategories(workspace, [
       item,
       supportedOlderVersion,

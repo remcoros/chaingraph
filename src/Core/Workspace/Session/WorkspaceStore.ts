@@ -246,7 +246,7 @@ export class WorkspaceStore {
     const evidenceChanged =
       data.chainData.transactions !== current.data.chainData.transactions ||
       walletEvidenceChanged(current.data.wallets.definitions, data.wallets.definitions);
-    data = invalidateFindings(current.data, data);
+    if (evidenceChanged) data = invalidateFindings(current.data, data);
     assertWorkspaceBudget(data);
     if (data.id !== id) throw new Error('A workspace edit cannot change its identity.');
     const previousGroup = current.editGroup;

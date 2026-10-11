@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { walletRelatedRecords } from './walletRelatedRecords';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import type { WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
 import type { WalletRow } from '../walletRows';
 import {
   transactions,
@@ -56,4 +57,54 @@ it('uses authoritative scripts for address outpoints rather than a conflicting d
     `out:${TX_FUNDING}:0`,
     `out:${TX_SPENDING}:0`,
   ]);
+});
+
+it('retains exact supporting records from every grouped finding', () => {
+  const workspace = fixture();
+  const extraTx = 'a'.repeat(64);
+  workspace.analysis.findings = [
+    {
+      id: 'one',
+      algorithm: 'cioh-v2',
+      title: 'One',
+      description: '',
+      nodeIds: [`out:${TX_FUNDING}:0`],
+      txids: [TX_FUNDING],
+      createdAt: '2026-09-01T00:00:00Z',
+    },
+    {
+      id: 'two',
+      algorithm: 'cioh-v2',
+      title: 'Two',
+      description: '',
+      nodeIds: [`out:${extraTx}:1`],
+      txids: [extraTx],
+      createdAt: '2026-09-01T00:00:00Z',
+    },
+  ];
+  const reviews: WalletReviewItem[] = workspace.analysis.findings.map((finding) => ({
+    kind: 'finding',
+    satisfied: false,
+    contextSubjects: [],
+    key: `wallet|link|${finding.id}`,
+    reason: 'link',
+    scope: 'transactions',
+    title: finding.title,
+    detail: '',
+    nodeId: `tx:${TX_SPENDING}`,
+    nodeIds: finding.nodeIds,
+    subjectIds: [`tx:${TX_SPENDING}`],
+    label: '',
+    tags: [],
+    evidence: '',
+    status: 'open',
+    changed: false,
+  }));
+  const related = walletRelatedRecords(workspace, {
+    ...row(`tx:${TX_SPENDING}`, 'transaction'),
+    txid: TX_SPENDING,
+    reviews,
+  });
+  expect(related.outputs).toContain(`out:${extraTx}:1`);
+  expect(related.transactions).toContain(`tx:${extraTx}`);
 });

@@ -3,10 +3,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import { buildWalletReviewContext, orderWalletContextTransactions } from './walletReviewContext';
 import { matchRelatedEntities } from './walletRelatedSelection';
-import {
-  buildWalletReview,
-  type WalletReviewItem,
-} from '../../../../Core/Workspace/Wallets/walletReview';
+import { type WalletReviewItem } from '../../../../Core/Workspace/Wallets/walletReview';
 import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
 import { outpointReference } from '../../../../Core/Workspace/entityReferences';
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
@@ -82,6 +79,9 @@ function item(
   overrides: Partial<WalletReviewItem> = {},
 ): WalletReviewItem {
   return {
+    kind: 'annotation-goal',
+    satisfied: false,
+    contextSubjects: [],
     key: 'review',
     reason: 'current-utxo',
     title: 'Review',
@@ -436,19 +436,10 @@ describe('wallet selected review context', () => {
 
   it('exposes source targets only when explicitly listed, wallet matched, and directly spending the receipt', () => {
     const workspace = fixture();
-    const review = buildWalletReview(workspace, wallet, {
-      utxos: [
-        {
-          txid: id(3),
-          vout: 0,
-          valueSats: 90_000_000,
-          height: 1,
-          address: mine,
-          scripthash: wallet.addresses[0].scripthash,
-        },
-      ],
+    const source = item(outpointReference(id(1), 0), {
+      reason: 'source',
+      nodeIds: [outpointReference(id(1), 0), outpointReference(id(3), 0)],
     });
-    const source = review.items.find((entry) => entry.reason === 'source')!;
     expect(source.nodeIds).toEqual([outpointReference(id(1), 0), outpointReference(id(3), 0)]);
     expect(
       buildWalletReviewContext(workspace, wallet, source).currentOutputs.map((entry) => entry.id),

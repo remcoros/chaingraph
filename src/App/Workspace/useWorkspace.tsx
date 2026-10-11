@@ -392,10 +392,23 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const canTraceAncestry = canLoadChainData;
   const transactionEvidence = app.chainDataAcquisition;
   const evidenceWallet = wallet ?? activeWorkspace?.wallets.definitions[0];
+  const walletDiscovery = useWalletActivity({
+    core,
+    transactions: transactionEvidence,
+    operation: workspaceOperation,
+    canLoadChainData,
+    fitAll,
+    automatic: {
+      walletId: evidenceWallet?.id,
+      ready: canLoadChainData && viewOwner === workspaceId && !lockingWorkspace && !tourStep,
+      busy: !!operation,
+    },
+  });
   const walletUtxos = useWalletUtxos({
     workspace: activeWorkspace,
     wallet: evidenceWallet,
     transactions: transactionEvidence,
+    completedCheck: evidenceWallet ? walletDiscovery.coinChecks[evidenceWallet.id] : undefined,
     enabled:
       canLoadChainData &&
       viewOwner === activeWorkspace?.id &&
@@ -530,13 +543,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       setNotice('Encrypted workspace exported. Keep the file and password safe.');
     });
   }
-  const walletDiscovery = useWalletActivity({
-    core,
-    transactions: transactionEvidence,
-    operation: workspaceOperation,
-    canLoadChainData,
-    fitAll,
-  });
   const history = useWorkspaceHistory({ workspaces });
   const graphActions = useGraphActions({
     core,
@@ -626,7 +632,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     workspaces,
     setNotice,
     select,
-    setSelectedId,
     replaceSelection: selection.batch.replace,
     setSelectionMode: selection.batch.setMode,
     handoff: graphHandoff,
@@ -667,8 +672,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       walletCommands.selectWalletRecord(walletActionRuntime(), ...args),
     openWalletRecord: (...args: Tail<Parameters<typeof walletCommands.openWalletRecord>>) =>
       walletCommands.openWalletRecord(walletActionRuntime(), ...args),
-    analyzeFromWallet: (...args: Tail<Parameters<typeof walletCommands.analyzeFromWallet>>) =>
-      walletCommands.analyzeFromWallet(walletActionRuntime(), ...args),
   };
   const analysisActions = {
     showFindingOnGraph: (...args: Tail<Parameters<typeof analysisCommands.showFindingOnGraph>>) =>
@@ -698,8 +701,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     },
     analysis: {
       sessions: analysis.sessions,
-      walletRevision: analysis.walletRevision,
-      noteWalletAnalysis: analysis.noteWalletAnalysis,
       sectionRef: analysisWorkspaceRef,
       actions: analysisActions,
     },

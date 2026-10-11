@@ -3,7 +3,10 @@ import type { WorkspaceCore } from './workspaceCore';
 
 /** One user-visible, cancellable workspace operation at a time. */
 export interface WorkspaceOperation {
-  run: (task: (signal: AbortSignal) => Promise<void>) => Promise<void>;
+  run: (
+    task: (signal: AbortSignal) => Promise<void>,
+    options?: { background?: boolean },
+  ) => Promise<void>;
   /** Cancel the active operation, or only the operation owning the supplied signal. */
   cancel: (expectedSignal?: AbortSignal) => void;
   isActive: () => boolean;
@@ -11,26 +14,41 @@ export interface WorkspaceOperation {
 
 export function useWorkspaceOperation(core: WorkspaceCore): WorkspaceOperation {
   const controllerRef = useRef<AbortController | undefined>(undefined);
+  const running = useRef<{ background: boolean; done: Promise<void> } | undefined>(undefined);
   const { activeWorkspaceRef, setError, setNotice, setOperation } = core;
   const cancel = useCallback((expectedSignal?: AbortSignal) => {
     const controller = controllerRef.current;
     if (controller && (!expectedSignal || controller.signal === expectedSignal)) controller.abort();
   }, []);
   const run = useCallback(
-    async (task: (signal: AbortSignal) => Promise<void>) => {
+    async (task: (signal: AbortSignal) => Promise<void>, options?: { background?: boolean }) => {
+      if (controllerRef.current && running.current?.background && !options?.background) {
+        controllerRef.current.abort();
+        await running.current.done;
+      }
       if (controllerRef.current) return;
       const controller = new AbortController();
       const workspaceId = activeWorkspaceRef.current?.id;
       controllerRef.current = controller;
-      setOperation('Working…');
-      setError('');
-      setNotice('');
+      let resolveDone!: () => void;
+      running.current = {
+        background: !!options?.background,
+        done: new Promise<void>((resolve) => {
+          resolveDone = resolve;
+        }),
+      };
+      if (!options?.background) {
+        setOperation('Working…');
+        setError('');
+        setNotice('');
+      }
       try {
         await task(controller.signal);
       } catch (cause) {
         if (
           activeWorkspaceRef.current?.id === workspaceId &&
-          controllerRef.current === controller
+          controllerRef.current === controller &&
+          !options?.background
         ) {
           if (!controller.signal.aborted)
             setError(cause instanceof Error ? cause.message : 'Operation failed.');
@@ -39,8 +57,10 @@ export function useWorkspaceOperation(core: WorkspaceCore): WorkspaceOperation {
       }
       if (controllerRef.current === controller) {
         controllerRef.current = undefined;
-        setOperation('');
+        running.current = undefined;
+        if (!options?.background) setOperation('');
       }
+      resolveDone();
     },
     [activeWorkspaceRef, setError, setNotice, setOperation],
   );

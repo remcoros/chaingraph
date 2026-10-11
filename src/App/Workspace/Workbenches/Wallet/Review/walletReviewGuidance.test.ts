@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { createElement, Fragment, type ReactNode } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
-import { addressReference } from '../../../../../Core/Workspace/entityReferences';
 import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
 
 import {
@@ -15,17 +12,13 @@ import {
 } from '../../../../../Core/Workspace/Wallets/walletReview';
 import { walletReviewCategories } from './reviewCategories';
 import { matchesWalletStatus, reviewRow } from '../walletRows';
-import { walletReviewGuidance, walletSubjectTitle } from './walletReviewGuidance';
+import { walletSubjectTitle } from './walletReviewGuidance';
 import {
   PUBLIC_ZPUB,
   transactions,
   TX_FUNDING,
   TX_SPENDING,
 } from '../../../../../../tests/fixtures/bitcoin';
-
-function guidanceText(guidance: ReactNode) {
-  return renderToStaticMarkup(createElement(Fragment, null, guidance));
-}
 
 function fixture() {
   const workspace = createWorkspace('Public review guidance', 'mainnet');
@@ -67,131 +60,126 @@ function fixture() {
 }
 
 describe('guided wallet review', () => {
-  it('reviews used own addresses without adding unused gap addresses or acknowledging UTXOs', () => {
-    const { workspace, wallet, addresses, options } = fixture();
+  it('uses activity and coin intentions without mandatory receive/change address tasks', () => {
+    const { workspace, wallet, options } = fixture();
     const initial = buildWalletReview(workspace, wallet, options);
-    const own = initial.items.filter((item) => item.reason === 'wallet-address');
-    expect(own.map((item) => item.nodeId).sort()).toEqual(
-      addresses
-        .slice(0, 2)
-        .map((entry) => addressReference(entry.address))
-        .sort(),
-    );
-    expect(initial.items[0].reason).toBe('current-utxo');
-    const target = own.find((item) => item.address === addresses[0].address)!;
-    const reviewed = applyReviewDecisions(workspace, wallet, [target], 'reviewed');
-    expect(Object.keys(reviewed.wallets.reviews!)).toEqual([target.key]);
-    reviewed.annotations.entities[target.nodeId] = {
-      label: 'Savings receipts',
+    expect(initial.items.some((item) => item.reason === 'wallet-address')).toBe(false);
+    const activity = initial.items.find((item) => item.goal === 'activity-context')!;
+    const coin = initial.items.find((item) => item.goal === 'coin-context')!;
+    expect(activity).toBeDefined();
+    expect(coin).toBeDefined();
+    const deferred = applyReviewDecisions(workspace, wallet, [activity], 'later');
+    deferred.annotations.entities[activity.nodeId] = {
+      label: 'Public receipt',
       note: '',
       icon: '',
       bookmarked: false,
     };
-    reviewed.chainData.transactions['d'.repeat(64)] = {
-      txid: 'd'.repeat(64),
-      vin: [{ coinbase: '00' }],
-      vout: [
-        {
-          n: 0,
-          value: 0.1,
-          scriptPubKey: { hex: bytesToHex(bitcoinAddress.toOutputScript(addresses[0].address)) },
-        },
-      ],
-    };
-    const next = buildWalletReview(reviewed, wallet, options);
-    expect(next.items.find((item) => item.key === target.key)).toMatchObject({
-      status: 'reviewed',
+    const next = buildWalletReview(deferred, wallet, options);
+    expect(next.items.find((item) => item.key === activity.key)).toMatchObject({
+      status: 'resolved',
+      satisfied: true,
       changed: false,
     });
-    expect(next.items.find((item) => item.reason === 'current-utxo')?.status).toBe('open');
+    expect(deferred.wallets.reviews?.[activity.key].status).toBe('later');
+    expect(Object.keys(deferred.wallets.reviews!)).toEqual([activity.key]);
   });
 
-  it('offers address counterparties, not new individual funding or destination-output tasks', () => {
+  it('asks about receipt and payment relationships without creating address or missing-tag obligations', () => {
     const { workspace, wallet, options } = fixture();
     const review = buildWalletReview(workspace, wallet, options);
-    expect(review.items.some((item) => item.reason === 'source-address')).toBe(true);
-    expect(review.items.some((item) => item.reason === 'destination-address')).toBe(true);
+    const parties = review.items.filter((item) => item.goal === 'counterparty-context');
+    expect(parties.map((item) => item.reason).sort()).toEqual([
+      'destination-address',
+      'source-address',
+    ]);
+    expect(parties.every((item) => item.nodeId.startsWith('tx:'))).toBe(true);
+    expect(parties.find((item) => item.reason === 'source-address')?.title).toBe('Who sent this?');
+    expect(parties.find((item) => item.reason === 'destination-address')?.title).toBe(
+      'Who received this?',
+    );
     expect(
-      review.items.some(
-        (item) => item.reason === 'counterparty' || item.reason === 'funding-source',
+      parties.every((item) =>
+        item.detail.includes('does not identify every input or output address'),
       ),
-    ).toBe(false);
+    ).toBe(true);
     const categories = walletReviewCategories(workspace, review.items);
     expect(
-      categories.some((item) => item.id === 'counterparty' || item.id === 'funding-source'),
+      categories.some((item) =>
+        [
+          'counterparty',
+          'funding-source',
+          'wallet-address',
+          'utxo-missing-tags',
+          'utxo-missing-label',
+        ].includes(item.id),
+      ),
     ).toBe(false);
-    expect(categories.some((item) => item.id === 'wallet-address')).toBe(true);
   });
 
-  it('retains compatible saved output decisions as history without copying them to addresses', () => {
+  it('retains saved output decisions in read-only history without copying them into active relationships', () => {
     const { workspace, wallet, options } = fixture();
     const key = reviewKey(wallet.id, 'counterparty', `${TX_SPENDING}:1`);
     workspace.wallets.reviews = {
       [key]: { status: 'unknown', at: '2026-09-09T10:00:00Z', evidence: 'old' },
     };
-    const legacy = buildWalletReview(workspace, wallet, options).items.find(
-      (item) => item.key === key,
-    )!;
-    workspace.wallets.reviews[key].evidence = legacy.evidence;
     const review = buildWalletReview(workspace, wallet, options);
-    expect(review.items.find((item) => item.key === key)).toMatchObject({
+    expect(review.items.some((item) => item.key === key)).toBe(false);
+    expect(review.legacyDecisions).toContainEqual({
+      key,
       status: 'unknown',
-      changed: false,
+      at: '2026-09-09T10:00:00Z',
+      evidence: 'old',
     });
-    const legacyRow = reviewRow(review.items.find((item) => item.key === key)!);
-    expect(matchesWalletStatus({ ...legacyRow, changed: true }, 'open')).toBe(false);
-    expect(matchesWalletStatus({ ...legacyRow, changed: true }, 'decided')).toBe(true);
-    expect(guidanceText(walletReviewGuidance(legacyRow, { tagCount: 0 }))).toContain(
-      'Saved output decision',
-    );
-    expect(review.items.find((item) => item.reason === 'destination-address')?.status).toBe('open');
+    expect(review.items.find((item) => item.reason === 'destination-address')).toMatchObject({
+      status: 'open',
+      satisfied: false,
+    });
     expect(
-      walletReviewCategories(workspace, []).find(
+      walletReviewCategories(workspace, []).some(
         (category) => category.id === 'saved-output-reviews',
-      )?.count,
-    ).toBe(0);
+      ),
+    ).toBe(false);
+    expect(workspace.wallets.reviews[key].evidence).toBe('old');
   });
 
-  it('explains source, destination, own-address and UTXO tasks with an actionable sentence', () => {
+  it('describes the task without requiring blanket acknowledgment of human context', () => {
     const { workspace, wallet, options } = fixture();
     const items = buildWalletReview(workspace, wallet, options).items;
-    const source = reviewRow(items.find((item) => item.reason === 'source-address')!);
-    expect(source.ownership).toBe('external');
-    expect(walletSubjectTitle(source)).toBe('Source address');
-    expect(guidanceText(walletReviewGuidance(source, { tagCount: 0 }))).toContain(
-      'sender or source',
-    );
-    expect(guidanceText(walletReviewGuidance(source, { tagCount: 1 }))).not.toContain(
-      'has no label or tags',
-    );
-    expect(
-      guidanceText(walletReviewGuidance(source, { label: 'Exchange', tagCount: 0 })),
-    ).toContain('Mark reviewed');
-    const destination = reviewRow(items.find((item) => item.reason === 'destination-address')!);
-    expect(guidanceText(walletReviewGuidance(destination, { tagCount: 0 }))).toContain(
-      'recipient or purpose',
-    );
-    const own = reviewRow(items.find((item) => item.reason === 'wallet-address')!);
-    expect(guidanceText(walletReviewGuidance(own, { tagCount: 0 }))).toContain(
-      'what you use it for',
-    );
-    const utxo = reviewRow(items.find((item) => item.reason === 'current-utxo')!);
-    expect(guidanceText(walletReviewGuidance(utxo, { tagCount: 0 }))).toContain(
-      'where you received it',
-    );
+    const activity = items.find((item) => item.goal === 'activity-context')!;
+    const coin = items.find((item) => item.goal === 'coin-context')!;
+    expect(activity.detail).toContain('label, note or tag');
+    expect(activity.detail).not.toContain('counterparty');
+    expect(activity.detail).not.toContain('Mark reviewed');
+    expect(coin.detail).toContain('Where this coin came from');
+    const party = items.find((item) => item.reason === 'source-address')!;
+    expect(walletSubjectTitle(reviewRow(party))).toBe('Transaction');
+    expect(party.detail).toContain('cannot identify it or need no annotation');
+    expect(party.detail).not.toContain('has no label or tags');
   });
 
-  it('does not tell users to label completed or deferred decisions as if they were new', () => {
+  it('keeps completed, unknown and deferred outcomes distinct from changed finding evidence', () => {
     const { workspace, wallet, options } = fixture();
-    const row = reviewRow(buildWalletReview(workspace, wallet, options).items[0]);
-    expect(
-      guidanceText(walletReviewGuidance({ ...row, status: 'unknown' }, { tagCount: 0 })),
-    ).toContain('Previously reviewed');
-    expect(
-      guidanceText(walletReviewGuidance({ ...row, status: 'later' }, { tagCount: 0 })),
-    ).toContain('Set aside');
-    expect(
-      guidanceText(walletReviewGuidance({ ...row, changed: true }, { tagCount: 0 })),
-    ).toContain('details changed');
+    const item = buildWalletReview(workspace, wallet, options).items.find(
+      (item) => item.goal === 'activity-context',
+    )!;
+    const unknown = applyReviewDecisions(workspace, wallet, [item], 'cannot-identify');
+    const projection = buildWalletReview(unknown, wallet, options).items.find(
+      (entry) => entry.key === item.key,
+    )!;
+    const row = reviewRow(projection);
+    expect(matchesWalletStatus(row, 'decided')).toBe(true);
+    expect(matchesWalletStatus(row, 'open')).toBe(false);
+    expect(projection.satisfied).toBe(false);
+    const later = reviewRow({ ...projection, status: 'later' });
+    expect(matchesWalletStatus(later, 'later')).toBe(true);
+    const finding = reviewRow({
+      ...projection,
+      kind: 'finding',
+      reason: 'link',
+      status: 'reviewed',
+      changed: true,
+    });
+    expect(matchesWalletStatus(finding, 'open')).toBe(true);
   });
 });

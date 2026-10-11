@@ -1,4 +1,4 @@
-import { canonicalEntityReference } from '../entityReferences';
+import { canonicalAnnotationReference } from '../annotationReferences';
 import {
   clampAnnotationText,
   MAX_ANNOTATION_LABEL_LENGTH,
@@ -24,7 +24,13 @@ function targets(workspace: Workspace, ids: Iterable<string>): string[] {
   for (const id of ids) {
     if (++supplied > MAX_BATCH_TARGETS)
       throw new Error('A batch edit supports at most 50,000 entity references.');
-    result.add(canonicalEntityReference(id, workspace.network));
+    const reference = canonicalAnnotationReference(id, workspace.network);
+    if (
+      reference.startsWith('party:') &&
+      !workspace.counterparties?.definitions.some((party) => party.id === reference.slice(6))
+    )
+      throw new Error('That counterparty is no longer part of this workspace.');
+    result.add(reference);
   }
   return [...result];
 }
@@ -70,6 +76,8 @@ export function applyBatchLabel(
 ): Workspace {
   const value = clampAnnotationText(label, MAX_ANNOTATION_LABEL_LENGTH);
   const plan = labelBatchPlan(workspace, ids, options);
+  if (!value.trim() && plan.targetIds.some((id) => id.startsWith('party:')))
+    throw new Error('Give the counterparty a name. Remove the counterparty to delete it.');
   const annotations = { ...workspace.annotations.entities };
   let changed = false;
   for (const id of plan.targetIds) {

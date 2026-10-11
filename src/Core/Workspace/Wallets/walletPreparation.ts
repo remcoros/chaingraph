@@ -7,13 +7,42 @@ import { reconcileWalletUtxos } from './WalletUtxos/walletUtxoObservation';
 import { buildWalletSelectionAddresses, buildWalletSelectionIndex } from './walletSelectionIndex';
 import { createWalletOutputEvidenceResolver } from './walletOutputEvidence';
 import type { WalletUtxoCheck } from './WalletUtxos/walletUtxoCheck';
+import { listWalletAddresses, listWalletTransactions } from './walletRecords';
+import { walletFindingEvidence } from './walletReviewEvidence';
+import type { AnalysisFinding } from '../Analysis/finding';
 
 type Dependencies = readonly unknown[];
 const same = (a: Dependencies, b: Dependencies) =>
   a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
 
+/** Same accepted coins and coverage, independently of renewed observation dates. */
+function sameCoinEvidence(a?: WalletUtxoCheck, b?: WalletUtxoCheck): boolean {
+  if (a === b) return true;
+  if (
+    !a ||
+    !b ||
+    a.checkedAddresses !== b.checkedAddresses ||
+    a.totalAddresses !== b.totalAddresses ||
+    a.nextCursor !== b.nextCursor ||
+    a.failed !== b.failed ||
+    a.records.length !== b.records.length
+  )
+    return false;
+  return a.records.every((record, index) => {
+    const other = b.records[index];
+    return (
+      record.txid === other.txid &&
+      record.vout === other.vout &&
+      record.valueSats === other.valueSats &&
+      record.height === other.height &&
+      record.address === other.address &&
+      record.scripthash === other.scripthash
+    );
+  });
+}
+
 interface PreparedReview {
-  dependencies: Dependencies;
+  check?: WalletUtxoCheck;
   value: WalletPreparation;
 }
 
@@ -21,6 +50,8 @@ interface PreparedWallet {
   relationshipDependencies: Dependencies;
   walletAddresses: ReturnType<typeof buildWalletSelectionAddresses>;
   relationships: ReturnType<typeof groupWalletRelationships>;
+  transactionRecords: ReturnType<typeof listWalletTransactions>;
+  addressRecords: ReturnType<typeof listWalletAddresses>;
   reviewDependencies?: Dependencies;
   // Keep the initial view and the latest dated UTXO projection separately.
   withoutUtxos?: PreparedReview;
@@ -31,6 +62,8 @@ export interface WalletPreparation {
   selectionIndex: ReturnType<typeof buildWalletSelectionIndex>;
   walletAddresses: ReturnType<typeof buildWalletSelectionAddresses>;
   relationships: ReturnType<typeof groupWalletRelationships>;
+  transactionRecords: ReturnType<typeof listWalletTransactions>;
+  addressRecords: ReturnType<typeof listWalletAddresses>;
   review: ReturnType<typeof buildWalletReview>;
   currentUtxos: WalletUtxoCheck['records'];
   invalidCount: number;
@@ -41,7 +74,6 @@ function relationshipDependencies(wallet: Wallet): Dependencies {
     wallet.addresses,
     wallet.pendingTransactionIds,
     wallet.scanComplete,
-    wallet.scannedAt,
     wallet.scanGap,
     wallet.scanLimit,
   ];
@@ -49,12 +81,28 @@ function relationshipDependencies(wallet: Wallet): Dependencies {
 
 function reviewDependencies(workspace: Workspace, wallet: Wallet): Dependencies {
   return [
-    wallet,
+    wallet.id,
+    wallet.key,
+    wallet.name,
+    wallet.scriptType,
+    ...relationshipDependencies(wallet),
     workspace.annotations.entities,
     workspace.annotations.tags,
     workspace.wallets.reviews,
     workspace.analysis.findings,
+    workspace.counterparties,
+    ...findingWalletDependencies(workspace),
   ];
+}
+
+// Wallet-intersection support includes every wallet's derivation anchors, not names or context.
+function findingWalletDependencies(workspace: Workspace): Dependencies {
+  return workspace.wallets.definitions.flatMap((wallet) => [
+    wallet.id,
+    wallet.key,
+    wallet.scriptType,
+    wallet.addresses,
+  ]);
 }
 
 /** Prepared views belong to one unlocked session, never its encrypted payload.
@@ -69,6 +117,8 @@ export class WalletPreparationCache {
     transactions: Workspace['chainData']['transactions'];
     evidence: ReturnType<typeof createWalletOutputEvidenceResolver>;
     selectionIndex: ReturnType<typeof buildWalletSelectionIndex>;
+    findingWalletDependencies: Dependencies;
+    findingEvidence: WeakMap<AnalysisFinding, string>;
   };
   private wallets = new Map<string, PreparedWallet>();
   private disposed = false;
@@ -95,7 +145,35 @@ export class WalletPreparationCache {
     )
       return undefined;
     const review = utxos ? cached.withUtxos : cached.withoutUtxos;
-    return review && same(review.dependencies, [utxos]) ? review.value : undefined;
+    if (!review || !sameCoinEvidence(review.check, utxos)) return undefined;
+    const value = review.value;
+    if (
+      value.review.coverage.scannedAt === wallet.scannedAt &&
+      value.review.coverage.utxoCheckedAt === utxos?.checkedAt
+    )
+      return value;
+    // Check dates decorate accepted evidence; they do not rebuild goals or findings.
+    const relationships =
+      value.relationships.coverage.scannedAt === wallet.scannedAt
+        ? value.relationships
+        : {
+            ...value.relationships,
+            coverage: { ...value.relationships.coverage, scannedAt: wallet.scannedAt },
+          };
+    cached.relationships = relationships;
+    review.value = {
+      ...value,
+      relationships,
+      review: {
+        ...value.review,
+        coverage: {
+          ...value.review.coverage,
+          scannedAt: wallet.scannedAt,
+          utxoCheckedAt: utxos?.checkedAt,
+        },
+      },
+    };
+    return review.value;
   }
 
   prepare(workspace: Workspace, wallet: Wallet, utxos?: WalletUtxoCheck): WalletPreparation {
@@ -113,9 +191,16 @@ export class WalletPreparationCache {
         transactions: workspace.chainData.transactions,
         evidence,
         selectionIndex: buildWalletSelectionIndex(workspace, evidence),
+        findingWalletDependencies: findingWalletDependencies(workspace),
+        findingEvidence: new WeakMap(),
       };
     }
     const chain = this.chain!;
+    const findingWallets = findingWalletDependencies(workspace);
+    if (!same(chain.findingWalletDependencies, findingWallets)) {
+      chain.findingWalletDependencies = findingWallets;
+      chain.findingEvidence = new WeakMap();
+    }
     let cached = this.wallets.get(wallet.id);
     const dependencies = relationshipDependencies(wallet);
     if (!cached || !same(cached.relationshipDependencies, dependencies)) {
@@ -128,6 +213,8 @@ export class WalletPreparationCache {
           chain.selectionIndex.prevouts,
           chain.evidence,
         ),
+        transactionRecords: listWalletTransactions(workspace, wallet),
+        addressRecords: listWalletAddresses(workspace, wallet),
       };
       this.wallets.set(wallet.id, cached);
     }
@@ -137,8 +224,7 @@ export class WalletPreparationCache {
       cached.withoutUtxos = undefined;
       cached.reviewDependencies = metadata;
     }
-    // A check may finish before the first wallet render. Also retain the no-check view.
-    if (utxos && !cached.withoutUtxos) this.prepare(workspace, wallet);
+    // Prepare only the requested projection. Keep an earlier no-check view if it exists.
     const reconciledUtxos = reconcileWalletUtxos(
       utxos?.records ?? [],
       chain.selectionIndex.transactions,
@@ -151,6 +237,8 @@ export class WalletPreparationCache {
       selectionIndex: chain.selectionIndex,
       walletAddresses: cached.walletAddresses,
       relationships: cached.relationships,
+      transactionRecords: cached.transactionRecords,
+      addressRecords: cached.addressRecords,
       currentUtxos,
       invalidCount: reconciledUtxos.invalidCount,
       review: buildWalletReview(workspace, wallet, {
@@ -162,9 +250,18 @@ export class WalletPreparationCache {
         relationships: cached.relationships,
         prevouts: chain.selectionIndex.prevouts,
         evidence: chain.evidence,
+        transactionRecords: cached.transactionRecords,
+        addressRecords: cached.addressRecords,
+        findingEvidence: (finding) => {
+          const previous = chain.findingEvidence.get(finding);
+          if (previous !== undefined) return previous;
+          const evidence = walletFindingEvidence(workspace, finding, chain.selectionIndex.prevouts);
+          chain.findingEvidence.set(finding, evidence);
+          return evidence;
+        },
       }),
     };
-    const result = { dependencies: [utxos], value };
+    const result = { check: utxos, value };
     if (utxos) cached.withUtxos = result;
     else cached.withoutUtxos = result;
     return value;

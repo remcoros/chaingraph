@@ -1,0 +1,424 @@
+// @vitest-environment jsdom
+import { useState } from 'react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
+import { WalletReviewPanel, type WalletWorkbenchViewProps } from './WalletReviewPanel';
+import {
+  PUBLIC_ZPUB,
+  transactions,
+  TX_FUNDING,
+  TX_SPENDING,
+} from '../../../../../../tests/fixtures/bitcoin';
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+});
+function Fixture({
+  saved = false,
+  findings = false,
+  receipt = false,
+}: {
+  saved?: boolean;
+  findings?: boolean;
+  receipt?: boolean;
+}) {
+  const [workspace, setWorkspace] = useState(() => {
+    const value = createWorkspace('Public wallet fixture', 'mainnet');
+    const wallet = {
+      id: '30000000-0000-4000-8000-000000000001',
+      name: 'Public wallet',
+      key: PUBLIC_ZPUB,
+      scriptType: 'p2wpkh' as const,
+      color: '#27c4a7',
+      addresses: deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 2),
+      scannedAt: '2026-10-01T10:00:00.000Z',
+      scanComplete: true,
+    };
+    value.wallets.definitions = [wallet];
+    value.chainData.transactions = structuredClone(transactions);
+    // Coinbase funding has no sender question; use an ordinary receipt for this interaction.
+    if (receipt) value.chainData.transactions[TX_FUNDING].vin = [{ txid: 'd'.repeat(64), vout: 0 }];
+    if (findings)
+      value.analysis.findings = [
+        {
+          id: 'receipt-finding',
+          algorithm: 'value-flow-v1',
+          title: 'Receipt finding',
+          description: 'Receipt evidence',
+          nodeIds: [`tx:${TX_FUNDING}`, `tx:${TX_SPENDING}`],
+          txids: [TX_FUNDING, TX_SPENDING],
+          subjects: [`tx:${TX_FUNDING}`],
+          kind: 'observation',
+          reviewRule: 'fee-threshold',
+          createdAt: '2026-10-01T10:00:00.000Z',
+        },
+        {
+          id: 'spend-finding',
+          algorithm: 'value-flow-v1',
+          title: 'Spending finding',
+          description: 'Spending evidence',
+          nodeIds: [`tx:${TX_FUNDING}`, `tx:${TX_SPENDING}`],
+          txids: [TX_FUNDING, TX_SPENDING],
+          subjects: [`tx:${TX_SPENDING}`],
+          kind: 'observation',
+          reviewRule: 'fee-threshold',
+          createdAt: '2026-10-01T10:00:00.000Z',
+        },
+      ];
+    if (saved)
+      value.view.wallet = {
+        [wallet.id]: {
+          activeTab: 'review',
+          browsing: { tab: 'transactions', query: TX_FUNDING, selectedKey: `tx:${TX_FUNDING}` },
+          review: { status: 'all' },
+        },
+      };
+    return value;
+  });
+  const props: WalletWorkbenchViewProps = {
+    workspace,
+    wallet: workspace.wallets.definitions[0],
+    active: true,
+    busy: false,
+    canLoadChainData: false,
+    onChange: setWorkspace,
+    updateEvidence: (_id, update) => setWorkspace(update),
+    onSelectWallet: vi.fn(),
+    onAddWallet: vi.fn(),
+    onRefresh: vi.fn(),
+    onShowInGraph: vi.fn(),
+    onIsolateInGraph: vi.fn(),
+    onShowSelection: vi.fn(),
+    onInspect: vi.fn(),
+    walletUtxos: { loading: false, error: '', check: vi.fn() },
+    onPresentationChange: (id, update) =>
+      setWorkspace((current) => {
+        const before = current.view.wallet?.[id] ?? {};
+        const after = update(before);
+        return before === after
+          ? current
+          : {
+              ...current,
+              view: { ...current.view, wallet: { ...current.view.wallet, [id]: after } },
+            };
+      }),
+  };
+  return <WalletReviewPanel {...props} wallet={props.wallet!} />;
+}
+it('starts with transaction activity and exposes address scopes under one tab', () => {
+  render(<Fixture />);
+  const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+  expect(
+    tabs.getAllByRole('button').map((button) => button.textContent?.replace(/\d+$/, '').trim()),
+  ).toEqual(['Transactions', 'Coins', 'Addresses', 'Counterparties', 'Review']);
+  expect(tabs.getByRole('button', { name: 'Transactions' }).getAttribute('aria-pressed')).toBe(
+    'true',
+  );
+  expect(screen.getAllByLabelText('received').length).toBeGreaterThan(0);
+  expect(
+    screen.getAllByText(
+      (_text, element) =>
+        element?.classList.contains('bitcoin-amount') === true &&
+        element.textContent?.replace(/\s/g, '').startsWith('+2.00000000') === true,
+    ).length,
+  ).toBeGreaterThan(0);
+  fireEvent.click(screen.getAllByRole('button', { name: / label$/i })[0]);
+  expect(tabs.getByRole('button', { name: 'Transactions' }).getAttribute('aria-pressed')).toBe(
+    'true',
+  );
+  const editor = screen.getByRole('dialog', { name: 'Label selected records' });
+  fireEvent.change(within(editor).getByRole('textbox', { name: 'Batch label' }), {
+    target: { value: 'Public fixture context' },
+  });
+  fireEvent.click(within(editor).getByRole('button', { name: 'Apply label' }));
+  expect(screen.queryByRole('dialog', { name: 'Label selected records' })).toBeNull();
+  expect(screen.getAllByText('Public fixture context').length).toBeGreaterThan(0);
+  fireEvent.click(tabs.getByRole('button', { name: 'Addresses' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Address scope' }), {
+    target: { value: 'sources' },
+  });
+  expect(tabs.getByRole('button', { name: 'Addresses' }).getAttribute('aria-pressed')).toBe('true');
+  expect(screen.getByRole('combobox', { name: 'Address scope' }).getAttribute('aria-label')).toBe(
+    'Address scope',
+  );
+});
+it('restores browsing filters independently of the saved Review position', () => {
+  render(<Fixture saved />);
+  const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+  expect(tabs.getByRole('button', { name: /^Review/ }).getAttribute('aria-pressed')).toBe('true');
+  fireEvent.click(tabs.getByRole('button', { name: 'Transactions' }));
+  expect(screen.getByRole('searchbox').getAttribute('value')).toBe(TX_FUNDING);
+  fireEvent.click(tabs.getByRole('button', { name: /^Review/ }));
+  expect(screen.getByRole('searchbox').getAttribute('value')).toBe('');
+  fireEvent.click(tabs.getByRole('button', { name: 'Transactions' }));
+  expect(screen.getByRole('searchbox').getAttribute('value')).toBe(TX_FUNDING);
+});
+
+it('opens the named counterparty editor without navigating away from transactions', () => {
+  render(<Fixture />);
+  fireEvent.click(screen.getAllByRole('button', { name: / recipients$/i })[0]);
+  expect(screen.getByRole('dialog', { name: 'Recipients' })).toBeTruthy();
+  expect(screen.getByRole('searchbox', { name: 'Search counterparties' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Transactions' }).getAttribute('aria-pressed')).toBe(
+    'true',
+  );
+});
+it('limits a transaction finding jump to its own review items', () => {
+  render(<Fixture findings />);
+  const row = within(screen.getByRole('list', { name: 'Transactions records' }))
+    .getByRole('link', { name: new RegExp(TX_FUNDING.slice(0, 8)) })
+    .closest('[role="listitem"]')!;
+  fireEvent.click(within(row as HTMLElement).getByRole('button', { name: /^Review items/ }));
+  const goals = screen.getByRole('region', { name: 'Review goals' });
+  expect(within(goals).getByText('Receipt finding')).toBeTruthy();
+  expect(within(goals).queryByText('Spending finding')).toBeNull();
+});
+
+it('preserves inspection and modifier selection through record links', () => {
+  render(<Fixture />);
+  const records = screen.getByRole('list', { name: 'Transactions records' });
+  const receipt = within(records).getByRole('link', { name: new RegExp(TX_FUNDING.slice(0, 8)) });
+  const payment = within(records).getByRole('link', { name: new RegExp(TX_SPENDING.slice(0, 8)) });
+  fireEvent.click(payment);
+  expect(payment.getAttribute('aria-current')).toBe('true');
+  expect(receipt.getAttribute('aria-current')).toBeNull();
+  expect(screen.getByRole('article', { name: 'Selected wallet item' })).toBeDefined();
+  fireEvent.click(receipt, { ctrlKey: true });
+  expect(
+    (within(records).getByRole('checkbox', { name: `Select ${TX_FUNDING}` }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+  expect(screen.getByRole('article', { name: 'Batch selection details' })).toBeDefined();
+  fireEvent.click(payment);
+  expect(payment.getAttribute('aria-current')).toBe('true');
+  expect(
+    (within(records).getByRole('checkbox', { name: `Select ${TX_FUNDING}` }) as HTMLInputElement)
+      .checked,
+  ).toBe(false);
+});
+
+it('shows an icon-only annotation on the transaction row and selected record', () => {
+  render(<Fixture />);
+  const records = screen.getByRole('list', { name: 'Transactions records' });
+  const record = within(records).getByRole('link', { name: new RegExp(TX_FUNDING.slice(0, 8)) });
+  fireEvent.click(record);
+  fireEvent.click(screen.getByRole('button', { name: 'Set icon: None' }));
+  fireEvent.click(
+    within(screen.getByRole('dialog', { name: 'Choose node icon' })).getByRole('button', {
+      name: 'Star',
+    }),
+  );
+  expect(within(record).getByText('★')).toBeDefined();
+  const selected = screen.getByRole('article', { name: 'Selected wallet item' });
+  expect(within(selected).getByRole('button', { name: 'Set icon: Star' }).textContent).toBe('★');
+  expect(within(record).getByTitle(TX_FUNDING)).toBeDefined();
+  expect(within(selected).getByRole('button', { name: 'Set icon: Star' })).toBeDefined();
+});
+
+it.each([
+  [TX_FUNDING, 'Sender review', 'Senders'],
+  [TX_SPENDING, 'Recipient review', 'Recipients'],
+])('identifies who was involved in %s without answering its purpose', (txid, question, title) => {
+  render(<Fixture receipt />);
+  const records = screen.getByRole('list', { name: 'Transactions records' });
+  const record = within(records).getByRole('link', { name: new RegExp(txid.slice(0, 8)) });
+  fireEvent.click(
+    within(record.closest('[role="listitem"]') as HTMLElement).getByRole('button', {
+      name: /^Review items/,
+    }),
+  );
+  const inspector = screen.getByRole('article', { name: 'Selected review item' });
+  const chip = within(inspector).getByRole('button', { name: question });
+  if (chip.getAttribute('aria-expanded') !== 'true') {
+    // Close the review opened by the navigation jump before choosing another field.
+    for (const dialog of screen.queryAllByRole('dialog'))
+      fireEvent.click(within(dialog).getByRole('button', { name: /^Close / }));
+    fireEvent.click(chip);
+  }
+  const review = screen.getByRole('dialog');
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  fireEvent.click(within(review).getByRole('button', { name: /^Add / }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  act(() => frames.splice(0).forEach((callback) => callback(0)));
+  const editor = screen.getByRole('dialog', { name: title });
+  fireEvent.change(within(editor).getByRole('searchbox', { name: 'Search counterparties' }), {
+    target: { value: 'Public fixture contact' },
+  });
+  fireEvent.click(within(editor).getByRole('button', { name: /Create/ }));
+  expect(within(inspector).queryByRole('button', { name: question })).toBeNull();
+  expect(within(inspector).getByRole('button', { name: 'Label review' })).toBeTruthy();
+  expect(within(inspector).getByRole('link', { name: 'Public fixture contact' })).toBeTruthy();
+  expect(screen.getByRole('dialog', { name: title })).toBeTruthy();
+  fireEvent.click(within(editor).getByRole('button', { name: `Close ${title.toLowerCase()}` }));
+  expect(screen.queryByRole('dialog', { name: title })).toBeNull();
+  expect(
+    within(within(inspector).getByRole('heading', { level: 2 })).getByTitle(txid),
+  ).toBeTruthy();
+});
+
+it('selects matching records from the first list header checkbox and retains selections outside a filter when clearing', () => {
+  render(<Fixture />);
+  const records = screen.getByRole('list', { name: 'Transactions records' });
+  const all = within(records).getByRole('checkbox', {
+    name: 'Select all matching records (2)',
+  }) as HTMLInputElement;
+  expect(records.firstElementChild?.contains(all)).toBe(true);
+  expect(within(records.firstElementChild as HTMLElement).getByText('2/2 shown')).toBeTruthy();
+  const funding = within(records).getByRole('checkbox', {
+    name: `Select ${TX_FUNDING}`,
+  }) as HTMLInputElement;
+  const spending = within(records).getByRole('checkbox', {
+    name: `Select ${TX_SPENDING}`,
+  }) as HTMLInputElement;
+  fireEvent.click(funding);
+  expect(all.indeterminate).toBe(true);
+  expect(all.getAttribute('aria-checked')).toBe('mixed');
+  fireEvent.click(all);
+  expect(all.checked).toBe(true);
+  expect(funding.checked).toBe(true);
+  expect(spending.checked).toBe(true);
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Filter wallet records' }), {
+    target: { value: TX_FUNDING },
+  });
+  const filteredAll = within(records).getByRole('checkbox', {
+    name: 'Select all matching records (1)',
+  }) as HTMLInputElement;
+  expect(filteredAll.checked).toBe(true);
+  fireEvent.click(filteredAll);
+  fireEvent.click(screen.getByRole('button', { name: 'Clear wallet filters' }));
+  expect(
+    (within(records).getByRole('checkbox', { name: `Select ${TX_FUNDING}` }) as HTMLInputElement)
+      .checked,
+  ).toBe(false);
+  expect(
+    (within(records).getByRole('checkbox', { name: `Select ${TX_SPENDING}` }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Filter wallet records' }), {
+    target: { value: 'no matching transaction' },
+  });
+  expect(
+    (
+      within(records).getByRole('checkbox', {
+        name: 'Select all matching records (0)',
+      }) as HTMLInputElement
+    ).disabled,
+  ).toBe(true);
+  expect(within(records).getByText('0/0 shown')).toBeTruthy();
+});
+
+it('hides an answered purpose question and restores it when the description is removed', () => {
+  render(<Fixture />);
+  const record = within(screen.getByRole('list', { name: 'Transactions records' })).getByRole(
+    'link',
+    { name: new RegExp(TX_FUNDING.slice(0, 8)) },
+  );
+  fireEvent.click(
+    within(record.closest('[role="listitem"]') as HTMLElement).getByRole('button', {
+      name: /^Review items/,
+    }),
+  );
+  const inspector = screen.getByRole('article', { name: 'Selected review item' });
+  expect(within(inspector).getByRole('button', { name: 'Label review' })).toBeTruthy();
+  fireEvent.click(within(inspector).getByRole('button', { name: / label$/i }));
+  const editor = screen.getByRole('dialog', { name: 'Label selected records' });
+  fireEvent.change(within(editor).getByRole('textbox', { name: 'Batch label' }), {
+    target: { value: 'Public fixture income' },
+  });
+  fireEvent.click(within(editor).getByRole('button', { name: 'Apply label' }));
+  expect(within(inspector).queryByRole('button', { name: 'Label review' })).toBeNull();
+  expect(within(inspector).getByRole('button', { name: 'Edit label' }).textContent).toBe(
+    'Public fixture income',
+  );
+  expect(
+    within(within(inspector).getByRole('heading', { level: 2 })).getByTitle(TX_FUNDING),
+  ).toBeTruthy();
+  fireEvent.click(within(inspector).getByRole('button', { name: / label$/i }));
+  const current = screen.getByRole('dialog', { name: 'Label selected records' });
+  expect(
+    (within(current).getByRole('textbox', { name: 'Batch label' }) as HTMLInputElement).value,
+  ).toBe('Public fixture income');
+  fireEvent.change(within(current).getByRole('textbox', { name: 'Batch label' }), {
+    target: { value: '' },
+  });
+  fireEvent.click(within(current).getByRole('button', { name: 'Apply label' }));
+  expect(within(inspector).getByRole('button', { name: 'Label review' })).toBeTruthy();
+  expect(within(inspector).getByRole('button', { name: / label$/i })).toBeTruthy();
+});
+
+it('follows a historical wallet input and returns without changing the filtered list', () => {
+  render(<Fixture />);
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Filter wallet records' }), {
+    target: { value: TX_SPENDING },
+  });
+  const records = screen.getByRole('list', { name: 'Transactions records' });
+  const payment = within(records).getByRole('link', { name: new RegExp(TX_SPENDING.slice(0, 8)) });
+  fireEvent.click(payment);
+  const inspector = screen.getByRole('article', { name: 'Selected wallet item' });
+  const io = within(inspector).getByRole('group', { name: 'Inputs and outputs' });
+  fireEvent.click(within(io).getByText(/Inputs \(2\) \/ Outputs \(2\)/));
+  const input = within(io).getByRole('link', { name: `Open output ${TX_FUNDING}:0` });
+  fireEvent.click(input);
+  expect(
+    within(within(inspector).getByRole('heading', { level: 2 })).getByTitle(`${TX_FUNDING}:0`),
+  ).toBeTruthy();
+  expect(payment.getAttribute('aria-current')).toBe('true');
+  expect(
+    (screen.getByRole('searchbox', { name: 'Filter wallet records' }) as HTMLInputElement).value,
+  ).toBe(TX_SPENDING);
+  expect(within(records).getAllByRole('link')).toHaveLength(1);
+  fireEvent.click(within(inspector).getByRole('button', { name: '← Back' }));
+  expect(
+    within(within(inspector).getByRole('heading', { level: 2 })).getByTitle(TX_SPENDING),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '← Back' })).toBeNull();
+  const disclosures = [...inspector.querySelectorAll('details')];
+  expect(
+    disclosures.findIndex((item) => item.getAttribute('aria-label') === 'Inputs and outputs'),
+  ).toBeLessThan(
+    disclosures.findIndex((item) => item.getAttribute('aria-label') === 'Wallet accounting'),
+  );
+});
+
+it('retains the selected finding after a decision so it can be reopened', () => {
+  render(<Fixture findings />);
+  const record = within(screen.getByRole('list', { name: 'Transactions records' })).getByRole(
+    'link',
+    { name: new RegExp(TX_FUNDING.slice(0, 8)) },
+  );
+  fireEvent.click(
+    within(record.closest('[role="listitem"]') as HTMLElement).getByRole('button', {
+      name: /^Review items/,
+    }),
+  );
+  const inspector = screen.getByRole('article', { name: 'Selected review item' });
+  fireEvent.click(within(inspector).getByRole('button', { name: 'Mark reviewed' }));
+  expect(
+    within(within(inspector).getByRole('heading', { level: 2 })).getByTitle(TX_FUNDING),
+  ).toBeTruthy();
+  expect(within(inspector).getByText('Reviewed')).toBeTruthy();
+  fireEvent.click(within(inspector).getByRole('button', { name: 'Reopen' }));
+  expect(within(inspector).queryByText('Reviewed')).toBeNull();
+  expect(within(inspector).queryByText('Spending finding')).toBeNull();
+});

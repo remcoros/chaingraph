@@ -45,6 +45,55 @@ export interface GraphFilters {
   includeIds?: string[];
 }
 
+const walletBrowsingSchema = z.object({
+  tab: z
+    .enum([
+      'review',
+      'transactions',
+      'utxos',
+      'counterparties',
+      'addresses',
+      'sources',
+      'destinations',
+    ])
+    .optional(),
+  query: z.string().max(10000).optional(),
+  labelFilter: z.enum(['all', 'labeled', 'unlabeled']).optional(),
+  tagFilter: z.string().max(200).optional(),
+  reviewOnly: z.boolean().optional(),
+  transactionIds: z
+    .array(z.string().regex(/^[0-9a-f]{64}$/))
+    .max(50000)
+    .optional(),
+  selectedKey: z.string().max(500).optional(),
+  limit: z.number().int().min(1).max(50000).optional(),
+  scrollTop: z.number().finite().min(0).max(10000000).optional(),
+});
+const walletReviewPresentationSchema = walletBrowsingSchema
+  .omit({ tab: true, reviewOnly: true })
+  .extend({
+    status: z.enum(['all', 'open', 'later', 'decided']).optional(),
+    typeIds: z.array(z.string().min(1).max(200)).max(100).optional(),
+    scopeFilter: z
+      .enum([
+        'all',
+        'utxos',
+        'transactions',
+        'addresses',
+        'relationships',
+        'previous-output-decisions',
+      ])
+      .optional(),
+  });
+const walletPresentationSchema = z.object({
+  activeTab: walletBrowsingSchema.shape.tab,
+  browsing: walletBrowsingSchema.optional(),
+  review: walletReviewPresentationSchema.optional(),
+});
+
+/** Ordinary browsing and a resumable review position, separate from human decisions. */
+export type WalletPresentation = z.infer<typeof walletPresentationSchema>;
+
 export const GRAPH_SNAPSHOT_NODE_LIMIT = 50_000;
 const coordinate = z.number().finite().min(-10_000_000).max(10_000_000);
 const point = z.object({ x: coordinate, y: coordinate, z: coordinate });
@@ -190,4 +239,10 @@ export const viewSchema = z.object({
     .optional(),
   prefetchDepth: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
   selectedWallet: z.string().max(200).optional(),
+  automaticWalletRefresh: z.boolean().optional(),
+  walletRefreshIntervalSeconds: z.number().int().min(10).max(86400).optional(),
+  wallet: z
+    .record(z.string().min(1).max(200), walletPresentationSchema)
+    .refine((entries) => Object.keys(entries).length <= 100, 'Too many wallet presentations')
+    .optional(),
 });

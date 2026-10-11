@@ -1,13 +1,10 @@
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Tag, TextCursorInput } from 'lucide-react';
 import { IconPickerControl } from '../../../../Controls/Metadata/IconPicker';
 import {
   BatchLabelEditor,
-  EntityLabelEditor,
   BatchTagEditor,
-  EntityNoteEditor,
   MetadataPopover,
-  type MetadataEditorProps,
 } from '../../../../Controls/Metadata/MetadataEditors';
 import {
   applyBatchIcon,
@@ -32,31 +29,6 @@ export interface BatchMetadataBarProps extends MetadataBarProps {
   scopeLabel: string;
 }
 
-/** A single entity always replaces its own metadata and can edit notes. */
-export function SingleMetadataBar({
-  id,
-  scopeLabel = '',
-  ...props
-}: MetadataBarProps & { id: string; scopeLabel?: string }) {
-  return (
-    <MetadataBar
-      {...props}
-      ids={[id]}
-      scope={scopeLabel}
-      className="single-metadata-bar"
-      groupLabel="Edit entity metadata"
-      LabelEditor={SingleLabelForBar}
-      noteId={id}
-      replaceIcons
-    />
-  );
-}
-
-/** The private frame receives one ID only from SingleMetadataBar. */
-function SingleLabelForBar({ ids, ...props }: MetadataEditorProps) {
-  return <EntityLabelEditor {...props} entityId={ids[0]} />;
-}
-
 /** Direct label, tag and icon editing for a chosen set of records. Each action is
  * one workspace update, so autosave and Undo treat the batch as a single step.
  */
@@ -70,9 +42,6 @@ export function BatchMetadataBar(props: BatchMetadataBarProps) {
           <strong>{props.ids.length}</strong> {props.scopeLabel}
         </>
       }
-      className="batch-selection-bar"
-      groupLabel="Batch metadata editing"
-      LabelEditor={BatchLabelEditor}
       replaceIcons={replaceIcons}
       replacementControl={
         <label className="batch-replace">
@@ -92,10 +61,6 @@ function MetadataBar({
   workspace,
   ids,
   scope,
-  className,
-  groupLabel,
-  LabelEditor,
-  noteId,
   replaceIcons,
   replacementControl,
   active = true,
@@ -108,14 +73,10 @@ function MetadataBar({
 }: MetadataBarProps & {
   ids: string[];
   scope: ReactNode;
-  className: string;
-  groupLabel: string;
-  LabelEditor: ComponentType<MetadataEditorProps>;
-  noteId?: string;
   replaceIcons: boolean;
   replacementControl?: ReactNode;
 }) {
-  const [openState, setOpen] = useState<'label' | 'tags' | 'notes' | 'icon' | undefined>();
+  const [openState, setOpen] = useState<'label' | 'tags' | 'icon' | undefined>();
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
   const scopeKey = `${workspace.id}:${ids.join('|')}`;
   const [previousScopeKey, setPreviousScopeKey] = useState(scopeKey);
@@ -133,7 +94,7 @@ function MetadataBar({
     (id) => (workspace.annotations.entities[id]?.icon ?? '') !== firstIcon,
   );
   return (
-    <div className={`batch-bar ${className}`} role="group" aria-label={groupLabel}>
+    <div className="batch-bar batch-selection-bar" role="group" aria-label="Batch metadata editing">
       <span className="batch-scope">{scope}</span>
       <div className="batch-actions">
         <div className="batch-popover-anchor">
@@ -151,7 +112,7 @@ function MetadataBar({
           </button>
           {open === 'label' && trigger && (
             <MetadataPopover anchor={trigger} onClose={() => setOpen(undefined)}>
-              <LabelEditor
+              <BatchLabelEditor
                 workspace={workspace}
                 ids={ids}
                 onClose={() => setOpen(undefined)}
@@ -190,32 +151,6 @@ function MetadataBar({
             </MetadataPopover>
           )}
         </div>
-        {noteId && (
-          <div className="batch-popover-anchor">
-            <button
-              aria-haspopup="dialog"
-              aria-expanded={open === 'notes'}
-              disabled={disabled}
-              onClick={(event) => {
-                setTrigger(event.currentTarget);
-                setOpen(open === 'notes' ? undefined : 'notes');
-              }}
-            >
-              Notes
-            </button>
-            {open === 'notes' && trigger && (
-              <MetadataPopover anchor={trigger} onClose={() => setOpen(undefined)}>
-                <EntityNoteEditor
-                  key={scopeKey}
-                  workspace={workspace}
-                  id={noteId}
-                  onChange={onChange}
-                  onClose={() => setOpen(undefined)}
-                />
-              </MetadataPopover>
-            )}
-          </div>
-        )}
         <div className="batch-icon">
           <IconPickerControl
             open={open === 'icon'}

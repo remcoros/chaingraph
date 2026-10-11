@@ -1,5 +1,8 @@
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../../../Core/Workspace/workspace';
+import type { WalletPresentation } from '../../../../Core/Workspace/view';
+import type { WorkspaceOperation } from '../../useWorkspaceOperation';
+import type { WalletDiscovery } from './useWalletActivity';
 
 import type { WalletUtxoRecord } from '../../../../Core/Workspace/Wallets/walletRecords';
 
@@ -12,8 +15,12 @@ import type { WalletUtxoRecord } from '../../../../Core/Workspace/Wallets/wallet
  */
 export interface WalletWorkbenchContext {
   active: boolean;
+  operation?: WorkspaceOperation;
   /** Disposable presentation using real loaded rows, with all background work inactive. */
-  tourPreview?: { tab: 'review' | 'sources'; example?: Workspace };
+  tourPreview?: {
+    tab: 'review' | 'sources' | 'transactions' | 'counterparties';
+    example?: Workspace;
+  };
   workspace: Workspace;
   wallet?: Wallet;
   canLoadChainData: boolean;
@@ -26,9 +33,24 @@ export interface WalletWorkbenchContext {
   onExchangeLabels?: (direction: 'import' | 'export') => void;
   onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
   onRefresh: () => void;
+  onPresentationChange?: (
+    walletId: string,
+    update: (current: WalletPresentation) => WalletPresentation,
+  ) => void;
+  refresh?: WalletDiscovery['refresh'];
+  discovery?: Pick<
+    WalletDiscovery,
+    | 'gapLimit'
+    | 'setGapLimit'
+    | 'addressesPerBranch'
+    | 'setAddressesPerBranch'
+    | 'monitorActivity'
+    | 'setMonitorActivity'
+    | 'refreshIntervalSeconds'
+    | 'setRefreshIntervalSeconds'
+  >;
   onShowInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
   onIsolateInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;
   onShowSelection: (ids: string[], isolate: boolean) => void;
   onInspect: (nodeId: string, utxo?: WalletUtxoRecord) => void;
-  onAnalyze: (nodeId?: string) => void;
 }

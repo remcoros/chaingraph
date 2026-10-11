@@ -116,16 +116,28 @@ describe('decrypted workspace schema boundary', () => {
     },
   );
 
-  it.each([2, 3, 4, 5, 6] as const)(
+  it.each([2, 3, 4, 5, 6, 7] as const)(
     'rejects missing v%s graph membership before accepting the document',
     (version) => {
       const current = createWorkspace('Public migration fixture', 'mainnet');
       const payload =
-        version === 5 || version === 6
+        version === 5 || version === 6 || version === 7
           ? { ...current, version }
           : legacyWorkspace(current, version);
       delete payload.view.graphNodeIds;
       expect(() => parseWorkspace(payload)).toThrow('explicit graph entity membership');
     },
   );
+
+  it('migrates nested v7 human work without inventing identities or changing existing decisions', () => {
+    const current = laboratoryWorkspace();
+    const legacy = { ...current, version: 7 };
+    const before = structuredClone(legacy);
+    const parsed = parseWorkspace(legacy);
+    expect(parsed).toEqual(current);
+    expect(parsed.counterparties).toBeUndefined();
+    expect(parsed.annotations).toEqual(before.annotations);
+    expect(parsed.wallets.reviews).toEqual(before.wallets.reviews);
+    expect(legacy).toEqual(before);
+  });
 });

@@ -52,6 +52,10 @@ Its output, wallet association and unspent observation have distinct meanings.
 Human-authored metadata attached to an investigation subject, such as a label,
 note, tag or bookmark.
 
+**Counterparty**:
+A reusable identity recorded by a person and linked to exact observed activity.
+An association expresses human context, not proven ownership or an allocation of value.
+
 **Finding**:
 A recorded analysis result with its scope and supporting information. Findings
 distinguish observations, heuristic hypotheses and incomplete results.
@@ -62,9 +66,8 @@ evidence can include additional entities without making them subjects of the
 finding.
 
 **Review item**:
-A decision task derived from current wallet observations or an applicable
-analysis finding. One item can be projected into several review scopes while
-retaining one decision.
+An unmet annotation goal or an assessment of an applicable finding. Added human
+context can satisfy a goal; assessing a finding records a deliberate judgment.
 
 **Review scope**:
 The kind of factual Wallet record a review item concerns: UTXOs, transactions,
@@ -94,7 +97,7 @@ what is known and when it was checked, while preserving unrelated human edits.
 
 **Rerun**:
 A new execution of an analysis or scan using its chosen scope and available
-information. Refreshing its inputs alone does not recompute its conclusions.
+information. A wallet refresh includes analysis when material inputs change.
 
 **Presentation**:
 The saved choices for viewing a Workspace, including graph membership,

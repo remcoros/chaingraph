@@ -2,6 +2,7 @@
 import { useSyncExternalStore } from 'react';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { WalletUtxoBatch } from '../../../../Core/Workspace/Wallets/WalletUtxos/fetchWalletUtxos';
 import { useWalletUtxos } from './useWalletUtxos';
 import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
 import { createWorkspacePersistence, parseWorkspace } from '../../../../Core/Workspace/Persistence';
@@ -11,7 +12,7 @@ import { deriveAddresses } from '../../../../Core/Workspace/Wallets/walletDeriva
 import { PUBLIC_ZPUB } from '../../../../../tests/fixtures/bitcoin';
 
 const oldTime = '2026-09-01T10:00:00.000Z';
-function fixture(count = 1, saved = false) {
+function fixture(count = 1, saved = false, refreshed = false) {
   const workspace = createWorkspace('Public UTXO hook fixture', 'mainnet');
   const wallet = {
     id: '30000000-0000-4000-8000-000000000001',
@@ -23,9 +24,12 @@ function fixture(count = 1, saved = false) {
   };
   workspace.wallets.definitions = [wallet];
   if (saved)
-    workspace.chainData.addressUtxos = {
-      [wallet.addresses[0].address]: { network: 'mainnet', checkedAt: oldTime, utxos: [] },
-    };
+    workspace.chainData.addressUtxos = Object.fromEntries(
+      wallet.addresses.map((address) => [
+        address.address,
+        { network: 'mainnet', checkedAt: oldTime, utxos: [] },
+      ]),
+    );
   const store = new WorkspaceStore(createWorkspacePersistence());
   store.open(parseWorkspace(workspace), 'public fixture password');
   const acquisition = createChainDataAcquisition({
@@ -33,8 +37,28 @@ function fixture(count = 1, saved = false) {
     getUnlocked: store.getUnlocked,
     fetchScope: store.getUnlocked(workspace.id)!.fetchScope,
   });
+  const batch: WalletUtxoBatch = {
+    walletId: wallet.id,
+    network: 'mainnet',
+    records: [],
+    observations: {},
+    checkedAt: oldTime,
+    totalAddresses: count,
+    checkedAddresses: Math.min(count, 100),
+    successfulAddresses: Math.min(count, 100),
+    nextCursor: count > 100 ? 100 : undefined,
+    errors: [
+      {
+        address: wallet.addresses[0].address,
+        message: 'Could not verify the UTXO response for this address. Retry the check.',
+      },
+    ],
+  };
+  const completedCheck = refreshed
+    ? { wallet: store.getUnlocked(workspace.id)!.data.wallets.definitions[0], coins: batch }
+    : undefined;
   const hook = renderHook(
-    ({ enabled }) => {
+    ({ enabled, completedCheck }) => {
       const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
       const current = snapshot.unlocked[0].data;
       return useWalletUtxos({
@@ -42,11 +66,12 @@ function fixture(count = 1, saved = false) {
         wallet: current.wallets.definitions[0],
         transactions: acquisition,
         enabled,
+        completedCheck,
       });
     },
-    { initialProps: { enabled: true } },
+    { initialProps: { enabled: true, completedCheck } },
   );
-  return { ...hook, store, workspace, wallet };
+  return { ...hook, store, workspace, wallet, completedCheck };
 }
 afterEach(() => {
   cleanup();
@@ -54,6 +79,58 @@ afterEach(() => {
 });
 
 describe('retained wallet UTXO request state', () => {
+  it('keeps the latest refresh continuation visible despite complete older coverage, without renewing its date', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ result: [] }))),
+    );
+    const view = fixture(101, true, true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(view.result.current.utxos).toMatchObject({
+      nextCursor: 100,
+      checkedAt: oldTime,
+      failed: 1,
+    });
+    await act(() => view.result.current.check(100));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(view.result.current.utxos).toMatchObject({
+      nextCursor: undefined,
+      checkedAt: oldTime,
+      failed: 1,
+    });
+    view.rerender({
+      enabled: true,
+      completedCheck: {
+        ...view.completedCheck!,
+        coins: { ...view.completedCheck!.coins, nextCursor: 100 },
+      },
+    });
+    expect(view.result.current.utxos?.nextCursor).toBe(100);
+  });
+  it('ignores a completed refresh summary whose discovered address snapshot is obsolete', async () => {
+    const view = fixture(101, true, true);
+    await act(async () =>
+      view.store.getUnlocked(view.workspace.id)!.edit(
+        (current) => ({
+          ...current,
+          wallets: {
+            ...current.wallets,
+            definitions: current.wallets.definitions.map((entry) => ({
+              ...entry,
+              addresses: [...entry.addresses],
+            })),
+          },
+        }),
+        false,
+      ),
+    );
+    expect(view.result.current.utxos).toMatchObject({
+      nextCursor: undefined,
+      checkedAt: oldTime,
+      failed: 0,
+    });
+    expect(view.result.current.error).toBe('');
+  });
   it('reopens a dated successful empty check without silently refreshing it, and retains it on failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 429 })));
     const view = fixture(1, true);
@@ -76,6 +153,7 @@ describe('retained wallet UTXO request state', () => {
       vi.fn(async () => new Response(JSON.stringify({ result: [] }))),
     );
     const view = fixture(101);
+    await act(() => view.result.current.check());
     await waitFor(() => expect(view.result.current.loading).toBe(false));
     expect(fetch).toHaveBeenCalledTimes(100);
     expect(view.result.current.utxos).toMatchObject({
@@ -107,8 +185,11 @@ describe('retained wallet UTXO request state', () => {
       ),
     );
     const view = fixture();
+    act(() => {
+      void view.result.current.check();
+    });
     await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-    view.rerender({ enabled: false });
+    view.rerender({ enabled: false, completedCheck: undefined });
     await act(async () => {
       resolve(new Response(JSON.stringify({ result: [] })));
     });

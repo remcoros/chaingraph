@@ -22,12 +22,30 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
   pair, and inspect bounded address history.
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level
-  extended public key. Chaingraph derives addresses in the browser, scans their
-  activity through your node, and keeps factual UTXO, transaction, address,
-  source and destination lists alongside a linked review queue. Successful
-  address UTXO checks are saved inside the encrypted workspace with their dates
-  and coverage; refresh them explicitly after reopening when you need a new
-  observation.
+  extended public key. Chaingraph derives addresses in the browser and refreshes
+  history, coins and analysis together. Transactions show direction, wallet net
+  change and actionable review items alongside Coins, Addresses and Counterparties.
+  Row actions open label and counterparty editors directly; finding assessments
+  open in Review. Sender and recipient selectors support multiple identities and
+  exact output scopes; the inspector groups inputs and outputs side by side.
+  All record tabs use clickable values and subtle prompts for empty fields.
+  Small review chips sit beside the relevant annotation; independent findings
+  retain concise checklist rows with direct assessment actions. Annotation
+  popovers separate the preferred edit action from alternative resolutions.
+  Answered questions disappear, while explicit decisions remain reversible.
+  Transaction headers show direction and amount above the ID, followed by
+  block date/age, observed confirmations, fee and size. Metadata and Review findings
+  share two columns, stacked in a narrow inspector; Transaction flow starts expanded
+  across the full width, with graph actions beside its heading. Other inspectors
+  retain their record-type title and graph actions. Custom icons are editable in
+  transaction Metadata and remain visible without labels.
+  Follow available wallet records in the inspector and return with Back.
+  A label, note or tag answers purpose; senders and recipients answer who.
+  The list header groups the shown count with the select-all checkbox.
+  Dated address checks and annotations stay inside the encrypted workspace.
+  Automatic refresh defaults on every 60 seconds while unlocked. The wallet
+  actions menu offers refresh settings; coverage distinguishes partial
+  observations from complete checks.
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
   outputs and addresses. Undo and redo edits without rolling back accepted chain

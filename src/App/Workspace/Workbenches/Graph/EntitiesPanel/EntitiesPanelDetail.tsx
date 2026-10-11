@@ -274,14 +274,16 @@ export function EntitiesPanelDetail({
                 disabled={!canLoadChainData}
                 onChange={(e) => setMonitorActivity(e.target.checked)}
               />
-              <span>Check activity every 30s</span>
+              <span>
+                Automatic refresh every {activeWorkspace.view.walletRefreshIntervalSeconds ?? 60}s
+              </span>
             </label>
             <p className="small muted">
               {monitorActivity
                 ? 'Monitoring while unlocked. '
                 : 'Refresh to check for new activity. '}
-              Each check scans receive and change branches, downloading up to 500 transactions per
-              wallet.
+              Each refresh checks history and all discovered addresses, downloads up to 500
+              transactions per wallet, and updates analysis when material evidence changes.
             </p>
           </div>
         </>

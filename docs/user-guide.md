@@ -382,8 +382,9 @@ native SegWit or Taproot. `ypub`/`upub` and `zpub`/`vpub` constrain the choice;
 wallet before scanning. Master keys, descriptors, multisig and custom derivation
 paths are not supported.
 
-Adding a wallet opens it in the Wallet workbench. Choose **Refresh** to discover
-its addresses and history; importing the key does not start analysis.
+Adding a wallet opens it in the Wallet workbench and starts its first refresh.
+**Refresh** discovers history, loads available transaction details, checks coins
+and updates analysis when material evidence changes.
 
 Scanning queries receive and change histories through your backend in bounded
 batches, using a gap limit, a maximum index and a transaction budget. Your key
@@ -393,72 +394,137 @@ empty.
 
 ### Review a wallet
 
-The **Wallet** workbench shows one wallet at a time. The coverage strip states
-the last check, discovered and used addresses, loaded versus known transactions
-and the current UTXO count and balance from the last verified check. If no
-check has run, it says so and offers one.
+The **Wallet** workbench shows one wallet at a time. The header shows the wallet
+picker, observed balance, oldest contributing check date and **Refresh**.
+**Coverage** discloses discovery bounds, known versus loaded history and coin
+checks. Missing evidence is unknown; a partial balance is identified as partial.
+The actions menu contains **Wallet details**, **Add wallet**, **Automatic refresh**
+and **Refresh settings**. Account-key reveal/copy lives in Wallet details.
+Refresh runs wallet analysis when its inputs change and retries failed tools.
 
-Six tabs share one list and detail panel: **To review**, **UTXOs**,
-**Transactions**, **Addresses**, **Sources** and **Destinations**.
+Five tabs share the existing list and detail panel, with **Transactions** first:
 
-- **To review** is the decision queue. **Review state** selects outstanding,
-  deferred, completed or all items. **Review scope** narrows the queue to UTXOs,
-  transactions, addresses, sources and destinations, or retained previous output
-  decisions. **Review reason** combines selected reasons with OR. Scope and reason
-  counts use the selected review state independently of the other facet, so counts
-  can overlap. Each item explains why it is here and shows its evidence. **Mark
-  reviewed** completes it; **Review later** defers it without losing it. One
-  analysis finding can appear in several scopes, but all of its rows share one
-  decision. Batch actions report selected rows and distinct review items, then
-  apply each decision once. The list shows 40 matching rows at a time; **Show
-  more** reveals the next group.
-- **UTXOs** checks discovered addresses through your backend when no saved check
-  is available, including mempool activity, 100 addresses per action. Successful
-  address observations are encrypted with the workspace, not stored as a separate
-  wallet balance. Reopening retains their dates and coverage; use **Refresh** to
-  check again or continue a partial check. The aggregate date is the oldest
-  contributing address check. A failed refresh keeps previous observations and
-  their original dates, and offers a retry.
-  If loaded data contains an exact spender for a saved UTXO, it is excluded from
-  current recommendations and the current candidate list. Its dated check and
-  any review decision remain saved as historical evidence. The coverage strip
-  reports the conflict; **Check UTXOs** requests a new observation. Neither an
-  old check nor a loaded historical spender establishes today's chain state.
-- **Transactions** lists known history, newest first, including entries whose
-  details are not loaded yet. Selecting one loads it if needed.
-- **Addresses** lists derived receive and change addresses with their index and
-  loaded output count. Opening it does not scan.
-- **Sources** and **Destinations** group one-hop counterparties by address:
-  who funded transactions that paid you, and who was paid by transactions
-  spending your outputs. Your own addresses are excluded. Missing inputs are
-  resolved in bounded background batches with **Load next** and **Retry**.
+- **Transactions** lists known history, newest first, including missing details.
+  Received, Sent, Transfer and Unknown describe the observed wallet effect.
+  The signed amount is wallet outputs minus wallet inputs; an ordinary outgoing
+  payment includes its fee. Details show wallet inputs, outputs, net change and
+  the whole transaction fee. Incomplete inputs leave the effect unknown and
+  offer loading. Collaborative transactions do not allocate the whole fee to
+  your wallet. The label icon opens the transaction label editor; the counterparty
+  icon opens its sender/recipient editor; the review icon opens the
+  selected assessment in Review.
+- **Coins** shows observed unspent outputs from discovered scripts. Refresh checks
+  every discovered address in bounded batches. Successful observations retain
+  their dates in the encrypted workspace. A failed check preserves previous
+  observations without renewing them. An exact loaded spender excludes an old
+  coin from current candidates; its dated observation and decisions remain saved.
+- **Addresses** offers **Wallet addresses**, **Sources** and **Destinations** as
+  scopes. Wallet addresses list derived receive/change addresses. Sources and
+  Destinations group observed one-hop address relationships,
+  excluding this wallet's scripts. Missing source inputs can be loaded in bounded
+  batches. These relationships are evidence, not proven identities or ownership.
+- **Counterparties** manages reusable identities across the workspace. Create or
+  search for identities using the inline Sender/Recipient field or the counterparty icon in a row
+  footer. Check several names without closing the selector. The scope beside a
+  chosen name offers the incoming/outgoing transaction or specific outputs. Associations concern exact incoming/outgoing transaction
+  activity or an explicitly chosen address/output; they do not allocate value or
+  infer ownership. Identity names, notes, tags, icons and bookmarks are ordinary
+  annotations. Related transactions use an exact scope. Unlinking one association
+  and deleting an identity are separate actions. Links survive wallet removal
+  and reimport when their concrete activity remains saved.
+  Select an identity to edit **Name**, **Category**, **Tags**, **Note** or its icon
+  beside each value. **Show in Transactions** filters the wallet list to its
+  related activity. The **…** menu offers **Bookmark** and **Remove counterparty**,
+  with confirmation before removal.
+- **Review** groups unmet annotation goals and applicable finding assessments.
+  A transaction label, note or tag describes its purpose; senders and recipients
+  identify who was involved. Edit these fields in the record details. Answered
+  questions disappear. **Needs review** appears beside the relevant field;
+  click it for the question, a shortcut to its editor, and **Unknown**, **Not needed**
+  or **Later**. These keep the distinct cannot-identify, no-annotation-needed and
+  review-later outcomes. The purpose question appears once beside **Label**, and
+  **Label**, **Note** or **Tags** can answer it. Saved identities and their output
+  scopes remain visible in the fields. Inherited associations identify and edit
+  their source. These annotations satisfy their question without recording **Reviewed**.
+  Findings require explicit assessment. **Cannot identify**, **No annotation
+  needed** and **Review later** are distinct outcomes. Material evidence changes
+  can reopen attention while retaining the earlier judgment; routine check dates
+  do not. Filters select state, scope and reasons with OR semantics. One finding
+  has one decision even when applicable to several scopes. Historical
+  acknowledgments remain inspectable with their original dates and meanings.
 
-The five factual tabs always list known wallet records, whether or not analysis
-has run. Their compact **To review (N)** toggle shows only records with outstanding
-linked work; it never changes or deletes the factual list. A selected record's
-quiet **Review items** section says **None** or lists every linked item and its
-state. Choosing one opens **To review**, clears the ordinary filters, shows all
-items linked to that exact record and selects the chosen item. The contextual
-relation is shown above the queue and is not text search.
+Factual lists remain available without analysis. **To review (N)** narrows them
+by outstanding linked work. The same inspector presents facts, annotations and
+review decisions in the factual tabs and Review. Explicit decisions remain visible
+with **Reopen** or **Return to review**, and making a decision keeps the record open. The list displays 40 matching rows at a time; **Show more** reveals the
+next group. Accounting and related evidence expand on demand. Filters, inspected
+records and editors remain stable through refresh
+and goal satisfaction. Browsing and Review context are saved separately.
 
-Select a row to label, tag or set an icon for it, then use **Show** to open it in
-Graph or **Isolate** to open it with only its connected context. **Select
-related** picks rows sharing the same address or transaction. Checkboxes,
-Ctrl/Cmd+click and Shift+click build a selection; **Select all (N)** takes the
-whole filtered list. Batch edits appear in the same detail panel and are one
-Undo step each. A contextual jump offers **Back to Wallet** and restores the
-originating control when it is still available.
+IDs stay visible above labels. Dates sit on the left of each row footer, with label,
+counterparty and review actions on the right. Copy controls are in the inspector;
+review icons show the number of outstanding items. **Inputs (N) / Outputs (N)**
+expands one section with two columns, stacked when the inspector is narrow.
+All tabs use plain selectable rows and the same inspector layout. Related transaction
+and address links in Counterparties also retain their IDs above any labels.
+Transaction inspectors show direction and signed wallet amount on the first row,
+with the stable ID/copy beneath. A **Needs review** chip appears for outstanding
+reviews. Other inspectors retain their **Address**, **Coin**, **Output** or
+**Counterparty** title and graph actions. Transaction **Show on graph** and
+**Isolate** icons sit beside **Transaction flow**; the custom icon editor sits
+beside **Metadata**. Transaction headers show the UTC block timestamp with its
+age, block height or status with recorded confirmations, network fee and rate, and available transaction
+size beneath the identity and amount. **Metadata** groups **Label**,
+**Sender/Recipient**, **Tags** and **Note** on the left, with **Review findings**
+on the right. The columns stack when the inspector is narrow. Other record types
+keep facts beside editable information, with Note below both groups. Annotation
+names use a fixed-width column, with smaller muted labels and larger foreground
+values. Click a value to edit it. In transaction Metadata, a plus marks empty
+fields and a pencil identifies editable values. Empty fields show
+**Add a label…**, **Add tags…** or **Add a note…**. **Name** and **Category** in
+Counterparties follow the same pattern. Click a sender or recipient value to edit
+its selection; the small navigation icon beside it opens the counterparty.
+Its sender/recipient selector keeps multiple selections open. Click its scope
+control to choose the incoming/outgoing transaction or specific outputs, shown with
+their addresses and amounts. Icons are visible even without a label.
 
-**Refresh** checks the wallet for new activity and keeps your selection, labels
-and camera; new transactions are flagged until you review them. **Analyze** runs
-the analysis tools on the wallet's loaded data. **Check activity every 30s**
-polls wallets and watched addresses while the workspace is unlocked.
+Annotation review chips sit beside their fields, with quieter indicators for
+postponed and resolved decisions. **Review findings** in transactions, or **Review**
+in other record types, holds the collapsible status checklist. **Mark reviewed** and **Later** are grouped with
+each finding, with **Reopen** for existing decisions. Rows show concise fee or
+script information; the help icon reveals longer technical details. Address and
+coin titles retain navigation to the exact review target. Annotation popovers put
+**Add sender** or **Add label** above **Unknown**, **Not needed** and **Later**.
+**Add sender** opens the existing sender selector; **Mark reviewed** records a
+finding assessment. Answered
+annotation questions disappear; explicit decisions stay available to reopen.
+**Transaction flow** spans the width below these groups and starts expanded for
+transactions. Collapse it to hide the diagram. **Inputs/Outputs**, **Wallet
+accounting**, and related records remain available below it. Available wallet records open in the
+inspector with **Back**, preserving the list and its filters. External or unavailable
+records have explicit graph actions. **Related** remains available for batch
+selections sharing an address or transaction.
+Checkboxes, Ctrl/Cmd+click and Shift+click build a selection. The checkbox in the
+list header selects every matching record, including rows below **Show more**;
+the next column shows the displayed/matching count. Batch edits are one Undo step each. A contextual
+jump offers **Back to Wallet** and restores its originating control when available.
 
-A label is your context, not a proven identity. **No wallet match** means no
-match to discovered addresses, not proof that someone else owns the output.
-When selected outputs carry different recorded sources, a note points out that
-spending them together would publish that link; Chaingraph has no coin
-selection, signing or broadcast.
+**Automatic refresh** defaults on and is saved with the encrypted workspace.
+Unlock displays saved activity then checks wallets sequentially, selected first.
+The default 60-second cadence runs across workbenches while unlocked, pauses in hidden
+browser tabs and checks freshness on return. Selecting a stale wallet triggers a
+check. Foreground operations interrupt background refresh; completed batches stay
+accepted. The header shows **Last refresh** after a complete refresh; balance
+coverage retains the separate dates of its contributing coin checks. Refresh spins
+without changing the layout. Limits, failures and **Retry refresh** appear inside
+**Coverage**, with a warning beside its title. Use **… → Refresh settings…** to
+change the interval and discovery limits. **Automatic refresh** in the same menu
+turns periodic checks on or off; explicit Refresh and first-import refresh remain available.
+
+Labels and counterparties are your annotations, not proven identities. **No wallet match**
+means no match to discovered addresses. A co-spend warning describes the link
+spending selected outputs together would publish; Chaingraph has no coin selection,
+signing or broadcast. Hiding amounts and balances is a separate planned feature.
 
 ## Analysis
 

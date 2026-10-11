@@ -3,6 +3,7 @@ import { applyWalletScan } from '../../../src/Core/Workspace/Wallets/walletActiv
 import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
 import { parseWorkspace } from '../../../src/Core/Workspace/Persistence';
 import type { Wallet } from '../../../src/Core/Workspace/Wallets/wallets';
+import { CURRENT_WORKSPACE_VERSION } from '../../../src/Core/Workspace/workspace';
 
 const key =
   'zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs';
@@ -17,7 +18,7 @@ const wallet: Wallet = {
 const txid = 'a'.repeat(64);
 
 describe('capability results survive workspace format validation', () => {
-  it('migrates the immediately preceding v6 activity shape before validation', () => {
+  it('migrates the v6 activity shape before current format validation', () => {
     const current = createWorkspace('Activity migration', 'mainnet');
     const legacy = {
       ...current,
@@ -39,7 +40,7 @@ describe('capability results survive workspace format validation', () => {
     const original = structuredClone(legacy);
 
     const parsed = parseWorkspace(legacy);
-    expect(parsed.version).toBe(7);
+    expect(parsed.version).toBe(CURRENT_WORKSPACE_VERSION);
     expect(parsed.wallets.definitions[0].lastActivity).toEqual({
       addedTransactionCount: 2,
       refreshedTransactionCount: 3,

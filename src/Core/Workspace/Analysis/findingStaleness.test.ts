@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createWorkspace } from '../createWorkspace';
 import { analysisTools } from './analysis';
-import { invalidateFindings } from './findingStaleness';
+import { findingAssessmentInputs, findingInputs, invalidateFindings } from './findingStaleness';
 import { scanAnalysis, analysisScanScope, scanDefaults, analysisScanMatches } from './analysisScan';
-import { RECEIVE_ADDRESS } from '../../../../tests/fixtures/bitcoin';
+import { RECEIVE_ADDRESS, SECOND_ADDRESS } from '../../../../tests/fixtures/bitcoin';
 import { addressToScriptHash } from '../../Bitcoin';
 
 const txid = 'a'.repeat(64),
@@ -24,6 +24,109 @@ function fixture() {
 }
 
 describe('finding-specific staleness', () => {
+  it('keeps wallet names in computational dependencies but outside assessment evidence', () => {
+    const before = fixture();
+    const walletFinding = {
+      ...before.analysis.findings[0],
+      id: 'wallet-name-support',
+      algorithm: 'wallet-intersections-v2',
+    };
+    before.analysis.findings = [walletFinding];
+    before.wallets.definitions = [
+      {
+        id: 'public-wallet',
+        name: 'Original wallet',
+        key: '',
+        scriptType: 'p2wpkh',
+        color: '#27c4a7',
+        addresses: [
+          {
+            address: RECEIVE_ADDRESS,
+            scripthash: addressToScriptHash(RECEIVE_ADDRESS, 'mainnet'),
+            path: 'account/0/0',
+            branch: 0,
+            index: 0,
+          },
+        ],
+      },
+    ];
+    const renamed = {
+      ...before,
+      wallets: {
+        ...before.wallets,
+        definitions: [{ ...before.wallets.definitions[0], name: 'Renamed wallet' }],
+      },
+    };
+    expect(findingInputs(renamed, walletFinding)).not.toBe(findingInputs(before, walletFinding));
+    expect(invalidateFindings(before, renamed).analysis.findings[0].stale).toBe(true);
+    expect(findingAssessmentInputs(renamed, walletFinding)).toBe(
+      findingAssessmentInputs(before, walletFinding),
+    );
+
+    const newAssociation = {
+      ...renamed,
+      wallets: {
+        ...renamed.wallets,
+        definitions: [
+          {
+            ...renamed.wallets.definitions[0],
+            addresses: [
+              {
+                ...renamed.wallets.definitions[0].addresses[0],
+                address: SECOND_ADDRESS,
+                scripthash: addressToScriptHash(SECOND_ADDRESS, 'mainnet'),
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(findingAssessmentInputs(newAssociation, walletFinding)).not.toBe(
+      findingAssessmentInputs(before, walletFinding),
+    );
+  });
+
+  it('keeps value support material while excluding placement and observation dates', () => {
+    const before = fixture();
+    const finding = before.analysis.findings.find((item) =>
+      item.algorithm.startsWith('value-flow'),
+    )!;
+    const refreshed = {
+      ...before,
+      chainData: {
+        ...before.chainData,
+        transactions: {
+          ...before.chainData.transactions,
+          [txid]: {
+            ...before.chainData.transactions[txid],
+            status: {
+              kind: 'confirmed' as const,
+              confirmations: 20,
+              blocktime: 1_790_000_000,
+              observation: { source: 'core' as const, observedAt: '2026-10-10T12:00:00Z' },
+            },
+          },
+        },
+      },
+    };
+    const material = {
+      ...refreshed,
+      chainData: {
+        ...refreshed.chainData,
+        transactions: {
+          ...refreshed.chainData.transactions,
+          [txid]: { ...refreshed.chainData.transactions[txid], vsize: 400 },
+        },
+      },
+    };
+    expect(findingAssessmentInputs(refreshed, finding)).toBe(
+      findingAssessmentInputs(before, finding),
+    );
+    expect(findingAssessmentInputs(material, finding)).not.toBe(
+      findingAssessmentInputs(before, finding),
+    );
+  });
+
   it('invalidates a wallet-dependent finding on changed derived coverage, but not a structure-only finding', () => {
     const before = fixture();
     const equal = before.analysis.findings.find((finding) =>

@@ -52,39 +52,43 @@ afterEach(() => {
 });
 
 describe('wallet UTXO scope guard', () => {
-  it('rejects a prior wallet completion while passive scope effects are deferred', async () => {
-    let resolve!: (response: Response) => void;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        () =>
-          new Promise<Response>((done) => {
-            resolve = done;
-          }),
-      ),
-    );
-    const setup = fixture();
-    const view = renderHook(
-      ({ walletIndex }) => {
-        const current = setup.store.getUnlocked(setup.workspace.id)!.data;
-        return useWalletUtxos({
-          workspace: current,
-          wallet: current.wallets.definitions[walletIndex],
-          transactions: setup.acquisition,
-          enabled: true,
-        });
-      },
-      { initialProps: { walletIndex: 0 } },
-    );
-    const pending = view.result.current.check();
-    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-    view.rerender({ walletIndex: 1 });
-    await act(async () => {
-      resolve(new Response(JSON.stringify({ result: [] })));
-      await pending;
-    });
-    expect(
-      setup.store.getUnlocked(setup.workspace.id)!.data.chainData.addressUtxos,
-    ).toBeUndefined();
-  });
+  it.each(['wallet', 'disabled'] as const)(
+    'rejects a prior completion after %s while passive effects are deferred',
+    async (change) => {
+      let resolve!: (response: Response) => void;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>((done) => {
+              resolve = done;
+            }),
+        ),
+      );
+      const setup = fixture();
+      const view = renderHook(
+        ({ walletIndex, enabled }) => {
+          const current = setup.store.getUnlocked(setup.workspace.id)!.data;
+          return useWalletUtxos({
+            workspace: current,
+            wallet: current.wallets.definitions[walletIndex],
+            transactions: setup.acquisition,
+            enabled,
+          });
+        },
+        { initialProps: { walletIndex: 0, enabled: true } },
+      );
+      const pending = view.result.current.check();
+      await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+      view.rerender({ walletIndex: change === 'wallet' ? 1 : 0, enabled: change !== 'disabled' });
+      await act(async () => {
+        resolve(new Response(JSON.stringify({ result: [] })));
+        await pending;
+      });
+      expect(
+        setup.store.getUnlocked(setup.workspace.id)!.data.chainData.addressUtxos,
+      ).toBeUndefined();
+      expect(view.result.current.loading).toBe(false);
+    },
+  );
 });

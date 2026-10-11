@@ -23,11 +23,11 @@ export function migrateWorkspace(data: unknown): unknown {
   if (raw.version === CURRENT_WORKSPACE_VERSION) return data;
   if (
     Object.prototype.hasOwnProperty.call(raw, 'version') &&
-    ![1, 2, 3, 4, 5, 6].includes(raw.version as number)
+    ![1, 2, 3, 4, 5, 6, 7].includes(raw.version as number)
   )
     throw new WorkspaceSchemaVersionError();
   const nested: Record<string, unknown> =
-    raw.version === 5 || raw.version === 6 ? raw : nestWorkspace(raw);
+    raw.version === 5 || raw.version === 6 || raw.version === 7 ? raw : nestWorkspace(raw);
   const chainData = nested.chainData as Record<string, unknown> | undefined;
   const scans = nested.connectionScans as Record<string, unknown> | undefined;
   const { inputContext, ...document } = nested;

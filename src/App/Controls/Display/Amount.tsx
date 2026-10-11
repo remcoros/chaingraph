@@ -6,11 +6,13 @@ export function Amount({
   as: Element = 'span',
   className,
   unknown = 'Unknown value',
+  signed = false,
 }: {
   value?: number | bigint;
   as?: 'span' | 'small' | 'strong' | 'dd';
   className?: string;
   unknown?: string;
+  signed?: boolean;
 }) {
   const amount = formatBitcoinAmount(value);
   const known = amount !== 'Unknown value';
@@ -19,7 +21,7 @@ export function Amount({
       className={['bitcoin-amount', className].filter(Boolean).join(' ')}
       title={known ? formatSats(value) : undefined}
     >
-      {known ? amount : unknown}
+      {known ? `${signed && value !== undefined && value > 0 ? '+' : ''}${amount}` : unknown}
     </Element>
   );
 }

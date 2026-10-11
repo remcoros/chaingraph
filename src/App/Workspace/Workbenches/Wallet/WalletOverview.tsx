@@ -1,29 +1,30 @@
-import { Amount } from '../../../Controls/Display/Amount';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
-  ArrowRight,
+  Check,
   Download,
-  Upload,
-  Pencil,
+  Info,
+  MoreHorizontal,
   Plus,
   RefreshCw,
-  ScanSearch,
+  Settings,
+  TriangleAlert,
+  Upload,
   Wallet as WalletIcon,
 } from 'lucide-react';
-import { walletCheckAge } from '../../../../Core/Workspace/Wallets/walletActivity';
+import { Amount } from '../../../Controls/Display/Amount';
+import { Modal } from '../../../Dialogs/Modal';
 import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
 import type { WalletReviewCoverage } from '../../../../Core/Workspace/Wallets/walletReview';
 import type { WalletUtxoCheck } from '../../../../Core/Workspace/Wallets/WalletUtxos/walletUtxoCheck';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
-import { WalletHelp } from '../../../Controls/Display/WalletHelp';
+import { WalletDetailsDialog } from './WalletDetailsDialog';
 import { walletDiscoveryStatus } from './walletDiscoveryStatus';
 
 export function WalletOverview({
   workspace,
-  tourPreview,
   wallet,
   coverage,
   utxos,
-  utxoLoading,
   canLoadChainData,
   busy,
   chainDataDisabledReason,
@@ -32,16 +33,14 @@ export function WalletOverview({
   onExchangeLabels,
   onAddWallet,
   onRefresh,
-  onCheck,
   active,
-  onAnalyze,
-  analyzing,
   analysisStatus,
   analysisIssues,
+  discovery,
+  refresh,
 }: Pick<
   WalletWorkbenchContext,
   | 'workspace'
-  | 'tourPreview'
   | 'canLoadChainData'
   | 'busy'
   | 'chainDataDisabledReason'
@@ -50,207 +49,385 @@ export function WalletOverview({
   | 'onExchangeLabels'
   | 'onAddWallet'
   | 'onRefresh'
+  | 'discovery'
+  | 'refresh'
 > & {
   wallet: NonNullable<WalletWorkbenchContext['wallet']>;
   coverage: WalletReviewCoverage;
   utxos?: WalletUtxoCheck;
-  utxoLoading: boolean;
-  onCheck: (cursor?: number) => void;
   active: boolean;
-  onAnalyze: () => void;
-  analyzing: boolean;
   analysisStatus: string;
   analysisIssues?: string;
 }) {
-  const discovery = walletDiscoveryStatus(wallet);
-  const missingHistory = Math.max(0, coverage.knownTransactions - coverage.loadedTransactions);
+  const [menuFor, setMenuFor] = useState<string>();
+  const menu = active && menuFor === wallet.id;
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const actionsId = useId();
+  const loading = refresh?.loading && refresh.walletId === wallet.id;
+  const partial = !coverage.scanComplete || coverage.utxoPartial || !!coverage.utxoLoadedSpenders;
+  const scanStatus = walletDiscoveryStatus(wallet);
+  const refreshIssue =
+    refresh?.walletId === wallet.id && !loading
+      ? refresh.error ||
+        (refresh.message.startsWith('Refresh interrupted') ? 'Refresh interrupted' : '')
+      : '';
+  const coverageIssue = coverage.utxoLoadedSpenders
+    ? 'Balance needs refresh'
+    : !coverage.scanComplete
+      ? (scanStatus?.text ?? 'History incomplete')
+      : coverage.utxoPartial
+        ? 'Coin checks incomplete'
+        : '';
+  const issue =
+    refreshIssue ||
+    coverageIssue ||
+    analysisIssues ||
+    (!canLoadChainData ? chainDataDisabledReason : '');
+  useEffect(() => {
+    if (!menu) return;
+    const items = () => [
+      ...(menuRef.current?.querySelectorAll<HTMLButtonElement>('.dropdown button:not(:disabled)') ??
+        []),
+    ];
+    items()[0]?.focus({ preventScroll: true });
+    const outside = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuFor(undefined);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenuFor(undefined);
+        triggerRef.current?.focus({ preventScroll: true });
+      }
+      const buttons = items();
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (index < 0 || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const next =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? buttons.length - 1
+            : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+      buttons[next]?.focus();
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', key);
+    };
+  }, [menu]);
   return (
     <>
       <header className="wallet-review-header" data-tour="wallet-overview">
-        <div className="wallet-identity">
-          <div className="wallet-picker-row">
-            <label className="wallet-picker">
-              <WalletIcon size={19} style={{ color: wallet.color }} aria-hidden="true" />
-              <select
-                aria-label="Selected wallet"
-                value={wallet.id}
-                onChange={(event) => onSelectWallet(event.target.value)}
-              >
-                {workspace.wallets.definitions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {onEditWallet && (
-              <button
-                className="icon-button"
-                aria-label="Edit wallet name"
-                title="Edit wallet name"
-                onClick={() => onEditWallet(wallet.id)}
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-            <button className="text-button" onClick={onAddWallet} disabled={workspace.demo}>
-              <Plus size={14} /> Add wallet
-            </button>
-            {onExchangeLabels && (
+        <div className="wallet-picker-row">
+          <label className="wallet-picker">
+            <WalletIcon size={19} style={{ color: wallet.color }} aria-hidden="true" />
+            <select
+              aria-label="Selected wallet"
+              value={wallet.id}
+              onChange={(event) => onSelectWallet(event.target.value)}
+            >
+              {workspace.wallets.definitions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="wallet-header-balance" aria-label="Wallet balance at last coin check">
+            {coverage.utxoCount === undefined ? (
+              <span className="muted">Balance not checked</span>
+            ) : (
               <>
-                <button
-                  className="icon-button"
-                  aria-label="Import wallet metadata"
-                  title="Import wallet metadata"
-                  disabled={!active}
-                  onClick={() => onExchangeLabels('import')}
-                >
-                  <Upload size={14} />
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Export wallet metadata"
-                  title="Export wallet metadata"
-                  disabled={!active}
-                  onClick={() => onExchangeLabels('export')}
-                >
-                  <Download size={14} />
-                </button>
+                <Amount as="strong" value={coverage.utxoBalanceSats} />
+                <span className={partial ? 'warning' : 'muted'}>
+                  {partial ? 'Partial balance' : null}
+                </span>
               </>
+            )}
+            <small className="muted">
+              Last refresh:{' '}
+              {wallet.refreshedAt ? (
+                <time dateTime={wallet.refreshedAt}>
+                  {formatLocalTimestamp(wallet.refreshedAt)}
+                </time>
+              ) : (
+                'Never'
+              )}
+            </small>
+          </div>
+        </div>
+        <div className="wallet-review-controls compact-controls">
+          <button
+            className="primary"
+            aria-label="Refresh wallet"
+            aria-busy={!!loading}
+            disabled={!canLoadChainData || busy}
+            title={chainDataDisabledReason ?? 'Update wallet history, coins and analysis'}
+            onClick={onRefresh}
+          >
+            <RefreshCw size={14} className={loading ? 'spin' : undefined} /> Refresh
+          </button>
+          <div
+            className="workspace-menu wallet-actions-menu"
+            ref={menuRef}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setMenuFor(undefined);
+            }}
+          >
+            <button
+              ref={triggerRef}
+              aria-label="Wallet actions"
+              aria-haspopup="menu"
+              aria-controls={menu ? actionsId : undefined}
+              aria-expanded={menu}
+              onClick={() => setMenuFor(menu ? undefined : wallet.id)}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menu && (
+              <div className="dropdown" id={actionsId} role="menu" aria-label="Wallet actions">
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuFor(undefined);
+                    setDetailsOpen(true);
+                  }}
+                >
+                  <Info size={13} /> Wallet details…
+                </button>
+                <button
+                  role="menuitem"
+                  disabled={workspace.demo}
+                  onClick={() => {
+                    setMenuFor(undefined);
+                    onAddWallet();
+                  }}
+                >
+                  <Plus size={13} /> Add wallet…
+                </button>
+                {onExchangeLabels && (
+                  <>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuFor(undefined);
+                        onExchangeLabels('import');
+                      }}
+                    >
+                      <Upload size={13} /> Import wallet metadata
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuFor(undefined);
+                        onExchangeLabels('export');
+                      }}
+                    >
+                      <Download size={13} /> Export wallet metadata
+                    </button>
+                  </>
+                )}
+                {discovery && (
+                  <>
+                    <hr />
+                    <button
+                      role="menuitemcheckbox"
+                      aria-checked={discovery.monitorActivity}
+                      onClick={() => {
+                        discovery.setMonitorActivity(!discovery.monitorActivity);
+                        setMenuFor(undefined);
+                      }}
+                    >
+                      <Check
+                        size={13}
+                        style={{ visibility: discovery.monitorActivity ? 'visible' : 'hidden' }}
+                      />{' '}
+                      Automatic refresh
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuFor(undefined);
+                        setSettingsOpen(true);
+                      }}
+                    >
+                      <Settings size={13} /> Refresh settings…
+                    </button>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
-        <div className="wallet-review-controls">
-          <button
-            className="primary"
-            disabled={!active || busy || analyzing}
-            title="Scan this wallet's loaded transactions for supported observations and hypotheses. No network requests"
-            onClick={onAnalyze}
-          >
-            <ScanSearch size={14} /> {analyzing ? 'Analyzing…' : 'Analyze'}
-          </button>
-          <button
-            aria-label="Refresh wallet"
-            disabled={!canLoadChainData || busy}
-            title={chainDataDisabledReason ?? 'Check wallet history for new transactions'}
-            onClick={onRefresh}
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-          <button
-            aria-label="Check current UTXOs"
-            disabled={!canLoadChainData || utxoLoading}
-            title="Check unspent outputs at the discovered wallet addresses"
-            onClick={() => onCheck()}
-          >
-            <RefreshCw size={13} /> {utxoLoading ? 'Checking...' : 'Check UTXOs'}
-          </button>
-        </div>
       </header>
-      <dl className="wallet-coverage" aria-label="Wallet coverage">
-        <div>
-          <dt>UTXOs at last check</dt>
-          <dd>
-            {coverage.utxoCount === undefined ? (
-              tourPreview ? (
-                'Not checked in preview'
-              ) : canLoadChainData ? (
-                'Not checked yet'
-              ) : (
-                'Backend unavailable'
-              )
-            ) : (
-              <>
-                {coverage.utxoCount}{' '}
-                {coverage.utxoLoadedSpenders ? 'remaining candidates' : 'observed unspent'} ·{' '}
-                <Amount value={coverage.utxoBalanceSats} />
-              </>
-            )}
-          </dd>
+      <details className="wallet-coverage-disclosure">
+        <summary>
+          Coverage{' '}
+          <TriangleAlert
+            size={13}
+            className={issue ? 'warning' : 'wallet-status-placeholder'}
+            aria-label={issue ? 'Needs attention' : undefined}
+            aria-hidden={!issue}
+          />
+        </summary>
+        <div className="wallet-coverage-actions" role="status">
+          {loading && <span>{refresh.message}</span>}
+          {issue && (
+            <>
+              <span className="warning">{issue}</span>
+              <button disabled={!canLoadChainData || busy || !!loading} onClick={onRefresh}>
+                Retry refresh
+              </button>
+            </>
+          )}
         </div>
-        <div>
-          <dt>Wallet refreshed</dt>
-          <dd title={wallet.scannedAt ? formatLocalTimestamp(wallet.scannedAt) : undefined}>
-            {walletCheckAge(wallet.scannedAt)}
-          </dd>
-        </div>
-        <div>
-          <dt>Addresses</dt>
-          <dd>
-            {coverage.usedAddresses} used of {coverage.discoveredAddresses} discovered
-          </dd>
-        </div>
-        <div>
-          <dt>History</dt>
-          <dd>
-            {coverage.loadedTransactions}/{coverage.knownTransactions} transactions loaded
-          </dd>
-        </div>
-      </dl>
-      <div className="wallet-coverage-actions">
-        <span className="wallet-scan-status" role="status">
-          {analysisStatus}
-        </span>
-        {analysisIssues && (
-          <WalletHelp title="Scan errors" active={active}>
-            {analysisIssues}
-          </WalletHelp>
-        )}
-        {discovery && (
-          <span className="wallet-discovery-status">
-            {discovery.text}
-            {discovery.hint && (
-              <WalletHelp title="Address search limit" active={active}>
-                {discovery.hint}
-              </WalletHelp>
-            )}
-          </span>
-        )}
-        {(missingHistory > 0 || coverage.pendingTransactions > 0) && (
-          <span className="compact-controls">
-            <button disabled={!canLoadChainData || busy} onClick={onRefresh}>
-              {missingHistory ? <Download size={13} /> : <RefreshCw size={13} />}
-              {missingHistory
-                ? `Load history (${missingHistory})`
-                : `Continue refresh (${coverage.pendingTransactions})`}
-            </button>
-          </span>
-        )}
-        {utxos?.nextCursor !== undefined && (
-          <span className="compact-controls">
-            <button
-              disabled={!canLoadChainData || utxoLoading}
-              onClick={() => onCheck(utxos.nextCursor)}
-            >
-              <ArrowRight size={13} /> Check next addresses
-            </button>
-          </span>
-        )}
-        {utxos && (
-          <span className="small muted" title={formatLocalTimestamp(utxos.checkedAt)}>
-            UTXOs checked · {utxos.checkedAddresses} / {utxos.totalAddresses} addresses ·{' '}
-            {formatLocalTimestamp(utxos.checkedAt) ?? 'Unknown time'}
-            {utxos.failed ? ` · ${utxos.failed} failed` : ''}
-          </span>
-        )}
-        {!!coverage.utxoLoadedSpenders && (
-          <span className="small warning" role="status">
-            {coverage.utxoLoadedSpenders} saved UTXO{' '}
-            {coverage.utxoLoadedSpenders === 1
-              ? 'has a loaded spender'
-              : 'checks have loaded spenders'}
-            . Historical checks retained; use Check UTXOs to resolve current status.
-          </span>
-        )}
-        {!!utxos?.failed && (
-          <span className="compact-controls">
-            <button disabled={!canLoadChainData || utxoLoading} onClick={() => onCheck()}>
-              <RefreshCw size={13} /> Retry address checks ({utxos.failed})
-            </button>
-          </span>
-        )}
-        {!canLoadChainData && <span className="small muted">{chainDataDisabledReason}</span>}
-      </div>
+        <dl className="wallet-coverage" aria-label="Wallet coverage">
+          <div>
+            <dt>Coins at last check</dt>
+            <dd>
+              {coverage.utxoCount === undefined
+                ? 'Not checked'
+                : `${coverage.utxoCount} ${coverage.utxoLoadedSpenders ? 'remaining candidates' : 'observed unspent'}`}
+            </dd>
+          </div>
+          <div>
+            <dt>History</dt>
+            <dd>
+              {coverage.loadedTransactions}/{coverage.knownTransactions} transactions loaded
+              {coverage.pendingTransactions ? ` · ${coverage.pendingTransactions} pending` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt>Addresses</dt>
+            <dd>
+              {coverage.usedAddresses} used of {coverage.discoveredAddresses} discovered
+            </dd>
+          </div>
+          <div>
+            <dt>Coin coverage</dt>
+            <dd>
+              {utxos
+                ? `${utxos.checkedAddresses}/${utxos.totalAddresses} addresses · ${formatLocalTimestamp(utxos.checkedAt)}`
+                : 'Not checked'}
+            </dd>
+          </div>
+        </dl>
+        {analysisStatus && <p>{analysisStatus}</p>}
+        {analysisIssues && analysisIssues !== issue && <p className="warning">{analysisIssues}</p>}
+      </details>
+      {settingsOpen && active && discovery && (
+        <WalletRefreshSettings discovery={discovery} onClose={() => setSettingsOpen(false)} />
+      )}
+      {detailsOpen && active && (
+        <WalletDetailsDialog
+          wallet={wallet}
+          network={workspace.network}
+          onEditWallet={onEditWallet}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
     </>
+  );
+}
+
+function WalletRefreshSettings({
+  discovery,
+  onClose,
+}: {
+  discovery: NonNullable<WalletWorkbenchContext['discovery']>;
+  onClose: () => void;
+}) {
+  const [interval, setInterval] = useState(String(discovery.refreshIntervalSeconds));
+  const [gap, setGap] = useState(String(discovery.gapLimit));
+  const [limit, setLimit] = useState(String(discovery.addressesPerBranch));
+  const [error, setError] = useState('');
+  return (
+    <Modal
+      title="Refresh settings"
+      onClose={onClose}
+      className="wallet-refresh-settings compact-controls"
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const seconds = Number(interval),
+            gapLimit = Number(gap),
+            addresses = Number(limit);
+          if (
+            !Number.isInteger(seconds) ||
+            seconds < 10 ||
+            seconds > 86400 ||
+            !Number.isInteger(gapLimit) ||
+            gapLimit < 1 ||
+            gapLimit > 100 ||
+            !Number.isInteger(addresses) ||
+            addresses < 1 ||
+            addresses > 1000
+          ) {
+            setError('Check the refresh settings.');
+            return;
+          }
+          discovery.setRefreshIntervalSeconds(seconds);
+          discovery.setGapLimit(gapLimit);
+          discovery.setAddressesPerBranch(addresses);
+          onClose();
+        }}
+      >
+        <div className="wallet-settings-fields">
+          <label>
+            Refresh interval (seconds)
+            <input
+              type="number"
+              required
+              min={10}
+              max={86400}
+              value={interval}
+              onChange={(event) => setInterval(event.target.value)}
+            />
+          </label>
+          <label>
+            Gap limit
+            <input
+              type="number"
+              required
+              min={1}
+              max={100}
+              value={gap}
+              onChange={(event) => setGap(event.target.value)}
+            />
+          </label>
+          <label>
+            Addresses per branch
+            <input
+              type="number"
+              required
+              min={1}
+              max={1000}
+              value={limit}
+              onChange={(event) => setLimit(event.target.value)}
+            />
+          </label>
+        </div>
+        {error && (
+          <p className="warning" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="button-row">
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary">
+            Save
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

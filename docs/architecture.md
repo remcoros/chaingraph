@@ -190,15 +190,17 @@ and results are inside the envelope.
 
 ### Workspace schema and migrations
 
-`CURRENT_WORKSPACE_VERSION` is 6. `WorkspaceDocument` is both the plain encrypted
+`CURRENT_WORKSPACE_VERSION` is 8. `WorkspaceDocument` is both the plain encrypted
 document and the in-memory document. Chain data, wallet definitions/reviews,
 annotations/tags and analysis findings have explicit nested groups; there is no
 second flattened runtime model. `workspaceMigrations.ts` transforms supported
-flat versionless/v1-v4 and nested v5 payloads before validation. Version 6 groups
+flat versionless/v1-v4 and nested v5-v7 payloads before validation. Version 6 groups
 transaction placement under `status` and compact input scope under `view.inputContext`.
-Only versionless/v1 documents may have graph membership seeded after validation;
-v2-v6 require explicit
-membership. Migration never invents observation timestamps or sources, mutates
+Version 7 replaces the transient new-transaction review queue with an activity
+summary. Version 8 adds Counterparties and precise goal/assessment decisions,
+retaining historical acknowledgments and validated assessment support. Only
+versionless/v1 documents may have graph membership seeded after validation;
+v2-v8 require explicit membership. Migration never invents observation timestamps or sources, mutates
 the input, or guesses at null, zero or unknown versions. Unlock never writes a
 migration back by itself; the next edited save or export uses the current
 schema and envelope v2. Backward-compatible optional observations can be
@@ -211,7 +213,8 @@ Every parse validates budgets, Zod shape, network-consistent addresses, prevout
 consistency and wallet binding: each supplied address must derive from its
 account key, script type, branch and index. Workspaces are bounded to 10,000
 transactions and 50,000 transaction/input/output records, 200 tags with 50,000
-members and 20,000 wallet review decisions.
+members, 20,000 wallet review decisions, 1,000 counterparties and 50,000
+counterparty association references.
 
 ## Backend: networks and the read-only bridge
 
@@ -325,30 +328,36 @@ the workspace network and agree with their scripts. The backend never sees a
 whole wallet. See [encryption-and-storage.md](encryption-and-storage.md)
 and [performance-notes.md](performance-notes.md).
 
-Refresh records checked bounds, scan time, pending downloads and an unreviewed
-transaction queue. Unchanged evidence keeps analysis results usable; changed
-evidence invalidates findings. Old annotated transactions are never removed
-because a new history omits them. The optional 30-second monitor runs only
-while unlocked.
+Session's `observe.walletRefresh` is the single Wallet intention: bounded history
+and admitted transaction loading, all discovered-address coin batches, then the
+existing analysis scan/merge path when material inputs change. Completed history
+and coin batches publish independently, preserving checkpoints if later work
+fails or is cancelled. Session/key/address bindings reject late results. Analysis
+fingerprints are transient per acquisition/session; findings remain in the existing
+analysis collection. An unchanged completed fingerprint skips recomputation; failed
+tools are eligible for retry. Wallet `refreshedAt` records completion only after
+history, coin checks and required analysis succeed; it is separate from history
+scan dates and contributing coin-check dates. Old annotated transactions are not removed because
+a later history omits them.
 
-Wallet UTXO checks publish successful native address observations into encrypted
-`chainData.addressUtxos`, shared with Graph address checks. Wallets projects those
-observations over verified discovered scripts; there is no second persisted
-wallet balance or UTXO model. Bounded Electrum `listunspent` queries cover at most
-100 addresses per action, with explicit continuation. Loaded-output uses require
-an exact amount/script match. Failed address checks retain earlier observations
-and do not renew their dates. The displayed aggregate date is the oldest
-contributing check, so refreshing one page cannot make older pages look fresh.
-Reopening displays saved coverage and dates without automatically refreshing a
-retained check. React owns only request, error and continuation state; lock drops
-decrypted data and cancellation state, not the encrypted observations.
+UTXO checks publish native observations into encrypted `chainData.addressUtxos`,
+shared with Graph. Wallets projects them over verified scripts; there is no second
+persisted balance or coin collection. Refresh automatically continues 100-address
+batches. Exact amount/script matching governs loaded outputs. Failed checks retain
+prior observations and dates. The aggregate date is the oldest contributing check.
+Loaded exact spenders exclude saved coins from current candidates while preserving
+the historical observation and review decision. Coverage distinguishes conflicts,
+missing data and incomplete discovery and points to Refresh recovery.
 
-Wallet reconciliation excludes saved UTXOs with exact loaded spenders from the
-current candidate list and current-UTXO recommendations. The native saved check
-and review decision remain intact; a new check date alone does not invalidate a
-review fingerprint. Coverage distinguishes loaded-spender conflicts from malformed
-output evidence and points to the existing Check UTXOs action. This does not
-assert that a loaded historical spender remains in today's chain or mempool.
+`useWalletActivity` schedules the existing Session intention. The encrypted view
+setting defaults on. All wallets run sequentially every 60 seconds by default,
+selected first; the encrypted View owns the editable interval,
+while unlocked and visible. A newly imported wallet gets an initial refresh even
+with the setting off. Per-session attempts avoid repeated runs on presentation
+edits. The existing `useWorkspaceOperation` accepts background work, preempts it
+for foreground work and waits for cancellation before admitting that work. It is
+the single operation arbiter; React retains only progress and accepted-check
+projections. Lock/switch drops transient state and cancels owned requests.
 
 ### Request scheduling
 
@@ -510,9 +519,11 @@ Wallet, Graph and the Inspector; `tagColors.ts` owns the 16 presets.
 Single-record controls accept one entity ID. Batch controls accept an explicit
 ID list, even for a batch of one, and retain their preserve-existing policy until
 the user selects replacement. The label and tag variants share private forms
-and the existing annotation operations. `SingleMetadataBar` exposes notes and
-direct replacement; `BatchMetadataBar` exposes batch scope and replacement controls.
-Each metadata toolbar owns one open-editor state, including its icon palette.
+and the existing annotation operations. Wallet's `WalletMetadataFields` and
+`WalletIconEdit` attach those single-record editors to their reading fields;
+`BatchMetadataBar` exposes explicit batch scope and replacement controls.
+The unused single-record toolbar has been removed. The batch toolbar owns one
+open-editor state, including its icon palette.
 `IconPickerControl` accepts that state and replaces capture-event coordination
 between the toolbar and picker. The standalone `IconPicker` retains local state
 and programmatic opening for Inspector fields. Both use the same trigger and
@@ -549,63 +560,109 @@ labels are opt-in, and wallet-name fallback is separate from explicit key labels
 
 ## Wallet workbench
 
-`walletReview.ts` derives one wallet's queue from loaded observations and an
-optional verified UTXO check. Native items declare their factual review scope.
-Active analysis findings enter Wallet Review only through their explicit
-`subjects`; broader `nodeIds` and `txids` remain evidence. Wallet-relative
-projection maps applicable subjects to UTXOs, transactions, addresses, or the
-combined sources-and-destinations scope. One finding may produce one row per
-applicable scope, but those rows retain one `walletId|link|findingId` decision.
-Older subjectless findings remain visible in Analysis and do not enter Wallet
-Review until rerun. Counterparties come only from transactions the wallet funded
-through loaded prevouts. The queue includes every item supported by the loaded
-evidence; coverage reports unloaded sources instead of filling them in. The
-Wallet UI renders matching rows 40 at a time without changing the queue, filter
-counts or batch-selection scope.
+The product contract is [wallet-experience.md](wallet-experience.md). The existing
+list/detail layout renders Transactions, Coins, Addresses, Counterparties and
+Review. Sources/Destinations remain scopes under Addresses. `view.ts` owns
+validated encrypted browsing and Review presentation separately, plus the automatic
+refresh preference. Background updates preserve inspected records and editors.
 
-Encrypted `walletReviews` maps `walletId|reason|subject` to `reviewed`,
-`unknown` (legacy) or `later`, a timestamp and an evidence fingerprint. Refresh
-keeps decisions; only a changed fingerprint re-queues an item, with its earlier
-date. Address items key on the verified derivation slot so new receipts do not
-undo a recorded purpose. Annotation edits never complete or change an item.
-Removing a wallet prunes its decisions.
+`walletRecords.ts` owns wallet-relative accounting from canonical scripts and
+loaded prevouts. Missing/co-input evidence stays unknown. It exposes matching
+inputs/outputs, signed net change, direction and whole transaction fee without
+allocating collaborative fees. Shared `Amount` renders monetary values.
 
-Factual Wallet rows are not review tasks. `walletRows.ts` links queue items to
-records through exact `subjectIds`; factual details expose those links and their
-states without owning decision controls. Their **To review** toggle filters records
-with outstanding linked work. Exact navigation to the queue uses a transient
-relation context instead of search text. Scope projections use distinct row keys,
-while all decision mutations deduplicate the persisted review key.
+`walletReview.ts` derives annotation goals and finding assessments, grouped around
+exact records. Transaction label, note or tag satisfies the purpose goal;
+counterparty associations satisfy the separate sender/recipient goal. Neither
+fabricates a judgment. Findings
+enter through explicit subjects; broader evidence is not an assessment subject.
+Encrypted decisions distinguish reviewed, cannot-identify, not-needed and later.
+`walletReviewEvidence.ts` owns material support fingerprints. Changed support can
+reopen attention while preserving the decision; routine dates do not. Migration
+retains historical acknowledgments and establishes baselines only from eligible
+validated finding support. Removing a wallet prunes its decisions, not reusable
+counterparty identity or concrete associations.
 
-`WalletReviewItemDetail` owns queue guidance and decision controls;
-`WalletRecordDetail` owns navigation to linked review items. Both compose one
-private detail frame for identity, metadata, related evidence and transaction
-flow. The frame owns flow state and input loading; it has no review-mode flag
-and does not receive decision callbacks.
+`Counterparties/` owns identities and exact receipt/payment, address and output
+association validity. `Annotations/` owns their ordinary human metadata through
+`annotationReferences.ts`; chain entity references remain factual. Party names
+never prove ownership. Exact association lookup is reused by review goals and
+Wallet display/search. Entity removal distinguishes associations from identity
+and reports concrete association consequences. `counterpartySelectionLinks` finds
+editable links for one exact wallet-anchor group. `setCounterpartySelection`
+changes that group's checklist selection or output scope atomically, preserving
+other anchor groups and inherited receipt links. UI callers express the selection
+without coordinating removals and additions. Persistence validates schema
+version 8 and migrates earlier workspaces without replacing observations.
 
-`walletRelationships.ts` projects one-hop counterparties: inputs funding
-transactions that paid verified wallet scripts, and outputs of transactions
-spending verified wallet outputs, grouped by canonical address and excluding the
-wallet's own. Raw script hex is authoritative; histories alone never prove
-direction or ownership. `useWalletCounterparties` resolves missing inputs in
-bounded batches with explicit continuation. `walletSelectionIndex.ts` builds
-per-snapshot indexes of scripts, outputs, spends and prevouts so row selection
-does not rescan; `walletRows.ts` is the shared row contract for all six
-tabs. `reviewCategoryDefinitions.ts` owns Wallet filter copy, grouping and display
-order; `reviewCategories.ts` owns matching, OR semantics and stable total counts.
-Wallet **Analyze** reuses the Analysis registry and merge path; it is distinct
-from history refresh.
+`walletRows.ts` links factual rows to exact goals/assessments. Context navigation
+uses exact keys and transaction scopes rather than search. Decision mutation
+deduplicates persisted keys. `WalletItemDetail` is the single inspector used by
+factual and Review tabs. Its private frame owns evidence and transaction-flow
+state; `WalletMetadataFields` owns the common reading layout and inline editors.
+Transaction facts move into the header, with Metadata and independent Review
+findings in two responsive columns below. Confirmations remain saved placement
+observations; the inspector does not infer them from loaded block heights.
+`RelativeTime` owns a disposable display clock, isolated from its containing
+inspector, and uses the shared Formatting calendar-age helper.
+Transaction flow remains in the same
+private frame, starts expanded for transactions, and spans the content width
+without an enclosing card. Other record types keep facts beside editable
+information and Note across the width. Values derive from annotations and exact association sources,
+with no stored answer state. Automatically satisfied annotation goals disappear;
+explicit decisions retain compact reopening controls. The separate factual and
+review detail variants and single-record toolbar have been removed.
+`WalletReviewInteractions` owns reusable field review indicators and the compact
+independent checklist, plus the existing decision controls shared with batch
+review. `WalletItemDetail` maps exact annotation goals to their editable fields:
+record-local description goals attach once to Label, while relationship goals
+attach to the matching sender/recipient or counterparty field. Other annotations
+can still satisfy a goal through the existing Core rules. No answer state or
+review mutation owner is added. Explicit decisions remain discoverable at their
+field; automatically satisfied goals disappear.
+One outer Review disclosure retains independent findings and linked review
+navigation, with status icons and direct assessment actions per finding. Existing
+decision controls supply the same outcomes in batch, inline and annotation-context
+presentations. Annotation popovers put the preferred edit shortcut above a row of
+alternative resolutions. Finding rows use concise presentation of saved analysis
+classifications, with longer evidence in the existing help tooltip. No analytical
+rule or stored finding is changed. The
+field editor shortcut invokes the ordinary trigger in the same annotation row,
+preserving the editor owner and exact association source. Popovers and tooltips
+remain local UI state, not a second review-state source. Address/coin navigation
+calls the panel's existing exact-key review operation. A focused review jump opens
+its field context or the outer section; there is no nested disclosure per item.
 
-Each unlocked session owns a `WalletPreparationCache` in
-`src/Core/Workspace/Wallets/walletPreparation.ts`. It shares one transaction index and script decoder
-per current network/transaction snapshot and retains relationships and prepared
-review items per wallet. Immutable source references invalidate only dependent
-results; camera and workbench changes do not. Initial review and latest UTXO-check
-variants are retained separately so returning to a wallet never presents an old
-UTXO check as current. Warm returns bypass the preparation placeholder. These
-results are not serialized, and successful locking disposes them; save failure
-leaves the unlocked session and its preparation intact. The cache does not keep
-separate wallet components mounted for every workspace or run analysis in the background.
+`WalletReviewPanel` owns a transient canonical-reference navigation trail. It
+resolves related wallet records from the existing rows and verified loaded output
+index, preserving list selection and filters; Back restores the prior inspector.
+The trail stores no record snapshots and is not persisted. External or unavailable
+records retain explicit Graph navigation. State changes keep the inspected record
+available for reversal. Batch selection retains its existing exact related-row
+shortcuts and preserve-existing metadata policy, including a batch of one.
+Counterparties composes the same inline field and list/detail styles; category
+drafts and removal confirmation remain local UI state. Its overflow menu retains
+bookmarking and removal. Record links inspect records, while checkboxes and modifier
+clicks retain batch selection.
+
+`walletRelationships.ts` continues to project observed one-hop addresses using
+raw scripts and loaded prevouts, excluding wallet scripts. Histories do not prove
+direction or ownership. `useWalletCounterparties` resolves missing source inputs
+in bounded batches. `walletSelectionIndex.ts` shares snapshot indexes.
+`reviewCategoryDefinitions.ts` owns filter copy and order; `reviewCategories.ts`
+owns OR matching and counts. Session-owned Refresh runs default wallet analysis
+when its inputs change and retries failed tools. Wallet has no separate scan
+controller; custom scopes and tool options remain in the Analysis workbench.
+
+Each unlocked session owns `WalletPreparationCache`. Immutable references
+invalidate dependent indexes, relationships, goals and coin projections, including
+counterparty context. Camera/workbench changes do not. Warm returns reuse prepared
+results. Transaction/address accounting and material finding support survive
+human context edits; chain snapshots and derivation anchors invalidate them.
+Finding support includes every wallet for wallet-intersection evidence. Checked
+and unchecked review projections are prepared only when requested. These are not serialized; locking disposes them, while save failure keeps
+the unlocked session. There is no second metadata store, findings collection or
+operation runtime.
 
 ## Analysis
 

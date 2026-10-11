@@ -15,9 +15,25 @@ export async function validateAndEncryptWorkspace(
   // Preserve unrelated persisted fields.
   const validated = decodeWorkspaceDocument(workspace, false);
   const migrated = migrateWorkspace(workspace) as Workspace;
+  let reviews = migrated.wallets.reviews;
+  for (const [key, record] of Object.entries(validated.wallets.reviews ?? {})) {
+    const original = migrated.wallets.reviews?.[key];
+    if (
+      !original ||
+      record.supportEvidence === undefined ||
+      record.supportEvidence === original.supportEvidence
+    )
+      continue;
+    if (reviews === migrated.wallets.reviews) reviews = { ...reviews };
+    // Retain unrelated raw fields while writing the one-time validated migration baseline.
+    reviews![key] = { ...original, supportEvidence: record.supportEvidence };
+  }
   return encrypt(
     {
       ...migrated,
+      ...(reviews !== migrated.wallets.reviews
+        ? { wallets: { ...migrated.wallets, reviews } }
+        : {}),
       connectionScans: validated.connectionScans,
       view: { ...migrated.view, graphNodeIds: validated.view.graphNodeIds },
     },

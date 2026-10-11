@@ -10,7 +10,7 @@ import {
   planBatchLabel,
   planBatchTag,
 } from '../../../Core/Workspace/Annotations/batchMetadata';
-import { canonicalEntityReference } from '../../../Core/Workspace/entityReferences';
+import { canonicalAnnotationReference } from '../../../Core/Workspace/annotationReferences';
 import type { Workspace } from '../../../Core/Workspace/workspace';
 import {
   MAX_ANNOTATION_LABEL_LENGTH,
@@ -72,7 +72,6 @@ export function EntityLabelEditor({ entityId, ...props }: EntityEditorProps) {
       initialValue={props.workspace.annotations.entities[entityId]?.label ?? ''}
       replace
       heading="Edit label"
-      description="Saves automatically after applying."
     />
   );
 }
@@ -107,13 +106,11 @@ function LabelEditor({
   initialValue,
   replace,
   heading,
-  description,
   children,
 }: MetadataEditorProps & {
   initialValue: string;
   replace: boolean;
   heading: string;
-  description?: string;
   children?: ReactNode;
 }) {
   const ref = useDialogFocus(onClose, undefined, false);
@@ -175,10 +172,12 @@ function LabelEditor({
           />
         </label>
         {children}
-        <p className="small muted">
-          {description ?? `${plan.targets.length} of ${ids.length} records change.`}
-          {plan.preserved ? ` ${plan.preserved} already labelled and kept as they are.` : ''}
-        </p>
+        {ids.length > 1 && (
+          <p className="small muted">
+            {plan.targets.length} of {ids.length} records
+            {plan.preserved ? ` · ${plan.preserved} existing labels kept` : ''}
+          </p>
+        )}
         <div className="button-row">
           <button className="primary" disabled={!plan.targets.length}>
             <Check size={14} /> Apply label
@@ -364,9 +363,7 @@ function TagEditor({
           );
         })}
         {!matching.length && (
-          <p className="small muted">
-            {tags.length ? 'No matching tags.' : 'Type a name to create your first tag.'}
-          </p>
+          <p className="small muted">{tags.length ? 'No results' : 'No tags yet'}</p>
         )}
       </div>
       {footer}
@@ -474,7 +471,7 @@ export function EntityNoteEditor({
 }) {
   const ref = useDialogFocus(onClose, undefined, false);
   const [group] = useState(() => `note:${crypto.randomUUID()}`);
-  const canonicalId = canonicalEntityReference(id, workspace.network);
+  const canonicalId = canonicalAnnotationReference(id, workspace.network);
   return (
     <div
       ref={ref}
@@ -500,7 +497,6 @@ export function EntityNoteEditor({
           onChange((current) => applyEntityNote(current, canonicalId, note), group);
         }}
       />
-      <p className="small muted">Saves automatically, encrypted. Undo restores edits.</p>
       <button onClick={onClose}>Done</button>
     </div>
   );

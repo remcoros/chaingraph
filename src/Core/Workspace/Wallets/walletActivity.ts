@@ -74,7 +74,11 @@ export function applyWalletScan(
           scanComplete: scanned.scanComplete,
           scanLimit: scanned.scanLimit,
           scanGap: scanned.scanGap,
-          pendingTransactionIds: scanned.pendingTransactionIds,
+          pendingTransactionIds:
+            JSON.stringify(wallet.pendingTransactionIds ?? []) ===
+            JSON.stringify(scanned.pendingTransactionIds ?? [])
+              ? wallet.pendingTransactionIds
+              : scanned.pendingTransactionIds,
           lastActivity: scanned.lastActivity,
         };
       }),

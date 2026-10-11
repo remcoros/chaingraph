@@ -32,7 +32,6 @@ interface Inputs {
   workspaces: WorkspaceCore['workspaces'];
   setNotice: WorkspaceCore['setNotice'];
   select: WorkspaceSelection['select'];
-  setSelectedId: WorkspaceSelection['setSelectedId'];
   replaceSelection: WorkspaceSelection['batch']['replace'];
   setSelectionMode: WorkspaceSelection['batch']['setMode'];
   /** Everything this workbench needs to hand a record over to Graph. */
@@ -48,7 +47,6 @@ export function createWalletActions({
   workspaces,
   setNotice,
   select,
-  setSelectedId,
   replaceSelection,
   setSelectionMode,
   handoff,
@@ -58,7 +56,7 @@ export function createWalletActions({
   shownRightTab,
   setGraphFilters,
 }: Inputs) {
-  const { showOnGraph, showRecordTab, showPanel, loadGraphTransactions, recoveryGraph } = handoff;
+  const { showOnGraph, showRecordTab, showPanel, loadGraphTransactions } = handoff;
   const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
 
@@ -152,7 +150,7 @@ export function createWalletActions({
     });
     return true;
   }
-  /** Wallet review keeps its context: Graph and Analysis both offer a way back. */
+  /** Wallet review keeps its context: Graph offers a way back. */
   function openWalletRecord(
     runtime: WalletActionRuntime,
     nodeId: string,
@@ -175,17 +173,5 @@ export function createWalletActions({
       });
     }
   }
-  function analyzeFromWallet(runtime: WalletActionRuntime, nodeId?: string) {
-    const node = nodeId ? recoveryGraph.nodes.find((item) => item.id === nodeId) : undefined;
-    if (node) select(node.id);
-    else {
-      setSelectedId(undefined);
-      if (nodeId)
-        setNotice(
-          'This record is not loaded yet, so the scan uses the selected wallet. Open it in Graph to scan it directly.',
-        );
-    }
-    runtime.switchWorkbench('analysis', { interaction: 'handoff', focus: 'workbench' });
-  }
-  return { selectWalletRecord, openWalletRecord, analyzeFromWallet };
+  return { selectWalletRecord, openWalletRecord };
 }

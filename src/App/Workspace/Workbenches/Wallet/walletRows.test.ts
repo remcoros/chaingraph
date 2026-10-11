@@ -11,6 +11,7 @@ import {
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import {
   buildWalletRecordRows,
+  buildWalletReviewRows,
   matchesWalletStatus,
   walletRowRelationship,
   walletRowTags,
@@ -24,7 +25,10 @@ import {
 } from './walletRows';
 import { PUBLIC_ZPUB } from '../../../../../tests/fixtures/bitcoin';
 
-import { buildWalletReview } from '../../../../Core/Workspace/Wallets/walletReview';
+import {
+  buildWalletReview,
+  type WalletReviewItem,
+} from '../../../../Core/Workspace/Wallets/walletReview';
 import { groupWalletRelationships } from '../../../../Core/Workspace/Wallets/walletRelationships';
 import { matchRelatedEntities } from './walletRelatedSelection';
 
@@ -105,7 +109,7 @@ describe('shared Wallet rows', () => {
     const destination = rows.destinations.find((row) => row.nodeId === id)!;
     expect(source.kind).toBe('address');
     expect(source.outpointIds).toEqual([outpointReference(parent, 0)]);
-    expect(source.reviews.map((item) => item.reason)).toEqual(['source-address']);
+    expect(source.reviews).toEqual([]);
     expect(destination.reviews.map((item) => item.reason)).toEqual(['destination-address']);
     expect(walletRowWithContext(workspace, source).contextTransactionIds).toEqual([B]);
     expect(source.contextTransactionIds).not.toContain(A);
@@ -123,11 +127,25 @@ describe('shared Wallet rows', () => {
         evidence: 'previously-saved',
       },
     };
-    const missing = reviewRow(
-      buildWalletReview(workspace, wallet).items.find(
-        (item) => item.reason === 'funding-source' && !item.address,
-      )!,
-    );
+    const missing = reviewRow({
+      kind: 'annotation-goal',
+      goal: 'counterparty-context',
+      satisfied: false,
+      contextSubjects: [],
+      key: 'fixture-missing',
+      reason: 'funding-source',
+      scope: 'relationships',
+      title: 'Missing source',
+      detail: '',
+      nodeId: outpointReference('9'.repeat(64), 0),
+      nodeIds: [],
+      subjectIds: [],
+      label: '',
+      tags: [],
+      evidence: '',
+      status: 'open',
+      changed: false,
+    });
     const address = buildWalletRecordRows(workspace, wallet, [], []).addresses[0];
     const resolved = { ...address, key: 'resolved', outpointIds: [missing.nodeId] };
     expect(resolveWalletRow([address, resolved], missing.key, missing)).toBe(resolved);
@@ -145,11 +163,25 @@ describe('shared Wallet rows', () => {
         evidence: 'previously-saved',
       },
     };
-    const missing = reviewRow(
-      buildWalletReview(workspace, wallet).items.find(
-        (item) => item.reason === 'funding-source' && !item.address,
-      )!,
-    );
+    const missing = reviewRow({
+      kind: 'annotation-goal',
+      goal: 'counterparty-context',
+      satisfied: false,
+      contextSubjects: [],
+      key: 'fixture-missing',
+      reason: 'funding-source',
+      scope: 'relationships',
+      title: 'Missing source',
+      detail: '',
+      nodeId: outpointReference('9'.repeat(64), 0),
+      nodeIds: [],
+      subjectIds: [],
+      label: '',
+      tags: [],
+      evidence: '',
+      status: 'open',
+      changed: false,
+    });
     const [first, second] = buildWalletRecordRows(workspace, wallet, [], []).addresses;
     const resolved = { ...first, key: 'resolved', outpointIds: [missing.nodeId] };
     const rows = [first, second, resolved];
@@ -423,4 +455,53 @@ describe('Wallet review findings regressions', () => {
       }),
     ).toBe('Conflicting evidence');
   });
+});
+
+it('groups derived coin context around the same conservative transaction effect', () => {
+  const { workspace, wallet, addresses } = fixture();
+  const utxos = [
+    {
+      txid: B,
+      vout: 0,
+      valueSats: 90_000_000,
+      height: 800000,
+      address: addresses[1].address,
+      scripthash: addresses[1].scripthash,
+    },
+  ];
+  const review = buildWalletReview(workspace, wallet, { utxos });
+  const rows = buildWalletReviewRows(workspace, wallet, utxos, review.groups);
+  const ordinary = buildWalletRecordRows(workspace, wallet, utxos, review.items).transactions;
+  for (const row of rows.filter((entry) => entry.kind === 'transaction')) {
+    expect(row.key).toBe(transactionReference(row.txid!));
+    expect(row.amountSats).toBe(ordinary.find((entry) => entry.key === row.key)?.amountSats);
+  }
+  expect(ordinary.find((entry) => entry.txid === A)?.amountSats).toBeUndefined();
+});
+
+it('does not keep satisfied goals in Later or open even if an earlier decision was deferred', () => {
+  const { workspace, wallet } = fixture();
+  const row = buildWalletRecordRows(workspace, wallet, [], []).transactions[0];
+  const item: WalletReviewItem = {
+    kind: 'annotation-goal',
+    goal: 'activity-context',
+    satisfied: true,
+    contextSubjects: [row.nodeId],
+    key: 'goal',
+    nodeId: row.nodeId,
+    nodeIds: [],
+    subjectIds: [row.nodeId],
+    reason: 'wallet-transaction',
+    scope: 'transactions',
+    title: '',
+    detail: '',
+    label: '',
+    tags: [],
+    evidence: '',
+    status: 'later',
+    changed: false,
+  };
+  expect(matchesWalletStatus({ ...row, reviews: [item] }, 'later')).toBe(false);
+  expect(matchesWalletStatus({ ...row, reviews: [item] }, 'open')).toBe(false);
+  expect(matchesWalletStatus({ ...row, reviews: [item] }, 'decided')).toBe(true);
 });

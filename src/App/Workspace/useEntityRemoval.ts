@@ -8,7 +8,10 @@ import { buildGraph } from './GraphState/graphEvidence';
 import type { AppState } from '../useAppState';
 
 /** The workspace fields a removal plan is derived from. */
-type RemovalInput = Pick<Workspace, 'network' | 'chainData' | 'annotations' | 'wallets'> & {
+type RemovalInput = Pick<
+  Workspace,
+  'network' | 'chainData' | 'annotations' | 'wallets' | 'counterparties'
+> & {
   view: Pick<Workspace['view'], 'inputContext'>;
 };
 
@@ -59,6 +62,7 @@ export function useEntityRemoval({
   const contextTransactionIds = activeWorkspace?.chainData.contextTransactionIds;
   const annotations = activeWorkspace?.annotations.entities;
   const tags = activeWorkspace?.annotations.tags;
+  const counterparties = activeWorkspace?.counterparties;
   const wallets = activeWorkspace?.wallets.definitions;
   const watchedAddresses = activeWorkspace?.chainData.watchedAddresses;
   const input = useMemo<RemovalInput | undefined>(() => {
@@ -72,6 +76,7 @@ export function useEntityRemoval({
         watchedAddresses: watchedAddresses,
       },
       annotations: { entities: annotations, tags: tags },
+      counterparties,
       wallets: { definitions: wallets },
       view: { inputContext: inputContext },
     };
@@ -82,6 +87,7 @@ export function useEntityRemoval({
     contextTransactionIds,
     annotations,
     tags,
+    counterparties,
     wallets,
     watchedAddresses,
   ]);

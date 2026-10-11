@@ -1,40 +1,46 @@
 import { Amount } from '../../../../Controls/Display/Amount';
 import { useCallback, useId, useMemo, useState, type ReactNode } from 'react';
 import {
-  ChevronRight,
-  Circle,
-  CircleCheck,
-  Clock3,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight,
+  Box,
+  CalendarClock,
+  ChevronDown,
+  FileText,
   Filter,
   Info,
+  ListChecks,
   Network,
-  TriangleAlert,
-  Undo2,
+  Receipt,
+  Tag,
+  Wallet as WalletIcon,
 } from 'lucide-react';
-import { short } from '../../../../../Core/Formatting';
+import { formatSats, short } from '../../../../../Core/Formatting';
 import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
-import type { WorkspaceTag } from '../../../../../Core/Workspace/Annotations/annotations';
 
-import {
-  isCompletedReview,
-  type WalletReviewItem,
-} from '../../../../../Core/Workspace/Wallets/walletReview';
+import { type WalletReviewItem } from '../../../../../Core/Workspace/Wallets/walletReview';
 import {
   buildWalletReviewContext,
   orderWalletContextTransactions,
   type WalletReviewFlowEntry,
 } from '../walletReviewContext';
-import { walletRowFinding, walletRowRelationship, type WalletRow } from '../walletRows';
+import { matchesWalletStatus, walletRowRelationship, type WalletRow } from '../walletRows';
 import { useTransactionFetch } from '../../../TransactionFetchProvider';
 import { useWalletFlowInputs } from './useWalletFlowInputs';
-import { SingleMetadataBar } from './BatchMetadataBar';
+import { WalletCounterpartyContext } from '../WalletCounterparties';
+import { WalletMetadataFields, WalletIconEdit } from '../WalletMetadataFields';
 import { WalletReference } from '../WalletReference';
 import { CopyButton } from '../../../../Controls/CopyButton';
+import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
 import {
   TransactionBlockTime,
-  TransactionBlockTimeWithFee,
+  TransactionTimestamp,
 } from '../../../../Controls/Display/TransactionBlockTime';
+import { transactionBlockTime } from '../../../../Controls/Display/transactionTime';
+import { RelativeTime } from '../../../../Controls/Display/RelativeTime';
+import { transactionFee } from '../../../../Controls/Display/transactionFee';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
@@ -43,9 +49,13 @@ import type {
   WalletSelectionAddresses,
 } from '../../../../../Core/Workspace/Wallets/walletSelectionIndex';
 import { walletRelatedRecords, walletRelatedDescription } from './walletRelatedRecords';
-import { walletReviewGuidance, walletSubjectTitle } from './walletReviewGuidance';
-
-export type WalletDecisionAction = 'reviewed' | 'later' | 'reopen';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
+import { walletSubjectTitle } from './walletReviewGuidance';
+import {
+  WalletFieldReview,
+  WalletReviewChecklist,
+  type WalletDecisionAction,
+} from './WalletReviewInteractions';
 
 /** The selected context already receives indexes and verified addresses. */
 function selectedWalletReviewContext(
@@ -79,54 +89,6 @@ function selectedWalletRelatedRecords(
   return walletRelatedRecords(workspace, row, selectionIndex);
 }
 
-export function WalletDecisionButtons({
-  items,
-  busy,
-  onDecide,
-}: {
-  items: readonly WalletReviewItem[];
-  busy: boolean;
-  onDecide: (items: readonly WalletReviewItem[], action: WalletDecisionAction) => void;
-}) {
-  const actionable = items.filter((item) => !item.legacyOutputReview);
-  if (!actionable.length) return null;
-  const completed = actionable.every(
-    (item) => !item.changed && item.status !== 'open' && isCompletedReview({ status: item.status }),
-  );
-  const later = actionable.every((item) => !item.changed && item.status === 'later');
-  return (
-    <div className="button-row wallet-review-decisions">
-      {completed ? (
-        <button
-          disabled={busy}
-          title="Return these decisions to To review"
-          onClick={() => onDecide(actionable, 'reopen')}
-        >
-          <Undo2 size={14} /> Reopen
-        </button>
-      ) : (
-        <>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => onDecide(actionable, 'reviewed')}
-          >
-            Mark reviewed
-          </button>
-          <button
-            disabled={busy}
-            aria-pressed={later}
-            title={later ? 'Return to To review' : 'Set aside without completing the review'}
-            onClick={() => onDecide(actionable, later ? 'reopen' : 'later')}
-          >
-            <Clock3 size={14} /> {later ? 'Return to review' : 'Review later'}
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
 type WalletDetailProps = Pick<
   WalletWorkbenchContext,
   | 'active'
@@ -141,195 +103,135 @@ type WalletDetailProps = Pick<
   row: WalletRow;
   selectionIndex: WalletSelectionIndex;
   walletAddresses: WalletSelectionAddresses;
-  tags?: WorkspaceTag[];
   workspace: Workspace;
   wallet: Wallet;
   onNotice: (message: string) => void;
-  relatedSelection?: ReactNode;
+  onOpenRecord?: (id: string) => void;
+  canOpenRecord?: (id: string) => boolean;
   resolveInputs?: boolean;
 };
 
-/** Review decisions and guidance belong to the queue, not factual records. */
-export function WalletReviewItemDetail({
+/** One inspector composes editable fields, contextual reviews and independent findings. */
+export function WalletItemDetail({
   onDecide,
+  focusedReviewKey,
+  onOpenReviewItem,
   ...props
 }: WalletDetailProps & {
+  focusedReviewKey?: string;
+  onOpenReviewItem?: (row: WalletRow, item: WalletReviewItem) => void;
   onDecide: (items: readonly WalletReviewItem[], action: WalletDecisionAction) => void;
 }) {
-  const { row, workspace, tags = [], relatedSelection, busy } = props;
-  const annotation = workspace.annotations.entities[row.nodeId];
-  const changed = row.reviews.find((item) => item.changed);
-  const actionableReviews = row.reviews.filter((item) => !item.legacyOutputReview);
-  const subjectTitle = walletSubjectTitle(row);
-  const missingContext = !annotation?.label?.trim() && tags.length === 0;
-  const completed = !changed && (row.status === 'reviewed' || row.status === 'unknown');
-  const finding = walletRowFinding(workspace, row);
-  const addressReuse = finding?.algorithm.replace(/-v\d+$/, '') === 'address-reuse';
-  const guidedActions: ('label' | 'tags')[] = completed
-    ? []
-    : finding
-      ? tags.length === 0
-        ? ['tags']
-        : []
-      : [
-          ...(!annotation?.label?.trim() ? ['label' as const] : []),
-          ...(tags.length === 0 ? ['tags' as const] : []),
-        ];
-  const title =
-    finding?.title ||
-    annotation?.label?.trim() ||
-    (missingContext ? `${subjectTitle} without label or tags` : subjectTitle);
-  const calloutTone =
-    changed || (!completed && (missingContext || addressReuse))
-      ? 'attention'
-      : completed
-        ? 'complete'
-        : 'info';
-  const GuidanceIcon = calloutTone === 'attention' ? TriangleAlert : completed ? CircleCheck : Info;
-  const guidance = walletReviewGuidance(
-    row,
-    { label: annotation?.label, tagCount: tags.length },
-    finding,
-    !!relatedSelection,
+  const items = [...new Map(props.row.reviews.map((item) => [item.key, item])).values()];
+  const description = items.filter(
+    (item) =>
+      item.kind === 'annotation-goal' &&
+      item.nodeId === props.row.nodeId &&
+      (item.goal === 'activity-context' || item.goal === 'coin-context'),
   );
-  const statusLabel = changed
-    ? 'Evidence changed'
-    : row.status === 'unknown'
-      ? 'Source unknown'
-      : row.status === 'reviewed'
-        ? 'Reviewed'
-        : row.status === 'later'
-          ? 'Review later'
-          : 'Not reviewed';
+  const parties = items.filter(
+    (item) =>
+      item.kind === 'annotation-goal' &&
+      item.goal === 'counterparty-context' &&
+      item.subjectIds.includes(props.row.nodeId),
+  );
+  const inField = new Set([...description, ...parties].map((item) => item.key));
+  const independent = items.filter((item) => !inField.has(item.key));
+  const contextReview =
+    items.find((item) => item.key === focusedReviewKey) ??
+    independent.find((item) => item.changed || item.status === 'open');
+  const [reviewOpen, setReviewOpen] = useState(true);
+  const [previousFocus, setPreviousFocus] = useState(focusedReviewKey);
+  const reviewId = useId();
+  if (previousFocus !== focusedReviewKey) {
+    setPreviousFocus(focusedReviewKey);
+    if (focusedReviewKey) setReviewOpen(true);
+  }
+  const fieldReview = (label: string, reviews: readonly WalletReviewItem[]) => (
+    <WalletFieldReview
+      items={reviews}
+      label={label}
+      row={props.row}
+      active={props.active}
+      busy={props.busy}
+      focusedReviewKey={focusedReviewKey}
+      onDecide={onDecide}
+      onOpenReviewItem={onOpenReviewItem}
+    />
+  );
+  const partyReviews =
+    props.row.kind === 'transaction'
+      ? {
+          senders: fieldReview(
+            'Sender',
+            parties.filter((item) => item.relationshipKinds?.includes('source')),
+          ),
+          recipients: fieldReview(
+            'Recipient',
+            parties.filter((item) => item.relationshipKinds?.includes('destination')),
+          ),
+        }
+      : { counterparties: fieldReview('Counterparties', parties) };
   return (
     <WalletDetailFrame
       {...props}
-      title={title}
-      contextReview={row.reviews[0]}
-      guidedActions={guidedActions}
-      status={
-        row.reviews.length > 0 && (
-          <span className={`wallet-subject-status status-${changed ? 'changed' : row.status}`}>
-            {statusLabel}
-          </span>
-        )
-      }
-      decisions={
-        actionableReviews.length > 0 && (
-          <div className="wallet-action-group" aria-label="Review decision">
-            <WalletDecisionButtons items={row.reviews} busy={busy} onDecide={onDecide} />
-            {actionableReviews.length > 1 && (
-              <span className="small muted">{actionableReviews.length} decisions</span>
-            )}
-          </div>
-        )
-      }
-      relatedSelection={
-        relatedSelection && (
-          <div
-            className={`wallet-action-group${!completed && finding ? ' wallet-guided-related' : ''}`}
-          >
-            {relatedSelection}
-          </div>
-        )
-      }
+      contextReview={contextReview}
+      annotationReviews={{ label: fieldReview('Label', description) }}
+      partyReviews={partyReviews}
       guidance={
-        <div
-          className={`wallet-review-callout tone-${calloutTone}`}
-          role="note"
-          aria-label="Review guidance"
-        >
-          <GuidanceIcon size={18} aria-hidden="true" />
-          <p>{guidance}</p>
-        </div>
+        independent.length > 0 && (
+          <section aria-label="Review goals" data-tour="wallet-review-goals">
+            <details
+              className={`wallet-linked-reviews${props.row.kind === 'transaction' ? ' wallet-transaction-reviews' : ''}`}
+              open={reviewOpen}
+            >
+              <summary
+                aria-controls={reviewId}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setReviewOpen(!reviewOpen);
+                }}
+              >
+                {props.row.kind === 'transaction' ? (
+                  <>
+                    <span className="wallet-transaction-section-heading">
+                      <ListChecks size={18} aria-hidden="true" />
+                      Review findings
+                    </span>
+                    <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
+                  </>
+                ) : (
+                  'Review'
+                )}
+              </summary>
+              <div id={reviewId} hidden={!reviewOpen}>
+                <WalletReviewChecklist
+                  items={independent}
+                  workspace={props.workspace}
+                  walletId={props.wallet.id}
+                  row={props.row}
+                  active={props.active}
+                  busy={props.busy}
+                  onDecide={onDecide}
+                  onOpenReviewItem={props.row.kind === 'transaction' ? undefined : onOpenReviewItem}
+                />
+              </div>
+            </details>
+          </section>
+        )
       }
     />
   );
 }
 
-/** Factual records link to review tasks but do not own decision controls. */
-export function WalletRecordDetail({
-  onOpenReviewItem,
-  ...props
-}: WalletDetailProps & {
-  onOpenReviewItem: (row: WalletRow, item: WalletReviewItem) => void;
-}) {
-  const { row, workspace, relatedSelection } = props;
-  const annotation = workspace.annotations.entities[row.nodeId];
-  return (
-    <WalletDetailFrame
-      {...props}
-      title={annotation?.label?.trim() || walletSubjectTitle(row)}
-      relatedSelection={
-        relatedSelection && <div className="wallet-action-group">{relatedSelection}</div>
-      }
-    >
-      <WalletLinkedReviews row={row} onOpenReviewItem={onOpenReviewItem} />
-    </WalletDetailFrame>
-  );
-}
-
-function WalletLinkedReviews({
-  row,
-  onOpenReviewItem,
-}: {
-  row: WalletRow;
-  onOpenReviewItem: (row: WalletRow, item: WalletReviewItem) => void;
-}) {
-  const linkedReviews = [...new Map(row.reviews.map((item) => [item.key, item])).values()];
-  return (
-    <section className="wallet-linked-reviews" aria-label="Review items">
-      <h3>Review items</h3>
-      {linkedReviews.length ? (
-        <ul>
-          {linkedReviews.map((item) => {
-            const state = item.changed
-              ? 'Evidence changed'
-              : item.status === 'later'
-                ? 'Review later'
-                : item.status === 'reviewed'
-                  ? 'Reviewed'
-                  : item.status === 'unknown'
-                    ? 'Source unknown'
-                    : 'To review';
-            const StateIcon = item.changed
-              ? TriangleAlert
-              : item.status === 'later'
-                ? Clock3
-                : item.status === 'reviewed' || item.status === 'unknown'
-                  ? CircleCheck
-                  : Circle;
-            return (
-              <li key={item.key}>
-                <button
-                  title={`${item.title}. ${state}`}
-                  onClick={() => onOpenReviewItem(row, item)}
-                >
-                  <StateIcon size={14} aria-hidden="true" />
-                  <span>{item.title}</span>
-                  <small>{state}</small>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="muted">None</p>
-      )}
-    </section>
-  );
-}
-
-/** Shared evidence and flow state stay in one owner across both detail variants. */
+/** Evidence and flow state share one owner across factual and review tabs. */
 function WalletDetailFrame({
   row,
   selectionIndex,
   walletAddresses,
-  tags = [],
   workspace,
   wallet,
   active,
-  tourPreview,
   busy,
   canLoadChainData,
   updateEvidence,
@@ -337,27 +239,24 @@ function WalletDetailFrame({
   onNotice,
   onShowInGraph,
   onIsolateInGraph,
-  relatedSelection,
+  onOpenRecord,
+  canOpenRecord,
   resolveInputs = true,
   contextReview,
-  title,
-  status,
-  decisions,
   guidance,
-  guidedActions,
+  annotationReviews,
+  partyReviews,
   children,
 }: WalletDetailProps & {
   contextReview?: WalletReviewItem;
-  title: string;
-  status?: ReactNode;
-  decisions?: ReactNode;
   guidance?: ReactNode;
-  guidedActions?: readonly ('label' | 'tags')[];
+  annotationReviews?: Partial<Record<'label' | 'note' | 'tags', ReactNode>>;
+  partyReviews?: Partial<Record<'senders' | 'recipients' | 'counterparties', ReactNode>>;
   children?: ReactNode;
 }) {
   const fetchTransaction = useTransactionFetch('visible');
   const [chosenContext, setChosenContext] = useState('');
-  const [flowOpen, setFlowOpen] = useState(false);
+  const [flowOpen, setFlowOpen] = useState(row.kind === 'transaction');
   const flowId = useId();
   const [evidenceLimits, setEvidenceLimits] = useState({
     inputs: 20,
@@ -445,7 +344,6 @@ function WalletDetailFrame({
     fetch: fetchTransaction,
     update: updateEvidence,
   });
-  const annotation = workspace.annotations.entities[row.nodeId];
   const awaitingAddress =
     row.kind === 'output' &&
     !row.address &&
@@ -461,7 +359,11 @@ function WalletDetailFrame({
     walletAddresses,
   );
   const outpoints = row.outpointIds ?? [];
-  const BlockTime = row.kind === 'output' ? TransactionBlockTime : TransactionBlockTimeWithFee;
+  const transaction = row.txid ? workspace.chainData.transactions[row.txid] : undefined;
+  const fee = row.kind === 'transaction' ? transactionFee(workspace, transaction) : undefined;
+  const placement = transactionStatus(transaction);
+  const blockTime = transactionBlockTime(transaction);
+  const confirmations = transaction?.status?.confirmations;
   const subjectTitle = walletSubjectTitle(row);
   const related = useMemo(
     () =>
@@ -471,7 +373,7 @@ function WalletDetailFrame({
           chainData: { transactions: workspace.chainData.transactions },
           analysis: { findings: workspace.analysis.findings },
         },
-        row,
+        { ...row, reviews: contextReview?.kind === 'finding' ? [contextReview] : [] },
         selectionIndex,
       ),
     [
@@ -479,206 +381,464 @@ function WalletDetailFrame({
       workspace.chainData.transactions,
       workspace.analysis.findings,
       row,
+      contextReview,
       selectionIndex,
     ],
   );
-  return (
+  const transactionOutputs =
+    row.kind === 'transaction' && transaction
+      ? transaction.vout.map((output) => `out:${row.txid}:${output.n}`)
+      : [];
+  const transactionOutpoints = new Set([...related.inputs, ...transactionOutputs]);
+  const otherOutputs =
+    row.kind === 'transaction'
+      ? related.outputs.filter((id) => !transactionOutpoints.has(id))
+      : related.outputs;
+  const relatedRecords = (
+    key: keyof typeof evidenceLimits,
+    ids: readonly string[],
+    showRelationship = true,
+  ) => (
     <>
-      <header className="wallet-subject-header wallet-detail-heading">
-        <div>
-          {annotation?.label && <span className="wallet-subject-kind">{subjectTitle}</span>}
-          <div className="wallet-subject-title-row">
-            <h2 className="wallet-item-title">
-              {annotation?.icon && (
-                <span className="wallet-entity-icon" aria-hidden="true">
-                  {annotation.icon}
+      {ids.slice(0, evidenceLimits[key]).map((id) => {
+        const description = showRelationship
+          ? walletRelatedDescription(workspace, row, id, selectionIndex)
+          : undefined;
+        return (
+          <div key={id} className="wallet-evidence-outpoint">
+            <div className="wallet-reference-actions">
+              {canOpenRecord?.(id) && onOpenRecord ? (
+                <span className="wallet-reference">
+                  <a
+                    href="#wallet-record-detail"
+                    data-wallet-reference={id}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onOpenRecord(id);
+                    }}
+                    aria-label={`Open ${id.startsWith('tx:') ? 'transaction' : 'output'} ${id.slice(id.indexOf(':') + 1)}`}
+                  >
+                    <code title={id.slice(id.indexOf(':') + 1)}>
+                      <ResponsiveIdentifier value={id.slice(id.indexOf(':') + 1)} />
+                    </code>
+                  </a>
+                  <CopyButton
+                    value={id.slice(id.indexOf(':') + 1)}
+                    label={`Copy ${id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}`}
+                  />
                 </span>
-              )}
-              {title}
-            </h2>
-            {status}
-          </div>
-          <div className="wallet-header-reference">
-            <WalletReference
-              value={row.identifier}
-              kind={
-                row.kind === 'address'
-                  ? 'address'
-                  : row.kind === 'output'
-                    ? 'outpoint'
-                    : 'transaction ID'
-              }
-            />
-          </div>
-        </div>
-        <div className="wallet-detail-graph-actions" aria-label="Graph actions">
-          <button
-            disabled={busy}
-            aria-label="Show on graph"
-            title={`Show and zoom to this ${row.kind === 'output' ? 'outpoint' : row.kind} in Graph`}
-            onClick={() => onShowInGraph(row.nodeId, row.utxo)}
-          >
-            <Network size={13} /> Show on graph
-          </button>
-          <button
-            disabled={busy}
-            title="Show only this selection and its connected graph context"
-            onClick={() => onIsolateInGraph(row.nodeId, row.utxo)}
-          >
-            <Filter size={13} /> Isolate
-          </button>
-        </div>
-      </header>
-      <div
-        className="wallet-detail-toolbar"
-        aria-label="Selected item actions"
-        data-tour="wallet-item-actions"
-      >
-        <SingleMetadataBar
-          active={active || !!tourPreview}
-          workspace={workspace}
-          id={row.nodeId}
-          guidedActions={guidedActions}
-          scopeLabel=""
-          disabled={
-            busy || awaitingAddress || (row.kind === 'output' && !row.address && flowInputs.loading)
-          }
-          onChange={onChange}
-          onNotice={onNotice}
-        />
-        {decisions}
-        {relatedSelection}
-      </div>
-      {guidance}
-      <section className="wallet-subject-card" aria-label={`${subjectTitle} details`}>
-        <dl className="wallet-review-evidence" aria-label="Identifiers and tags">
-          <div className="wallet-subject-identifier">
-            <dt>
-              {row.kind === 'output'
-                ? 'Outpoint'
-                : row.kind === 'transaction'
-                  ? 'Transaction ID'
-                  : 'Address'}
-            </dt>
-            <dd className="wallet-copy-value">
-              <WalletReference
-                value={row.identifier}
-                kind={
-                  row.kind === 'output'
-                    ? 'outpoint'
-                    : row.kind === 'transaction'
-                      ? 'transaction ID'
-                      : 'address'
-                }
-              />
-            </dd>
-          </div>
-          {row.address && row.kind !== 'address' && (
-            <div>
-              <dt>Address</dt>
-              <dd className="wallet-copy-value">
-                <WalletReference value={row.address} kind="address" />
-              </dd>
-            </div>
-          )}
-          {row.kind !== 'address' && row.txid && (
-            <div>
-              <dt>{row.kind === 'output' ? 'Creating transaction block' : 'Transaction block'}</dt>
-              <dd>
-                <BlockTime
-                  transaction={workspace.chainData.transactions[row.txid]}
-                  workspace={workspace}
-                />
-              </dd>
-            </div>
-          )}
-          <div>
-            <dt>Wallet relationship</dt>
-            <dd
-              className={`wallet-match-value ${relationship === 'In this wallet' ? 'is-wallet' : ''}`}
-            >
-              {relationship}
-              <WalletHelp title="Wallet relationship" active={active}>
-                Matched against this wallet's discovered addresses. No match does not rule out an
-                undiscovered wallet address or identify its owner.
-              </WalletHelp>
-            </dd>
-          </div>
-          {row.kind === 'address' && row.contextTransactionIds.length > 0 && (
-            <div>
-              <dt>Seen in loaded data</dt>
-              <dd>
-                {row.contextTransactionIds.length} transaction
-                {row.contextTransactionIds.length === 1 ? '' : 's'}
-              </dd>
-            </div>
-          )}
-          {row.amountSats !== undefined && (
-            <div>
-              <dt>
-                {row.kind === 'address'
-                  ? `Observed total (${outpoints.length} output${outpoints.length === 1 ? '' : 's'})`
-                  : 'Amount'}
-              </dt>
-              <Amount as="dd" value={row.amountSats} />
-            </div>
-          )}
-          <div>
-            <dt>Tags</dt>
-            <dd className="wallet-item-tags">
-              {tags.length ? (
-                tags.map((tag) => (
-                  <span className="wallet-review-record-tag" key={tag.id} title={tag.name}>
-                    <span className="tag-dot" style={{ backgroundColor: tag.color }} />
-                    {tag.name}
-                  </span>
-                ))
               ) : (
-                <span className="muted">No tags</span>
+                <WalletReference
+                  value={id.replace(/^(out|tx):/, '')}
+                  kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
+                />
               )}
-            </dd>
-          </div>
-        </dl>
-        {annotation?.note && (
-          <div className="wallet-subject-note">
-            <h3>Note</h3>
-            <p className="wallet-detail-note">{annotation.note}</p>
-          </div>
-        )}
-      </section>
-      {children}
-      {context ? (
-        <section
-          className={`wallet-flow-disclosure${flowOpen ? ' is-open' : ''}`}
-          aria-label="Transaction flow"
-        >
-          <div className="wallet-flow-titlebar">
-            <button
-              className="wallet-flow-toggle"
-              aria-expanded={flowOpen}
-              aria-controls={flowId}
-              onClick={() => setFlowOpen(!flowOpen)}
-            >
-              <ChevronRight size={14} aria-hidden="true" /> Transaction flow
-            </button>
-            {contextTransactionIds.length > 1 && (
-              <div className="wallet-context-chooser">
-                <select
-                  aria-label="Transaction context"
-                  title={contextId}
-                  value={contextId ?? ''}
-                  onChange={(event) => setChosenContext(event.target.value)}
-                >
-                  {contextTransactionIds.map((txid) => (
-                    <option value={txid} key={txid} title={txid}>
-                      {workspace.annotations.entities[`tx:${txid}`]?.label || short(txid)}
-                    </option>
-                  ))}
-                </select>
-                {contextId && <CopyButton value={contextId} label="Copy transaction ID" />}
-              </div>
+              <button
+                className="icon-button"
+                title="Show on graph"
+                aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
+                onClick={() => onShowInGraph(id)}
+              >
+                <Network size={13} />
+              </button>
+            </div>
+            {description && <span className="wallet-related-description">{description}</span>}
+            {workspace.annotations.entities[id]?.label && (
+              <span
+                className="wallet-related-label"
+                title={workspace.annotations.entities[id].label}
+              >
+                {workspace.annotations.entities[id].label}
+              </span>
             )}
           </div>
+        );
+      })}
+      {ids.length > evidenceLimits[key] && (
+        <button
+          onClick={() =>
+            setEvidenceLimits((value) => ({
+              ...value,
+              [key]: value[key] + 20,
+            }))
+          }
+        >
+          Show more
+        </button>
+      )}
+    </>
+  );
+  const metadataFields = (
+    <WalletMetadataFields
+      reviews={annotationReviews}
+      workspace={workspace}
+      id={row.nodeId}
+      active={active}
+      disabled={!active || busy || awaitingAddress}
+      onChange={onChange}
+      onNotice={onNotice}
+      facts={
+        row.kind !== 'transaction' && (
+          <dl className="wallet-review-evidence" aria-label="Record facts">
+            {row.kind === 'output' && row.amountSats !== undefined && (
+              <div>
+                <dt>Amount</dt>
+                <Amount as="dd" value={row.amountSats} />
+              </div>
+            )}
+            {row.address && row.kind !== 'address' && (
+              <div>
+                <dt>Address</dt>
+                <dd className="wallet-copy-value">
+                  {canOpenRecord?.(`addr:${row.address}`) && onOpenRecord ? (
+                    <span className="wallet-reference">
+                      <a
+                        href="#wallet-record-detail"
+                        data-wallet-reference={`addr:${row.address}`}
+                        aria-label={`Open address ${row.address}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          onOpenRecord(`addr:${row.address}`);
+                        }}
+                      >
+                        <code title={row.address}>
+                          <ResponsiveIdentifier value={row.address} />
+                        </code>
+                      </a>
+                      <CopyButton value={row.address} label="Copy address" />
+                    </span>
+                  ) : (
+                    <WalletReference value={row.address} kind="address" />
+                  )}
+                </dd>
+              </div>
+            )}
+            {row.kind === 'output' && row.txid && (
+              <div>
+                <dt>Block</dt>
+                <dd>
+                  <TransactionBlockTime transaction={transaction} />
+                </dd>
+              </div>
+            )}
+            {!row.walletTransaction && (
+              <div>
+                <dt>Wallet relationship</dt>
+                <dd
+                  className={`wallet-match-value ${relationship === 'In this wallet' ? 'is-wallet' : ''}`}
+                >
+                  {relationship}
+                  <WalletHelp title="Wallet relationship" active={active}>
+                    Matched against this wallet's discovered addresses. No match does not rule out
+                    an undiscovered wallet address or identify its owner.
+                  </WalletHelp>
+                </dd>
+              </div>
+            )}
+            {row.kind === 'address' && row.contextTransactionIds.length > 0 && (
+              <div>
+                <dt>Seen in</dt>
+                <dd>
+                  {row.contextTransactionIds.length} transaction
+                  {row.contextTransactionIds.length === 1 ? '' : 's'}
+                </dd>
+              </div>
+            )}
+
+            {row.amountSats !== undefined && !row.walletTransaction && row.kind === 'address' && (
+              <div>
+                <dt>
+                  {row.kind === 'address'
+                    ? `Observed total (${outpoints.length} output${outpoints.length === 1 ? '' : 's'})`
+                    : 'Amount'}
+                </dt>
+                <Amount as="dd" value={row.amountSats} />
+              </div>
+            )}
+          </dl>
+        )
+      }
+    >
+      <WalletCounterpartyContext
+        reviews={partyReviews}
+        workspace={workspace}
+        wallet={wallet}
+        row={row}
+        active={active}
+        busy={busy}
+        onChange={onChange}
+        onNotice={onNotice}
+        onOpenRecord={onOpenRecord}
+        prepared={{
+          prevouts: selectionIndex.prevouts,
+          scripthashes: walletAddresses.scripthashes,
+        }}
+      />
+    </WalletMetadataFields>
+  );
+
+  const graphActions = (
+    <span className="wallet-detail-graph-actions">
+      <button
+        className="wallet-inline-edit"
+        aria-label="Show on graph"
+        title="Show on graph"
+        disabled={!active || busy}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onShowInGraph(row.nodeId, row.utxo);
+        }}
+      >
+        <Network size={14} />
+      </button>
+      <button
+        className="wallet-inline-edit"
+        aria-label="Isolate on graph"
+        title="Isolate on graph"
+        disabled={!active || busy}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onIsolateInGraph(row.nodeId, row.utxo);
+        }}
+      >
+        <Filter size={14} />
+      </button>
+    </span>
+  );
+  const iconEditor = (
+    <WalletIconEdit
+      workspace={workspace}
+      id={row.nodeId}
+      active={active}
+      onChange={onChange}
+      disabled={!active || busy}
+    />
+  );
+  const identifier = (
+    <h2 className="wallet-item-title" tabIndex={-1}>
+      <WalletReference
+        value={row.identifier}
+        kind={
+          row.kind === 'address' ? 'address' : row.kind === 'output' ? 'outpoint' : 'transaction ID'
+        }
+      />
+    </h2>
+  );
+
+  return (
+    <>
+      <header
+        className={`wallet-subject-header wallet-detail-heading${row.kind === 'transaction' ? ' wallet-transaction-heading' : ''}`}
+      >
+        {row.kind !== 'transaction' && (
+          <div className="wallet-detail-topline">
+            <span className="wallet-detail-type">
+              {row.kind === 'address' ? 'Address' : row.utxo ? 'Coin' : 'Output'}
+            </span>
+            {graphActions}
+          </div>
+        )}
+        <div className="wallet-detail-identity">
+          {row.kind === 'transaction' ? (
+            <div className="wallet-transaction-title-row">
+              {row.walletTransaction && (
+                <span
+                  className={`wallet-transaction-direction-icon is-${row.walletTransaction.direction}`}
+                  title={row.walletTransaction.direction}
+                  aria-label={row.walletTransaction.direction}
+                >
+                  {row.walletTransaction.direction === 'sent' ? (
+                    <ArrowUpRight size={48} />
+                  ) : row.walletTransaction.direction === 'received' ? (
+                    <ArrowDownLeft size={48} />
+                  ) : (
+                    <ArrowLeftRight size={48} />
+                  )}
+                </span>
+              )}
+              <div className="wallet-transaction-title-text">
+                <span className="wallet-transaction-title">
+                  TRANSACTION
+                  {row.walletTransaction && ` ${row.walletTransaction.direction.toUpperCase()}`}
+                </span>
+                {matchesWalletStatus(row, 'open') && (
+                  <span className="wallet-transaction-review-status">Needs review</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="wallet-subject-title-row">
+              {iconEditor}
+              {identifier}
+            </div>
+          )}
+        </div>
+        {row.walletTransaction && (
+          <div className="wallet-detail-value">
+            <Amount value={row.walletTransaction.netSats} signed />
+          </div>
+        )}
+        {row.kind === 'transaction' && identifier}
+        {row.kind === 'transaction' && (
+          <dl className="wallet-transaction-facts" aria-label="Transaction facts">
+            {blockTime && (
+              <div>
+                <dt aria-label="Block date (UTC)">
+                  <CalendarClock size={24} aria-hidden="true" />
+                  <span className="wallet-transaction-fact-value">
+                    <TransactionTimestamp transaction={transaction} />
+                  </span>
+                </dt>
+                <dd>
+                  <small>
+                    <RelativeTime dateTime={blockTime.iso} active={active} />
+                  </small>
+                </dd>
+              </div>
+            )}
+            <div>
+              <dt>
+                <Box size={24} aria-hidden="true" />
+                <span className="wallet-transaction-fact-value" title={placement.title}>
+                  {placement.kind === 'confirmed' && transaction?.status?.blockHeight !== undefined
+                    ? `Block ${placement.label}`
+                    : placement.label}
+                </span>
+              </dt>
+              <dd>
+                {(placement.kind === 'confirmed' || placement.kind === 'mempool') &&
+                  confirmations !== undefined &&
+                  confirmations >= 0 && (
+                    <small title="Confirmations at the last lookup.">
+                      {confirmations.toLocaleString()} confirmation{confirmations === 1 ? '' : 's'}
+                    </small>
+                  )}
+              </dd>
+            </div>
+            {placement.kind === 'confirmed' && (
+              <div>
+                <dt aria-label="Network fee">
+                  <Receipt size={24} aria-hidden="true" />
+                  <span className="wallet-transaction-fact-value" title="Network fee">
+                    {fee ? formatSats(fee.feeSats) : 'Unknown'}
+                  </span>
+                </dt>
+                <dd>{fee && <small>{fee.feeRateSatVb.toFixed(2)} sat/vB</small>}</dd>
+              </div>
+            )}
+            {(transaction?.vsize !== undefined || transaction?.size !== undefined) && (
+              <div>
+                <dt aria-label="Transaction size">
+                  <FileText size={24} aria-hidden="true" />
+                  <span
+                    className="wallet-transaction-fact-value"
+                    title={transaction.vsize !== undefined ? 'Virtual size' : 'Serialized size'}
+                  >
+                    {transaction.vsize !== undefined
+                      ? `${transaction.vsize.toLocaleString()} vB`
+                      : `${transaction.size?.toLocaleString()} bytes`}
+                  </span>
+                </dt>
+                <dd>
+                  {transaction.vsize !== undefined && transaction.size !== undefined && (
+                    <small>{transaction.size.toLocaleString()} bytes</small>
+                  )}
+                </dd>
+              </div>
+            )}
+            {!row.walletTransaction && (
+              <div>
+                <dt>
+                  <WalletIcon size={24} aria-hidden="true" />
+                  <span>Wallet relationship</span>
+                </dt>
+                <dd
+                  className={`wallet-match-value ${relationship === 'In this wallet' ? 'is-wallet' : ''}`}
+                >
+                  {relationship}
+                  <WalletHelp title="Wallet relationship" active={active}>
+                    Matched against this wallet's discovered addresses. No match does not rule out
+                    an undiscovered wallet address or identify its owner.
+                  </WalletHelp>
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </header>
+      <section
+        className={
+          row.kind === 'transaction' ? 'wallet-transaction-overview' : 'wallet-detail-fields'
+        }
+        aria-label={`${subjectTitle} details`}
+      >
+        {row.kind === 'transaction' ? (
+          <section className="wallet-transaction-metadata" aria-label="Metadata">
+            <div className="wallet-transaction-metadata-heading">
+              <h3 className="wallet-transaction-section-heading">
+                <Tag size={18} aria-hidden="true" />
+                Metadata
+              </h3>
+              {iconEditor}
+            </div>
+            {metadataFields}
+          </section>
+        ) : (
+          metadataFields
+        )}
+        {row.kind === 'transaction' && guidance}
+      </section>
+
+      {row.kind !== 'transaction' && guidance}
+      {children}
+      {context ? (
+        <details
+          className={`wallet-flow-disclosure${row.kind === 'transaction' ? ' wallet-transaction-flow' : ''}`}
+          aria-label="Transaction flow"
+          open={flowOpen}
+        >
+          <summary
+            onClick={(event) => {
+              event.preventDefault();
+              setFlowOpen(!flowOpen);
+            }}
+            aria-controls={flowId}
+          >
+            {row.kind === 'transaction' ? (
+              <>
+                <span className="wallet-transaction-section-heading">
+                  <Network size={18} aria-hidden="true" />
+                  Transaction flow
+                </span>
+                {graphActions}
+                <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
+              </>
+            ) : (
+              'Transaction flow'
+            )}
+          </summary>
+          {contextTransactionIds.length > 1 && (
+            <div className="wallet-context-chooser">
+              <select
+                aria-label="Transaction context"
+                title={contextId}
+                value={contextId ?? ''}
+                onChange={(event) => setChosenContext(event.target.value)}
+              >
+                {contextTransactionIds.map((txid) => (
+                  <option value={txid} key={txid} title={txid}>
+                    {short(txid)}
+                    {workspace.annotations.entities[`tx:${txid}`]?.label
+                      ? ` · ${workspace.annotations.entities[`tx:${txid}`].label}`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+              {contextId && <CopyButton value={contextId} label="Copy transaction ID" />}
+            </div>
+          )}
           <div id={flowId} className="wallet-flow-content" hidden={!flowOpen}>
             {flowOpen && (
               <>
@@ -712,80 +872,94 @@ function WalletDetailFrame({
               </>
             )}
           </div>
-        </section>
+        </details>
       ) : (
         <div className="wallet-flow-empty" role="status">
           <Info size={16} aria-hidden="true" />
           <div>
-            <span>No related transaction found in loaded data.</span>
+            <span>No linked transaction</span>
             {hasUnloadedHistory && <span>Some wallet history is not loaded.</span>}
           </div>
+          {row.kind === 'transaction' && graphActions}
         </div>
       )}
+
       <div className="wallet-related-grid">
-        {(
-          [
-            ['inputs', 'Input outpoints', related.inputs],
-            [
-              'outputs',
-              row.kind === 'transaction' ? 'Output outpoints' : 'Related outpoints',
-              related.outputs,
-            ],
-            ['transactions', 'Related transactions', related.transactions],
-          ] as const
-        )
-          .filter(([, , ids]) => ids.length)
-          .map(([key, title, ids]) => (
-            <section className="wallet-related-records" aria-label={title} key={title}>
-              <h3>
-                {title} ({ids.length})
-              </h3>
-              {ids.slice(0, evidenceLimits[key]).map((id) => {
-                const description = walletRelatedDescription(workspace, row, id, selectionIndex);
-                return (
-                  <div key={id} className="wallet-evidence-outpoint">
-                    <div className="wallet-reference-actions">
-                      <WalletReference
-                        value={id.replace(/^(out|tx):/, '')}
-                        kind={id.startsWith('tx:') ? 'transaction ID' : 'outpoint'}
-                      />
-                      <button
-                        className="icon-button"
-                        title="Show on graph"
-                        aria-label={`Show ${id.startsWith('tx:') ? 'transaction' : 'outpoint'} ${id.slice(id.indexOf(':') + 1)} on graph`}
-                        onClick={() => onShowInGraph(id)}
-                      >
-                        <Network size={13} />
-                      </button>
-                    </div>
-                    {description && (
-                      <span className="wallet-related-description">{description}</span>
-                    )}
-                    {workspace.annotations.entities[id]?.label && (
-                      <span
-                        className="wallet-related-label"
-                        title={workspace.annotations.entities[id].label}
-                      >
-                        {workspace.annotations.entities[id].label}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-              {ids.length > evidenceLimits[key] && (
-                <button
-                  onClick={() =>
-                    setEvidenceLimits((value) => ({
-                      ...value,
-                      [key]: value[key] + 20,
-                    }))
-                  }
-                >
-                  Show more
-                </button>
-              )}
-            </section>
-          ))}
+        {row.kind === 'transaction' &&
+          (related.inputs.length > 0 || transactionOutputs.length > 0) && (
+            <details className="wallet-related-records" aria-label="Inputs and outputs">
+              <summary>
+                Inputs ({related.inputs.length}) / Outputs ({transactionOutputs.length})
+              </summary>
+              <div className="wallet-outpoint-columns">
+                {(
+                  [
+                    ['inputs', related.inputs],
+                    ['outputs', transactionOutputs],
+                  ] as const
+                ).map(([key, ids]) => (
+                  <section aria-label={key === 'inputs' ? 'Inputs' : 'Outputs'} key={key}>
+                    <h3>
+                      {key === 'inputs' ? 'Inputs' : 'Outputs'} ({ids.length})
+                    </h3>
+                    {ids.length ? relatedRecords(key, ids, false) : <p className="muted">None</p>}
+                  </section>
+                ))}
+              </div>
+            </details>
+          )}
+        {row.walletTransaction && (
+          <details className="wallet-accounting" aria-label="Wallet accounting">
+            <summary>Wallet accounting</summary>
+            <dl className="wallet-review-evidence">
+              <div>
+                <dt>Direction</dt>
+                <dd>{row.walletTransaction.direction}</dd>
+              </div>
+              <div>
+                <dt>Wallet inputs</dt>
+                <Amount as="dd" value={row.walletTransaction.spentSats} />
+              </div>
+              <div>
+                <dt>Wallet outputs</dt>
+                <Amount as="dd" value={row.walletTransaction.receivedSats} />
+              </div>
+              <div>
+                <dt>Wallet net change</dt>
+                <Amount as="dd" value={row.walletTransaction.netSats} />
+              </div>
+              <div>
+                <dt>Whole-transaction fee</dt>
+                <Amount as="dd" value={row.walletTransaction.feeSats} />
+              </div>
+            </dl>
+            {row.walletTransaction.missingInputCount > 0 && (
+              <button disabled={!canLoadChainData || busy} onClick={() => setFlowOpen(true)}>
+                Load inputs ({row.walletTransaction.missingInputCount})
+              </button>
+            )}
+            {!row.walletTransaction.transaction && (
+              <button
+                disabled={!canLoadChainData || busy}
+                onClick={() => onShowInGraph(row.nodeId)}
+              >
+                Load transaction
+              </button>
+            )}
+          </details>
+        )}
+        {otherOutputs.length > 0 && (
+          <details className="wallet-related-records" aria-label="Related outpoints">
+            <summary>Related outpoints ({otherOutputs.length})</summary>
+            {relatedRecords('outputs', otherOutputs)}
+          </details>
+        )}
+        {related.transactions.length > 0 && (
+          <details className="wallet-related-records" aria-label="Related transactions">
+            <summary>Related transactions ({related.transactions.length})</summary>
+            {relatedRecords('transactions', related.transactions)}
+          </details>
+        )}
       </div>
     </>
   );

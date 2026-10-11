@@ -2,18 +2,24 @@ import { CURRENT_WORKSPACE_VERSION, validateWorkspace, type Workspace } from '..
 import { parseGraphNodeIds } from '../../view';
 import { migrateWorkspace } from '../Migrations/workspaceMigrations';
 import { legacyGraphNodeIds } from '../Migrations/legacyGraphMembership';
+import { initializeLegacyFindingEvidence } from '../../Wallets/walletReviewEvidence';
 
 /** Full decoded-document migration and restoration. Run in a worker, not the UI thread. */
 export function decodeWorkspaceDocument(data: unknown, verifyDerivation = true): Workspace {
   const parsed = validateWorkspace(migrateWorkspace(data), verifyDerivation);
   if (
     parsed.view.graphNodeIds === undefined &&
-    [2, 3, 4, 5, 6, CURRENT_WORKSPACE_VERSION].includes((data as { version?: number }).version ?? 0)
+    [2, 3, 4, 5, 6, 7, CURRENT_WORKSPACE_VERSION].includes(
+      (data as { version?: number }).version ?? 0,
+    )
   )
     throw new Error('Workspace is missing explicit graph entity membership.');
   if (parsed.view.graphNodeIds === undefined)
     parsed.view.graphNodeIds = parseGraphNodeIds(legacyGraphNodeIds(parsed), parsed.network);
-  return parsed;
+  const previousVersion = (data as { version?: number }).version;
+  return previousVersion === undefined || previousVersion <= 7
+    ? initializeLegacyFindingEvidence(parsed)
+    : parsed;
 }
 
 /** Reopening transitions never run during a live save or ordinary model validation. */
