@@ -1,5 +1,6 @@
 import { canonicalEntityReference } from '../entityReferences';
 import {
+  clampAnnotationText,
   MAX_ANNOTATION_LABEL_LENGTH,
   MAX_TAG_NAME_LENGTH,
   MAX_TAG_MEMBERS,
@@ -67,7 +68,7 @@ export function applyBatchLabel(
   label: string,
   options: { onlyUnlabeled?: boolean } = {},
 ): Workspace {
-  const value = label.slice(0, MAX_ANNOTATION_LABEL_LENGTH);
+  const value = clampAnnotationText(label, MAX_ANNOTATION_LABEL_LENGTH);
   const plan = labelBatchPlan(workspace, ids, options);
   const annotations = { ...workspace.annotations.entities };
   let changed = false;
@@ -139,7 +140,7 @@ export function createBatchTag(
   ids: Iterable<string>,
   tag: { name: string; color: string; description?: string },
 ): Workspace {
-  const name = tag.name.trim().slice(0, MAX_TAG_NAME_LENGTH);
+  const name = clampAnnotationText(tag.name.trim(), MAX_TAG_NAME_LENGTH);
   if (!name) throw new Error('Enter a tag name.');
   const tags = workspace.annotations.tags ?? [];
   const existing = tags.find((entry) => entry.name.toLowerCase() === name.toLowerCase());

@@ -5,7 +5,12 @@ import {
   createBatchTag as writeNewBatchTag,
 } from './batchEdits';
 import { canonicalEntityReference } from '../entityReferences';
-import { MAX_ANNOTATION_NOTE_LENGTH, MAX_TAG_NAME_LENGTH, type Annotation } from './annotations';
+import {
+  clampAnnotationText,
+  MAX_ANNOTATION_NOTE_LENGTH,
+  MAX_TAG_NAME_LENGTH,
+  type Annotation,
+} from './annotations';
 import type { Workspace } from '../workspace';
 
 const EMPTY: Annotation = { label: '', note: '', icon: '', bookmarked: false };
@@ -88,7 +93,7 @@ export function applyBatchIcon(
   replaceExisting = false,
 ): Workspace {
   const { targets } = planBatchIcon(workspace, ids, replaceExisting);
-  return writeBatchIcon(workspace, targets, icon.slice(0, 20));
+  return writeBatchIcon(workspace, targets, clampAnnotationText(icon, 20));
 }
 
 export function applyBatchTag(
@@ -108,7 +113,7 @@ export function createBatchTag(
   value: { name: string; color: string; description?: string },
   ids: readonly string[],
 ): Workspace {
-  const name = value.name.trim().slice(0, MAX_TAG_NAME_LENGTH);
+  const name = clampAnnotationText(value.name.trim(), MAX_TAG_NAME_LENGTH);
   if (!name) throw new Error('Give the tag a name.');
   return writeNewBatchTag(workspace, canonical(workspace, ids), { ...value, name });
 }
@@ -117,7 +122,7 @@ export function createBatchTag(
 export function applyEntityNote(workspace: Workspace, id: string, note: string): Workspace {
   const [target] = canonical(workspace, [id]);
   if (!target) return workspace;
-  const value = note.slice(0, MAX_ANNOTATION_NOTE_LENGTH);
+  const value = clampAnnotationText(note, MAX_ANNOTATION_NOTE_LENGTH);
   if ((workspace.annotations.entities[target]?.note ?? '') === value) return workspace;
   return {
     ...workspace,

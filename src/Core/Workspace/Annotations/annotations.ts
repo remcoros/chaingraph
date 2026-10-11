@@ -7,6 +7,15 @@ const text = z.string().max(MAX_ANNOTATION_NOTE_LENGTH);
 /** BIP329's suggested default, shared by editing, interchange and saved data. */
 export const MAX_ANNOTATION_LABEL_LENGTH = 255;
 
+/** Enforce UTF-16 text budgets without retaining half of a supplementary character. */
+export function clampAnnotationText(value: string, limit: number): string {
+  if (value.length <= limit) return value;
+  const end = value.charCodeAt(limit - 1);
+  const next = value.charCodeAt(limit);
+  const splitsPair = end >= 0xd800 && end <= 0xdbff && next >= 0xdc00 && next <= 0xdfff;
+  return value.slice(0, splitsPair ? limit - 1 : limit);
+}
+
 export interface Annotation {
   label: string;
   note: string;

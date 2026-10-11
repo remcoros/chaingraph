@@ -4,11 +4,18 @@ import {
   applyBatchIcon,
   applyBatchLabel,
   applyBatchTag,
+  applyEntityNote,
   createBatchTag,
   planBatchIcon,
   planBatchLabel,
   planBatchTag,
 } from './batchMetadata';
+import {
+  applyBatchLabel as applyNativeLabel,
+  createBatchTag as createNativeTag,
+} from './batchEdits';
+import { clampAnnotationText } from './annotations';
+import { defaultLabelExportOptions, inspectLabels, planLabelExport } from './labels';
 import { createWorkspace } from '../createWorkspace';
 import type { Workspace } from '../workspace';
 
@@ -16,6 +23,7 @@ const id = (n: number) => n.toString(16).padStart(64, '0');
 const OUT_A = `out:${id(1)}:0`;
 const OUT_B = `out:${id(1)}:1`;
 const OUT_C = `out:${id(2)}:0`;
+const TX = `tx:${id(3)}`;
 
 function fixture(): Workspace {
   return {
@@ -153,5 +161,73 @@ describe('batch tag edits', () => {
 
   it('refuses to edit a tag that no longer exists', () => {
     expect(() => applyBatchTag(fixture(), [OUT_A], 'missing', true)).toThrow(/no longer exists/);
+  });
+});
+
+describe('Unicode text limits', () => {
+  it('keeps complete supplementary characters within the UTF-16 budget', () => {
+    expect(clampAnnotationText(`abc😀`, 4)).toBe('abc');
+    expect(clampAnnotationText(`abc😀`, 5)).toBe('abc😀');
+    expect(clampAnnotationText('😀x', 0)).toBe('');
+    expect(clampAnnotationText('plain', 4)).toBe('plai');
+  });
+
+  it('clamps native labels, Notes and icons without splitting a surrogate pair', () => {
+    const base = createWorkspace('Unicode fixture', 'mainnet');
+    const label = `${'L'.repeat(254)}😀`;
+    const native = applyNativeLabel(base, [TX], label);
+    expect(native.annotations.entities[TX].label).toBe('L'.repeat(254));
+    const batch = applyBatchLabel(base, [TX], label);
+    expect(batch.annotations.entities[TX].label).toBe(native.annotations.entities[TX].label);
+    expect(applyBatchLabel(base, [TX], `${'L'.repeat(253)}😀`).annotations.entities[TX].label).toBe(
+      `${'L'.repeat(253)}😀`,
+    );
+    const noted = applyEntityNote(base, TX, `${'N'.repeat(9_999)}😀`);
+    expect(noted.annotations.entities[TX].note).toBe('N'.repeat(9_999));
+    expect(applyEntityNote(base, TX, `${'N'.repeat(9_998)}😀`).annotations.entities[TX].note).toBe(
+      `${'N'.repeat(9_998)}😀`,
+    );
+    expect(applyBatchIcon(base, [TX], `${'I'.repeat(19)}😀`).annotations.entities[TX].icon).toBe(
+      'I'.repeat(19),
+    );
+  });
+
+  it('clamps tag names at both mutation entry points without splitting a surrogate pair', () => {
+    const base = createWorkspace('Unicode fixture', 'mainnet');
+    const value = { name: `${'T'.repeat(99)}😀`, color: '#65cbbb' };
+    expect(createNativeTag(base, [TX], value).annotations.tags![0].name).toBe('T'.repeat(99));
+    expect(createBatchTag(base, value, [TX]).annotations.tags![0].name).toBe('T'.repeat(99));
+    expect(
+      createBatchTag(base, { ...value, name: `${'T'.repeat(98)}😀` }, [TX]).annotations.tags![0]
+        .name,
+    ).toBe(`${'T'.repeat(98)}😀`);
+  });
+
+  it('exports clamped native text into records accepted by BIP329 inspection', () => {
+    const base = createWorkspace('Unicode fixture', 'mainnet');
+    const cases = [
+      {
+        workspace: applyBatchLabel(base, [TX], `${'L'.repeat(254)}😀`),
+        options: defaultLabelExportOptions(),
+        expected: 'L'.repeat(254),
+      },
+      {
+        workspace: applyEntityNote(base, TX, `${'N'.repeat(9_999)}😀`),
+        options: { ...defaultLabelExportOptions(), profile: 'bluewallet' as const },
+        expected: 'N'.repeat(9_999),
+      },
+      {
+        workspace: createBatchTag(base, { name: `${'T'.repeat(99)}😀`, color: '#65cbbb' }, [TX]),
+        options: { ...defaultLabelExportOptions(), includeTagsInLabels: true },
+        expected: `[${'T'.repeat(99)}]`,
+      },
+    ];
+    for (const { workspace, options, expected } of cases) {
+      const exported = planLabelExport(workspace, options);
+      expect(exported.recordCount).toBe(1);
+      const inspected = inspectLabels(exported.content, workspace.network);
+      expect(inspected.issues).toEqual([]);
+      expect(inspected.records.map((record) => record.label)).toEqual([expected]);
+    }
   });
 });
