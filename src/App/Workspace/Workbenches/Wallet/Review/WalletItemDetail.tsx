@@ -676,7 +676,9 @@ function WalletDetailFrame({
           )}
         </div>
         {row.walletTransaction && (
-          <div className="wallet-detail-value">
+          <div
+            className={`wallet-detail-value ${row.walletTransaction.netSats !== undefined ? (row.walletTransaction.netSats > 0 ? 'is-positive' : row.walletTransaction.netSats < 0 ? 'is-negative' : '') : ''}`}
+          >
             <Amount value={row.walletTransaction.netSats} signed />
           </div>
         )}

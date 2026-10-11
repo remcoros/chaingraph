@@ -1425,7 +1425,7 @@ export function WalletReviewPanel(
                             <span className="wallet-row-primary">
                               {row.walletTransaction && (
                                 <span
-                                  className="wallet-direction"
+                                  className={`wallet-direction is-${row.walletTransaction.direction}`}
                                   title={row.walletTransaction.direction}
                                   aria-label={row.walletTransaction.direction}
                                 >
@@ -1453,7 +1453,9 @@ export function WalletReviewPanel(
                           </a>
                         </div>
                         {(row.amountSats !== undefined || row.kind === 'transaction') && (
-                          <span className="wallet-row-amount">
+                          <span
+                            className={`wallet-row-amount ${row.kind === 'transaction' && row.amountSats !== undefined ? (row.amountSats > 0 ? 'is-positive' : row.amountSats < 0 ? 'is-negative' : '') : ''}`}
+                          >
                             <Amount value={row.amountSats} signed={row.kind === 'transaction'} />
                           </span>
                         )}

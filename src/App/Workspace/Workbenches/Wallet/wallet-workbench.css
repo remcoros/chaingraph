@@ -2429,10 +2429,16 @@
   align-self: center;
   color: var(--color-muted);
 }
-.wallet-transaction-direction-icon.is-received {
+.wallet-direction.is-received,
+.wallet-transaction-direction-icon.is-received,
+.wallet-row-amount.is-positive,
+.wallet-detail-value.is-positive {
   color: var(--color-flow-output);
 }
-.wallet-transaction-direction-icon.is-sent {
+.wallet-direction.is-sent,
+.wallet-transaction-direction-icon.is-sent,
+.wallet-row-amount.is-negative,
+.wallet-detail-value.is-negative {
   color: var(--color-error);
 }
 .wallet-transaction-title-text {
