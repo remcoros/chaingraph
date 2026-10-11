@@ -1,12 +1,23 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   type Annotation,
   parseWorkspaceTags,
 } from '../../../Core/Workspace/Annotations/annotations';
 import type { Workspace } from '../../../Core/Workspace/workspace';
 
-import { emptyAnnotation } from '../../../Core/Workspace/Annotations/emptyAnnotation';
-import { exportLabels, importLabels } from '../../../Core/Workspace/Annotations/labels';
+import {
+  applyLabelImport,
+  defaultLabelImportOptions,
+  defaultLabelExportOptions,
+  planLabelImport,
+  planLabelExport,
+  MAX_LABEL_FILE_BYTES,
+  type LabelInspection,
+  type LabelImportOptions,
+  type LabelExportOptions,
+  type LabelScope,
+} from '../../../Core/Workspace/Annotations/labels';
+import { inspectLabelFile, createImportPreview, createExportPreview } from './labelExchange';
 
 import { download } from '../../../Core/Browser/download';
 import type { AppState } from '../../useAppState';
@@ -31,12 +42,35 @@ export interface WorkspaceAnnotations {
    * token when something changed, so a caller can offer to undo exactly it.
    */
   applyBatch: (summary: string, update: (data: Workspace) => Workspace) => number | undefined;
-  /** The hidden file input the import dialog renders. */
+  /** Reviewed plaintext metadata exchange; opening/inspection never edits state. */
+  labelTransfer: LabelTransfer | undefined;
+  importPlan: ReturnType<typeof planLabelImport> | undefined;
+  exportPlan: ReturnType<typeof planLabelExport> | undefined;
+  previewBusy: boolean;
+  previewError: string | undefined;
   labelsInput: React.RefObject<HTMLInputElement | null>;
-  chooseLabelFile: () => void;
+  openLabelImport: (scope?: LabelScope) => void;
+  openLabelExport: (scope?: LabelScope) => void;
+  closeLabelTransfer: () => void;
+  pickLabelFile: () => void;
   importLabelFile: (file: File) => Promise<void>;
-  exportLabels: () => void;
+  configureLabelImport: (options: Partial<LabelImportOptions>) => void;
+  configureLabelExport: (options: Partial<LabelExportOptions>) => void;
+  confirmLabelImport: () => void;
+  downloadLabelExport: () => void;
 }
+
+export type LabelTransfer =
+  | {
+      kind: 'import';
+      workspaceId: string;
+      options: LabelImportOptions;
+      filename?: string;
+      inspection?: LabelInspection;
+      busy?: boolean;
+      failure?: string;
+    }
+  | { kind: 'export'; workspaceId: string; options: LabelExportOptions };
 
 interface Inputs {
   current: AppState['activeWorkspace'];
@@ -44,9 +78,8 @@ interface Inputs {
   edit: (fn: (data: Workspace) => Workspace, undo?: boolean) => void;
   setError: AppState['setError'];
   setNotice: AppState['setNotice'];
+  context?: { walletView: boolean; walletId?: string; selectedIds: readonly string[] };
 }
-
-const MAX_LABEL_FILE_BYTES = 5_000_000;
 
 export function useAnnotations({
   current,
@@ -54,9 +87,82 @@ export function useAnnotations({
   edit,
   setError,
   setNotice,
+  context,
 }: Inputs): WorkspaceAnnotations {
   const labelsInput = useRef<HTMLInputElement>(null);
   const editRequest = useMetadataEditRequest(current?.id);
+  const [transfer, setTransfer] = useState<LabelTransfer>();
+  const fileRequest = useRef(0);
+  const fileRead = useRef<AbortController | undefined>(undefined);
+  const labelTransfer = transfer?.workspaceId === current?.id ? transfer : undefined;
+  const [preview, setPreview] = useState<{
+    workspace: Workspace;
+    transfer: LabelTransfer;
+    importPlan?: ReturnType<typeof planLabelImport>;
+    exportPlan?: ReturnType<typeof planLabelExport>;
+    error?: string;
+  }>();
+  const previewCurrent = preview?.workspace === current && preview?.transfer === labelTransfer;
+  const importPlan = previewCurrent ? preview?.importPlan : undefined;
+  const exportPlan = previewCurrent ? preview?.exportPlan : undefined;
+  const needsPreview =
+    !!current && !!labelTransfer && (labelTransfer.kind === 'export' || !!labelTransfer.inspection);
+  useEffect(() => {
+    if (
+      !current ||
+      !labelTransfer ||
+      (labelTransfer.kind === 'import' && !labelTransfer.inspection)
+    )
+      return;
+    const controller = new AbortController();
+    const prepare = async () => {
+      try {
+        const result =
+          labelTransfer.kind === 'export'
+            ? {
+                exportPlan: await createExportPreview(
+                  current,
+                  labelTransfer.options,
+                  controller.signal,
+                ),
+              }
+            : {
+                importPlan: await createImportPreview(
+                  current,
+                  labelTransfer.inspection!,
+                  labelTransfer.options,
+                  controller.signal,
+                ),
+              };
+        if (!controller.signal.aborted)
+          setPreview({ workspace: current, transfer: labelTransfer, ...result });
+      } catch (error) {
+        if (!controller.signal.aborted)
+          setPreview({
+            workspace: current,
+            transfer: labelTransfer,
+            error: error instanceof Error ? error.message : 'Could not prepare the preview.',
+          });
+      }
+    };
+    void prepare();
+    return () => {
+      controller.abort();
+      // A closed or switched dialog must release its decrypted source/plan.
+      setPreview(undefined);
+    };
+  }, [current, labelTransfer]);
+  useEffect(() => () => fileRead.current?.abort(), []);
+  const defaultScope = (): LabelScope =>
+    context?.walletView && context.walletId
+      ? { kind: 'wallet', walletId: context.walletId }
+      : { kind: 'workspace' };
+  const closeLabelTransfer = () => {
+    fileRequest.current++;
+    fileRead.current?.abort();
+    setTransfer(undefined);
+    setPreview(undefined);
+  };
   return {
     bookmarks: Object.entries(current?.annotations.entities ?? {}).filter(([, a]) => a.bookmarked),
     edit: editRequest,
@@ -99,47 +205,124 @@ export function useAnnotations({
       setNotice(`${summary}. Undo restores the previous values.`);
       return after;
     },
-    chooseLabelFile: () => labelsInput.current?.click(),
-    importLabelFile: async (file) => {
+    labelTransfer,
+    importPlan,
+    exportPlan,
+    previewBusy: needsPreview && !previewCurrent,
+    previewError: previewCurrent ? preview?.error : undefined,
+    closeLabelTransfer,
+    openLabelImport: (scope) => {
       if (!current) return;
+      fileRequest.current++;
+      setTransfer({
+        kind: 'import',
+        workspaceId: current.id,
+        options: defaultLabelImportOptions(current.network, scope ?? defaultScope()),
+      });
+    },
+    openLabelExport: (scope) => {
+      if (!current) return;
+      fileRequest.current++;
+      setTransfer({
+        kind: 'export',
+        workspaceId: current.id,
+        options: defaultLabelExportOptions(scope ?? defaultScope()),
+      });
+    },
+    pickLabelFile: () => labelsInput.current?.click(),
+    importLabelFile: async (file) => {
+      if (!current || labelTransfer?.kind !== 'import') return;
+      const request = ++fileRequest.current;
+      fileRead.current?.abort();
       if (file.size > MAX_LABEL_FILE_BYTES) {
-        setError('Label file exceeds 5 MB.');
+        setTransfer({
+          ...labelTransfer,
+          filename: file.name,
+          inspection: undefined,
+          busy: false,
+          failure: 'Label file exceeds 5 MB.',
+        });
         return;
       }
+      const controller = new AbortController();
+      fileRead.current = controller;
+      setTransfer({
+        ...labelTransfer,
+        filename: file.name,
+        inspection: undefined,
+        busy: true,
+        failure: undefined,
+      });
       try {
-        const result = importLabels(await file.text());
-        edit((workspace) => {
-          const annotations = { ...workspace.annotations.entities };
-          for (const [id, annotation] of Object.entries(result.annotations))
-            annotations[id] = {
-              ...(annotations[id] ?? emptyAnnotation),
-              label: annotation.label,
-            };
-          return {
-            ...workspace,
-            annotations: { ...workspace.annotations, entities: annotations },
-            wallets: {
-              ...workspace.wallets,
-              definitions: workspace.wallets.definitions.map((wallet) => ({
-                ...wallet,
-                name: result.annotations[`xpub:${wallet.key}`]?.label.trim() || wallet.name,
-              })),
-            },
-          };
-        });
-        setNotice(
-          `Imported ${Object.keys(result.annotations).length} labels. ${result.skipped} records skipped (unsupported type or no label).`,
+        const inspection = await inspectLabelFile(file, current.network, controller.signal);
+        if (request !== fileRequest.current) return;
+        setTransfer((state) =>
+          state?.kind === 'import' && state.workspaceId === current.id
+            ? { ...state, inspection, busy: false }
+            : state,
         );
       } catch (error) {
-        setError(error instanceof Error ? error.message : 'Label import failed.');
+        if (request !== fileRequest.current) return;
+        setTransfer((state) =>
+          state?.kind === 'import' && state.workspaceId === current.id
+            ? {
+                ...state,
+                busy: false,
+                failure:
+                  error instanceof TypeError
+                    ? 'File is not valid UTF-8. Choose a UTF-8 JSONL file.'
+                    : error instanceof Error
+                      ? error.message
+                      : 'Label file could not be read.',
+              }
+            : state,
+        );
       }
     },
-    exportLabels: () => {
-      if (!current) return;
-      download('labels.jsonl', exportLabels(current), 'application/x-ndjson');
-      setNotice(
-        'BIP329 labels exported as unencrypted JSONL. Notes and graph layout use the encrypted workspace format.',
+    configureLabelImport: (patch) =>
+      setTransfer((state) =>
+        state?.kind === 'import' ? { ...state, options: { ...state.options, ...patch } } : state,
+      ),
+    configureLabelExport: (patch) =>
+      setTransfer((state) => {
+        if (state?.kind !== 'export') return state;
+        const options = { ...state.options, ...patch };
+        if (patch.profile === 'keeper' && options.scope.kind !== 'wallet')
+          options.scope = {
+            kind: 'wallet',
+            walletId: context?.walletId ?? current?.wallets.definitions[0]?.id ?? '',
+          };
+        return { ...state, options };
+      }),
+    confirmLabelImport: () => {
+      if (!importPlan || !importPlan.changes.length) return;
+      try {
+        edit((workspace) => applyLabelImport(workspace, importPlan));
+        closeLabelTransfer();
+        setError('');
+        setNotice(
+          `Imported ${importPlan.changes.length} metadata changes. Undo restores the previous values.`,
+        );
+      } catch (error) {
+        const failure = error instanceof Error ? error.message : 'Label import failed.';
+        setTransfer((state) => (state?.kind === 'import' ? { ...state, failure } : state));
+      }
+    },
+    downloadLabelExport: () => {
+      if (
+        !exportPlan ||
+        exportPlan.blocked ||
+        !exportPlan.recordCount ||
+        labelTransfer?.kind !== 'export'
+      )
+        return;
+      download(
+        `labels-${labelTransfer.options.profile}.jsonl`,
+        exportPlan.content,
+        'application/x-ndjson',
       );
+      closeLabelTransfer();
+      setNotice(`Exported ${exportPlan.recordCount} BIP329 records as plaintext JSONL.`);
     },
   };
 }

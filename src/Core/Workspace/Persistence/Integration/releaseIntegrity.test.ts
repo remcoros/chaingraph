@@ -30,9 +30,9 @@ function workspace() {
   return w;
 }
 describe('release review data integrity fixes', () => {
-  it('reopens legacy wallet labels between101 and200 characters without truncation', async () => {
+  it.each([200, 255])('reopens %i-character wallet names without truncation', async (length) => {
     const w = workspace();
-    w.wallets.definitions[0].name = 'L'.repeat(200);
+    w.wallets.definitions[0].name = 'L'.repeat(length);
     const encrypted = await encryptWorkspace(w, password);
     const restored = parseWorkspace(await decryptWorkspace(encrypted, password));
     expect(restored.wallets.definitions[0].name).toBe(w.wallets.definitions[0].name);
@@ -40,7 +40,7 @@ describe('release review data integrity fixes', () => {
     store.open(restored, password);
     await store.lock(w.id);
     await store.unlock(store.getSnapshot().saved[0], password);
-    expect(store.getSnapshot().unlocked[0].data.wallets.definitions[0].name).toHaveLength(200);
+    expect(store.getSnapshot().unlocked[0].data.wallets.definitions[0].name).toHaveLength(length);
   });
   it('rejects an invalid updated wallet before replacing its good encrypted snapshot', async () => {
     const memory = storage();
@@ -53,7 +53,7 @@ describe('release review data integrity fixes', () => {
       ...w,
       wallets: {
         ...w.wallets,
-        definitions: w.wallets.definitions.map((wallet) => ({ ...wallet, name: 'L'.repeat(201) })),
+        definitions: w.wallets.definitions.map((wallet) => ({ ...wallet, name: 'L'.repeat(256) })),
       },
     }));
     await expect(store.persist(w.id)).rejects.toThrow();

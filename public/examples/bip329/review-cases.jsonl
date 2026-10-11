@@ -1,0 +1,12 @@
+{"type":"tx","ref":"9f3dbe0da718398178955cbe386813f8f6ed709f525fb5bf2885ba3545276ed3","label":"Conflict A","origin":"wpkh(xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/0/*)"}
+
+{"type":"tx","ref":"9f3dbe0da718398178955cbe386813f8f6ed709f525fb5bf2885ba3545276ed3","label":"Conflict B","origin":"wpkh(xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/1/*)"}
+{"type":"addr","ref":"bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el","label":"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"}
+{"type":"output","ref":"9f3dbe0da718398178955cbe386813f8f6ed709f525fb5bf2885ba3545276ed3:0","label":"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"}
+{"type":"tx","ref":"05de8fc4cc4038e33c09606890f88e3e8e3b4b1941c03b131c273226e2aac8a0","label":""}
+{"type":"tx","ref":"e2af6479b2ac4e0c515b4e2d89ade68a18179dda948e4c37f0ea9a2024107541"}
+{"type":"addr","ref":"tb1q725dvvqem2jpf0wjsx9z82h0gu62n448w5x8ye","label":"Wrong-network example"}
+{"type":"input","ref":"9f3dbe0da718398178955cbe386813f8f6ed709f525fb5bf2885ba3545276ed3:0","label":"Unsupported input label"}
+{"type":"tx", broken JSON}
+{"type":"tx","ref":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","label":"Unmatched synthetic reference"}
+{"type":"tx","ref":"c9fe41e18ba7f97e413a63e0ca1a8ed3bf550670a70417de8851ba5c0f530e5d","label":"Recoverable valid record"}

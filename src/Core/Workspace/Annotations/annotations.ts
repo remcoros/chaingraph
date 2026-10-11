@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { canonicalEntityReference } from '../entityReferences';
 import type { Network } from '../../Bitcoin/index';
-const text = z.string().max(10000);
+export const MAX_ANNOTATION_NOTE_LENGTH = 10_000;
+export const MAX_TAG_NAME_LENGTH = 100;
+const text = z.string().max(MAX_ANNOTATION_NOTE_LENGTH);
+/** BIP329's suggested default, shared by editing, interchange and saved data. */
+export const MAX_ANNOTATION_LABEL_LENGTH = 255;
+
 export interface Annotation {
   label: string;
   note: string;
@@ -25,7 +30,7 @@ const tagSchema = z.object({
     .string()
     .uuid()
     .transform((id) => id.toLowerCase()),
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(MAX_TAG_NAME_LENGTH),
   color: z.string().regex(/^#[0-9a-f]{6}$/i),
   description: z.string().max(2000).optional(),
   nodeIds: z.array(z.string().max(200)).max(MAX_TAG_MEMBERS),
@@ -66,7 +71,7 @@ export const annotationsSchema = z.object({
   entities: z.record(
     z.string().max(200),
     z.object({
-      label: z.string().max(200),
+      label: z.string().max(MAX_ANNOTATION_LABEL_LENGTH),
       note: text,
       icon: z.string().max(20),
       bookmarked: z.boolean(),

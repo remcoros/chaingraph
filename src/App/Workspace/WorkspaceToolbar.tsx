@@ -247,7 +247,7 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  annotations.chooseLabelFile();
+                  annotations.openLabelImport({ kind: 'workspace' });
                 }}
               >
                 <Upload size={15} />
@@ -256,11 +256,11 @@ export function WorkspaceToolbar({ workspace }: { workspace: WorkspaceController
               <button
                 onClick={() => {
                   setMenu(false);
-                  annotations.exportLabels();
+                  annotations.openLabelExport({ kind: 'workspace' });
                 }}
               >
                 <Download size={15} />
-                Export BIP329 labels · plaintext
+                Export BIP329 labels
               </button>
               <button
                 onClick={() => {

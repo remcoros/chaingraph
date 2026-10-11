@@ -53,11 +53,89 @@ but older Chaingraph releases cannot open v2 files. Saving needs Web Workers,
 Web Crypto and native gzip support; without them, existing saves stay intact
 and new saves report an error.
 
-**BIP329 labels are different.** **Export BIP329 labels · plaintext** in the
-workspace menu writes unencrypted JSON Lines that can include extended public
-keys. They carry labels only, not notes, bookmarks, layout or findings. Import
-skips unsupported record types and records without a label; an explicit empty
-label clears an existing one, and malformed references are rejected by line.
+**BIP329 metadata exchange is plaintext.** The workspace menu opens an import or
+export dialog for the whole workspace. The buttons beside the wallet selector
+open the same dialog scoped to that wallet. You can also choose selected
+entities. Select the source or destination software to use its field meanings:
+
+| Software                 | Imported into Chaingraph                                              | Exported by default                                                 |
+| ------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Generic BIP329 / Sparrow | Literal entity labels                                                 | Populated entity labels                                             |
+| BTCPay Server            | Each repeated label becomes a tag; existing entity labels stay intact | One record per tag membership                                       |
+| BlueWallet               | Transaction memos become Notes                                        | Transaction Notes, falling back to the entity label                 |
+| Bitcoin Keeper           | Transaction text becomes Notes; address/output strings become tags    | Transaction Notes with label fallback; repeated address/output tags |
+
+Generic and Sparrow support transaction, address, output and extended-public-key
+labels. Unsupported types, such as input and silent-payment scan-key records,
+are listed as skipped entries. Optional source fields such as `spendable`
+and height are not applied to chain observations. Commas, brackets and other
+punctuation remain literal text; strings are never automatically split into tags.
+
+**Import shows Changes to apply before confirmation.** Existing nonempty labels and
+Notes are kept by default; tag memberships merge. The **Mapping** section lets
+you keep or replace existing text and choose where transaction memos or notes
+are saved. Expand **More options** to apply explicit empty-label clears, create
+labels from imported tags, choose a source account, or rename matching wallets
+from key labels. Each applied import is one Undo step. Differing source
+values for the same entity are excluded until you choose an account/origin or
+explicitly select the first or last value. Repeated BTCPay and Keeper tag records
+merge instead. Origins are review context and are not saved as a separate
+per-account annotation model.
+
+Malformed, unsupported and wrong-network records can be excluded while you
+import the valid records shown in the preview. Expand an outcome to see the
+affected source lines and items. **Existing text kept** compares current and
+incoming text and explains how to replace it; **Already up to date** means the
+text or tag is already saved. Skipped entries are grouped by their reason, with
+the relevant recovery action. **Other file fields** lists additional fields
+that are left out. Confirm the file's source network: addresses
+and public keys are checked, but transaction IDs cannot reveal the network.
+Whole-workspace imports can retain metadata for references without a loaded
+match, with an unmatched count. Wallet scope includes only references associated
+through known wallet addresses and loaded script evidence. No import downloads
+transactions or changes wallet scan coverage.
+
+Labels and wallet names support 255 JavaScript UTF-16 units, Notes 10,000 and
+tag names 100. BIP329 suggests 255 characters as a default rather than a universal
+maximum. Over-limit values are excluded by default; explicit shortening shows
+original and resulting text for review. Export shortening leaves native text intact.
+Distinct names that would collide after shortening are excluded. Files over
+5 MB or 10,000 nonblank records are rejected as a whole. Exports use those same
+safety budgets, with BTCPay's smaller 1 MB file budget; narrow the scope if the
+download is blocked. BTCPay values are trimmed and limited to 50 UTF-16 units.
+Sparrow ordinary labels use 255 and its key names use 16.
+
+**Export previews the actual file before download.** Switch between **Table**
+and **JSONL** to inspect the same page of records in file order. The table shows
+the exported `type`, `ref` and `label`; expand a value to read it in full. JSONL
+shows complete serialized lines, including escaped characters. Page controls
+cover the entire export. **Text changes** compares original and exported text
+when shortening or trimming applies. Oversized exports show totals and the
+limit, with no file preview until the scope is narrowed.
+
+Key labels are off by default
+and available for Generic/Sparrow only. Including wallet names as fallback key
+labels is a separate option under **More options**. The **Content** section shows
+which fields supply the destination's labels or transaction memos/notes. Its
+tag choice can append readable tag names to that text; question-mark hints
+explain the mapping with examples. BTCPay and Keeper can explicitly include entity
+labels alongside tags. Single-string destinations can explicitly compose tags
+into readable text such as `Shop payment [business, reviewed]`; on re-import
+that string stays literal. BlueWallet and Keeper can use entity labels instead
+of Notes for transaction text. Ordinary exports omit empty labels, so portable
+clearing through other wallets is not promised.
+
+BlueWallet is available only on mainnet for the audited release. Keeper exports
+require one selected wallet: **Import into the matching wallet in Keeper**.
+Chaingraph exports origin-free records rather than inventing a descriptor with
+an unknown master fingerprint or derivation path.
+
+BIP329 files do not preserve icons, bookmarks, tag colors/descriptions, layout,
+findings or the complete native metadata. Use encrypted workspace export for a
+full backup. The [representative example files](../public/examples/bip329/README.md)
+work with **Explore a public demo wallet** and include manual testing instructions
+and a file with recoverable errors, conflicts, length boundaries and clears.
+The import dialog offers these downloads when that public wallet is loaded.
 
 ## Look up activity
 

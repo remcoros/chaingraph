@@ -83,6 +83,14 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         onAddWallet={() => dialogs.openAddWallet()}
         onChange={(update, group) => edit(update, true, group)}
         onEditWallet={(walletId) => dialogs.openWalletRename(activeWorkspace.id, walletId)}
+        onExchangeLabels={(direction) => {
+          const scope = {
+            kind: 'wallet' as const,
+            walletId: (wallet ?? activeWorkspace.wallets.definitions[0]).id,
+          };
+          if (direction === 'import') workspace.annotations.openLabelImport(scope);
+          else workspace.annotations.openLabelExport(scope);
+        }}
         onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets.definitions[0])}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'show')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}

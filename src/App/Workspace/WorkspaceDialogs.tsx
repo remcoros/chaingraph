@@ -5,6 +5,7 @@ import { WalletDialog } from './Wallets/Dialogs/WalletDialog';
 import { WalletNameDialog } from './Wallets/Dialogs/WalletNameDialog';
 import type { WorkspaceController } from './useWorkspace';
 import { short } from '../../Core/Formatting';
+import { LabelExchangeDialog } from './Annotations/LabelExchangeDialog';
 
 type Props = { workspace: WorkspaceController };
 
@@ -30,20 +31,23 @@ export function WorkspaceSettingsDialog({ workspace }: Props) {
   );
 }
 
-export function WorkspaceLabelImport({ workspace }: Props) {
+export function WorkspaceLabelExchange({ workspace }: Props) {
   const { labelsInput, importLabelFile } = workspace.annotations;
   return (
-    <input
-      ref={labelsInput}
-      type="file"
-      accept=".jsonl,.json,.txt"
-      hidden
-      onChange={async (event) => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-        if (file) await importLabelFile(file);
-      }}
-    />
+    <>
+      <input
+        ref={labelsInput}
+        type="file"
+        accept=".jsonl,.json,.txt"
+        hidden
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) await importLabelFile(file);
+        }}
+      />
+      <LabelExchangeDialog workspace={workspace} />
+    </>
   );
 }
 

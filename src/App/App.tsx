@@ -22,7 +22,7 @@ import { useWorkspace } from './Workspace/useWorkspace';
 import {
   EntityRemovalDialog,
   WalletDialogs,
-  WorkspaceLabelImport,
+  WorkspaceLabelExchange,
   WorkspaceSettingsDialog,
 } from './Workspace/WorkspaceDialogs';
 import { WorkspaceTour } from './Help/WorkspaceTour';
@@ -230,7 +230,7 @@ export default function App() {
           e.target.value = '';
         }}
       />
-      <WorkspaceLabelImport workspace={workspace} />
+      <WorkspaceLabelExchange workspace={workspace} />
       <EntityRemovalDialog workspace={workspace} />
       {app.create && (
         <CreateWorkspaceDialog

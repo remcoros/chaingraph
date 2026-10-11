@@ -27,7 +27,7 @@ src/
       Dialogs/                      create, import, unlock and details UI
       useWorkspaces.ts              React subscriptions and autosave timer
       TransactionFetchProvider.tsx  React provider for session-bound transaction reads
-      Annotations/                  editing hooks, tag proposals and projections
+      Annotations/                  editing hooks, tag proposals, label dialog/worker
       Selection/                    transient selection and scan-target picking
       GraphState/                   Graph projections, membership actions and panels
         panelState.ts               openFlowPanel presentation action
@@ -132,7 +132,7 @@ src/
           fetchWalletUtxos.ts        bounded discovery-address UTXO checks
           walletUtxoCheck.ts         retained address-observation projection and coverage
           walletUtxoObservation.ts   checked-output verification and spender reconciliation
-      Annotations/                  annotation/tag mutation and membership operations
+      Annotations/                  annotation/tag mutation, label inspection/plans/scope
         annotations.ts              types, schemas and tag normalization
         tagMembership.ts            entity/address tag membership semantics
       Analysis/                     algorithms, findings, recovery and invalidation
@@ -162,17 +162,17 @@ tests/
 
 ## Common tasks
 
-| Task                         | Start here                                                 | Tests                                                        |
-| ---------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
-| Creation, import or unlock   | App workspace dialogs, Core `createWorkspace`, Persistence | Dialog tests and workspace integration tests                 |
-| Autosave, locking or undo    | Core `Session/`, App `Store/`, Persistence `Browser/`      | Colocated history tests and workspace integration tests      |
-| Wallet discovery or review   | Core `Wallets/`, App Wallet workbench                      | Colocated rules; Bitcoin/wallet integration tests            |
-| Connection scanning          | Core `ConnectionScan/`, App Graph `ConnectionScan/`        | Colocated engine tests and connection-scan integration tests |
-| Analysis algorithms          | Core `Analysis/`                                           | Colocated algorithm/recovery tests; format integration tests |
-| Metadata and labels          | Core `Annotations/`, App metadata controls                 | Colocated mutations and workspace integration tests          |
-| Canvas and flow presentation | App Graph `Renderer/`, `TransactionFlow/`                  | Tests beside their presentation implementation               |
-| Membership or entity removal | App `GraphState/`, Core and App `entityRemoval.ts`         | Colocated tests and graph integration tests                  |
-| Fetch scheduling             | Core `ChainData/`, Core Workspace `Session/`               | Colocated scheduler tests and Bitcoin integration tests      |
+| Task                         | Start here                                                                                                      | Tests                                                                       |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Creation, import or unlock   | App workspace dialogs, Core `createWorkspace`, Persistence                                                      | Dialog tests and workspace integration tests                                |
+| Autosave, locking or undo    | Core `Session/`, App `Store/`, Persistence `Browser/`                                                           | Colocated history tests and workspace integration tests                     |
+| Wallet discovery or review   | Core `Wallets/`, App Wallet workbench                                                                           | Colocated rules; Bitcoin/wallet integration tests                           |
+| Connection scanning          | Core `ConnectionScan/`, App Graph `ConnectionScan/`                                                             | Colocated engine tests and connection-scan integration tests                |
+| Analysis algorithms          | Core `Analysis/`                                                                                                | Colocated algorithm/recovery tests; format integration tests                |
+| Metadata and labels          | Core `Annotations/labels.ts`, `labelRecords.ts`, `labelScope.ts`; App metadata controls and label dialog/worker | Colocated mutations, shipped JSONL examples and workspace integration tests |
+| Canvas and flow presentation | App Graph `Renderer/`, `TransactionFlow/`                                                                       | Tests beside their presentation implementation                              |
+| Membership or entity removal | App `GraphState/`, Core and App `entityRemoval.ts`                                                              | Colocated tests and graph integration tests                                 |
+| Fetch scheduling             | Core `ChainData/`, Core Workspace `Session/`                                                                    | Colocated scheduler tests and Bitcoin integration tests                     |
 
 Persistence paths in the table are relative to `src/Core/Workspace/`; App and
 other Core paths are relative to `src/`. Unit tests live beside their
@@ -185,7 +185,7 @@ dependency on test helpers or App.
 ## Dependency direction
 
 App consumes Core capabilities and concept-owned models. Persistence also
-consumes those models and validity rules, never App or Session implementation. 
+consumes those models and validity rules, never App or Session implementation.
 Session depends on the public WorkspacePersistence contract; App composition supplies the facade.
 Canonical document validation loads neither Persistence nor live query code.
 Core Bitcoin owns native mechanisms; Core ChainData owns shared application chain data, typed RPC queries and scheduling, and consumes Bitcoin. Workspace consumes both and owns workspace references and

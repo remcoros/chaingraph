@@ -28,7 +28,11 @@ import {
   transactionReference,
   addressReference,
 } from '../../../../../Core/Workspace/entityReferences';
-import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import {
+  MAX_ANNOTATION_LABEL_LENGTH,
+  MAX_ANNOTATION_NOTE_LENGTH,
+  type Annotation,
+} from '../../../../../Core/Workspace/Annotations/annotations';
 import type { Wallet } from '../../../../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { AddressBalanceObservation, Transaction } from '../../../../../Core/ChainData';
@@ -114,7 +118,7 @@ export function AnnotationEditor({
         <input
           ref={labelRef}
           aria-label="Node label"
-          maxLength={200}
+          maxLength={MAX_ANNOTATION_LABEL_LENGTH}
           placeholder="Add a label"
           value={annotation.label}
           onChange={(e) => {
@@ -127,7 +131,7 @@ export function AnnotationEditor({
         <textarea
           aria-label="Node notes"
           rows={3}
-          maxLength={10000}
+          maxLength={MAX_ANNOTATION_NOTE_LENGTH}
           placeholder="Add notes"
           value={annotation.note}
           onChange={(e) => {

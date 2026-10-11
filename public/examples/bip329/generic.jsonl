@@ -1,0 +1,5 @@
+{"type":"tx","ref":"9f3dbe0da718398178955cbe386813f8f6ed709f525fb5bf2885ba3545276ed3","label":"Demo funding reviewed"}
+{"type":"tx","ref":"c9fe41e18ba7f97e413a63e0ca1a8ed3bf550670a70417de8851ba5c0f530e5d","label":"Literal punctuation: business, reviewed [sample]"}
+{"type":"addr","ref":"bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el","label":"Public demo address"}
+{"type":"output","ref":"9f3dbe0da718398178955cbe386813f8f6ed709f525fb5bf2885ba3545276ed3:0","label":"Demo receive output"}
+{"type":"xpub","ref":"xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V","label":"Demo key label"}

@@ -119,6 +119,7 @@ const PREVIEW_ACTIONS = {
   onSelectWallet: noop,
   onAddWallet: noop,
   onEditWallet: noop,
+  onExchangeLabels: noop,
   onChange: noop,
   onRefresh: noop,
   onShowInGraph: noop,

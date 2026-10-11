@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Network, ScriptType } from '../../../../Core/Bitcoin';
 
-import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import { MAX_WALLET_NAME_LENGTH, type Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import {
   deriveAddresses,
   inspectExtendedPublicKey,
@@ -70,7 +70,7 @@ export function WalletDialog({
           <input
             required
             data-autofocus
-            maxLength={100}
+            maxLength={MAX_WALLET_NAME_LENGTH}
             value={name}
             onFocus={(event) => event.currentTarget.select()}
             onChange={(e) => setName(e.target.value)}

@@ -12,7 +12,12 @@ import {
 } from '../../../Core/Workspace/Annotations/batchMetadata';
 import { canonicalEntityReference } from '../../../Core/Workspace/entityReferences';
 import type { Workspace } from '../../../Core/Workspace/workspace';
-import type { WorkspaceTag } from '../../../Core/Workspace/Annotations/annotations';
+import {
+  MAX_ANNOTATION_LABEL_LENGTH,
+  MAX_ANNOTATION_NOTE_LENGTH,
+  MAX_TAG_NAME_LENGTH,
+  type WorkspaceTag,
+} from '../../../Core/Workspace/Annotations/annotations';
 
 import { DEFAULT_TAG_COLOR, TAG_COLORS } from './tagColors';
 import './metadata-editors.css';
@@ -163,7 +168,7 @@ function LabelEditor({
           <input
             data-autofocus
             aria-label="Batch label"
-            maxLength={200}
+            maxLength={MAX_ANNOTATION_LABEL_LENGTH}
             value={value}
             placeholder="Exchange A withdrawal, shop payment…"
             onChange={(event) => setValue(event.target.value)}
@@ -319,7 +324,7 @@ function TagEditor({
           type="search"
           aria-label="Find or create tag"
           placeholder="Find or create tag…"
-          maxLength={100}
+          maxLength={MAX_TAG_NAME_LENGTH}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -488,7 +493,7 @@ export function EntityNoteEditor({
         data-autofocus
         aria-label="Entity notes"
         rows={5}
-        maxLength={10000}
+        maxLength={MAX_ANNOTATION_NOTE_LENGTH}
         value={workspace.annotations.entities[canonicalId]?.note ?? ''}
         onChange={(event) => {
           const note = event.target.value;

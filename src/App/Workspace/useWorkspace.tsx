@@ -269,6 +269,22 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   }, [recoveryNodesById, prune]);
   const wallet = activeWorkspace?.wallets.definitions.find((x) => x.id === selectedWallet);
   const tx = selected?.txid ? activeWorkspace?.chainData.transactions[selected.txid] : undefined;
+  const annotations = useAnnotations({
+    current: activeWorkspace,
+    sessions: workspaces,
+    edit: edit,
+    setError,
+    setNotice,
+    context: {
+      walletView: workbench === 'wallet',
+      walletId: wallet?.id,
+      selectedIds: selection.batch.ids.length
+        ? selection.batch.ids
+        : selectedId
+          ? [selectedId]
+          : [],
+    },
+  });
   const resetWorkspacePresentation = useEffectEvent(() => {
     workspaceOperation.cancel();
     preserveSelectionCamera(undefined);
@@ -300,6 +316,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setError('');
     setNotice('');
     dialogs.closeAll();
+    annotations.closeLabelTransfer();
     setExamplesOpen(false);
     lookup.clear();
     lookup.setError('');
@@ -316,13 +333,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     // oxlint-disable-next-line react/set-state-in-effect -- Aborts running work and restores a saved presentation when the workspace changes.
     resetWorkspacePresentation();
   }, [workspaceId]);
-  const annotations = useAnnotations({
-    current: activeWorkspace,
-    sessions: workspaces,
-    edit: edit,
-    setError,
-    setNotice,
-  });
   // Hydration has its own owner so a workspace switch never writes the previous
   // presentation into the newly active workspace. Presentation does not consume annotation undo.
   const presentationFilters = filters.persistable(activeWorkspace?.view.filters);

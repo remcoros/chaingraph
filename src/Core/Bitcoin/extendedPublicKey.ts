@@ -69,7 +69,11 @@ export function parseExtendedPublicKey(key: string, network: Network) {
   }
   if (node.privateKey || !node.publicKey)
     throw new Error('Only extended public keys are accepted.');
-  return { node, encoding };
+  // Version bytes describe an encoding, not a different BIP32 public payload.
+  // Keep the encoding's script hint separate when matching wallet policies.
+  const canonical = raw.slice();
+  new DataView(canonical.buffer).setUint32(0, bitcoinNetwork(network).bip32.public);
+  return { node, encoding, bip32Key: base58.encode(canonical) };
 }
 
 /** Recognized public encodings and valid BIP32 payloads, independent of account depth. */

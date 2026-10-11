@@ -518,6 +518,25 @@ between the toolbar and picker. The standalone `IconPicker` retains local state
 and programmatic opening for Inspector fields. Both use the same trigger and
 palette, with the existing focus and annotation operations.
 
+BIP329 inspection, profile mappings, scope, budgets and atomic application belong
+to the existing Annotations capability. `labels.ts` replaces immediate label
+import/export with inspection and reviewed plans. App supplies options and applies
+one metadata mutation; it does not sequence annotation, tag and wallet setters.
+File decoding and projection run in cancellable, short-lived Web Workers.
+Export's serialized content is the single source for download and both file
+preview views. The UI decodes only the visible table page; the JSONL view uses
+those exact lines in their original order. Export plans retain only changed text
+for the separate original/exported review, replacing the former representative
+metadata preview. Import issues distinguish protected existing text from values
+already up to date, and carry the text comparison needed to explain preservation.
+The reviewed plan retains its main-thread source references so application can
+reject changed metadata or evidence and preserve unrelated current state.
+Origins, profiles and transfer previews live only for the dialog; no persistent
+per-account labels or alternative wallet-name source of truth are introduced.
+Equivalent public key encodings share a canonical BIP32 payload identity while
+explicit script-policy encodings still constrain wallet matching. Exported key
+labels are opt-in, and wallet-name fallback is separate from explicit key labels.
+
 ## Wallet workbench
 
 `walletReview.ts` derives one wallet's queue from loaded observations and an

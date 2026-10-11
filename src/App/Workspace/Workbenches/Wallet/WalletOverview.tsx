@@ -2,6 +2,7 @@ import { Amount } from '../../../Controls/Display/Amount';
 import {
   ArrowRight,
   Download,
+  Upload,
   Pencil,
   Plus,
   RefreshCw,
@@ -28,6 +29,7 @@ export function WalletOverview({
   chainDataDisabledReason,
   onSelectWallet,
   onEditWallet,
+  onExchangeLabels,
   onAddWallet,
   onRefresh,
   onCheck,
@@ -45,6 +47,7 @@ export function WalletOverview({
   | 'chainDataDisabledReason'
   | 'onSelectWallet'
   | 'onEditWallet'
+  | 'onExchangeLabels'
   | 'onAddWallet'
   | 'onRefresh'
 > & {
@@ -93,6 +96,28 @@ export function WalletOverview({
             <button className="text-button" onClick={onAddWallet} disabled={workspace.demo}>
               <Plus size={14} /> Add wallet
             </button>
+            {onExchangeLabels && (
+              <>
+                <button
+                  className="icon-button"
+                  aria-label="Import wallet metadata"
+                  title="Import wallet metadata"
+                  disabled={!active}
+                  onClick={() => onExchangeLabels('import')}
+                >
+                  <Upload size={14} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Export wallet metadata"
+                  title="Export wallet metadata"
+                  disabled={!active}
+                  onClick={() => onExchangeLabels('export')}
+                >
+                  <Download size={14} />
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="wallet-review-controls">

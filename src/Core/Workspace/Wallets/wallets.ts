@@ -14,6 +14,8 @@ export interface DerivedAddress {
 
 export const MAX_WALLET_REVIEWS = 20_000;
 export const MAX_WALLET_HISTORY_ENTRIES = 50_000;
+/** Wallet names are also exchanged as BIP329 extended-public-key labels. */
+export const MAX_WALLET_NAME_LENGTH = 255;
 
 export interface WalletReviewRecord {
   status: 'reviewed' | 'unknown' | 'later';
@@ -92,7 +94,7 @@ export interface Wallet {
 
 const walletSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1).max(200),
+  name: z.string().min(1).max(MAX_WALLET_NAME_LENGTH),
   key: z.string().max(150),
   scriptType: z.enum(['p2pkh', 'p2sh-p2wpkh', 'p2wpkh', 'p2tr']),
   color: z.string().regex(/^#[0-9a-f]{6}$/i),

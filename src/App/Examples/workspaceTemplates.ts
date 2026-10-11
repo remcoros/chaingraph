@@ -14,7 +14,7 @@ import type { Wallet } from '../../Core/Workspace/Wallets/wallets';
 import type { Workspace } from '../../Core/Workspace/workspace';
 import { outpointReference, transactionReference } from '../../Core/Workspace/entityReferences';
 
-import { type Network, sats } from '../../Core/Bitcoin';
+import { type Network, parseExtendedPublicKey, sats } from '../../Core/Bitcoin';
 import type { Transaction } from '../../Core/ChainData';
 
 import { createWorkspace } from '../../Core/Workspace/createWorkspace';
@@ -29,6 +29,26 @@ export interface WorkspaceTemplate {
   readonly summary: string;
   readonly icon: string;
   readonly sources: readonly { readonly title: string; readonly url: string }[];
+}
+
+// Canonical public BIP84 account-0 test vector, shared by the bundled demo's
+// zpub and its equivalent BIP32 xpub. Full payload identity avoids fingerprint
+// collisions and remains stable when a workspace or wallet is renamed.
+const PUBLIC_DEMO_ACCOUNT_KEY =
+  'xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V';
+
+export function hasPublicDemoWallet(workspace: Pick<Workspace, 'network' | 'wallets'>): boolean {
+  if (workspace.network !== 'mainnet') return false;
+  return workspace.wallets.definitions.some((wallet) => {
+    if (wallet.scriptType !== 'p2wpkh') return false;
+    try {
+      return (
+        parseExtendedPublicKey(wallet.key, workspace.network).bip32Key === PUBLIC_DEMO_ACCOUNT_KEY
+      );
+    } catch {
+      return false;
+    }
+  });
 }
 
 const equalSeed = '323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2';

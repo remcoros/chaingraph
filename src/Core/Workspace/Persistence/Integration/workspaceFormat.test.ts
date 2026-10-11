@@ -12,6 +12,11 @@ import { decryptAndValidateWorkspace, validateAndEncryptWorkspace } from '../Cod
 import { createBrowserWorkspaceStore } from './workspaceStoreFixture';
 import { transactionScheduler } from '../../../ChainData/transactionScheduler';
 import { legacyWorkspace } from '../../../../../tests/fixtures/legacyWorkspace';
+import {
+  inspectLabels,
+  planLabelImport,
+  defaultLabelImportOptions,
+} from '../../Annotations/labels';
 
 const password = 'public format integration fixture';
 // Independent pre-compression writer, including the exact legacy AAD order.
@@ -62,6 +67,20 @@ function savedIndex(workspace: { id: string; name: string }, envelope: unknown) 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('workspace format at persistence and import boundaries', () => {
+  it('preserves an imported 255-character label through encrypted save and reopen', async () => {
+    const workspace = createWorkspace('Long label fixture', 'mainnet');
+    const txid = 'a'.repeat(64);
+    const label = 'é'.repeat(255);
+    workspace.annotations.entities = planLabelImport(
+      workspace,
+      inspectLabels(JSON.stringify({ type: 'tx', ref: txid, label }), workspace.network),
+      defaultLabelImportOptions(workspace.network),
+    ).next.annotations.entities;
+    const envelope = await validateAndEncryptWorkspace(workspace, password);
+    const reopened = await decryptAndValidateWorkspace(envelope, password);
+    expect(reopened.annotations.entities[`tx:${txid}`].label).toBe(label);
+  });
+
   it('validates legacy observations before persisting migrated membership without dropping other fields', async () => {
     const current = createWorkspace('Legacy save fixture', 'mainnet');
     const txid = 'a'.repeat(64);

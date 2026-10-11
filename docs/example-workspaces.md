@@ -53,6 +53,26 @@ and keeps the other 204 IDs as pending. The wallet is saved with
 queries the user's backend. A change-branch match is a derivation fact, not
 proof that an output is economically change.
 
+## BIP329 exchange examples
+
+[`public/examples/bip329/`](../public/examples/bip329/README.md) includes a small
+JSONL file for each supported software profile and a separate review-cases file.
+They reference the public wallet snapshot's loaded transactions, outputs,
+derived addresses and published key. Their annotations are synthetic examples
+shaped around the audited import/export behavior, not captures from external
+wallets or evidence of ownership. The import dialog offers the files only when
+the public demo wallet is loaded, identified by its complete public account key
+and script type, including equivalent xpub encoding. Renaming the workspace or
+wallet does not hide the files. The links start with Sparrow and Keeper and end
+with conflicts/errors.
+
+Open **Explore a public demo wallet**, select the matching software in the import
+dialog and inspect the result. Keep-existing is the default; choose replacement
+explicitly to compare text changes against the starter annotations. The README
+beside the files describes conflict, clear, length, error-recovery and Undo checks.
+Unit tests use these same shipped files with the actual example workspace and
+validate the resulting canonical workspace and profile round trips.
+
 ## Snapshot shape
 
 A snapshot holds `network`, `retrievedAt`, `roots` and `transactions`. Labels,

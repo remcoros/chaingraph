@@ -1,0 +1,414 @@
+.modal.label-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: min(720px, 96vw);
+  overflow: hidden;
+}
+.label-exchange .modal-heading {
+  flex-shrink: 0;
+  margin: 0;
+}
+.label-exchange-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 0;
+  margin: calc(-1 * var(--space-sm));
+  padding: var(--space-sm);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.label-setup,
+.label-settings {
+  display: grid;
+  gap: var(--space-sm);
+}
+.label-settings {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.label-settings > * {
+  grid-column: 1 / -1;
+}
+.label-settings,
+.label-review {
+  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-md);
+}
+.label-settings h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.label-exchange p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.label-network {
+  padding-bottom: var(--space-xs);
+}
+.label-exchange-fields {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.label-exchange-fields label {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+.label-exchange label {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+  gap: 5px;
+}
+.label-exchange select {
+  width: auto;
+  max-width: min(36ch, 100%);
+  justify-self: start;
+}
+.label-exchange .label-setting-row,
+.label-mapping-values > div {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+}
+.label-setting-row > span,
+.label-mapping-values dt {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.label-settings > .label-setting-row,
+.label-settings > .label-mapping-values,
+.label-settings > .label-mapping-values > div {
+  grid-template-columns: subgrid;
+}
+.label-settings > .label-mapping-values > div {
+  grid-column: 1 / -1;
+}
+.label-setting-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.label-setting-title > label,
+.label-setting-title > span {
+  min-width: 0;
+}
+.label-setting-title .wallet-help {
+  min-width: 24px;
+  min-height: 24px;
+}
+.label-mapping-values {
+  display: grid;
+  margin: 0;
+}
+.label-mapping-values dd {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.label-exchange .checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.label-exchange .checkbox input {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  margin: 0;
+}
+.label-example-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+.label-review {
+  display: grid;
+  flex-shrink: 0;
+  gap: var(--space-sm);
+  min-height: 220px;
+  align-content: start;
+}
+.label-review.is-loading {
+  height: var(--label-preview-height, 220px);
+  min-height: 220px;
+  overflow: hidden;
+}
+.label-preview-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+.label-preview-skeleton {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+}
+.label-preview-skeleton > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--color-rule);
+}
+.label-preview-skeleton span {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-raised);
+}
+.label-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.label-file-row button {
+  flex-shrink: 0;
+}
+.label-file-row span {
+  overflow-wrap: anywhere;
+}
+.label-summary {
+  font-variant-numeric: tabular-nums;
+}
+.label-excluded {
+  color: var(--color-warning);
+}
+.label-preview {
+  overflow-x: auto;
+  margin: 0;
+}
+.label-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.label-preview caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+.label-preview th,
+.label-preview td {
+  padding: 7px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-rule);
+  overflow-wrap: anywhere;
+}
+.label-preview-text {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.label-reference {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.label-entry-reference {
+  display: grid;
+  gap: var(--space-xs);
+}
+.label-full-value > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  list-style: none;
+}
+.label-full-value > summary::before {
+  content: '▸';
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.label-full-value[open] > summary::before {
+  content: '▾';
+}
+.label-value-excerpt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.label-full-value[open] > span {
+  display: block;
+  padding-top: var(--space-xs);
+}
+.label-preview-toolbar,
+.label-page-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.label-file-preview {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.label-file-preview h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.label-view-switch,
+.label-page-controls .button-row {
+  margin: 0;
+  gap: var(--space-xs);
+}
+.label-view-switch [aria-pressed='true'] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-raised);
+}
+.label-file-viewport {
+  height: 296px;
+  padding: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+}
+.label-file-table th,
+.label-file-table td {
+  padding: 5px 7px;
+}
+.label-type-column {
+  width: 70px;
+}
+.label-raw-preview {
+  margin: 0;
+  padding: var(--space-xs);
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
+  white-space: pre;
+  font: 12px/1.8 var(--font-mono);
+}
+.label-page-controls {
+  min-height: 30px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.label-text-changes[open] > .label-preview,
+.label-text-source,
+.label-other-fields[open] > p {
+  margin-top: var(--space-sm);
+}
+.label-exchange details {
+  margin: 0;
+}
+.label-exchange details > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+.label-options > summary,
+.label-text-changes > summary,
+.label-other-fields > summary,
+.label-examples > summary {
+  width: fit-content;
+  color: var(--color-muted);
+}
+.label-options-body {
+  display: grid;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+}
+.label-dependent-option {
+  margin-left: var(--space-lg);
+}
+.label-length-option {
+  display: grid;
+  gap: var(--space-xs);
+}
+.label-length-option > span {
+  font-size: var(--text-xs);
+  padding-left: var(--space-lg);
+}
+.label-exchange-actions {
+  flex-shrink: 0;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-md);
+}
+.label-outcomes {
+  display: grid;
+  gap: var(--space-sm);
+}
+.label-outcome-group > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  list-style: none;
+}
+.label-outcome-group > summary::before {
+  content: '▸';
+  color: var(--color-muted);
+}
+.label-outcome-group[open] > summary::before {
+  content: '▾';
+}
+.label-outcome-body {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-left: var(--space-md);
+}
+.label-outcome-entries {
+  display: grid;
+  gap: var(--space-sm);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.label-outcome-entries > li {
+  display: grid;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+}
+.label-kept-text {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+.label-kept-text > div {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+.label-kept-text dt {
+  color: var(--color-muted);
+}
+.label-kept-text dd {
+  margin: 0;
+}
+.label-origin {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 560px) {
+  .modal.label-exchange {
+    padding: var(--space-md);
+  }
+  .label-exchange .label-setting-row,
+  .label-mapping-values > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs);
+  }
+  .label-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .label-preview table {
+    min-width: 420px;
+  }
+}

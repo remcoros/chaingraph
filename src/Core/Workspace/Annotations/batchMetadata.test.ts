@@ -55,6 +55,18 @@ describe('batch label and icon edits', () => {
     expect(applyBatchLabel(workspace, [OUT_A], 'Anything')).toBe(workspace);
   });
 
+  it('keeps all 255 characters when applying a label to selected records', () => {
+    const label = 'é'.repeat(255);
+    const applied = applyBatchLabel(fixture(), [OUT_A, OUT_B], label, true);
+    expect(applied.annotations.entities[OUT_A]).toEqual({
+      label,
+      note: 'A note',
+      icon: '★',
+      bookmarked: true,
+    });
+    expect(applied.annotations.entities[OUT_B].label).toBe(label);
+  });
+
   it('scopes edits to supplied identifiers and rejects unusable references', () => {
     const workspace = fixture();
     const applied = applyBatchLabel(workspace, [OUT_B, 'not-a-reference', 'addr:xyz'], 'Scoped');
@@ -70,8 +82,8 @@ describe('batch label and icon edits', () => {
       'invalid',
       `addr:${bitcoinAddress.toBech32(new Uint8Array(20).fill(3), 0, 'tb')}`,
     ];
-    const labeled = applyBatchLabel(workspace, [...invalid, OUT_B], 'L'.repeat(201));
-    expect(labeled.annotations.entities[OUT_B].label).toHaveLength(200);
+    const labeled = applyBatchLabel(workspace, [...invalid, OUT_B], 'L'.repeat(256));
+    expect(labeled.annotations.entities[OUT_B].label).toHaveLength(255);
     const icons = applyBatchIcon(labeled, [...invalid, OUT_A, OUT_B], 'I'.repeat(21));
     expect(icons.annotations.entities[OUT_A]).toEqual(workspace.annotations.entities[OUT_A]);
     expect(icons.annotations.entities[OUT_B].icon).toHaveLength(20);

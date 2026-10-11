@@ -23,6 +23,7 @@ export interface WalletWorkbenchContext {
   onSelectWallet: (id: string) => void;
   onAddWallet: () => void;
   onEditWallet?: (id: string) => void;
+  onExchangeLabels?: (direction: 'import' | 'export') => void;
   onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
   onRefresh: () => void;
   onShowInGraph: (nodeId: string, utxo?: WalletUtxoRecord) => void;

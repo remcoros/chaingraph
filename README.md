@@ -31,8 +31,12 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
   outputs and addresses. Undo and redo edits without rolling back accepted chain
-  refreshes in the current session, or exchange
-  labels through plaintext BIP329 files.
+  refreshes in the current session. Review BIP329 imports before applying them
+  and inspect exports as a table or exact JSONL, with
+  profiles for Sparrow, BTCPay Server, BlueWallet, Bitcoin Keeper and generic
+  files. Labels support 255 characters; profiles preserve tags or transaction
+  notes where the destination supports them. Try the
+  [example exchange files](public/examples/bip329/README.md) with the public demo wallet.
 
 - **Run analysis.** Use seven local tools to find patterns in outputs, inputs,
   address reuse, value flow, scripts and wallet overlap. Findings link to
@@ -178,7 +182,9 @@ automatically and can be exported as encrypted files for backup or transfer.
 - Saved workspaces use AES-256-GCM with a PBKDF2-SHA256 derived key. Passwords
   live only in the unlocked browser tab. There is no recovery: keep encrypted
   exports and remember your password.
-- **BIP329 label exports are plaintext** and may contain extended public keys.
+- **BIP329 metadata exports are plaintext.** Key labels and extended public keys
+  are included only when explicitly selected. Use encrypted workspace exports
+  to preserve the complete workspace.
 - The backend has no login and binds to loopback by default. It is meant for one
   trusted user on a trusted machine or behind your own authenticated HTTPS proxy.
   Public or shared hosting is not supported.

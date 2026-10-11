@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { CircleHelp } from 'lucide-react';
+import './wallet-help.css';
 
 /** Informational tooltip: hover or focus on desktop, tap on touch. Never traps focus. */
 export function WalletHelp({

@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
+import { MAX_WALLET_NAME_LENGTH, type Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 import { Modal } from '../../../Dialogs/Modal';
 
 export function WalletNameDialog({
@@ -23,7 +23,7 @@ export function WalletNameDialog({
           <input
             data-autofocus
             required
-            maxLength={100}
+            maxLength={MAX_WALLET_NAME_LENGTH}
             value={name}
             aria-invalid={!name.trim()}
             onChange={(event) => {
