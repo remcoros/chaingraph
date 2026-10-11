@@ -794,6 +794,20 @@ trigger data loading. `FlowPanelTransactionView`,
 status line and body, and keep their downstream components in their own file.
 Transaction choice and quick editors have panel lifetime; address tabs and
 pagination have address lifetime.
+Transaction connectors are decorative cubic curves owned by
+`FlowPanelTransactionView` in Graph and `WalletReviewFlow` in Wallet.
+Graph's existing layout effect applies sticky offsets before measuring card
+edges in a viewport-anchored SVG, so one observer and animation frame batch own
+both layout and connectors. Decorative paths update directly in that paint frame,
+without a React geometry commit. Selected curves paint last at the shared junction.
+Strokes end at an arrowhead's base; the matching-color head finishes 2px before
+the card. Clipping excludes obscured rows, confines Graph curves to the panel
+viewport and fades the last visible pixels before a row disappears.
+Wallet measures its independent lane scrollers, observes paging and annotation
+changes, and uses vertical curves when the detail container stacks its lanes.
+Geometry stays transient; neither workbench shares a layout coordinator or stores it.
+Arrows express input/transaction/output relationships, never ownership or an
+input-to-output allocation. CSS rails, branches and endpoint caps are removed.
 The Inspector derives selected transactions and their loaded relationships through
 `relatedTransactions.ts`. `ScriptInspector` renders Core Bitcoin's saved-script
 decode; `src/Core/ChainData/rawTransactionInspection.ts` fetches raw bytes on

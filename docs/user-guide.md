@@ -179,7 +179,9 @@ under **More details** for the current selection.
 
 Selecting a transaction or output opens a collapsible inputs/outputs view above
 the graph. Inputs and outputs sit around the central transaction; long lists
-start collapsed. Select an input to follow its previous output while keeping the
+start collapsed. Curved arrows connect visible rows to the transaction, with
+emphasis on selected rows. They do not allocate inputs to specific outputs.
+Select an input to follow its previous output while keeping the
 current transaction open; select an output to see its creating transaction and
 every loaded spending transaction in a chooser. A loaded spend can already show
 an input's value, address and script before its parent is loaded. **Load
@@ -503,7 +505,9 @@ coin titles retain navigation to the exact review target. Annotation popovers pu
 finding assessment. Answered
 annotation questions disappear; explicit decisions stay available to reopen.
 **Transaction flow** spans the width below these groups and starts expanded for
-transactions. Collapse it to hide the diagram. **Inputs/Outputs**, **Wallet
+transactions. Curved arrows connect visible inputs and outputs to the transaction,
+with matching line and arrow colors for the selected record. Narrow panels stack
+the lanes so amounts remain readable. Collapse it to hide the diagram. **Inputs/Outputs**, **Wallet
 accounting**, and related records remain available below it. Available wallet records open in the
 inspector with **Back**, preserving the list and its filters. External or unavailable
 records have explicit graph actions. **Related** remains available for batch

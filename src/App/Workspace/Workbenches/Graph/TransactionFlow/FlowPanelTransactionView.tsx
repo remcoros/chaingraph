@@ -109,6 +109,13 @@ interface FlowRowActions {
 
 const INITIAL_FLOW_ROW_LIMIT = 25;
 
+interface FlowCurve {
+  key: string;
+  path: string;
+  selected: boolean;
+  opacity: number;
+}
+
 function moveSelectedRowFirst(rows: Row[], selectedId?: string) {
   const selectedIndex = selectedId ? rows.findIndex((row) => row.id === selectedId) : -1;
   if (selectedIndex <= 0) return rows;
@@ -119,8 +126,6 @@ function moveSelectedRowFirst(rows: Row[], selectedId?: string) {
 const TransactionFlowRow = memo(function TransactionFlowRow({
   row,
   inputs,
-  first,
-  last,
   selected,
   pinned,
   belowThreshold,
@@ -141,8 +146,6 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
 }: {
   row: Row;
   inputs: boolean;
-  first: boolean;
-  last: boolean;
   selected: boolean;
   pinned: boolean;
   belowThreshold: boolean;
@@ -189,8 +192,9 @@ const TransactionFlowRow = memo(function TransactionFlowRow({
   return (
     <div
       key={row.index}
-      className={`transaction-row ${first ? 'is-first' : ''} ${last ? 'is-last' : ''} ${icon ? 'has-annotation-icon' : ''} ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
+      className={`transaction-row ${icon ? 'has-annotation-icon' : ''} ${selected ? 'is-selected' : ''} ${pinned ? 'is-pinned' : ''} ${batchSelected ? 'is-batch-selected' : ''}`}
       data-selected={selected}
+      data-flow-row={row.index}
     >
       {batchMode && row.id && (
         <SelectionCheckbox
@@ -342,6 +346,8 @@ function TransactionRows({
   identity,
   previous,
   next,
+  overlay,
+  connectorId,
 }: Props & {
   tx: Transaction;
   spends: ReturnType<typeof indexLoadedSpends>;
@@ -350,6 +356,8 @@ function TransactionRows({
   identity: ReactNode;
   previous: ReactNode;
   next: ReactNode;
+  overlay: RefObject<SVGSVGElement | null>;
+  connectorId: string;
 }) {
   const {
     network,
@@ -412,20 +420,32 @@ function TransactionRows({
   useLayoutEffect(() => {
     const container = flow.current;
     const panel = container?.closest<HTMLDetailsElement>('.flow-panel');
-    if (!container || !panel) return;
+    const svg = overlay.current;
+    if (!container || !panel || !svg) return;
+    const paths = svg.querySelector<SVGGElement>('.transaction-flow-paths')!;
+    const clipRect = svg.querySelector<SVGRectElement>('clipPath rect')!;
+    const drawn = new Map<string, SVGPathElement>();
     const summary = panel.querySelector<HTMLElement>(':scope > summary');
     const feedback = panel.querySelector<HTMLElement>('.transaction-input-feedback');
     const center = container.querySelector<HTMLElement>('.transaction-flow-center');
+    const identityCard = container.querySelector<HTMLElement>('.flow-panel-identity');
     const actions = panel.querySelector<HTMLElement>('.flow-panel-body > .flow-panel-actions');
     const lanes = Array.from(container.querySelectorAll<HTMLElement>(':scope > section')).map(
       (section) => ({
         section,
         header: section.querySelector<HTMLElement>('.transaction-lane-context')!,
         rows: section.querySelector<HTMLElement>('.transaction-rows')!,
+        cards: Array.from(section.querySelectorAll<HTMLElement>('.transaction-row')),
       }),
     );
+    let frame = 0;
     const measure = () => {
-      if (!panel.open || !panel.clientHeight) return;
+      frame = 0;
+      if (!panel.open || !panel.clientHeight) {
+        paths.replaceChildren();
+        drawn.clear();
+        return;
+      }
       const top = summary?.offsetHeight ?? 38;
       const bottom = panel.clientHeight - (feedback?.offsetHeight ?? 0) - 8;
       container.style.setProperty('--transaction-lane-top', `${top}px`);
@@ -463,28 +483,148 @@ function TransactionRows({
           `${Math.min(top + header.offsetHeight + 4, bottom - rows.offsetHeight)}px`,
         );
       }
+      // Read after applying the sticky offsets. The SVG's own rendered origin
+      // accounts for panel scrolling, including the narrow horizontal layout.
+      svg.style.width = `${panel.clientWidth}px`;
+      svg.style.height = `${Math.max(0, panel.clientHeight - top)}px`;
+      svg.parentElement!.style.top = `${top}px`;
+      const origin = svg.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const visibleLeft = panelRect.left + panel.clientLeft;
+      const visibleRight = visibleLeft + panel.clientWidth;
+      const visibleTop = Math.max(
+        panelRect.top + panel.clientTop,
+        summary?.getBoundingClientRect().bottom ?? panelRect.top + top,
+      );
+      const visibleBottom = panelRect.top + panel.clientTop + bottom;
+      const clip = {
+        x: visibleLeft - origin.left,
+        y: visibleTop - origin.top,
+        width: panel.clientWidth,
+        height: Math.max(0, visibleBottom - visibleTop),
+      };
+      const curves: FlowCurve[] = [];
+      const transaction = identityCard?.getBoundingClientRect();
+      // Keep arrowheads within the visible part of a partially clipped card.
+      const visibleCenter = (rect: DOMRect, lowerBound: number) => {
+        const start = Math.max(rect.top, lowerBound);
+        const end = Math.min(rect.bottom, visibleBottom);
+        if (end <= start) return undefined;
+        const inset = Math.min(3, (end - start) / 2);
+        return Math.max(start + inset, Math.min(end - inset, (rect.top + rect.bottom) / 2));
+      };
+      const txY = transaction && visibleCenter(transaction, visibleTop);
+      if (origin.width && transaction?.width && txY !== undefined) {
+        for (const { section, header, cards } of lanes) {
+          const inputs = section.classList.contains('transaction-flow-inputs');
+          const laneTop = Math.max(visibleTop, header.getBoundingClientRect().bottom);
+          const pinned = cards.find((card) => card.classList.contains('is-pinned'));
+          const pinnedBottom = pinned?.getBoundingClientRect().bottom ?? laneTop;
+          for (const card of cards) {
+            const rect = card.getBoundingClientRect();
+            const lowerBound = card === pinned ? laneTop : Math.max(laneTop, pinnedBottom);
+            const rowY = visibleCenter(rect, lowerBound);
+            const rowX = inputs ? rect.right : rect.left;
+            const txX = inputs ? transaction.left : transaction.right;
+            if (
+              !rect.width ||
+              rowY === undefined ||
+              rect.right <= visibleLeft ||
+              rect.left >= visibleRight ||
+              rowX < visibleLeft ||
+              rowX > visibleRight ||
+              txX < visibleLeft ||
+              txX > visibleRight
+            )
+              continue;
+            const startX = (inputs ? rowX : txX) - origin.left;
+            const startY = (inputs ? rowY : txY) - origin.top;
+            // Stop the stroke at the arrow's base. Its 8px head ends 2px
+            // before the card, clear of the border and selection outline.
+            const endX = (inputs ? txX : rowX) - origin.left - 10;
+            const endY = (inputs ? txY : rowY) - origin.top;
+            const bend = (endX - startX) / 2;
+            if (bend <= 0) continue;
+            curves.push({
+              key: `${inputs ? 'input' : 'output'}:${card.dataset.flowRow}`,
+              path: `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`,
+              selected: card.dataset.selected === 'true',
+              opacity: Math.min(
+                1,
+                (Math.min(rect.bottom, visibleBottom) - Math.max(rect.top, lowerBound)) / 12,
+              ),
+            });
+          }
+        }
+      }
+      for (const [name, value] of Object.entries(clip)) clipRect.setAttribute(name, String(value));
+      // These decorative nodes have no React-owned children. Update them in the
+      // measurement frame so scrolling never waits for a subsequent React commit.
+      // Selected arrows paint last at the shared input junction.
+      curves.sort((a, b) => Number(a.selected) - Number(b.selected));
+      const retained = new Set(curves.map((curve) => curve.key));
+      for (const [key, path] of drawn)
+        if (!retained.has(key)) {
+          path.remove();
+          drawn.delete(key);
+        }
+      for (const [index, curve] of curves.entries()) {
+        let path = drawn.get(curve.key);
+        if (!path) {
+          path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.dataset.flowCurve = curve.key;
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', 'currentColor');
+          path.setAttribute('stroke-width', '1.5');
+          drawn.set(curve.key, path);
+        }
+        path.setAttribute('d', curve.path);
+        path.setAttribute('opacity', String(curve.opacity));
+        path.setAttribute('class', `transaction-flow-curve${curve.selected ? ' is-selected' : ''}`);
+        path.setAttribute(
+          'marker-end',
+          `url(#${connectorId}-${curve.selected ? 'selected' : 'quiet'})`,
+        );
+        if (paths.children[index] !== path) paths.insertBefore(path, paths.children[index] ?? null);
+      }
     };
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
-    });
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const observer = new ResizeObserver(schedule);
     observer.observe(panel);
+    observer.observe(container);
     if (summary) observer.observe(summary);
     if (feedback) observer.observe(feedback);
     if (center) observer.observe(center);
+    if (identityCard) observer.observe(identityCard);
     if (actions) observer.observe(actions);
-    for (const { header, rows } of lanes) {
+    for (const { header, rows, cards } of lanes) {
       observer.observe(header);
       observer.observe(rows);
+      for (const card of cards) observer.observe(card);
     }
-    measure();
+    panel.addEventListener('scroll', schedule, { capture: true, passive: true });
+    panel.addEventListener('toggle', schedule);
+    window.addEventListener('resize', schedule);
+    schedule();
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      panel.removeEventListener('scroll', schedule, true);
+      panel.removeEventListener('toggle', schedule);
+      window.removeEventListener('resize', schedule);
+      paths.replaceChildren();
     };
   }, [
-    tx.txid,
+    overlay,
+    connectorId,
+    tx,
+    transactions,
+    workspace.annotations,
+    renderMetadata,
+    selected?.id,
+    selected?.address,
     expandedInputs,
     expandedOutputs,
     workspace.view.flowAmountThreshold,
@@ -616,8 +756,6 @@ function TransactionRows({
                   <TransactionFlowRow
                     row={row}
                     inputs={inputs}
-                    first={index === 0}
-                    last={index === displayedRows.length - 1}
                     selected={Boolean(matches(row))}
                     pinned={row.id === selected?.id}
                     belowThreshold={belowThreshold(row)}
@@ -828,6 +966,8 @@ export function FlowPanelTransactionView({
   panel: Props;
   transaction: TransactionFlowModel;
 }) {
+  const overlay = useRef<SVGSVGElement>(null);
+  const connectorId = useId();
   const {
     workspace,
     selected,
@@ -982,6 +1122,39 @@ export function FlowPanelTransactionView({
   if (!selected) return null;
   return (
     <>
+      {current && (
+        <div className="transaction-flow-connections-anchor" aria-hidden="true">
+          <svg
+            ref={overlay}
+            className="transaction-flow-connections"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <defs>
+              <clipPath id={`${connectorId}-clip`}>
+                <rect />
+              </clipPath>
+              {(['quiet', 'selected'] as const).map((tone) => (
+                <marker
+                  key={tone}
+                  id={`${connectorId}-${tone}`}
+                  className={`transaction-flow-arrowhead${tone === 'selected' ? ' is-selected' : ''}`}
+                  viewBox="0 0 8 6"
+                  refX="0"
+                  refY="3"
+                  markerWidth="8"
+                  markerHeight="7"
+                  markerUnits="userSpaceOnUse"
+                  orient="auto"
+                >
+                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="currentColor" />
+                </marker>
+              ))}
+            </defs>
+            <g className="transaction-flow-paths" clipPath={`url(#${connectorId}-clip)`} />
+          </svg>
+        </div>
+      )}
       <div className="flow-panel-body">
         <div className="flow-panel-actions">
           <TransactionFlowActions
@@ -998,6 +1171,8 @@ export function FlowPanelTransactionView({
             key={current.tx.txid}
             spends={spends}
             previousOutputs={previousOutputs}
+            overlay={overlay}
+            connectorId={connectorId}
             onNavigate={navigate}
             onSelect={(id) => {
               choose(current.tx.txid);

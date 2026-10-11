@@ -19,7 +19,8 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 - **Explore transactions.** Look up a transaction, address or output in a
   chronologically ordered 3D or flat graph. Filter the view, follow funding and
   spending links, compact repeated outputs between the same visible transaction
-  pair, and inspect bounded address history.
+  pair, and inspect bounded address history. The transaction flow panel connects
+  visible inputs and outputs to their transaction with curved arrows.
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level
   extended public key. Chaingraph derives addresses in the browser and refreshes
@@ -37,7 +38,8 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
   Transaction headers show direction and amount above the ID, followed by
   block date/age, observed confirmations, fee and size. Metadata and Review findings
   share two columns, stacked in a narrow inspector; Transaction flow starts expanded
-  across the full width, with graph actions beside its heading. Other inspectors
+  across the full width, with curved arrows and graph actions beside its heading.
+  Narrow flow panels stack their lanes to keep card amounts readable. Other inspectors
   retain their record-type title and graph actions. Custom icons are editable in
   transaction Metadata and remain visible without labels.
   Follow available wallet records in the inspector and return with Back.

@@ -2790,18 +2790,14 @@ details[open] > summary > .wallet-section-toggle {
 }
 .wallet-transaction-flow .wallet-flow-columns {
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.8fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: 28px;
 }
 .wallet-transaction-flow .wallet-flow-transaction-node {
   padding-block: 10px;
 }
-@container wallet-detail (max-width: 680px) {
-  .wallet-transaction-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .wallet-transaction-facts > div:nth-child(odd)::before {
-    content: none;
-  }
+.wallet-transaction-flow .wallet-flow-column-heading,
+.wallet-transaction-flow .wallet-flow-counts {
+  background: var(--color-surface);
 }
 @container wallet-detail (max-width: 600px) {
   .wallet-transaction-overview {
@@ -2815,22 +2811,54 @@ details[open] > summary > .wallet-section-toggle {
     border-left: 0;
   }
 }
-@container wallet-detail (max-width: 480px) {
+@container wallet-detail (max-width: 680px) {
+  .wallet-transaction-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wallet-transaction-facts > div:nth-child(odd)::before {
+    content: none;
+  }
   .wallet-transaction-flow .wallet-flow-columns {
     grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
+    gap: 24px;
   }
   .wallet-transaction-flow .wallet-flow-transaction {
     flex-direction: column;
     gap: 2px;
     padding-top: 0;
   }
-  .wallet-transaction-flow .wallet-flow-arrow {
-    transform: rotate(90deg);
+  .wallet-transaction-flow .wallet-flow-entries {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .wallet-transaction-flow .wallet-flow-column[data-flow-side='output'] > .wallet-flow-entries {
+    padding-top: 16px;
   }
   .wallet-transaction-flow .wallet-flow-transaction-node {
-    width: 100%;
+    flex: none;
+    width: min(100%, 320px);
     box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    column-gap: 8px;
+    text-align: left;
+    padding: 10px;
+  }
+  .wallet-transaction-flow .wallet-flow-transaction-node > * {
+    grid-column: 2;
+  }
+  .wallet-transaction-flow .wallet-flow-transaction-node > .wallet-flow-transaction-icon {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+  .wallet-transaction-flow .wallet-flow-transaction-node > .wallet-flow-show {
+    grid-column: 3;
+    grid-row: 1 / span 3;
+  }
+  .wallet-transaction-flow .wallet-flow-transaction-node .transaction-block-time {
+    grid-column: 2 / 4;
+    justify-content: flex-start;
   }
 }
 @container wallet-detail (max-width: 340px) {

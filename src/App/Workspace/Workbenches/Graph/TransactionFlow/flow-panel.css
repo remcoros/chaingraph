@@ -447,16 +447,38 @@
   margin: 0;
 }
 .transaction-flow {
-  --transaction-flow-gap: 20px;
-  --transaction-flow-rail: color-mix(in srgb, var(--color-accent) 28%, var(--color-rule));
-  --transaction-flow-branch: color-mix(in srgb, var(--color-accent) 16%, var(--color-rule));
-  --transaction-flow-junction: color-mix(in srgb, var(--color-accent) 48%, var(--color-rule));
+  --transaction-flow-gap: clamp(24px, 3vw, 40px);
+  position: relative;
+  isolation: isolate;
   display: grid;
   /* Keep complete amounts inside their lane; the view already scrolls on narrow screens. */
   grid-template-columns: minmax(200px, 1fr) clamp(136px, 19%, 184px) minmax(200px, 1fr);
   grid-template-areas: 'inputs identity outputs';
   column-gap: var(--transaction-flow-gap);
   align-items: start;
+}
+.transaction-flow-connections-anchor {
+  position: sticky;
+  top: var(--transaction-lane-top, 38px);
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.transaction-flow-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.transaction-flow-curve,
+.transaction-flow-arrowhead {
+  color: color-mix(in srgb, var(--color-accent) 24%, var(--color-rule));
+}
+.transaction-flow-curve.is-selected,
+.transaction-flow-arrowhead.is-selected {
+  color: var(--color-accent);
 }
 @media (min-width: 1000px) {
   .transaction-flow {
@@ -475,11 +497,9 @@
   }
 }
 .transaction-flow-inputs {
-  --transaction-connector-cover-offset: var(--transaction-flow-gap);
   grid-area: inputs;
 }
 .transaction-flow-outputs {
-  --transaction-connector-cover-offset: calc(-1 * var(--transaction-flow-gap));
   grid-area: outputs;
 }
 .transaction-flow-hint {
@@ -548,6 +568,7 @@
 .transaction-flow-center {
   grid-area: identity;
   position: sticky;
+  z-index: 1;
   top: var(--transaction-center-top, 76px);
   align-self: start;
   min-width: 0;
@@ -707,6 +728,8 @@
   padding: 5px;
 }
 .transaction-flow section {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   /* Give sticky headings and shorter lists the full opposite lane to travel in. */
   align-self: stretch;
@@ -780,42 +803,9 @@
   scroll-margin-top: 38px;
   scroll-margin-bottom: 8px;
 }
-.transaction-flow-inputs .transaction-rows {
-  border-right: 0;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: linear-gradient(var(--transaction-flow-rail), var(--transaction-flow-rail)) right /
-    2px 100% no-repeat;
-}
-.transaction-flow-outputs .transaction-rows {
-  border-left: 0;
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-  background: linear-gradient(var(--transaction-flow-rail), var(--transaction-flow-rail)) left / 2px
-    100% no-repeat;
-}
 .transaction-row-separator {
   flex: 0 0 5px;
   background: var(--color-paper);
-}
-.transaction-row::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: 19px;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--transaction-flow-branch);
-}
-.transaction-row:has(
-    .transaction-row-content:hover,
-    .transaction-row-content:focus-visible
-  )::after {
-  background: color-mix(in srgb, var(--color-accent) 36%, var(--transaction-flow-branch));
-}
-.transaction-flow-inputs .transaction-row::after {
-  left: 100%;
-}
-.transaction-flow-outputs .transaction-row::after {
-  right: 100%;
 }
 .transaction-row.is-selected {
   border-color: var(--color-accent);
@@ -828,80 +818,17 @@
   z-index: 1;
   background-color: color-mix(in srgb, var(--color-accent) 10%, var(--color-paper));
 }
-.transaction-lane-context,
-.transaction-row.is-pinned {
-  /* Cover the connector gutter along with rows scrolling behind pinned content. */
-  box-shadow: var(--transaction-connector-cover-offset) 0 0 0 var(--color-paper);
-}
 .transaction-row.is-pinned .transaction-row-content {
   max-height: calc(
     var(--transaction-selected-max-height) - var(--transaction-row-tools-space, 0px)
   );
   overflow: auto;
 }
-.transaction-row.is-selected::after {
-  background: var(--color-accent);
-  height: 2px;
-}
 .transaction-row-content {
   position: relative;
   flex: 1;
   min-width: 0;
   cursor: pointer;
-}
-.transaction-row.is-first .transaction-row-content::before,
-.transaction-row.is-last .transaction-row-content::after {
-  content: '';
-  position: absolute;
-  width: 40px;
-  height: var(--radius-sm);
-  pointer-events: none;
-}
-.transaction-flow-inputs .transaction-row.is-first .transaction-row-content {
-  border-top-right-radius: var(--radius-sm);
-}
-.transaction-flow-inputs .transaction-row.is-first .transaction-row-content::before {
-  top: 0;
-  right: 0;
-  border-top: 2px solid var(--transaction-flow-rail);
-  border-right: 2px solid var(--transaction-flow-rail);
-  border-radius: 0 var(--radius-sm) 0 0;
-}
-.transaction-flow-inputs .transaction-row.is-last .transaction-row-content {
-  border-bottom-right-radius: var(--radius-sm);
-}
-.transaction-flow-inputs .transaction-row.is-last .transaction-row-content::after {
-  right: 0;
-  bottom: 0px;
-  border-right: 2px solid var(--transaction-flow-rail);
-  border-bottom: 2px solid var(--transaction-flow-rail);
-  border-radius: 0 0 var(--radius-sm) 0;
-}
-.transaction-flow-outputs .transaction-row.is-first .transaction-row-content {
-  border-top-left-radius: var(--radius-sm);
-}
-.transaction-flow-outputs .transaction-row.is-first .transaction-row-content::before {
-  top: 0;
-  left: 0;
-  border-top: 2px solid var(--transaction-flow-rail);
-  border-left: 2px solid var(--transaction-flow-rail);
-  border-radius: var(--radius-sm) 0 0;
-}
-.transaction-flow-outputs .transaction-row.is-last .transaction-row-content {
-  border-bottom-left-radius: var(--radius-sm);
-}
-.transaction-flow-outputs .transaction-row.is-last .transaction-row-content::after {
-  bottom: 0;
-  left: 0;
-  border-bottom: 2px solid var(--transaction-flow-rail);
-  border-left: 2px solid var(--transaction-flow-rail);
-  border-radius: 0 0 0 var(--radius-sm);
-}
-.transaction-flow-inputs .transaction-row.is-selected .transaction-row-content::before,
-.transaction-flow-inputs .transaction-row.is-selected .transaction-row-content::after,
-.transaction-flow-outputs .transaction-row.is-selected .transaction-row-content::before,
-.transaction-flow-outputs .transaction-row.is-selected .transaction-row-content::after {
-  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--transaction-flow-rail));
 }
 .transaction-row.has-annotation-icon .transaction-row-content {
   min-height: 44px;
@@ -1044,7 +971,7 @@
     padding: 0 5px 7px;
   }
   .transaction-flow {
-    --transaction-flow-gap: 7px;
+    --transaction-flow-gap: 18px;
     grid-template-columns: minmax(200px, 1fr) 110px minmax(200px, 1fr);
   }
   .flow-panel-identity {
@@ -1098,9 +1025,6 @@
     min-width: 32px;
     min-height: 32px;
   }
-  .transaction-row::after {
-    width: 6px;
-  }
   .transaction-neighbor-card {
     padding: 7px 4px;
     gap: 4px;
@@ -1118,28 +1042,6 @@
   }
   .transaction-flow-hint {
     font-size: 9px;
-  }
-}
-.transaction-row::before {
-  content: '';
-  position: absolute;
-  top: calc(50% - 2px);
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  border-left: 4px solid var(--color-rule);
-}
-.transaction-flow-inputs .transaction-row::before {
-  left: calc(100% + 15px);
-}
-.transaction-flow-outputs .transaction-row::before {
-  right: 100%;
-}
-.transaction-row.is-selected::before {
-  border-left-color: var(--color-accent);
-}
-@media (max-width: 700px) {
-  .transaction-flow-inputs .transaction-row::before {
-    left: calc(100% + 2px);
   }
 }
 .transaction-coverage {

@@ -25,17 +25,38 @@
   overflow-wrap: anywhere;
 }
 .wallet-flow-columns {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(150px, 0.8fr) minmax(0, 1fr);
   align-items: stretch;
-  gap: 10px;
+  gap: 28px;
+}
+.wallet-flow-connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wallet-flow-curve,
+.wallet-flow-arrowhead {
+  color: color-mix(in srgb, var(--color-accent) 24%, var(--color-rule));
+}
+.wallet-flow-curve.is-selected,
+.wallet-flow-arrowhead.is-selected {
+  color: var(--color-accent);
 }
 .wallet-flow-column {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 .wallet-flow-column-heading {
+  background: var(--color-paper);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -165,6 +186,7 @@
   flex-shrink: 0;
 }
 .wallet-flow-counts {
+  background: var(--color-paper);
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -183,15 +205,12 @@
   overflow: visible;
 }
 .wallet-flow-transaction {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
   padding-top: 27px;
-}
-.wallet-flow-arrow {
-  flex-shrink: 0;
-  width: 14px;
-  color: var(--color-muted);
 }
 .wallet-flow-transaction-node {
   align-items: center;
@@ -272,17 +291,12 @@
   }
   .wallet-flow-columns {
     grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
+    gap: 24px;
   }
   .wallet-flow-transaction {
     flex-direction: column;
     gap: 2px;
     padding-top: 0;
-  }
-  .wallet-flow-arrow {
-    transform: rotate(90deg);
-    width: 10px;
-    height: 10px;
   }
   .wallet-flow-transaction-node {
     width: 100%;
@@ -312,6 +326,9 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+  }
+  .wallet-flow-column[data-flow-side='output'] > .wallet-flow-entries {
+    padding-top: 16px;
   }
   .wallet-flow-node:only-child {
     grid-column: 1 / -1;

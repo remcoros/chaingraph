@@ -1,16 +1,15 @@
 import { formatBitcoinAmount } from '../../../../../Core/Formatting';
 import { Amount } from '../../../../Controls/Display/Amount';
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import {
-  ArrowRight,
-  Box,
-  Pencil,
-  Network,
-  Wallet,
-  CircleHelp,
-  TriangleAlert,
-  FileCode,
-} from 'lucide-react';
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useId,
+  type RefObject,
+} from 'react';
+import { Box, Pencil, Network, Wallet, CircleHelp, TriangleAlert, FileCode } from 'lucide-react';
 import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { GraphNode } from '../../../GraphState/types';
@@ -46,6 +45,7 @@ export function WalletReviewFlow({
   onVisibleInputsChange?: (inputs: readonly WalletReviewFlowEntry[]) => void;
   active?: boolean;
 }) {
+  const columnsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (context.status !== 'loaded') onVisibleInputsChange?.([]);
   }, [context.status, onVisibleInputsChange]);
@@ -77,7 +77,8 @@ export function WalletReviewFlow({
           <Wallet size={12} aria-hidden="true" /> Your wallet · {walletName}
         </span>
       </figcaption>
-      <div className="wallet-flow-columns">
+      <div className="wallet-flow-columns" ref={columnsRef}>
+        <FlowConnections columnsRef={columnsRef} />
         <FlowColumn
           key={`${context.transactionNodeId}:inputs`}
           title="Inputs"
@@ -89,7 +90,6 @@ export function WalletReviewFlow({
           onVisibleEntriesChange={onVisibleInputsChange}
         />
         <div className="wallet-flow-transaction">
-          <ArrowRight className="wallet-flow-arrow" size={17} aria-hidden="true" />
           <div
             className={`wallet-flow-node wallet-flow-transaction-node${editingTransaction ? ' is-selected' : ''}`}
             title={[context.transactionId, transactionAnnotation?.label]
@@ -123,7 +123,6 @@ export function WalletReviewFlow({
               onShowInGraph={onShowInGraph}
             />
           </div>
-          <ArrowRight className="wallet-flow-arrow" size={17} aria-hidden="true" />
         </div>
         <FlowColumn
           key={`${context.transactionNodeId}:outputs`}
@@ -165,6 +164,182 @@ export function WalletReviewFlow({
         </WalletHelp>
       </div>
     </figure>
+  );
+}
+
+/** Decorative geometry only; evidence, paging and selection retain their existing owners. */
+function FlowConnections({ columnsRef }: { columnsRef: RefObject<HTMLDivElement | null> }) {
+  const overlay = useRef<SVGSVGElement>(null);
+  const markerId = useId();
+  useEffect(() => {
+    const columns = columnsRef.current;
+    const svg = overlay.current;
+    if (!columns || !svg) return;
+    const paths = svg.querySelector<SVGGElement>('.wallet-flow-paths')!;
+    const drawn = new Map<string, SVGPathElement>();
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const origin = svg.getBoundingClientRect();
+      const transaction = columns
+        .querySelector('.wallet-flow-transaction-node')
+        ?.getBoundingClientRect();
+      const curves: { key: string; path: string; selected: boolean; opacity: number }[] = [];
+      if (origin.width && transaction?.width) {
+        for (const column of columns.querySelectorAll<HTMLElement>('[data-flow-side]')) {
+          const list = column.querySelector('.wallet-flow-entries')?.getBoundingClientRect();
+          if (!list) continue;
+          const input = column.dataset.flowSide === 'input';
+          const horizontal = list.right <= transaction.left || list.left >= transaction.right;
+          for (const card of column.querySelectorAll<HTMLElement>('[data-flow-entry]')) {
+            const rect = card.getBoundingClientRect();
+            const top = Math.max(rect.top, list.top);
+            const bottom = Math.min(rect.bottom, list.bottom);
+            const left = Math.max(rect.left, list.left);
+            const right = Math.min(rect.right, list.right);
+            if (bottom <= top || right <= left) continue;
+            const inset = Math.min(3, (bottom - top) / 2);
+            const cardY =
+              Math.max(top + inset, Math.min(bottom - inset, (rect.top + rect.bottom) / 2)) -
+              origin.top;
+            const cardX = (left + right) / 2 - origin.left;
+            const txX = (transaction.left + transaction.right) / 2 - origin.left;
+            const txY = (transaction.top + transaction.bottom) / 2 - origin.top;
+            const startX = horizontal
+              ? (input ? rect.right : transaction.right) - origin.left
+              : input
+                ? cardX
+                : txX;
+            const startY = horizontal
+              ? input
+                ? cardY
+                : txY
+              : (input ? bottom : transaction.bottom) - origin.top;
+            const endX = horizontal
+              ? (input ? transaction.left : rect.left) - origin.left - 10
+              : input
+                ? txX
+                : cardX;
+            const endY = horizontal
+              ? input
+                ? txY
+                : cardY
+              : (input ? transaction.top : top) - origin.top - 10;
+            const bend = horizontal ? (endX - startX) / 2 : (endY - startY) / 2;
+            if (bend <= 0) continue;
+            curves.push({
+              key: `${input ? 'input' : 'output'}:${card.dataset.flowEntry}`,
+              path: horizontal
+                ? `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`
+                : `M ${startX} ${startY} C ${startX} ${startY + bend}, ${endX} ${endY - bend}, ${endX} ${endY}`,
+              selected: card.classList.contains('is-selected'),
+              opacity: Math.min(1, (bottom - top) / 12),
+            });
+          }
+        }
+      }
+      curves.sort((a, b) => Number(a.selected) - Number(b.selected));
+      const retained = new Set(curves.map((curve) => curve.key));
+      for (const [key, path] of drawn)
+        if (!retained.has(key)) {
+          path.remove();
+          drawn.delete(key);
+        }
+      for (const [index, curve] of curves.entries()) {
+        let path = drawn.get(curve.key);
+        if (!path) {
+          path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.dataset.flowCurve = curve.key;
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', 'currentColor');
+          path.setAttribute('stroke-width', '1.5');
+          drawn.set(curve.key, path);
+        }
+        path.setAttribute('d', curve.path);
+        path.setAttribute('opacity', String(curve.opacity));
+        path.setAttribute('class', `wallet-flow-curve${curve.selected ? ' is-selected' : ''}`);
+        path.setAttribute(
+          'marker-end',
+          `url(#${markerId}-${curve.selected ? 'selected' : 'quiet'})`,
+        );
+        if (paths.children[index] !== path) paths.insertBefore(path, paths.children[index] ?? null);
+      }
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const observed = new Set<Element>();
+    const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(schedule);
+    const observeCards = () => {
+      const targets = new Set<Element>([
+        columns,
+        ...columns.querySelectorAll('.wallet-flow-node, .wallet-flow-entries'),
+      ]);
+      for (const target of observed)
+        if (!targets.has(target)) {
+          resize?.unobserve(target);
+          observed.delete(target);
+        }
+      for (const target of targets)
+        if (!observed.has(target)) {
+          resize?.observe(target);
+          observed.add(target);
+        }
+      schedule();
+    };
+    const mutations = new MutationObserver((records) => {
+      // SVG paint updates must not trigger another measurement frame.
+      if (
+        records.some(
+          (record) =>
+            !(
+              record.target instanceof Element ? record.target : record.target.parentElement
+            )?.closest('svg'),
+        )
+      )
+        observeCards();
+    });
+    mutations.observe(columns, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    columns.addEventListener('scroll', schedule, { capture: true, passive: true });
+    window.addEventListener('resize', schedule);
+    observeCards();
+    return () => {
+      cancelAnimationFrame(frame);
+      resize?.disconnect();
+      mutations.disconnect();
+      columns.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+      paths.replaceChildren();
+    };
+  }, [columnsRef, markerId]);
+  return (
+    <svg ref={overlay} className="wallet-flow-connections" aria-hidden="true" focusable="false">
+      <defs>
+        {(['quiet', 'selected'] as const).map((tone) => (
+          <marker
+            key={tone}
+            id={`${markerId}-${tone}`}
+            className={`wallet-flow-arrowhead${tone === 'selected' ? ' is-selected' : ''}`}
+            viewBox="0 0 8 6"
+            refX="0"
+            refY="3"
+            markerWidth="8"
+            markerHeight="7"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
+          >
+            <path d="M 0 0 L 8 3 L 0 6 Z" fill="currentColor" />
+          </marker>
+        ))}
+      </defs>
+      <g className="wallet-flow-paths" />
+    </svg>
   );
 }
 
@@ -245,7 +420,10 @@ function FlowColumn({
     else if (inner.bottom > outer.bottom) container.scrollTop += inner.bottom - outer.bottom;
   }, [editingId, limit, visibleKey]);
   return (
-    <div className={`wallet-flow-column${limit === 2 ? ' is-collapsed' : ''}`}>
+    <div
+      className={`wallet-flow-column${limit === 2 ? ' is-collapsed' : ''}`}
+      data-flow-side={kind}
+    >
       <div className="wallet-flow-column-heading">
         <span>
           {title} <b>{total}</b>
@@ -314,6 +492,7 @@ function FlowColumn({
             <div
               className={`wallet-flow-node ownership-${entry.ownership}${selected ? ' is-selected' : ''}`}
               key={entry.id.startsWith('out:') ? entry.id : `${entry.id}:${index}`}
+              data-flow-entry={index}
               title={[
                 role,
                 entry.id,
