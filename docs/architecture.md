@@ -529,8 +529,18 @@ those exact lines in their original order. Export plans retain only changed text
 for the separate original/exported review, replacing the former representative
 metadata preview. Import issues distinguish protected existing text from values
 already up to date, and carry the text comparison needed to explain preservation.
+Conflict issues carry candidate text and origin for comparison before selection.
 The reviewed plan retains its main-thread source references so application can
 reject changed metadata or evidence and preserve unrelated current state.
+The worker returns reviewed wallet-name changes instead of cloned wallet definitions;
+App applies those changes to the original definitions and restores unchanged
+annotation/tag identities. Annotation-only imports therefore retain wallet evidence
+identity. Native text boundaries share Annotations' Unicode-safe clamp.
+The transfer is bound to the existing unlocked session's fetch scope, including
+same-ID reopenings. One completed plan supplies retained review content during
+recalculation; only a plan for the current source and settings can be applied or
+downloaded. Close releases both transfer and preview, and Retry uses the same
+inspection/options with a fresh cancellable job.
 Origins, profiles and transfer previews live only for the dialog; no persistent
 per-account labels or alternative wallet-name source of truth are introduced.
 Equivalent public key encodings share a canonical BIP32 payload identity while

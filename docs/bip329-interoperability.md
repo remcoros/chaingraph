@@ -288,8 +288,14 @@ The six [shipped JSONL files](../public/examples/bip329/README.md) are synthetic
 annotations for the bundled public wallet snapshot: five profile files and one
 review-cases file. Tests load those same files into the actual example workspace,
 validate canonical persistence shape and verify profile round trips. The adjacent
-README describes manual testing. No browser screenshots or live external-wallet
-tests were performed; source compatibility is tied to the audited releases above.
+README describes manual testing. Mainnet browser review exercised all five profile
+examples, review cases, import/Undo and actual export downloads. The final pass
+adds regressions for wallet scope on mainnet and testnet4, normalized name collisions,
+legacy key annotations, Unicode boundaries, preview retry/lifetime and keyboard
+focus. Tests execute the shipped worker entry point through a real worker-thread
+clone boundary for decoding, cancellation and unchanged source identities.
+These checks do not certify live external-wallet round trips; source compatibility
+is tied to the audited releases above.
 
 ## Primary references
 

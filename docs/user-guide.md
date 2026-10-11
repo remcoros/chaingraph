@@ -78,7 +78,10 @@ are saved. Expand **More options** to apply explicit empty-label clears, create
 labels from imported tags, choose a source account, or rename matching wallets
 from key labels. Each applied import is one Undo step. Differing source
 values for the same entity are excluded until you choose an account/origin or
-explicitly select the first or last value. Repeated BTCPay and Keeper tag records
+explicitly select the first or last entry in the file. Expand **Conflicting labels**
+to compare each entry's text, source line and origin before choosing. Source account
+choices keep distinguishing path endings visible; expand the selected origin to
+read it in full. Repeated BTCPay and Keeper tag records
 merge instead. Origins are review context and are not saved as a separate
 per-account annotation model.
 
@@ -91,7 +94,7 @@ the relevant recovery action. **Other file fields** lists additional fields
 that are left out. Confirm the file's source network: addresses
 and public keys are checked, but transaction IDs cannot reveal the network.
 Whole-workspace imports can retain metadata for references without a loaded
-match, with an unmatched count. Wallet scope includes only references associated
+match; the count includes only items whose metadata will change. Wallet scope includes only references associated
 through known wallet addresses and loaded script evidence. No import downloads
 transactions or changes wallet scan coverage.
 
@@ -99,7 +102,8 @@ Labels and wallet names support 255 JavaScript UTF-16 units, Notes 10,000 and
 tag names 100. BIP329 suggests 255 characters as a default rather than a universal
 maximum. Over-limit values are excluded by default; explicit shortening shows
 original and resulting text for review. Export shortening leaves native text intact.
-Distinct names that would collide after shortening are excluded. Files over
+Shortening preserves complete Unicode characters. Distinct names that would collide
+after shortening and destination trimming are excluded. Files over
 5 MB or 10,000 nonblank records are rejected as a whole. Exports use those same
 safety budgets, with BTCPay's smaller 1 MB file budget; narrow the scope if the
 download is blocked. BTCPay values are trimmed and limited to 50 UTF-16 units.
@@ -112,6 +116,14 @@ shows complete serialized lines, including escaped characters. Page controls
 cover the entire export. **Text changes** compares original and exported text
 when shortening or trimming applies. Oversized exports show totals and the
 limit, with no file preview until the scope is narrowed.
+
+Changing settings keeps the previous review visible while the preview updates;
+Apply and Download become available when the new review is ready. Conflict and
+shortening choices stay available to change back, and expanded results stay open.
+If a preview cannot be prepared, **Retry preview** uses the same file and settings.
+Escape dismisses an open question-mark hint first; the next Escape closes the dialog
+and returns focus to its opening control or the workspace menu. The export footer
+identifies the download as **Unencrypted JSONL** before you save it.
 
 Key labels are off by default
 and available for Generic/Sparrow only. Including wallet names as fallback key

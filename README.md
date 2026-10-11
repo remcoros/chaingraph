@@ -31,7 +31,7 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
   outputs and addresses. Undo and redo edits without rolling back accepted chain
-  refreshes in the current session. Review BIP329 imports before applying them
+  refreshes in the current session. Compare conflicting BIP329 entries before applying imports
   and inspect exports as a table or exact JSONL, with
   profiles for Sparrow, BTCPay Server, BlueWallet, Bitcoin Keeper and generic
   files. Labels support 255 characters; profiles preserve tags or transaction
