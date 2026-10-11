@@ -89,8 +89,9 @@ export function EntityRemovalDialog({ workspace }: Props) {
         This removes {removalPlan.annotationCount} annotated{' '}
         {removalPlan.annotationCount === 1 ? 'entity' : 'entities'} and{' '}
         {removalPlan.tagMembershipCount} tag{' '}
-        {removalPlan.tagMembershipCount === 1 ? 'membership' : 'memberships'}. Tag definitions
-        remain. Undo can restore this change during the current session.
+        {removalPlan.tagMembershipCount === 1 ? 'membership' : 'memberships'} and{' '}
+        {removalPlan.counterpartyLinkCount} counterparty associations. Tag and counterparty
+        definitions remain. Undo can restore this change during the current session.
       </p>
       <div className="button-row">
         <button onClick={() => entityRemoval.cancel()}>Keep in workspace</button>

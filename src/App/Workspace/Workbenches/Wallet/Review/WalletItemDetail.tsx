@@ -4,6 +4,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowLeftRight,
+  Bitcoin,
   Box,
   CalendarClock,
   ChevronDown,
@@ -12,7 +13,6 @@ import {
   Info,
   ListChecks,
   Network,
-  Receipt,
   Tag,
   Wallet as WalletIcon,
 } from 'lucide-react';
@@ -722,7 +722,7 @@ function WalletDetailFrame({
             {placement.kind === 'confirmed' && (
               <div>
                 <dt aria-label="Network fee">
-                  <Receipt size={24} aria-hidden="true" />
+                  <Bitcoin size={24} aria-hidden="true" />
                   <span className="wallet-transaction-fact-value" title="Network fee">
                     {fee ? formatSats(fee.feeSats) : 'Unknown'}
                   </span>
