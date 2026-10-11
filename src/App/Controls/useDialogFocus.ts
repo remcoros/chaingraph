@@ -101,7 +101,11 @@ export function useDialogFocus(
         !el?.contains(document.activeElement)
       )
         return;
-      const target = previous?.isConnected
+      const hasInvoker =
+        previous?.isConnected &&
+        previous !== document.body &&
+        previous !== document.documentElement;
+      const target = hasInvoker
         ? previous
         : fallbackFocusSelector
           ? document.querySelector<HTMLElement>(fallbackFocusSelector)
