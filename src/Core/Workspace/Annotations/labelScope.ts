@@ -51,11 +51,15 @@ export function labelScopeIds(
     if (id.startsWith('tx:')) subjects.push({ id, kind: 'transaction', txid: id.slice(3) });
     else if (id.startsWith('out:')) subjects.push({ id, kind: 'output' });
     else if (id.startsWith('addr:')) subjects.push({ id, kind: 'address', address: id.slice(5) });
-    else if (
-      id.startsWith('xpub:') &&
-      matcher.matching(id.slice(5)).some((wallet) => wallet.id === scope.walletId)
-    )
-      keys.push(id);
+    else if (id.startsWith('xpub:')) {
+      try {
+        if (matcher.matching(id.slice(5)).some((wallet) => wallet.id === scope.walletId))
+          keys.push(id);
+      } catch {
+        // Legacy annotation references cannot establish wallet membership.
+        // Wallet definitions and inspected incoming keys are validated separately.
+      }
+    }
   }
   const matches = buildWalletMatches(workspace, subjects);
   return new Set([

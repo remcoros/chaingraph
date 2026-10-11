@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { parseExtendedPublicKey } from '../../Bitcoin';
+import { addressToScriptHash, parseExtendedPublicKey, type Network } from '../../Bitcoin';
 import { createWorkspace } from '../createWorkspace';
+import { parseWorkspace } from '../Persistence';
 import { emptyAnnotation } from './emptyAnnotation';
 import {
   inspectLabels,
@@ -41,6 +42,13 @@ function wallet(
   };
   workspace.wallets.definitions.push(item);
   return item;
+}
+function publicKey(network: Network): string {
+  if (network === 'mainnet') return PUBLIC_ZPUB;
+  const bytes = base58check(sha256).decode(PUBLIC_ZPUB);
+  // The same public BIP84 payload, using the published testnet vpub version.
+  bytes.set([0x04, 0x5f, 0x1c, 0xf6]);
+  return base58check(sha256).encode(bytes);
 }
 function importPlan(
   workspace: Workspace,
@@ -142,7 +150,13 @@ describe('BIP329 inspection and reviewed import', () => {
     const content = [row('tx', txid, 'A', 'account A'), row('tx', txid, 'B', 'account B')].join(
       '\n',
     );
-    expect(importPlan(workspace, content).changes).toEqual([]);
+    const excluded = importPlan(workspace, content);
+    expect(excluded.changes).toEqual([]);
+    expect(excluded.unmatched).toBe(0);
+    expect(excluded.issues.map((issue) => ({ line: issue.line, source: issue.source }))).toEqual([
+      { line: 1, source: { label: 'A', origin: 'account A' } },
+      { line: 2, source: { label: 'B', origin: 'account B' } },
+    ]);
     expect(
       importPlan(workspace, content, { origin: 'account A' }).next.annotations.entities[
         `tx:${txid}`
@@ -201,6 +215,31 @@ describe('BIP329 inspection and reviewed import', () => {
     expect(secondTag.issues[0].reason).toBe('unchanged');
     expect(secondTag.changes).toEqual([]);
     expect(secondTag.next).toBe(firstTag.next);
+  });
+  it('counts unloaded items only when their metadata will actually change', () => {
+    const workspace = createWorkspace('fixture', 'mainnet');
+    workspace.annotations.entities[`tx:${txid}`] = { ...emptyAnnotation, label: 'Kept' };
+    const skipped = 'b'.repeat(64),
+      changed = 'c'.repeat(64);
+    const plan = importPlan(
+      workspace,
+      [
+        row('tx', txid, 'Incoming'),
+        row('tx', skipped, 'Conflict A'),
+        row('tx', skipped, 'Conflict B'),
+        row('tx', changed, 'Saved annotation'),
+      ].join('\n'),
+    );
+    expect(plan.changes).toHaveLength(1);
+    expect(plan.changes[0].id).toBe(`tx:${changed}`);
+    expect(plan.unmatched).toBe(1);
+    const tagPlan = importPlan(
+      workspace,
+      [row('tx', changed, 'tag A'), row('tx', changed, 'tag B')].join('\n'),
+      { profile: 'btcpay' },
+    );
+    expect(tagPlan.changes).toHaveLength(2);
+    expect(tagPlan.unmatched).toBe(1);
   });
   it.each([201, 255])(
     'round trips a %i-unit label through reviewed import and export',
@@ -314,6 +353,110 @@ describe('BIP329 inspection and reviewed import', () => {
     expect(budget.issues[0].reason).toBe('tag-budget');
     expect(budget.changes).toHaveLength(1);
   });
+  it.each(['mainnet', 'testnet4'] as const)(
+    'recovers existing and incoming tag collisions after shortening exposes whitespace on %s',
+    (network) => {
+      for (const profile of ['btcpay', 'keeper'] as const) {
+        const prefix = 'x'.repeat(99),
+          incoming = prefix + ' A',
+          validRef = `${'b'.repeat(64)}:0`;
+        const workspace = createWorkspace('fixture', network);
+        workspace.annotations.tags = [
+          { id: crypto.randomUUID(), name: prefix, color: '#aabbcc', nodeIds: [] },
+        ];
+        const before = JSON.stringify(workspace);
+        const plan = importPlan(
+          workspace,
+          [row('output', `${txid}:0`, incoming), row('output', validRef, 'valid tag')].join('\n'),
+          { profile, shorten: true },
+        );
+        expect(plan.issues.map((issue) => [issue.line, issue.reason])).toEqual([[1, 'collision']]);
+        expect(plan.changes).toMatchObject([{ id: `out:${validRef}`, after: 'valid tag' }]);
+        expect(plan.next.annotations.tags?.map((tag) => tag.name)).toEqual([prefix, 'valid tag']);
+        expect(plan.next.annotations.tags?.[0].nodeIds).toEqual([]);
+        expect(JSON.stringify(workspace)).toBe(before);
+        expect(() => parseWorkspace(plan.next)).not.toThrow();
+
+        const fresh = createWorkspace('fixture', network);
+        const incomingPlan = importPlan(
+          fresh,
+          [
+            row('output', `${txid}:0`, incoming),
+            row('output', `${txid}:0`, prefix),
+            row('output', validRef, 'valid tag'),
+          ].join('\n'),
+          { profile, shorten: true },
+        );
+        expect(incomingPlan.issues.map((issue) => [issue.line, issue.reason])).toEqual([
+          [1, 'collision'],
+          [2, 'collision'],
+        ]);
+        expect(incomingPlan.next.annotations.tags?.map((tag) => tag.name)).toEqual(['valid tag']);
+        expect(() => parseWorkspace(incomingPlan.next)).not.toThrow();
+      }
+    },
+  );
+  it('stores and previews the final trimmed name when shortening a tag without a collision', () => {
+    const workspace = createWorkspace('fixture', 'mainnet'),
+      prefix = 'x'.repeat(99);
+    const plan = importPlan(workspace, row('tx', txid, prefix + ' A'), {
+      profile: 'btcpay',
+      shorten: true,
+      combineTagLabels: true,
+    });
+    expect(plan.issues).toEqual([]);
+    expect(plan.next.annotations.tags?.[0].name).toBe(prefix);
+    expect(plan.next.annotations.entities[`tx:${txid}`].label).toBe(prefix);
+    expect(plan.changes.find((change) => change.target === 'tag')).toMatchObject({
+      original: prefix + ' A',
+      after: prefix,
+    });
+  });
+  it.each(['mainnet', 'testnet4'] as const)(
+    'renames only the selected equivalent-key wallet on %s',
+    (network) => {
+      const workspace = createWorkspace('fixture', network),
+        key = publicKey(network),
+        canonicalKey = parseExtendedPublicKey(key, network).bip32Key,
+        first = wallet(workspace, key),
+        second = wallet(workspace, canonicalKey);
+      second.name = 'Outside scope';
+      expect(() => parseWorkspace(workspace)).not.toThrow();
+      const content = row('xpub', canonicalKey, 'Imported name');
+      const plan = importPlan(workspace, content, {
+        scope: { kind: 'wallet', walletId: first.id },
+        renameWallets: true,
+      });
+      expect(plan.next.wallets.definitions.map((item) => item.name)).toEqual([
+        'Imported name',
+        'Outside scope',
+      ]);
+      expect(plan.next.wallets.definitions[1]).toBe(second);
+      expect(plan.changes.filter((change) => change.target === 'walletName')).toMatchObject([
+        { id: first.id, before: first.name, after: 'Imported name' },
+      ]);
+      expect(plan.unmatched).toBe(0);
+      expect(() => parseWorkspace(applyLabelImport(workspace, plan))).not.toThrow();
+      const wholeWorkspace = importPlan(workspace, content, { renameWallets: true });
+      expect(wholeWorkspace.next.wallets.definitions.map((item) => item.name)).toEqual([
+        'Imported name',
+        'Imported name',
+      ]);
+      wallet(workspace, canonicalKey, 'p2pkh');
+      expect(
+        importPlan(workspace, content, {
+          scope: { kind: 'wallet', walletId: first.id },
+          renameWallets: true,
+        }).next.wallets.definitions.map((item) => item.name),
+      ).toEqual([first.name, second.name, first.name]);
+      expect(
+        importPlan(workspace, row('xpub', key, 'Explicit policy'), {
+          scope: { kind: 'wallet', walletId: first.id },
+          renameWallets: true,
+        }).next.wallets.definitions.map((item) => item.name),
+      ).toEqual(['Explicit policy', second.name, first.name]);
+    },
+  );
   it('matches equivalent public encodings while keeping wallet rename explicit and policy safe', () => {
     const workspace = createWorkspace('fixture', 'mainnet'),
       w = wallet(workspace);
@@ -423,6 +566,52 @@ describe('destination-aware BIP329 export', () => {
     });
     expect(plan.recordCount).toBe(0);
     expect(plan.issues.every((issue) => issue.reason === 'conflict')).toBe(true);
+    expect(plan.issues.map((issue) => issue.source?.label)).toEqual(['One', 'Two']);
+  });
+  it('recovers invalid legacy key annotations in wallet scope and respects key-label opt-in', () => {
+    const workspace = createWorkspace('fixture', 'mainnet'),
+      selected = wallet(workspace),
+      invalidId = 'xpub:invalid-legacy-key';
+    workspace.wallets.definitions[0].addresses = [
+      {
+        address: addr,
+        scripthash: addressToScriptHash(addr, 'mainnet'),
+        path: 'account/0/0',
+        branch: 0,
+        index: 0,
+      },
+    ];
+    workspace.annotations.entities[`addr:${addr}`] = { ...emptyAnnotation, label: 'Address label' };
+    workspace.annotations.entities[invalidId] = { ...emptyAnnotation, label: 'Legacy key label' };
+    expect(() => parseWorkspace(workspace)).not.toThrow();
+    const options = defaultLabelExportOptions({ kind: 'wallet', walletId: selected.id });
+    const omitted = planLabelExport(workspace, options);
+    expect(omitted.issues).toEqual([]);
+    expect(JSON.parse(omitted.content)).toEqual({
+      type: 'addr',
+      ref: addr,
+      label: 'Address label',
+    });
+    const included = planLabelExport(workspace, { ...options, includeKeyLabels: true });
+    expect(included.content).toBe(omitted.content);
+    expect(included.issues).toMatchObject([{ id: invalidId, reason: 'malformed' }]);
+    expect(included.blocked).toBeUndefined();
+    const incoming = inspectLabels(row('xpub', 'invalid-legacy-key', 'Incoming'), 'mainnet');
+    expect(incoming.records).toEqual([]);
+    expect(incoming.issues.map((issue) => issue.reason)).toEqual(['malformed']);
+    expect(importPlan(workspace, row('xpub', 'invalid-legacy-key', 'Incoming')).next).toBe(
+      workspace,
+    );
+  });
+  it('does not weaken invalid wallet definition validation while recovering legacy annotations', () => {
+    const workspace = createWorkspace('fixture', 'mainnet');
+    const invalidWallet = wallet(workspace, 'invalid-legacy-key');
+    expect(() =>
+      planLabelExport(
+        workspace,
+        defaultLabelExportOptions({ kind: 'wallet', walletId: invalidWallet.id }),
+      ),
+    ).toThrow();
   });
   it('exports BTCPay tags, trims before length checking, deduplicates destination text and detects collisions', () => {
     const workspace = createWorkspace('fixture', 'mainnet');
@@ -453,6 +642,36 @@ describe('destination-aware BIP329 export', () => {
     ).toEqual(['collision', 'collision']);
     expect(workspace.annotations.tags[0].name).toHaveLength(51);
   });
+  it.each(['mainnet', 'testnet4'] as const)(
+    'excludes BTCPay collisions caused by trimming after shortening on %s',
+    (network) => {
+      const workspace = createWorkspace('fixture', network),
+        prefix = 'x'.repeat(49);
+      workspace.annotations.tags = [prefix + ' A', prefix, 'valid tag'].map((name) => ({
+        id: crypto.randomUUID(),
+        name,
+        color: '#aabbcc',
+        nodeIds: [`tx:${txid}`],
+      }));
+      const before = JSON.stringify(workspace);
+      const options = { ...defaultLabelExportOptions(), profile: 'btcpay' as const, shorten: true };
+      const plan = planLabelExport(workspace, options);
+      expect(plan.issues.map((issue) => issue.reason)).toEqual(['collision', 'collision']);
+      expect(plan.recordCount).toBe(1);
+      expect(JSON.parse(plan.content)).toEqual({ type: 'tx', ref: txid, label: 'valid tag' });
+      expect(plan.textChanges).toEqual([]);
+      expect(JSON.stringify(workspace)).toBe(before);
+
+      workspace.annotations.tags = [workspace.annotations.tags[0]];
+      const withoutCollision = planLabelExport(workspace, options);
+      expect(withoutCollision.issues).toEqual([]);
+      expect(JSON.parse(withoutCollision.content).label).toBe(prefix);
+      expect(withoutCollision.textChanges).toMatchObject([
+        { original: prefix + ' A', before: prefix + ' A', after: prefix },
+      ]);
+      expect(inspectLabels(withoutCollision.content, network).records).toHaveLength(1);
+    },
+  );
   it('composes readable tags only when selected and keeps the result literal on import', () => {
     const workspace = createWorkspace('fixture', 'mainnet');
     workspace.annotations.entities[`tx:${txid}`] = { ...emptyAnnotation, label: 'Shop payment' };

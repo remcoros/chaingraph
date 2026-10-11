@@ -33,6 +33,7 @@ export interface LabelIssue {
   detail: string;
   recordType?: string;
   text?: { current: string; incoming: string };
+  source?: { label: string; origin?: string };
 }
 export interface LabelInspection {
   network: Network;
@@ -200,10 +201,4 @@ export function inspectLabelRecords(content: string, network: Network): LabelIns
   };
 }
 
-/** Shorten in UTF-16 units without cutting a supplementary Unicode character. */
-export function shortenLabel(value: string, limit: number): string {
-  if (value.length <= limit) return value;
-  const shortened = value.slice(0, limit);
-  const last = shortened.charCodeAt(shortened.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? shortened.slice(0, -1) : shortened;
-}
+export { clampAnnotationText as shortenLabel } from './annotations';

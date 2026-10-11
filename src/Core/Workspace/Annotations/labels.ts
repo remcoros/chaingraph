@@ -291,6 +291,7 @@ export function planLabelImport(
           id: row.id,
           reason: 'conflict' as const,
           detail: 'Several source values. Select an account/origin or choose first/last.',
+          source: { label: row.label, origin: row.origin },
         })),
       );
       continue;
@@ -316,7 +317,11 @@ export function planLabelImport(
         ? shortenLabel(row.label.trim(), MAX_WALLET_NAME_LENGTH)
         : row.label.trim();
       wallets = wallets.map((wallet) => {
-        if (!matches.some((match) => match.id === wallet.id) || wallet.name === after)
+        if (
+          (options.scope.kind === 'wallet' && wallet.id !== options.scope.walletId) ||
+          !matches.some((match) => match.id === wallet.id) ||
+          wallet.name === after
+        )
           return wallet;
         changes.push({
           id: wallet.id,
@@ -333,9 +338,9 @@ export function planLabelImport(
   const names = new Map<string, Set<string>>();
   for (const row of tagRows) {
     const original = row.label.trim();
-    const name = (
-      options.shorten ? shortenLabel(original, MAX_TAG_NAME_LENGTH) : original
-    ).toLowerCase();
+    const name = (options.shorten ? shortenLabel(original, MAX_TAG_NAME_LENGTH) : original)
+      .trim()
+      .toLowerCase();
     const originals = names.get(name) ?? new Set<string>();
     originals.add(original.toLowerCase());
     names.set(name, originals);
@@ -344,7 +349,7 @@ export function planLabelImport(
   const combined = new Map<string, LabelRecord[]>();
   for (const row of tagRows) {
     const original = row.label.trim();
-    const name = options.shorten ? shortenLabel(original, MAX_TAG_NAME_LENGTH) : original;
+    const name = (options.shorten ? shortenLabel(original, MAX_TAG_NAME_LENGTH) : original).trim();
     const existing = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
     if (original.length > MAX_TAG_NAME_LENGTH && !options.shorten) {
       issues.push({
@@ -405,7 +410,12 @@ export function planLabelImport(
     for (const group of combined.values())
       writeText(group[0], 'label', [...new Set(group.map((row) => row.label))].join(', '));
   const unmatched = new Set(
-    rows.filter((row) => !knownLabelReference(workspace, row.id, keys)).map((row) => row.id),
+    changes
+      .filter(
+        (change) =>
+          change.target !== 'walletName' && !knownLabelReference(workspace, change.id, keys),
+      )
+      .map((change) => change.id),
   ).size;
   if (!changes.length) return { ...unchanged(), unmatched };
   const next: Workspace = {
@@ -501,15 +511,30 @@ export function planLabelExport(
     tag: boolean;
   }[] = [];
   for (const id of ids) {
-    if (!scoped.has(id)) {
-      issues.push({ id, reason: 'scope', detail: 'Outside the selected scope.' });
-      continue;
-    }
     const prefix = id.slice(0, id.indexOf(':')),
       type = prefix === 'out' ? 'output' : prefix;
     if (!['tx', 'addr', 'output', 'xpub'].includes(type)) continue;
     if (type === 'xpub' && (!options.includeKeyLabels || !supported(options.profile, type)))
       continue;
+    let ref = id.slice(id.indexOf(':') + 1);
+    // Requested legacy key annotations need a recoverable explanation even
+    // when an invalid reference cannot establish membership in wallet scope.
+    if (type === 'xpub') {
+      try {
+        ref = keys.parse(ref).bip32Key;
+      } catch {
+        issues.push({
+          id,
+          reason: 'malformed',
+          detail: 'The public key reference is invalid or belongs to a different Bitcoin network.',
+        });
+        continue;
+      }
+    }
+    if (!scoped.has(id)) {
+      issues.push({ id, reason: 'scope', detail: 'Outside the selected scope.' });
+      continue;
+    }
     if (!supported(options.profile, type)) {
       issues.push({
         id,
@@ -518,12 +543,9 @@ export function planLabelExport(
       });
       continue;
     }
-    let ref = id.slice(id.indexOf(':') + 1);
     try {
-      ref =
-        type === 'xpub'
-          ? keys.parse(ref).bip32Key
-          : canonicalEntityReference(id, workspace.network).slice(id.indexOf(':') + 1);
+      if (type !== 'xpub')
+        ref = canonicalEntityReference(id, workspace.network).slice(id.indexOf(':') + 1);
     } catch {
       issues.push({
         id,
@@ -578,10 +600,11 @@ export function planLabelExport(
         });
         return;
       }
+      const shortened = options.shorten ? shortenLabel(value, limit) : value;
       projected.push({
         type,
         ref,
-        label: options.shorten ? shortenLabel(value, limit) : value,
+        label: options.profile === 'btcpay' ? shortened.trim() : shortened,
         id,
         original,
         tag,
@@ -628,6 +651,7 @@ export function planLabelExport(
           id: row.id,
           reason: 'conflict' as const,
           detail: 'Conflicting equivalent-key labels cannot share one exported reference.',
+          source: { label: row.original },
         })),
       );
       continue;
