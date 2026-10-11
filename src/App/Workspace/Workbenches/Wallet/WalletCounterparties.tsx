@@ -868,22 +868,22 @@ export function WalletCounterpartyList({
   return (
     <section className="wallet-review-body wallet-counterparties" aria-label="Named counterparties">
       <div className="wallet-record-filters compact-controls">
-        <label className="wallet-record-search">
-          Search
-          <input
-            type="search"
-            aria-label="Find counterparties"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Find counterparties"
-          />
-        </label>
         <CounterpartyPicker
           workspace={workspace}
           onChange={onChange}
           onNotice={setNotice}
           disabled={!active || busy}
         />
+        <label className="wallet-record-search">
+          <span className="sr-only">Search</span>
+          <input
+            type="search"
+            aria-label="Find counterparties"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Search counterparties…"
+          />
+        </label>
       </div>
       <div className="wallet-review-grid">
         <div

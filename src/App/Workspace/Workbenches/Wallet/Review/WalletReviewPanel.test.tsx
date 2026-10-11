@@ -151,13 +151,11 @@ it('starts with transaction activity and exposes address scopes under one tab', 
   expect(screen.queryByRole('dialog', { name: 'Label selected records' })).toBeNull();
   expect(screen.getAllByText('Public fixture context').length).toBeGreaterThan(0);
   fireEvent.click(tabs.getByRole('button', { name: 'Addresses' }));
-  fireEvent.change(screen.getByRole('combobox', { name: 'Address scope' }), {
+  fireEvent.change(screen.getByRole('combobox', { name: 'Scope' }), {
     target: { value: 'sources' },
   });
   expect(tabs.getByRole('button', { name: 'Addresses' }).getAttribute('aria-pressed')).toBe('true');
-  expect(screen.getByRole('combobox', { name: 'Address scope' }).getAttribute('aria-label')).toBe(
-    'Address scope',
-  );
+  expect(screen.getByRole('combobox', { name: 'Scope' }).getAttribute('aria-label')).toBe('Scope');
 });
 it('restores browsing filters independently of the saved Review position', () => {
   render(<Fixture saved />);

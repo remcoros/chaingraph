@@ -420,8 +420,8 @@ Five tabs share the existing list and detail panel, with **Transactions** first:
   their dates in the encrypted workspace. A failed check preserves previous
   observations without renewing them. An exact loaded spender excludes an old
   coin from current candidates; its dated observation and decisions remain saved.
-- **Addresses** offers **Wallet addresses**, **Sources** and **Destinations** as
-  scopes. Wallet addresses list derived receive/change addresses. Sources and
+- **Addresses** offers **Wallet addresses**, **Sources** and **Destinations** in
+  **Scope**. Wallet addresses list derived receive/change addresses. Sources and
   Destinations group observed one-hop address relationships,
   excluding this wallet's scripts. Missing source inputs can be loaded in bounded
   batches. These relationships are evidence, not proven identities or ownership.

@@ -1106,11 +1106,23 @@ export function WalletReviewPanel(
             </div>
           )}
           <div className="wallet-record-filters" data-tour="wallet-filters">
+            {tab !== 'review' && (
+              <button
+                className="wallet-review-only-toggle"
+                aria-pressed={reviewOnly}
+                onClick={() => {
+                  setLimit(PAGE);
+                  setReviewOnly((value) => !value);
+                }}
+              >
+                To review ({outstandingRecordCount})
+              </button>
+            )}
             {(tab === 'addresses' || tab === 'sources' || tab === 'destinations') && (
               <label>
-                Address scope
+                Scope
                 <select
-                  aria-label="Address scope"
+                  aria-label="Scope"
                   value={tab}
                   onChange={(event) => changeTab(event.target.value as WalletTab)}
                 >
@@ -1180,18 +1192,6 @@ export function WalletReviewPanel(
                   ))}
                 </select>
               </label>
-            )}
-            {tab !== 'review' && (
-              <button
-                className="wallet-review-only-toggle"
-                aria-pressed={reviewOnly}
-                onClick={() => {
-                  setLimit(PAGE);
-                  setReviewOnly((value) => !value);
-                }}
-              >
-                To review ({outstandingRecordCount})
-              </button>
             )}
             <label>
               <span>Labels</span>
