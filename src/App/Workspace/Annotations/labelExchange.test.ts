@@ -52,7 +52,6 @@ it('rebinds the worker result to the reviewed main-thread snapshot', async () =>
     kind: 'import',
     plan,
     annotations: next.annotations,
-    definitions: next.wallets.definitions,
   });
   const result = await pending;
   expect(result.source).toBe(workspace);
@@ -75,5 +74,5 @@ it('terminates cancelled inspection and reports worker/decoding failure safely',
   await expect(decoding).rejects.toThrow('UTF-8');
   const crash = inspectLabelFile(file, 'mainnet', new AbortController().signal);
   PreviewWorker.latest.onerror!();
-  await expect(crash).rejects.toThrow('Could not prepare');
+  await expect(crash).rejects.toThrow("Couldn't prepare");
 });

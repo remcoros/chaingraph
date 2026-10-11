@@ -29,7 +29,6 @@ self.onmessage = async (event: MessageEvent<LabelJob>) => {
         kind: 'import',
         plan,
         annotations: next.annotations,
-        definitions: next.wallets.definitions,
       };
     } else result = { kind: 'export', plan: planLabelExport(job.workspace, job.options) };
   } catch (error) {

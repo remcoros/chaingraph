@@ -452,7 +452,10 @@ export function applyLabelImport(workspace: Workspace, plan: LabelImportPlan): W
   return {
     ...workspace,
     annotations: plan.next.annotations,
-    wallets: { ...workspace.wallets, definitions: plan.next.wallets.definitions },
+    wallets:
+      workspace.wallets.definitions === plan.next.wallets.definitions
+        ? workspace.wallets
+        : { ...workspace.wallets, definitions: plan.next.wallets.definitions },
   };
 }
 

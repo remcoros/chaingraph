@@ -23,7 +23,6 @@ export type LabelJobResult =
       kind: 'import';
       plan: Omit<LabelImportPlan, 'source' | 'next'>;
       annotations: Workspace['annotations'];
-      definitions: Workspace['wallets']['definitions'];
     }
   | { kind: 'export'; plan: LabelExportPlan }
   | { kind: 'error'; error: string };
@@ -42,7 +41,7 @@ function runLabelJob(job: LabelJob, signal: AbortSignal): Promise<LabelJobResult
     };
     const fail = () => {
       finish();
-      reject(new Error('Could not prepare the metadata preview. Try again.'));
+      reject(new Error("Couldn't prepare the preview. Retry with the same settings."));
     };
     const abort = () => {
       finish();
@@ -81,14 +80,68 @@ export async function createImportPreview(
 ): Promise<LabelImportPlan> {
   const result = await runLabelJob({ kind: 'import', workspace, inspection, options }, signal);
   if (result.kind !== 'import') throw new Error('Unexpected metadata import result.');
+  const entities = Object.fromEntries(
+    Object.entries(result.annotations.entities).map(([id, value]) => {
+      const original = workspace.annotations.entities[id];
+      return [
+        id,
+        original &&
+        original.label === value.label &&
+        original.note === value.note &&
+        original.icon === value.icon &&
+        original.bookmarked === value.bookmarked
+          ? original
+          : value,
+      ];
+    }),
+  );
+  const entitiesUnchanged =
+    Object.keys(entities).length === Object.keys(workspace.annotations.entities).length &&
+    Object.entries(entities).every(([id, value]) => value === workspace.annotations.entities[id]);
+  const originalTags = workspace.annotations.tags;
+  const tags = result.annotations.tags?.map((tag) => {
+    const original = originalTags?.find((value) => value.id === tag.id);
+    return original &&
+      original.name === tag.name &&
+      original.color === tag.color &&
+      original.description === tag.description &&
+      original.nodeIds.length === tag.nodeIds.length &&
+      original.nodeIds.every((id, index) => id === tag.nodeIds[index])
+      ? original
+      : tag;
+  });
+  const tagsUnchanged =
+    (tags?.length ?? 0) === (originalTags?.length ?? 0) &&
+    (tags ?? []).every((tag, index) => tag === originalTags?.[index]);
+  const names = new Map(
+    result.plan.changes
+      .filter((change) => change.target === 'walletName')
+      .map((change) => [change.id, change.after]),
+  );
+  const definitions = names.size
+    ? workspace.wallets.definitions.map((wallet) => {
+        const name = names.get(wallet.id);
+        return name === undefined || name === wallet.name ? wallet : { ...wallet, name };
+      })
+    : workspace.wallets.definitions;
   // Retain the main-thread snapshot identity for exact reviewed application.
   return {
     ...result.plan,
     source: workspace,
     next: {
       ...workspace,
-      annotations: result.annotations,
-      wallets: { ...workspace.wallets, definitions: result.definitions },
+      annotations:
+        entitiesUnchanged && tagsUnchanged
+          ? workspace.annotations
+          : {
+              ...workspace.annotations,
+              entities: entitiesUnchanged ? workspace.annotations.entities : entities,
+              tags: tagsUnchanged ? originalTags : tags,
+            },
+      wallets:
+        definitions === workspace.wallets.definitions
+          ? workspace.wallets
+          : { ...workspace.wallets, definitions },
     },
   };
 }
