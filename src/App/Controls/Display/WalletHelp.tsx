@@ -58,19 +58,25 @@ export function WalletHelp({
         setOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancelClose();
+      trigger.current?.focus({ preventScroll: true });
+      setOpen(false);
     };
     place();
     window.addEventListener('resize', schedule);
     window.addEventListener('scroll', schedule, { capture: true, passive: true });
     document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape);
+    // Help dismisses before the containing dialog's document-level Escape handler.
+    document.addEventListener('keydown', escape, { capture: true });
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', schedule);
       window.removeEventListener('scroll', schedule, { capture: true });
       document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', escape);
+      document.removeEventListener('keydown', escape, { capture: true });
     };
   }, [open, active]);
   return (
@@ -102,9 +108,6 @@ export function WalletHelp({
           setOpen(true);
         }}
         onBlur={closeSoon}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
       >
         {icon ?? <CircleHelp size={14} aria-hidden="true" />}
       </span>
