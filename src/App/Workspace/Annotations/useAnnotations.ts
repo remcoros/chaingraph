@@ -4,6 +4,7 @@ import {
   parseWorkspaceTags,
 } from '../../../Core/Workspace/Annotations/annotations';
 import type { Workspace } from '../../../Core/Workspace/workspace';
+import type { UnlockedWorkspace } from '../../../Core/Workspace/Session/WorkspaceStore';
 
 import {
   applyLabelImport,
@@ -46,6 +47,9 @@ export interface WorkspaceAnnotations {
   labelTransfer: LabelTransfer | undefined;
   importPlan: ReturnType<typeof planLabelImport> | undefined;
   exportPlan: ReturnType<typeof planLabelExport> | undefined;
+  /** Last successful results for review while a replacement plan is pending. */
+  importReviewPlan: ReturnType<typeof planLabelImport> | undefined;
+  exportReviewPlan: ReturnType<typeof planLabelExport> | undefined;
   previewBusy: boolean;
   previewError: string | undefined;
   labelsInput: React.RefObject<HTMLInputElement | null>;
@@ -56,6 +60,7 @@ export interface WorkspaceAnnotations {
   importLabelFile: (file: File) => Promise<void>;
   configureLabelImport: (options: Partial<LabelImportOptions>) => void;
   configureLabelExport: (options: Partial<LabelExportOptions>) => void;
+  retryLabelPreview: () => void;
   confirmLabelImport: () => void;
   downloadLabelExport: () => void;
 }
@@ -91,10 +96,17 @@ export function useAnnotations({
 }: Inputs): WorkspaceAnnotations {
   const labelsInput = useRef<HTMLInputElement>(null);
   const editRequest = useMetadataEditRequest(current?.id);
-  const [transfer, setTransfer] = useState<LabelTransfer>();
+  const [transfer, setTransfer] = useState<
+    LabelTransfer & { sessionScope?: UnlockedWorkspace['fetchScope'] }
+  >();
   const fileRequest = useRef(0);
   const fileRead = useRef<AbortController | undefined>(undefined);
-  const labelTransfer = transfer?.workspaceId === current?.id ? transfer : undefined;
+  const transferCurrent =
+    !!current &&
+    transfer?.workspaceId === current.id &&
+    transfer.sessionScope === sessions.getUnlocked(current.id)?.fetchScope &&
+    !transfer.sessionScope?.closed;
+  const labelTransfer = transferCurrent ? transfer : undefined;
   const [preview, setPreview] = useState<{
     workspace: Workspace;
     transfer: LabelTransfer;
@@ -102,12 +114,31 @@ export function useAnnotations({
     exportPlan?: ReturnType<typeof planLabelExport>;
     error?: string;
   }>();
+  // A same-ID reopening is a different unlocked lifetime. Release the old
+  // review before rendering it or accepting its pending worker response.
+  if (transfer && !transferCurrent) {
+    setTransfer(undefined);
+    setPreview(undefined);
+  }
   const previewCurrent = preview?.workspace === current && preview?.transfer === labelTransfer;
   const importPlan = previewCurrent ? preview?.importPlan : undefined;
   const exportPlan = previewCurrent ? preview?.exportPlan : undefined;
+  const reviewCompatible =
+    !!preview &&
+    !preview.error &&
+    preview.workspace.id === current?.id &&
+    preview.transfer.kind === labelTransfer?.kind &&
+    (preview.transfer.kind === 'export' ||
+      (labelTransfer?.kind === 'import' &&
+        preview.transfer.inspection === labelTransfer.inspection));
   const needsPreview =
     !!current && !!labelTransfer && (labelTransfer.kind === 'export' || !!labelTransfer.inspection);
   useEffect(() => {
+    if (!labelTransfer) {
+      fileRequest.current++;
+      fileRead.current?.abort();
+      return;
+    }
     if (
       !current ||
       !labelTransfer ||
@@ -148,8 +179,6 @@ export function useAnnotations({
     void prepare();
     return () => {
       controller.abort();
-      // A closed or switched dialog must release its decrypted source/plan.
-      setPreview(undefined);
     };
   }, [current, labelTransfer]);
   useEffect(() => () => fileRead.current?.abort(), []);
@@ -162,6 +191,12 @@ export function useAnnotations({
     fileRead.current?.abort();
     setTransfer(undefined);
     setPreview(undefined);
+  };
+  const openTransfer = (next: LabelTransfer) => {
+    fileRequest.current++;
+    fileRead.current?.abort();
+    setPreview(undefined);
+    setTransfer({ ...next, sessionScope: sessions.getUnlocked(next.workspaceId)?.fetchScope });
   };
   return {
     bookmarks: Object.entries(current?.annotations.entities ?? {}).filter(([, a]) => a.bookmarked),
@@ -208,13 +243,14 @@ export function useAnnotations({
     labelTransfer,
     importPlan,
     exportPlan,
+    importReviewPlan: reviewCompatible ? preview?.importPlan : undefined,
+    exportReviewPlan: reviewCompatible ? preview?.exportPlan : undefined,
     previewBusy: needsPreview && !previewCurrent,
     previewError: previewCurrent ? preview?.error : undefined,
     closeLabelTransfer,
     openLabelImport: (scope) => {
       if (!current) return;
-      fileRequest.current++;
-      setTransfer({
+      openTransfer({
         kind: 'import',
         workspaceId: current.id,
         options: defaultLabelImportOptions(current.network, scope ?? defaultScope()),
@@ -222,8 +258,7 @@ export function useAnnotations({
     },
     openLabelExport: (scope) => {
       if (!current) return;
-      fileRequest.current++;
-      setTransfer({
+      openTransfer({
         kind: 'export',
         workspaceId: current.id,
         options: defaultLabelExportOptions(scope ?? defaultScope()),
@@ -294,6 +329,9 @@ export function useAnnotations({
           };
         return { ...state, options };
       }),
+    retryLabelPreview: () => {
+      if (labelTransfer && needsPreview) setTransfer({ ...labelTransfer });
+    },
     confirmLabelImport: () => {
       if (!importPlan || !importPlan.changes.length) return;
       try {

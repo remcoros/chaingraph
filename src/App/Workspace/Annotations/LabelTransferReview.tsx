@@ -122,7 +122,10 @@ function ChangesTable({
   return (
     <>
       <div className="label-preview">
-        <table aria-label={exporting ? 'Export text changes' : undefined}>
+        <table
+          className={`label-change-table${exporting ? '' : ' is-import'}`}
+          aria-label={exporting ? 'Export text changes' : undefined}
+        >
           {!exporting && <caption>Changes to apply</caption>}
           <thead>
             <tr>
@@ -152,10 +155,13 @@ function ChangesTable({
                     </>
                   )}
                 </td>
-                <td>
+                <td className="label-change-value" data-field={exporting ? 'Original' : 'Current'}>
                   <TextValue value={change.before} />
                 </td>
-                <td>
+                <td
+                  className="label-change-value"
+                  data-field={exporting ? 'Exported' : 'After import'}
+                >
                   {change.after ? <TextValue value={change.after} /> : <span>Clear text</span>}
                   {!exporting && change.original !== change.after && (
                     <details className="label-text-source">
@@ -297,7 +303,7 @@ const issueCopy: Record<LabelIssue['reason'], { title: string; hint: string }> =
   },
   conflict: {
     title: 'Conflicting labels',
-    hint: 'Choose a source account or choose which value to use under Conflicting values.',
+    hint: 'Compare the entries below, then choose a source account or which entry to use under Conflicting values.',
   },
   'tag-budget': {
     title: 'No room for more tags',
@@ -313,7 +319,7 @@ const issueCopy: Record<LabelIssue['reason'], { title: string; hint: string }> =
   },
 };
 
-function OutcomeEntries({ issues }: { issues: LabelIssue[] }) {
+function OutcomeEntries({ issues, importing }: { issues: LabelIssue[]; importing: boolean }) {
   const page = usePage(issues.length);
   return (
     <>
@@ -322,6 +328,28 @@ function OutcomeEntries({ issues }: { issues: LabelIssue[] }) {
           <li key={page.start + index}>
             <EntryReference id={issue.id} recordType={issue.recordType} line={issue.line} />
             {(issue.reason === 'malformed' || issue.reason === 'length') && <p>{issue.detail}</p>}
+            {issue.reason === 'conflict' && issue.source && (
+              <dl className="label-conflict-text">
+                <div>
+                  <dt>{importing ? 'From file' : 'Exported text'}</dt>
+                  <dd>
+                    <TextValue value={issue.source.label} />
+                  </dd>
+                </div>
+                {importing && (
+                  <div>
+                    <dt>Source account / origin</dt>
+                    <dd>
+                      {issue.source.origin ? (
+                        <TextValue value={issue.source.origin} reference />
+                      ) : (
+                        <span className="muted">No origin in file</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
             {issue.reason === 'kept' && issue.text && (
               <dl className="label-kept-text">
                 <div>
@@ -355,6 +383,7 @@ export function TransferOutcomes({
   ignoredFields?: string[];
   importing: boolean;
 }) {
+  const [expanded, setExpanded] = useState<Partial<Record<LabelIssue['reason'], boolean>>>({});
   const groups = new Map<LabelIssue['reason'], LabelIssue[]>();
   for (const issue of issues) {
     if (!importing && issue.reason === 'scope') continue;
@@ -369,7 +398,17 @@ export function TransferOutcomes({
       aria-label={importing ? 'Import outcomes' : 'Values not exported'}
     >
       {[...groups].map(([reason, entries]) => (
-        <details key={reason} className="label-outcome-group">
+        <details
+          key={reason}
+          className="label-outcome-group"
+          open={expanded[reason] ?? false}
+          onToggle={(event) => {
+            const open = event.currentTarget.open;
+            setExpanded((previous) =>
+              previous[reason] === open ? previous : { ...previous, [reason]: open },
+            );
+          }}
+        >
           <summary>
             <span>{issueCopy[reason].title}</span>
             <span className="muted">
@@ -397,7 +436,7 @@ export function TransferOutcomes({
                         ? 'Enable shortening to review a shorter version for this destination.'
                         : 'These values cannot be exported. Check their references or choose another destination.'}
             </p>
-            <OutcomeEntries issues={entries} />
+            <OutcomeEntries issues={entries} importing={importing} />
           </div>
         </details>
       ))}

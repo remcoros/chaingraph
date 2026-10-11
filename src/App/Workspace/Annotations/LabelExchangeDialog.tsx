@@ -9,6 +9,7 @@ import {
   type LabelProfile,
   type LabelImportOptions,
   type LabelExportOptions,
+  type LabelIssue,
 } from '../../../Core/Workspace/Annotations/labels';
 import { ExportFilePreview, ImportChanges, TransferOutcomes } from './LabelTransferReview';
 import './label-exchange.css';
@@ -32,8 +33,16 @@ function SettingTitle({
   );
 }
 
-/** Reserve the last preview's height while its replacement is being prepared. */
-function PreviewRegion({ busy, children }: { busy: boolean; children: ReactNode }) {
+/** Keep the read-only review mounted while preparing its replacement. */
+function PreviewRegion({
+  busy,
+  hasReview,
+  children,
+}: {
+  busy: boolean;
+  hasReview: boolean;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const region = ref.current;
@@ -50,26 +59,36 @@ function PreviewRegion({ busy, children }: { busy: boolean; children: ReactNode 
     observer.observe(region);
     return () => observer.disconnect();
   }, [busy]);
+  if (!busy && !hasReview) return null;
   return (
     <div ref={ref} className={`label-review${busy ? ' is-loading' : ''}`} aria-busy={busy}>
-      {busy ? (
-        <div className="label-preview-loading" role="status">
+      {busy && (
+        <div
+          className={hasReview ? 'label-preview-updating' : 'label-preview-loading'}
+          role="status"
+        >
           <span className="muted">Updating preview…</span>
-          <div className="label-preview-skeleton" aria-hidden="true">
-            {[0, 1, 2].map((row) => (
-              <div key={row}>
-                <span />
-                <span />
-                <span />
-              </div>
-            ))}
-          </div>
+          {!hasReview && (
+            <div className="label-preview-skeleton" aria-hidden="true">
+              {[0, 1, 2].map((row) => (
+                <div key={row}>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        children
       )}
+      <div className="label-review-content">{children}</div>
     </div>
   );
+}
+
+function originOption(origin: string) {
+  if (origin.length <= 64) return origin;
+  return `${origin.slice(0, 28)}…${origin.slice(-28)}`;
 }
 
 function ScopeField({
@@ -276,7 +295,7 @@ function ImportSettings({
           {!!origins.length && (
             <>
               <label className="label-setting-row">
-                <span>Source account</span>
+                <span>Source account / origin</span>
                 <select
                   value={options.origin ?? '*'}
                   onChange={(event) =>
@@ -289,12 +308,17 @@ function ImportSettings({
                   <option value="">Records without origin</option>
                   {origins.map((origin) => (
                     <option key={origin} value={origin}>
-                      {origin.length > 90 ? origin.slice(0, 90) + '…' : origin}
+                      {originOption(origin)}
                     </option>
                   ))}
                 </select>
               </label>
-              {options.origin && <code className="label-origin">{options.origin}</code>}
+              {options.origin && (
+                <details className="label-origin-details">
+                  <summary>Full source account / origin</summary>
+                  <code className="label-origin">{options.origin}</code>
+                </details>
+              )}
             </>
           )}
         </div>
@@ -439,6 +463,71 @@ function ExportSettings({
   );
 }
 
+function ReviewControls({
+  issues,
+  shorten,
+  onShorten,
+  conflicts,
+  onConflicts,
+  exporting = false,
+}: {
+  issues: LabelIssue[];
+  shorten: boolean;
+  onShorten: (shorten: boolean) => void;
+  conflicts?: LabelImportOptions['conflicts'];
+  onConflicts?: (conflicts: LabelImportOptions['conflicts']) => void;
+  exporting?: boolean;
+}) {
+  const available = {
+    length: shorten || issues.some((issue) => issue.reason === 'length'),
+    conflicts:
+      !!conflicts &&
+      (conflicts !== 'exclude' || issues.some((issue) => issue.reason === 'conflict')),
+  };
+  // A resolved warning must not remove its focused setting when the user changes
+  // back. This component is reset when the source file or profile changes.
+  const [visible, setVisible] = useState(available);
+  if ((available.length && !visible.length) || (available.conflicts && !visible.conflicts))
+    setVisible({
+      length: visible.length || available.length,
+      conflicts: visible.conflicts || available.conflicts,
+    });
+  if (!visible.length && !available.length && !visible.conflicts && !available.conflicts)
+    return null;
+  return (
+    <div className="label-review-controls">
+      {(visible.conflicts || available.conflicts) && onConflicts && (
+        <label className="label-setting-row">
+          <span>Conflicting values</span>
+          <select
+            value={conflicts}
+            onChange={(event) => onConflicts(event.target.value as LabelImportOptions['conflicts'])}
+          >
+            <option value="exclude">Skip conflicting entries</option>
+            <option value="first">Use first entry in file</option>
+            <option value="last">Use last entry in file</option>
+          </select>
+        </label>
+      )}
+      {(visible.length || available.length) && (
+        <div className="label-length-option">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={shorten}
+              onChange={(event) => onShorten(event.target.checked)}
+            />
+            {exporting
+              ? 'Shorten over-limit values for this destination'
+              : 'Shorten over-limit values'}
+          </label>
+          {exporting && <span className="muted">Full text stays in Chaingraph.</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceController }) {
   const [exportView, setExportView] = useState<'table' | 'jsonl'>('table');
   const { annotations, activeWorkspace } = workspace;
@@ -446,11 +535,9 @@ export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceControl
   if (!activeWorkspace || !transfer) return null;
   const importing = transfer.kind === 'import';
   const profile = transfer.options.profile;
-  const importPlan = annotations.importPlan,
-    exportPlan = annotations.exportPlan;
+  const importPlan = annotations.importReviewPlan,
+    exportPlan = annotations.exportReviewPlan;
   const issues = (importing ? importPlan?.issues : exportPlan?.issues) ?? [];
-  const hasLength = issues.some((issue) => issue.reason === 'length') || transfer.options.shorten;
-  const conflicts = issues.some((issue) => issue.reason === 'conflict');
   const appliedLines = new Set(importPlan?.changes.map((change) => change.line));
   const excluded = importing
     ? new Set(
@@ -476,6 +563,7 @@ export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceControl
       title={importing ? 'Import BIP329 metadata' : 'Export BIP329 metadata'}
       onClose={annotations.closeLabelTransfer}
       className="label-exchange compact-controls"
+      fallbackFocusSelector='[aria-label="Workspace menu"]'
     >
       <div className="label-exchange-body">
         <section
@@ -571,97 +659,101 @@ export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceControl
               origins={transfer.inspection?.origins ?? []}
             />
             {!!transfer.filename && (
-              <PreviewRegion busy={!!transfer.busy || annotations.previewBusy}>
+              <>
+                <ReviewControls
+                  key={`${profile}:${transfer.filename}`}
+                  issues={issues}
+                  shorten={transfer.options.shorten}
+                  onShorten={(shorten) => configureImport({ shorten })}
+                  conflicts={transfer.options.conflicts}
+                  onConflicts={(conflicts) => configureImport({ conflicts })}
+                />
                 {transfer.failure && (
                   <p className="error-text" role="alert">
                     {transfer.failure}
                   </p>
                 )}
                 {annotations.previewError && (
-                  <p className="error-text" role="alert">
-                    {annotations.previewError}
-                  </p>
-                )}
-                {importPlan && (
-                  <>
-                    <p className="label-summary" role="status">
-                      <strong>
-                        {importPlan.changes.length
-                          ? [
-                              textChanges &&
-                                `${textChanges} text change${textChanges === 1 ? '' : 's'}`,
-                              tagChanges &&
-                                `${tagChanges} tag addition${tagChanges === 1 ? '' : 's'}`,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')
-                          : 'No changes to apply'}
-                      </strong>
-                      {!!kept && (
-                        <span className="muted">
-                          {' '}
-                          · {kept} existing value{kept === 1 ? '' : 's'} kept
-                        </span>
-                      )}
-                      {!!excluded && (
-                        <span className="label-excluded">
-                          {' '}
-                          · {excluded} entr{excluded === 1 ? 'y' : 'ies'} skipped
-                        </span>
-                      )}
+                  <div className="label-preview-error">
+                    <p className="error-text" role="alert">
+                      {annotations.previewError}
                     </p>
-                    {!!importPlan.unmatched && (
-                      <p className="muted">
-                        {importPlan.unmatched} references are not loaded in this workspace.
+                    <button type="button" onClick={annotations.retryLabelPreview}>
+                      Retry preview
+                    </button>
+                  </div>
+                )}
+                <PreviewRegion
+                  busy={!!transfer.busy || annotations.previewBusy}
+                  hasReview={!!importPlan}
+                >
+                  {importPlan && (
+                    <>
+                      <p className="label-summary" role="status">
+                        <strong>
+                          {importPlan.changes.length
+                            ? [
+                                textChanges &&
+                                  `${textChanges} text change${textChanges === 1 ? '' : 's'}`,
+                                tagChanges &&
+                                  `${tagChanges} tag addition${tagChanges === 1 ? '' : 's'}`,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')
+                            : 'No changes to apply'}
+                        </strong>
+                        {!!kept && (
+                          <span className="muted">
+                            {' '}
+                            · {kept} existing value{kept === 1 ? '' : 's'} kept
+                          </span>
+                        )}
+                        {!!excluded && (
+                          <span className="label-excluded">
+                            {' '}
+                            · {excluded} entr{excluded === 1 ? 'y' : 'ies'} skipped
+                          </span>
+                        )}
                       </p>
-                    )}
-                    {(conflicts || transfer.options.conflicts !== 'exclude') && (
-                      <label className="label-setting-row">
-                        <span>Conflicting values</span>
-                        <select
-                          value={transfer.options.conflicts}
-                          onChange={(event) =>
-                            configureImport({
-                              conflicts: event.target.value as 'exclude' | 'first' | 'last',
-                            })
-                          }
-                        >
-                          <option value="exclude">Exclude unresolved conflicts</option>
-                          <option value="first">Use first source value</option>
-                          <option value="last">Use last source value</option>
-                        </select>
-                      </label>
-                    )}
-                    <ImportChanges changes={importPlan.changes} />
-                  </>
-                )}
-                {hasLength && (
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={transfer.options.shorten}
-                      onChange={(event) => configureImport({ shorten: event.target.checked })}
-                    />
-                    Shorten over-limit values
-                  </label>
-                )}
-                <TransferOutcomes
-                  issues={issues}
-                  ignoredFields={transfer.inspection?.ignoredFields}
-                  importing
-                />
-              </PreviewRegion>
+                      {!!importPlan.unmatched && (
+                        <p className="muted">
+                          Metadata will be saved for {importPlan.unmatched} item
+                          {importPlan.unmatched === 1 ? '' : 's'} not yet loaded.
+                        </p>
+                      )}
+                      <ImportChanges changes={importPlan.changes} />
+                    </>
+                  )}
+                  <TransferOutcomes
+                    issues={issues}
+                    ignoredFields={transfer.inspection?.ignoredFields}
+                    importing
+                  />
+                </PreviewRegion>
+              </>
             )}
           </>
         ) : (
           <>
             <ExportSettings options={transfer.options} onChange={configureExport} />
-            <PreviewRegion busy={annotations.previewBusy}>
-              {annotations.previewError && (
+            <ReviewControls
+              key={profile}
+              issues={issues}
+              shorten={transfer.options.shorten}
+              onShorten={(shorten) => configureExport({ shorten })}
+              exporting
+            />
+            {annotations.previewError && (
+              <div className="label-preview-error">
                 <p className="error-text" role="alert">
                   {annotations.previewError}
                 </p>
-              )}
+                <button type="button" onClick={annotations.retryLabelPreview}>
+                  Retry preview
+                </button>
+              </div>
+            )}
+            <PreviewRegion busy={annotations.previewBusy} hasReview={!!exportPlan}>
               {exportPlan && (
                 <>
                   <p className="label-summary" role="status">
@@ -689,25 +781,13 @@ export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceControl
                   />
                 </>
               )}
-              {hasLength && (
-                <div className="label-length-option">
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={transfer.options.shorten}
-                      onChange={(event) => configureExport({ shorten: event.target.checked })}
-                    />
-                    Shorten over-limit values for this destination
-                  </label>
-                  <span className="muted">Full text stays in Chaingraph.</span>
-                </div>
-              )}
               <TransferOutcomes issues={issues} importing={false} />
             </PreviewRegion>
           </>
         )}
       </div>
       <div className="button-row label-exchange-actions">
+        {!importing && <span className="label-export-format muted">Unencrypted JSONL</span>}
         <button type="button" onClick={annotations.closeLabelTransfer}>
           Cancel
         </button>
@@ -716,8 +796,12 @@ export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceControl
           className="primary"
           disabled={
             importing
-              ? !importPlan?.changes.length || (transfer.kind === 'import' && transfer.busy)
-              : !exportPlan?.recordCount || !!exportPlan.blocked
+              ? !annotations.importPlan?.changes.length ||
+                !!transfer.busy ||
+                annotations.previewBusy
+              : !annotations.exportPlan?.recordCount ||
+                !!annotations.exportPlan.blocked ||
+                annotations.previewBusy
           }
           onClick={importing ? annotations.confirmLabelImport : annotations.downloadLabelExport}
         >

@@ -5,9 +5,11 @@ import { createWorkspace } from '../../../Core/Workspace/createWorkspace';
 import { parseWorkspace } from '../../../Core/Workspace/Persistence';
 import type { Workspace } from '../../../Core/Workspace/workspace';
 import { PUBLIC_ZPUB } from '../../../../tests/fixtures/bitcoin';
+import { TransactionFetchScope } from '../../../Core/ChainData/transactionScheduler';
 import { useAnnotations } from './useAnnotations';
 import { download } from '../../../Core/Browser/download';
-import { inspectLabelFile } from './labelExchange';
+import { inspectLabelFile, createImportPreview, createExportPreview } from './labelExchange';
+import { planLabelImport, planLabelExport } from '../../../Core/Workspace/Annotations/labels';
 
 // Exercise hook lifetime and mutation wiring with the real Core rules. Worker
 // transport has separate cancellation and snapshot tests in labelExchange.test.
@@ -36,6 +38,7 @@ afterEach(() => {
 
 function fixture() {
   let current = createWorkspace('Metadata fixture', 'mainnet');
+  let scope: TransactionFetchScope | undefined;
   const edit = vi.fn((update: (workspace: Workspace) => Workspace) => {
     current = update(current);
   });
@@ -51,7 +54,7 @@ function fixture() {
         storageError: '',
         saving: false,
         active: undefined,
-        getUnlocked: vi.fn(),
+        getUnlocked: vi.fn().mockImplementation(() => scope && { fetchScope: scope }),
         getSaved: vi.fn(),
         setActiveId: vi.fn(),
         open: vi.fn(),
@@ -69,6 +72,10 @@ function fixture() {
     },
     setCurrent(workspace: Workspace) {
       current = workspace;
+      view.rerender();
+    },
+    setScope(next: TransactionFetchScope) {
+      scope = next;
       view.rerender();
     },
   };
@@ -109,6 +116,73 @@ it('reviews a 255-unit equivalent-key label, then applies once with explicit wal
   expect(saved.annotations.entities[`xpub:${PUBLIC_ZPUB}`].label).toBe(label);
   expect(saved.wallets.definitions[0].name).toBe(label);
   expect(f.view.result.current.labelTransfer).toBeUndefined();
+});
+
+it('retains review results while replanning but ignores a late obsolete plan', async () => {
+  const f = fixture();
+  act(() => f.view.result.current.openLabelImport());
+  await act(() =>
+    f.view.result.current.importLabelFile(
+      file(JSON.stringify({ type: 'tx', ref: 'a'.repeat(64), label: 'Incoming' })),
+    ),
+  );
+  await waitFor(() => expect(f.view.result.current.importPlan?.changes).toHaveLength(1));
+  const first = f.view.result.current.importPlan;
+  let finish: ((plan: ReturnType<typeof planLabelImport>) => void) | undefined;
+  let oldPlan: ReturnType<typeof planLabelImport>;
+  vi.mocked(createImportPreview).mockImplementationOnce((workspace, inspection, options) => {
+    oldPlan = planLabelImport(workspace, inspection, options);
+    return new Promise((resolve) => {
+      finish = resolve;
+    });
+  });
+  act(() => f.view.result.current.configureLabelImport({ existingText: 'replace' }));
+  expect(f.view.result.current.previewBusy).toBe(true);
+  expect(f.view.result.current.importPlan).toBeUndefined();
+  expect(f.view.result.current.importReviewPlan).toBe(first);
+  act(() => f.view.result.current.confirmLabelImport());
+  expect(f.edit).not.toHaveBeenCalled();
+  act(() => f.view.result.current.configureLabelImport({ conflicts: 'last' }));
+  await waitFor(() => expect(f.view.result.current.previewBusy).toBe(false));
+  const latest = f.view.result.current.importPlan;
+  await act(async () => finish!(oldPlan!));
+  expect(f.view.result.current.importPlan).toBe(latest);
+});
+
+it('retries a failed preview with the same settings and releases review data on close', async () => {
+  const f = fixture();
+  vi.mocked(createExportPreview).mockRejectedValueOnce(new Error('Transient preview failure'));
+  act(() => f.view.result.current.openLabelExport());
+  await waitFor(() => expect(f.view.result.current.previewError).toBe('Transient preview failure'));
+  expect(f.view.result.current.exportPlan).toBeUndefined();
+  const transfer = f.view.result.current.labelTransfer;
+  act(() => f.view.result.current.retryLabelPreview());
+  await waitFor(() => expect(f.view.result.current.exportPlan).toBeDefined());
+  expect(f.view.result.current.labelTransfer?.options).toBe(transfer?.options);
+  expect(f.view.result.current.previewError).toBeUndefined();
+  act(() => f.view.result.current.closeLabelTransfer());
+  expect(f.view.result.current.exportReviewPlan).toBeUndefined();
+  expect(f.view.result.current.exportPlan).toBeUndefined();
+});
+
+it('drops pending results and transfer state after the same workspace ID is reopened', async () => {
+  const f = fixture();
+  f.setScope(new TransactionFetchScope('mainnet'));
+  let finish: (() => void) | undefined;
+  vi.mocked(createExportPreview).mockImplementationOnce(
+    (workspace, options) =>
+      new Promise((resolve) => {
+        finish = () => resolve(planLabelExport(workspace, options));
+      }),
+  );
+  act(() => f.view.result.current.openLabelExport());
+  await waitFor(() => expect(finish).toBeDefined());
+  f.setScope(new TransactionFetchScope('mainnet'));
+  expect(f.view.result.current.labelTransfer).toBeUndefined();
+  await act(async () => finish!());
+  expect(f.view.result.current.exportPlan).toBeUndefined();
+  expect(f.view.result.current.exportReviewPlan).toBeUndefined();
+  expect(download).not.toHaveBeenCalled();
 });
 
 it('drops a late file result after cancellation and never edits another workspace', async () => {
