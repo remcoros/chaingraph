@@ -27,7 +27,8 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
   change and actionable review items alongside Coins, Addresses and Counterparties.
   Row actions open label and counterparty editors directly; finding assessments
   open in Review. Sender and recipient selectors support multiple identities and
-  exact output scopes; the inspector groups inputs and outputs side by side.
+  optional coin/output assignments in a focused view of the same popover;
+  the inspector groups inputs and outputs side by side.
   All record tabs use clickable values and subtle prompts for empty fields.
   Small review chips sit beside the relevant annotation; independent findings
   retain concise checklist rows with direct assessment actions. Annotation

@@ -211,9 +211,14 @@ it('shows a saved recipient and its output scope beside the matching editor', ()
   expect(
     within(dialog).getByRole('checkbox', { name: 'Public shop' }).getAttribute('aria-checked'),
   ).toBe('true');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Choose outputs for Public shop' }));
+  const assignment = screen.getByRole('form', { name: 'Paid to Public shop' });
   expect(
-    within(dialog).getByRole('button', { name: 'Edit outputs for Public shop' }).textContent,
-  ).toContain('1 output');
+    (within(assignment).getByRole('checkbox', { name: 'Output 0' }) as HTMLInputElement).checked,
+  ).toBe(true);
+  expect(
+    (within(assignment).getByRole('checkbox', { name: 'Output 1' }) as HTMLInputElement).checked,
+  ).toBe(false);
 });
 
 it('shows an inherited output association and edits that source without changing other links', () => {
@@ -501,7 +506,7 @@ it('opens a sender checklist from an empty field', () => {
   );
 });
 
-it('changes output scope inline while preserving other identities and records', () => {
+it('changes exact coin assignment in the same popover and preserves other identities and records', () => {
   const props = contextFixture();
   const donorId = '55555555-5555-4555-8555-555555555555';
   props.workspace = saveCounterparty(
@@ -525,22 +530,30 @@ it('changes output scope inline while preserving other identities and records', 
   const shop = screen
     .getByRole('checkbox', { name: 'Public shop' })
     .closest('.wallet-party-choice') as HTMLElement;
-  fireEvent.click(within(shop).getByRole('button', { name: 'Edit outputs for Public shop' }));
+  const choose = within(shop).getByRole('button', { name: 'Choose coins for Public shop' });
+  fireEvent.click(choose);
+  const assignment = screen.getByRole('form', { name: 'Received from Public shop' });
+  expect(document.activeElement).toBe(
+    within(assignment).getByRole('button', { name: 'Back to senders' }),
+  );
+  expect(screen.queryByRole('checkbox', { name: 'Public donor' })).toBeNull();
   expect(
-    (within(shop).getByRole('radio', { name: 'Incoming transaction' }) as HTMLInputElement).checked,
+    (within(assignment).getByRole('radio', { name: 'This payment' }) as HTMLInputElement).checked,
   ).toBe(true);
-  expect(within(shop).getByRole('checkbox', { name: /^Output 0$/ })).toBeDefined();
+  expect(within(assignment).queryByRole('checkbox')).toBeNull();
+  fireEvent.click(within(assignment).getByRole('radio', { name: 'Specific received coins' }));
+  expect(within(assignment).getByRole('checkbox', { name: /^Output 0$/ })).toBeDefined();
+  expect(within(assignment).queryByRole('checkbox', { name: /^Output 1$/ })).toBeNull();
   expect(
-    within(shop).getByTitle(
+    within(assignment).getByTitle(
       props.workspace.chainData.transactions[TX_FUNDING].vout[0].scriptPubKey.address!,
     ),
   ).toBeDefined();
-  fireEvent.click(within(shop).getByRole('radio', { name: 'Selected outputs' }));
-  expect((within(shop).getByRole('button', { name: 'Apply' }) as HTMLButtonElement).disabled).toBe(
-    true,
-  );
-  fireEvent.click(within(shop).getByRole('checkbox', { name: /Output 0/ }));
-  fireEvent.click(within(shop).getByRole('button', { name: 'Apply' }));
+  expect(
+    (within(assignment).getByRole('button', { name: 'Apply' }) as HTMLButtonElement).disabled,
+  ).toBe(true);
+  fireEvent.click(within(assignment).getByRole('checkbox', { name: /Output 0/ }));
+  fireEvent.click(within(assignment).getByRole('button', { name: 'Apply' }));
   expect(
     current.counterparties?.links.filter(
       (link) =>
@@ -564,6 +577,66 @@ it('changes output scope inline while preserving other identities and records', 
   );
   expect(current.annotations).toBe(before.annotations);
   expect(screen.getByRole('dialog', { name: 'Senders' })).toBeDefined();
+  expect(document.activeElement).toBe(choose);
+});
+
+it('separates wallet and data outputs while preserving explicit assignments and cancelling drafts', () => {
+  const props = contextFixture('sent');
+  props.wallet = {
+    ...props.wallet,
+    addresses: [
+      ...props.wallet.addresses,
+      ...deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 1, 0, 1),
+    ],
+  };
+  props.workspace.wallets.definitions = [props.wallet];
+  props.prepared = {
+    ...props.prepared,
+    scripthashes: new Set(props.wallet.addresses.map((address) => address.scripthash)),
+  };
+  const transaction = props.workspace.chainData.transactions[TX_SPENDING];
+  transaction.vout[0].scriptPubKey = structuredClone(
+    props.workspace.chainData.transactions[TX_FUNDING].vout[1].scriptPubKey,
+  );
+  transaction.vout.push({ n: 2, value: 0, scriptPubKey: { hex: '6a0101' } });
+  let current = props.workspace;
+  props.onChange = vi.fn((update) => {
+    current = update(current);
+  });
+  render(contextElements(props));
+  fireEvent.click(screen.getByRole('button', { name: / recipients$/i }));
+  const choose = screen.getByRole('button', { name: 'Choose outputs for Public shop' });
+  fireEvent.click(choose);
+  const assignment = screen.getByRole('form', { name: 'Paid to Public shop' });
+  fireEvent.click(within(assignment).getByRole('radio', { name: 'Specific payment outputs' }));
+  const payment = within(assignment).getByRole('region', { name: 'Payment outputs' });
+  expect(within(payment).getByRole('checkbox', { name: 'Output 0' })).toBeDefined();
+  expect(within(payment).queryByRole('checkbox', { name: 'Output 1' })).toBeNull();
+  const walletOutput = within(assignment).getByRole('checkbox', { name: 'Output 1', hidden: true });
+  const dataOutput = within(assignment).getByRole('checkbox', { name: 'Output 2', hidden: true });
+  const walletGroup = walletOutput.closest('details')!;
+  const dataGroup = dataOutput.closest('details')!;
+  expect(walletGroup.open).toBe(false);
+  expect(dataGroup.open).toBe(false);
+  fireEvent.click(within(payment).getByRole('checkbox', { name: 'Output 0' }));
+  fireEvent.click(within(assignment).getByRole('button', { name: 'Back to recipients' }));
+  expect(props.onChange).not.toHaveBeenCalled();
+  expect(current).toBe(props.workspace);
+  expect(document.activeElement).toBe(choose);
+  fireEvent.click(choose);
+  fireEvent.click(screen.getByRole('radio', { name: 'Specific payment outputs' }));
+  const explicitWalletOutput = screen.getByRole('checkbox', { name: 'Output 1', hidden: true });
+  const group = explicitWalletOutput.closest('details')!;
+  group.open = true;
+  fireEvent.click(explicitWalletOutput);
+  fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+  expect(
+    current.counterparties?.links.find(
+      (link) => link.kind === 'wallet-transaction' && link.direction === 'sent',
+    ),
+  ).toMatchObject({ outputIds: [`out:${TX_SPENDING}:1`] });
+  expect(current.annotations).toBe(props.workspace.annotations);
+  expect(current.chainData).toBe(props.workspace.chainData);
 });
 
 it('toggles multiple senders without closing and preserves existing narrow scopes when adding another sender', () => {

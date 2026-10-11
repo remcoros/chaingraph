@@ -1894,6 +1894,13 @@
   max-height: 280px;
   overflow: auto;
 }
+.wallet-party-checklist {
+  display: grid;
+  gap: 8px;
+}
+.wallet-party-checklist[hidden] {
+  display: none;
+}
 .wallet-party-choice-heading {
   display: flex;
   align-items: center;
@@ -1939,36 +1946,73 @@
   padding: 2px 4px;
 }
 .wallet-party-output-scope {
-  padding: 8px;
   display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.wallet-party-scope-heading {
+  display: flex;
+  align-items: center;
   gap: 6px;
-  background: var(--color-raised);
-  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+.wallet-party-scope-heading strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.wallet-party-scope-heading .icon-button {
+  flex: none;
 }
 .wallet-party-scope-options {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   border: 0;
   padding: 0;
   margin: 0;
   min-width: 0;
 }
-.wallet-party-scope-options legend {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 0 0 8px;
-  overflow-wrap: anywhere;
-}
 .wallet-party-scope-outputs {
   display: grid;
   gap: 8px;
+  max-height: min(320px, 40vh);
+  overflow: auto;
+  margin-top: 4px;
 }
-.wallet-party-scope-output {
+.wallet-party-scope-outputs > section,
+.wallet-party-scope-outputs > details {
+  min-width: 0;
+}
+.wallet-party-scope-outputs h4,
+.wallet-party-scope-outputs summary {
+  margin: 0;
+  padding: 4px 0;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.wallet-party-scope-outputs summary {
+  cursor: pointer;
+}
+.wallet-party-form .wallet-party-output-scope .wallet-party-scope-output {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  min-height: 38px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-xs);
+  color: var(--color-ink);
+}
+.wallet-party-form .wallet-party-scope-output:last-child {
+  border-bottom: 0;
+}
+.wallet-party-scope-output .bitcoin-amount {
+  text-align: right;
+}
+.wallet-party-scope-output:has(input:focus-visible) {
+  background: var(--color-raised);
 }
 .wallet-party-scope-output input {
   width: auto;
@@ -1979,7 +2023,8 @@
   min-width: 0;
   gap: 2px;
 }
-.wallet-party-output-identity > span {
+.wallet-party-output-identity > span,
+.wallet-party-output-identity > small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1987,6 +2032,7 @@
 .wallet-party-choice-heading > .text-button {
   flex: none;
   font-size: 11px;
+  white-space: nowrap;
 }
 .wallet-review-detail {
   container: wallet-detail / inline-size;

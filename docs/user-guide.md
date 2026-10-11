@@ -425,8 +425,11 @@ Five tabs share the existing list and detail panel, with **Transactions** first:
   batches. These relationships are evidence, not proven identities or ownership.
 - **Counterparties** manages reusable identities across the workspace. Create or
   search for identities using the inline Sender/Recipient field or the counterparty icon in a row
-  footer. Check several names without closing the selector. The scope beside a
-  chosen name offers the incoming/outgoing transaction or specific outputs. Associations concern exact incoming/outgoing transaction
+  footer. Check several names without closing the selector. **Choose coins…** or
+  **Choose outputs…** beside a selected name opens its assignment in the same popover.
+  Keep **This payment** or choose specific received coins/payment outputs. Wallet
+  outputs and data outputs are grouped separately; **Apply** saves the assignment,
+  while Back or **Cancel** leaves it unchanged. Associations concern exact incoming/outgoing transaction
   activity or an explicitly chosen address/output; they do not allocate value or
   infer ownership. Identity names, notes, tags, icons and bookmarks are ordinary
   annotations. Related transactions use an exact scope. Unlinking one association
@@ -484,9 +487,10 @@ fields and a pencil identifies editable values. Empty fields show
 **Add a label…**, **Add tags…** or **Add a note…**. **Name** and **Category** in
 Counterparties follow the same pattern. Click a sender or recipient value to edit
 its selection; the small navigation icon beside it opens the counterparty.
-Its sender/recipient selector keeps multiple selections open. Click its scope
-control to choose the incoming/outgoing transaction or specific outputs, shown with
-their addresses and amounts. Icons are visible even without a label.
+Its sender/recipient selector keeps multiple selections open. **Choose coins…** /
+**Choose outputs…** opens a focused **Received from** / **Paid to** view. Specific
+assignments show addresses, labels, output numbers and amounts; saved assignments
+remain visible beside the name. Icons are visible even without a label.
 
 Annotation review chips sit beside their fields, with quieter indicators for
 postponed and resolved decisions. **Review findings** in transactions, or **Review**

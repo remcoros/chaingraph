@@ -90,6 +90,7 @@ export function WalletRowAttention({
         <CounterpartyPicker
           workspace={workspace}
           subject={subject}
+          walletScripthashes={prepared.scripthashes}
           onChange={onChange}
           onNotice={onNotice}
           disabled={busy}

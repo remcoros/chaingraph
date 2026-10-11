@@ -595,6 +595,13 @@ other anchor groups and inherited receipt links. UI callers express the selectio
 without coordinating removals and additions. Persistence validates schema
 version 8 and migrates earlier workspaces without replacing observations.
 
+`CounterpartyPicker` keeps name selection and optional output assignment inside
+one anchored popover. Its private scope editor holds unsaved choices locally;
+Back/Cancel discard them and Apply uses `setCounterpartySelection`. The optional
+`walletScripthashes` display input reuses prepared verified wallet scripts from
+the inspector and row-action callers to separate wallet outputs from other
+payment outputs. It adds no ownership inference, persistence state or review rule.
+
 `walletRows.ts` links factual rows to exact goals/assessments. Context navigation
 uses exact keys and transaction scopes rather than search. Decision mutation
 deduplicates persisted keys. `WalletItemDetail` is the single inspector used by

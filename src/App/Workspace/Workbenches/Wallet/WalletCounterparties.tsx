@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  ArrowLeft,
   ArrowUpRight,
   Bookmark,
   Check,
@@ -93,6 +94,7 @@ export function walletCounterpartyNames(
 export function CounterpartyPicker({
   workspace,
   subject,
+  walletScripthashes,
   onChange,
   onNotice,
   disabled,
@@ -104,6 +106,7 @@ export function CounterpartyPicker({
 }: {
   workspace: Workspace;
   subject?: CounterpartySubject;
+  walletScripthashes?: ReadonlySet<string>;
   onChange: WalletWorkbenchContext['onChange'];
   onNotice: (message: string) => void;
   disabled?: boolean;
@@ -159,6 +162,7 @@ export function CounterpartyPicker({
           <CounterpartyChecklist
             workspace={workspace}
             subject={subject}
+            walletScripthashes={walletScripthashes}
             onChange={onChange}
             onNotice={onNotice}
           />
@@ -171,11 +175,13 @@ export function CounterpartyPicker({
 function CounterpartyChecklist({
   workspace,
   subject,
+  walletScripthashes,
   onChange,
   onNotice,
 }: {
   workspace: Workspace;
   subject?: CounterpartySubject;
+  walletScripthashes?: ReadonlySet<string>;
   onChange: WalletWorkbenchContext['onChange'];
   onNotice: (message: string) => void;
 }) {
@@ -184,8 +190,16 @@ function CounterpartyChecklist({
   const [scopeFor, setScopeFor] = useState<string>();
   const [sourceSubject, setSourceSubject] = useState<CounterpartySubject>();
   const search = useRef<HTMLInputElement>(null);
+  const scopeTrigger = useRef<HTMLButtonElement>(null);
   const editing = sourceSubject ?? subject;
   const definitions = workspace.counterparties?.definitions ?? [];
+  const scopeParty =
+    editing?.kind === 'wallet-transaction'
+      ? definitions.find((party) => party.id === scopeFor)
+      : undefined;
+  useEffect(() => {
+    if (!scopeFor) scopeTrigger.current?.focus({ preventScroll: true });
+  }, [scopeFor]);
   const matching = definitions.filter((party) =>
     partyName(workspace, party).toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -242,120 +256,143 @@ function CounterpartyChecklist({
   }
   return (
     <div className="wallet-party-form compact-controls">
-      {sourceSubject && (
-        <button
-          className="text-button"
-          onClick={() => {
-            setSourceSubject(undefined);
-            setScopeFor(undefined);
+      <div className="wallet-party-checklist" hidden={!!scopeParty}>
+        {sourceSubject && (
+          <button
+            className="text-button"
+            onClick={() => {
+              setSourceSubject(undefined);
+              setScopeFor(undefined);
+            }}
+          >
+            <ArrowLeft size={14} /> Back to record
+          </button>
+        )}
+        <input
+          ref={search}
+          data-autofocus
+          type="search"
+          aria-label="Search counterparties"
+          autoComplete="off"
+          maxLength={200}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search or create…"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && query.trim() && !exactName) {
+              event.preventDefault();
+              create();
+            }
           }}
-        >
-          Back to this record
-        </button>
-      )}
-      <input
-        ref={search}
-        data-autofocus
-        type="search"
-        aria-label="Search counterparties"
-        autoComplete="off"
-        maxLength={200}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search or create…"
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && query.trim() && !exactName) {
-            event.preventDefault();
-            create();
-          }
-        }}
-      />
-      {editing && (
-        <div className="wallet-party-options" aria-label="Counterparties">
-          {matching.map((party) => {
-            const links = direct.filter((link) => link.counterpartyId === party.id);
-            const source = inherited.find((link) => link.counterpartyId === party.id);
-            const selected = links.length > 0;
-            const whole = links.some((link) => link.kind === 'entity' || !link.outputIds);
-            const scopedOutputs = [
-              ...new Set(
-                links.flatMap((link) =>
-                  link.kind === 'wallet-transaction' ? (link.outputIds ?? []) : [],
+        />
+        {editing && (
+          <div className="wallet-party-options" aria-label="Counterparties">
+            {matching.map((party) => {
+              const links = direct.filter((link) => link.counterpartyId === party.id);
+              const source = inherited.find((link) => link.counterpartyId === party.id);
+              const selected = links.length > 0;
+              const whole = links.some((link) => link.kind === 'entity' || !link.outputIds);
+              const scopedOutputs = [
+                ...new Set(
+                  links.flatMap((link) =>
+                    link.kind === 'wallet-transaction' ? (link.outputIds ?? []) : [],
+                  ),
                 ),
-              ),
-            ];
-            return (
-              <div className="wallet-party-choice" key={party.id}>
-                <div className="wallet-party-choice-heading">
-                  <button
-                    className="wallet-party-choice-toggle"
-                    role="checkbox"
-                    aria-checked={selected || !!source}
-                    disabled={!selected && !!source}
-                    onClick={() => change(party.id, selected ? 'none' : 'all')}
-                  >
-                    <span
-                      className={`wallet-choice-check${selected || source ? ' is-checked' : ''}`}
-                      aria-hidden="true"
-                    >
-                      {(selected || source) && <Check size={12} />}
-                    </span>
-                    <span>{partyName(workspace, party)}</span>
-                  </button>
-                  {selected && editing.kind === 'wallet-transaction' && (
+              ];
+              return (
+                <div className="wallet-party-choice" key={party.id}>
+                  <div className="wallet-party-choice-heading">
                     <button
-                      className="text-button"
-                      aria-label={`Edit outputs for ${partyName(workspace, party)}`}
-                      aria-expanded={scopeFor === party.id}
-                      onClick={() => setScopeFor(scopeFor === party.id ? undefined : party.id)}
+                      className="wallet-party-choice-toggle"
+                      role="checkbox"
+                      aria-checked={selected || !!source}
+                      disabled={!selected && !!source}
+                      onClick={() => change(party.id, selected ? 'none' : 'all')}
                     >
-                      {whole
-                        ? `${editing.direction === 'sent' ? 'Outgoing' : 'Incoming'} transaction`
-                        : `${scopedOutputs.length} ${scopedOutputs.length === 1 ? 'output' : 'outputs'}`}
+                      <span
+                        className={`wallet-choice-check${selected || source ? ' is-checked' : ''}`}
+                        aria-hidden="true"
+                      >
+                        {(selected || source) && <Check size={12} />}
+                      </span>
+                      <span>{partyName(workspace, party)}</span>
                     </button>
+                    {selected && editing.kind === 'wallet-transaction' && (
+                      <button
+                        className="text-button"
+                        aria-label={`${editing.direction === 'received' ? 'Choose coins' : 'Choose outputs'} for ${partyName(workspace, party)}`}
+                        onClick={(event) => {
+                          scopeTrigger.current = event.currentTarget;
+                          setScopeFor(party.id);
+                        }}
+                      >
+                        {whole
+                          ? editing.direction === 'received'
+                            ? 'Choose coins…'
+                            : 'Choose outputs…'
+                          : `${scopedOutputs.length} ${editing.direction === 'received' ? (scopedOutputs.length === 1 ? 'coin' : 'coins') : scopedOutputs.length === 1 ? 'output' : 'outputs'}…`}
+                      </button>
+                    )}
+                  </div>
+                  {!selected && source && (
+                    <div className="wallet-party-choice-hint">
+                      From payment{' '}
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          setSourceSubject(source);
+                          setScopeFor(undefined);
+                        }}
+                      >
+                        Edit{' '}
+                        {source.kind === 'wallet-transaction' && source.direction === 'sent'
+                          ? 'recipients'
+                          : 'senders'}
+                      </button>
+                    </div>
                   )}
                 </div>
-                {!selected && source && (
-                  <div className="wallet-party-choice-hint">
-                    From{' '}
-                    {source.kind === 'wallet-transaction' && source.direction === 'sent'
-                      ? 'outgoing transaction'
-                      : 'incoming transaction'}{' '}
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setSourceSubject(source);
-                        setScopeFor(undefined);
-                      }}
-                    >
-                      Edit{' '}
-                      {source.kind === 'wallet-transaction' && source.direction === 'sent'
-                        ? 'recipients'
-                        : 'senders'}
-                    </button>
-                  </div>
-                )}
-                {scopeFor === party.id && editing.kind === 'wallet-transaction' && (
-                  <CounterpartyOutputScope
-                    key={party.id}
-                    workspace={workspace}
-                    subject={editing}
-                    name={partyName(workspace, party)}
-                    initialOutputs={whole ? undefined : scopedOutputs}
-                    onCancel={() => setScopeFor(undefined)}
-                    onApply={(outputs) => {
-                      if (change(party.id, outputs ?? 'all')) setScopeFor(undefined);
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
-          {!matching.length && !query.trim() && <p className="muted">No counterparties yet</p>}
-          {!matching.length && query.trim() && <p className="muted">No results</p>}
-        </div>
+              );
+            })}
+            {!matching.length && !query.trim() && <p className="muted">No counterparties yet</p>}
+            {!matching.length && query.trim() && <p className="muted">No results</p>}
+          </div>
+        )}
+      </div>
+      {scopeParty && editing?.kind === 'wallet-transaction' && (
+        <CounterpartyOutputScope
+          key={scopeParty.id}
+          workspace={workspace}
+          subject={editing}
+          walletScripthashes={walletScripthashes}
+          name={partyName(workspace, scopeParty)}
+          initialOutputs={
+            direct.some(
+              (link) =>
+                link.counterpartyId === scopeParty.id &&
+                (link.kind === 'entity' || !link.outputIds),
+            )
+              ? undefined
+              : [
+                  ...new Set(
+                    direct.flatMap((link) =>
+                      link.counterpartyId === scopeParty.id && link.kind === 'wallet-transaction'
+                        ? (link.outputIds ?? [])
+                        : [],
+                    ),
+                  ),
+                ]
+          }
+          onCancel={() => {
+            setScopeFor(undefined);
+            setError('');
+          }}
+          onApply={(outputs) => {
+            if (change(scopeParty.id, outputs ?? 'all')) setScopeFor(undefined);
+          }}
+        />
       )}
-      {((query.trim() && !exactName) || !editing) && (
+      {!scopeParty && ((query.trim() && !exactName) || !editing) && (
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -380,6 +417,7 @@ function CounterpartyChecklist({
 function CounterpartyOutputScope({
   workspace,
   subject,
+  walletScripthashes,
   name,
   initialOutputs,
   onCancel,
@@ -387,6 +425,7 @@ function CounterpartyOutputScope({
 }: {
   workspace: Workspace;
   subject: Extract<CounterpartySubject, { kind: 'wallet-transaction' }>;
+  walletScripthashes?: ReadonlySet<string>;
   name: string;
   initialOutputs?: string[];
   onCancel: () => void;
@@ -395,77 +434,150 @@ function CounterpartyOutputScope({
   const [whole, setWhole] = useState(!initialOutputs);
   const [outputs, setOutputs] = useState(initialOutputs ?? []);
   const radioName = useId();
+  const back = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    back.current?.focus({ preventScroll: true });
+  }, []);
   const transaction = workspace.chainData.transactions[subject.transactionId];
-  const choices =
-    transaction?.vout.filter(
-      (output) =>
-        subject.direction === 'sent' ||
-        subject.walletOutputIds.includes(`out:${subject.transactionId}:${output.n}`),
-    ) ?? [];
+  const choices = useMemo(() => {
+    const received = new Set(subject.walletOutputIds);
+    return (transaction?.vout ?? []).flatMap((output) => {
+      const id = `out:${subject.transactionId}:${output.n}`;
+      if (subject.direction === 'received' && !received.has(id)) return [];
+      const evidence = walletOutputEvidence(output, workspace.network);
+      return [
+        {
+          id,
+          output,
+          address: evidence.address,
+          kind: isOpReturn(output.scriptPubKey.hex ?? '')
+            ? 'data'
+            : evidence.scripthash && walletScripthashes?.has(evidence.scripthash)
+              ? 'wallet'
+              : 'payment',
+        },
+      ];
+    });
+  }, [
+    transaction,
+    subject.transactionId,
+    subject.direction,
+    subject.walletOutputIds,
+    workspace.network,
+    walletScripthashes,
+  ]);
+  const paymentOutputs = choices.filter((choice) => choice.kind === 'payment');
+  const walletOutputs = choices.filter((choice) => choice.kind === 'wallet');
+  const dataOutputs = choices.filter((choice) => choice.kind === 'data');
+  const outputRows = (items: typeof choices) =>
+    items.map(({ id, output, address }) => {
+      const label =
+        workspace.annotations.entities[id]?.label ||
+        (address ? workspace.annotations.entities[`addr:${address}`]?.label : undefined);
+      return (
+        <label className="wallet-party-scope-output" key={id}>
+          <input
+            type="checkbox"
+            aria-label={`Output ${output.n}`}
+            checked={outputs.includes(id)}
+            onChange={(event) =>
+              setOutputs((current) =>
+                event.target.checked ? [...current, id] : current.filter((entry) => entry !== id),
+              )
+            }
+          />
+          <span className="wallet-party-output-identity">
+            {address ? (
+              <span className="mono" title={address}>
+                <ResponsiveIdentifier value={address} />
+              </span>
+            ) : (
+              <span>
+                {isOpReturn(output.scriptPubKey.hex ?? '') ? 'OP_RETURN' : 'Script output'}
+              </span>
+            )}
+            <small className="muted">
+              {label && <span title={label}>{label} · </span>}Output {output.n}
+            </small>
+          </span>
+          <Amount value={Math.round(output.value * 100_000_000)} />
+        </label>
+      );
+    });
   return (
     <form
       className="wallet-party-output-scope"
+      aria-labelledby={`${radioName}-heading`}
       onSubmit={(event) => {
         event.preventDefault();
         onApply(whole ? undefined : outputs);
       }}
     >
-      <fieldset className="wallet-party-scope-options">
-        <legend>Apply {name} to</legend>
+      <div className="wallet-party-scope-heading">
+        <button
+          ref={back}
+          type="button"
+          className="icon-button"
+          aria-label={`Back to ${subject.direction === 'received' ? 'senders' : 'recipients'}`}
+          onClick={onCancel}
+        >
+          <ArrowLeft size={15} />
+        </button>
+        <strong id={`${radioName}-heading`}>
+          {subject.direction === 'received' ? 'Received from' : 'Paid to'} {name}
+        </strong>
+      </div>
+      <fieldset className="wallet-party-scope-options" aria-label={`Assignment for ${name}`}>
         <label className="wallet-checkbox-label">
           <input type="radio" name={radioName} checked={whole} onChange={() => setWhole(true)} />
-          {subject.direction === 'sent' ? 'Outgoing' : 'Incoming'} transaction
+          This payment
         </label>
         <label className="wallet-checkbox-label">
           <input type="radio" name={radioName} checked={!whole} onChange={() => setWhole(false)} />
-          Selected outputs
+          {subject.direction === 'received'
+            ? 'Specific received coins'
+            : 'Specific payment outputs'}
         </label>
-        <div className="wallet-party-scope-outputs">
-          {choices.map((output) => {
-            const id = `out:${subject.transactionId}:${output.n}`;
-            const evidence = walletOutputEvidence(output, workspace.network);
-            const address = evidence.address;
-            const label =
-              workspace.annotations.entities[id]?.label ||
-              (address ? workspace.annotations.entities[`addr:${address}`]?.label : undefined);
-            return (
-              <label className="wallet-party-scope-output" key={id}>
-                <input
-                  type="checkbox"
-                  aria-label={`Output ${output.n}`}
-                  checked={outputs.includes(id)}
-                  onChange={(event) => {
-                    setWhole(false);
-                    setOutputs((current) =>
-                      event.target.checked
-                        ? [...current, id]
-                        : current.filter((entry) => entry !== id),
-                    );
-                  }}
-                />
-                <span className="wallet-party-output-identity">
-                  <span className="small muted">Output {output.n}</span>
-                  {address ? (
-                    <span className="mono" title={address}>
-                      <ResponsiveIdentifier value={address} />
-                    </span>
-                  ) : (
-                    <span>
-                      {isOpReturn(output.scriptPubKey.hex ?? '') ? 'OP_RETURN' : 'Script output'}
-                    </span>
-                  )}
-                  {label && (
-                    <span className="small muted" title={label}>
-                      {label}
-                    </span>
-                  )}
-                </span>
-                <Amount value={Math.round(output.value * 100_000_000)} />
-              </label>
-            );
-          })}
-          {!choices.length && <p className="muted">Output details unavailable</p>}
-        </div>
+        {!whole && (
+          <div className="wallet-party-scope-outputs">
+            {subject.direction === 'received' ? (
+              <section aria-label="Your received coins">
+                <h4>Your received coins</h4>
+                {outputRows(choices)}
+              </section>
+            ) : (
+              <>
+                {!!paymentOutputs.length && (
+                  <section aria-label="Payment outputs">
+                    <h4>Payment outputs</h4>
+                    {outputRows(paymentOutputs)}
+                  </section>
+                )}
+                {!!walletOutputs.length && (
+                  <details
+                    open={initialOutputs?.some((id) =>
+                      walletOutputs.some((choice) => choice.id === id),
+                    )}
+                  >
+                    <summary>In this wallet ({walletOutputs.length})</summary>
+                    {outputRows(walletOutputs)}
+                  </details>
+                )}
+                {!!dataOutputs.length && (
+                  <details
+                    open={initialOutputs?.some((id) =>
+                      dataOutputs.some((choice) => choice.id === id),
+                    )}
+                  >
+                    <summary>Data outputs ({dataOutputs.length})</summary>
+                    {outputRows(dataOutputs)}
+                  </details>
+                )}
+              </>
+            )}
+            {!choices.length && <p className="muted">Output details unavailable</p>}
+          </div>
+        )}
       </fieldset>
       <div className="button-row">
         <button type="button" onClick={onCancel}>
@@ -565,6 +677,7 @@ export function WalletCounterpartyContext({
     <CounterpartyPicker
       workspace={workspace}
       subject={subject}
+      walletScripthashes={prepared.scripthashes}
       onChange={onChange}
       onNotice={onNotice}
       disabled={!active || busy}

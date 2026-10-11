@@ -64,10 +64,15 @@ one-time baseline from validated saved support during migration.
 Counterparties are workspace-wide human identities with exact incoming/outgoing transaction or
 explicit address/output associations. Received from and Paid to support search,
 creation and multiple selections in a persistent checklist. Creating or selecting
-an identity keeps the selector open. The scope beside a selected identity shows
-Incoming transaction, Outgoing transaction or an output count. Its inline editor offers the whole
-relationship or selected outputs, with addresses and amounts visible. Inherited context offers an explicit action to edit its
-incoming or outgoing transaction. Transfers do not prompt for external parties.
+an identity keeps the selector open. Choose coins / Choose outputs beside a selected
+identity opens a focused view in the same popover. Received from / Paid to names the
+relationship; This payment keeps a general association, while specific assignments
+show received wallet coins or payment outputs. Addresses stay primary, with labels
+and output numbers below and amounts on the right. Verified wallet outputs and data
+outputs remain available in separate disclosures. Back and Cancel discard scope
+edits; Apply returns to the name checklist. Narrow assignments show their coin/output
+count in the picker and exact outputs in the inspector. Inherited context offers an
+explicit action to edit the source payment. Transfers do not prompt for external parties.
 Associations do not establish ownership or allocate transaction value. Concrete
 associations survive wallet removal/reimport. Removing a link and deleting an
 identity are separate actions. Annotations owns names, notes, tags, icons and
