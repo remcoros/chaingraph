@@ -4,7 +4,8 @@
 
 Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to understand their wallets and follow activity on chain.
 
-It runs against your Bitcoin Core node and Electrum server, and everything you save stays encrypted in your browser.
+It runs against your Bitcoin Core node and Electrum server. Workspace contents
+are saved encrypted in your browser; workspace names remain public.
 
 > Chaingraph is not a custodial wallet or a public service. It never touches private keys, cannot sign or spend, and does not identify people.
 
@@ -18,37 +19,13 @@ It runs against your Bitcoin Core node and Electrum server, and everything you s
 
 - **Explore transactions.** Look up a transaction, address or output in a
   chronologically ordered 3D or flat graph. Filter the view, follow funding and
-  spending links, compact repeated outputs between the same visible transaction
-  pair, and inspect bounded address history. The transaction flow panel connects
-  visible inputs and outputs to their transaction with curved arrows.
+  spending links, and inspect bounded address history.
 
 - **Review wallets.** Import one or more watch-only wallets from an account-level
-  extended public key. Chaingraph derives addresses in the browser and refreshes
-  history, coins and analysis together. Transactions show direction, wallet net
-  change and actionable review items alongside Coins, Addresses and Counterparties.
-  Row actions open label and counterparty editors directly; finding assessments
-  open in Review. Sender and recipient selectors support multiple identities and
-  optional coin/output assignments in a focused view of the same popover;
-  the inspector groups inputs and outputs side by side.
-  All record tabs use clickable values and subtle prompts for empty fields.
-  Small review chips sit beside the relevant annotation; independent findings
-  retain concise checklist rows with direct assessment actions. Annotation
-  popovers separate the preferred edit action from alternative resolutions.
-  Answered questions disappear, while explicit decisions remain reversible.
-  Transaction headers show direction and amount above the ID, followed by
-  block date/age, observed confirmations, fee and size. Metadata and Review findings
-  share two columns, stacked in a narrow inspector; Transaction flow starts expanded
-  across the full width, with curved arrows and graph actions beside its heading.
-  Narrow flow panels stack their lanes to keep card amounts readable. Other inspectors
-  retain their record-type title and graph actions. Custom icons are editable in
-  transaction Metadata and remain visible without labels.
-  Follow available wallet records in the inspector and return with Back.
-  A label, note or tag answers purpose; senders and recipients answer who.
-  The list header groups the shown count with the select-all checkbox.
-  Dated address checks and annotations stay inside the encrypted workspace.
-  Automatic refresh defaults on every 60 seconds while unlocked. The wallet
-  actions menu offers refresh settings; coverage distinguishes partial
-  observations from complete checks.
+  extended public key. Review transactions, coins, addresses and counterparties
+  with wallet net changes and linked findings. Chaingraph derives addresses in
+  your browser and refreshes wallet history from your own nodes. Coverage
+  distinguishes incomplete observations from completed checks.
 
 - **Annotate activity.** Add labels, notes, bookmarks and tags to transactions,
   outputs and addresses. Undo and redo edits without rolling back accepted chain
@@ -194,10 +171,9 @@ automatically and can be exported as encrypted files for backup or transfer.
 ## Data and trust
 
 - The backend is a read-only proxy to your Bitcoin Core RPC and Electrum server.
-  It keeps no database, wallet, index, or cache of anything you look up. The
-  genesis hash of each configured network is held in memory to identify it. The
-  proxy and your upstream services do see the script hashes and transaction IDs
-  you look up.
+  It keeps no database, wallet, index, or cache of anything you look up. The proxy
+  and your upstream services do see the script hashes and transaction IDs you
+  look up.
 - Address derivation, scanning, analysis and encryption happen in the browser.
   Extended public keys are never sent to the backend as a wallet import.
 - Saved workspaces use AES-256-GCM with a PBKDF2-SHA256 derived key. Passwords
@@ -217,9 +193,7 @@ automatically and can be exported as encrypted files for backup or transfer.
   signing and spending are out of scope.
 - Loaded data is a snapshot. Scans, history and expansion are bounded, and a
   partial result never proves that nothing else exists. A missing spend means
-  unknown, not unspent. When bounded spending history reaches its configured
-  limit, Chaingraph keeps any verified spenders already loaded and reports the
-  incomplete evidence.
+  unknown, not unspent.
 - Heuristics are hypotheses. Common-input ownership can be wrong, CoinJoin
   detection is incomplete, and no tool identifies a person or proves a wallet
   owns anything.
@@ -227,12 +201,6 @@ automatically and can be exported as encrypted files for backup or transfer.
   backups before large investigations.
 
 ## Documentation
-
-The browser source separates React UI and wiring (`src/App`) from workspace
-capabilities (`src/Core/Workspace`). Each concept owns its data types and validation;
-the Workspace root composes the canonical document. `Persistence` owns encrypted
-formats, migration and storage.
-The source map below identifies each concept and its tests.
 
 - [User guide](docs/user-guide.md)
 - [Self-hosted deployment](docs/deployment.md)
@@ -248,5 +216,5 @@ The source map below identifies each concept and its tests.
 
 ## License
 
-[LICENSE.md](MIT). Third-party dependency notices are in
+[MIT license](LICENSE). Third-party dependency notices are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

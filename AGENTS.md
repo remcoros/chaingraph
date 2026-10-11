@@ -156,7 +156,33 @@ After editing, report:
   validation was not performed. Do not pause merely to ask for it.
 - State exactly what was validated. A build or mocked RPC test is not live
   validation, and passing non-browser checks does not establish visual usability.
-- Keep `README.md` and `docs/user-guide.md` in sync with behavior changes.
+
+## Documentation
+
+- Keep documentation accurate at the level of detail intended for each
+  document. A code or UI change does not automatically require a README edit.
+- `README.md` is the entry point for prospective users: what Chaingraph is,
+  its core capabilities, requirements, basic installation and use, and
+  material privacy, security and evidence limits.
+- Update `README.md` when a change makes one of those descriptions inaccurate
+  or materially incomplete. Identify the affected claim before editing.
+  If no README-level claim is affected, leave it unchanged.
+- Describe the current product in plain language and present tense. Revise
+  the existing description instead of appending a record of the change.
+  Keep capability summaries short, parallel and at a similar level of detail.
+- Keep control placement, visual styling, detailed panel behavior, internal
+  types, module ownership, lifecycle mechanics and implementation rationale
+  out of `README.md` unless needed to install, configure or understand a
+  material product boundary.
+- Update `docs/user-guide.md` when a documented workflow, control name or
+  user-visible behavior changes. It should explain how to use the product;
+  do not add an entry for every UI refinement.
+- Put architecture and implementation decisions in `docs/architecture.md` or
+  the relevant topic document, contributor procedures in `CONTRIBUTING.md`,
+  and change history and validation results in PR descriptions or `CHANGELOG.md`.
+- When editing a README paragraph, check nearby text for accumulated detail
+  and duplication. Consolidate it around stable user outcomes rather than
+  adding another implementation note.
 
 ## Conventions
 
