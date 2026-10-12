@@ -1,4 +1,4 @@
-import { formatBitcoinAmount } from '../../../../../Core/Formatting';
+import { formatBitcoinAmount, formatSats } from '../../../../../Core/Formatting';
 import { Amount } from '../../../../Controls/Display/Amount';
 import {
   useEffect,
@@ -9,18 +9,18 @@ import {
   useId,
   type RefObject,
 } from 'react';
-import { Box, Pencil, Network, Wallet, CircleHelp, TriangleAlert, FileCode } from 'lucide-react';
-import type { Annotation } from '../../../../../Core/Workspace/Annotations/annotations';
+import { Box, Wallet, CircleHelp, TriangleAlert, FileCode } from 'lucide-react';
 import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { GraphNode } from '../../../GraphState/types';
 
 import { listTagsForNode } from '../../../../../Core/Workspace/Annotations/tagMembership';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
 import { isWalletFlowEditTarget, walletFlowVisibility } from './walletFlowVisibility';
-import { TransactionBlockTimeWithFee } from '../../../../Controls/Display/TransactionBlockTime';
+import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
+import { transactionBlockTime } from '../../../../Controls/Display/transactionTime';
+import { transactionFee } from '../../../../Controls/Display/transactionFee';
 import { isOpReturn } from '../../../../../Core/Bitcoin';
 import { OpReturnData } from '../../../../Controls/Display/OpReturnData';
-import { WalletHelp } from '../../../../Controls/Display/WalletHelp';
 import { WalletReference } from '../WalletReference';
 import './wallet-review-flow.css';
 
@@ -31,19 +31,13 @@ const MAX_VISIBLE = 100;
 export function WalletReviewFlow({
   context,
   workspace,
-  walletName,
   editedNodeId,
-  onShowInGraph,
   onVisibleInputsChange,
-  active = true,
 }: {
   context: WalletReviewContext;
   workspace: Workspace;
-  walletName: string;
   editedNodeId?: string;
-  onShowInGraph: (id: string) => void;
   onVisibleInputsChange?: (inputs: readonly WalletReviewFlowEntry[]) => void;
-  active?: boolean;
 }) {
   const columnsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -59,11 +53,6 @@ export function WalletReviewFlow({
     return (
       <div className="wallet-flow-unavailable">
         <p>The transaction is not loaded. Open it to see its inputs and outputs.</p>
-        {context.transactionNodeId && (
-          <button onClick={() => onShowInGraph(context.transactionNodeId!)}>
-            Load transaction details
-          </button>
-        )}
       </div>
     );
   const editingTransaction = editingId === context.transactionNodeId;
@@ -72,11 +61,6 @@ export function WalletReviewFlow({
     : undefined;
   return (
     <figure className="wallet-review-flow" aria-label="Wallet transaction flow">
-      <figcaption>
-        <span className="wallet-flow-legend">
-          <Wallet size={12} aria-hidden="true" /> Your wallet · {walletName}
-        </span>
-      </figcaption>
       <div className="wallet-flow-columns" ref={columnsRef}>
         <FlowConnections columnsRef={columnsRef} />
         <FlowColumn
@@ -86,53 +70,48 @@ export function WalletReviewFlow({
           entries={context.inputs}
           workspace={workspace}
           editingId={editingId}
-          onShowInGraph={onShowInGraph}
           onVisibleEntriesChange={onVisibleInputsChange}
         />
         <div className="wallet-flow-transaction">
           <div
             className={`wallet-flow-node wallet-flow-transaction-node${editingTransaction ? ' is-selected' : ''}`}
+            role="group"
+            aria-label={editingTransaction ? 'Editing transaction' : 'Transaction'}
             title={[context.transactionId, transactionAnnotation?.label]
               .filter(Boolean)
               .join(' · ')}
           >
-            <Box className="wallet-flow-transaction-icon" size={25} aria-hidden="true" />
-            <span className="wallet-flow-role" title="Inputs / outputs">
-              Transaction ({context.inputs.length} / {context.outputs.length})
-            </span>
-            {editingTransaction && (
-              <span className="wallet-flow-editing">
-                <Pencil size={10} aria-hidden="true" /> Editing transaction
+            <div className="wallet-flow-transaction-heading">
+              <Box className="wallet-flow-transaction-icon" size={16} aria-hidden="true" />
+              {transactionAnnotation?.icon && (
+                <span className="wallet-flow-annotation-icon">{transactionAnnotation.icon}</span>
+              )}
+              <WalletReference value={context.transactionId!} kind="transaction ID" />
+              <span
+                className="wallet-flow-io-count"
+                title="Inputs / outputs"
+                aria-label={`${context.inputs.length} inputs, ${context.outputs.length} outputs`}
+              >
+                {context.inputs.length} / {context.outputs.length}
               </span>
-            )}
-            <WalletReference value={context.transactionId!} kind="transaction ID" />
-            {(transactionAnnotation?.label || transactionAnnotation?.icon) && (
-              <strong title={transactionAnnotation.label}>
-                {transactionAnnotation.icon && <span>{transactionAnnotation.icon} </span>}
-                {transactionAnnotation.label}
-              </strong>
+            </div>
+            {transactionAnnotation?.label && (
+              <strong title={transactionAnnotation.label}>{transactionAnnotation.label}</strong>
             )}
             <FlowTags
               workspace={workspace}
               node={{ id: context.transactionNodeId!, kind: 'transaction', label: '' }}
             />
-            <TransactionBlockTimeWithFee transaction={context.transaction} workspace={workspace} />
-            <ShowOnGraph
-              id={context.transactionNodeId!}
-              kind="transaction"
-              onShowInGraph={onShowInGraph}
-            />
+            <FlowTransactionFacts transaction={context.transaction} workspace={workspace} />
           </div>
         </div>
         <FlowColumn
           key={`${context.transactionNodeId}:outputs`}
           title="Outputs"
           kind="output"
-          displayedTransactionId={context.transactionId}
           entries={context.outputs}
           workspace={workspace}
           editingId={editingId}
-          onShowInGraph={onShowInGraph}
         />
       </div>
       {context.currentOutputs.length > 0 && (
@@ -144,25 +123,12 @@ export function WalletReviewFlow({
             entries={context.currentOutputs}
             workspace={workspace}
             editingId={editingId}
-            onShowInGraph={onShowInGraph}
           />
         </div>
       )}
-      <div className="wallet-flow-footnote">
-        {context.missingPrevouts > 0 && <span>{context.missingPrevouts} inputs need details</span>}
-        <WalletHelp title="Wallet flow evidence" active={active}>
-          <p>
-            “Your wallet” identifies an address discovered in your wallet. “No wallet match” means
-            it is not among your discovered addresses, though it could still belong to you.
-            “Unknown” means there is not enough information to check.
-          </p>
-          <p>
-            Arrows connect transactions to the outputs they create or spend. They do not show which
-            input funded each output or who owns the coins. Choose <strong>Show on graph</strong>{' '}
-            (the network icon) to open a transaction or outpoint in Graph.
-          </p>
-        </WalletHelp>
-      </div>
+      {context.missingPrevouts > 0 && (
+        <div className="wallet-flow-footnote">{context.missingPrevouts} inputs need details</div>
+      )}
     </figure>
   );
 }
@@ -343,32 +309,45 @@ function FlowConnections({ columnsRef }: { columnsRef: RefObject<HTMLDivElement 
   );
 }
 
-function ShowOnGraph({
-  id,
-  kind,
-  unavailable,
-  onShowInGraph,
+function FlowTransactionFacts({
+  transaction,
+  workspace,
 }: {
-  id: string;
-  kind: 'input' | 'output' | 'transaction';
-  unavailable?: 'coinbase' | 'missing-input';
-  onShowInGraph: (id: string) => void;
+  transaction: WalletReviewContext['transaction'];
+  workspace: Workspace;
 }) {
+  const status = transactionStatus(transaction);
+  const time = transactionBlockTime(transaction);
+  const fee = transactionFee(workspace, transaction);
   return (
-    <button
-      type="button"
-      className="wallet-flow-show"
-      title="Show on graph"
-      aria-label={
-        unavailable
-          ? `${unavailable === 'coinbase' ? 'Coinbase input' : 'Input'} for ${id.replace(/^tx:/, '')} has no ${unavailable === 'coinbase' ? 'previous output' : 'known outpoint'}`
-          : `Show ${kind} ${id.replace(/^(?:out|tx):/, '')} on graph`
-      }
-      disabled={!!unavailable}
-      onClick={() => onShowInGraph(id)}
-    >
-      <Network size={13} aria-hidden="true" />
-    </button>
+    <dl className="wallet-flow-transaction-facts">
+      <div className="wallet-flow-placement">
+        <dt className="sr-only">Block</dt>
+        <dd title={status.title}>{status.label}</dd>
+      </div>
+      {fee && (
+        <div className="wallet-flow-fee-rate">
+          <dt className="sr-only">Fee rate</dt>
+          <dd>{fee.feeRateSatVb.toFixed(2)} sat/vB</dd>
+        </div>
+      )}
+      {time && (
+        <div className="wallet-flow-time">
+          <dt className="sr-only">Block timestamp</dt>
+          <dd>
+            <time dateTime={time.iso} title={`Block timestamp: ${time.exact}`}>
+              {time.compact}
+            </time>
+          </dd>
+        </div>
+      )}
+      {status.kind === 'confirmed' && (
+        <div className="wallet-flow-fee">
+          <dt className="sr-only">Fee</dt>
+          <dd>{fee ? formatSats(fee.feeSats) : 'Fee unknown'}</dd>
+        </div>
+      )}
+    </dl>
   );
 }
 
@@ -376,19 +355,15 @@ function FlowColumn({
   title,
   kind,
   entries,
-  displayedTransactionId,
   workspace,
   editingId,
-  onShowInGraph,
   onVisibleEntriesChange,
 }: {
   title: string;
   kind: 'input' | 'output';
   entries: WalletReviewFlowEntry[];
-  displayedTransactionId?: string;
   workspace: Workspace;
   editingId?: string;
-  onShowInGraph: (id: string) => void;
   onVisibleEntriesChange?: (entries: readonly WalletReviewFlowEntry[]) => void;
 }) {
   const [limit, setLimit] = useState(2);
@@ -463,11 +438,6 @@ function FlowColumn({
             ? workspace.annotations.entities[addressId]
             : undefined;
           const addressPrimary = !!editingAddress && entry.address === editingAddress;
-          const primaryAnnotation = addressPrimary ? addressAnnotation : annotation;
-          const creatingId = entry.txid ?? /^out:([0-9a-f]{64}):/.exec(entry.id)?.[1];
-          const creatingAnnotation = creatingId
-            ? workspace.annotations.entities[`tx:${creatingId}`]
-            : undefined;
           const opReturn = isOpReturn(entry.scriptPubKey?.hex);
           const scriptOutput = !entry.address && !entry.missing && !!entry.scriptPubKey;
           const role = entry.coinbase
@@ -477,7 +447,7 @@ function FlowColumn({
               : entry.ownership === 'wallet'
                 ? 'Your wallet'
                 : entry.ownership === 'external'
-                  ? 'No wallet match'
+                  ? undefined
                   : entry.prevoutStatus === 'conflict'
                     ? 'Conflicting evidence'
                     : scriptOutput
@@ -493,6 +463,14 @@ function FlowColumn({
               className={`wallet-flow-node ownership-${entry.ownership}${selected ? ' is-selected' : ''}`}
               key={entry.id.startsWith('out:') ? entry.id : `${entry.id}:${index}`}
               data-flow-entry={index}
+              role="group"
+              aria-label={
+                selected
+                  ? `Editing ${addressPrimary ? 'address' : kind}`
+                  : kind === 'input'
+                    ? 'Input'
+                    : 'Output'
+              }
               title={[
                 role,
                 entry.id,
@@ -504,45 +482,11 @@ function FlowColumn({
                 .filter(Boolean)
                 .join(' · ')}
             >
-              <div className="wallet-flow-node-heading">
-                <span className="wallet-flow-role">
-                  {opReturn ? (
-                    <FileCode size={11} aria-hidden="true" />
-                  ) : entry.ownership === 'wallet' ? (
-                    <Wallet size={11} aria-hidden="true" />
-                  ) : entry.prevoutStatus === 'conflict' ? (
-                    <TriangleAlert size={11} aria-hidden="true" />
-                  ) : scriptOutput ? (
-                    <FileCode size={11} aria-hidden="true" />
-                  ) : entry.ownership === 'unknown' && !entry.coinbase ? (
-                    <CircleHelp size={11} aria-hidden="true" />
-                  ) : null}
-                  {role}
-                </span>
-                <ShowOnGraph
-                  id={entry.id}
-                  kind={kind}
-                  unavailable={
-                    entry.coinbase
-                      ? 'coinbase'
-                      : kind === 'input' && !entry.id.startsWith('out:')
-                        ? 'missing-input'
-                        : undefined
-                  }
-                  onShowInGraph={onShowInGraph}
-                />
-              </div>
-              {selected && (
-                <span className="wallet-flow-editing">
-                  <Pencil size={10} aria-hidden="true" /> Editing{' '}
-                  {editingAddress ? 'address' : kind}
-                </span>
-              )}
-              {opReturn && <OpReturnData hex={entry.scriptPubKey?.hex} />}
               {entry.coinbase ? (
                 <strong>Newly mined coins</strong>
               ) : (
                 <WalletReference
+                  preferFull
                   value={entry.address ?? entry.id.replace(/^(out|tx):/, '')}
                   kind={
                     entry.address
@@ -553,40 +497,30 @@ function FlowColumn({
                   }
                 />
               )}
-              {(primaryAnnotation?.label || primaryAnnotation?.icon) && (
-                <strong title={primaryAnnotation.label}>
-                  {primaryAnnotation.icon && <span>{primaryAnnotation.icon} </span>}
-                  {primaryAnnotation.label}
-                </strong>
-              )}
-              {addressPrimary ? (
-                <AnnotationLine
-                  name={kind === 'input' ? 'Previous output' : 'Output'}
-                  annotation={annotation}
+              {opReturn && <OpReturnData hex={entry.scriptPubKey?.hex} />}
+              <div className="wallet-flow-node-footer">
+                {role && (
+                  <span className="wallet-flow-role">
+                    {opReturn ? (
+                      <FileCode size={11} aria-hidden="true" />
+                    ) : entry.ownership === 'wallet' ? (
+                      <Wallet size={11} aria-hidden="true" />
+                    ) : entry.prevoutStatus === 'conflict' ? (
+                      <TriangleAlert size={11} aria-hidden="true" />
+                    ) : scriptOutput ? (
+                      <FileCode size={11} aria-hidden="true" />
+                    ) : entry.ownership === 'unknown' && !entry.coinbase ? (
+                      <CircleHelp size={11} aria-hidden="true" />
+                    ) : null}
+                    {role}
+                  </span>
+                )}
+                <Amount
+                  className="wallet-flow-amount"
+                  value={entry.valueSats}
+                  unknown="Value not loaded"
                 />
-              ) : (
-                <AnnotationLine name="Address" annotation={addressAnnotation} />
-              )}
-              {!entry.coinbase && creatingId !== displayedTransactionId && (
-                <AnnotationLine name="Creating transaction" annotation={creatingAnnotation} />
-              )}
-              {!entry.coinbase && creatingId && creatingId !== displayedTransactionId && (
-                <FlowTags
-                  workspace={workspace}
-                  node={{ id: `tx:${creatingId}`, kind: 'transaction', label: '' }}
-                  caption="Creating transaction tags"
-                />
-              )}
-              <FlowTags
-                workspace={workspace}
-                node={{
-                  id: entry.id,
-                  kind: entry.id.startsWith('out:') ? 'output' : 'transaction',
-                  address: entry.address,
-                  label: '',
-                }}
-              />
-              <Amount value={entry.valueSats} unknown="Value not loaded" />
+              </div>
             </div>
           );
         })}
@@ -612,31 +546,11 @@ function FlowColumn({
   );
 }
 
-function AnnotationLine({ name, annotation }: { name: string; annotation?: Annotation }) {
-  if (!annotation?.label && !annotation?.icon) return null;
-  return (
-    <span className="wallet-flow-annotation" title={`${name}: ${annotation.label}`}>
-      <span className="wallet-flow-annotation-kind">{name}</span>{' '}
-      {annotation.icon && <span>{annotation.icon} </span>}
-      {annotation.label}
-    </span>
-  );
-}
-
-function FlowTags({
-  workspace,
-  node,
-  caption,
-}: {
-  workspace: Workspace;
-  node: GraphNode;
-  caption?: string;
-}) {
+function FlowTags({ workspace, node }: { workspace: Workspace; node: GraphNode }) {
   const tags = listTagsForNode(workspace, node);
   if (!tags.length) return null;
   return (
-    <span className="wallet-flow-tags" aria-label={caption ?? 'Tags'}>
-      {caption && <span className="wallet-flow-annotation-kind">{caption}</span>}
+    <span className="wallet-flow-tags" aria-label="Tags">
       {tags.map((tag) => (
         <span className="wallet-flow-tag" key={tag.id} title={tag.name}>
           <i style={{ backgroundColor: tag.color }} aria-hidden="true" />

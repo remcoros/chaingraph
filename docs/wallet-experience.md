@@ -154,8 +154,14 @@ The transaction custom icon editor sits beside Metadata; Show on graph and
 Isolate sit beside Transaction flow. Transaction flow spans the full content width below
 Metadata and Review findings, with a section icon and no enclosing card. It starts
 expanded for transactions and retains its existing collapse and input-loading
-behavior. Other record types retain their existing flow presentation. Below it,
-disclosures appear as Inputs/Outputs, Wallet accounting, then
+behavior. Other record types retain their existing flow presentation.
+The flow's transaction card has one identity row (transaction icon, annotation
+icon, ID/copy and input/output counts), optional label/tags, then block/fee rate
+and timestamp/fee rows. Input/output identifiers expand within the card width,
+keeping their suffix and copy action visible. Cards show identity above a footer with a
+positive wallet match at the left when present and the amount at the right. Graph actions live only in the flow
+header; the repeated wallet legend and evidence-help footer are omitted.
+Below it, disclosures appear as Inputs/Outputs, Wallet accounting, then
 other related records. Related wallet records open in the inspector with Back,
 preserving the list and its filters; unavailable or external records use explicit
 graph actions. Exact related-selection shortcuts remain in the batch toolbar.

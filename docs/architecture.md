@@ -854,6 +854,14 @@ viewport and fades the last visible pixels before a row disappears.
 Wallet measures its independent lane scrollers, observes paging and annotation
 changes, and uses vertical curves when the detail container stacks its lanes.
 Geometry stays transient; neither workbench shares a layout coordinator or stores it.
+Wallet flow cards are informational and retain exact copy actions. Their Graph
+handoff stays in the enclosing detail disclosure header. Wallet's transaction
+card arranges the existing status, timestamp and fee projections independently,
+so an absent block timestamp cannot hide a known fee. The flow component no
+longer consumes wallet names, active-state help or Graph navigation callbacks.
+`WalletReference` exposes the existing responsive identifier expansion for flow
+inputs/outputs; local card styling uses available width while retaining the
+suffix and copy action. Other reference callers retain their compact display.
 Arrows express input/transaction/output relationships, never ownership or an
 input-to-output allocation. CSS rails, branches and endpoint caps are removed.
 The Inspector derives selected transactions and their loaded relationships through

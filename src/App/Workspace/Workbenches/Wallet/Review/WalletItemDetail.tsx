@@ -1012,11 +1012,8 @@ function WalletDetailFrame({
                   key={contextId}
                   context={context}
                   workspace={workspace}
-                  walletName={wallet.name}
                   editedNodeId={row.nodeId}
-                  onShowInGraph={onShowInGraph}
                   onVisibleInputsChange={onVisibleInputsChange}
-                  active={active}
                 />
                 <div className="wallet-flow-load-state" role="status">
                   {flowInputs.loading && <span>Loading input details...</span>}

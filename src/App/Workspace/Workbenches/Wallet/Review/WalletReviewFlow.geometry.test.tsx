@@ -118,7 +118,7 @@ function fixture(outputCount = 2) {
       valueSats: 1000,
     })),
   };
-  return { workspace, context, walletName: 'Synthetic wallet', onShowInGraph: vi.fn() };
+  return { workspace, context };
 }
 
 async function draw() {
@@ -163,8 +163,6 @@ it('paints the edited input last with its own highlighted arrow, without colorin
       .find((path) => path.dataset.flowCurve === 'output:0')
       ?.classList.contains('is-selected'),
   ).toBe(false);
-  fireEvent.click(screen.getByRole('button', { name: `Show input ${TX_FUNDING}:0 on graph` }));
-  expect(props.onShowInGraph).toHaveBeenCalledWith(`out:${TX_FUNDING}:0`);
 });
 
 it('keeps visible paths mounted while scrolling, omits clipped cards and follows resize in the paint frame', async () => {

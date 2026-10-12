@@ -8,6 +8,8 @@ import { SelectionToolbar } from '../../../Selection/SelectionToolbar';
 import { WalletReviewFlow } from './WalletReviewFlow';
 import type { WalletReviewContext, WalletReviewFlowEntry } from '../walletReviewContext';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
+import { buildWalletReviewContext } from '../walletReviewContext';
+import { transactions, TX_SPENDING } from '../../../../../../tests/fixtures/bitcoin';
 
 const txid = 'a'.repeat(64);
 const parentId = 'b'.repeat(64);
@@ -29,34 +31,28 @@ const context = (): WalletReviewContext => ({
   role: 'wallet-related-transaction',
   missingPrevouts: 0,
 });
-const renderFlow = (flow: WalletReviewContext, editedNodeId?: string) =>
+const renderFlow = (
+  flow: WalletReviewContext,
+  editedNodeId?: string,
+  workspace = createWorkspace('Flow controls test', 'mainnet'),
+) =>
   renderToStaticMarkup(
     createElement(WalletReviewFlow, {
       context: flow,
-      workspace: createWorkspace('Flow controls test', 'mainnet'),
-      walletName: 'Test wallet',
+      workspace,
       editedNodeId,
-      onShowInGraph: vi.fn(),
     }),
   );
 
 describe('Wallet transaction flow controls', () => {
-  it('uses non-clickable cards with identity-specific graph magnifiers and full values', () => {
+  it('keeps flow cards informational while retaining exact copies and values', () => {
     const html = renderFlow(context(), `out:${txid}:0`);
     expect(html).not.toMatch(/<button[^>]*class="wallet-flow-node/);
-    expect(html.match(/class="wallet-flow-show"/g)).toHaveLength(4);
-    expect(html).toContain(`aria-label="Show transaction ${txid} on graph"`);
-    expect(html).toContain(`aria-label="Show input ${parentId}:0 on graph"`);
-    expect(html).toContain(`aria-label="Show output ${txid}:0 on graph"`);
-    expect(html).toContain('title="Show on graph"');
+    expect(html).not.toMatch(/aria-label="Show [^"]+ on graph"/);
     expect(html).toContain(`title="${formatSats(123_456_789)}"`);
     expect(html).toContain('Editing output');
     expect(html).toContain('Your wallet');
-    expect(html).toContain('No wallet match');
-    expect(html).toMatch(
-      /<span[^>]*class="wallet-help"[^>]*role="img"[^>]*aria-label="Wallet flow evidence"/,
-    );
-    expect(html).not.toMatch(/<button[^>]*class="[^"]*wallet-help/);
+    expect(html).not.toContain('No wallet match');
     expect(html).toContain('aria-label="Copy outpoint"');
     expect(html).toContain('aria-label="Copy transaction ID"');
   });
@@ -75,9 +71,9 @@ describe('Wallet transaction flow controls', () => {
     const flow = context();
     flow.outputs = Array.from({ length: 1000 }, (_, index) => output(index));
     const html = renderFlow(flow, `out:${txid}:999`);
-    expect(html).toContain(`aria-label="Show output ${txid}:999 on graph"`);
-    expect(html).not.toContain(`aria-label="Show output ${txid}:998 on graph"`);
-    expect(html.match(/class="wallet-flow-show"/g)).toHaveLength(4);
+    expect(html).toContain(`title="${txid}:999"`);
+    expect(html).not.toContain(`title="${txid}:998"`);
+    expect(html.match(/data-flow-entry=/g)).toHaveLength(3);
     expect(html).toContain('Outputs <b>1000</b>');
     expect(html).toContain('aria-label="Expand outputs" aria-expanded="false"');
   });
@@ -94,10 +90,8 @@ describe('Wallet transaction flow controls', () => {
       },
     ];
     const html = renderFlow(flow, `tx:${txid}`);
-    expect(html).toContain(
-      `aria-label="Coinbase input for ${txid} has no previous output" disabled=""`,
-    );
-    expect(html).not.toContain(`aria-label="Show input ${txid}`);
+    expect(html).toContain('Newly mined coins');
+    expect(html.match(/aria-label="Copy outpoint"/g)).toHaveLength(2);
     expect(html).toContain('Editing transaction');
   });
 
@@ -110,16 +104,54 @@ describe('Wallet transaction flow controls', () => {
     expect(html).toContain('Editing address');
     expect(html).not.toContain('Editing output');
     expect(html).not.toContain('Editing transaction');
-    expect(html).toContain(`aria-label="Show output ${txid}:0 on graph"`);
+    expect(html).toContain('aria-label="Copy address"');
   });
 
   it('keeps an unresolved input without an outpoint unknown and non-actionable', () => {
     const flow = context();
     flow.inputs = [{ id: `tx:${txid}`, ownership: 'unknown', selected: false, missing: true }];
     const html = renderFlow(flow, `tx:${txid}`);
-    expect(html).toContain(`aria-label="Input for ${txid} has no known outpoint" disabled=""`);
     expect(html).toContain('Unknown');
+    expect(html).toContain('Value not loaded');
     expect(html).not.toContain('Editing input');
+  });
+
+  it('shows exact transaction annotations, block time and independently calculated fee values', () => {
+    const workspace = createWorkspace('Flow transaction facts', 'mainnet');
+    workspace.chainData.transactions = structuredClone(transactions);
+    workspace.chainData.transactions[TX_SPENDING].status = {
+      kind: 'confirmed',
+      blockHeight: 800000,
+      blocktime: 1690168629,
+    };
+    const id = `tx:${TX_SPENDING}`;
+    workspace.annotations.entities[id] = {
+      icon: '★',
+      label: 'Invoice payment',
+      note: '',
+      bookmarked: false,
+    };
+    workspace.annotations.tags = [
+      { id: 'invoice', name: 'Invoice', color: '#ffaa00', nodeIds: [id] },
+    ];
+    const flow = buildWalletReviewContext(workspace, { addresses: [] }, { nodeId: id });
+    const html = renderFlow(flow, id, workspace);
+    expect(html).toContain('★');
+    expect(html).toContain('Invoice payment');
+    expect(html).toContain('title="Invoice"');
+    expect(html).toContain('#800000');
+    expect(html).toContain('dateTime="2023-07-24T03:17:09.000Z"');
+    expect(html).toContain('48.08 sat/vB');
+    expect(html).toContain(formatSats(10000));
+    // A missing block timestamp must not also hide the independently known fee.
+    flow.transaction = { ...flow.transaction!, status: { kind: 'confirmed', blockHeight: 800000 } };
+    const withoutTime = renderFlow(flow, id, workspace);
+    expect(withoutTime).not.toContain('<time');
+    expect(withoutTime).toContain('48.08 sat/vB');
+    expect(withoutTime).toContain(formatSats(10000));
+    const incomplete = renderFlow(flow, id, createWorkspace('Missing fee evidence', 'mainnet'));
+    expect(incomplete).toContain('Fee unknown');
+    expect(incomplete).not.toContain('48.08 sat/vB');
   });
 });
 

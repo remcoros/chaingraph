@@ -539,7 +539,13 @@ finding assessment. Answered
 annotation questions disappear; explicit decisions stay available to reopen.
 **Transaction flow** spans the width below these groups and starts expanded for
 transactions. Curved arrows connect visible inputs and outputs to the transaction,
-with matching line and arrow colors for the selected record. Narrow panels stack
+with matching line and arrow colors for the selected record. The transaction card
+shows its ID and input/output counts, annotation icon, label and tags, followed by
+block time and fee information when known. Input/output cards show the address,
+using the available width while retaining its ending and copy action,
+with **Your wallet** at the bottom left when matched and the amount at the bottom
+right. **Show on graph** and **Isolate**
+remain in the flow header. Narrow panels stack
 the lanes so amounts remain readable. Collapse it to hide the diagram. **Inputs/Outputs**, **Wallet
 accounting**, and related records remain available below it. Available wallet records open in the
 inspector with **Back**, preserving the list and its filters. External or unavailable
