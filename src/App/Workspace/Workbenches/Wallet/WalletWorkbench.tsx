@@ -26,6 +26,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
     selected: wallet,
     discovery: walletDiscovery,
     sectionRef: walletWorkspaceRef,
+    navigationSession,
   } = workspace.wallet;
   const analysis = workspace.analysis;
   const { invalidate: invalidateSelection, setSelectedWallet, setSelectedId } = workspace.selection;
@@ -45,6 +46,9 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
         operation={workspaceOperation}
         walletUtxos={walletUtxos}
         preparationCache={workspaces.getUnlocked(activeWorkspace.id)?.walletPreparation}
+        navigationSession={navigationSession(
+          workspaces.getUnlocked(activeWorkspace.id)?.fetchScope,
+        )}
         tourPreview={
           tour.step?.view?.workbench === 'wallet'
             ? { tab: tour.step.view.walletTab ?? 'review', example: tour.example.snapshot }

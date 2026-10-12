@@ -2,7 +2,9 @@
 
 This experiment builds on the existing Wallet workbench layout and styling.
 Transactions are the initial view, followed by Coins, Addresses, Counterparties
-and Review. Returning use restores browsing context. One Addresses selector offers
+and Review. Each visible tab retains its own filters, inspected record, revealed
+rows, scroll and explicit selection per wallet. Addresses retains its selected
+Wallet/Sources/Destinations scope as part of that position. One Addresses selector offers
 Wallet (all), Wallet (receive), Wallet (change), Sources and Destinations.
 
 ## Refresh
@@ -157,6 +159,17 @@ disclosures appear as Inputs/Outputs, Wallet accounting, then
 other related records. Related wallet records open in the inspector with Back,
 preserving the list and its filters; unavailable or external records use explicit
 graph actions. Exact related-selection shortcuts remain in the batch toolbar.
+Ordinary tab clicks resume that tab without adding a Back step. Related-activity
+and exact-review jumps create temporary views with contextual Back, preserving
+both the origin and the destination's normal position. The named return beside
+the temporary filter restores the originating tab directly; inspector Back
+returns one record at a time. Repeating a contextual jump replaces an earlier
+temporary destination, so completed return links do not survive an ordinary tab
+visit. Nested jumps return one step at a time without undoing edits or accepted evidence. Checked selection,
+range anchors and inspector/return trails survive wallet and workbench switches
+within the unlocked session; locking drops them. Per-tab browsing positions are
+encrypted and restored on reopening. Filtering retains checked records and
+reports hidden selections; batch actions cover the complete explicit selection.
 
 Counterparty editing uses the shared label, tag, note and icon editors. Its
 inspector uses the shared type header with the name beneath, wallet activity

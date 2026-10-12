@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
+import { saveCounterparty } from '../../../../../Core/Workspace/Counterparties/counterparties';
 import { WalletReviewPanel, type WalletWorkbenchViewProps } from './WalletReviewPanel';
 import {
   PUBLIC_ZPUB,
@@ -36,12 +37,14 @@ function Fixture({
   receipt = false,
   addressActivity = false,
   addressReview = false,
+  counterparties = false,
 }: {
   saved?: boolean;
   findings?: boolean;
   receipt?: boolean;
   addressActivity?: boolean;
   addressReview?: boolean;
+  counterparties?: boolean;
 }) {
   const [workspace, setWorkspace] = useState(() => {
     const value = createWorkspace('Public wallet fixture', 'mainnet');
@@ -111,7 +114,22 @@ function Fixture({
           review: { status: 'open', typeIds: ['address-description'], addressBranch: 'all' },
         },
       };
-    return value;
+    return counterparties
+      ? saveCounterparty(
+          value,
+          {
+            id: '40000000-0000-4000-8000-000000000001',
+            name: 'Public contact',
+          },
+          {
+            kind: 'wallet-transaction',
+            walletId: wallet.id,
+            transactionId: TX_FUNDING,
+            direction: 'received',
+            walletOutputIds: [`out:${TX_FUNDING}:0`],
+          },
+        )
+      : value;
   });
   const props: WalletWorkbenchViewProps = {
     workspace,
@@ -550,4 +568,206 @@ it('retains the selected finding after a decision so it can be reopened', () => 
   fireEvent.click(within(inspector).getByRole('button', { name: 'Reopen' }));
   expect(within(inspector).queryByText('Reviewed')).toBeNull();
   expect(within(inspector).queryByText('Spending finding')).toBeNull();
+});
+
+it('restores checked rows, inspection, filters and scroll independently across ordinary tabs', () => {
+  render(<Fixture addressActivity />);
+  const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+  const section = screen.getByRole('region', { name: 'Wallet review workbench' });
+  const records = screen.getByRole('list', { name: 'Transactions records' });
+  fireEvent.click(within(records).getByRole('link', { name: new RegExp(TX_SPENDING.slice(0, 8)) }));
+  fireEvent.click(within(records).getByRole('checkbox', { name: `Select ${TX_FUNDING}` }));
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: TX_SPENDING } });
+  fireEvent.scroll(section, { target: { scrollTop: 300 } });
+  fireEvent.click(tabs.getByRole('button', { name: 'Addresses' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Addresses' }), {
+    target: { value: 'change' },
+  });
+  const change = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 1, 7, 1)[0].address;
+  fireEvent.click(screen.getByRole('checkbox', { name: `Select ${change}` }));
+  fireEvent.scroll(section, { target: { scrollTop: 100 } });
+  fireEvent.click(tabs.getByRole('button', { name: 'Transactions' }));
+  expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe(TX_SPENDING);
+  expect(section.scrollTop).toBe(300);
+  expect(screen.getByRole('article', { name: 'Batch selection details' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear wallet filters' }));
+  expect(
+    (screen.getByRole('checkbox', { name: `Select ${TX_FUNDING}` }) as HTMLInputElement).checked,
+  ).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+  expect(
+    within(screen.getByRole('list', { name: 'Transactions records' }))
+      .getByRole('link', { name: new RegExp(TX_SPENDING.slice(0, 8)) })
+      .getAttribute('aria-current'),
+  ).toBe('true');
+  fireEvent.click(tabs.getByRole('button', { name: 'Addresses' }));
+  expect((screen.getByRole('combobox', { name: 'Addresses' }) as HTMLSelectElement).value).toBe(
+    'change',
+  );
+  expect(
+    (screen.getByRole('checkbox', { name: `Select ${change}` }) as HTMLInputElement).checked,
+  ).toBe(true);
+  expect(section.scrollTop).toBe(100);
+});
+
+it('resumes a linked inspector when returning to its tab and keeps its Back action', () => {
+  render(<Fixture />);
+  const detail = screen.getByRole('article', { name: 'Selected wallet item' });
+  const address = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+  fireEvent.click(within(detail).getByLabelText('Inputs and outputs').querySelector('summary')!);
+  fireEvent.click(within(detail).getAllByRole('link', { name: `Open address ${address}` })[0]);
+  fireEvent.click(screen.getByRole('button', { name: 'Addresses' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Transactions' }));
+  const resumed = screen.getByRole('article', { name: 'Selected wallet item' });
+  expect(within(resumed).getByText('account/0/0')).toBeTruthy();
+  fireEvent.click(within(resumed).getByRole('button', { name: /Back$/ }));
+  expect(within(resumed).queryByText('account/0/0')).toBeNull();
+  expect(screen.getByRole('list', { name: 'Transactions records' })).toBeTruthy();
+});
+
+it('returns from nested related Transactions and Review while restoring the destination batch and keeping edits', () => {
+  render(<Fixture counterparties findings receipt />);
+  const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: `Select ${TX_SPENDING}` }));
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: TX_SPENDING } });
+  fireEvent.click(tabs.getByRole('button', { name: 'Counterparties' }));
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Find counterparties' }), {
+    target: { value: 'contact' },
+  });
+  fireEvent.click(
+    within(screen.getByRole('list', { name: 'Counterparty records' })).getByRole('link', {
+      name: 'Public contact',
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Show related transactions' }));
+  expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('');
+  expect(
+    within(screen.getByRole('list', { name: 'Transactions records' })).getAllByRole('link'),
+  ).toHaveLength(1);
+  const row = within(screen.getByRole('list', { name: 'Transactions records' }))
+    .getByRole('link', { name: new RegExp(TX_FUNDING.slice(0, 8)) })
+    .closest('[role="listitem"]')!;
+  fireEvent.click(within(row as HTMLElement).getByRole('button', { name: /^Review items/ }));
+  const detail = screen.getByRole('article', { name: 'Selected review item' });
+  fireEvent.click(within(detail).getByRole('button', { name: / note$/i }));
+  const note = screen.getByRole('textbox', { name: 'Entity notes' });
+  fireEvent.change(note, { target: { value: 'Kept after returning' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Close notes editor' }));
+  fireEvent.click(screen.getByRole('button', { name: /Back to Transactions/ }));
+  expect(
+    within(screen.getByRole('article', { name: 'Selected wallet item' })).getByText(
+      'Kept after returning',
+    ),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /Back to Counterparties/ }));
+  expect(
+    (screen.getByRole('searchbox', { name: 'Find counterparties' }) as HTMLInputElement).value,
+  ).toBe('contact');
+  expect(
+    within(screen.getByRole('list', { name: 'Counterparty records' }))
+      .getByRole('link', { name: 'Public contact' })
+      .getAttribute('aria-current'),
+  ).toBe('true');
+  fireEvent.click(tabs.getByRole('button', { name: 'Transactions' }));
+  expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe(TX_SPENDING);
+  expect(
+    (screen.getByRole('checkbox', { name: `Select ${TX_SPENDING}` }) as HTMLInputElement).checked,
+  ).toBe(true);
+  expect(screen.queryByRole('button', { name: /Back to Counterparties/ })).toBeNull();
+  expect(screen.queryByText(/^Related activity/)).toBeNull();
+});
+
+it('returns a review jump to the original batch and focuses its restored selection details', () => {
+  render(<Fixture findings />);
+  fireEvent.click(screen.getByRole('checkbox', { name: `Select ${TX_SPENDING}` }));
+  const row = within(screen.getByRole('list', { name: 'Transactions records' }))
+    .getByRole('link', { name: new RegExp(TX_FUNDING.slice(0, 8)) })
+    .closest('[role="listitem"]')!;
+  const trigger = within(row as HTMLElement).getByRole('button', { name: /^Review items/ });
+  act(() => trigger.focus());
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('button', { name: /Back to Transactions/ }));
+  const batch = screen.getByRole('article', { name: 'Batch selection details' });
+  expect(
+    (screen.getByRole('checkbox', { name: `Select ${TX_SPENDING}` }) as HTMLInputElement).checked,
+  ).toBe(true);
+  expect(document.activeElement).toBe(within(batch).getByRole('heading', { level: 2 }));
+});
+
+it('keeps inspector Back next to a related record opened inside a temporary transaction view', () => {
+  render(<Fixture counterparties receipt />);
+  const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+  fireEvent.click(tabs.getByRole('button', { name: 'Counterparties' }));
+  fireEvent.click(
+    within(screen.getByRole('list', { name: 'Counterparty records' })).getByRole('link', {
+      name: 'Public contact',
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Show related transactions' }));
+  const detail = screen.getByRole('article', { name: 'Selected wallet item' });
+  const address = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+  fireEvent.click(within(detail).getByLabelText('Inputs and outputs').querySelector('summary')!);
+  fireEvent.click(within(detail).getAllByRole('link', { name: `Open address ${address}` })[0]);
+  expect(screen.getByRole('button', { name: /Back to Counterparties/ })).toBeTruthy();
+  expect(within(detail).queryByRole('button', { name: /Back to Counterparties/ })).toBeNull();
+  fireEvent.click(within(detail).getByRole('button', { name: /Back$/ }));
+  expect(
+    within(within(detail).getByRole('heading', { level: 2 })).getByTitle(TX_FUNDING),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /Back to Counterparties/ }));
+  expect(
+    within(screen.getByRole('list', { name: 'Counterparty records' }))
+      .getByRole('link', { name: 'Public contact' })
+      .getAttribute('aria-current'),
+  ).toBe('true');
+});
+
+it('clears the temporary return after repeating Show in Transactions through a manual tab switch', () => {
+  render(<Fixture counterparties receipt />);
+  const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: `Select ${TX_SPENDING}` }));
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: TX_SPENDING } });
+  fireEvent.click(tabs.getByRole('button', { name: 'Counterparties' }));
+  fireEvent.click(
+    within(screen.getByRole('list', { name: 'Counterparty records' })).getByRole('link', {
+      name: 'Public contact',
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Show related transactions' }));
+  fireEvent.click(tabs.getByRole('button', { name: 'Counterparties' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Show related transactions' }));
+  const detail = screen.getByRole('article', { name: 'Selected wallet item' });
+  const address = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+  fireEvent.click(within(detail).getByLabelText('Inputs and outputs').querySelector('summary')!);
+  fireEvent.click(within(detail).getAllByRole('link', { name: `Open address ${address}` })[0]);
+  fireEvent.click(screen.getByRole('button', { name: /Back to Counterparties/ }));
+  expect(
+    within(screen.getByRole('list', { name: 'Counterparty records' }))
+      .getByRole('link', { name: 'Public contact' })
+      .getAttribute('aria-current'),
+  ).toBe('true');
+  fireEvent.click(tabs.getByRole('button', { name: 'Transactions' }));
+  expect(screen.queryByRole('button', { name: /Back/ })).toBeNull();
+  expect(screen.queryByText(/^Related activity/)).toBeNull();
+  expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe(TX_SPENDING);
+  expect(
+    (screen.getByRole('checkbox', { name: `Select ${TX_SPENDING}` }) as HTMLInputElement).checked,
+  ).toBe(true);
+});
+
+it('keeps the context return available after clearing a related transaction scope', () => {
+  render(<Fixture counterparties receipt />);
+  fireEvent.click(screen.getByRole('button', { name: 'Counterparties' }));
+  fireEvent.click(
+    within(screen.getByRole('list', { name: 'Counterparty records' })).getByRole('link', {
+      name: 'Public contact',
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Show related transactions' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Clear scope' }));
+  expect(screen.queryByText(/^Related activity/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Clear scope' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /Back to Counterparties/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Transactions' }));
+  expect(screen.queryByRole('button', { name: /Back to Counterparties/ })).toBeNull();
 });

@@ -11,6 +11,49 @@ import {
 } from './view';
 
 describe('saved presentation contract', () => {
+  it('round-trips independent Wallet tab positions while excluding transient selection and navigation', () => {
+    const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
+    const wallet = {
+      one: {
+        activeTab: 'addresses',
+        tabs: {
+          transactions: { query: 'income', selectedKey: 'tx:one', scrollTop: 240, limit: 80 },
+          utxos: { tagFilter: 'reserved', selectedKey: 'out:two' },
+          addresses: { addressScope: 'sources', addressBranch: 'all', selectedKey: 'addr:three' },
+          counterparties: { query: 'contact', selectedKey: 'party:four' },
+          review: { status: 'later', scopeFilter: 'addresses', typeIds: ['address-description'] },
+        },
+      },
+    };
+    expect(viewSchema.parse({ ...base, wallet }).wallet).toEqual(wallet);
+    const transient = viewSchema.parse({
+      ...base,
+      wallet: {
+        one: {
+          ...wallet.one,
+          selection: ['tx:one'],
+          returnTo: { selectedKey: 'tx:two' },
+          tabs: {
+            transactions: {
+              ...wallet.one.tabs.transactions,
+              selection: ['tx:one'],
+              detailTrail: ['tx:two'],
+            },
+          },
+        },
+      },
+    });
+    expect(transient.wallet!.one).toEqual({
+      activeTab: 'addresses',
+      tabs: { transactions: wallet.one.tabs.transactions },
+    });
+    expect(
+      viewSchema.safeParse({
+        ...base,
+        wallet: { one: { tabs: { addresses: { addressScope: 'invalid' } } } },
+      }).success,
+    ).toBe(false);
+  });
   it('stores wallet and Review branch selections independently and accepts older documents', () => {
     const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
     const wallet = {

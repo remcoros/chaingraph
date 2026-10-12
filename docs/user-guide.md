@@ -479,7 +479,11 @@ review decisions in the factual tabs and Review. Explicit decisions remain visib
 with **Reopen** or **Return to review**, and making a decision keeps the record open. The list displays 40 matching rows at a time; **Show more** reveals the
 next group. Accounting and related evidence expand on demand. Filters, inspected
 records and editors remain stable through refresh
-and goal satisfaction. Browsing and Review context are saved separately.
+and goal satisfaction. Each tab remembers its filters, inspected record, scroll
+position and revealed rows separately for each wallet. Returning to a tab resumes
+that position, including any linked inspector and checked selection. Checked
+selections and Back history last while the workspace is unlocked; reopening
+restores saved browsing positions with no checked rows.
 
 IDs stay visible above labels. Dates sit on the left of each row footer, with label,
 counterparty and review actions on the right. Copy controls are in the inspector;
@@ -541,9 +545,19 @@ accounting**, and related records remain available below it. Available wallet re
 inspector with **Back**, preserving the list and its filters. External or unavailable
 records have explicit graph actions. **Related** remains available for batch
 selections sharing an address or transaction.
+**Show in Transactions** and links into a record's review items open a temporary
+view with **Back to Counterparties**, **Back to Transactions**, or the originating
+tab. This return appears beside the related-activity or review filter and restores
+the originating tab's position and selection, including when you have opened a
+related record in its inspector. The inspector's own **Back** returns one record
+at a time. The destination tab's earlier normal position is preserved for your
+next ordinary visit, without the completed return link. Nested jumps
+return one step at a time; annotations and review decisions remain saved.
 Checkboxes, Ctrl/Cmd+click and Shift+click build a selection. The checkbox in the
 list header selects every matching record, including rows below **Show more**;
-the next column shows the displayed/matching count. Batch edits are one Undo step each. A contextual
+the next column shows the displayed/matching count. Filtering keeps checked
+records selected and reports those outside the current filter. Batch actions
+apply to the complete checked selection. Batch edits are one Undo step each. A contextual
 jump offers **Back to Wallet** and restores its originating control when available.
 
 **Automatic refresh** defaults on and is saved with the encrypted workspace.

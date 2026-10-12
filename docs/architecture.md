@@ -563,8 +563,10 @@ labels are opt-in, and wallet-name fallback is separate from explicit key labels
 The product contract is [wallet-experience.md](wallet-experience.md). The existing
 list/detail layout renders Transactions, Coins, Addresses, Counterparties and
 Review. Sources/Destinations remain scopes under Addresses. `view.ts` owns
-validated encrypted browsing and Review presentation separately, plus the automatic
-refresh preference. Background updates preserve inspected records and editors.
+validated encrypted per-tab browsing positions, plus the automatic refresh
+preference. Optional `tabs` entries load older `browsing`/`review` positions as a
+compatibility fallback; subsequent presentation writes use only per-tab entries.
+Background updates preserve inspected records and editors.
 
 `walletRecords.ts` owns wallet-relative accounting from canonical scripts and
 loaded prevouts. Missing/co-input evidence stays unknown. It exposes matching
@@ -672,10 +674,24 @@ remain local UI state, not a second review-state source. Address/coin navigation
 calls the panel's existing exact-key review operation. A focused review jump opens
 its field context or the outer section; there is no nested disclosure per item.
 
-`WalletReviewPanel` owns a transient canonical-reference navigation trail. It
-resolves related wallet records from the existing rows and verified loaded output
-index, preserving list selection and filters; Back restores the prior inspector.
-The trail stores no record snapshots and is not persisted. External or unavailable
+`WalletReviewPanel` consumes its Wallet-owned `WalletNavigation` through
+`useSyncExternalStore`. This replaces its individual tab, filter, selection and
+trail states with one presentation owner and atomic navigation intentions.
+`useRecordSelection` owns the shared range/toggle rules, reused by Wallet navigation.
+The workspace controller retains Wallet navigation per wallet in a session map keyed by the
+existing unlocked fetch scope, pruned on lock and wallet removal; Core Session
+does not acquire UI types or navigation responsibilities. Inspector links retain
+canonical references and contextual jumps retain the origin and destination's
+normal presentation, replacing any suspended temporary destination. The named
+context return restores those positions directly, while inspector Back pops one
+record. Both restore keyboard focus without
+rolling back annotations or evidence. Only normal per-tab positions enter View;
+temporary scopes, checked IDs, range anchors and return trails are not persisted.
+Back labels derive from the subscribed immutable snapshot, not an implicit read
+of the navigation instance. Wallet panel interaction tests use the app's React
+compiler so memoization regressions are covered alongside state transitions.
+The panel resolves related wallet records from current rows and the verified
+loaded output index. Navigation stores no chain-data snapshots. External or unavailable
 records retain explicit Graph navigation. State changes keep the inspected record
 available for reversal. Batch selection retains its existing exact related-row
 shortcuts and preserve-existing metadata policy, including a batch of one.

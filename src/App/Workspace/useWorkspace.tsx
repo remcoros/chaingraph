@@ -40,6 +40,7 @@ import { useGraphExpansion } from './Workbenches/Graph/Navigation/useGraphExpans
 import { useGraphLookup } from './Workbenches/Graph/Navigation/useGraphLookup';
 import { useWorkspaceOperation } from './useWorkspaceOperation';
 import { useWalletActivity } from './Workbenches/Wallet/useWalletActivity';
+import { useWalletNavigationSessions } from './Workbenches/Wallet/useWalletNavigation';
 import { useGraphActions } from './Workbenches/Graph/useGraphActions';
 import { createWalletActions } from './Workbenches/Wallet/walletActions';
 import { createAnalysisActions } from './Workbenches/Analysis/analysisActions';
@@ -122,6 +123,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     entityLinked: entityFiltersLinked,
   } = filters;
   const analysis = useWorkspaceAnalysis(workspaces.unlocked);
+  const walletNavigationSession = useWalletNavigationSessions(workspaces.unlocked);
   const [lockingWorkspace, setLockingWorkspace] = useState(false);
   const [workbench, setWorkbench] = useState<WorkbenchMode>('graph');
   const [returnWorkbench, setReturnWorkbench] = useState<WorkbenchMode>();
@@ -693,6 +695,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     },
     wallet: {
       selected: wallet,
+      navigationSession: walletNavigationSession,
       utxos: walletUtxos,
       utxoObservation: walletUtxoObservation,
       discovery: walletDiscovery,

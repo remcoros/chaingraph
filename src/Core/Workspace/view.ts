@@ -88,11 +88,24 @@ const walletReviewPresentationSchema = walletBrowsingSchema
   });
 const walletPresentationSchema = z.object({
   activeTab: walletBrowsingSchema.shape.tab,
+  tabs: z
+    .object({
+      transactions: walletBrowsingSchema.omit({ tab: true }).optional(),
+      utxos: walletBrowsingSchema.omit({ tab: true }).optional(),
+      addresses: walletBrowsingSchema
+        .omit({ tab: true })
+        .extend({ addressScope: z.enum(['wallet', 'sources', 'destinations']).optional() })
+        .optional(),
+      counterparties: walletBrowsingSchema.omit({ tab: true }).optional(),
+      review: walletReviewPresentationSchema.optional(),
+    })
+    .optional(),
+  // Read compatibility for workspaces saved before per-tab positions.
   browsing: walletBrowsingSchema.optional(),
   review: walletReviewPresentationSchema.optional(),
 });
 
-/** Ordinary browsing and a resumable review position, separate from human decisions. */
+/** Each Wallet tab's saved browsing position, separate from human decisions. */
 export type WalletPresentation = z.infer<typeof walletPresentationSchema>;
 
 export const GRAPH_SNAPSHOT_NODE_LIMIT = 50_000;

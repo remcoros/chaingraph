@@ -574,7 +574,14 @@
   background: color-mix(in srgb, var(--color-accent) 7%, var(--color-surface));
   font-size: 12px;
 }
-.wallet-review-context > span {
+.wallet-review-context-origin {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+.wallet-review-context-origin > span {
   min-width: 0;
 }
 .wallet-review-only-toggle {

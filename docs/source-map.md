@@ -56,6 +56,7 @@ src/
           Renderer/                 Three.js, layout, camera and picking
         Wallet/
           WalletWorkbench.tsx       wallet view and controller binding
+          useWalletNavigation.ts    per-tab positions, selections and contextual return
           WalletMetadataFields.tsx  common reading fields and inline metadata editors
           WalletCounterparties.tsx  exact identity selectors, list and detail UI
           useWalletActivity.ts      discovery controls and monitoring lifecycle

@@ -53,7 +53,11 @@ import {
   type WalletReviewCategoryWorkspace,
 } from './reviewCategories';
 import type { AnalysisScan } from '../../../../../Core/Workspace/Analysis/analysisScan';
-import { useRecordSelection } from '../useRecordSelection';
+import {
+  useWalletNavigation,
+  walletSection,
+  type WalletNavigationSession,
+} from '../useWalletNavigation';
 import type { WalletUtxoController } from '../../../Wallets/WalletUtxos';
 import type { WalletWorkbenchContext } from '../walletWorkbenchContext';
 import { useWalletCounterparties } from '../useWalletCounterparties';
@@ -87,6 +91,7 @@ import '../wallet-workbench.css';
 export interface WalletWorkbenchViewProps extends WalletWorkbenchContext {
   walletUtxos: WalletUtxoController;
   preparationCache?: WalletPreparationCache;
+  navigationSession?: WalletNavigationSession;
   sessionAnalysis?: AnalysisScan;
 }
 
@@ -147,13 +152,17 @@ function buildWalletRows(
   preparedRecords: Pick<WalletPreparation, 'transactionRecords' | 'addressRecords'>,
 ): Record<WalletTab, WalletRow[]> {
   const records =
-    tab === 'utxos' || tab === 'transactions' || tab === 'addresses' || tab === 'counterparties'
+    tab !== 'review'
       ? buildWalletRecordRows(
           workspace,
           wallet,
           currentUtxos,
           reviewItems,
-          tab === 'counterparties' ? 'transactions' : tab,
+          tab === 'counterparties'
+            ? 'transactions'
+            : tab === 'sources' || tab === 'destinations'
+              ? 'addresses'
+              : tab,
           preparedRecords,
         )
       : { utxos: [], transactions: [], addresses: [] };
@@ -161,7 +170,7 @@ function buildWalletRows(
     review: buildWalletReviewRows(workspace, wallet, currentUtxos, groups, preparedRecords),
     counterparties: [],
     ...records,
-    ...(tab === 'sources' || tab === 'destinations'
+    ...(walletSection(tab) === 'addresses'
       ? buildWalletRelationshipRows(workspace, relationships, reviewItems)
       : { sources: [], destinations: [] }),
   };
@@ -272,6 +281,7 @@ export const WalletWorkbenchView = memo(
             {...props}
             {...PREVIEW_ACTIONS}
             preparationCache={undefined}
+            navigationSession={undefined}
             active={false}
             workspace={previewWorkspace}
             wallet={previewWallet}
@@ -311,50 +321,43 @@ export function WalletReviewPanel(
   const [localPreparation] = useState(() => new WalletPreparationCache());
   const preparation = props.preparationCache ?? localPreparation;
   const saved = workspace.view.wallet?.[wallet.id];
-  const [tab, setTab] = useState<WalletTab>(
-    props.tourPreview?.tab ?? saved?.activeTab ?? saved?.browsing?.tab ?? 'transactions',
-  );
-  const initial = tab === 'review' ? saved?.review : saved?.browsing;
+  const {
+    navigation,
+    state: navigationState,
+    visit,
+  } = useWalletNavigation(wallet.id, saved, props.navigationSession, props.tourPreview?.tab);
+  const {
+    tab,
+    status,
+    selectedKey,
+    limit,
+    query,
+    labelFilter,
+    tagFilter,
+    addressBranch,
+    typeIds,
+    scopeFilter,
+    reviewOnly,
+    exactReview,
+    transactionScope,
+    focusedReviewKey,
+    detailTrail,
+  } = visit.position;
+  const selection = {
+    ids: visit.position.selection.ids,
+    choose: (...args: Parameters<typeof navigation.choose>) => navigation.choose(...args),
+    setIds: (ids: string[]) => navigation.select(ids),
+    clear: () => navigation.clearSelection(),
+  };
   const scrollRef = useRef<HTMLElement>(null);
-  const [initialScroll] = useState(initial?.scrollTop ?? 0);
   const partyLookup = useMemo(
     () => createCounterpartyLookup({ counterparties: workspace.counterparties }),
     [workspace.counterparties],
   );
-  const [status, setStatus] = useState<WalletStatusFilter>(
-    saved?.review?.status ?? (props.tourPreview?.tab === 'sources' ? 'all' : 'open'),
-  );
-  const [selectedKey, setSelectedKey] = useState<string | undefined>(initial?.selectedKey);
-  const selection = useRecordSelection();
-  const [limit, setLimit] = useState(initial?.limit ?? PAGE);
-  const [query, setQuery] = useState(initial?.query ?? '');
-  const [labelFilter, setLabelFilter] = useState<string>(initial?.labelFilter ?? 'all');
-  const [tagFilter, setTagFilter] = useState(initial?.tagFilter ?? 'all');
-  const [addressBranch, setAddressBranch] = useState<'all' | 'receive' | 'change'>(
-    initial?.addressBranch ?? 'all',
-  );
-  const [typeIds, setTypeIds] = useState<string[] | undefined>(saved?.review?.typeIds);
-  const [scopeFilter, setScopeFilter] = useState<'all' | ReviewScope>(
-    saved?.review?.scopeFilter ?? 'all',
-  );
-  const [reviewOnly, setReviewOnly] = useState(saved?.browsing?.reviewOnly ?? false);
-  const [exactReview, setExactReview] = useState<{
-    nodeId: string;
-    reference: string;
-  }>();
-  const [transactionScope, setTransactionScope] = useState<string[] | undefined>(
-    saved?.browsing?.transactionIds,
-  );
-  const [focusedReviewKey, setFocusedReviewKey] = useState<string>();
   const [notice, setNotice] = useState('');
-  const [detailTrail, setDetailTrail] = useState<{
-    origin: string;
-    scope: string;
-    references: string[];
-  }>();
 
   const detailRef = useRef<HTMLElement>(null);
-  const navigationFocus = useRef<{ reference?: string } | undefined>(undefined);
+  const handledFocus = useRef<typeof navigationState.focus>(undefined);
   // The row this workbench settled on and the filters it was chosen under.
   // Recording it is what lets a row that a metadata edit pushed out of the
   // current filters stay on screen until the user navigates, changes filters,
@@ -363,7 +366,8 @@ export function WalletReviewPanel(
     row: WalletRow | undefined;
     scope: string | undefined;
     selectedKey: string | undefined;
-  }>({ row: undefined, scope: undefined, selectedKey: undefined });
+    entry: number;
+  }>({ row: undefined, scope: undefined, selectedKey: undefined, entry: navigationState.entry });
   const filterScopeFor = (reviewStatus: WalletStatusFilter) =>
     JSON.stringify([
       workspace.id,
@@ -639,23 +643,27 @@ export function WalletReviewPanel(
     workspace.wallets.reviews,
   ]);
   const displayedRows = filteredRows.slice(0, limit);
+  const previousShown = shown.entry === navigationState.entry ? shown : undefined;
   const initialReviewLoading =
     !props.tourPreview &&
     tab === 'review' &&
     filteredRows.length === 0 &&
     !selectedKey &&
-    !shown.row &&
+    !previousShown?.row &&
     canLoadChainData &&
     utxoLoading &&
     !utxos &&
     !utxoError;
   const retainedRow =
-    shown.scope === filterScope && (!selectedKey || selectedKey === shown.row?.key)
-      ? rows.find((row) => row.key === shown.row?.key)
-      : undefined;
+    visit.position.retained?.scope === filterScope
+      ? rows.find((row) => row.key === visit.position.retained?.key)
+      : previousShown?.scope === filterScope &&
+          (!selectedKey || selectedKey === previousShown.row?.key)
+        ? rows.find((row) => row.key === previousShown.row?.key)
+        : undefined;
   const currentRow = initialReviewLoading
     ? undefined
-    : (retainedRow ?? resolveWalletRow(filteredRows, selectedKey, shown.row));
+    : (retainedRow ?? resolveWalletRow(filteredRows, selectedKey, previousShown?.row));
   const selectedRow = useMemo(
     () =>
       currentRow
@@ -671,13 +679,22 @@ export function WalletReviewPanel(
     [workspace.network, workspace.chainData.transactions, selectionIndex, currentRow],
   );
   const selectionKeys = useMemo(() => new Set(selection.ids), [selection.ids]);
-  const rowKeys = useMemo(() => new Set(rows.map((row) => row.key)), [rows]);
+  const selectionRows = useMemo(
+    () =>
+      walletSection(tab) === 'addresses'
+        ? [...rowsByTab.addresses, ...rowsByTab.sources, ...rowsByTab.destinations]
+        : rows,
+    [tab, rowsByTab, rows],
+  );
+  const rowKeys = useMemo(() => new Set(selectionRows.map((row) => row.key)), [selectionRows]);
   const filteredKeys = useMemo(() => new Set(filteredRows.map((row) => row.key)), [filteredRows]);
   const allSelection = useMemo(
     () => walletSelectAll(selection.ids, [...filteredKeys]),
     [selection.ids, filteredKeys],
   );
-  const selectedRows = selection.ids.length ? rows.filter((row) => selectionKeys.has(row.key)) : [];
+  const selectedRows = selection.ids.length
+    ? selectionRows.filter((row) => selectionKeys.has(row.key))
+    : [];
   const selectedIds = [...new Set(selectedRows.map((row) => row.nodeId))];
   const selectedKinds = new Map(selectedRows.map((row) => [row.nodeId, row.kind]));
   const selectionSummary = (['address', 'transaction', 'output'] as const)
@@ -701,27 +718,20 @@ export function WalletReviewPanel(
   const hiddenSelected = selectedRows.filter((row) => !filteredKeys.has(row.key)).length;
   const missingSelected = selection.ids.filter((id) => !rowKeys.has(id)).length;
   const batching = selection.ids.length > 0;
-  // Record what this render settled on. Doing it here rather than in an effect
-  // keeps the row React renders and the row it remembers in step: an effect
-  // records after the fact, so the next render reads commit history instead of
-  // the value this one actually used. The recorded selection is the one this
-  // render saw, so snapping it below re-runs this block once and then settles.
+  // Keep the current render's row for enrichment/goal satisfaction. Session
+  // navigation retains its exact key, rather than retaining chain-data snapshots.
   if (
     !batching &&
-    (shown.row !== currentRow || shown.scope !== filterScope || shown.selectedKey !== selectedKey)
+    (shown.row !== currentRow ||
+      shown.scope !== filterScope ||
+      shown.selectedKey !== selectedKey ||
+      shown.entry !== navigationState.entry)
   ) {
-    if (
-      currentRow &&
-      ((selectedKey && selectedKey !== currentRow.key) ||
-        (shown.row?.kind === 'output' &&
-          !shown.row.address &&
-          currentRow.kind === 'address' &&
-          currentRow.outpointIds?.includes(shown.row.nodeId) &&
-          (!selectedKey || selectedKey === shown.row.key)))
-    )
-      setSelectedKey(currentRow.key);
-    setShown({ row: currentRow, scope: filterScope, selectedKey });
+    setShown({ row: currentRow, scope: filterScope, selectedKey, entry: navigationState.entry });
   }
+  useLayoutEffect(() => {
+    navigation.settle(currentRow?.key, filterScope);
+  }, [navigation, currentRow?.key, filterScope, batching]);
   const tabLabel =
     TABS.find((item) => item.id === tab)?.label ?? (tab === 'sources' ? 'Sources' : 'Destinations');
   const statusTotals = useMemo(
@@ -765,91 +775,21 @@ export function WalletReviewPanel(
   }, [selectedKey, batching]);
 
   useLayoutEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = initialScroll;
-  }, [initialScroll]);
+    if (scrollRef.current)
+      scrollRef.current.scrollTop =
+        navigation.getSnapshot().visits[navigationState.section].position.scrollTop;
+  }, [navigation, navigationState.entry, navigationState.section]);
   useEffect(() => {
     if (!active || tourPreview || !onPresentationChange) return;
-    const shared = {
-      query,
-      labelFilter: labelFilter as 'all' | 'labeled' | 'unlabeled',
-      tagFilter,
-      addressBranch,
-      selectedKey,
-      limit,
-    };
-    onPresentationChange(wallet.id, (current) => {
-      const next =
-        tab === 'review'
-          ? {
-              ...current,
-              activeTab: tab,
-              review: { ...current.review, ...shared, status, scopeFilter, typeIds },
-            }
-          : {
-              ...current,
-              activeTab: tab,
-              browsing: {
-                ...current.browsing,
-                ...shared,
-                tab,
-                reviewOnly,
-                transactionIds: transactionScope,
-              },
-            };
-      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
-    });
-  }, [
-    active,
-    tourPreview,
-    onPresentationChange,
-    wallet.id,
-    tab,
-    query,
-    labelFilter,
-    tagFilter,
-    addressBranch,
-    selectedKey,
-    limit,
-    status,
-    scopeFilter,
-    typeIds,
-    reviewOnly,
-    transactionScope,
-  ]);
+    const next = navigation.presentation();
+    onPresentationChange(wallet.id, (current) =>
+      JSON.stringify(next) === JSON.stringify(current) ? current : next,
+    );
+  }, [active, tourPreview, onPresentationChange, wallet.id, navigation, navigationState]);
 
   function changeTab(next: WalletTab) {
-    const restored =
-      next === 'review'
-        ? saved?.review
-        : saved?.browsing?.tab === next
-          ? saved.browsing
-          : undefined;
-    setLimit(restored?.limit ?? PAGE);
-    setTab(next);
-    selection.clear();
-    setSelectedKey(restored?.selectedKey);
-    setShown({ row: undefined, scope: undefined, selectedKey: undefined });
-    setQuery(restored?.query ?? '');
-    setLabelFilter(restored?.labelFilter ?? 'all');
-    setTagFilter(restored?.tagFilter ?? 'all');
-    setAddressBranch(restored?.addressBranch ?? 'all');
-    setStatus(next === 'review' ? (saved?.review?.status ?? 'open') : 'all');
-    setScopeFilter(next === 'review' ? (saved?.review?.scopeFilter ?? 'all') : 'all');
-    setReviewOnly(next === saved?.browsing?.tab ? (saved.browsing.reviewOnly ?? false) : false);
-    setExactReview(undefined);
-    setFocusedReviewKey(undefined);
-    setTypeIds(next === 'review' ? saved?.review?.typeIds : undefined);
+    navigation.switchTab(next);
     setNotice('');
-    setTransactionScope(next === 'transactions' ? restored?.transactionIds : undefined);
-    if (scrollRef.current) scrollRef.current.scrollTop = restored?.scrollTop ?? 0;
-  }
-
-  function changeAddressScope(value: string) {
-    const next = value === 'sources' || value === 'destinations' ? value : 'addresses';
-    if (next !== tab) changeTab(next);
-    setAddressBranch(value === 'receive' || value === 'change' ? value : 'all');
-    setLimit(PAGE);
-    selection.clear();
   }
 
   function decide(items: readonly WalletReviewItem[], action: WalletDecisionAction) {
@@ -869,40 +809,28 @@ export function WalletReviewPanel(
   }
 
   function openLinkedReview(row: WalletRow, item: WalletReviewItem) {
-    setTab('review');
-    setFocusedReviewKey(item.key);
-    setLimit(PAGE);
-    setStatus('all');
-    setScopeFilter('all');
-    setTypeIds(undefined);
-    setReviewOnly(false);
-    setQuery('');
-    setLabelFilter('all');
-    setTagFilter('all');
-    setAddressBranch('all');
-    setExactReview({ nodeId: row.nodeId, reference: row.identifier });
-    selection.clear();
-    setSelectedKey(
-      rowsByTab.review.find((candidate) =>
+    navigation.openReview({
+      nodeId: row.nodeId,
+      reference: row.identifier,
+      key: item.key,
+      selectedKey: rowsByTab.review.find((candidate) =>
         candidate.reviews.some((entry) => entry.key === item.key),
       )?.key,
-    );
-    setShown({ row: undefined, scope: undefined, selectedKey: undefined });
+    });
     setNotice('');
   }
 
   function clearExactReview() {
-    setLimit(PAGE);
-    setStatus('open');
-    setScopeFilter('all');
-    setTypeIds(undefined);
-    setQuery('');
-    setLabelFilter('all');
-    setTagFilter('all');
-    setExactReview(undefined);
-    selection.clear();
-    setSelectedKey(undefined);
-    setShown({ row: undefined, scope: undefined, selectedKey: undefined });
+    navigation.filter({
+      status: 'open',
+      scopeFilter: 'all',
+      typeIds: undefined,
+      query: '',
+      labelFilter: 'all',
+      tagFilter: 'all',
+      exactReview: undefined,
+      focusedReviewKey: undefined,
+    });
   }
 
   const recordById = useMemo(() => {
@@ -942,8 +870,10 @@ export function WalletReviewPanel(
     detailTrail && detailTrail.origin === origin && detailTrail.scope === filterScope
       ? detailTrail.references
       : [];
-  if (detailTrail && (detailTrail.origin !== origin || detailTrail.scope !== filterScope))
-    setDetailTrail(undefined);
+  useLayoutEffect(() => {
+    if (detailTrail && (detailTrail.origin !== origin || detailTrail.scope !== filterScope))
+      navigation.update({ detailTrail: undefined });
+  }, [navigation, detailTrail, origin, filterScope]);
   const inspectedId = trail.at(-1) ?? origin;
   const inspectedRow =
     inspectedId && !inspectedId.startsWith('party:')
@@ -952,17 +882,31 @@ export function WalletReviewPanel(
         : linkedRow(inspectedId)
       : undefined;
   useLayoutEffect(() => {
-    const pending = navigationFocus.current;
-    if (!pending) return;
-    navigationFocus.current = undefined;
+    const pending = navigationState.focus;
+    if (!pending || pending === handledFocus.current) return;
+    handledFocus.current = pending;
+    const element = pending.element;
+    if (
+      element?.isConnected &&
+      scrollRef.current?.contains(element) &&
+      !element.matches(':disabled') &&
+      element.getClientRects().length
+    ) {
+      element.focus({ preventScroll: true });
+      return;
+    }
     const target = [
       ...(detailRef.current?.querySelectorAll<HTMLElement>('[data-wallet-reference]') ?? []),
     ].find((element) => element.dataset.walletReference === pending.reference);
     const visibleTarget = target?.closest('details:not([open])') ? undefined : target;
-    (visibleTarget ?? detailRef.current?.querySelector<HTMLElement>('h2'))?.focus({
+    (
+      visibleTarget ??
+      detailRef.current?.querySelector<HTMLElement>('h2') ??
+      scrollRef.current
+    )?.focus({
       preventScroll: true,
     });
-  }, [inspectedId]);
+  }, [inspectedId, navigationState.focus, navigationState.entry]);
 
   function openRecord(id: string) {
     if (id === inspectedId || !origin) return;
@@ -970,13 +914,7 @@ export function WalletReviewPanel(
       props.onShowInGraph(id);
       return;
     }
-    navigationFocus.current = {};
-    setDetailTrail({ origin, scope: filterScope, references: [...trail, id] });
-  }
-  function returnToRecord() {
-    if (!origin || !trail.length) return;
-    navigationFocus.current = { reference: inspectedId };
-    setDetailTrail({ origin, scope: filterScope, references: trail.slice(0, -1) });
+    navigation.openRecord(origin, filterScope, id);
   }
   const inspector = inspectedId?.startsWith('party:') ? (
     <WalletCounterpartyDetail
@@ -984,16 +922,12 @@ export function WalletReviewPanel(
       partyId={inspectedId.slice(6)}
       activityRows={rowsByTab.transactions}
       onRemoved={() => {
-        if (trail.length)
-          setDetailTrail({ origin: origin!, scope: filterScope, references: trail.slice(0, -1) });
-        else setSelectedKey(undefined);
+        if (trail.length) navigation.back();
+        else navigation.inspect(undefined);
       }}
       onOpenRecord={openRecord}
       canOpenRecord={canOpenRecord}
-      onShowRelatedTransactions={(ids) => {
-        changeTab('transactions');
-        setTransactionScope(ids);
-      }}
+      onShowRelatedTransactions={(ids) => navigation.showTransactions(ids)}
     />
   ) : inspectedRow ? (
     <WalletItemDetail
@@ -1011,15 +945,22 @@ export function WalletReviewPanel(
       resolveInputs={tab !== 'sources' || (counterpartyReady && !counterparties.loading)}
     />
   ) : undefined;
+  const contextBackLabel = navigation.contextBackLabel(navigationState);
+  const contextBack = contextBackLabel ? (
+    <button className="text-button" onClick={() => navigation.returnToOrigin()}>
+      ← {contextBackLabel}
+    </button>
+  ) : undefined;
+  const navigationBack =
+    trail.length > 0 ? (
+      <div className="wallet-inspector-back">
+        <button className="text-button" onClick={() => navigation.back()}>
+          ← Back
+        </button>
+      </div>
+    ) : undefined;
   const inspectedDetail = (
     <>
-      {trail.length > 0 && (
-        <div className="wallet-inspector-back">
-          <button className="text-button" onClick={returnToRecord}>
-            ← Back
-          </button>
-        </div>
-      )}
       {inspector ?? (trail.length > 0 && <p className="wallet-empty-note">Record unavailable</p>)}
     </>
   );
@@ -1049,15 +990,11 @@ export function WalletReviewPanel(
       className="wallet-workbench"
       ref={scrollRef}
       onScroll={(event) => {
-        const scrollTop = event.currentTarget.scrollTop;
         if (active && !props.tourPreview)
-          props.onPresentationChange?.(wallet.id, (current) =>
-            tab === 'review'
-              ? { ...current, review: { ...current.review, scrollTop } }
-              : { ...current, browsing: { ...current.browsing, scrollTop } },
-          );
+          navigation.update({ scrollTop: event.currentTarget.scrollTop });
       }}
       aria-label="Wallet review workbench"
+      tabIndex={-1}
       hidden={props.hidden}
       inert={!!props.tourPreview}
       data-tour={props.tourPreview ? 'wallet-preview' : undefined}
@@ -1113,36 +1050,52 @@ export function WalletReviewPanel(
         <WalletCounterpartyList
           {...props}
           selectedId={selectedKey?.replace(/^party:/, '')}
-          onSelect={(id) => {
-            setDetailTrail(undefined);
-            setSelectedKey(`party:${id}`);
-          }}
+          onSelect={(id) => navigation.inspect(`party:${id}`)}
           query={query}
-          onQueryChange={setQuery}
+          onQueryChange={(value) => navigation.filter({ query: value })}
         >
-          <article className="wallet-review-detail" aria-label="Selected counterparty">
+          <article
+            ref={detailRef}
+            className="wallet-review-detail"
+            aria-label="Selected counterparty"
+          >
+            {navigationBack}
             {inspector ? inspectedDetail : <p>Select a counterparty.</p>}
           </article>
         </WalletCounterpartyList>
       ) : (
         <div className="wallet-review-body">
-          {tab === 'review' && exactReview && (
+          {tab === 'review' && (exactReview || contextBack) && (
             <div className="wallet-review-context" role="status">
-              <span>
-                Review items for{' '}
-                <strong>
-                  <ResponsiveIdentifier value={exactReview.reference} />
-                </strong>
-              </span>
-              <button className="text-button" onClick={clearExactReview}>
-                Clear
-              </button>
+              <div className="wallet-review-context-origin">
+                {contextBack}
+                {exactReview && (
+                  <span>
+                    Review items for{' '}
+                    <strong>
+                      <ResponsiveIdentifier value={exactReview.reference} />
+                    </strong>
+                  </span>
+                )}
+              </div>
+              {exactReview && (
+                <button className="text-button" onClick={clearExactReview}>
+                  Clear
+                </button>
+              )}
             </div>
           )}
-          {tab === 'transactions' && transactionScope && (
+          {tab === 'transactions' && (transactionScope || contextBack) && (
             <div className="wallet-review-context">
-              <span>Related activity ({transactionScope.length})</span>
-              <button onClick={() => setTransactionScope(undefined)}>Clear scope</button>
+              <div className="wallet-review-context-origin">
+                {contextBack}
+                {transactionScope && <span>Related activity ({transactionScope.length})</span>}
+              </div>
+              {transactionScope && (
+                <button onClick={() => navigation.filter({ transactionScope: undefined })}>
+                  Clear scope
+                </button>
+              )}
             </div>
           )}
           <div className="wallet-record-filters" data-tour="wallet-filters">
@@ -1151,8 +1104,7 @@ export function WalletReviewPanel(
                 className="wallet-review-only-toggle"
                 aria-pressed={reviewOnly}
                 onClick={() => {
-                  setLimit(PAGE);
-                  setReviewOnly((value) => !value);
+                  navigation.filter({ reviewOnly: !reviewOnly });
                 }}
               >
                 To review ({outstandingRecordCount})
@@ -1164,7 +1116,7 @@ export function WalletReviewPanel(
                 <select
                   aria-label="Addresses"
                   value={tab === 'addresses' ? addressBranch : tab}
-                  onChange={(event) => changeAddressScope(event.target.value)}
+                  onChange={(event) => navigation.addressScope(event.target.value)}
                 >
                   <option value="all">Wallet (all)</option>
                   <option value="receive">Wallet (receive)</option>
@@ -1181,9 +1133,9 @@ export function WalletReviewPanel(
                   aria-label="Addresses"
                   value={addressBranch}
                   onChange={(event) => {
-                    setAddressBranch(event.target.value as typeof addressBranch);
-                    setLimit(PAGE);
-                    selection.clear();
+                    navigation.filter({
+                      addressBranch: event.target.value as typeof addressBranch,
+                    });
                   }}
                 >
                   <option value="all">Wallet (all)</option>
@@ -1199,8 +1151,7 @@ export function WalletReviewPanel(
                   groups={categoryGroups}
                   selectedIds={selectedTypes}
                   onChange={(ids) => {
-                    setLimit(PAGE);
-                    setTypeIds(ids);
+                    navigation.filter({ typeIds: ids });
                   }}
                   labels={{
                     trigger: 'Review',
@@ -1216,8 +1167,7 @@ export function WalletReviewPanel(
                     aria-label="Scope"
                     value={scopeFilter}
                     onChange={(event) => {
-                      setLimit(PAGE);
-                      setScopeFilter(event.target.value as 'all' | ReviewScope);
+                      navigation.filter({ scopeFilter: event.target.value as 'all' | ReviewScope });
                     }}
                   >
                     <option value="all">All review items ({statusFiltered.length})</option>
@@ -1240,8 +1190,7 @@ export function WalletReviewPanel(
                   aria-label="State"
                   value={status}
                   onChange={(event) => {
-                    setLimit(PAGE);
-                    setStatus(event.target.value as WalletStatusFilter);
+                    navigation.filter({ status: event.target.value as WalletStatusFilter });
                   }}
                 >
                   {(Object.keys(STATUS_LABELS) as WalletStatusFilter[]).map((value) => (
@@ -1258,8 +1207,7 @@ export function WalletReviewPanel(
                 aria-label="Label filter"
                 value={labelFilter}
                 onChange={(event) => {
-                  setLimit(PAGE);
-                  setLabelFilter(event.target.value);
+                  navigation.filter({ labelFilter: event.target.value as typeof labelFilter });
                 }}
               >
                 <option value="all">All</option>
@@ -1273,8 +1221,7 @@ export function WalletReviewPanel(
                 aria-label="Tag filter"
                 value={tagFilter}
                 onChange={(event) => {
-                  setLimit(PAGE);
-                  setTagFilter(event.target.value);
+                  navigation.filter({ tagFilter: event.target.value });
                 }}
               >
                 <option value="all">Any tag state</option>
@@ -1294,8 +1241,7 @@ export function WalletReviewPanel(
                 placeholder={`Search ${tab === 'utxos' ? 'coins' : tab === 'review' ? 'review items' : tab === 'sources' || tab === 'destinations' ? 'addresses' : tab}…`}
                 value={query}
                 onChange={(event) => {
-                  setLimit(PAGE);
-                  setQuery(event.target.value);
+                  navigation.filter({ query: event.target.value });
                 }}
               />
             </label>
@@ -1310,15 +1256,16 @@ export function WalletReviewPanel(
                 className="text-button"
                 aria-label="Clear wallet filters"
                 onClick={() => {
-                  setLimit(PAGE);
-                  setQuery('');
-                  setLabelFilter('all');
-                  setTagFilter('all');
-                  setAddressBranch('all');
-                  setStatus('all');
-                  setScopeFilter('all');
-                  setTypeIds(undefined);
-                  setReviewOnly(false);
+                  navigation.filter({
+                    query: '',
+                    labelFilter: 'all',
+                    tagFilter: 'all',
+                    addressBranch: 'all',
+                    status: 'all',
+                    scopeFilter: 'all',
+                    typeIds: undefined,
+                    reviewOnly: false,
+                  });
                 }}
               >
                 Clear filters
@@ -1468,10 +1415,7 @@ export function WalletReviewPanel(
                             event,
                           );
                         else {
-                          selection.clear();
-                          selection.anchorAt(row.key);
-                          setDetailTrail(undefined);
-                          setSelectedKey(row.key);
+                          navigation.inspect(row.key);
                         }
                       }}
                     >
@@ -1618,7 +1562,7 @@ export function WalletReviewPanel(
                 </p>
               )}
               {filteredRows.length > limit && (
-                <button onClick={() => setLimit((current) => current + PAGE)}>
+                <button onClick={() => navigation.update({ limit: limit + PAGE })}>
                   Show more ({filteredRows.length - limit} remaining)
                 </button>
               )}
@@ -1634,6 +1578,7 @@ export function WalletReviewPanel(
                     : 'Selected wallet item'
               }
             >
+              {navigationBack}
               {batching ? (
                 <>
                   <div className="wallet-detail-toolbar" aria-label="Selected batch actions">
@@ -1686,7 +1631,7 @@ export function WalletReviewPanel(
                       </button>
                     </div>
                   </div>
-                  <h2>
+                  <h2 tabIndex={-1}>
                     {selectionSummary
                       ? `${selectionSummary} selected`
                       : 'Selection no longer listed'}
