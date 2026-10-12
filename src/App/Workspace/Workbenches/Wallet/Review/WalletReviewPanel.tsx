@@ -12,10 +12,10 @@ import {
   ArrowLeftRight,
   Coins,
   ListChecks,
-  Users,
+  UsersRound,
   ArrowDownLeft,
   ArrowUpRight,
-  MapPin,
+  Layers,
   Filter,
   Network,
   Wallet as WalletIcon,
@@ -93,8 +93,8 @@ export interface WalletWorkbenchViewProps extends WalletWorkbenchContext {
 const TABS = [
   { id: 'transactions', label: 'Transactions', Icon: ArrowLeftRight },
   { id: 'utxos', label: 'Coins', Icon: Coins },
-  { id: 'addresses', label: 'Addresses', Icon: MapPin },
-  { id: 'counterparties', label: 'Counterparties', Icon: Users },
+  { id: 'addresses', label: 'Addresses', Icon: Layers },
+  { id: 'counterparties', label: 'Counterparties', Icon: UsersRound },
   { id: 'review', label: 'Review', Icon: ListChecks },
 ] as const;
 const PAGE = 40;
@@ -330,6 +330,9 @@ export function WalletReviewPanel(
   const [query, setQuery] = useState(initial?.query ?? '');
   const [labelFilter, setLabelFilter] = useState<string>(initial?.labelFilter ?? 'all');
   const [tagFilter, setTagFilter] = useState(initial?.tagFilter ?? 'all');
+  const [addressBranch, setAddressBranch] = useState<'all' | 'receive' | 'change'>(
+    initial?.addressBranch ?? 'all',
+  );
   const [typeIds, setTypeIds] = useState<string[] | undefined>(saved?.review?.typeIds);
   const [scopeFilter, setScopeFilter] = useState<'all' | ReviewScope>(
     saved?.review?.scopeFilter ?? 'all',
@@ -369,6 +372,7 @@ export function WalletReviewPanel(
       query,
       labelFilter,
       tagFilter,
+      addressBranch,
       reviewStatus,
       typeIds,
       scopeFilter,
@@ -472,9 +476,17 @@ export function WalletReviewPanel(
     [workspace.annotations.tags, rows],
   );
   const search = query.trim().toLowerCase();
+  const addressReviewFilter =
+    tab === 'review' && typeIds?.length === 1 && typeIds[0] === 'address-description';
   const metadataFiltered = useMemo(
     () =>
       rows.filter((row) => {
+        if (
+          (tab === 'addresses' || addressReviewFilter) &&
+          addressBranch !== 'all' &&
+          row.walletAddress?.branch !== (addressBranch === 'receive' ? 0 : 1)
+        )
+          return false;
         if (
           tab === 'transactions' &&
           transactionScope &&
@@ -489,6 +501,10 @@ export function WalletReviewPanel(
             row.identifier,
             row.address,
             row.title,
+            row.walletAddress?.path,
+            row.walletAddress
+              ? `${row.walletAddress.branch === 0 ? 'receive' : 'change'} ${row.walletAddress.index}`
+              : undefined,
             annotation?.label,
             annotation?.note,
             ...walletCounterpartyNames(workspace, row, partyLookup),
@@ -508,7 +524,19 @@ export function WalletReviewPanel(
           return false;
         return true;
       }),
-    [rows, rowTags, workspace, partyLookup, search, labelFilter, tagFilter, tab, transactionScope],
+    [
+      rows,
+      rowTags,
+      workspace,
+      partyLookup,
+      search,
+      labelFilter,
+      tagFilter,
+      tab,
+      transactionScope,
+      addressBranch,
+      addressReviewFilter,
+    ],
   );
   const relationFiltered = metadataFiltered;
   const statusFiltered = useMemo(
@@ -745,6 +773,7 @@ export function WalletReviewPanel(
       query,
       labelFilter: labelFilter as 'all' | 'labeled' | 'unlabeled',
       tagFilter,
+      addressBranch,
       selectedKey,
       limit,
     };
@@ -778,6 +807,7 @@ export function WalletReviewPanel(
     query,
     labelFilter,
     tagFilter,
+    addressBranch,
     selectedKey,
     limit,
     status,
@@ -802,6 +832,7 @@ export function WalletReviewPanel(
     setQuery(restored?.query ?? '');
     setLabelFilter(restored?.labelFilter ?? 'all');
     setTagFilter(restored?.tagFilter ?? 'all');
+    setAddressBranch(restored?.addressBranch ?? 'all');
     setStatus(next === 'review' ? (saved?.review?.status ?? 'open') : 'all');
     setScopeFilter(next === 'review' ? (saved?.review?.scopeFilter ?? 'all') : 'all');
     setReviewOnly(next === saved?.browsing?.tab ? (saved.browsing.reviewOnly ?? false) : false);
@@ -811,6 +842,14 @@ export function WalletReviewPanel(
     setNotice('');
     setTransactionScope(next === 'transactions' ? restored?.transactionIds : undefined);
     if (scrollRef.current) scrollRef.current.scrollTop = restored?.scrollTop ?? 0;
+  }
+
+  function changeAddressScope(value: string) {
+    const next = value === 'sources' || value === 'destinations' ? value : 'addresses';
+    if (next !== tab) changeTab(next);
+    setAddressBranch(value === 'receive' || value === 'change' ? value : 'all');
+    setLimit(PAGE);
+    selection.clear();
   }
 
   function decide(items: readonly WalletReviewItem[], action: WalletDecisionAction) {
@@ -840,6 +879,7 @@ export function WalletReviewPanel(
     setQuery('');
     setLabelFilter('all');
     setTagFilter('all');
+    setAddressBranch('all');
     setExactReview({ nodeId: row.nodeId, reference: row.identifier });
     selection.clear();
     setSelectedKey(
@@ -1120,15 +1160,35 @@ export function WalletReviewPanel(
             )}
             {(tab === 'addresses' || tab === 'sources' || tab === 'destinations') && (
               <label>
-                Scope
+                Addresses
                 <select
-                  aria-label="Scope"
-                  value={tab}
-                  onChange={(event) => changeTab(event.target.value as WalletTab)}
+                  aria-label="Addresses"
+                  value={tab === 'addresses' ? addressBranch : tab}
+                  onChange={(event) => changeAddressScope(event.target.value)}
                 >
-                  <option value="addresses">Wallet addresses</option>
+                  <option value="all">Wallet (all)</option>
+                  <option value="receive">Wallet (receive)</option>
+                  <option value="change">Wallet (change)</option>
                   <option value="sources">Sources</option>
                   <option value="destinations">Destinations</option>
+                </select>
+              </label>
+            )}
+            {addressReviewFilter && (
+              <label>
+                Addresses
+                <select
+                  aria-label="Addresses"
+                  value={addressBranch}
+                  onChange={(event) => {
+                    setAddressBranch(event.target.value as typeof addressBranch);
+                    setLimit(PAGE);
+                    selection.clear();
+                  }}
+                >
+                  <option value="all">Wallet (all)</option>
+                  <option value="receive">Wallet (receive)</option>
+                  <option value="change">Wallet (change)</option>
                 </select>
               </label>
             )}
@@ -1143,7 +1203,7 @@ export function WalletReviewPanel(
                     setTypeIds(ids);
                   }}
                   labels={{
-                    trigger: 'Review reason',
+                    trigger: 'Review',
                     title: 'Review reasons',
                     optionNoun: 'reasons',
                     countHelpTitle: 'Review reason counts',
@@ -1152,7 +1212,6 @@ export function WalletReviewPanel(
                   }}
                 />
                 <label>
-                  <span>Scope</span>
                   <select
                     aria-label="Scope"
                     value={scopeFilter}
@@ -1243,6 +1302,7 @@ export function WalletReviewPanel(
             {(query ||
               labelFilter !== 'all' ||
               tagFilter !== 'all' ||
+              ((tab === 'addresses' || addressReviewFilter) && addressBranch !== 'all') ||
               (tab === 'review' &&
                 (status !== 'all' || scopeFilter !== 'all' || typeIds !== undefined)) ||
               (tab !== 'review' && reviewOnly)) && (
@@ -1254,6 +1314,7 @@ export function WalletReviewPanel(
                   setQuery('');
                   setLabelFilter('all');
                   setTagFilter('all');
+                  setAddressBranch('all');
                   setStatus('all');
                   setScopeFilter('all');
                   setTypeIds(undefined);
@@ -1423,6 +1484,13 @@ export function WalletReviewPanel(
                             onClick={(event) => event.preventDefault()}
                           >
                             <span className="wallet-row-primary">
+                              {row.kind === 'address' && (
+                                <Layers
+                                  size={15}
+                                  className="wallet-address-icon"
+                                  aria-hidden="true"
+                                />
+                              )}
                               {row.walletTransaction && (
                                 <span
                                   className={`wallet-direction is-${row.walletTransaction.direction}`}
@@ -1462,9 +1530,15 @@ export function WalletReviewPanel(
                       </div>
                       <div className="wallet-row-footer">
                         <span className="wallet-row-values muted">
-                          {row.kind === 'address' && row.relationshipDirection && row.meta && (
-                            <span>{row.meta}</span>
-                          )}
+                          {row.kind === 'address' &&
+                            (row.walletAddress ? (
+                              <span>
+                                {row.walletAddress.branch === 0 ? 'Receive' : 'Change'} · Index{' '}
+                                {row.walletAddress.index}
+                              </span>
+                            ) : (
+                              row.meta && <span>{row.meta}</span>
+                            ))}
                           {tab === 'review' && (
                             <span className={`wallet-review-status status-${row.status}`}>
                               {row.changed
@@ -1519,6 +1593,7 @@ export function WalletReviewPanel(
                     : query ||
                         labelFilter !== 'all' ||
                         tagFilter !== 'all' ||
+                        ((tab === 'addresses' || addressReviewFilter) && addressBranch !== 'all') ||
                         (tab === 'review' &&
                           (status !== 'all' || scopeFilter !== 'all' || typeIds !== undefined)) ||
                         (tab !== 'review' && reviewOnly)

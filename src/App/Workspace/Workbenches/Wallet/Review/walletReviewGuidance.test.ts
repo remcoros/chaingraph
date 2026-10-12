@@ -85,7 +85,7 @@ describe('guided wallet review', () => {
     expect(Object.keys(deferred.wallets.reviews!)).toEqual([activity.key]);
   });
 
-  it('asks about receipt and payment relationships without creating address or missing-tag obligations', () => {
+  it('asks about receipt and payment relationships without legacy acknowledgments or field-completeness obligations', () => {
     const { workspace, wallet, options } = fixture();
     const review = buildWalletReview(workspace, wallet, options);
     const parties = review.items.filter((item) => item.goal === 'counterparty-context');

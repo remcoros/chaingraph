@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Coins,
   Layers,
-  MapPin,
   PanelRight,
   ScanLine,
   Wallet as WalletIcon,
@@ -124,7 +123,7 @@ export function InspectorPanel({
               aria-pressed={shownRightTab === 'addresses'}
               onClick={() => setRightTab('addresses')}
             >
-              <MapPin size={15} aria-hidden="true" /> Addresses
+              <Layers size={15} aria-hidden="true" /> Addresses
             </button>
             <button
               className={`wallet-panel-tab ${shownRightTab === 'transactions' ? 'active' : ''}`}

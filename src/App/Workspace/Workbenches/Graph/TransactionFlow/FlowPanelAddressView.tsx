@@ -7,7 +7,8 @@ import {
   TransactionTimestampWithFee,
 } from '../../../../Controls/Display/TransactionBlockTime';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
-import { addressBalanceSats, type AddressHistory } from '../Address/addressHistory';
+import { type AddressHistory } from '../Address/addressHistory';
+import { addressBalanceSats } from '../../../../../Core/ChainData/observations';
 import { paginateAddressHistorySections } from './addressHistorySections';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { transactionReference } from '../../../../../Core/Workspace/entityReferences';

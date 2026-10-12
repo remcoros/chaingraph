@@ -38,7 +38,7 @@ import type { Workspace } from '../../../../../Core/Workspace/workspace';
 import type { AddressBalanceObservation, Transaction } from '../../../../../Core/ChainData';
 
 import type { GraphNode, GraphData } from '../../../GraphState/types';
-import { addressBalanceSats } from '../Address/addressHistory';
+import { addressBalanceSats } from '../../../../../Core/ChainData/observations';
 import { formatLocalTimestamp } from '../../../../Controls/Display/transactionTime';
 import { equalOutputCount } from '../../../../../Core/Workspace/Analysis/analysis';
 import { isProvablyUnspendable, outputAddress } from '../../../../../Core/Bitcoin';

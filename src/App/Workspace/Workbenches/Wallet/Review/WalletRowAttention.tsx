@@ -38,7 +38,11 @@ export function WalletRowAttention({
     ).values(),
   ];
   const context = outstanding.find(
-    (item) => item.goal === 'activity-context' || item.goal === 'coin-context',
+    (item) =>
+      item.nodeId === row.nodeId &&
+      (item.goal === 'activity-context' ||
+        item.goal === 'coin-context' ||
+        item.goal === 'address-context'),
   );
   const party = outstanding.find((item) => item.goal === 'counterparty-context');
   const findings = outstanding.filter((item) => item.kind === 'finding');

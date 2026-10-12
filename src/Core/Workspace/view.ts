@@ -59,6 +59,7 @@ const walletBrowsingSchema = z.object({
     .optional(),
   query: z.string().max(10000).optional(),
   labelFilter: z.enum(['all', 'labeled', 'unlabeled']).optional(),
+  addressBranch: z.enum(['all', 'receive', 'change']).optional(),
   tagFilter: z.string().max(200).optional(),
   reviewOnly: z.boolean().optional(),
   transactionIds: z

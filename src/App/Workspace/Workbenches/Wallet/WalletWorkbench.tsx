@@ -96,6 +96,7 @@ export function WalletWorkbench({ workspace }: { workspace: WorkspaceController 
           }, false);
         }}
         onRefresh={() => void walletDiscovery.run(wallet ?? activeWorkspace.wallets.definitions[0])}
+        onRefreshAddressBalance={workspace.graph.address.actions.refreshBalance}
         onShowInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'show')}
         onIsolateInGraph={(nodeId, utxo) => openWalletRecord(nodeId, utxo, 'isolate')}
         onShowSelection={(ids, isolate) => {

@@ -33,6 +33,43 @@ export interface AddressUtxoObservation {
   checkedAt: string;
 }
 
+/** A dated address observation can establish a zero balance. Loaded outputs
+ * alone cannot. Pending balance changes may be negative; the total may not.
+ */
+export function addressBalanceSats(
+  observation: AddressBalanceObservation | AddressUtxoObservation | undefined,
+): number | undefined {
+  if (!observation) return undefined;
+  let total: number;
+  if ('utxos' in observation) {
+    const points = new Set<string>();
+    total = 0;
+    for (const output of observation.utxos) {
+      const point = `${output.txid}:${output.vout}`;
+      if (
+        points.has(point) ||
+        !Number.isSafeInteger(output.valueSats) ||
+        output.valueSats < 0 ||
+        output.valueSats > MAX_MONEY_SATS
+      )
+        return undefined;
+      points.add(point);
+      total += output.valueSats;
+    }
+  } else {
+    if (
+      !Number.isSafeInteger(observation.confirmedSats) ||
+      observation.confirmedSats < 0 ||
+      observation.confirmedSats > MAX_MONEY_SATS ||
+      !Number.isSafeInteger(observation.unconfirmedSats) ||
+      Math.abs(observation.unconfirmedSats) > MAX_MONEY_SATS
+    )
+      return undefined;
+    total = observation.confirmedSats + observation.unconfirmedSats;
+  }
+  return Number.isSafeInteger(total) && total >= 0 && total <= MAX_MONEY_SATS ? total : undefined;
+}
+
 export const addressHistorySchema: z.ZodType<AddressHistoryObservation> = z.object({
   history: z.array(z.object({ tx_hash: txid, height })).max(10000),
   truncated: z.boolean(),

@@ -135,7 +135,7 @@ export function InspectorPanelDetail({ workspace }: { workspace: WorkspaceContro
       annotationKey={`${activeWorkspace.id}:${selected.id}`}
       onExpand={(direction) => void expand(direction)}
       onRefresh={() => refreshTransaction(selected.txid)}
-      onRefreshAddressBalance={refreshAddressBalance}
+      onRefreshAddressBalance={() => refreshAddressBalance()}
       canRemove={!!entityRemoval.selectedPlan}
       onRemove={() => entityRemoval.request()}
       onSave={(annotation, group) => {

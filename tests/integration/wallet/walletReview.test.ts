@@ -139,19 +139,208 @@ const finding: AnalysisFinding = {
   kind: 'hypothesis',
 };
 
+describe('wallet address descriptions', () => {
+  const addressGoal = (review: ReturnType<typeof build>, address = MINE_B) =>
+    review.items.find((item) => item.goal === 'address-context' && item.address === address)!;
+
+  it('includes both used branches from history, scripts or checked coins, and leaves lookahead alone', () => {
+    const workspace = fixture({ chainData: { transactions: {} } });
+    const unused = mine(3);
+    workspace.wallets.definitions = [
+      {
+        ...wallet,
+        addresses: [
+          {
+            ...wallet.addresses[0],
+            history: [
+              { tx_hash: id(9), height: 0 },
+              { tx_hash: id(9), height: 0 },
+            ],
+          },
+          { ...wallet.addresses[1], branch: 1, index: 0, path: 'account/1/0', history: [] },
+          {
+            address: unused,
+            scripthash: addressToScriptHash(unused, 'mainnet'),
+            branch: 0,
+            index: 2,
+            path: 'account/0/2',
+          },
+        ],
+      },
+    ];
+    const review = build(workspace);
+    expect(
+      review.items.filter((item) => item.goal === 'address-context').map((item) => item.address),
+    ).toEqual([MINE_A, MINE_B]);
+    expect(addressGoal(review, MINE_A).transactionIds).toEqual([id(9)]);
+    expect(addressGoal(review).transactionIds).toEqual([id(2)]);
+    expect(addressGoal(build(workspace, []))).toBeUndefined();
+    const loaded = fixture();
+    loaded.wallets.definitions = [
+      {
+        ...wallet,
+        addresses: wallet.addresses.map((address) => ({ ...address, history: undefined })),
+      },
+    ];
+    expect(build(loaded, []).items.filter((item) => item.goal === 'address-context')).toHaveLength(
+      2,
+    );
+  });
+
+  it('keeps one address entry with transaction context and leaves legacy acknowledgments separate', () => {
+    const key = reviewKey(wallet.id, 'wallet-address', MINE_B);
+    const decision = {
+      status: 'reviewed' as const,
+      at: '2026-09-01T00:00:00.000Z',
+      evidence: 'legacy',
+    };
+    const workspace = fixture({ wallets: { reviews: { [key]: decision } } });
+    const review = build(workspace);
+    const item = addressGoal(review);
+    const group = review.groups.find((group) =>
+      group.items.some((candidate) => candidate.key === item.key),
+    )!;
+    expect(group).toMatchObject({ key: `addr:${MINE_B}`, transactionId: undefined });
+    expect(group.items).toHaveLength(1);
+    expect(item).toMatchObject({ status: 'open', nodeId: `addr:${MINE_B}`, scope: 'addresses' });
+    expect(review.legacyDecisions).toEqual([{ key, ...decision }]);
+    expect(item.key).not.toBe(key);
+  });
+
+  it.each(['label', 'note', 'tag'] as const)(
+    'uses an address %s for address and exact coin context without copying it or answering transactions',
+    (field) => {
+      let workspace = fixture({ analysis: { findings: [finding] } });
+      if (field === 'tag')
+        workspace.annotations.tags = [
+          { id: partyId, name: 'Project reserves', color: '#27c4a7', nodeIds: [`addr:${MINE_B}`] },
+        ];
+      else
+        workspace.annotations.entities[`addr:${MINE_B}`] = {
+          label: field === 'label' ? 'Project reserves' : '',
+          note: field === 'note' ? 'Project reserves' : '',
+          icon: '',
+          bookmarked: false,
+        };
+      const review = build(workspace);
+      expect(addressGoal(review)).toMatchObject({
+        satisfied: true,
+        status: 'resolved',
+        contextSubjects: [`addr:${MINE_B}`],
+      });
+      expect(goal(review, 'coin-context').status).toBe('resolved');
+      expect(goal(review, 'coin-context').contextSubjects).toContain(`addr:${MINE_B}`);
+      expect(goal(review, 'activity-context').status).toBe('open');
+      expect(
+        review.items
+          .filter((item) => item.kind === 'finding')
+          .every((item) => item.status === 'open'),
+      ).toBe(true);
+      expect(workspace.annotations.entities[`out:${id(2)}:0`]).toBeUndefined();
+      expect(workspace.annotations.entities[`tx:${id(2)}`]).toBeUndefined();
+      expect(workspace.wallets.reviews).toBeUndefined();
+      workspace = { ...workspace, annotations: { entities: {}, tags: [] } };
+      expect(addressGoal(build(workspace))).toMatchObject({ status: 'open', satisfied: false });
+      expect(goal(build(workspace), 'coin-context').status).toBe('open');
+    },
+  );
+
+  it.each(['cannot-identify', 'not-needed', 'later'] as const)(
+    'retains %s through new activity, annotation removal and explicit reopen',
+    (status) => {
+      const original = fixture();
+      const item = addressGoal(build(original));
+      let workspace = applyReviewDecisions(original, wallet, [item], status);
+      workspace = {
+        ...workspace,
+        wallets: {
+          ...workspace.wallets,
+          definitions: [
+            {
+              ...wallet,
+              scannedAt: '2026-10-01T00:00:00.000Z',
+              addresses: wallet.addresses.map((address) => ({
+                ...address,
+                history: [...address.history!, { tx_hash: id(10), height: 800010 }],
+              })),
+            },
+          ],
+        },
+      };
+      expect(addressGoal(build(workspace))).toMatchObject({
+        status,
+        changed: false,
+        evidence: item.evidence,
+        key: item.key,
+      });
+      const labelled = applyBatchLabel(workspace, [item.nodeId], 'Reserves');
+      expect(addressGoal(build(labelled))).toMatchObject({ status: 'resolved', satisfied: true });
+      expect(labelled.wallets.reviews![item.key].status).toBe(status);
+      const removed = applyBatchLabel(labelled, [item.nodeId], '', true);
+      expect(addressGoal(build(removed))).toMatchObject({ status, changed: false });
+      const reopened = applyReviewDecisions(
+        removed,
+        wallet,
+        [addressGoal(build(removed))],
+        'reopen',
+      );
+      expect(addressGoal(build(reopened))).toMatchObject({ status: 'open', changed: false });
+    },
+  );
+
+  it('ignores icons, empty annotations, invalid histories and another network', () => {
+    const workspace = fixture({ chainData: { transactions: {} } });
+    workspace.annotations.entities[`addr:${MINE_A}`] = {
+      label: '  ',
+      note: '\t',
+      icon: 'gift',
+      bookmarked: true,
+    };
+    expect(addressGoal(build(workspace), MINE_A).status).toBe('open');
+    const foreign = bitcoinAddress.toBech32(new Uint8Array(20).fill(4), 0, 'tb');
+    workspace.wallets.definitions = [
+      {
+        ...wallet,
+        addresses: [
+          {
+            ...wallet.addresses[0],
+            history: [
+              { tx_hash: 'invalid', height: 0 },
+              { tx_hash: id(1), height: -2 },
+            ],
+          },
+          {
+            ...wallet.addresses[1],
+            address: foreign,
+            scripthash: addressToScriptHash(foreign, 'testnet4'),
+          },
+        ],
+      },
+    ];
+    expect(build(workspace, []).items.some((item) => item.goal === 'address-context')).toBe(false);
+  });
+});
+
 describe('derived wallet annotation goals', () => {
-  it('groups unmet context around transactions without used-address or receipt acknowledgments', () => {
+  it('groups activity around transactions and address descriptions around exact addresses', () => {
     const review = build(fixture());
     expect(review.items.every((item) => item.kind === 'annotation-goal')).toBe(true);
     expect(review.items.map((item) => item.goal)).toEqual([
       'activity-context',
       'activity-context',
+      'address-context',
+      'address-context',
       'coin-context',
       'counterparty-context',
     ]);
     expect(find(review.items, 'wallet-address')).toEqual([]);
     expect(find(review.items, 'source')).toEqual([]);
-    expect(review.groups.map((group) => group.transactionId)).toEqual([id(2), id(1)]);
+    expect(review.groups.map((group) => group.transactionId)).toEqual([
+      id(2),
+      id(1),
+      undefined,
+      undefined,
+    ]);
     expect(review.groups[0].items.map((item) => item.goal)).toEqual([
       'activity-context',
       'coin-context',
@@ -221,7 +410,10 @@ describe('derived wallet annotation goals', () => {
       icon: '',
       bookmarked: false,
     };
-    expect(goal(build(workspace), 'coin-context').status).toBe('open');
+    expect(goal(build(workspace), 'coin-context')).toMatchObject({
+      status: 'resolved',
+      contextSubjects: [`addr:${MINE_B}`],
+    });
     workspace.annotations.tags = [
       { id: partyId, name: 'Savings', color: '#27c4a7', nodeIds: [`addr:${MINE_B}`] },
     ];

@@ -8,8 +8,156 @@ import { buildWalletSelectionIndex } from '../../../../../Core/Workspace/Wallets
 import type { WalletRow } from '../walletRows';
 import { WalletItemDetail } from './WalletItemDetail';
 import { PUBLIC_ZPUB, transactions, TX_SPENDING } from '../../../../../../tests/fixtures/bitcoin';
+import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
 
 afterEach(cleanup);
+
+it('dates only an exact coin check and does not carry a conflicting block timestamp or confirmation count', () => {
+  const props = fixture();
+  const derived = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0];
+  const txid = props.row.txid!;
+  props.workspace.chainData.transactions = {
+    [txid]: {
+      txid,
+      vin: [{ coinbase: '00' }],
+      vout: [{ n: 0, value: 0, scriptPubKey: { address: derived.address } }],
+      status: { kind: 'confirmed', blockHeight: 800000, blocktime: 1690168629, confirmations: 7 },
+    },
+  };
+  const coin = { txid, vout: 0, height: 800000, valueSats: 0 };
+  props.row = {
+    ...props.row,
+    kind: 'output',
+    nodeId: `out:${txid}:0`,
+    identifier: `${txid}:0`,
+    address: derived.address,
+    amountSats: 0,
+    utxo: { ...coin, address: derived.address, scripthash: derived.scripthash },
+  };
+  props.workspace.chainData.addressUtxos = {
+    [derived.address]: { network: 'mainnet', utxos: [coin], checkedAt: '2026-10-12T12:00:00Z' },
+  };
+  props.selectionIndex = buildWalletSelectionIndex(props.workspace);
+  const view = render(<WalletItemDetail {...props} onDecide={vi.fn()} />);
+  const facts = screen.getByLabelText('Coin facts');
+  expect(within(facts).getByTitle(/2026-10-12/)).toBeTruthy();
+  expect(within(facts).getByText('7 confirmations')).toBeTruthy();
+  expect(facts.querySelector('time')?.getAttribute('datetime')).toBe('2023-07-24T03:17:09.000Z');
+  expect(screen.getByTitle('0 sats')).toBeTruthy();
+
+  props.workspace.chainData.addressUtxos[derived.address] = {
+    network: 'mainnet',
+    utxos: [],
+    checkedAt: '2026-10-12T14:00:00Z',
+  };
+  props.workspace.chainData.transactions[txid].status = {
+    kind: 'confirmed',
+    blockHeight: 800001,
+    blocktime: 1690169000,
+    confirmations: 50,
+  };
+  view.rerender(<WalletItemDetail {...props} onDecide={vi.fn()} />);
+  expect(within(facts).queryByTitle(/2026-10-12/)).toBeNull();
+  expect(facts.querySelector('time')).toBeNull();
+  expect(within(facts).queryByText(/confirmations/)).toBeNull();
+  expect(within(facts).getByText('Block #800000')).toBeTruthy();
+});
+
+it.each(['source', 'destination'] as const)(
+  'shows a balance check for %s addresses without mistaking historical receipts for balance',
+  (direction) => {
+    const props = fixture();
+    const address = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+    props.row = {
+      ...props.row,
+      kind: 'address',
+      nodeId: `addr:${address}`,
+      identifier: address,
+      address,
+      relationshipDirection: direction,
+      amountSats: 900_000,
+      txid: undefined,
+      reviews: [],
+    };
+    const checkBalance = vi.fn();
+    const view = render(
+      <WalletItemDetail
+        {...props}
+        canLoadChainData
+        onRefreshAddressBalance={checkBalance}
+        onDecide={vi.fn()}
+      />,
+    );
+    const facts = screen.getByLabelText('Address facts');
+    const amount = within(facts).getByLabelText('Balance').querySelector('.bitcoin-amount');
+    expect(amount).toBeTruthy();
+    expect(amount!.getAttribute('title')).toBeNull();
+    expect(within(facts).queryByTitle('900 000 sats')).toBeNull();
+    fireEvent.click(within(facts).getByRole('button', { name: 'Check balance' }));
+    expect(checkBalance).toHaveBeenCalledWith(address);
+
+    props.workspace.chainData.addressBalances = {
+      [address]: {
+        network: 'mainnet',
+        confirmedSats: 0,
+        unconfirmedSats: 0,
+        checkedAt: '2026-10-12T12:00:00Z',
+      },
+    };
+    view.rerender(
+      <WalletItemDetail
+        {...props}
+        canLoadChainData
+        onRefreshAddressBalance={checkBalance}
+        onDecide={vi.fn()}
+      />,
+    );
+    expect(within(facts).getByTitle('0 sats')).toBeTruthy();
+    expect(within(facts).getByRole('button', { name: 'Refresh balance' })).toBeTruthy();
+  },
+);
+
+it('uses the newest address check, includes pending changes, and rejects another network', () => {
+  const props = fixture();
+  const address = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+  props.row = {
+    ...props.row,
+    kind: 'address',
+    address,
+    nodeId: `addr:${address}`,
+    txid: undefined,
+  };
+  props.workspace.chainData.addressBalances = {
+    [address]: {
+      network: 'mainnet',
+      confirmedSats: 5_000,
+      unconfirmedSats: -1_000,
+      checkedAt: '2026-10-12T12:00:00Z',
+    },
+  };
+  props.workspace.chainData.addressUtxos = {
+    [address]: { network: 'mainnet', utxos: [], checkedAt: '2026-10-12T13:00:00Z' },
+  };
+  const view = render(<WalletItemDetail {...props} onDecide={vi.fn()} />);
+  const facts = screen.getByLabelText('Address facts');
+  expect(within(facts).getByTitle('0 sats')).toBeTruthy();
+  props.workspace.chainData.addressBalances[address].checkedAt = '2026-10-12T14:00:00Z';
+  view.rerender(<WalletItemDetail {...props} onDecide={vi.fn()} />);
+  expect(within(facts).getByTitle('4 000 sats')).toBeTruthy();
+  expect(within(facts).getByTitle('-1 000 sats')).toBeTruthy();
+  props.workspace.chainData.addressBalances[address].confirmedSats = 0;
+  view.rerender(<WalletItemDetail {...props} onDecide={vi.fn()} />);
+  expect(
+    within(facts).getByLabelText('Balance').querySelector('.bitcoin-amount')!.getAttribute('title'),
+  ).toBeNull();
+  expect(within(facts).queryByTitle('0 sats')).toBeNull();
+  props.workspace.chainData.addressBalances[address].network = 'testnet4';
+  props.workspace.chainData.addressUtxos[address].network = 'testnet4';
+  view.rerender(<WalletItemDetail {...props} onDecide={vi.fn()} />);
+  expect(
+    within(facts).getByLabelText('Balance').querySelector('.bitcoin-amount')!.getAttribute('title'),
+  ).toBeNull();
+});
 
 it('groups transaction inputs and outputs in one disclosure and preserves per-outpoint graph actions', () => {
   const props = fixture();

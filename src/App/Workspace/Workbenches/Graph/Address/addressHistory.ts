@@ -8,7 +8,6 @@ import {
   indexPreviousOutputs,
   resolvePreviousOutput,
   type Transaction,
-  type AddressBalanceObservation,
   type AddressHistoryObservation,
   type AddressUtxoObservation,
 } from '../../../../../Core/ChainData';
@@ -128,14 +127,6 @@ export type AddressHistoryWorkspace = Pick<Workspace, 'network'> & {
 // snapshot keeps history projections focused on the selected address and its
 // observation metadata instead of rebuilding previous-output evidence each render.
 const transactionIndexCache = new WeakMap<object, AddressHistoryTransactionIndex>();
-
-export function addressBalanceSats(
-  observation: AddressBalanceObservation | undefined,
-): number | undefined {
-  if (!observation) return undefined;
-  const total = observation.confirmedSats + observation.unconfirmedSats;
-  return Number.isSafeInteger(total) && total >= 0 ? total : undefined;
-}
 
 function addAmount(previous: number | undefined, value: number | undefined): number | undefined {
   if (value === undefined || !Number.isSafeInteger(value) || value < 0) return undefined;

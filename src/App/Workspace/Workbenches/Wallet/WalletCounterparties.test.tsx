@@ -248,7 +248,7 @@ it('shows an inherited output association and edits that source without changing
   };
   render(createElement(WalletCounterpartyContext, props));
   expect(screen.getByText('Public shop')).toBeDefined();
-  expect(screen.getByText('Output')).toBeDefined();
+  expect(screen.getByTitle(sourceId)).toBeDefined();
   expect(screen.queryByRole('button', { name: / senders$/i })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: / association$/i }));
   const dialog = screen.getByRole('dialog', { name: 'Counterparties' });
@@ -840,11 +840,11 @@ it('uses the shared metadata editors without changing association scopes', () =>
   });
   render(createElement(WalletCounterpartyDetail, { ...props, onChange }));
   fireEvent.click(screen.getByRole('button', { name: / name$/i }));
-  const dialog = screen.getByRole('dialog', { name: 'Label selected records' });
-  fireEvent.change(within(dialog).getByRole('textbox', { name: 'Batch label' }), {
+  const dialog = screen.getByRole('dialog', { name: 'Name' });
+  fireEvent.change(within(dialog).getByRole('textbox', { name: 'Name' }), {
     target: { value: 'Renamed public shop' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Apply label' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: /apply name/i }));
   expect(onChange).toHaveBeenCalledOnce();
   expect(current.annotations.entities[reference]).toEqual({
     ...props.workspace.annotations.entities[reference],

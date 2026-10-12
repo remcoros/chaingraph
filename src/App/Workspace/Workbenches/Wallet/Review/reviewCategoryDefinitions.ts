@@ -56,6 +56,12 @@ export const walletReviewReasonDefinitions = {
       'An acknowledgment of a used receiving or change address from the earlier review workflow. Retained in prior decisions with its original meaning.',
     filter: false,
   },
+  'address-description': {
+    id: 'address-description',
+    label: 'Address description',
+    description: 'What a used wallet address is for. Add a label, note or tag.',
+    filter: { group: walletReviewGroups.reviewItems, displayOrder: 30 },
+  },
   source: {
     id: 'source',
     label: 'Prior incoming transaction acknowledgment',

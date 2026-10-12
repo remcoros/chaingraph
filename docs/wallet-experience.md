@@ -2,8 +2,8 @@
 
 This experiment builds on the existing Wallet workbench layout and styling.
 Transactions are the initial view, followed by Coins, Addresses, Counterparties
-and Review. Returning use restores browsing context. Addresses retains Wallet
-addresses, Sources and Destinations as scopes.
+and Review. Returning use restores browsing context. One Addresses selector offers
+Wallet (all), Wallet (receive), Wallet (change), Sources and Destinations.
 
 ## Refresh
 
@@ -51,6 +51,14 @@ Review is unmet annotation goals and explicit finding assessments. A transaction
 label, note or tag answers its purpose question. Counterparties answer who sent or
 received it and do not satisfy purpose. These annotations, added from any supported
 view, satisfy their own goal without fabricating a Reviewed decision.
+Each derived wallet address with reported history, verified output activity or a
+verified coin observation has one address-description goal, on either branch.
+Its own label, note or tag satisfies it; unused lookahead does not create a goal.
+Address context also supplies coin context through the existing exact address and
+one-hop receipt links, without copying annotations or answering transaction purpose.
+Additional activity does not reopen address-purpose dispositions. Removing context
+reveals its saved disposition or restores the unanswered goal. Address goals retain
+their own Review row and related transaction evidence.
 Missing chain evidence, missing descriptions and unassessed
 findings remain distinct. Cannot identify, No annotation needed and Review later
 are distinct deliberate outcomes. Findings need assessment; material support
@@ -96,11 +104,13 @@ wallet amount share the first row; the stable ID/copy occupies the second row.
 Metadata and independent Review
 findings share an unbordered two-column area, approximately 45/55, stacked below
 600px of available inspector width. Annotation names use a fixed-width column
-and small muted text; values are larger foreground text. Other record types keep
-observed facts beside editable information and Note across the width below them.
-Output facts show Amount, Address, Block and wallet relationship; address facts
-show wallet relationship, Seen in and observed total. Counterparties uses a wider
-Name, Category, Tags group followed by Note, with activity in Transactions below.
+and small muted text; values are larger foreground text. Addresses use the same header,
+metadata/findings columns and section styling, with their own address icon and
+record title. Address headers show dated balance, transaction count and available
+account-relative derivation. Coins and outputs use the same metadata/findings
+columns, with amount, outpoint, recorded block information and exact address in
+the header area. Counterparties group Name, Category, Tags and Note beside related
+Transactions.
 Values open their existing editors directly. Empty fields show subtle prompts
 such as Add a label, Add tags or Add a note, with the same interaction across
 transactions, coins, addresses and counterparties. Counterparty values open the
@@ -149,10 +159,25 @@ preserving the list and its filters; unavailable or external records use explici
 graph actions. Exact related-selection shortcuts remain in the batch toolbar.
 
 Counterparty editing uses the shared label, tag, note and icon editors. Its
-standard overflow menu contains Bookmark and Remove counterparty; removal
+inspector uses the shared type header with the name beneath, wallet activity
+and workspace association counts, and Metadata beside related Transactions.
+Coin and output inspectors use the same header, with amount and exact outpoint
+above coin-check/block facts and the address. Metadata and Review findings
+use the transaction columns; a coin-check age requires that exact output in
+the matching-network observation.
+The standard overflow menu contains Bookmark and Remove counterparty; removal
 requires confirmation. Related activity retains IDs above labels. Editing is
-never hidden in an Edit counterparty disclosure. Address details omit derivation
-shorthand because account-key imports do not preserve a full root origin path.
+never hidden in an Edit counterparty disclosure. Wallet address rows show branch
+and index; their inspectors expose account-relative derivation such as
+`account/1/7`, without inventing a full origin path. These details use the same
+inspector in ordinary browsing and Review. Address-description Review retains
+its own branch choice, separately from the Addresses browsing selection.
+Address headers use the transaction typography, with receive/change or
+source/destination in the title. Balance, transaction count and available
+derivation form one compact facts row. A dated zero balance is visible;
+missing observations show Not checked with a balance-check action. Historical
+receipt totals do not substitute for balance. Pending changes and unloaded
+transaction details appear only when relevant.
 
 New monetary displays use shared amount presentation. Lurker mode is a separate
 follow-up covering visible values, tooltips and accessible text.

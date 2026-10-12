@@ -1,14 +1,18 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   Bookmark,
   Check,
+  ChevronDown,
+  Link,
   MoreHorizontal,
   Network,
   Pencil,
   Plus,
   Trash2,
+  Tag,
   Unlink,
   UsersRound,
 } from 'lucide-react';
@@ -815,7 +819,7 @@ export function WalletCounterpartyContext({
                     partyValue(party, { kind: 'entity', subjectId: source.id }, 'Edit association'),
                   )}
                   <span className="wallet-inline-source small muted">
-                    {source.id.startsWith('addr:') ? 'Address' : 'Output'}{' '}
+                    {source.id.startsWith('addr:') ? 'Via address' : 'Via output'}{' '}
                     <code title={source.id}>
                       <ResponsiveIdentifier value={source.id.slice(source.id.indexOf(':') + 1)} />
                     </code>
@@ -919,6 +923,11 @@ export function WalletCounterpartyList({
                     onClick={(event) => event.preventDefault()}
                   >
                     <strong className="wallet-item-title">
+                      <UsersRound
+                        size={13}
+                        className="wallet-record-list-icon"
+                        aria-hidden="true"
+                      />
                       {workspace.annotations.entities[counterpartyReference(item.id)]?.icon && (
                         <span aria-hidden="true">
                           {workspace.annotations.entities[counterpartyReference(item.id)].icon}
@@ -1124,85 +1133,105 @@ function CounterpartyDetail({
       className="wallet-counterparty-detail compact-controls"
       aria-label="Counterparty details"
     >
-      <header className="wallet-subject-header wallet-detail-heading">
-        <div className="wallet-detail-topline">
-          <span className="wallet-detail-type">Counterparty</span>
-        </div>
+      <header className="wallet-subject-header wallet-detail-heading wallet-record-heading wallet-counterparty-heading">
+        <span className="wallet-record-type-icon" aria-hidden="true">
+          <UsersRound size={48} />
+        </span>
         <div className="wallet-detail-identity">
-          <div className="wallet-subject-title-row">
-            <WalletIconEdit
-              workspace={workspace}
-              id={reference}
-              active={active}
-              onChange={onChange}
-              disabled={!active || busy}
-            />
-            <h2 className="wallet-item-title" tabIndex={-1}>
-              {partyName(workspace, party)}
-            </h2>{' '}
-            <div
-              className="workspace-menu wallet-actions-menu wallet-counterparty-menu"
-              ref={menuRef}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
-              }}
-            >
-              <button
-                ref={menuTrigger}
-                className="icon-button"
-                aria-label="Counterparty actions"
-                title="Counterparty actions"
-                aria-haspopup="menu"
-                aria-expanded={menu}
-                aria-controls={menu ? actionsId : undefined}
-                disabled={!active || busy}
-                onClick={() => setMenuOpen(!menu)}
-              >
-                <MoreHorizontal size={16} />
-              </button>
-              {menu && (
-                <div
-                  className="dropdown"
-                  id={actionsId}
-                  role="menu"
-                  aria-label="Counterparty actions"
-                >
-                  <button
-                    role="menuitemcheckbox"
-                    aria-checked={annotation?.bookmarked ?? false}
-                    disabled={busy}
-                    onClick={() => {
-                      const bookmarked = !annotation?.bookmarked;
-                      onChange((current) => ({
-                        ...current,
-                        annotations: {
-                          ...current.annotations,
-                          entities: {
-                            ...current.annotations.entities,
-                            [reference]: { ...current.annotations.entities[reference], bookmarked },
-                          },
-                        },
-                      }));
-                      setMenuOpen(false);
-                    }}
-                  >
-                    <Bookmark size={14} /> Bookmark
-                  </button>
-                  <button
-                    role="menuitem"
-                    disabled={busy}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setConfirmDelete(true);
-                    }}
-                  >
-                    <Trash2 size={14} /> Remove counterparty
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="wallet-transaction-title-text">
+            <span className="wallet-transaction-title">COUNTERPARTY</span>
+            {annotation?.bookmarked && (
+              <Bookmark size={14} aria-label="Bookmarked" className="muted" />
+            )}
           </div>
+          <h2 className="wallet-item-title" tabIndex={-1}>
+            {partyName(workspace, party)}
+          </h2>
         </div>
+        <div
+          className="workspace-menu wallet-actions-menu wallet-counterparty-menu"
+          ref={menuRef}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+          }}
+        >
+          <button
+            ref={menuTrigger}
+            className="icon-button"
+            aria-label="Counterparty actions"
+            title="Counterparty actions"
+            aria-haspopup="menu"
+            aria-expanded={menu}
+            aria-controls={menu ? actionsId : undefined}
+            disabled={!active || busy}
+            onClick={() => setMenuOpen(!menu)}
+          >
+            <MoreHorizontal size={16} />
+          </button>
+          {menu && (
+            <div className="dropdown" id={actionsId} role="menu" aria-label="Counterparty actions">
+              <button
+                role="menuitemcheckbox"
+                aria-checked={annotation?.bookmarked ?? false}
+                disabled={busy}
+                onClick={() => {
+                  const bookmarked = !annotation?.bookmarked;
+                  onChange((current) => ({
+                    ...current,
+                    annotations: {
+                      ...current.annotations,
+                      entities: {
+                        ...current.annotations.entities,
+                        [reference]: { ...current.annotations.entities[reference], bookmarked },
+                      },
+                    },
+                  }));
+                  setMenuOpen(false);
+                }}
+              >
+                <Bookmark size={14} /> Bookmark
+              </button>
+              <button
+                role="menuitem"
+                disabled={busy}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmDelete(true);
+                }}
+              >
+                <Trash2 size={14} /> Remove counterparty
+              </button>
+            </div>
+          )}
+        </div>
+        <dl
+          className="wallet-record-facts wallet-counterparty-facts"
+          aria-label="Counterparty facts"
+        >
+          <div>
+            <dt>
+              <ArrowLeftRight size={24} aria-hidden="true" />
+              <span className="wallet-transaction-fact-value">
+                {transactions.length.toLocaleString()} transaction
+                {transactions.length === 1 ? '' : 's'}
+              </span>
+            </dt>
+            <dd>
+              <small>This wallet</small>
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <Link size={24} aria-hidden="true" />
+              <span className="wallet-transaction-fact-value">
+                {links.length.toLocaleString()} association{links.length === 1 ? '' : 's'}
+              </span>
+            </dt>
+            <dd>
+              <small>Workspace</small>
+            </dd>
+          </div>
+        </dl>
       </header>
       {active && category !== undefined && categoryAnchor && (
         <AnchoredPopover
@@ -1246,64 +1275,90 @@ function CounterpartyDetail({
           </form>
         </AnchoredPopover>
       )}
-      <section
-        className="wallet-detail-fields wallet-counterparty-fields"
-        aria-label="Identity details"
-      >
-        <WalletMetadataFields
-          workspace={workspace}
-          id={reference}
-          active={active}
-          label="Name"
-          disabled={!active || busy}
-          onChange={onChange}
-          onNotice={setNotice}
-        >
-          <div className="wallet-inline-field" role="region" aria-label="Category field">
-            <dt>Category</dt>
-            <dd>
-              <button
-                className={`wallet-field-value${party.category ? '' : ' is-empty'}`}
-                aria-label="Edit category"
-                title="Edit category"
-                aria-haspopup="dialog"
-                aria-expanded={category !== undefined}
-                disabled={!active || busy}
-                onClick={(event) => {
-                  setCategoryAnchor(event.currentTarget);
-                  setCategory(party.category ?? '');
-                }}
-              >
-                {party.category || 'Add a category…'}
-              </button>
-            </dd>
+      <section className="wallet-transaction-overview" aria-label="Identity details">
+        <section className="wallet-transaction-metadata" aria-label="Metadata">
+          <div className="wallet-transaction-metadata-heading">
+            <h3 className="wallet-transaction-section-heading">
+              <Tag size={18} aria-hidden="true" />
+              Metadata
+            </h3>
+            <WalletIconEdit
+              workspace={workspace}
+              id={reference}
+              active={active}
+              onChange={onChange}
+              disabled={!active || busy}
+            />
           </div>
-        </WalletMetadataFields>
-      </section>
-      <details className="wallet-related-records" open>
-        <summary>Transactions ({transactions.length})</summary>
-        {transactions.length > 0 && (
-          <button
-            className="text-button"
-            aria-label="Show related transactions"
-            disabled={busy}
-            onClick={() => onShowRelatedTransactions(transactions)}
+          <WalletMetadataFields
+            workspace={workspace}
+            id={reference}
+            active={active}
+            label="Name"
+            disabled={!active || busy}
+            onChange={onChange}
+            onNotice={setNotice}
           >
-            Show in Transactions
-          </button>
-        )}
-        <section aria-label="Related wallet activity">
-          {transactions.length ? (
-            transactions.map((txid) => (
-              <div className="wallet-party-activity" key={txid}>
-                {recordLink(`tx:${txid}`)}
-              </div>
-            ))
-          ) : (
-            <p className="wallet-empty-note">No transactions in this wallet</p>
-          )}
+            <div className="wallet-inline-field" role="region" aria-label="Category field">
+              <dt>Category</dt>
+              <dd>
+                <button
+                  className={`wallet-field-value${party.category ? '' : ' is-empty'}`}
+                  aria-label="Edit category"
+                  title="Edit category"
+                  aria-haspopup="dialog"
+                  aria-expanded={category !== undefined}
+                  disabled={!active || busy}
+                  onClick={(event) => {
+                    setCategoryAnchor(event.currentTarget);
+                    setCategory(party.category ?? '');
+                  }}
+                >
+                  {!party.category && (
+                    <Plus className="wallet-field-add-icon" size={14} aria-hidden="true" />
+                  )}
+                  <span className="wallet-field-text">{party.category || 'Add a category…'}</span>
+                  {party.category && (
+                    <Pencil className="wallet-field-edit-icon" size={14} aria-hidden="true" />
+                  )}
+                </button>
+              </dd>
+            </div>
+          </WalletMetadataFields>
         </section>
-      </details>
+        <section aria-label="Wallet activity">
+          <details className="wallet-linked-reviews wallet-transaction-reviews" open>
+            <summary>
+              <span className="wallet-transaction-section-heading">
+                <ArrowLeftRight size={18} aria-hidden="true" />
+                Transactions ({transactions.length})
+              </span>
+              <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
+            </summary>
+            {transactions.length > 0 && (
+              <button
+                className="text-button"
+                aria-label="Show related transactions"
+                disabled={busy}
+                onClick={() => onShowRelatedTransactions(transactions)}
+              >
+                Show in Transactions
+              </button>
+            )}
+            <section aria-label="Related wallet activity">
+              {transactions.length ? (
+                transactions.map((txid) => (
+                  <div className="wallet-party-activity" key={txid}>
+                    {recordLink(`tx:${txid}`)}
+                  </div>
+                ))
+              ) : (
+                <p className="wallet-empty-note">No transactions in this wallet</p>
+              )}
+            </section>
+          </details>
+        </section>
+      </section>
       {addresses.length > 0 && (
         <details className="wallet-related-records">
           <summary>Addresses ({addresses.length})</summary>

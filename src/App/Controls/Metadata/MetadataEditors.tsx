@@ -65,13 +65,15 @@ export function ColorPicker({
 }
 
 export function EntityLabelEditor({ entityId, ...props }: EntityEditorProps) {
+  const fieldName = entityId.startsWith('party:') ? 'Name' : 'Label';
   return (
     <LabelEditor
       {...props}
       ids={[entityId]}
       initialValue={props.workspace.annotations.entities[entityId]?.label ?? ''}
       replace
-      heading="Edit label"
+      heading={`Edit ${fieldName.toLowerCase()}`}
+      fieldName={fieldName}
     />
   );
 }
@@ -106,11 +108,13 @@ function LabelEditor({
   initialValue,
   replace,
   heading,
+  fieldName = 'Label',
   children,
 }: MetadataEditorProps & {
   initialValue: string;
   replace: boolean;
   heading: string;
+  fieldName?: 'Label' | 'Name';
   children?: ReactNode;
 }) {
   const ref = useDialogFocus(onClose, undefined, false);
@@ -124,11 +128,15 @@ function LabelEditor({
       role="dialog"
       aria-modal="false"
       id={id}
-      aria-label="Label selected records"
+      aria-label={fieldName === 'Name' ? 'Name' : 'Label selected records'}
     >
       <div className="metadata-editor-heading">
         <strong>{heading}</strong>
-        <button className="icon-button" aria-label="Close label editor" onClick={onClose}>
+        <button
+          className="icon-button"
+          aria-label={`Close ${fieldName.toLowerCase()} editor`}
+          onClick={onClose}
+        >
           <X size={15} />
         </button>
       </div>
@@ -142,32 +150,42 @@ function LabelEditor({
           try {
             update(workspace);
             const applied = onApply(
-              `Labelled ${count} record${count === 1 ? '' : 's'}.${
-                plan.preserved
-                  ? ` ${plan.preserved} existing label${plan.preserved === 1 ? '' : 's'} kept.`
-                  : ''
-              }`,
+              fieldName === 'Name'
+                ? 'Name saved.'
+                : `Labelled ${count} record${count === 1 ? '' : 's'}.${
+                    plan.preserved
+                      ? ` ${plan.preserved} existing label${plan.preserved === 1 ? '' : 's'} kept.`
+                      : ''
+                  }`,
               update,
             );
             if (applied === false) {
-              setError('Could not apply this label. Try again.');
+              setError(`Could not apply this ${fieldName.toLowerCase()}. Try again.`);
               return;
             }
           } catch (cause) {
-            setError(cause instanceof Error ? cause.message : 'Could not apply this label.');
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : `Could not apply this ${fieldName.toLowerCase()}.`,
+            );
             return;
           }
           onClose();
         }}
       >
         <label>
-          Label
+          {fieldName}
           <input
             data-autofocus
-            aria-label="Batch label"
+            aria-label={fieldName === 'Name' ? 'Name' : 'Batch label'}
             maxLength={MAX_ANNOTATION_LABEL_LENGTH}
             value={value}
-            placeholder="Exchange A withdrawal, shop payment…"
+            placeholder={
+              fieldName === 'Name'
+                ? 'Person or organization…'
+                : 'Exchange A withdrawal, shop payment…'
+            }
             onChange={(event) => setValue(event.target.value)}
           />
         </label>
@@ -180,7 +198,7 @@ function LabelEditor({
         )}
         <div className="button-row">
           <button className="primary" disabled={!plan.targets.length}>
-            <Check size={14} /> Apply label
+            <Check size={14} /> Apply {fieldName.toLowerCase()}
           </button>
           <button type="button" onClick={onClose}>
             Cancel

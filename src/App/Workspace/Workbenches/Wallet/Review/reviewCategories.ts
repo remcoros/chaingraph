@@ -56,6 +56,7 @@ function categoryIds(
   if (item.kind === 'annotation-goal') {
     if (item.goal === 'activity-context') ids.add('wallet-transaction');
     else if (item.goal === 'coin-context') ids.add('current-utxo');
+    else if (item.goal === 'address-context') ids.add('address-description');
     else if (item.goal === 'counterparty-context') {
       if (item.relationshipKinds?.includes('source')) ids.add('source-address');
       if (item.relationshipKinds?.includes('destination')) ids.add('destination-address');
@@ -72,7 +73,7 @@ function categoryIds(
   return ids;
 }
 
-/** Count transaction groups, not questions, coins or repeated finding scopes.
+/** Count record groups, not questions, coins or repeated finding scopes.
  * The caller supplies the population and may retain resolved goals for history. */
 export function walletReviewCategoryGroups(
   workspace: WalletReviewCategoryWorkspace,
@@ -91,7 +92,13 @@ export function walletReviewCategoryGroups(
     const transactionId = item.txid ?? item.transactionIds?.[0];
     const keys =
       groupKeys.get(item.key) ??
-      new Set([transactionId ? `tx:${transactionId}` : `task:${item.key}`]);
+      new Set([
+        item.goal === 'address-context'
+          ? item.nodeId
+          : transactionId
+            ? `tx:${transactionId}`
+            : `task:${item.key}`,
+      ]);
     for (const id of categoryIds(workspace, item)) {
       const matchingGroups = matches.get(id) ?? new Set<string>();
       for (const key of keys) matchingGroups.add(key);

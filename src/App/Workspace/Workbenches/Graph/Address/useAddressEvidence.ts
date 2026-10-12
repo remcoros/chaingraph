@@ -300,9 +300,10 @@ export function useAddressEvidence({
     startAddressHistoryLoad,
     activeWorkspace?.id,
   ]);
-  function refreshAddressBalance() {
-    if (!activeWorkspace || !selected) return;
-    const address = selectedAddressForHistory(selected, activeWorkspace.network);
+  function refreshAddressBalance(targetAddress?: string) {
+    if (!activeWorkspace) return;
+    const address =
+      targetAddress ?? (selected && selectedAddressForHistory(selected, activeWorkspace.network));
     if (!address || !canLoadChainData) return;
     const ownerId = activeWorkspace.id;
     const generation = selectionGeneration.current;

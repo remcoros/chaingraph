@@ -33,6 +33,7 @@ export interface WalletWorkbenchContext {
   onExchangeLabels?: (direction: 'import' | 'export') => void;
   onChange: (update: (workspace: Workspace) => Workspace, group?: string) => void;
   onRefresh: () => void;
+  onRefreshAddressBalance?: (address: string) => void;
   onPresentationChange?: (
     walletId: string,
     update: (current: WalletPresentation) => WalletPresentation,

@@ -111,6 +111,7 @@ describe('discoverable wallet review reasons', () => {
       new Set([
         'wallet-transaction',
         'current-utxo',
+        'address-description',
         'source-address',
         'destination-address',
         ...analysisTools.map((tool) => `heuristic:${tool.id}`),
@@ -296,7 +297,7 @@ describe('discoverable wallet review reasons', () => {
     expect(openItems.some((item) => item.goal === 'activity-context')).toBe(true);
     expect(
       walletReviewCategories(edited, openItems, review.groups)
-        .filter((category) => category.id !== 'wallet-transaction')
+        .filter((category) => !['wallet-transaction', 'address-description'].includes(category.id))
         .every((category) => category.count === 0),
     ).toBe(true);
   });

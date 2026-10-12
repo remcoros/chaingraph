@@ -27,6 +27,7 @@ import {
   listWalletTransactions,
   type WalletUtxoRecord,
   type WalletTransactionRecord,
+  type WalletAddressRecord,
 } from '../../../../Core/Workspace/Wallets/walletRecords';
 import {
   isCompletedReview,
@@ -75,6 +76,8 @@ export interface WalletRow {
   walletTransaction?: WalletTransactionRecord;
   changed: boolean;
   ownership?: 'wallet' | 'external' | 'unknown';
+  /** Verified derived record, reused for branch filters and account-relative facts. */
+  walletAddress?: WalletAddressRecord;
 }
 
 export function walletRowFindings(
@@ -213,7 +216,7 @@ export function reviewProjectionKey(item: Pick<WalletReviewItem, 'key' | 'scope'
   return `review:${JSON.stringify([item.key, item.scope])}`;
 }
 
-/** Transactions organize the session; each task retains its canonical decision key. */
+/** Each record organizes its tasks; every task retains its canonical decision key. */
 export function buildWalletReviewRows(
   workspace: Pick<Workspace, 'network'> & {
     chainData: Pick<Workspace['chainData'], 'transactions'>;
@@ -224,15 +227,15 @@ export function buildWalletReviewRows(
   groups: readonly WalletReviewGroup[],
   records?: Pick<WalletPreparation, 'transactionRecords' | 'addressRecords'>,
 ): WalletRow[] {
-  const transactions = new Map(
-    buildWalletRecordRows(workspace, wallet, utxos, [], 'transactions', records).transactions.map(
-      (row) => [row.txid, row],
-    ),
-  );
+  const recordRows = buildWalletRecordRows(workspace, wallet, utxos, [], 'all', records);
+  const transactions = new Map(recordRows.transactions.map((row) => [row.txid, row]));
+  const addresses = new Map(recordRows.addresses.map((row) => [row.nodeId, row]));
   return groups.flatMap((group) => {
     const first = group.items[0];
     if (!first) return [];
-    const base = group.transactionId ? transactions.get(group.transactionId) : undefined;
+    const base = group.transactionId
+      ? transactions.get(group.transactionId)
+      : addresses.get(first.nodeId);
     const row = base ?? reviewRow(first);
     const changed = group.items.some((item) => item.changed && !item.satisfied);
     const status =
@@ -413,9 +416,10 @@ export function buildWalletRecordRows(
               description: `${record.loadedOutputCount} loaded outputs; ${record.history?.length ?? 0} history entries. Flow contexts require a verified loaded input or output match, not history membership alone.`,
               kind: 'address',
               address: record.address,
-              meta: `${record.branch === 0 ? 'Receive' : 'Change'} ${record.index}`,
+              meta: '',
               contextTransactionIds: [],
               ownership: 'wallet',
+              walletAddress: record,
             });
           })
         : [],

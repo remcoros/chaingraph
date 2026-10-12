@@ -2,7 +2,6 @@ import { address as bitcoinAddress } from 'bitcoinjs-lib';
 import { describe, expect, it } from 'vitest';
 import {
   addressHistoryOutputIds,
-  addressBalanceSats,
   indexAddressHistoryTransactions,
   LAST_ADDRESS_TRANSACTION_LIMIT,
   lastAddressHistoryEntries,
@@ -15,6 +14,7 @@ import { addressToScriptHash } from '../../../../../Core/Bitcoin';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import { outpointReference } from '../../../../../Core/Workspace/entityReferences';
 import type { Transaction } from '../../../../../Core/ChainData';
+import { addressBalanceSats } from '../../../../../Core/ChainData/observations';
 
 const id = (value: number) => value.toString(16).padStart(64, '0');
 const address = (value: number) => bitcoinAddress.toBech32(new Uint8Array(20).fill(value), 0, 'bc');

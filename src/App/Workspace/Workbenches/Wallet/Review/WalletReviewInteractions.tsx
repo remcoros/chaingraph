@@ -163,7 +163,9 @@ function ReviewContext({
             ? item.title
             : item.goal === 'coin-context'
               ? 'What is this coin for?'
-              : 'What was this transaction for?'}
+              : item.goal === 'address-context'
+                ? 'What is this address for?'
+                : 'What was this transaction for?'}
         </p>
       )}
       {item.nodeId !== row.nodeId && item.txid && (

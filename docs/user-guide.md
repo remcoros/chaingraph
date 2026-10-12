@@ -420,8 +420,12 @@ Five tabs share the existing list and detail panel, with **Transactions** first:
   their dates in the encrypted workspace. A failed check preserves previous
   observations without renewing them. An exact loaded spender excludes an old
   coin from current candidates; its dated observation and decisions remain saved.
-- **Addresses** offers **Wallet addresses**, **Sources** and **Destinations** in
-  **Scope**. Wallet addresses list derived receive/change addresses. Sources and
+- **Addresses** offers **Wallet (all)**, **Wallet (receive)**, **Wallet (change)**,
+  **Sources** and **Destinations** in its **Addresses** selector. Wallet rows show
+  their branch and index. The inspector shows a derivation such as
+  `account/1/7`, relative to the imported account key; its full origin path is
+  unavailable. These choices combine with search, labels, tags and **To review**.
+  Sources and
   Destinations group observed one-hop address relationships,
   excluding this wallet's scripts. Missing source inputs can be loaded in bounded
   batches. These relationships are evidence, not proven identities or ownership.
@@ -458,6 +462,17 @@ Five tabs share the existing list and detail panel, with **Transactions** first:
   has one decision even when applicable to several scopes. Historical
   acknowledgments remain inspectable with their original dates and meanings.
 
+Used wallet addresses on both derivation branches have one **Describe wallet
+address** goal each. Reported history, a verified matching output or a verified
+coin observation establishes activity; unused lookahead does not create a task.
+The address's own label, note or tag answers its question. The same context can
+describe coins at that address or through the existing one-hop wallet receipt
+links, without copying annotations or answering transaction purpose. New activity
+does not reopen an address-purpose decision. Removing its description restores
+the saved disposition, or the unanswered question if none exists. Choose the
+**Address description** review reason to filter these tasks by receive/change
+branch. Review and ordinary browsing retain their filter choices separately.
+
 Factual lists remain available without analysis. **To review (N)** narrows them
 by outstanding linked work. The same inspector presents facts, annotations and
 review decisions in the factual tabs and Review. Explicit decisions remain visible
@@ -474,15 +489,29 @@ All tabs use plain selectable rows and the same inspector layout. Related transa
 and address links in Counterparties also retain their IDs above any labels.
 Transaction inspectors show direction and signed wallet amount on the first row,
 with the stable ID/copy beneath. A **Needs review** chip appears for outstanding
-reviews. Other inspectors retain their **Address**, **Coin**, **Output** or
-**Counterparty** title and graph actions. Transaction **Show on graph** and
+reviews. Address inspectors use matching titles for receive, change, source and
+destination addresses, with the address and copy action beneath. The header
+shows **Balance**, with transaction count and wallet-address derivation below.
+Known zero balances remain visible. **Check balance** or **Refresh balance**
+checks the selected address through your backend. Until checked, the balance
+shows **Not checked**. Checked balances show their age. Balances come from dated balance or coin checks, never
+from summing historical receipts. An incomplete transaction count shows how many
+details are loaded; pending balance changes appear only when present.
+Their metadata and findings use the same columns as Transactions, with related
+transactions in **Address activity**. Coin and output inspectors show their
+type, amount and outpoint/copy in the same header layout, followed by the coin
+check and recorded block information. The exact address opens its inspector
+when available. Coin check dates apply only to matching observed coins.
+Counterparties show their name below the type heading, with wallet transaction
+and workspace association counts. **Metadata** and related **Transactions**
+sit side by side, with address and association details below. **Show on graph** and
 **Isolate** icons sit beside **Transaction flow**; the custom icon editor sits
 beside **Metadata**. Transaction headers show the UTC block timestamp with its
 age, block height or status with recorded confirmations, network fee and rate, and available transaction
 size beneath the identity and amount. **Metadata** groups **Label**,
 **Sender/Recipient**, **Tags** and **Note** on the left, with **Review findings**
-on the right. The columns stack when the inspector is narrow. Other record types
-keep facts beside editable information, with Note below both groups. Annotation
+on the right. Coins and outputs use the same metadata/findings columns.
+The columns stack when the inspector is narrow. Annotation
 names use a fixed-width column, with smaller muted labels and larger foreground
 values. Click a value to edit it. In transaction Metadata, a plus marks empty
 fields and a pencil identifies editable values. Empty fields show
@@ -495,8 +524,8 @@ assignments show addresses, labels, output numbers and amounts; saved assignment
 remain visible beside the name. Icons are visible even without a label.
 
 Annotation review chips sit beside their fields, with quieter indicators for
-postponed and resolved decisions. **Review findings** in transactions, or **Review**
-in other record types, holds the collapsible status checklist. **Mark reviewed** and **Later** are grouped with
+postponed and resolved decisions. **Review findings** in transactions, addresses and coins
+holds the collapsible status checklist. **Mark reviewed** and **Later** are grouped with
 each finding, with **Reopen** for existing decisions. Rows show concise fee or
 script information; the help icon reveals longer technical details. Address and
 coin titles retain navigation to the exact review target. Annotation popovers put
@@ -541,7 +570,7 @@ loaded transaction; **Selection** follows the selected transaction, output,
 address or wallet; each wallet is also available directly. **Options** adjusts
 each tool's parameters and controls whether missing input data is loaded before
 scanning. Analysis keeps its **Finding types** filter for algorithm categories;
-Wallet calls its broader queue facet **Review reason**, which also includes the
+Wallet calls its broader queue facet **Review**, which also includes the
 current Analysis tools. **Older or unknown findings** appears there only when
 applicable. Analysis counts cover all findings in the current result scope and do not change with the priority,
 evidence or list pagination controls. Empty choices and groups are available

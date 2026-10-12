@@ -583,6 +583,25 @@ retains historical acknowledgments and establishes baselines only from eligible
 validated finding support. Removing a wallet prunes its decisions, not reusable
 counterparty identity or concrete associations.
 
+The existing review generator also owns `address-context` goals, presented through
+the new `address-description` reason rather than reusing legacy address
+acknowledgments. Verified wallet addresses become eligible through reported history,
+script-matching loaded/attached outputs or verified coin observations on either
+derivation branch. One canonical address goal retains its transaction context but
+groups under the address itself. Its support fingerprint represents the question
+and stable network/script identity; more activity does not invalidate an explicit
+address-purpose disposition. The address's own label, note or tag supplies context.
+Coin context reuses that exact address subject through the existing bounded receipt
+links, without copying metadata or satisfying transaction purpose. The saved decision
+shape is unchanged; no second queue or completion state is added.
+
+`WalletRow.walletAddress` reuses the verified prepared address record for list and
+inspector derivation facts, branch filtering and Review presentation. View retains
+an optional `addressBranch` choice separately in browsing and Review; the existing
+Addresses selector combines it with the Wallet/Sources/Destinations scope. Missing
+choices default to all branches, so older documents require no format migration.
+Only account-relative paths are shown, with no inferred master origin.
+
 `Counterparties/` owns identities and exact receipt/payment, address and output
 association validity. `Annotations/` owns their ordinary human metadata through
 `annotationReferences.ts`; chain entity references remain factual. Party names
@@ -614,8 +633,21 @@ observations; the inspector does not infer them from loaded block heights.
 inspector, and uses the shared Formatting calendar-age helper.
 Transaction flow remains in the same
 private frame, starts expanded for transactions, and spans the content width
-without an enclosing card. Other record types keep facts beside editable
-information and Note across the width. Values derive from annotations and exact association sources,
+without an enclosing card. Addresses share the header and metadata/findings
+styling, with account-relative derivation and activity in their own factual header.
+Address balance uses the latest matching-network balance or UTXO observation in
+`chainData`; zero is established by a successful observation, never by absent
+loaded activity. `ChainData/observations.ts` owns the shared balance projection
+used by Graph and Wallet. The existing address-evidence balance action accepts
+an exact address for Wallet while retaining Graph's selected-address default;
+both publish through session acquisition and the existing operation owner.
+Coins and outputs share the same factual header and metadata/findings columns.
+Coin dates come from exact matching address-UTXO observations; the existing
+wallet-record block projection reconciles their heights with loaded timestamps.
+Counterparty details use the same header/facts and metadata styles, with their
+existing related transactions beside metadata. Their counts remain projections
+of saved associations and wallet activity. No new persisted summary is added.
+Values derive from annotations and exact association sources,
 with no stored answer state. Automatically satisfied annotation goals disappear;
 explicit decisions retain compact reopening controls. The separate factual and
 review detail variants and single-record toolbar have been removed.

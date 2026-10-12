@@ -4,15 +4,21 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowLeftRight,
+  ArrowRightFromLine,
   Bitcoin,
   Box,
   CalendarClock,
+  CircleCheck,
+  Coins,
   ChevronDown,
   FileText,
   Filter,
   Info,
   ListChecks,
+  Layers,
+  GitBranch,
   Network,
+  RefreshCw,
   Tag,
   Wallet as WalletIcon,
 } from 'lucide-react';
@@ -34,11 +40,11 @@ import { WalletMetadataFields, WalletIconEdit } from '../WalletMetadataFields';
 import { WalletReference } from '../WalletReference';
 import { CopyButton } from '../../../../Controls/CopyButton';
 import { ResponsiveIdentifier } from '../../../../Controls/Display/ResponsiveIdentifier';
+import { TransactionTimestamp } from '../../../../Controls/Display/TransactionBlockTime';
 import {
-  TransactionBlockTime,
-  TransactionTimestamp,
-} from '../../../../Controls/Display/TransactionBlockTime';
-import { transactionBlockTime } from '../../../../Controls/Display/transactionTime';
+  formatLocalTimestamp,
+  transactionBlockTime,
+} from '../../../../Controls/Display/transactionTime';
 import { RelativeTime } from '../../../../Controls/Display/RelativeTime';
 import { transactionFee } from '../../../../Controls/Display/transactionFee';
 import { WalletReviewFlow } from './WalletReviewFlow';
@@ -50,7 +56,10 @@ import type {
 } from '../../../../../Core/Workspace/Wallets/walletSelectionIndex';
 import { walletRelatedRecords, walletRelatedDescription } from './walletRelatedRecords';
 import { transactionStatus } from '../../../../Controls/Display/transactionStatus';
+import { walletOutputEvidence } from '../../../../../Core/Workspace/Wallets/walletOutputEvidence';
 import { walletSubjectTitle } from './walletReviewGuidance';
+import { addressBalanceSats } from '../../../../../Core/ChainData/observations';
+import { walletRecordBlockObservation } from '../../../../../Core/Workspace/Wallets/walletRecordBlockObservation';
 import {
   WalletFieldReview,
   WalletReviewChecklist,
@@ -99,6 +108,7 @@ type WalletDetailProps = Pick<
   | 'onChange'
   | 'onShowInGraph'
   | 'onIsolateInGraph'
+  | 'onRefreshAddressBalance'
 > & {
   row: WalletRow;
   selectionIndex: WalletSelectionIndex;
@@ -127,7 +137,9 @@ export function WalletItemDetail({
     (item) =>
       item.kind === 'annotation-goal' &&
       item.nodeId === props.row.nodeId &&
-      (item.goal === 'activity-context' || item.goal === 'coin-context'),
+      (item.goal === 'activity-context' ||
+        item.goal === 'coin-context' ||
+        item.goal === 'address-context'),
   );
   const parties = items.filter(
     (item) =>
@@ -181,10 +193,7 @@ export function WalletItemDetail({
       guidance={
         independent.length > 0 && (
           <section aria-label="Review goals" data-tour="wallet-review-goals">
-            <details
-              className={`wallet-linked-reviews${props.row.kind === 'transaction' ? ' wallet-transaction-reviews' : ''}`}
-              open={reviewOpen}
-            >
+            <details className="wallet-linked-reviews wallet-transaction-reviews" open={reviewOpen}>
               <summary
                 aria-controls={reviewId}
                 onClick={(event) => {
@@ -192,17 +201,11 @@ export function WalletItemDetail({
                   setReviewOpen(!reviewOpen);
                 }}
               >
-                {props.row.kind === 'transaction' ? (
-                  <>
-                    <span className="wallet-transaction-section-heading">
-                      <ListChecks size={18} aria-hidden="true" />
-                      Review findings
-                    </span>
-                    <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
-                  </>
-                ) : (
-                  'Review'
-                )}
+                <span className="wallet-transaction-section-heading">
+                  <ListChecks size={18} aria-hidden="true" />
+                  Review findings
+                </span>
+                <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
               </summary>
               <div id={reviewId} hidden={!reviewOpen}>
                 <WalletReviewChecklist
@@ -239,6 +242,7 @@ function WalletDetailFrame({
   onNotice,
   onShowInGraph,
   onIsolateInGraph,
+  onRefreshAddressBalance,
   onOpenRecord,
   canOpenRecord,
   resolveInputs = true,
@@ -358,13 +362,66 @@ function WalletDetailFrame({
     context?.selected,
     walletAddresses,
   );
-  const outpoints = row.outpointIds ?? [];
   const transaction = row.txid ? workspace.chainData.transactions[row.txid] : undefined;
   const fee = row.kind === 'transaction' ? transactionFee(workspace, transaction) : undefined;
-  const placement = transactionStatus(transaction);
-  const blockTime = transactionBlockTime(transaction);
-  const confirmations = transaction?.status?.confirmations;
+  const headerTransaction = row.utxo
+    ? walletRecordBlockObservation(
+        row.utxo.txid,
+        transaction,
+        row.utxo.height,
+        row.utxo.height <= 0,
+      )
+    : transaction;
+  const placement = transactionStatus(headerTransaction);
+  const blockTime = transactionBlockTime(headerTransaction);
+  const confirmations =
+    headerTransaction?.status?.confirmations ??
+    (row.utxo &&
+    transaction?.status?.kind === 'confirmed' &&
+    row.utxo.height === transaction.status.blockHeight
+      ? transaction.status.confirmations
+      : undefined);
+  const coinObservation =
+    row.utxo && row.address ? workspace.chainData.addressUtxos?.[row.address] : undefined;
+  const coinCheckedAt =
+    coinObservation?.network === workspace.network &&
+    row.utxo &&
+    coinObservation.utxos.some(
+      (output) =>
+        output.txid === row.utxo!.txid &&
+        output.vout === row.utxo!.vout &&
+        output.valueSats === row.utxo!.valueSats &&
+        output.height === row.utxo!.height,
+    )
+      ? coinObservation.checkedAt
+      : undefined;
   const subjectTitle = walletSubjectTitle(row);
+  const walletAddress = row.walletAddress;
+  const addressTitle = walletAddress
+    ? `${walletAddress.branch === 0 ? 'RECEIVE' : 'CHANGE'} ADDRESS`
+    : row.relationshipDirection
+      ? `${row.relationshipDirection.toUpperCase()} ADDRESS`
+      : 'ADDRESS';
+  const addressBalance = row.address
+    ? [
+        workspace.chainData.addressBalances?.[row.address],
+        workspace.chainData.addressUtxos?.[row.address],
+      ]
+        .filter(
+          (observation) =>
+            observation?.network === workspace.network &&
+            Number.isFinite(Date.parse(observation.checkedAt)),
+        )
+        .sort((a, b) => Date.parse(b!.checkedAt) - Date.parse(a!.checkedAt))[0]
+    : undefined;
+  const balanceSats = addressBalanceSats(addressBalance);
+  const reportedHistory =
+    walletAddress?.history ??
+    (row.address ? workspace.chainData.addressHistories?.[row.address]?.history : undefined);
+  const addressTransactionCount = new Set([
+    ...contextTransactionIds,
+    ...(reportedHistory?.map((entry) => entry.tx_hash) ?? []),
+  ]).size;
   const related = useMemo(
     () =>
       selectedWalletRelatedRecords(
@@ -404,6 +461,11 @@ function WalletDetailFrame({
         const description = showRelationship
           ? walletRelatedDescription(workspace, row, id, selectionIndex)
           : undefined;
+        const output = selectionIndex.prevouts.get(id.replace(/^out:/, ''));
+        const relatedAddress =
+          output?.status === 'loaded' || output?.status === 'attached'
+            ? walletOutputEvidence(output.output, workspace.network).address
+            : undefined;
         return (
           <div key={id} className="wallet-evidence-outpoint">
             <div className="wallet-reference-actions">
@@ -442,6 +504,23 @@ function WalletDetailFrame({
                 <Network size={13} />
               </button>
             </div>
+            {relatedAddress && canOpenRecord?.(`addr:${relatedAddress}`) && onOpenRecord && (
+              <a
+                href="#wallet-record-detail"
+                className="wallet-related-address"
+                data-wallet-reference={`addr:${relatedAddress}`}
+                aria-label={`Open address ${relatedAddress}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onOpenRecord(`addr:${relatedAddress}`);
+                }}
+              >
+                <Layers size={13} aria-hidden="true" />
+                <code>
+                  <ResponsiveIdentifier value={relatedAddress} />
+                </code>
+              </a>
+            )}
             {description && <span className="wallet-related-description">{description}</span>}
             {workspace.annotations.entities[id]?.label && (
               <span
@@ -477,87 +556,6 @@ function WalletDetailFrame({
       disabled={!active || busy || awaitingAddress}
       onChange={onChange}
       onNotice={onNotice}
-      facts={
-        row.kind !== 'transaction' && (
-          <dl className="wallet-review-evidence" aria-label="Record facts">
-            {row.kind === 'output' && row.amountSats !== undefined && (
-              <div>
-                <dt>Amount</dt>
-                <Amount as="dd" value={row.amountSats} />
-              </div>
-            )}
-            {row.address && row.kind !== 'address' && (
-              <div>
-                <dt>Address</dt>
-                <dd className="wallet-copy-value">
-                  {canOpenRecord?.(`addr:${row.address}`) && onOpenRecord ? (
-                    <span className="wallet-reference">
-                      <a
-                        href="#wallet-record-detail"
-                        data-wallet-reference={`addr:${row.address}`}
-                        aria-label={`Open address ${row.address}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          onOpenRecord(`addr:${row.address}`);
-                        }}
-                      >
-                        <code title={row.address}>
-                          <ResponsiveIdentifier value={row.address} />
-                        </code>
-                      </a>
-                      <CopyButton value={row.address} label="Copy address" />
-                    </span>
-                  ) : (
-                    <WalletReference value={row.address} kind="address" />
-                  )}
-                </dd>
-              </div>
-            )}
-            {row.kind === 'output' && row.txid && (
-              <div>
-                <dt>Block</dt>
-                <dd>
-                  <TransactionBlockTime transaction={transaction} />
-                </dd>
-              </div>
-            )}
-            {!row.walletTransaction && (
-              <div>
-                <dt>Wallet relationship</dt>
-                <dd
-                  className={`wallet-match-value ${relationship === 'In this wallet' ? 'is-wallet' : ''}`}
-                >
-                  {relationship}
-                  <WalletHelp title="Wallet relationship" active={active}>
-                    Matched against this wallet's discovered addresses. No match does not rule out
-                    an undiscovered wallet address or identify its owner.
-                  </WalletHelp>
-                </dd>
-              </div>
-            )}
-            {row.kind === 'address' && row.contextTransactionIds.length > 0 && (
-              <div>
-                <dt>Seen in</dt>
-                <dd>
-                  {row.contextTransactionIds.length} transaction
-                  {row.contextTransactionIds.length === 1 ? '' : 's'}
-                </dd>
-              </div>
-            )}
-
-            {row.amountSats !== undefined && !row.walletTransaction && row.kind === 'address' && (
-              <div>
-                <dt>
-                  {row.kind === 'address'
-                    ? `Observed total (${outpoints.length} output${outpoints.length === 1 ? '' : 's'})`
-                    : 'Amount'}
-                </dt>
-                <Amount as="dd" value={row.amountSats} />
-              </div>
-            )}
-          </dl>
-        )
-      }
     >
       <WalletCounterpartyContext
         reviews={partyReviews}
@@ -616,6 +614,45 @@ function WalletDetailFrame({
       disabled={!active || busy}
     />
   );
+  const blockFacts = (
+    <>
+      {blockTime && (
+        <div>
+          <dt aria-label="Block date (UTC)">
+            <CalendarClock size={24} aria-hidden="true" />
+            <span className="wallet-transaction-fact-value">
+              <TransactionTimestamp transaction={headerTransaction} />
+            </span>
+          </dt>
+          <dd>
+            <small>
+              <RelativeTime dateTime={blockTime.iso} active={active} />
+            </small>
+          </dd>
+        </div>
+      )}
+      <div>
+        <dt>
+          <Box size={24} aria-hidden="true" />
+          <span className="wallet-transaction-fact-value" title={placement.title}>
+            {placement.kind === 'confirmed' && headerTransaction?.status?.blockHeight !== undefined
+              ? `Block ${placement.label}`
+              : placement.label}
+          </span>
+        </dt>
+        <dd>
+          {(placement.kind === 'confirmed' || placement.kind === 'mempool') &&
+            confirmations !== undefined &&
+            confirmations >= 0 && (
+              <small title="Confirmations at the last lookup.">
+                {confirmations.toLocaleString()} confirmation{confirmations === 1 ? '' : 's'}
+              </small>
+            )}
+        </dd>
+      </div>
+    </>
+  );
+
   const identifier = (
     <h2 className="wallet-item-title" tabIndex={-1}>
       <WalletReference
@@ -630,16 +667,8 @@ function WalletDetailFrame({
   return (
     <>
       <header
-        className={`wallet-subject-header wallet-detail-heading${row.kind === 'transaction' ? ' wallet-transaction-heading' : ''}`}
+        className={`wallet-subject-header wallet-detail-heading wallet-record-heading${row.kind === 'transaction' ? ' wallet-transaction-heading' : row.kind === 'address' ? ' wallet-address-heading' : ' wallet-coin-heading'}`}
       >
-        {row.kind !== 'transaction' && (
-          <div className="wallet-detail-topline">
-            <span className="wallet-detail-type">
-              {row.kind === 'address' ? 'Address' : row.utxo ? 'Coin' : 'Output'}
-            </span>
-            {graphActions}
-          </div>
-        )}
         <div className="wallet-detail-identity">
           {row.kind === 'transaction' ? (
             <div className="wallet-transaction-title-row">
@@ -668,10 +697,30 @@ function WalletDetailFrame({
                 )}
               </div>
             </div>
+          ) : row.kind === 'address' ? (
+            <div className="wallet-transaction-title-row">
+              <span className="wallet-address-type-icon" aria-hidden="true">
+                <Layers size={48} />
+              </span>
+              <div className="wallet-transaction-title-text">
+                <span className="wallet-transaction-title">{addressTitle}</span>
+                {matchesWalletStatus(row, 'open') && (
+                  <span className="wallet-transaction-review-status">Needs review</span>
+                )}
+              </div>
+              {graphActions}
+            </div>
           ) : (
-            <div className="wallet-subject-title-row">
-              {iconEditor}
-              {identifier}
+            <div className="wallet-transaction-title-row">
+              <span className="wallet-record-type-icon" aria-hidden="true">
+                {row.utxo ? <Coins size={48} /> : <ArrowRightFromLine size={48} />}
+              </span>
+              <div className="wallet-transaction-title-text">
+                <span className="wallet-transaction-title">{row.utxo ? 'COIN' : 'OUTPUT'}</span>
+                {matchesWalletStatus(row, 'open') && (
+                  <span className="wallet-transaction-review-status">Needs review</span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -682,43 +731,173 @@ function WalletDetailFrame({
             <Amount value={row.walletTransaction.netSats} signed />
           </div>
         )}
-        {row.kind === 'transaction' && identifier}
-        {row.kind === 'transaction' && (
-          <dl className="wallet-transaction-facts" aria-label="Transaction facts">
-            {blockTime && (
-              <div>
-                <dt aria-label="Block date (UTC)">
-                  <CalendarClock size={24} aria-hidden="true" />
-                  <span className="wallet-transaction-fact-value">
-                    <TransactionTimestamp transaction={transaction} />
+        {row.kind === 'output' && (
+          <div className="wallet-detail-value">
+            <Amount value={row.amountSats} />
+          </div>
+        )}
+        {identifier}
+        {row.kind === 'output' && (
+          <>
+            <dl className="wallet-record-facts wallet-coin-facts" aria-label="Coin facts">
+              {row.utxo ? (
+                <div>
+                  <dt>
+                    <CircleCheck size={24} aria-hidden="true" />
+                    <span className="wallet-transaction-fact-value">Reported unspent</span>
+                  </dt>
+                  <dd>
+                    <small
+                      title={
+                        coinCheckedAt ? `Checked ${formatLocalTimestamp(coinCheckedAt)}` : undefined
+                      }
+                    >
+                      {coinCheckedAt ? (
+                        <>
+                          Checked <RelativeTime dateTime={coinCheckedAt} active={active} />
+                        </>
+                      ) : (
+                        'Coin check'
+                      )}
+                    </small>
+                  </dd>
+                </div>
+              ) : (
+                <div>
+                  <dt>
+                    <WalletIcon size={24} aria-hidden="true" />
+                    <span
+                      className={`wallet-transaction-fact-value ${relationship === 'In this wallet' ? 'is-wallet' : ''}`}
+                    >
+                      {relationship}
+                    </span>
+                  </dt>
+                  <dd>
+                    <small>
+                      Wallet relationship{' '}
+                      <WalletHelp title="Wallet relationship" active={active}>
+                        Matched against this wallet's discovered addresses. No match does not rule
+                        out an undiscovered wallet address or identify its owner.
+                      </WalletHelp>
+                    </small>
+                  </dd>
+                </div>
+              )}
+              {blockFacts}
+            </dl>
+            {row.address && (
+              <div className="wallet-coin-address" role="group" aria-label="Address">
+                <Layers size={16} aria-hidden="true" />
+                {canOpenRecord?.(`addr:${row.address}`) && onOpenRecord ? (
+                  <span className="wallet-reference">
+                    <a
+                      href="#wallet-record-detail"
+                      data-wallet-reference={`addr:${row.address}`}
+                      aria-label={`Open address ${row.address}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onOpenRecord(`addr:${row.address}`);
+                      }}
+                    >
+                      <code title={row.address}>
+                        <ResponsiveIdentifier value={row.address} />
+                      </code>
+                    </a>
+                    <CopyButton value={row.address} label="Copy address" />
                   </span>
-                </dt>
-                <dd>
-                  <small>
-                    <RelativeTime dateTime={blockTime.iso} active={active} />
-                  </small>
-                </dd>
+                ) : (
+                  <WalletReference value={row.address} kind="address" />
+                )}
               </div>
             )}
+          </>
+        )}
+        {row.kind === 'address' && (
+          <dl className="wallet-record-facts wallet-address-facts" aria-label="Address facts">
             <div>
-              <dt>
-                <Box size={24} aria-hidden="true" />
-                <span className="wallet-transaction-fact-value" title={placement.title}>
-                  {placement.kind === 'confirmed' && transaction?.status?.blockHeight !== undefined
-                    ? `Block ${placement.label}`
-                    : placement.label}
+              <dt aria-label="Balance">
+                <Bitcoin size={24} aria-hidden="true" />
+                <span className="wallet-transaction-fact-value wallet-address-balance">
+                  <Amount
+                    value={balanceSats}
+                    unknown={addressBalance ? 'Unavailable' : 'Not checked'}
+                  />
+                  {onRefreshAddressBalance && row.address && (
+                    <button
+                      className="icon-button wallet-address-balance-refresh"
+                      aria-label={addressBalance ? 'Refresh balance' : 'Check balance'}
+                      title={addressBalance ? 'Refresh balance' : 'Check balance'}
+                      disabled={!active || busy || !canLoadChainData}
+                      onClick={() => onRefreshAddressBalance(row.address!)}
+                    >
+                      <RefreshCw size={14} aria-hidden="true" />
+                    </button>
+                  )}
                 </span>
               </dt>
               <dd>
-                {(placement.kind === 'confirmed' || placement.kind === 'mempool') &&
-                  confirmations !== undefined &&
-                  confirmations >= 0 && (
-                    <small title="Confirmations at the last lookup.">
-                      {confirmations.toLocaleString()} confirmation{confirmations === 1 ? '' : 's'}
+                <small
+                  className="wallet-address-balance-caption"
+                  title={
+                    addressBalance
+                      ? `Checked ${formatLocalTimestamp(addressBalance.checkedAt)}`
+                      : undefined
+                  }
+                >
+                  Balance
+                  {addressBalance && (
+                    <>
+                      {' '}
+                      · Checked <RelativeTime dateTime={addressBalance.checkedAt} active={active} />
+                    </>
+                  )}
+                </small>
+                {addressBalance &&
+                  'unconfirmedSats' in addressBalance &&
+                  addressBalance.unconfirmedSats !== 0 && (
+                    <small>
+                      Pending <Amount value={addressBalance.unconfirmedSats} signed />
                     </small>
                   )}
               </dd>
             </div>
+            <div>
+              <dt>
+                <ArrowLeftRight size={24} aria-hidden="true" />
+                <span className="wallet-transaction-fact-value">
+                  {addressTransactionCount.toLocaleString()} transaction
+                  {addressTransactionCount === 1 ? '' : 's'}
+                </span>
+              </dt>
+              <dd>
+                {contextTransactionIds.length < addressTransactionCount ? (
+                  <small>{contextTransactionIds.length.toLocaleString()} loaded</small>
+                ) : !reportedHistory ? (
+                  <small>Loaded activity</small>
+                ) : null}
+              </dd>
+            </div>
+            {walletAddress && (
+              <div className="wallet-address-derivation">
+                <dt>
+                  <GitBranch size={24} aria-hidden="true" />
+                  <span className="wallet-transaction-fact-value">
+                    <code title="Relative to imported account key">{walletAddress.path}</code>
+                  </span>
+                </dt>
+                <dd>
+                  <small>Derivation</small>
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
+        {row.kind === 'transaction' && (
+          <dl
+            className="wallet-record-facts wallet-transaction-facts"
+            aria-label="Transaction facts"
+          >
+            {blockFacts}
             {placement.kind === 'confirmed' && (
               <div>
                 <dt aria-label="Network fee">
@@ -770,35 +949,24 @@ function WalletDetailFrame({
           </dl>
         )}
       </header>
-      <section
-        className={
-          row.kind === 'transaction' ? 'wallet-transaction-overview' : 'wallet-detail-fields'
-        }
-        aria-label={`${subjectTitle} details`}
-      >
-        {row.kind === 'transaction' ? (
-          <section className="wallet-transaction-metadata" aria-label="Metadata">
-            <div className="wallet-transaction-metadata-heading">
-              <h3 className="wallet-transaction-section-heading">
-                <Tag size={18} aria-hidden="true" />
-                Metadata
-              </h3>
-              {iconEditor}
-            </div>
-            {metadataFields}
-          </section>
-        ) : (
-          metadataFields
-        )}
-        {row.kind === 'transaction' && guidance}
+      <section className="wallet-transaction-overview" aria-label={`${subjectTitle} details`}>
+        <section className="wallet-transaction-metadata" aria-label="Metadata">
+          <div className="wallet-transaction-metadata-heading">
+            <h3 className="wallet-transaction-section-heading">
+              <Tag size={18} aria-hidden="true" />
+              Metadata
+            </h3>
+            {iconEditor}
+          </div>
+          {metadataFields}
+        </section>
+        {guidance}
       </section>
-
-      {row.kind !== 'transaction' && guidance}
       {children}
       {context ? (
         <details
-          className={`wallet-flow-disclosure${row.kind === 'transaction' ? ' wallet-transaction-flow' : ''}`}
-          aria-label="Transaction flow"
+          className="wallet-flow-disclosure wallet-transaction-flow"
+          aria-label={row.kind === 'address' ? 'Address activity' : 'Transaction flow'}
           open={flowOpen}
         >
           <summary
@@ -808,18 +976,14 @@ function WalletDetailFrame({
             }}
             aria-controls={flowId}
           >
-            {row.kind === 'transaction' ? (
-              <>
-                <span className="wallet-transaction-section-heading">
-                  <Network size={18} aria-hidden="true" />
-                  Transaction flow
-                </span>
-                {graphActions}
-                <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
-              </>
-            ) : (
-              'Transaction flow'
-            )}
+            <>
+              <span className="wallet-transaction-section-heading">
+                <Network size={18} aria-hidden="true" />
+                {row.kind === 'address' ? 'Address activity' : 'Transaction flow'}
+              </span>
+              {row.kind !== 'address' && graphActions}
+              <ChevronDown size={14} className="wallet-section-toggle" aria-hidden="true" />
+            </>
           </summary>
           {contextTransactionIds.length > 1 && (
             <div className="wallet-context-chooser">
@@ -882,7 +1046,7 @@ function WalletDetailFrame({
             <span>No linked transaction</span>
             {hasUnloadedHistory && <span>Some wallet history is not loaded.</span>}
           </div>
-          {row.kind === 'transaction' && graphActions}
+          {row.kind !== 'address' && graphActions}
         </div>
       )}
 

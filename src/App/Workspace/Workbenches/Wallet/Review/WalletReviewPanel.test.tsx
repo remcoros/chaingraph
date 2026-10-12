@@ -34,10 +34,14 @@ function Fixture({
   saved = false,
   findings = false,
   receipt = false,
+  addressActivity = false,
+  addressReview = false,
 }: {
   saved?: boolean;
   findings?: boolean;
   receipt?: boolean;
+  addressActivity?: boolean;
+  addressReview?: boolean;
 }) {
   const [workspace, setWorkspace] = useState(() => {
     const value = createWorkspace('Public wallet fixture', 'mainnet');
@@ -47,12 +51,21 @@ function Fixture({
       key: PUBLIC_ZPUB,
       scriptType: 'p2wpkh' as const,
       color: '#27c4a7',
-      addresses: deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 2),
+      addresses: [
+        ...deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 2),
+        ...(addressActivity ? deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 1, 7, 1) : []),
+      ],
       scannedAt: '2026-10-01T10:00:00.000Z',
       scanComplete: true,
     };
     value.wallets.definitions = [wallet];
     value.chainData.transactions = structuredClone(transactions);
+    if (addressActivity)
+      value.chainData.transactions['e'.repeat(64)] = {
+        txid: 'e'.repeat(64),
+        vin: [{ coinbase: '00' }],
+        vout: [{ n: 0, value: 0.1, scriptPubKey: { address: wallet.addresses[2].address } }],
+      };
     // Coinbase funding has no sender question; use an ordinary receipt for this interaction.
     if (receipt) value.chainData.transactions[TX_FUNDING].vin = [{ txid: 'd'.repeat(64), vout: 0 }];
     if (findings)
@@ -88,6 +101,14 @@ function Fixture({
           activeTab: 'review',
           browsing: { tab: 'transactions', query: TX_FUNDING, selectedKey: `tx:${TX_FUNDING}` },
           review: { status: 'all' },
+        },
+      };
+    if (addressReview)
+      value.view.wallet = {
+        [wallet.id]: {
+          activeTab: 'review',
+          browsing: { tab: 'addresses', addressBranch: 'receive' },
+          review: { status: 'open', typeIds: ['address-description'], addressBranch: 'all' },
         },
       };
     return value;
@@ -151,11 +172,121 @@ it('starts with transaction activity and exposes address scopes under one tab', 
   expect(screen.queryByRole('dialog', { name: 'Label selected records' })).toBeNull();
   expect(screen.getAllByText('Public fixture context').length).toBeGreaterThan(0);
   fireEvent.click(tabs.getByRole('button', { name: 'Addresses' }));
-  fireEvent.change(screen.getByRole('combobox', { name: 'Scope' }), {
+  fireEvent.change(screen.getByRole('combobox', { name: 'Addresses' }), {
+    target: { value: 'change' },
+  });
+  expect(screen.getByText('No results')).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Addresses' }), {
     target: { value: 'sources' },
   });
   expect(tabs.getByRole('button', { name: 'Addresses' }).getAttribute('aria-pressed')).toBe('true');
-  expect(screen.getByRole('combobox', { name: 'Scope' }).getAttribute('aria-label')).toBe('Scope');
+  expect(screen.getByRole('combobox', { name: 'Addresses' }).getAttribute('aria-label')).toBe(
+    'Addresses',
+  );
+});
+
+it('filters both branches through one Addresses selector and restores it after Review', () => {
+  render(<Fixture addressActivity />);
+  fireEvent.click(screen.getByRole('button', { name: 'Addresses' }));
+  const selector = screen.getByRole('combobox', { name: 'Addresses' });
+  expect(
+    within(selector)
+      .getAllByRole('option')
+      .map((option) => option.textContent),
+  ).toEqual(['Wallet (all)', 'Wallet (receive)', 'Wallet (change)', 'Sources', 'Destinations']);
+  const records = screen.getByRole('list', { name: 'Addresses records' });
+  expect(within(records).getAllByRole('link')).toHaveLength(3);
+  fireEvent.change(selector, { target: { value: 'change' } });
+  expect(within(records).getAllByRole('link')).toHaveLength(1);
+  expect(within(records).getByText('Change · Index 7')).toBeTruthy();
+  const detail = screen.getByRole('article', { name: 'Selected wallet item' });
+  expect(within(detail).getByText('account/1/7')).toBeTruthy();
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'account/1/7' } });
+  expect(within(records).getAllByRole('link')).toHaveLength(1);
+  fireEvent.click(
+    within(screen.getByRole('navigation', { name: 'Wallet sections' })).getByRole('button', {
+      name: /^Review/,
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Addresses' }));
+  expect((screen.getByRole('combobox', { name: 'Addresses' }) as HTMLSelectElement).value).toBe(
+    'change',
+  );
+  expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('account/1/7');
+});
+
+it('opens the same address inspector from Review and preserves the selected address when its goal is answered', async () => {
+  render(<Fixture addressActivity />);
+  const change = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 1, 7, 1)[0];
+  fireEvent.click(
+    within(screen.getByRole('navigation', { name: 'Wallet sections' })).getByRole('button', {
+      name: /^Review/,
+    }),
+  );
+  const records = screen.getByRole('list', { name: 'Review queue' });
+  fireEvent.click(
+    within(records).getByRole('link', { name: new RegExp(change.address.slice(0, 8)) }),
+  );
+  const detail = screen.getByRole('article', { name: 'Selected review item' });
+  expect(within(detail).getByText('account/1/7')).toBeTruthy();
+  expect(within(detail).getByRole('button', { name: 'Label review' })).toBeTruthy();
+  fireEvent.click(within(detail).getByRole('button', { name: 'Label review' }));
+  expect(screen.getByText('What is this address for?')).toBeTruthy();
+  fireEvent.click(
+    within(screen.getByRole('dialog', { name: 'Label needs review' })).getByRole('button', {
+      name: 'Add label',
+    }),
+  );
+  const editor = await screen.findByRole('dialog', { name: 'Label selected records' });
+  fireEvent.change(within(editor).getByRole('textbox', { name: 'Batch label' }), {
+    target: { value: 'Project reserves' },
+  });
+  fireEvent.click(within(editor).getByRole('button', { name: 'Apply label' }));
+  expect(within(detail).getByText('account/1/7')).toBeTruthy();
+  expect(within(detail).getByRole('button', { name: 'Edit label' }).textContent).toContain(
+    'Project reserves',
+  );
+  expect(within(detail).queryByRole('button', { name: 'Label review' })).toBeNull();
+});
+
+it('opens a derived address directly from a transaction output while keeping the transaction list', () => {
+  render(<Fixture />);
+  const address = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 0, 1)[0].address;
+  const detail = screen.getByRole('article', { name: 'Selected wallet item' });
+  fireEvent.click(within(detail).getByLabelText('Inputs and outputs').querySelector('summary')!);
+  fireEvent.click(within(detail).getAllByRole('link', { name: `Open address ${address}` })[0]);
+  expect(within(detail).getByText('account/0/0')).toBeTruthy();
+  expect(screen.getByRole('list', { name: 'Transactions records' })).toBeTruthy();
+  fireEvent.click(within(detail).getByRole('button', { name: /Back$/ }));
+  expect(within(detail).queryByText('account/0/0')).toBeNull();
+});
+it('filters address-description Review entries by branch without changing the saved browser choice', () => {
+  render(<Fixture addressActivity addressReview />);
+  const records = screen.getByRole('list', { name: 'Review queue' });
+  expect(within(records).getAllByRole('link')).toHaveLength(3);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Addresses' }), {
+    target: { value: 'change' },
+  });
+  expect(within(records).getAllByRole('link')).toHaveLength(1);
+  expect(within(records).getByText('Change · Index 7')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Addresses' }));
+  expect((screen.getByRole('combobox', { name: 'Addresses' }) as HTMLSelectElement).value).toBe(
+    'receive',
+  );
+  expect(
+    within(screen.getByRole('list', { name: 'Addresses records' })).getAllByRole('link'),
+  ).toHaveLength(2);
+  fireEvent.click(
+    within(screen.getByRole('navigation', { name: 'Wallet sections' })).getByRole('button', {
+      name: /^Review/,
+    }),
+  );
+  expect((screen.getByRole('combobox', { name: 'Addresses' }) as HTMLSelectElement).value).toBe(
+    'change',
+  );
+  expect(
+    within(screen.getByRole('list', { name: 'Review queue' })).getAllByRole('link'),
+  ).toHaveLength(1);
 });
 it('restores browsing filters independently of the saved Review position', () => {
   render(<Fixture saved />);

@@ -13,7 +13,7 @@ import {
   type WalletUtxoRecord,
 } from './walletRecords';
 import { listTagsForNode } from '../Annotations/tagMembership';
-import { outpointReference, transactionReference } from '../entityReferences';
+import { addressReference, outpointReference, transactionReference } from '../entityReferences';
 import { counterpartyReference } from '../annotationReferences';
 import {
   createCounterpartyLookup,
@@ -44,6 +44,7 @@ import { indexPreviousOutputs, type PreviousOutputIndex, type Transaction } from
 export const REVIEW_REASONS = [
   'current-utxo',
   'wallet-address',
+  'address-description',
   'source-address',
   'destination-address',
   'source',
@@ -55,7 +56,8 @@ export const REVIEW_REASONS = [
 export type ReviewReason = (typeof REVIEW_REASONS)[number];
 export type ReviewStatus = WalletReviewRecord['status'];
 export type ReviewDecision = WalletReviewRecord;
-export type WalletAnnotationGoal = 'activity-context' | 'coin-context' | 'counterparty-context';
+export type WalletAnnotationGoal =
+  'activity-context' | 'coin-context' | 'address-context' | 'counterparty-context';
 export const REVIEW_SCOPES = [
   'utxos',
   'transactions',
@@ -316,6 +318,7 @@ function coinContext(
     const directParties = counterparties.forEntity(receipt.nodeId);
     const direct = [
       ...humanContext(workspace, receipt.nodeId, receipt.address),
+      ...(receipt.address ? humanContext(workspace, addressReference(receipt.address)) : []),
       ...(directParties.length
         ? [receipt.nodeId, ...directParties.map((party) => counterpartyReference(party.id))]
         : []),
@@ -389,12 +392,21 @@ function buildGroups(
   }
   const groups = new Map<string, WalletReviewGroup>();
   for (const item of canonical.values()) {
-    const transactionId = [...(item.transactionIds ?? (item.txid ? [item.txid] : []))].sort(
-      (a, b) =>
-        (transactionOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
-          (transactionOrder.get(b) ?? Number.MAX_SAFE_INTEGER) || a.localeCompare(b),
-    )[0];
-    const key = transactionId ? transactionReference(transactionId) : `task:${item.key}`;
+    // Address descriptions retain their own edit target, even with receipt context.
+    const transactionId =
+      item.goal === 'address-context'
+        ? undefined
+        : [...(item.transactionIds ?? (item.txid ? [item.txid] : []))].sort(
+            (a, b) =>
+              (transactionOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+                (transactionOrder.get(b) ?? Number.MAX_SAFE_INTEGER) || a.localeCompare(b),
+          )[0];
+    const key =
+      item.goal === 'address-context'
+        ? item.nodeId
+        : transactionId
+          ? transactionReference(transactionId)
+          : `task:${item.key}`;
     const group = groups.get(key) ?? { key, transactionId, items: [], subjectIds: [] };
     group.items.push(item);
     group.subjectIds = [...new Set([...group.subjectIds, ...item.subjectIds])];
@@ -545,6 +557,46 @@ export function buildWalletReview(
           ]),
         ),
         contextSubjects: [...new Set(contexts)],
+      },
+      nodeId,
+    );
+  }
+
+  const addressActivity = new Map(addresses.map((address) => [address.address, new Set<string>()]));
+  const observeAddress = (address: string | undefined, txid: string) => {
+    const canonical = canonicalTransactionId(txid);
+    if (address && canonical) addressActivity.get(address)?.add(canonical);
+  };
+  for (const address of addresses)
+    for (const entry of address.history ?? [])
+      if (Number.isSafeInteger(entry.height) && entry.height >= -1 && entry.height <= 0x7fffffff)
+        observeAddress(address.address, entry.tx_hash);
+  for (const output of owned.values()) observeAddress(output.address, output.txid);
+  for (const [txid, inputs] of spentByTransaction)
+    for (const id of inputs) observeAddress(owned.get(id)?.address, txid);
+  for (const record of verifiedRecords) observeAddress(record.address, record.txid);
+  for (const address of addresses) {
+    const transactionIds = [...addressActivity.get(address.address)!].sort();
+    if (!transactionIds.length) continue;
+    const nodeId = addressReference(address.address);
+    pushGoal(
+      {
+        goal: 'address-context',
+        reason: 'address-description',
+        scope: 'addresses',
+        nodeId,
+        nodeIds: [nodeId],
+        subjectIds: [nodeId],
+        address: address.address,
+        ownership: 'wallet',
+        transactionIds,
+        title: `Describe wallet address ${short(address.address)}`,
+        detail: 'Add a label, note or tag describing what this address is for.',
+        // More activity does not invalidate an address-purpose disposition.
+        evidence: fingerprint(
+          JSON.stringify(['address-context', workspace.network, nodeId, address.scripthash]),
+        ),
+        contextSubjects: humanContext(workspace, nodeId),
       },
       nodeId,
     );

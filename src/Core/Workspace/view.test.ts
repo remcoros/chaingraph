@@ -11,6 +11,26 @@ import {
 } from './view';
 
 describe('saved presentation contract', () => {
+  it('stores wallet and Review branch selections independently and accepts older documents', () => {
+    const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
+    const wallet = {
+      first: {
+        browsing: { tab: 'addresses', addressBranch: 'change' },
+        review: { typeIds: ['address-description'], addressBranch: 'receive' },
+      },
+    };
+    expect(viewSchema.parse({ ...base, wallet }).wallet).toEqual(wallet);
+    expect(
+      viewSchema.parse({ ...base, wallet: { first: { browsing: { tab: 'addresses' } } } }).wallet!
+        .first.browsing!.addressBranch,
+    ).toBeUndefined();
+    expect(
+      viewSchema.safeParse({
+        ...base,
+        wallet: { first: { browsing: { addressBranch: 'invalid' } } },
+      }).success,
+    ).toBe(false);
+  });
   it('keeps ordinary browsing separate from a resumable review position for each wallet', () => {
     const base = { dimensions: 3, sizeBy: 'uniform', glow: false, showAddresses: false };
     const wallet = {
