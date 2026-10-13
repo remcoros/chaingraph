@@ -28,7 +28,7 @@ app/workspace dependency; ChainData consumes Bitcoin, never Workspace or its run
 ChainData also owns workspace-independent RPC queries, decoding and scheduling.
 Its model/validation index does not export live queries; callers use named files.
 Canonical schema imports must not pull execution into document validation.
-Do not reintroduce Domain or invent new owners. Ask when ownership is unresolved. 
+Do not reintroduce Domain or invent new owners. Ask when ownership is unresolved.
 Follow direct imports from the affected area.
 
 ## Product boundaries
@@ -83,8 +83,8 @@ task, not for explaining the implementation.
   browser output go under the ignored `artifacts/`.
 - When a user asks for another UI and gives a running backend or port hint,
   reuse it through `CHAINGRAPH_PROXY_TARGET` with a unique strict Vite port;
-  verify listener ownership, the UI shell and proxied `/api/networks`. `npm run
-  dev` remains the contained-stack option and starts both Node and Vite
+  verify listener ownership, the UI shell and proxied `/api/networks`.
+  `npm run dev` remains the contained-stack option and starts both Node and Vite
   watchers. For `ENOSPC` or `EMFILE` watcher failures, tell the developer to
   inspect the shared host settings `fs.inotify.max_user_instances` and
   `fs.inotify.max_user_watches` plus process ownership. Do not change sysctls
@@ -104,8 +104,9 @@ task, not for explaining the implementation.
 ## Architecture-first changes
 
 For a change that crosses module boundaries, changes an exported interface,
-adds shared state, or alters data flow to satisfy a diagnostic, establish the
-following before editing:
+adds shared state, changes shared action admission, reference kinds, projection
+availability or state lifetime, or alters data flow to satisfy a diagnostic,
+establish the following before editing:
 
 - the user-level operation;
 - its current owner and public entry point;
@@ -113,6 +114,22 @@ following before editing:
 - the existing interface that can be deepened;
 - the observable behavior that must remain;
 - the public concepts the change adds and removes.
+
+For shared behavior changes, identify the assumptions that change and trace
+their affected consumers, including callers outside the diff. Apply the relevant
+checks before editing:
+
+- For scheduling, busy state and cancellation, trace control availability,
+  preflight guards, cached/local paths, owner admission and result publication.
+  A caller must not reject an action its owner is meant to admit or preempt.
+  Distinguish any active work from work that blocks a particular user action.
+- For new reference kinds, trace shared collections and their consumers through
+  routing and selection. A metadata subject need not be a factual Graph entity.
+- For lazy or scoped projections, check consumers that need data independently
+  of the active view. An unbuilt projection is not evidence of an empty result.
+- For new state fields, classify observation, human-edit and presentation
+  ownership. Trace persistence and history policy; accepted observation fields
+  must survive both Undo and Redo while human edits remain reversible.
 
 Prefer extending the existing owner over introducing a parallel coordinator,
 runtime, registry, or protocol. A UI caller should express one intention and
@@ -132,7 +149,8 @@ After editing, report:
 - exported concepts added and removed;
 - sources of truth added and removed;
 - searches performed to verify the old protocol is gone;
-- behavior tests that preserve the existing UX.
+- behavior tests that preserve the existing UX and the consumer-to-owner paths
+  they exercise.
 
 ## Validation
 
@@ -143,6 +161,14 @@ After editing, report:
   or extend tests only when existing coverage does not protect the changed
   behavior. Copy-only and visual-only changes do not justify new unit,
   component or E2E tests.
+- Claims about a user workflow need coverage through its real consumer and the
+  relevant policy owner. An owner-only test establishes its capability, not that
+  the user action reaches it. Use the smallest existing non-browser test boundary
+  that contains the claimed behavior; mock external I/O rather than the boundary
+  being proved. Assert the requested result, not only intermediate calls or aborts.
+  Cover distinct affected control-flow paths and affected default runtime modes,
+  including automatic background work. A fixture that disables a mode does not
+  cover its interaction. Do not require every control/state combination.
 - Test user outcomes and state transitions: affected records, action routing,
   selection, filtering, persistence, cancellation, recovery and accessibility
   behavior. Do not add assertions whose only purpose is to freeze ordinary
@@ -210,7 +236,9 @@ After editing, report:
 ## Conventions
 
 - Do not use em dashes in authored copy.
-- Use `.agents/skills/chaingraph-ui-review/SKILL.md` when browser validation is in
-  scope.
+- Use `.agents/skills/product-ui-design/SKILL.md` before UI work. Use
+  `.agents/skills/chaingraph-ui-review/SKILL.md` for substantive interaction
+  changes, including source-based review when browser validation is outside
+  scope. This does not authorize browser work or require a separate reviewer.
 - Independent reviews requested without skills, memory or this guide must
   receive the product and privacy constraints above in their task.

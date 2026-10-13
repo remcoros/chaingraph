@@ -44,6 +44,13 @@ does not protect the changed behavior. Copy-only and visual-only changes do
 not justify new unit, component or E2E tests. Documentation-only changes need
 no test run.
 
+For shared behavior changes, follow the [affected-consumer audit](AGENTS.md#architecture-first-changes),
+including callers outside the diff. [Workflow coverage](AGENTS.md#validation)
+must exercise the real consumer and its policy owner; testing the owner alone
+does not establish that a user action reaches it. Substantive interaction changes
+also need the [source-based interaction review](.agents/skills/chaingraph-ui-review/SKILL.md),
+without implying browser authorization or a separate reviewer.
+
 Test user outcomes, state transitions and accessibility behavior rather than
 ordinary UI wording or styling. Text may locate a control in an interaction
 test, but avoid unnecessarily exact wording and redundant label assertions.
@@ -150,8 +157,8 @@ chain models, validation, observation rules and workspace-independent RPC querie
 Account-wallet policy belongs to Workspace Wallets; entity references belong to
 the Workspace root, not Bitcoin.
 Shared amount/reference formatting lives in Core Formatting. ChainData owns Bitcoin RPC
-decoding and fetch scheduling; Session owns workspace-bound request lifetime and accepted 
-publication. Live queries use named-file imports and are not re-exported by the model/validation 
+decoding and fetch scheduling; Session owns workspace-bound request lifetime and accepted
+publication. Live queries use named-file imports and are not re-exported by the model/validation
 index, so canonical document parsing does not load the transport or scheduler.
 
 App Selection and the shared wallet UTXO hook cannot import workbench internals.

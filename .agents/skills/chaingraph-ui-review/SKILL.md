@@ -11,6 +11,15 @@ Browser and screenshot validation happen only on explicit request or within an a
 
 Review the criteria below through source inspection and appropriate non-browser checks by default. Perform browser exercises and screenshot inspection only when authorized, in a fresh browser context and within the agreed scope.
 
+Apply the [affected-consumer audit](../../../AGENTS.md#architecture-first-changes) and [workflow coverage rules](../../../AGENTS.md#validation) to changed interactions, including consumers outside the diff. Check these boundaries where affected:
+
+- Does an enabled action reach its policy owner through preflight and cached/local paths? Does foreground work reach preemption while background work runs, and does the requested result appear?
+- Does each newly admitted reference kind route to a supported workbench and selection instead of entering an incompatible Graph-only path?
+- Can an inspector obtain its records independently of the active tab, without treating an unbuilt projection as zero activity?
+- Do accepted observation fields survive existing Undo and Redo stacks while human edits remain reversible?
+
+An owner-only test cannot establish these user workflows. Identify coverage through the real consumer and owner, and state any remaining gap. Use the smallest appropriate existing test boundary; do not require an exhaustive state matrix.
+
 - Check keyboard access, visible focus, control labels, modal focus return, reduced motion, and narrow screens.
 - Apply section 5 and the communication pass in `.agents/skills/product-ui-design/SKILL.md` when reviewing user-facing text. Trace actual rendering, including messages supplied by Core, and read complete interactions and conditional fragments together. Flag internal reasoning, implementation reminders, repeated caveats and paragraphs that mix descriptions, settings and status.
 - Before proposing a rewrite, consider omitting the text or communicating through existing placement, grouping, values, selection or established icons. Preserve accessible names and semantic states; essential meaning must not rely on color or hover alone. Avoid replacing unnecessary prose with unnecessary badges or unfamiliar icons.
