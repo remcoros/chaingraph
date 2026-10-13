@@ -959,7 +959,15 @@ export class FlowRenderer implements GraphAdapter {
   private placeLabels() {
     const candidates = this.displayedNodes
       .map((n) => {
-        if (!n.text && !n.selected && !n.highlight && !n.marker && n.id !== this.hovered)
+        if (
+          !n.text &&
+          !n.selected &&
+          !n.selectionRing &&
+          !n.highlight &&
+          !n.marker &&
+          !n.indicator &&
+          n.id !== this.hovered
+        )
           return undefined;
         const p = this.positions.get(n.id);
         if (!p) return undefined;
@@ -1004,7 +1012,8 @@ export class FlowRenderer implements GraphAdapter {
     };
     // Role markers are appearance only. They never change mesh size, picking or placement.
     for (const { n, p, radius } of candidates) {
-      if (!n.marker || (radius < 3 && !n.selected && n.id !== this.hovered)) continue;
+      if (!n.marker || (radius < 3 && !n.selected && !n.selectionRing && n.id !== this.hovered))
+        continue;
       const r = Math.max(4, radius + 1.5);
       append(
         '',
@@ -1012,13 +1021,13 @@ export class FlowRenderer implements GraphAdapter {
         ((1 - p.y) * this.height) / 2 - r,
         r * 2,
         r * 2,
-        `flow-node-marker flow-marker-${n.marker.shape}${n.selected || n.id === this.hovered ? ' active' : ''}`,
+        `flow-node-marker flow-marker-${n.marker.shape}${n.selected || n.selectionRing || n.id === this.hovered ? ' active' : ''}`,
         n.marker.color,
       );
     }
     // Selection brackets and restrained glow remain visible even with all text off.
     for (const { n, p, radius } of candidates) {
-      if (!n.selected && !n.highlight && n.id !== this.hovered) continue;
+      if (!n.selected && !n.selectionRing && !n.highlight && n.id !== this.hovered) continue;
       const r = Math.max(7, radius * 1.5 + 3);
       append(
         '',
@@ -1026,7 +1035,22 @@ export class FlowRenderer implements GraphAdapter {
         ((1 - p.y) * this.height) / 2 - r,
         r * 2,
         r * 2,
-        `flow-node-ring${n.selected ? ' selected' : ''}${n.highlight ? ' glow' : ''}`,
+        `flow-node-ring${n.selected || n.selectionRing ? ' selected' : ''}${n.highlight ? ' glow' : ''}`,
+        n.color,
+      );
+    }
+    // Factual indicators remain visible with captions off and do not compete
+    // with role markers, selection rings or the physical picking/layout body.
+    for (const { n, p, radius } of candidates) {
+      if (!n.indicator) continue;
+      const extent = radius * (n.shape === 'octahedron' ? 1.4 : n.shape === 'box' ? 0.8 : 1);
+      append(
+        n.indicator,
+        ((p.x + 1) * this.width) / 2 + extent + 2,
+        ((1 - p.y) * this.height) / 2 - extent - 9,
+        12,
+        14,
+        'flow-node-indicator',
         n.color,
       );
     }
@@ -1049,7 +1073,7 @@ export class FlowRenderer implements GraphAdapter {
         y,
         width,
         height,
-        `flow-node-caption${node.selected ? ' selected' : ''}`,
+        `flow-node-caption${node.selected || node.selectionRing ? ' selected' : ''}`,
         node.color,
       );
     }

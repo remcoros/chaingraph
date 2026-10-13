@@ -46,6 +46,15 @@
 .flow-node-marker.active {
   opacity: 1;
 }
+.flow-node-indicator {
+  font:
+    500 11px/14px 'IBM Plex Mono',
+    monospace;
+  color: var(--color-muted, #74818b);
+  background: var(--color-paper, #111a20);
+  border-radius: 2px;
+  text-align: center;
+}
 .flow-marker-brackets {
   border: 1px solid currentColor;
   border-radius: 2px;

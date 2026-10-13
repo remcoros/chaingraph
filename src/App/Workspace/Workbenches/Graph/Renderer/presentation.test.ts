@@ -378,12 +378,11 @@ describe('shared graph semantics and presentation', () => {
     const render = (items: GraphNode[]) =>
       presentGraph({ ...input, nodes: items, links: [], sizeBy: 'value' }, palette).nodes;
     const radii = render(valueNodes).map((node) => node.radius);
-    expect(radii.every((radius) => Number.isFinite(radius) && radius >= 1.6 && radius <= 12)).toBe(
+    expect(radii.every((radius) => Number.isFinite(radius) && radius >= 2 && radius <= 12)).toBe(
       true,
     );
     for (let index = 1; index < radii.length; index++)
       expect(radii[index]).toBeGreaterThan(radii[index - 1]);
-    expect(radii[4]).toBeGreaterThan(radii[2] * 1.15);
     expect(radii[8] / radii[2]).toBeGreaterThan(4);
     // Filtering or adding an unrelated whale must not resize existing values.
     expect(render([valueNodes[2], valueNodes[8]]).map((node) => node.radius)).toEqual([
@@ -393,29 +392,39 @@ describe('shared graph semantics and presentation', () => {
     const beyondSupply = render([{ ...valueNodes[0], value: Number.MAX_VALUE }])[0].radius;
     expect(Number.isFinite(beyondSupply)).toBe(true);
     expect(beyondSupply).toBeGreaterThan(radii.at(-1)!);
+    expect(beyondSupply).toBeLessThanOrEqual(12);
   });
-  it('makes 150 million sats substantially larger than 20 thousand sats at a fixed absolute scale', () => {
-    const small: GraphNode = { id: 'small', kind: 'output', label: 'Small', value: 20_000 };
-    const large: GraphNode = { id: 'large', kind: 'output', label: 'Large', value: 150_000_000 };
+  it('clearly separates tiny, medium and large wallet amounts at a fixed scale in 2D and 3D', () => {
+    const amounts = [23_000, 14_000_000, 138_000_000];
+    const examples: GraphNode[] = amounts.map((value, index) => ({
+      id: String(index),
+      kind: 'output',
+      label: 'Output',
+      value,
+    }));
     const render = (items: GraphNode[]) =>
       presentGraph({ ...input, nodes: items, links: [], sizeBy: 'value' }, palette).nodes;
-    const radii = render([small, large]).map((node) => node.radius);
+    const radii = render(examples).map((node) => node.radius);
     expect(radii[0]).toBeGreaterThan(2);
     expect(radii[0]).toBeLessThan(2.2);
-    expect(radii[1]).toBeGreaterThan(5);
-    expect(radii[1]).toBeLessThan(5.6);
-    expect(radii[1] / radii[0]).toBeGreaterThan(2.5);
-    expect(radii[1] / radii[0]).toBeLessThan(2.8);
-    expect((radii[1] / radii[0]) ** 2).toBeGreaterThan(6);
+    expect(radii[1] / radii[0]).toBeGreaterThan(1.9);
+    expect(radii[2] / radii[1]).toBeGreaterThan(1.8);
+    expect(radii[2] / radii[1]).toBeLessThan(2);
+    expect(radii[2] / radii[0]).toBeGreaterThan(3.5);
     expect(
-      render([small, large, { ...large, id: 'whale', value: 2_100_000_000_000_000 }])
-        .slice(0, 2)
+      render([...examples, { ...examples[0], id: 'whale', value: 2_100_000_000_000_000 }])
+        .slice(0, 3)
         .map((node) => node.radius),
     ).toEqual(radii);
-    expect(render([small])[0].radius).toBe(radii[0]);
-    expect(render([large])[0].radius).toBe(radii[1]);
+    examples.forEach((node, index) => expect(render([node])[0].radius).toBe(radii[index]));
+    expect(
+      presentGraph(
+        { ...input, nodes: examples, links: [], sizeBy: 'value', dimensions: 3 },
+        palette,
+      ).nodes.map((node) => node.radius),
+    ).toEqual(radii);
   });
-  it('keeps increasing across large whale values without an early plateau', () => {
+  it('keeps whale amounts ordered while approaching the individual size ceiling', () => {
     const amounts = [59_849_955_894, 340_000_000_000, 1_000_000_000_000, 10_000_000_000_000];
     const valueNodes: GraphNode[] = amounts.map((value, index) => ({
       id: String(index),
@@ -426,12 +435,9 @@ describe('shared graph semantics and presentation', () => {
     const render = (items: GraphNode[]) =>
       presentGraph({ ...input, nodes: items, links: [], sizeBy: 'value' }, palette).nodes;
     const radii = render(valueNodes).map((node) => node.radius);
-    const diameterRatio = radii[1] / radii[0];
-    expect(diameterRatio).toBeGreaterThan(1.08);
-    expect(diameterRatio ** 2).toBeGreaterThan(1.16);
     for (let index = 1; index < radii.length; index++)
       expect(radii[index]).toBeGreaterThan(radii[index - 1]);
-    expect(radii[3] - radii[0]).toBeGreaterThan(1.8);
+    expect(radii[3] - radii[0]).toBeLessThan(0.2);
     expect(radii.every((radius) => radius < 12)).toBe(true);
     // The same pair retains its proportions after unrelated large nodes disappear.
     expect(render(valueNodes.slice(0, 2)).map((node) => node.radius)).toEqual(radii.slice(0, 2));
@@ -443,6 +449,7 @@ describe('shared graph semantics and presentation', () => {
         palette,
       );
       expect(frame.nodes[0].radius).toBe(3.2);
+      expect(frame.nodes[0].indicator).toBe('?');
     }
     const base = presentGraph({ ...input, sizeBy: 'value' }, palette).nodes[0].radius;
     const overridden = presentGraph(
@@ -450,6 +457,71 @@ describe('shared graph semantics and presentation', () => {
       palette,
     );
     expect(overridden.nodes[0].radius).toBeCloseTo(base * 1.5);
+  });
+  it('distinguishes unknown values from zero without losing hidden-label, annotation or flow states', () => {
+    const frame = presentGraph(
+      {
+        ...input,
+        sizeBy: 'value',
+        glow: false,
+        showLabels: false,
+        showIcons: false,
+        showTags: false,
+        nodes: [
+          { ...nodes[1], value: undefined },
+          { ...nodes[3], value: 0 },
+        ],
+        links: [],
+        flowContext: { transactionId: 'tx', nodes: new Map([['out', 'input']]), links: new Map() },
+        nodePresentation: new Map([['out', { color: '#abcdef', label: 'Annotation' }]]),
+      },
+      palette,
+    );
+    expect(frame.nodes[0]).toMatchObject({
+      text: undefined,
+      color: '#abcdef',
+      shape: 'sphere',
+      radius: 3.2,
+      marker: { shape: 'brackets' },
+      indicator: '?',
+    });
+    expect(frame.nodes[1]).toMatchObject({ shape: 'octahedron', radius: 2, indicator: undefined });
+    expect(presentGraph({ ...input, sizeBy: 'value' }, palette).nodes[3].indicator).toBe('?');
+    expect(presentGraph(input, palette).nodes.every((node) => !node.indicator)).toBe(true);
+  });
+  it('keeps Value-mode batch emphasis visible without changing individual or grouped radii', () => {
+    const bridge = parallelOutputBridge(3);
+    bridge.nodes = bridge.nodes.map((node) => ({ ...node, value: 138_000_000 }));
+    for (const groupOutputs of [false, true]) {
+      const options = { ...input, ...bridge, groupOutputs, sizeBy: 'value' as const, glow: false };
+      const baseline = presentGraph(options, palette);
+      const selected = presentGraph({ ...options, batchSelectedIds: ['output-2'] }, palette);
+      expect(selected.nodes.map((node) => node.radius)).toEqual(
+        baseline.nodes.map((node) => node.radius),
+      );
+      expect(
+        selected.nodes.find(
+          (node) => node.id === (groupOutputs ? 'outputs:source>target' : 'output-2'),
+        ),
+      ).toMatchObject({
+        selected: false,
+        selectionRing: true,
+        color: palette.accent,
+        highlight: false,
+      });
+    }
+    bridge.nodes[2].value = undefined;
+    expect(
+      presentGraph({ ...input, ...bridge, sizeBy: 'value' }, palette).nodes.find(
+        (node) => node.group,
+      )?.indicator,
+    ).toBe('?');
+    bridge.nodes[2].value = 0;
+    expect(
+      presentGraph({ ...input, ...bridge, sizeBy: 'value' }, palette).nodes.find(
+        (node) => node.group,
+      )?.indicator,
+    ).toBeUndefined();
   });
   it('filters missing endpoints before degree sizing and restores defaults when overrides disappear', () => {
     const frame = presentGraph({ ...input, nodes: nodes.slice(0, 2), sizeBy: 'degree' }, palette);

@@ -256,10 +256,14 @@ export function useGraphProjection({
     const merged = new Map(nodePresentation);
     for (const id of highlightedSelection) {
       const base = merged.get(id);
-      merged.set(id, { ...base, highlight: true, scale: (base?.scale ?? 1) * 1.35 });
+      merged.set(id, {
+        ...base,
+        highlight: true,
+        scale: appliedGraphRequest.sizeBy === 'value' ? base?.scale : (base?.scale ?? 1) * 1.35,
+      });
     }
     return merged;
-  }, [nodePresentation, highlightedSelection]);
+  }, [nodePresentation, highlightedSelection, appliedGraphRequest.sizeBy]);
   const effectiveFilters = useMemo(
     () =>
       membershipFilters(completeGraph, walletMatches, tagIndex, appliedGraphFilters, workspaceTags),

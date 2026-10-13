@@ -96,6 +96,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     { material: SpriteMaterial; width: number; height: number }
   >();
   const nodeText = new Map<string, { sprite: Sprite; text: string }>();
+  const nodeIndicators = new Map<string, { sprite: Sprite; text: string }>();
   const halos = makeHalos();
   let haloNodes: SimNode[] = [];
   let topology = '';
@@ -282,6 +283,32 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     mesh.geometry = geometries[node.shape];
     mesh.material = materialFor(node.color);
     mesh.scale.setScalar(node.radius);
+    const indicatorText = node.indicator;
+    let indicator = nodeIndicators.get(node.id);
+    if (indicator && (indicator.text !== indicatorText || indicator.sprite.parent !== mesh)) {
+      indicator.sprite.removeFromParent();
+      nodeIndicators.delete(node.id);
+      indicator = undefined;
+    }
+    if (indicatorText) {
+      const resource = textMaterialFor(indicatorText);
+      if (resource) {
+        if (!indicator) {
+          const sprite = new Sprite(resource.material);
+          sprite.raycast = () => {};
+          mesh.add(sprite);
+          indicator = { sprite, text: indicatorText };
+          nodeIndicators.set(node.id, indicator);
+        }
+        const extent = node.shape === 'octahedron' ? 1.4 : node.shape === 'box' ? 0.8 : 1;
+        indicator.sprite.scale.set(resource.width / node.radius, resource.height / node.radius, 1);
+        indicator.sprite.position.set(
+          extent + resource.width / node.radius / 2,
+          extent + resource.height / node.radius / 2,
+          0,
+        );
+      }
+    }
     const existing = nodeText.get(node.id);
     if (existing && (existing.text !== node.text || existing.sprite.parent !== mesh)) {
       existing.sprite.removeFromParent();
@@ -380,6 +407,8 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
       if (!ids.has(id)) {
         nodeText.get(id)?.sprite.removeFromParent();
         nodeText.delete(id);
+        nodeIndicators.get(id)?.sprite.removeFromParent();
+        nodeIndicators.delete(id);
         meshes.delete(id);
       }
     for (const node of nodes) {
@@ -408,7 +437,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     halos.geometry.dispose();
     halos.geometry = geometry;
     positionHalos();
-    const usedTexts = new Set(nodes.map((node) => node.text));
+    const usedTexts = new Set(nodes.flatMap((node) => [node.text, node.indicator]));
     for (const [text, resource] of textMaterials)
       if (!usedTexts.has(text)) {
         resource.material.map?.dispose();
@@ -508,6 +537,7 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
     }
     textMaterials.clear();
     nodeText.clear();
+    nodeIndicators.clear();
     element.replaceChildren();
   };
   try {
@@ -744,7 +774,13 @@ export const createForceAdapter: GraphAdapterFactory = (element, events) => {
           return { ...node, ...position, z: frame.dimensions === 2 ? 0 : (position?.z ?? node.z) };
         }
         const { x, y, z } = existing;
-        return Object.assign(existing, node, { x, y, z, text: node.text });
+        return Object.assign(existing, node, {
+          x,
+          y,
+          z,
+          text: node.text,
+          indicator: node.indicator,
+        });
       });
       const ids = new Set(nodes.map((node) => node.id));
       for (const id of savedDepth.keys()) if (!ids.has(id)) savedDepth.delete(id);

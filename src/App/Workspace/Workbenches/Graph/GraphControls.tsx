@@ -63,7 +63,7 @@ export function GraphControls({
         <span>Size by</span>
         <select
           aria-label="Size nodes by"
-          title="Value uses a gentle logarithmic scale. Sizes stay stable when filtering; perspective also affects apparent size."
+          title="Value emphasizes differences in amount within a bounded scale. Sizes stay stable when filtering; ? means the amount is unavailable."
           value={view.sizeBy}
           onChange={(e) =>
             onChange((current) => ({

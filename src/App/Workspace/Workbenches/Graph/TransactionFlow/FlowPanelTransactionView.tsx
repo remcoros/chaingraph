@@ -993,6 +993,9 @@ export function FlowPanelTransactionView({
     selected?.kind !== 'address' &&
     props.graphNodeIds !== undefined &&
     !props.graphNodeIds.includes(transactionReference(current.tx.txid));
+  const currentOffGraph =
+    currentNotOnGraph ||
+    (!!current && !!props.hiddenNodeIds?.includes(transactionReference(current.tx.txid)));
   const navigate = (txid: string, outputId: string) => {
     choose(txid);
     props.onSetHidden?.([transactionReference(txid)], false);
@@ -1259,76 +1262,81 @@ export function FlowPanelTransactionView({
                     <CopyButton value={current.tx.txid} label="Copy displayed transaction ID" />
                   </span>
                   <div
-                    className="transaction-identity-tools"
+                    className={`transaction-identity-tools${currentOffGraph ? ' has-visibility-state' : ''}`}
                     role="group"
-                    aria-label="Transaction annotation tools"
+                    aria-label="Transaction tools"
                   >
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label="Edit displayed transaction annotation"
-                      title="Edit transaction label"
-                      onClick={() => props.onEdit(transactionReference(current.tx.txid), 'label')}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label="Edit displayed transaction tags"
-                      title="Choose transaction tags"
-                      onClick={(event) =>
-                        setQuickEditor({
-                          kind: 'tags',
-                          nodeId: transactionReference(current.tx.txid),
-                          anchor: event.currentTarget,
-                          point: event.detail ? { x: event.clientX, y: event.clientY } : undefined,
-                        })
-                      }
-                    >
-                      <Tags size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label="Edit displayed transaction icon"
-                      title="Choose transaction icon"
-                      onClick={(event) =>
-                        setQuickEditor({
-                          kind: 'icon',
-                          nodeId: transactionReference(current.tx.txid),
-                          anchor: event.currentTarget,
-                          point: event.detail ? { x: event.clientX, y: event.clientY } : undefined,
-                        })
-                      }
-                    >
-                      <Smile size={13} />
-                    </button>
-                  </div>
-                  {(currentNotOnGraph ||
-                    props.hiddenNodeIds?.includes(transactionReference(current.tx.txid))) && (
-                    <div className="transaction-hidden-state">
-                      <span className="entity-hidden-badge">
-                        <EyeOff size={10} /> {currentNotOnGraph ? 'Not on graph' : 'Hidden'}
-                      </span>
-                      {props.onSetHidden && (
-                        <button
-                          type="button"
-                          className="text-button"
-                          aria-label={
-                            currentNotOnGraph
-                              ? 'Add displayed transaction to graph'
-                              : 'Show displayed transaction in graph'
-                          }
-                          onClick={() =>
-                            props.onSetHidden?.([transactionReference(current.tx.txid)], false)
-                          }
-                        >
-                          {currentNotOnGraph ? 'Add to graph' : 'Show'}
-                        </button>
-                      )}
+                    {currentOffGraph && (
+                      <div className="transaction-hidden-state">
+                        <span className="entity-hidden-badge">
+                          <EyeOff size={10} /> {currentNotOnGraph ? 'Not on graph' : 'Hidden'}
+                        </span>
+                        {props.onSetHidden && (
+                          <button
+                            type="button"
+                            className="text-button"
+                            aria-label={
+                              currentNotOnGraph
+                                ? 'Add displayed transaction to graph'
+                                : 'Show displayed transaction in graph'
+                            }
+                            onClick={() =>
+                              props.onSetHidden?.([transactionReference(current.tx.txid)], false)
+                            }
+                          >
+                            {currentNotOnGraph ? 'Add to graph' : 'Show'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div className="transaction-identity-annotations">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Edit displayed transaction annotation"
+                        title="Edit transaction label"
+                        onClick={() => props.onEdit(transactionReference(current.tx.txid), 'label')}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Edit displayed transaction tags"
+                        title="Choose transaction tags"
+                        onClick={(event) =>
+                          setQuickEditor({
+                            kind: 'tags',
+                            nodeId: transactionReference(current.tx.txid),
+                            anchor: event.currentTarget,
+                            point: event.detail
+                              ? { x: event.clientX, y: event.clientY }
+                              : undefined,
+                          })
+                        }
+                      >
+                        <Tags size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Edit displayed transaction icon"
+                        title="Choose transaction icon"
+                        onClick={(event) =>
+                          setQuickEditor({
+                            kind: 'icon',
+                            nodeId: transactionReference(current.tx.txid),
+                            anchor: event.currentTarget,
+                            point: event.detail
+                              ? { x: event.clientX, y: event.clientY }
+                              : undefined,
+                          })
+                        }
+                      >
+                        <Smile size={13} />
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             }

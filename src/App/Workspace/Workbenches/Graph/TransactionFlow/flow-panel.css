@@ -687,6 +687,7 @@
 .transaction-identity-tools {
   display: none;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 1px;
   padding: 3px;
@@ -695,8 +696,15 @@
   border-radius: 0 0 8px 8px;
 }
 .flow-panel-identity:hover .transaction-identity-tools,
-.flow-panel-identity:focus-within .transaction-identity-tools {
+.flow-panel-identity:focus-within .transaction-identity-tools,
+.transaction-identity-tools.has-visibility-state {
   display: flex;
+}
+.transaction-identity-annotations {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
 }
 .transaction-identity-footer {
   display: flex;
@@ -1089,14 +1097,21 @@
 
 .transaction-hidden-state {
   display: flex;
+  flex: 1 1 95px;
+  min-width: 0;
+  padding-inline-start: 5px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 3px;
+  margin-inline-end: auto;
 }
 .transaction-hidden-state .text-button {
   font-size: 10px;
+  white-space: nowrap;
+}
+.transaction-hidden-state .entity-hidden-badge {
+  white-space: nowrap;
 }
 .transaction-row-main .entity-hidden-badge {
   font-size: 9px;

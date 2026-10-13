@@ -44,6 +44,7 @@ import {
   buildGraphPresentationIndex,
   readGraphPalette,
   resolveGraphHit,
+  hasGraphValue,
   type NodePresentation,
   type GraphPresentationInput,
 } from './Renderer/presentation';
@@ -490,6 +491,12 @@ export default function GraphView(props: GraphViewProps) {
   const hoveredNode =
     hover?.type === 'node' ? props.nodes.find((node) => node.id === hover.id) : undefined;
   const hoveredGroup = hover?.type === 'output-group' ? hover : undefined;
+  const unavailableValue = hoveredNode && !hasGraphValue(hoveredNode.value);
+  const groupValueUnavailable = useMemo(() => {
+    if (props.sizeBy !== 'value' || !hoveredGroup) return false;
+    const members = new Set(hoveredGroup.memberIds);
+    return props.nodes.some((node) => members.has(node.id) && !hasGraphValue(node.value));
+  }, [props.sizeBy, hoveredGroup, props.nodes]);
   const hoveredIdentifier = hoveredNode
     ? hoveredNode.kind === 'output' && hoveredNode.txid
       ? `${hoveredNode.txid}:${hoveredNode.vout}`
@@ -649,6 +656,9 @@ export default function GraphView(props: GraphViewProps) {
             <strong className="graph-card-summary">
               {hoveredGroup.memberIds.length.toLocaleString('en-US')} outputs
             </strong>
+            {groupValueUnavailable && (
+              <p className="graph-card-explanation">One or more values unavailable</p>
+            )}
             {props.onSelectOutputGroup && (
               <div className="graph-card-actions" role="group" aria-label="Output group actions">
                 <button
@@ -747,7 +757,7 @@ export default function GraphView(props: GraphViewProps) {
                   <ResponsiveIdentifier value={hoveredIdentifier} />
                 </dd>
               </div>
-              {hoveredNode.value !== undefined && (
+              {(!unavailableValue || props.sizeBy === 'value') && (
                 <div>
                   <dt>
                     {hoveredNode.kind === 'transaction'
@@ -756,7 +766,11 @@ export default function GraphView(props: GraphViewProps) {
                         ? 'Balance'
                         : 'Output value'}
                   </dt>
-                  <Amount as="dd" value={hoveredNode.value} />
+                  {unavailableValue ? (
+                    <dd>Unavailable</dd>
+                  ) : (
+                    <Amount as="dd" value={hoveredNode.value!} />
+                  )}
                 </div>
               )}
               {hoveredNode.address && hoveredNode.kind !== 'address' && (

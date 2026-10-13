@@ -56,14 +56,19 @@ export function resolveGraphHit(
   return nodes.find((node) => node.id === (link ? linkActionId(link) : hit.id));
 }
 const DEFAULT_NODE_RADIUS = 3.2;
+/** Shared availability rule for Value sizing and its hover details. Zero is known. */
+export function hasGraphValue(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value) && value >= 0;
+}
+
 function valueRadius(satoshis: number | undefined): number {
-  if (satoshis === undefined || !Number.isFinite(satoshis) || satoshis < 0)
-    return DEFAULT_NODE_RADIUS;
-  // Absolute logarithmic radius exposes ordinary payment differences while
-  // keeping the full Bitcoin range usable: 20k sats ~2.0, 150m sats ~5.4,
-  // and 21m BTC ~11.8. Neither sphere area nor volume represents a value ratio.
-  // Zero stays pickable; filtering and additions never change this scale.
-  return 1.6 + 0.9 * Math.log10(1 + satoshis / 10_000);
+  if (!hasGraphValue(satoshis)) return DEFAULT_NODE_RADIUS;
+  // Fixed smooth bounds of 2..12 emphasize ordinary wallet magnitudes without
+  // letting whales dominate: 23k sats ~2.03, 14m ~4.02, 138m ~7.56.
+  // One BTC is the midpoint. Size is not a literal value/area/volume ratio,
+  // and filtering or unrelated additions never change an existing amount's size.
+  const magnitude = (satoshis / 100_000_000) ** 0.7;
+  return 2 + 10 * (magnitude / (1 + magnitude));
 }
 
 function presentationRadius(
@@ -144,11 +149,13 @@ export function createGraphNodePresenter(
   return (node) => {
     const override = input.nodePresentation?.get(node.id);
     const selected = node.id === input.selectedId;
+    const selectionRing = input.sizeBy === 'value' && activeIds.has(node.id);
     const role = input.flowContext?.nodes.get(node.id);
     const roleColor =
       role === 'input' ? (palette.input ?? '#83baff') : (palette.flowOutput ?? palette.output);
     const radius = presentationRadius(input.sizeBy, node.value, degrees.get(node.id) || 0);
     const scale = override?.scale;
+    const unavailable = input.sizeBy === 'value' && !hasGraphValue(node.value);
     // Explicit coordinates are transient layout hints, never renderer-owned state.
     const fixed = node as GraphNode & { fx?: number; fy?: number; fz?: number };
     return {
@@ -178,12 +185,15 @@ export function createGraphNodePresenter(
           }
         : undefined,
       chronology: input.chronology?.get(node.id),
-      color: selected
-        ? palette.accent
-        : (override?.color ??
-          (node.cluster ? clusterColor(node.cluster) : role ? roleColor : palette[node.kind])),
+      indicator: unavailable ? '?' : undefined,
+      color:
+        selected || selectionRing
+          ? palette.accent
+          : (override?.color ??
+            (node.cluster ? clusterColor(node.cluster) : role ? roleColor : palette[node.kind])),
       radius: radius * (scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale : 1),
       selected,
+      selectionRing,
       flowActive: activeIds.has(node.id),
       highlight: input.glow && (selected || (override?.highlight ?? Boolean(node.cluster))),
       x: node.x,
@@ -261,8 +271,9 @@ export function presentGraph(
           ? markers[0]
           : undefined;
       const selected = members.some((member) => member.selected);
+      const selectionRing = members.some((member) => member.selectionRing);
       // Preserve the rendered volume of the particles this glyph replaces.
-      // Applying the size curve to aggregated facts would make logarithmic value
+      // Applying the size curve to aggregated facts would make bounded value
       // sizing, uniform sizing and per-node scale overrides visibly too small.
       const radius = Math.cbrt(
         members.reduce((sum, member) => sum + member.radius ** 3, 0) / OUTPUT_GROUP_VOLUME_FILL,
@@ -276,12 +287,19 @@ export function presentGraph(
             kind: 'multiple-outputs' as const,
             memberIds: group.members.map((member) => member.id),
           },
-          color: selected ? palette.accent : colors.size === 1 ? members[0].color : palette.output,
+          color:
+            selected || selectionRing
+              ? palette.accent
+              : colors.size === 1
+                ? members[0].color
+                : palette.output,
           radius,
           selected,
+          selectionRing,
           flowActive: members.some((member) => member.flowActive),
           highlight: members.some((member) => member.highlight),
           marker,
+          indicator: members.some((member) => member.indicator) ? '?' : undefined,
         },
       ] as const;
     }),

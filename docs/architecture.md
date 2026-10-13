@@ -398,8 +398,18 @@ nodes with stable IDs, shapes (cube, sphere, octahedron, grouped output), colors
 highlights, optional captions and coordinate hints; links with endpoints,
 colors, widths, arrows and a `directed`/`flowSide` hint. Callers supply
 `NodePresentation` overrides for tags, wallet matches and findings; selection
-color wins, then tag color, then wallet color. Value sizing uses
-`1.6 + 0.9 * log10(1 + sats / 10000)`.
+color wins, then tag color, then wallet color. Value sizing uses the fixed
+bounded curve `2 + 10 * m / (1 + m)`, where `m = (sats / 100000000)^0.7`.
+It emphasizes ordinary wallet magnitudes while approaching a radius ceiling of
+12; zero has radius 2. Unknown or invalid values retain the neutral radius of
+3.2 and an independent `?` indicator. The shared presentation owner supplies its
+availability rule to the hover card. Batch selections and scan targets use
+selection colour/rings without the body-scale boost in Value mode. Other modes
+retain their existing boost. The renderer's appearance-only `selectionRing`
+leaves the focused item and expansion anchor unchanged. The independent
+`indicator` remains visible with captions hidden and never changes mesh geometry
+or picking. Size changes preserve established node positions and the camera;
+Repack remains explicit.
 
 `outputGroups.ts` derives an optional presentation-only compaction when at least
 three visible output-only bridges connect the same creating and spending

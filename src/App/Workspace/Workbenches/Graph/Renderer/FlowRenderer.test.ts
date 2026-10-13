@@ -48,6 +48,7 @@ class Element extends EventTarget {
   style = { setProperty: vi.fn() };
   children: unknown[] = [];
   textContent = '';
+  className = '';
   hidden = false;
   append(...children: unknown[]) {
     this.children.push(...children);
@@ -395,7 +396,11 @@ describe('default renderer responsiveness and snapshots', () => {
       const camera = renderer.camera.position.clone();
       const chosen = {
         ...original,
-        nodes: original.nodes.map((node) => ({ ...node, selected: node.id === 'n1' })),
+        nodes: original.nodes.map((node) => ({
+          ...node,
+          selected: node.id === 'n1',
+          selectionRing: node.id === 'n0',
+        })),
       };
       renderer.update(chosen);
       expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(requests);
@@ -406,6 +411,7 @@ describe('default renderer responsiveness and snapshots', () => {
         ...node,
         shape: node.id === 'n2' ? 'box' : 'sphere',
         selected: node.id === (selection === 'transaction' ? 'n2' : 'n1'),
+        selectionRing: node.id === 'n0',
       }));
       opened.links = opened.links.map((link, index) => ({
         ...link,
@@ -770,6 +776,59 @@ describe('partial node appearance updates', () => {
       renderer.camera.updateMatrixWorld();
     });
   };
+
+  it('shows and clears unavailable-value indicators without moving nodes or the camera as radii change', () => {
+    const animation = animationHarness();
+    const { renderer, events, container } = setup();
+    projectCaptions(renderer);
+    const original = frame();
+    renderer.update(original);
+    WorkerMock.instances[0].reply();
+    renderer.camera.position.set(0, 0, 300);
+    renderer.flushSnapshot();
+    const saved = vi.mocked(events.snapshot!).mock.calls.at(-1)![0];
+    const withIndicator: GraphFrame = {
+      ...original,
+      nodes: original.nodes.map((node, index) =>
+        index
+          ? node
+          : {
+              ...node,
+              radius: 3.2,
+              text: undefined,
+              indicator: '?',
+            },
+      ),
+    };
+    renderer.update(withIndicator);
+    animation.step(0);
+    const indicators = () =>
+      ((container.children[1] as Element).children as Element[]).filter(
+        (child) => !child.hidden && child.className === 'flow-node-indicator',
+      );
+    expect(indicators().map((child) => child.textContent)).toEqual(['?']);
+    renderer.update({
+      ...withIndicator,
+      nodes: withIndicator.nodes.map((node, i) => (i ? node : { ...node, selectionRing: true })),
+    });
+    animation.step(16);
+    expect(
+      ((container.children[1] as Element).children as Element[]).some(
+        (child) => !child.hidden && child.className === 'flow-node-ring selected',
+      ),
+    ).toBe(true);
+    expect(indicators().map((child) => child.textContent)).toEqual(['?']);
+    renderer.update({
+      ...original,
+      nodes: original.nodes.map((node) => ({ ...node, radius: 7.56 })),
+    });
+    animation.step(32);
+    expect(indicators()).toHaveLength(0);
+    renderer.flushSnapshot();
+    expect(WorkerMock.instances[0].postMessage).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(events.snapshot!).mock.calls.at(-1)![0]).toEqual(saved);
+    renderer.dispose();
+  });
 
   it('uploads only changed colors without resetting geometry, particles, camera or persistence', () => {
     const animation = animationHarness();

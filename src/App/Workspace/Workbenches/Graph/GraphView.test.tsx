@@ -91,7 +91,7 @@ describe('grouped output interaction', () => {
         onSelect={onSelect}
         onSelectOutputGroup={onSelectOutputGroup}
         dimensions={3}
-        sizeBy="uniform"
+        sizeBy="value"
         glow
         fitToken={0}
       />,
@@ -128,6 +128,7 @@ describe('grouped output interaction', () => {
 
     expect(screen.getByRole('dialog', { name: 'Multiple outputs' })).toBeTruthy();
     expect(screen.getByText('3 outputs')).toBeTruthy();
+    expect(screen.getByText(/values.*unavailable/i)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Select outputs' }));
     expect(onSelectOutputGroup).toHaveBeenNthCalledWith(1, ['output-1', 'output-2', 'output-3']);
 

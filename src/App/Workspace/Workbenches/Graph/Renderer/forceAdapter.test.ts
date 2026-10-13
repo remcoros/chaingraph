@@ -870,6 +870,41 @@ describe('force adapter contract', () => {
     adapter.dispose();
     expect(textureDispose).toHaveBeenCalledTimes(1);
   });
+  it('keeps an unavailable-value indicator independent of captions and releases it when cleared', () => {
+    const drawing = {
+      measureText: (text: string) => ({ width: text.length * 12 }),
+      beginPath() {},
+      roundRect() {},
+      fill() {},
+      fillText() {},
+    };
+    vi.stubGlobal('document', { createElement: () => ({ getContext: () => drawing }) });
+    const { adapter, graph, callbacks } = setup();
+    adapter.update({
+      ...frame(),
+      nodes: frame().nodes.map((node) => ({
+        ...node,
+        text: undefined,
+        indicator: '?',
+      })),
+    });
+    const node = graph.graphData().nodes[0];
+    const mesh = callbacks.nodeThreeObject(node) as any;
+    expect(mesh.children).toHaveLength(1);
+    const sprite = mesh.children[0];
+    const textureDispose = vi.spyOn(sprite.material.map, 'dispose');
+    const hits: any[] = [];
+    sprite.raycast(new Raycaster(), hits);
+    expect(hits).toEqual([]);
+    expect(textureDispose).not.toHaveBeenCalled();
+    node.x = 125;
+    adapter.update(frame());
+    expect(mesh.children).toHaveLength(0);
+    expect(node.x).toBe(125);
+    expect(textureDispose).toHaveBeenCalledTimes(1);
+    adapter.dispose();
+    expect(textureDispose).toHaveBeenCalledTimes(1);
+  });
   it('releases resources/listeners once, reports context loss and ignores methods after disposal', () => {
     const { adapter, graph, events, pointer, scene, container, callbacks } = setup();
     adapter.update(frame());

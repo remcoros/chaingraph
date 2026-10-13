@@ -13,12 +13,16 @@ export interface RenderNode {
   color: string;
   radius: number;
   highlight: boolean;
-  /** Selection emphasis independent of optional glow; older adapters may ignore it. */
+  /** Focused item, with selection emphasis independent of optional glow. */
   selected?: boolean;
+  /** Additional selection outline only; never becomes a focus or layout anchor. */
+  selectionRing?: boolean;
   /** Active or batch selection participates in flow animation without changing focus. */
   flowActive?: boolean;
   /** Screen-space role accent, independent of physical geometry and layout. */
   marker?: { shape: 'brackets' | 'ring'; color: string };
+  /** Small factual appearance cue, independent of captions and role/selection markers. */
+  indicator?: string;
   /** Compact layout order. `latest` is a lane, not a claim that the event is recent. */
   chronology?: RenderChronology;
   x?: number;

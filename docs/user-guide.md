@@ -285,9 +285,15 @@ history, **Isolate**, filters and **Repack**. **Motion** toggles flow dots and
 camera inertia; the dots show transaction direction along the paths connected to
 your selection. **Show labels**, **Show tags** and **Show icons** control captions
 without touching annotations. **Size by** switches between uniform, value-based
-(logarithmic) and degree-based node sizes. Address nodes use their observed
-balance when one is available; unknown balances are not treated as zero. On
-desktop, **Hide panels** collapses both side panels to give the canvas more room.
+and degree-based node sizes. Value sizing emphasizes differences in amount while
+keeping individual nodes within a bounded size range. Sizes stay stable when
+filtering, and selection does not enlarge their bodies in Value mode. Address
+nodes use their observed balance. A small **?** marks an unavailable amount,
+including groups with an unavailable member value; a known zero uses the
+smallest size. Changing sizing preserves positions and the camera; use
+**Repack** if larger nodes need more space. Perspective still affects apparent
+size in 3D. On desktop, **Hide panels** collapses both side panels to give the
+canvas more room.
 
 Hover a node for a card with identifiers, value, and compact actions. Connection
 lines do not open cards. The Inspector and the entity list provide the same
