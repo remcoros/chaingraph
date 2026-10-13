@@ -450,7 +450,9 @@ Five tabs share the existing list and detail panel, with **Transactions** first:
   Select an identity to edit **Name**, **Category**, **Tags**, **Note** or its icon
   beside each value. **Show in Transactions** filters the wallet list to its
   related activity. The **…** menu offers **Bookmark** and **Remove counterparty**,
-  with confirmation before removal.
+  with confirmation before removal. Clicking a counterparty in Graph's **Bookmarks**
+  opens Wallet's **Counterparties** tab with that identity selected in the current
+  wallet. The list search clears to show it, and **Back to Graph** returns to Graph.
 - **Review** groups unmet annotation goals and applicable finding assessments.
   A transaction label, note or tag describes its purpose; senders and recipients
   identify who was involved. Edit these fields in the record details. Answered

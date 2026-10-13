@@ -5,11 +5,34 @@ import {
   WalletNavigation,
   useWalletNavigation,
   useWalletNavigationSessions,
+  walletNavigationFor,
 } from './useWalletNavigation';
 import { TransactionFetchScope } from '../../../../Core/ChainData/transactionScheduler';
 import { viewSchema } from '../../../../Core/Workspace/view';
 
 afterEach(cleanup);
+it('opens an external counterparty in the navigation reused by mounted Wallet panels', () => {
+  const session = new Map<string, WalletNavigation>();
+  const navigation = walletNavigationFor(session, 'one', {
+    activeTab: 'review',
+    tabs: { counterparties: { query: 'hides the clicked identity', selectedKey: 'party:other' } },
+  });
+  navigation.openCounterparty('contact');
+  const panel = renderHook(() => useWalletNavigation('one', undefined, session));
+  expect(panel.result.current.navigation).toBe(navigation);
+  expect(panel.result.current.visit.position).toMatchObject({
+    tab: 'counterparties',
+    selectedKey: 'party:contact',
+    query: '',
+    selection: { ids: [] },
+  });
+  act(() => navigation.openCounterparty('second'));
+  expect(panel.result.current.visit.position.selectedKey).toBe('party:second');
+  expect(navigation.presentation()).toMatchObject({
+    activeTab: 'counterparties',
+    tabs: { counterparties: { selectedKey: 'party:second' } },
+  });
+});
 const a = `tx:${'a'.repeat(64)}`;
 const b = `tx:${'b'.repeat(64)}`;
 const c = `tx:${'c'.repeat(64)}`;

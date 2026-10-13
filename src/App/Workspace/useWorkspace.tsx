@@ -40,7 +40,10 @@ import { useGraphExpansion } from './Workbenches/Graph/Navigation/useGraphExpans
 import { useGraphLookup } from './Workbenches/Graph/Navigation/useGraphLookup';
 import { useWorkspaceOperation } from './useWorkspaceOperation';
 import { useWalletActivity } from './Workbenches/Wallet/useWalletActivity';
-import { useWalletNavigationSessions } from './Workbenches/Wallet/useWalletNavigation';
+import {
+  useWalletNavigationSessions,
+  walletNavigationFor,
+} from './Workbenches/Wallet/useWalletNavigation';
 import { useGraphActions } from './Workbenches/Graph/useGraphActions';
 import { createWalletActions } from './Workbenches/Wallet/walletActions';
 import { createAnalysisActions } from './Workbenches/Analysis/analysisActions';
@@ -670,6 +673,25 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     };
   }
   const walletActions = {
+    openCounterparty: (partyId: string) => {
+      if (!activeWorkspace?.counterparties?.definitions.some((party) => party.id === partyId))
+        return;
+      const targetWallet = wallet ?? activeWorkspace.wallets.definitions[0];
+      const session = workspaces.getUnlocked(activeWorkspace.id);
+      if (!targetWallet || !session) {
+        setNotice('Add a wallet to inspect counterparty activity.');
+        switchWorkbench('wallet', { interaction: 'handoff' });
+        return;
+      }
+      walletNavigationFor(
+        walletNavigationSession(session.fetchScope),
+        targetWallet.id,
+        activeWorkspace.view.wallet?.[targetWallet.id],
+      ).openCounterparty(partyId);
+      selection.invalidate();
+      setSelectedWallet(targetWallet.id);
+      switchWorkbench('wallet', { interaction: 'handoff' });
+    },
     selectWalletRecord: (...args: Tail<Parameters<typeof walletCommands.selectWalletRecord>>) =>
       walletCommands.selectWalletRecord(walletActionRuntime(), ...args),
     openWalletRecord: (...args: Tail<Parameters<typeof walletCommands.openWalletRecord>>) =>

@@ -150,6 +150,8 @@ Undo and Redo hold up to 15 session-only steps, each a workspace snapshot with
 a description derived by `undoDescription.ts`. Continuous typing in one field
 coalesces. Accepted transaction and wallet-observation refreshes carry through
 both stacks so undo does not discard downloaded data or erase pending redo.
+Wallet scan metadata, including the last completed refresh timestamp, carries
+through both stacks independently of reversible human edits.
 Explicit user removals remain undoable. Presentation writes (camera, view, scan
 results) carry through history. A batch edit is one step.
 
@@ -690,7 +692,12 @@ trail states with one presentation owner and atomic navigation intentions.
 `useRecordSelection` owns the shared range/toggle rules, reused by Wallet navigation.
 The workspace controller retains Wallet navigation per wallet in a session map keyed by the
 existing unlocked fetch scope, pruned on lock and wallet removal; Core Session
-does not acquire UI types or navigation responsibilities. Inspector links retain
+does not acquire UI types or navigation responsibilities. `walletNavigationFor`
+owns lazy creation and reuse for both
+mounted panels and external entries, so Graph bookmarks can enter Wallet before
+its panel mounts. A counterparty handoff selects the current wallet's Counterparties
+tab and identity through one navigation intention, clearing a search that could
+hide it. Workspace owns the cross-workbench return point. Inspector links retain
 canonical references and contextual jumps retain the origin and destination's
 normal presentation, replacing any suspended temporary destination. The named
 context return restores those positions directly, while inspector Back pops one
@@ -700,6 +707,9 @@ temporary scopes, checked IDs, range anchors and return trails are not persisted
 Back labels derive from the subscribed immutable snapshot, not an implicit read
 of the navigation instance. Wallet panel interaction tests use the app's React
 compiler so memoization regressions are covered alongside state transitions.
+Counterparty inspector activity uses prepared wallet transaction records and
+review context regardless of the active tab, building its transaction projection
+on demand when that tab has not already built it.
 The panel resolves related wallet records from current rows and the verified
 loaded output index. Navigation stores no chain-data snapshots. External or unavailable
 records retain explicit Graph navigation. State changes keep the inspected record

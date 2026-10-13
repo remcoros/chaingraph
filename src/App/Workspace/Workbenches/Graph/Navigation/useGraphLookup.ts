@@ -37,8 +37,7 @@ export function useGraphLookup({
   prefetchDepth,
   reveal,
 }: Inputs) {
-  const { activeWorkspace, activeWorkspaceRef, workspaces, setOperation, setError, setNotice } =
-    core;
+  const { activeWorkspace, activeWorkspaceRef, workspaces, setOperation, setNotice } = core;
   const { getUnlocked } = workspaces;
   const { generation: selectionGeneration } = selection;
   const { transaction: getTransaction } = transactions.read;
@@ -46,32 +45,34 @@ export function useGraphLookup({
   const { run } = operation;
 
   async function submit(text: string) {
-    if (!activeWorkspace || !text || operation.isActive()) return;
+    if (!activeWorkspace || !text.trim()) return;
     text = text.trim();
     if (/^(bc1|tb1)/i.test(text)) text = text.toLowerCase();
-    const existing = state.resolveLoaded(text);
-    if (existing && !existing.startsWith('addr:')) {
-      setError('');
-      setNotice('');
-      recordTransactions(activeWorkspace.id, [], { promotionIds: [existing.split(':')[1]] });
-      reveal(existing);
-      if (!canLoadChainData || !prefetchDepth) {
+    const submittedGeneration = selectionGeneration.current;
+    await run(async (signal) => {
+      if (
+        activeWorkspaceRef.current?.id !== activeWorkspace.id ||
+        selectionGeneration.current !== submittedGeneration
+      )
+        return;
+      const existing = state.resolveLoaded(text);
+      if (existing && !existing.startsWith('addr:')) {
+        recordTransactions(activeWorkspace.id, [], { promotionIds: [existing.split(':')[1]] });
+        reveal(existing);
+        if (!canLoadChainData || !prefetchDepth) {
+          state.clear();
+          return;
+        }
+      }
+      if (!/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
+        if (!canLoadChainData && !existing) return;
+        reveal(addressReference(text));
         state.clear();
+        addressEvidence.startAddressHistoryLoad(text);
         return;
       }
-    }
-    if (!/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
-      if (!canLoadChainData && !existing) return;
-      setError('');
-      setNotice('');
-      reveal(addressReference(text));
-      state.clear();
-      addressEvidence.startAddressHistoryLoad(text);
-      return;
-    }
-    if (!canLoadChainData) return;
-    const generation = selectionGeneration.current;
-    await run(async (signal) => {
+      if (!canLoadChainData) return;
+      const generation = selectionGeneration.current;
       const [id, index] = text.split(':');
       setOperation('Loading transaction…');
       const cached = activeWorkspace.chainData.transactions[id.toLowerCase()];

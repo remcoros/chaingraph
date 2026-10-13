@@ -218,6 +218,19 @@ export class WalletNavigation {
   showTransactions(ids: string[]) {
     this.handoff({ ...position('transactions'), transactionScope: [...new Set(ids)] });
   }
+  /** External entry selects an identity even if the saved list search would hide it. */
+  openCounterparty(id: string) {
+    this.publish({
+      ...this.state,
+      section: 'counterparties',
+      entry: this.state.entry + 1,
+      focus: {},
+      visits: {
+        ...this.state.visits,
+        counterparties: { position: { ...position('counterparties'), selectedKey: `party:${id}` } },
+      },
+    });
+  }
   openReview(target: { nodeId: string; reference: string; key: string; selectedKey?: string }) {
     this.handoff({
       ...position('review'),
@@ -315,6 +328,17 @@ export class WalletNavigation {
 
 export type WalletNavigationSession = Map<string, WalletNavigation>;
 
+/** The same navigation owner serves mounted Wallet panels and external handoffs. */
+export function walletNavigationFor(
+  session: WalletNavigationSession | undefined,
+  walletId: string,
+  saved?: WalletPresentation,
+) {
+  const navigation = session?.get(walletId) ?? new WalletNavigation(saved);
+  session?.set(walletId, navigation);
+  return navigation;
+}
+
 /** Matches the existing unlocked Analysis UI lifetime. Relocking/reopening gets
  * a new scope; removed wallets and closed scopes release their UI state.
  */
@@ -353,9 +377,9 @@ export function useWalletNavigation(
   previewTab?: WalletTab,
 ) {
   const [navigation] = useState(() => {
-    const value = session?.get(walletId) ?? new WalletNavigation(saved, previewTab);
-    session?.set(walletId, value);
-    return value;
+    return previewTab
+      ? new WalletNavigation(saved, previewTab)
+      : walletNavigationFor(session, walletId, saved);
   });
   const state = useSyncExternalStore(
     navigation.subscribe,

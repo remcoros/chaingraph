@@ -102,6 +102,10 @@ export function EntitiesPanel({ workspace }: { workspace: WorkspaceController })
         }));
       }}
       onSelectNode={(id) => {
+        if (id.startsWith('party:')) {
+          workspace.wallet.actions.openCounterparty(id.slice(6));
+          return;
+        }
         select(id);
         if (!connectionScanTargets.picking) setMobilePanel('right');
       }}

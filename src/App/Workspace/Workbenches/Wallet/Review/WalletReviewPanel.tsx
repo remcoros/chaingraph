@@ -875,6 +875,40 @@ export function WalletReviewPanel(
       navigation.update({ detailTrail: undefined });
   }, [navigation, detailTrail, origin, filterScope]);
   const inspectedId = trail.at(-1) ?? origin;
+  const inspectingCounterparty = !!inspectedId?.startsWith('party:');
+  const counterpartyActivityRows = useMemo(
+    () =>
+      inspectingCounterparty
+        ? tab === 'transactions' || tab === 'counterparties'
+          ? rowsByTab.transactions
+          : buildWalletRecordRows(
+              {
+                network: workspace.network,
+                chainData: { transactions: workspace.chainData.transactions },
+                wallets: { reviews: workspace.wallets.reviews },
+              },
+              { id: wallet.id, addresses: wallet.addresses },
+              currentUtxos,
+              review.items,
+              'transactions',
+              { transactionRecords, addressRecords },
+            ).transactions
+        : [],
+    [
+      inspectingCounterparty,
+      tab,
+      rowsByTab.transactions,
+      workspace.network,
+      workspace.chainData.transactions,
+      workspace.wallets.reviews,
+      wallet.id,
+      wallet.addresses,
+      currentUtxos,
+      review.items,
+      transactionRecords,
+      addressRecords,
+    ],
+  );
   const inspectedRow =
     inspectedId && !inspectedId.startsWith('party:')
       ? inspectedId === selectedRow?.nodeId
@@ -920,7 +954,7 @@ export function WalletReviewPanel(
     <WalletCounterpartyDetail
       {...props}
       partyId={inspectedId.slice(6)}
-      activityRows={rowsByTab.transactions}
+      activityRows={counterpartyActivityRows}
       onRemoved={() => {
         if (trail.length) navigation.back();
         else navigation.inspect(undefined);

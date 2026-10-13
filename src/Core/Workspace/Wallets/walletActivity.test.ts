@@ -16,6 +16,18 @@ const wallet: Wallet = {
 const txid = 'a'.repeat(64);
 
 describe('wallet refresh merging', () => {
+  it('carries a completion timestamp when no other scan metadata changed', () => {
+    const snapshot = createWorkspace('Quiet refresh history', 'mainnet');
+    snapshot.wallets.definitions = [wallet];
+    const refreshedAt = '2026-10-13T10:00:00.000Z';
+    const latest = {
+      ...snapshot,
+      wallets: { ...snapshot.wallets, definitions: [{ ...wallet, refreshedAt }] },
+    };
+    const carried = carryScanMetadata(snapshot, latest);
+    expect(carried.wallets.definitions[0].refreshedAt).toBe(refreshedAt);
+    expect(carryScanMetadata(carried, latest)).toBe(carried);
+  });
   it.each([{ key: 'changed public account' }, { scriptType: 'p2pkh' as const }])(
     'rejects scan results and undo metadata for a replaced wallet binding: %o',
     (binding) => {

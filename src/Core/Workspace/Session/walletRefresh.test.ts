@@ -49,6 +49,37 @@ function fixture() {
   return { store, session, wallet, addresses, acquisition, txid };
 }
 describe('complete wallet refresh', () => {
+  it('keeps completed refresh observations through both history stacks while human edits remain reversible', async () => {
+    const f = fixture();
+    const data = () => f.store.getUnlocked(f.session.data.id)!.data;
+    f.session.edit((current) => ({ ...current, name: 'Renamed workspace' }));
+    f.session.edit((current) => ({ ...current, description: 'Reversible note' }));
+    f.session.undo();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ result: [] }))),
+    );
+    const result = await f.acquisition.observe.walletRefresh(f.wallet, { gap: 20, maxIndex: 200 });
+    const refreshedAt = result.wallet.refreshedAt;
+    expect(refreshedAt).toBeDefined();
+    const expectObservations = () => {
+      expect(data().wallets.definitions[0].refreshedAt).toBe(refreshedAt);
+      expect(data().wallets.definitions[0].addresses).toHaveLength(125);
+      expect(data().chainData.transactions[f.txid]).toBeDefined();
+      expect(Object.keys(data().chainData.addressUtxos!)).toHaveLength(125);
+    };
+    f.session.redo();
+    expect(data().description).toBe('Reversible note');
+    expectObservations();
+    f.session.undo();
+    f.session.undo();
+    expect(data().name).toBe('Public batch refresh');
+    expect(data().description).toBeUndefined();
+    expectObservations();
+    f.session.redo();
+    expect(data().name).toBe('Renamed workspace');
+    expectObservations();
+  });
   it('continues beyond the first 100 addresses and only reruns analysis when material support changes', async () => {
     const f = fixture();
     const fetch = vi.fn(async () => new Response(JSON.stringify({ result: [] })));

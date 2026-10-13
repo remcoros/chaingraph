@@ -4,7 +4,10 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createWorkspace } from '../../../../../Core/Workspace/createWorkspace';
 import { deriveAddresses } from '../../../../../Core/Workspace/Wallets/walletDerivation';
-import { saveCounterparty } from '../../../../../Core/Workspace/Counterparties/counterparties';
+import {
+  assignCounterparty,
+  saveCounterparty,
+} from '../../../../../Core/Workspace/Counterparties/counterparties';
 import { WalletReviewPanel, type WalletWorkbenchViewProps } from './WalletReviewPanel';
 import {
   PUBLIC_ZPUB,
@@ -38,6 +41,7 @@ function Fixture({
   addressActivity = false,
   addressReview = false,
   counterparties = false,
+  unspentReceipt = false,
 }: {
   saved?: boolean;
   findings?: boolean;
@@ -45,6 +49,7 @@ function Fixture({
   addressActivity?: boolean;
   addressReview?: boolean;
   counterparties?: boolean;
+  unspentReceipt?: boolean;
 }) {
   const [workspace, setWorkspace] = useState(() => {
     const value = createWorkspace('Public wallet fixture', 'mainnet');
@@ -63,6 +68,7 @@ function Fixture({
     };
     value.wallets.definitions = [wallet];
     value.chainData.transactions = structuredClone(transactions);
+    if (unspentReceipt) delete value.chainData.transactions[TX_SPENDING];
     if (addressActivity)
       value.chainData.transactions['e'.repeat(64)] = {
         txid: 'e'.repeat(64),
@@ -114,7 +120,7 @@ function Fixture({
           review: { status: 'open', typeIds: ['address-description'], addressBranch: 'all' },
         },
       };
-    return counterparties
+    const result = counterparties
       ? saveCounterparty(
           value,
           {
@@ -130,6 +136,12 @@ function Fixture({
           },
         )
       : value;
+    return unspentReceipt && counterparties
+      ? assignCounterparty(result, '40000000-0000-4000-8000-000000000001', {
+          kind: 'entity',
+          subjectId: `addr:${wallet.addresses[0].address}`,
+        })
+      : result;
   });
   const props: WalletWorkbenchViewProps = {
     workspace,
@@ -146,7 +158,29 @@ function Fixture({
     onIsolateInGraph: vi.fn(),
     onShowSelection: vi.fn(),
     onInspect: vi.fn(),
-    walletUtxos: { loading: false, error: '', check: vi.fn() },
+    walletUtxos: {
+      loading: false,
+      error: '',
+      check: vi.fn(),
+      utxos: unspentReceipt
+        ? {
+            checkedAt: '2026-10-01T10:00:00.000Z',
+            records: [
+              {
+                txid: TX_FUNDING,
+                vout: 0,
+                address: workspace.wallets.definitions[0].addresses[0].address,
+                scripthash: workspace.wallets.definitions[0].addresses[0].scripthash,
+                valueSats: 100_000_000,
+                height: 100,
+              },
+            ],
+            checkedAddresses: 1,
+            totalAddresses: 2,
+            failed: 0,
+          }
+        : undefined,
+    },
     onPresentationChange: (id, update) =>
       setWorkspace((current) => {
         const before = current.view.wallet?.[id] ?? {};
@@ -327,6 +361,26 @@ it('opens the named counterparty editor without navigating away from transaction
     'true',
   );
 });
+it.each(['Transactions', 'Coins', 'Addresses', 'Review'])(
+  'keeps counterparty activity when inspecting from %s and scopes the Transactions jump',
+  (tab) => {
+    render(<Fixture counterparties receipt unspentReceipt />);
+    const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));
+    fireEvent.click(tabs.getByRole('button', { name: new RegExp(`^${tab}`) }));
+    const detail = screen.getByRole('article', { name: /Selected (wallet|review) item/ });
+    fireEvent.click(within(detail).getAllByRole('link', { name: 'Public contact' })[0]);
+    const party = screen.getByRole('region', { name: 'Counterparty details' });
+    expect(within(party).getByText('1 transaction')).toBeTruthy();
+    fireEvent.click(within(party).getByRole('button', { name: 'Show related transactions' }));
+    const records = screen.getByRole('list', { name: 'Transactions records' });
+    expect(within(records).getAllByRole('link')).toHaveLength(1);
+    expect(
+      within(records).getByRole('link', { name: new RegExp(TX_FUNDING.slice(0, 8)) }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Back to ${tab}`) }));
+    expect(screen.getByRole('region', { name: 'Counterparty details' })).toBeTruthy();
+  },
+);
 it('limits a transaction finding jump to its own review items', () => {
   render(<Fixture findings />);
   const row = within(screen.getByRole('list', { name: 'Transactions records' }))

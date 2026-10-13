@@ -100,6 +100,7 @@ export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Works
       return wallet;
     if (
       wallet.scannedAt === current.scannedAt &&
+      wallet.refreshedAt === current.refreshedAt &&
       wallet.scanComplete === current.scanComplete &&
       wallet.scanLimit === current.scanLimit &&
       wallet.scanGap === current.scanGap &&
@@ -111,6 +112,7 @@ export function carryScanMetadata(snapshot: Workspace, latest: Workspace): Works
     return {
       ...wallet,
       scannedAt: current.scannedAt,
+      refreshedAt: current.refreshedAt,
       scanComplete: current.scanComplete,
       scanLimit: current.scanLimit,
       scanGap: current.scanGap,
