@@ -237,6 +237,21 @@ configured concurrency and queue depth. Host and Origin are validated against
 loopback or `CORS_ALLOW_ORIGINS`. None of this is authentication: the deployment
 model is one trusted user. See [deployment.md](deployment.md).
 
+### Browser build and asset caching
+
+Vite groups React and its runtime, Zod, Bitcoin/crypto dependencies and Three.js
+into separate vendor chunks so application edits can reuse unchanged dependencies
+from the browser cache. Three.js remains behind GraphView's dynamic import.
+Other dependencies retain automatic chunking; workers have separate build graphs.
+This improves cache reuse across updates without reducing the total startup code.
+
+The existing static-file server gives content-hashed files under `assets/` a
+one-year immutable cache lifetime. HTML and unversioned files use `no-cache` so
+they revalidate, including the application document served for client routes.
+API responses use `no-store`. Asset recognition follows Vite's default
+eight-character filename hash and uses the served file rather than the request
+path, preventing an HTML fallback from inheriting immutable caching.
+
 ### Optional exact-output spender lookup
 
 `CHAINGRAPH_USE_TXOSPENDERINDEX=true` in a network file lets the server pass

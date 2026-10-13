@@ -96,6 +96,11 @@ For a private certificate authority, mount its PEM file read-only and set the co
 
 ## Shared HTTP settings
 
+The production server marks content-hashed files under `/assets/` as immutable
+for one year. HTML and unversioned files revalidate on reuse; API responses are
+not stored. Preserve these response headers when using a reverse proxy, and do
+not apply the immutable policy to HTML or `/api/` responses.
+
 Shared server settings come from the process environment, separately from network files. Compose forwards the origin and limit settings below, while its internal host/port remain `0.0.0.0:3000`.
 
 | Variable | Default | Scope |

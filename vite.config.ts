@@ -51,6 +51,27 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1500,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          // Keep stable dependency families cached across application edits.
+          // Three stays behind GraphView's existing dynamic import; combining
+          // all dependencies would pull the renderer into the startup graph.
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /[\\/]node_modules[\\/](?:react|react-dom|scheduler)[\\/]/,
+            },
+            { name: 'schema-vendor', test: /[\\/]node_modules[\\/]zod[\\/]/ },
+            {
+              name: 'bitcoin-vendor',
+              test: /[\\/]node_modules[\\/](?:bitcoinjs-lib|bip174|bs58check|bs58|uint8array-tools|varuint-bitcoin|valibot)[\\/]|[\\/]node_modules[\\/]@(?:noble|scure)[\\/]/,
+            },
+            { name: 'graph-vendor', test: /[\\/]node_modules[\\/]three[\\/]/ },
+          ],
+        },
+      },
+    },
     // Template snapshots are fetched and JSON.parsed at runtime. Small ones
     // would otherwise be inlined as base64 data URLs, which both bloats the
     // chunk that holds them and gives two of the nine templates a different

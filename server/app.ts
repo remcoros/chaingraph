@@ -204,11 +204,30 @@ export function createApp(
       ? undefined
       : (options.staticDirectory ?? path.resolve('dist'));
   if (directory) {
-    app.use(express.static(directory));
+    app.use(
+      express.static(directory, {
+        setHeaders(res, filePath) {
+          // Vite emits eight-character content hashes under assets/. Match the
+          // served file, so a missing asset's HTML fallback cannot be immutable.
+          const relativePath = path.relative(directory, filePath);
+          const hashedAsset =
+            /^assets[\\/].+-[A-Za-z0-9_-]{8}\.[^\\/]+$/.test(relativePath) &&
+            !/\.html?$/i.test(filePath);
+          res.setHeader(
+            'Cache-Control',
+            hashedAsset ? 'public, max-age=31536000, immutable' : 'no-cache',
+          );
+        },
+      }),
+    );
     app.get('/{*path}', (_req, res, next) => {
-      res.sendFile(path.join(directory, 'index.html'), (error) => {
-        if (error) next(error);
-      });
+      res.sendFile(
+        path.join(directory, 'index.html'),
+        { headers: { 'Cache-Control': 'no-cache' } },
+        (error) => {
+          if (error) next(error);
+        },
+      );
     });
   }
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {
