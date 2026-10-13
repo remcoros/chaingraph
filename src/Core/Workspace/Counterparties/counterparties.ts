@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { counterpartyReference } from '../annotationReferences';
 import { canonicalEntityReference } from '../entityReferences';
 import { emptyAnnotation } from '../Annotations/emptyAnnotation';
+import { MAX_ANNOTATION_LABEL_LENGTH } from '../Annotations/annotations';
 import type { Workspace } from '../workspace';
 import {
   MAX_COUNTERPARTIES,
@@ -42,7 +43,7 @@ export function saveCounterparty(
   subject?: CounterpartySubject,
 ): Workspace {
   const id = counterpartyReference(edit.id).slice(6);
-  const name = z.string().trim().min(1).max(200).parse(edit.name);
+  const name = z.string().trim().min(1).max(MAX_ANNOTATION_LABEL_LENGTH).parse(edit.name);
   const category = edit.category?.trim() || undefined;
   if (category && category.length > 100)
     throw new Error('Counterparty category exceeds 100 characters.');

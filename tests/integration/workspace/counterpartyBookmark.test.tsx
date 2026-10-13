@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useLayoutEffect, useMemo, useRef } from 'react';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WorkspaceStore } from '../../../src/Core/Workspace/Session/WorkspaceStore';
 import { createWorkspace } from '../../../src/Core/Workspace/createWorkspace';
@@ -8,7 +8,7 @@ import { createChainDataAcquisition } from '../../../src/Core/Workspace/Session/
 import { saveCounterparty } from '../../../src/Core/Workspace/Counterparties/counterparties';
 import { emptyAnnotation } from '../../../src/Core/Workspace/Annotations/emptyAnnotation';
 import { useWorkspaces } from '../../../src/App/Workspace/useWorkspaces';
-import { useWorkspace } from '../../../src/App/Workspace/useWorkspace';
+import { useWorkspace, type WorkspaceController } from '../../../src/App/Workspace/useWorkspace';
 import type { AppState } from '../../../src/App/useAppState';
 import { EntitiesPanel } from '../../../src/App/Workspace/Workbenches/Graph/EntitiesPanel/EntitiesPanel';
 import { WalletWorkbench } from '../../../src/App/Workspace/Workbenches/Wallet/WalletWorkbench';
@@ -105,7 +105,13 @@ function fixture() {
   return { store, workspace };
 }
 
-function Fixture({ store }: { store: WorkspaceStore }) {
+function Fixture({
+  store,
+  onController,
+}: {
+  store: WorkspaceStore;
+  onController?: (controller: WorkspaceController) => void;
+}) {
   const workspaces = useWorkspaces(store);
   const activeWorkspace = workspaces.active?.data;
   const activeWorkspaceRef = useRef(activeWorkspace);
@@ -150,6 +156,9 @@ function Fixture({ store }: { store: WorkspaceStore }) {
     displayNetwork: 'mainnet',
   } as unknown as AppState);
   const { graphWorkspaceRef, shownWorkbench } = controller;
+  useLayoutEffect(() => {
+    onController?.(controller);
+  }, [controller, onController]);
   return (
     <>
       <nav aria-label="Test workbench navigation">
@@ -177,6 +186,38 @@ function Fixture({ store }: { store: WorkspaceStore }) {
     </>
   );
 }
+
+it.each(['import', 'export'] as const)(
+  'opens wallet metadata %s for the selected wallet without changing annotations',
+  async (direction) => {
+    const f = fixture();
+    let controller!: WorkspaceController;
+    render(
+      <Fixture
+        store={f.store}
+        onController={(value) => {
+          controller = value;
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open Wallet' }));
+    await screen.findByRole('navigation', { name: 'Wallet sections' });
+    const before = f.store.getUnlocked(f.workspace.id)!.data.annotations;
+    fireEvent.click(screen.getByRole('button', { name: 'Wallet actions' }));
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: new RegExp(`${direction} wallet metadata`, 'i') }),
+    );
+    expect(controller.annotations.labelTransfer).toMatchObject({
+      kind: direction,
+      workspaceId: f.workspace.id,
+      options: { scope: { kind: 'wallet', walletId: selectedWalletId } },
+    });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(f.store.getUnlocked(f.workspace.id)!.data.annotations).toBe(before);
+    act(() => controller.annotations.closeLabelTransfer());
+    expect(controller.annotations.labelTransfer).toBeUndefined();
+  },
+);
 
 it.each([false, true])(
   'hands a counterparty bookmark to Wallet with its identity selected (Wallet already mounted: %s)',

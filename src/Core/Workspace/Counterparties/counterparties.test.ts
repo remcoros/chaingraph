@@ -14,7 +14,7 @@ import {
   applyEntityNote,
   createBatchTag,
 } from '../Annotations/batchMetadata';
-import { exportLabels } from '../Annotations/labels';
+import { defaultLabelExportOptions, planLabelExport } from '../Annotations/labels';
 import { planEntityRemoval, removeWorkspaceEntity } from '../entityRemoval';
 import {
   assertCounterpartyBudget,
@@ -74,6 +74,20 @@ function fixture() {
 }
 
 describe('human counterparties and scoped relationships', () => {
+  it('keeps a full native label when saving a counterparty category after a name edit', () => {
+    const workspace = saveCounterparty(fixture(), { id: partyId, name: 'Initial name' }, receipt);
+    const reference = counterpartyReference(partyId);
+    const name = 'é'.repeat(253) + '😀';
+    const renamed = applyBatchLabel(workspace, [reference], name, true);
+    const categorized = saveCounterparty(renamed, { id: partyId, name, category: 'Exchange' });
+    expect(categorized.annotations.entities[reference].label).toBe(name);
+    expect(categorized.counterparties?.definitions).toEqual([
+      { id: partyId, category: 'Exchange' },
+    ]);
+    expect(categorized.counterparties?.links).toEqual(workspace.counterparties?.links);
+    expect(validateWorkspace(categorized)).toEqual(categorized);
+    expect(() => saveCounterparty(categorized, { id: partyId, name: 'é'.repeat(256) })).toThrow();
+  });
   it('saves identity and relationship in one immutable edit with metadata owned once', () => {
     const workspace = fixture();
     const before = structuredClone(workspace);
@@ -97,7 +111,7 @@ describe('human counterparties and scoped relationships', () => {
     expect(
       saveCounterparty(named, { id: partyId, name: 'Exchange A', category: 'Exchange' }, receipt),
     ).toBe(named);
-    expect(exportLabels(named)).toBe('');
+    expect(planLabelExport(named, defaultLabelExportOptions()).content).toBe('');
   });
 
   it('uses shared metadata editors without letting a party name become blank', () => {

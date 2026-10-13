@@ -31,6 +31,7 @@ import {
   type CounterpartySubject,
 } from '../../../../Core/Workspace/Counterparties/counterparties';
 import { counterpartyReference } from '../../../../Core/Workspace/annotationReferences';
+import { MAX_ANNOTATION_LABEL_LENGTH } from '../../../../Core/Workspace/Annotations/annotations';
 import { walletTransactionCounterpartySubject } from '../../../../Core/Workspace/Counterparties/walletCounterpartySubjects';
 import { isOpReturn } from '../../../../Core/Bitcoin';
 import { indexPreviousOutputs } from '../../../../Core/ChainData';
@@ -278,7 +279,7 @@ function CounterpartyChecklist({
           type="search"
           aria-label="Search counterparties"
           autoComplete="off"
-          maxLength={200}
+          maxLength={MAX_ANNOTATION_LABEL_LENGTH}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search or create…"

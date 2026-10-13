@@ -54,8 +54,9 @@ Web Crypto and native gzip support; without them, existing saves stay intact
 and new saves report an error.
 
 **BIP329 metadata exchange is plaintext.** The workspace menu opens an import or
-export dialog for the whole workspace. The buttons beside the wallet selector
-open the same dialog scoped to that wallet. You can also choose selected
+export dialog for the whole workspace. In Wallet, **Import wallet metadata** and
+**Export wallet metadata** in the **Wallet actions** menu open the same dialog
+scoped to the selected wallet. You can also choose selected
 entities. Select the source or destination software to use its field meanings:
 
 | Software                 | Imported into Chaingraph                                              | Exported by default                                                 |
@@ -98,7 +99,7 @@ match; the count includes only items whose metadata will change. Wallet scope in
 through known wallet addresses and loaded script evidence. No import downloads
 transactions or changes wallet scan coverage.
 
-Labels and wallet names support 255 JavaScript UTF-16 units, Notes 10,000 and
+Labels, wallet names and counterparty names support 255 JavaScript UTF-16 units, Notes 10,000 and
 tag names 100. BIP329 suggests 255 characters as a default rather than a universal
 maximum. Over-limit values are excluded by default; explicit shortening shows
 original and resulting text for review. Export shortening leaves native text intact.
