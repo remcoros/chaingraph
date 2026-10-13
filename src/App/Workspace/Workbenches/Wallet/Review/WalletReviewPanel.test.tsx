@@ -200,7 +200,7 @@ function Fixture({
   };
   return <WalletReviewPanel {...props} wallet={props.wallet!} />;
 }
-it('keeps another analysis scope out of the selected wallet error notice', () => {
+it('keeps retained manual analysis failures out of the wallet refresh notice even when names match', () => {
   const error = 'Synthetic wallet analysis failure';
   const scan: NonNullable<WalletWorkbenchViewProps['sessionAnalysis']> = {
     scope: {
@@ -223,7 +223,7 @@ it('keeps another analysis scope out of the selected wallet error notice', () =>
       sessionAnalysis={{ ...scan, scope: { ...scan.scope, label: 'Wallet Public wallet' } }}
     />,
   );
-  expect(within(header).getByText(new RegExp(error))).toBeDefined();
+  expect(within(header).queryByText(new RegExp(error))).toBeNull();
 });
 
 it('routes coin-check failures into the header notice and clears them after recovery', () => {

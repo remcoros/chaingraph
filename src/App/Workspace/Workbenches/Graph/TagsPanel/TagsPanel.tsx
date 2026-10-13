@@ -456,7 +456,9 @@ function TagMembers({
                       ? 'Transaction'
                       : id.startsWith('out:')
                         ? 'Output'
-                        : 'Address'}
+                        : id.startsWith('party:')
+                          ? 'Counterparty'
+                          : 'Address'}
                     {!loadedIds.has(id) && ' · Unavailable in graph'}
                   </small>
                 </div>

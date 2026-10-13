@@ -7,6 +7,7 @@ import { createApp } from './app';
 import { loadConfig, loadNetworkConfig } from './config';
 
 let directory: string;
+let temporaryDirectory: string;
 let base: string;
 let server: http.Server;
 let application: ReturnType<typeof createApp>;
@@ -20,8 +21,11 @@ const assets = {
 };
 
 beforeAll(async () => {
-  directory = await mkdtemp(path.join(tmpdir(), 'chaingraph-static-assets-'));
-  await mkdir(path.join(directory, 'assets'));
+  temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'chaingraph-static-assets-'));
+  // A checkout may have hidden parent directories. They are part of the
+  // trusted static root, not dotfiles requested from within the build.
+  directory = path.join(temporaryDirectory, '.preview', 'dist');
+  await mkdir(path.join(directory, 'assets'), { recursive: true });
   for (const [file, content] of Object.entries({
     ...assets,
     'index.html': '<html>public application fixture</html>',
@@ -29,6 +33,7 @@ beforeAll(async () => {
     'assets/unversioned.js': 'export const value = 2;',
     'outside-Ab12_-cd.js': 'export const value = 3;',
     'assets/help-Ab12_-cd.html': '<html>public help fixture</html>',
+    '.private.js': 'synthetic hidden asset must not be served',
   })) {
     await writeFile(path.join(directory, file), content);
   }
@@ -51,7 +56,7 @@ afterAll(async () => {
   application?.close();
   server?.closeAllConnections();
   if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
-  if (directory) await rm(directory, { recursive: true, force: true });
+  if (temporaryDirectory) await rm(temporaryDirectory, { recursive: true, force: true });
 });
 
 it('allows long-lived reuse of hashed build assets, including workers and query strings', async () => {
@@ -108,4 +113,12 @@ it('never stores API discovery or API error responses', async () => {
   const missing = await fetch(`${base}/api/missing-Ab12_-cd.js`);
   expect(missing.status).toBe(404);
   expect(missing.headers.get('cache-control')).toBe('no-store');
+});
+
+it('keeps hidden files inaccessible while serving the application fallback from a hidden root', async () => {
+  const response = await fetch(`${base}/.private.js`);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('content-type')).toMatch(/text\/html/);
+  expect(response.headers.get('cache-control')).toBe('no-cache');
+  expect(await response.text()).not.toContain('synthetic hidden asset must not be served');
 });

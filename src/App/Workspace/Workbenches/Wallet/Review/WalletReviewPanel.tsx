@@ -551,11 +551,6 @@ export function WalletReviewPanel(
     [tab, relationFiltered, status],
   );
   const currentAnalysis = props.sessionAnalysis;
-  const overviewAnalysis =
-    currentAnalysis?.scope.kind === 'wallet' &&
-    currentAnalysis.scope.label === `Wallet ${wallet.name}`
-      ? currentAnalysis
-      : undefined;
   const scanState = useMemo(
     () => walletCategoryScanState(workspace.analysis.findings, currentAnalysis),
     [workspace.analysis.findings, currentAnalysis],
@@ -1048,10 +1043,6 @@ export function WalletReviewPanel(
             : '',
         ]
           .filter(Boolean)
-          .join(' ')}
-        analysisIssues={overviewAnalysis?.reports
-          .filter((report) => report.status === 'error')
-          .map((report) => `${report.toolId}: ${report.message}`)
           .join(' ')}
       />
       <nav className="wallet-review-tabs" aria-label="Wallet sections" data-tour="wallet-sections">

@@ -33,7 +33,6 @@ export function WalletOverview({
   onRefresh,
   active,
   coinIssues,
-  analysisIssues,
   discovery,
   refresh,
 }: Pick<
@@ -54,7 +53,6 @@ export function WalletOverview({
   coverage: WalletReviewCoverage;
   active: boolean;
   coinIssues?: string;
-  analysisIssues?: string;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const menu = active && menuFor === wallet.id;
@@ -91,7 +89,7 @@ export function WalletOverview({
         ? refreshIssue
         : coverageIssue) ||
     coinIssues ||
-    (analysisIssues ? 'Wallet analysis incomplete' : refreshIssue);
+    refreshIssue;
   const recovery = addressLimit ? scanStatus.recovery : 'refresh';
   useEffect(() => {
     if (!menu) return;
@@ -270,7 +268,7 @@ export function WalletOverview({
             )}
           </div>
         </div>
-        {(!canLoadChainData || coinIssues || analysisIssues || (!loading && issue)) && (
+        {(!canLoadChainData || coinIssues || (!loading && issue)) && (
           <div
             className="wallet-review-callout tone-attention wallet-refresh-notice compact-controls"
             role="status"
@@ -280,7 +278,6 @@ export function WalletOverview({
               {!loading && issue && <p>{issue}</p>}
               {!loading && refreshIssue && refreshIssue !== issue && <p>{refreshIssue}</p>}
               {coinIssues && (loading || coinIssues !== issue) && <p>{coinIssues}</p>}
-              {analysisIssues && (loading || analysisIssues !== issue) && <p>{analysisIssues}</p>}
               {!loading && addressLimit && scanStatus.hint && <p>{scanStatus.hint}</p>}
               {!canLoadChainData && <p>{chainDataDisabledReason ?? 'Chain data unavailable'}</p>}
             </div>

@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useWalletActivity } from './useWalletActivity';
 import { useWorkspaceOperation } from '../../useWorkspaceOperation';
@@ -9,10 +18,97 @@ import { createWorkspace } from '../../../../Core/Workspace/createWorkspace';
 import { WorkspaceStore } from '../../../../Core/Workspace/Session/WorkspaceStore';
 import { createChainDataAcquisition } from '../../../../Core/Workspace/Session/chainDataAcquisition';
 import { PUBLIC_ZPUB } from '../../../../../tests/fixtures/bitcoin';
+import { WalletReviewPanel } from './Review/WalletReviewPanel';
+import type { AnalysisScan } from '../../../../Core/Workspace/Analysis/analysisScan';
 
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+it('clears a retried refresh notice without reviving a same-name manual analysis failure', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  // Hold automatic work so the test drives the actual foreground Retry path.
+  const view = fixture({ ready: true, busy: true, walletId: firstId });
+  await act(async () =>
+    view.store.getUnlocked(view.workspace.id)!.edit((current) => ({
+      ...current,
+      wallets: {
+        ...current.wallets,
+        definitions: current.wallets.definitions.map((wallet) => ({
+          ...wallet,
+          name: 'Public shared name',
+        })),
+      },
+    })),
+  );
+  const manual: AnalysisScan = {
+    scope: {
+      kind: 'wallet',
+      label: 'Wallet Public shared name',
+      explanation: 'Public fixture',
+      txids: [],
+    },
+    options: {},
+    reports: [{ toolId: 'fee-rate', status: 'error', message: 'Retained manual scan failure' }],
+    findings: [],
+    runAt: '2026-10-01T10:00:00.000Z',
+  };
+  const current = () => view.store.getUnlocked(view.workspace.id)!.data;
+  const panel = (walletId: string) => {
+    const workspace = current();
+    const wallet = workspace.wallets.definitions.find((wallet) => wallet.id === walletId)!;
+    return (
+      <WalletReviewPanel
+        workspace={workspace}
+        wallet={wallet}
+        active
+        busy={view.result.current.refresh.loading}
+        canLoadChainData
+        refresh={view.result.current.refresh}
+        sessionAnalysis={manual}
+        walletUtxos={{ loading: false, error: '', check: vi.fn() }}
+        onChange={(update) => view.store.getUnlocked(workspace.id)!.edit(update)}
+        updateEvidence={(_id, update) => view.store.getUnlocked(workspace.id)!.edit(update, false)}
+        onSelectWallet={vi.fn()}
+        onAddWallet={vi.fn()}
+        onRefresh={() => void view.result.current.run(wallet)}
+        onShowInGraph={vi.fn()}
+        onIsolateInGraph={vi.fn()}
+        onShowSelection={vi.fn()}
+        onInspect={vi.fn()}
+      />
+    );
+  };
+  const failure = 'Synthetic wallet refresh failure';
+  view.refresh.mockRejectedValueOnce(new Error(failure));
+  await act(async () => view.result.current.run(current().wallets.definitions[0]));
+  const consumer = render(panel(firstId));
+  const header = () =>
+    screen.getByRole('combobox', { name: /selected wallet/i }).closest('header')!;
+  expect(within(header()).getByText(failure)).toBeDefined();
+  consumer.rerender(panel(secondId));
+  expect(within(header()).queryByRole('status')).toBeNull();
+  consumer.rerender(panel(firstId));
+  fireEvent.click(within(header()).getByRole('button', { name: /retry/i }));
+  await waitFor(() => expect(view.result.current.refresh.error).toBe(''));
+  expect(view.refresh).toHaveBeenCalledTimes(2);
+  expect(view.refresh.mock.calls[1][0].id).toBe(firstId);
+  consumer.rerender(panel(firstId));
+  expect(within(header()).queryByRole('status')).toBeNull();
+  expect(manual.reports[0].status).toBe('error');
 });
 const firstId = '30000000-0000-4000-8000-000000000001';
 const secondId = '30000000-0000-4000-8000-000000000002';

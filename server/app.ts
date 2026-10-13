@@ -222,8 +222,8 @@ export function createApp(
     );
     app.get('/{*path}', (_req, res, next) => {
       res.sendFile(
-        path.join(directory, 'index.html'),
-        { headers: { 'Cache-Control': 'no-cache' } },
+        'index.html',
+        { root: directory, headers: { 'Cache-Control': 'no-cache' } },
         (error) => {
           if (error) next(error);
         },
