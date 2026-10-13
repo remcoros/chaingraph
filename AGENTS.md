@@ -137,9 +137,32 @@ After editing, report:
 ## Validation
 
 - `npm run check` (portability, linting, build, domain and integration tests) is
-  the routine gate and must pass without lint errors. Engine or data changes
-  need relevant behavioral tests; UI polish does not need new E2E coverage.
-  Documentation-only edits need no test run.
+  the routine gate and must pass without lint errors. Documentation-only edits
+  need no test run.
+- Engine, data and interaction changes need relevant behavioral coverage. Add
+  or extend tests only when existing coverage does not protect the changed
+  behavior. Copy-only and visual-only changes do not justify new unit,
+  component or E2E tests.
+- Test user outcomes and state transitions: affected records, action routing,
+  selection, filtering, persistence, cancellation, recovery and accessibility
+  behavior. Do not add assertions whose only purpose is to freeze ordinary
+  button names, headings, helper text, empty-state wording, punctuation,
+  capitalization or styling.
+- UI text may locate a control in a behavioral test. Prefer scoped semantic
+  queries and avoid unnecessarily exact wording. Use a stable test ID only
+  when semantic queries cannot identify the intended control reliably. Do not
+  retain outdated accessible names for tests or introduce shared copy constants
+  merely to keep assertions passing.
+- Exact wording assertions need a specific reason: externally specified output
+  or a wording requirement explicitly identified in the acceptance criteria.
+  Displayed amounts, identifiers and user-entered data are behavioral checks.
+  Preserve evidence and uncertainty semantics without automatically making an
+  entire sentence immutable.
+- Before adding a test, identify the concrete user failure it would catch. If
+  the only failure is that ordinary wording changed, omit it. When a redesign
+  breaks a copy-only assertion, remove or rewrite that assertion while
+  preserving meaningful behavioral coverage; do not automatically replace the
+  expected string.
 - Keep to the tools the repository already has. Do not add a linter, test
   framework, build step or runtime dependency in order to finish a task. When
   one would genuinely help, report it instead of quietly working around it:

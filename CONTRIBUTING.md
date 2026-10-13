@@ -38,9 +38,22 @@ docker buildx bake --check release-platform
 
 Routine push/PR CI runs exactly these plus a license-notice diff, without a
 browser. Run `npm run format` after editing source and `npm run licenses` after
-changing runtime dependencies. Engine or data changes need relevant behavioral
-tests; UI polish does not need new E2E coverage. Documentation-only changes
-need no test run.
+changing runtime dependencies. Engine, data and interaction changes need
+relevant behavioral coverage; add or extend tests only when existing coverage
+does not protect the changed behavior. Copy-only and visual-only changes do
+not justify new unit, component or E2E tests. Documentation-only changes need
+no test run.
+
+Test user outcomes, state transitions and accessibility behavior rather than
+ordinary UI wording or styling. Text may locate a control in an interaction
+test, but avoid unnecessarily exact wording and redundant label assertions.
+Displayed amounts, identifiers and user-entered data still need meaningful
+coverage. Exact wording assertions require externally specified output or an
+explicit acceptance requirement. Before adding a test, identify the concrete
+user failure it catches. When a redesign breaks a copy-only assertion, remove
+or rewrite it while preserving behavioral coverage instead of automatically
+updating the expected string. See [the validation rules](AGENTS.md#validation)
+for query and assertion guidance.
 
 Narrower commands:
 
