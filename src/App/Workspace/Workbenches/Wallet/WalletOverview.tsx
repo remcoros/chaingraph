@@ -15,7 +15,6 @@ import { Amount } from '../../../Controls/Display/Amount';
 import { Modal } from '../../../Dialogs/Modal';
 import { formatLocalTimestamp } from '../../../Controls/Display/transactionTime';
 import type { WalletReviewCoverage } from '../../../../Core/Workspace/Wallets/walletReview';
-import type { WalletUtxoCheck } from '../../../../Core/Workspace/Wallets/WalletUtxos/walletUtxoCheck';
 import type { WalletWorkbenchContext } from './walletWorkbenchContext';
 import { WalletDetailsDialog } from './WalletDetailsDialog';
 import { walletDiscoveryStatus } from './walletDiscoveryStatus';
@@ -24,7 +23,6 @@ export function WalletOverview({
   workspace,
   wallet,
   coverage,
-  utxos,
   canLoadChainData,
   busy,
   chainDataDisabledReason,
@@ -34,7 +32,7 @@ export function WalletOverview({
   onAddWallet,
   onRefresh,
   active,
-  analysisStatus,
+  coinIssues,
   analysisIssues,
   discovery,
   refresh,
@@ -54,9 +52,8 @@ export function WalletOverview({
 > & {
   wallet: NonNullable<WalletWorkbenchContext['wallet']>;
   coverage: WalletReviewCoverage;
-  utxos?: WalletUtxoCheck;
   active: boolean;
-  analysisStatus: string;
+  coinIssues?: string;
   analysisIssues?: string;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
@@ -77,15 +74,25 @@ export function WalletOverview({
   const coverageIssue = coverage.utxoLoadedSpenders
     ? 'Balance needs refresh'
     : !coverage.scanComplete
-      ? (scanStatus?.text ?? 'History incomplete')
+      ? (scanStatus?.text ??
+        (coverage.pendingTransactions
+          ? `${coverage.pendingTransactions} transactions still need loading`
+          : wallet.scannedAt
+            ? 'Address search incomplete'
+            : ''))
       : coverage.utxoPartial
         ? 'Coin checks incomplete'
         : '';
+  const addressLimit = scanStatus && scanStatus.recovery !== 'refresh';
   const issue =
-    refreshIssue ||
-    coverageIssue ||
-    analysisIssues ||
-    (!canLoadChainData ? chainDataDisabledReason : '');
+    (addressLimit
+      ? scanStatus.text
+      : refreshIssue === 'Refresh interrupted'
+        ? refreshIssue
+        : coverageIssue) ||
+    coinIssues ||
+    (analysisIssues ? 'Wallet analysis incomplete' : refreshIssue);
+  const recovery = addressLimit ? scanStatus.recovery : 'refresh';
   useEffect(() => {
     if (!menu) return;
     const items = () => [
@@ -143,12 +150,10 @@ export function WalletOverview({
             {coverage.utxoCount === undefined ? (
               <span className="muted">Balance not checked</span>
             ) : (
-              <>
+              <div className="wallet-header-amount">
                 <Amount as="strong" value={coverage.utxoBalanceSats} />
-                <span className={partial ? 'warning' : 'muted'}>
-                  {partial ? 'Partial balance' : null}
-                </span>
-              </>
+                {partial && <span className="warning">Partial balance</span>}
+              </div>
             )}
             <small className="muted">
               Last refresh:{' '}
@@ -265,62 +270,30 @@ export function WalletOverview({
             )}
           </div>
         </div>
-      </header>
-      <details className="wallet-coverage-disclosure">
-        <summary>
-          Coverage{' '}
-          <TriangleAlert
-            size={13}
-            className={issue ? 'warning' : 'wallet-status-placeholder'}
-            aria-label={issue ? 'Needs attention' : undefined}
-            aria-hidden={!issue}
-          />
-        </summary>
-        <div className="wallet-coverage-actions" role="status">
-          {loading && <span>{refresh.message}</span>}
-          {issue && (
-            <>
-              <span className="warning">{issue}</span>
-              <button disabled={!canLoadChainData || busy || !!loading} onClick={onRefresh}>
+        {(!canLoadChainData || coinIssues || analysisIssues || (!loading && issue)) && (
+          <div
+            className="wallet-review-callout tone-attention wallet-refresh-notice compact-controls"
+            role="status"
+          >
+            <TriangleAlert size={16} aria-hidden="true" />
+            <div className="wallet-refresh-notice-content">
+              {!loading && issue && <p>{issue}</p>}
+              {!loading && refreshIssue && refreshIssue !== issue && <p>{refreshIssue}</p>}
+              {coinIssues && (loading || coinIssues !== issue) && <p>{coinIssues}</p>}
+              {analysisIssues && (loading || analysisIssues !== issue) && <p>{analysisIssues}</p>}
+              {!loading && addressLimit && scanStatus.hint && <p>{scanStatus.hint}</p>}
+              {!canLoadChainData && <p>{chainDataDisabledReason ?? 'Chain data unavailable'}</p>}
+            </div>
+            {!loading && recovery === 'settings' && discovery ? (
+              <button onClick={() => setSettingsOpen(true)}>Refresh settings</button>
+            ) : !loading && recovery === 'refresh' && canLoadChainData ? (
+              <button disabled={busy} onClick={onRefresh}>
                 Retry refresh
               </button>
-            </>
-          )}
-        </div>
-        <dl className="wallet-coverage" aria-label="Wallet coverage">
-          <div>
-            <dt>Coins at last check</dt>
-            <dd>
-              {coverage.utxoCount === undefined
-                ? 'Not checked'
-                : `${coverage.utxoCount} ${coverage.utxoLoadedSpenders ? 'remaining candidates' : 'observed unspent'}`}
-            </dd>
+            ) : null}
           </div>
-          <div>
-            <dt>History</dt>
-            <dd>
-              {coverage.loadedTransactions}/{coverage.knownTransactions} transactions loaded
-              {coverage.pendingTransactions ? ` · ${coverage.pendingTransactions} pending` : ''}
-            </dd>
-          </div>
-          <div>
-            <dt>Addresses</dt>
-            <dd>
-              {coverage.usedAddresses} used of {coverage.discoveredAddresses} discovered
-            </dd>
-          </div>
-          <div>
-            <dt>Coin coverage</dt>
-            <dd>
-              {utxos
-                ? `${utxos.checkedAddresses}/${utxos.totalAddresses} addresses · ${formatLocalTimestamp(utxos.checkedAt)}`
-                : 'Not checked'}
-            </dd>
-          </div>
-        </dl>
-        {analysisStatus && <p>{analysisStatus}</p>}
-        {analysisIssues && analysisIssues !== issue && <p className="warning">{analysisIssues}</p>}
-      </details>
+        )}
+      </header>
       {settingsOpen && active && discovery && (
         <WalletRefreshSettings discovery={discovery} onClose={() => setSettingsOpen(false)} />
       )}

@@ -64,42 +64,6 @@
   max-width: 220px;
   padding: 5px 30px 5px 8px;
 }
-.wallet-coverage {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px 24px;
-  margin: 0;
-  padding: 10px 0;
-  border-block: 1px solid var(--color-rule);
-  font-size: 12px;
-}
-.wallet-coverage dt {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-muted);
-}
-.wallet-coverage dd {
-  margin: 3px 0 0;
-}
-.wallet-coverage-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 10px 0 6px;
-}
-.wallet-coverage-actions .compact-controls > button {
-  min-height: var(--control-height-compact);
-  padding: var(--control-padding-compact);
-  font-size: var(--text-xs);
-}
-.wallet-review-messages:empty {
-  display: none;
-}
-.wallet-review-messages p {
-  margin: 2px 0;
-}
 .wallet-review-notice {
   color: var(--color-accent);
 }
@@ -144,9 +108,6 @@
   margin: 8px 0 0;
 }
 .wallet-review-header,
-.wallet-coverage-actions,
-.wallet-coverage-disclosure,
-.wallet-review-messages,
 .wallet-review-tabs,
 .wallet-review-body,
 .wallet-workbench > .wallet-review-grid {
@@ -500,40 +461,6 @@
   min-height: 34px;
   white-space: nowrap;
 }
-.wallet-coverage {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--color-rule);
-  border-radius: 0;
-  background: transparent;
-}
-.wallet-coverage > div {
-  padding: 6px 14px;
-  min-width: 0;
-}
-.wallet-coverage > div + div {
-  border-left: 1px solid var(--color-rule);
-}
-.wallet-coverage dt {
-  font-size: 11px;
-  text-transform: none;
-  letter-spacing: normal;
-}
-.wallet-coverage dd {
-  margin-top: 3px;
-  line-height: 1.4;
-  font-size: 12px;
-}
-.wallet-coverage-actions {
-  justify-content: flex-end;
-  min-height: 24px;
-  padding: 4px 0;
-}
-.wallet-coverage-actions > span {
-  font-size: 11px;
-}
 .wallet-review-tabs {
   margin-top: 0;
   gap: 6px;
@@ -791,15 +718,6 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 1000px) {
-  .wallet-coverage {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .wallet-coverage > div:nth-child(3) {
-    border-left: 0;
-  }
-  .wallet-coverage > div:nth-child(n + 3) {
-    border-top: 1px solid var(--color-rule);
-  }
   .wallet-review-controls {
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -826,16 +744,6 @@
     flex: 1;
     padding-inline: 7px;
     font-size: 11px;
-  }
-  .wallet-coverage > div {
-    padding: 8px 10px;
-  }
-  .wallet-coverage dt {
-    font-size: 9px;
-  }
-  .wallet-coverage dd {
-    font-size: 11px;
-    line-height: 1.45;
   }
   .wallet-review-grid {
     grid-template-columns: 1fr;
@@ -1114,9 +1022,6 @@
 .wallet-workbench .wallet-help {
   padding: 3px;
 }
-.wallet-coverage-actions .wallet-scan-status {
-  margin-right: 0;
-}
 .wallet-flow-load-state {
   display: flex;
   align-items: center;
@@ -1374,12 +1279,6 @@
   font-size: 11px;
   text-align: right;
 }
-.wallet-coverage > div:first-child {
-  padding-left: 0;
-}
-.wallet-coverage > div:first-child dd {
-  font-weight: 600;
-}
 .wallet-review-detail .wallet-detail-heading {
   display: flex;
   flex-wrap: wrap;
@@ -1501,20 +1400,60 @@
   color: var(--color-ink);
   font-size: 15px;
 }
-.wallet-coverage-disclosure {
-  margin-bottom: 12px;
-  font-size: var(--text-xs);
-}
-.wallet-coverage-disclosure > summary {
-  cursor: pointer;
-  color: var(--color-muted);
-}
-.wallet-coverage-actions {
-  min-height: 22px;
-  font-size: var(--text-xs);
-  display: flex;
+.wallet-workbench .wallet-review-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px 16px;
+  padding-bottom: 12px;
+}
+.wallet-header-amount {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.wallet-header-balance small {
+  white-space: nowrap;
+}
+.wallet-workbench .wallet-picker-row {
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+.wallet-header-balance {
+  flex-shrink: 0;
+}
+.wallet-refresh-notice {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+}
+.wallet-refresh-notice-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wallet-workbench .wallet-refresh-notice-content p + p {
+  margin-top: 4px;
+}
+.wallet-refresh-notice > button {
+  align-self: center;
+}
+@media (max-width: 760px) {
+  .wallet-workbench .wallet-review-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .wallet-review-header > .wallet-review-controls {
+    justify-self: end;
+  }
+  .wallet-refresh-notice > button {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
 .wallet-direction,
 .wallet-row-attention,
@@ -1591,9 +1530,6 @@
   margin: 0;
 }
 @media (max-width: 760px) {
-  .wallet-header-balance {
-    flex-basis: 100%;
-  }
   .wallet-picker-row {
     flex-wrap: wrap;
   }
@@ -1861,21 +1797,6 @@
   border: 0;
   border-top: 1px solid var(--color-rule);
   margin: 4px 0;
-}
-.wallet-status-placeholder {
-  visibility: hidden;
-}
-.wallet-coverage-disclosure > summary {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 24px;
-}
-.wallet-coverage-disclosure > summary::before {
-  content: '›';
-}
-.wallet-coverage-disclosure[open] > summary::before {
-  transform: rotate(90deg);
 }
 .wallet-settings-fields {
   display: grid;

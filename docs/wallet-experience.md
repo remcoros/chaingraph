@@ -25,10 +25,14 @@ browser tabs, checks freshness on return, and stops at workspace lock or switch.
 Foreground operations take priority through the existing operation owner. Quiet
 refreshes reuse prepared relationships, review items and findings; observation
 dates update independently. The encrypted View owns the editable interval.
-Background refresh shows only a fixed-size spinner in Refresh. Coverage has a
-reserved warning icon for partial results or failures, with progress and recovery
-actions inside its disclosure. Last refresh records completion of history, coin
-checks and required analysis, separately from scan and balance-check dates.
+Background refresh shows a fixed-size spinner in Refresh. The header shows Last
+refresh beneath the observed balance, beside the wallet picker. Routine progress
+and completion messages have no permanent status surface. Errors, incomplete checks
+and unavailable chain data appear in a bordered notice with the available recovery
+action. Reached address limits route to the existing settings form when they can
+be increased; the supported cap offers no search retry. Last refresh records
+completion of history, coin checks and required analysis, separately from scan and
+balance-check dates.
 Material evidence still invalidates the affected preparation.
 
 Each wallet remains one imported account derivation. Balances stay separate.
@@ -92,8 +96,8 @@ support consumes the same model.
 The compact header shows wallet picker, observed balance, Last refresh, Refresh
 and the standard actions menu. Automatic refresh is a checked menu item;
 Refresh settings opens the interval and discovery controls. Wallet details owns
-account-key reveal/copy. Coverage is disclosed;
-partial states, failures and recovery actions remain visible when needed.
+account-key reveal/copy. Notices appear only for problems or limitations that need
+attention; successful refreshes have no extra labels.
 Extend the existing list and detail layout, preserving inspected records, filters,
 selection and active editors through refresh and goal satisfaction. Row actions
 open their named editors directly: the label icon edits the record label,

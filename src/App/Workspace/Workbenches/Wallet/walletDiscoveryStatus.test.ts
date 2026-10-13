@@ -22,16 +22,13 @@ it('does not turn missing counterparty prevouts into a wallet discovery warning'
   expect(walletDiscoveryStatus(wallet())).toBeUndefined();
 });
 
-it('identifies an address limit and tells the user where it can be increased', () => {
+it('routes a reached address limit to settings instead of repeating the same search', () => {
   const current = wallet();
   current.scanComplete = false;
   current.addresses = deriveAddresses(PUBLIC_ZPUB, 'mainnet', 'p2wpkh', 0, 190, 10).map(
     (entry) => ({ ...entry, history: [] }),
   );
-  expect(walletDiscoveryStatus(current)).toEqual({
-    text: 'Address limit: 200/branch',
-    hint: 'Increase Addresses / branch in Graph wallet controls, then Refresh.',
-  });
+  expect(walletDiscoveryStatus(current)?.recovery).toBe('settings');
 });
 
 it('distinguishes queued history from incomplete address discovery', () => {
@@ -40,7 +37,7 @@ it('distinguishes queued history from incomplete address discovery', () => {
   current.pendingTransactionIds = ['a'.repeat(64)];
   expect(walletDiscoveryStatus(current)).toBeUndefined();
   current.pendingTransactionIds = [];
-  expect(walletDiscoveryStatus(current)?.text).toBe('Refresh to finish address discovery');
+  expect(walletDiscoveryStatus(current)?.recovery).toBe('refresh');
 });
 
 it('does not suggest repeating a scan beyond the supported address cap', () => {
@@ -51,7 +48,5 @@ it('does not suggest repeating a scan beyond the supported address cap', () => {
     ...entry,
     history: [],
   }));
-  expect(walletDiscoveryStatus(current)?.hint).toContain(
-    'Repeating the same scan cannot search further',
-  );
+  expect(walletDiscoveryStatus(current)?.recovery).toBe('none');
 });

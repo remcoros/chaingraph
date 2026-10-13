@@ -551,6 +551,11 @@ export function WalletReviewPanel(
     [tab, relationFiltered, status],
   );
   const currentAnalysis = props.sessionAnalysis;
+  const overviewAnalysis =
+    currentAnalysis?.scope.kind === 'wallet' &&
+    currentAnalysis.scope.label === `Wallet ${wallet.name}`
+      ? currentAnalysis
+      : undefined;
   const scanState = useMemo(
     () => walletCategoryScanState(workspace.analysis.findings, currentAnalysis),
     [workspace.analysis.findings, currentAnalysis],
@@ -1036,31 +1041,19 @@ export function WalletReviewPanel(
       <WalletOverview
         {...props}
         coverage={review.coverage}
-        utxos={utxos}
-        analysisStatus={
-          currentAnalysis?.scope.kind === 'wallet' &&
-          currentAnalysis.scope.label === `Wallet ${wallet.name}`
-            ? `${currentAnalysis.findings.length} findings`
-            : ''
-        }
-        analysisIssues={currentAnalysis?.reports
+        coinIssues={[
+          utxoError,
+          invalidCount
+            ? `${invalidCount} UTXO observations disagree with their loaded transactions and are excluded. Refresh to retry.`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        analysisIssues={overviewAnalysis?.reports
           .filter((report) => report.status === 'error')
           .map((report) => `${report.toolId}: ${report.message}`)
           .join(' ')}
       />
-      <div aria-live="polite" className="wallet-review-messages">
-        {utxoError && (
-          <p role="alert" className="small warning">
-            {utxoError}
-          </p>
-        )}
-        {invalidCount > 0 && (
-          <p role="alert" className="small warning">
-            {invalidCount} UTXO observations disagree with their loaded transactions and are
-            excluded. Check again to retry.
-          </p>
-        )}
-      </div>
       <nav className="wallet-review-tabs" aria-label="Wallet sections" data-tour="wallet-sections">
         {TABS.map(({ id, label, Icon }) => (
           <button

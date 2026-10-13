@@ -42,6 +42,8 @@ function Fixture({
   addressReview = false,
   counterparties = false,
   unspentReceipt = false,
+  sessionAnalysis,
+  coinError = '',
 }: {
   saved?: boolean;
   findings?: boolean;
@@ -50,6 +52,8 @@ function Fixture({
   addressReview?: boolean;
   counterparties?: boolean;
   unspentReceipt?: boolean;
+  sessionAnalysis?: WalletWorkbenchViewProps['sessionAnalysis'];
+  coinError?: string;
 }) {
   const [workspace, setWorkspace] = useState(() => {
     const value = createWorkspace('Public wallet fixture', 'mainnet');
@@ -144,6 +148,7 @@ function Fixture({
       : result;
   });
   const props: WalletWorkbenchViewProps = {
+    sessionAnalysis,
     workspace,
     wallet: workspace.wallets.definitions[0],
     active: true,
@@ -160,7 +165,7 @@ function Fixture({
     onInspect: vi.fn(),
     walletUtxos: {
       loading: false,
-      error: '',
+      error: coinError,
       check: vi.fn(),
       utxos: unspentReceipt
         ? {
@@ -195,6 +200,41 @@ function Fixture({
   };
   return <WalletReviewPanel {...props} wallet={props.wallet!} />;
 }
+it('keeps another analysis scope out of the selected wallet error notice', () => {
+  const error = 'Synthetic wallet analysis failure';
+  const scan: NonNullable<WalletWorkbenchViewProps['sessionAnalysis']> = {
+    scope: {
+      kind: 'wallet',
+      label: 'Wallet Other public wallet',
+      explanation: 'Public fixture',
+      txids: [],
+    },
+    options: {},
+    reports: [{ toolId: 'fee-rate', status: 'error', message: error }],
+    findings: [],
+    runAt: '2026-10-01T10:00:00.000Z',
+  };
+  const view = render(<Fixture sessionAnalysis={scan} />);
+  const header = screen.getByRole('combobox', { name: /selected wallet/i }).closest('header')!;
+  expect(within(header).queryByText(new RegExp(error))).toBeNull();
+
+  view.rerender(
+    <Fixture
+      sessionAnalysis={{ ...scan, scope: { ...scan.scope, label: 'Wallet Public wallet' } }}
+    />,
+  );
+  expect(within(header).getByText(new RegExp(error))).toBeDefined();
+});
+
+it('routes coin-check failures into the header notice and clears them after recovery', () => {
+  const error = 'Synthetic coin-check failure';
+  const view = render(<Fixture coinError={error} />);
+  const header = screen.getByRole('combobox', { name: /selected wallet/i }).closest('header')!;
+  expect(within(header).getByText(error)).toBeDefined();
+  view.rerender(<Fixture />);
+  expect(within(header).queryByText(error)).toBeNull();
+});
+
 it('starts with transaction activity and exposes address scopes under one tab', () => {
   render(<Fixture />);
   const tabs = within(screen.getByRole('navigation', { name: 'Wallet sections' }));

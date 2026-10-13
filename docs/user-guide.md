@@ -404,9 +404,9 @@ empty.
 ### Review a wallet
 
 The **Wallet** workbench shows one wallet at a time. The header shows the wallet
-picker, observed balance, oldest contributing check date and **Refresh**.
-**Coverage** discloses discovery bounds, known versus loaded history and coin
-checks. Missing evidence is unknown; a partial balance is identified as partial.
+picker, observed balance and **Refresh**, with **Last refresh** beneath the balance.
+Errors and incomplete checks appear in a notice with the available recovery action.
+Missing evidence is unknown; a partial balance is identified as partial.
 The actions menu contains **Wallet details**, **Add wallet**, **Automatic refresh**
 and **Refresh settings**. Account-key reveal/copy lives in Wallet details.
 Refresh runs wallet analysis when its inputs change and retries failed tools.
@@ -581,10 +581,13 @@ The default 60-second cadence runs across workbenches while unlocked, pauses in 
 browser tabs and checks freshness on return. Selecting a stale wallet triggers a
 check. Foreground operations interrupt background refresh; completed batches stay
 accepted. The header shows **Last refresh** after a complete refresh; balance
-coverage retains the separate dates of its contributing coin checks. Refresh spins
-without changing the layout. Limits, failures and **Retry refresh** appear inside
-**Coverage**, with a warning beside its title. Use **… → Refresh settings…** to
-change the interval and discovery limits. **Automatic refresh** in the same menu
+observations retain the separate dates of their contributing coin checks. Refresh
+spins during a refresh without showing routine progress or completion messages.
+A notice appears for errors, incomplete checks or unavailable chain data. A reached address-search limit offers **Refresh
+settings** when it can be increased; the supported maximum is 1,000 addresses per
+branch. Refresh still updates discovered addresses at that maximum. Interrupted
+or incomplete checks offer **Retry refresh** when chain data is available. Use
+**… → Refresh settings…** to change the interval and discovery limits. **Automatic refresh** in the same menu
 turns periodic checks on or off; explicit Refresh and first-import refresh remain available.
 
 Labels and counterparties are your annotations, not proven identities. **No wallet match**

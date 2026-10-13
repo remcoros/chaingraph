@@ -1,6 +1,8 @@
 import type { Wallet } from '../../../../Core/Workspace/Wallets/wallets';
 
-export function walletDiscoveryStatus(wallet: Wallet): { text: string; hint?: string } | undefined {
+export function walletDiscoveryStatus(
+  wallet: Wallet,
+): { text: string; hint?: string; recovery: 'refresh' | 'settings' | 'none' } | undefined {
   if (!wallet.scannedAt || wallet.scanComplete === true) return;
   const limit = wallet.scanLimit;
   const gap = wallet.scanGap;
@@ -23,12 +25,16 @@ export function walletDiscoveryStatus(wallet: Wallet): { text: string; hint?: st
     });
   if (hitLimit && limit !== undefined)
     return {
-      text: `Address limit: ${limit}/branch`,
+      text:
+        limit < 1000
+          ? `Address search limit reached (${limit} per branch)`
+          : 'Supported address limit reached (1,000 per branch)',
       hint:
         limit < 1000
-          ? 'Increase Addresses / branch in Graph wallet controls, then Refresh.'
-          : 'The supported address search ends at 1,000 per branch. Repeating the same scan cannot search further.',
+          ? 'Increase Addresses per branch in Refresh settings, then refresh.'
+          : 'Refresh can still update the addresses already discovered.',
+      recovery: limit < 1000 ? 'settings' : 'none',
     };
   if (wallet.pendingTransactionIds?.length) return;
-  return { text: 'Refresh to finish address discovery' };
+  return { text: 'Address search incomplete', recovery: 'refresh' };
 }
