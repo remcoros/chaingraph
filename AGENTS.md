@@ -51,6 +51,27 @@ Follow direct imports from the affected area.
 - Wallet, Graph and Analysis share evidence, selection and metadata. Keep
   renderer mechanics separate from selection, metadata and workspace logic.
 
+## Product UI and language
+
+Use `.agents/skills/product-ui-design/SKILL.md` for UI work, including copy-only
+changes and user-facing messages supplied by Core helpers. Design for the user's
+task, not for explaining the implementation.
+
+- Before adding a label, description, tooltip or message, decide whether the
+  information is needed and whether placement, grouping, selection, an established
+  icon or a value already communicates it. Omit redundant text; preserve
+  accessible names and do not rely on color or hover alone for essential meaning.
+- Translate technical facts into the affected item, observable state, consequence
+  or supported next action. Preserve necessary Bitcoin terminology and evidence
+  qualifications. Domain expertise does not imply knowledge of app internals.
+- Keep API names, schema paths, query strategies and configuration mechanics in
+  explicit setup, inspection or troubleshooting contexts where they help the
+  task. Failure messages lead with the user's operation and its consequence.
+  Do not invent a cause, remedy or assurance that current edits were saved.
+- Review the complete interaction and assembled messages before shortening copy.
+  Fix misleading presentation rather than adding explanations to compensate for
+  it. Readability alone does not establish factual accuracy or useful recovery.
+
 ## Working safely
 
 - Never open, display, copy or commit real `.env.mainnet` or `.env.testnet4`
@@ -140,8 +161,7 @@ After editing, report:
 ## Conventions
 
 - Do not use em dashes in authored copy.
-- Use `.agents/skills/product-ui-design/SKILL.md` before UI work, and
-  `.agents/skills/chaingraph-ui-review/SKILL.md` when browser validation is in
+- Use `.agents/skills/chaingraph-ui-review/SKILL.md` when browser validation is in
   scope.
 - Independent reviews requested without skills, memory or this guide must
   receive the product and privacy constraints above in their task.

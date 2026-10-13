@@ -80,6 +80,20 @@ Deeper topic notes: [encryption and storage](encryption-and-storage.md),
 | [Fontsource](https://github.com/fontsource/fontsource) Manrope and IBM Plex Mono                                                                                                                                                                                                                                                            | Locally served fonts, OFL-1.1                                                                                                  |
 | [Esplora](https://github.com/Blockstream/esplora) ([API](https://github.com/Blockstream/esplora/blob/master/API.md))                                                                                                                                                                                                                        | Familiar input/output inspection pattern; UI is original and no public explorer API is used                                    |
 
+## Product UI and content
+
+The product UI design skill uses the following as research references. Its
+instructions and examples are original project guidance, not copied skill text.
+The decision is to communicate user tasks through existing interface conventions
+before adding words, preserve necessary Bitcoin terminology and evidence limits,
+and translate implementation facts into useful state, consequences and recovery.
+
+- [Jakob Nielsen's usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/): familiar user language, relevant information and useful error recovery.
+- [GOV.UK error-message guidance](https://design-system.service.gov.uk/components/error-message/): specific problems and practical corrections without internal jargon.
+- [Impeccable clarify guidance](https://github.com/pbakaus/impeccable/blob/main/skill/reference/clarify.md): interaction context, message hierarchy, domain vocabulary and supported recovery.
+- [Anthropic UX copy skill](https://github.com/anthropics/knowledge-work-plugins/blob/main/design/skills/ux-copy/SKILL.md): surveyed application microcopy patterns.
+- [Content Designer UX writing skill](https://github.com/content-designer/ux-writing-skill/blob/main/SKILL.md): surveyed purpose-first editing; fixed length targets and universal comprehension percentages were not adopted.
+
 ## Deployment
 
 | Source                                                                                                                                                                                                                                                                                                                                                   | Applied                                                                                                                        |

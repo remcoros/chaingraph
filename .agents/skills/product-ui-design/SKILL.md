@@ -1,6 +1,6 @@
 ---
 name: product-ui-design
-description: Design and implement compact, professional UI for data-rich web applications and desktop-like product workspaces. Use when creating, changing, or substantially reviewing app screens, panels, dialogs, popovers, toolbars, tables, inspectors, status surfaces, forms, and interaction flows. Optimizes for task fit, scanability, information hierarchy, restrained copy, progressive disclosure, accessibility, complete states, and visual verification. Do not use marketing-site conventions unless the task is explicitly promotional.
+description: Design and implement compact, professional UI for data-rich web applications and desktop-like product workspaces. Use when creating, changing, or reviewing app screens, controls, interaction flows or user-facing text, including copy-only changes and messages supplied by non-UI helpers. Optimizes for task fit, scanability, information hierarchy, restrained copy, progressive disclosure, accessibility and complete states. Do not use marketing-site conventions unless the task is explicitly promotional.
 license: MIT
 ---
 
@@ -94,13 +94,45 @@ Translate system concepts into a user-facing mental model.
 
 Do not expose an internal distinction merely because the code has a field for it. Do not create a visible label for every property. Do not repeat the same type label on every row when the surrounding region already establishes the type.
 
-Prefer domain language users already know over implementation language. In a technical application, established domain terms are often clearer than generic paraphrases. Keep internal scheduler names, cache terminology, transport details, and storage mechanics out of normal UI unless users need them to act or diagnose a problem.
+Prefer domain language users already know over implementation language. In a technical application, established domain terms are often clearer than generic paraphrases. Expertise in the domain does not imply knowledge of the application's internals. Technical detail belongs in explicit setup, inspection or troubleshooting contexts when it helps the current task; see section 5 for the translation rule.
 
 Structure can replace visible labels when meaning remains clear. Accessible names must still exist for assistive technology.
 
-## 5. UI copy: minimum sufficient words
+## 5. Communicate the task before writing copy
 
-Words in product UI exist to help users understand, act, recover, or build trust. They are not decoration and not embedded documentation.
+Words in product UI help users understand, act, recover or judge a result. Decide what needs communication and how to communicate it before drafting text. This applies to visible copy, tooltips, accessible descriptions and user-facing messages supplied by Core or other non-UI helpers.
+
+### Choose omission, interface treatment or words
+
+Identify what the user needs to perceive, decide or do in the current state. Then choose:
+
+- **Omit** information that does not affect the task or is already clear from the surrounding interface. A control's existence is not a reason to add a description or tooltip.
+- **Use the interface** when placement, grouping, a value, a selected state, a highlight or an established icon communicates the meaning clearly. A selected row rarely needs an additional "Selected" label; a shared column heading can replace repeated row labels.
+- **Use words** when those treatments leave meaningful ambiguity, or when users need an instruction, consequence, evidence qualification or recovery action. Do not replace a useful explanation with an unfamiliar icon merely to reduce text.
+
+Preserve accessible names and semantic states when visible text is omitted. Do not rely on color alone or hover-only content for essential meaning. Prefer existing conventions over new badges, icons or legends that users must learn.
+
+### Translate facts into the user's task
+
+Read the action, surrounding controls, result and failure path. Trace messages to their actual rendering before treating an internal string as user-facing copy.
+
+For each technical fact, determine internally which affected item, observable state, consequence or supported next action the user needs. Write that meaning. The explanation of why the implementation works belongs in developer discussion or documentation, unless it directly helps the current user task.
+
+- Name the operation or item the user recognizes. Do not make users translate workers, parser categories, schema paths, caches or query strategies into what happened to their work.
+- In failures and partial results, lead with what failed or remains incomplete and the consequence. Include a cause only when known and useful; offer a recovery only when the product supports it. Do not fill every message with a mandatory problem/cause/recovery sentence when the controls already supply part of that meaning.
+- Verify assurances such as "saved", "preserved", "unchanged" and "can be undone" against the actual behavior. Distinguish the previously saved copy from current unsaved edits. Do not infer a browser-permissions remedy from a worker failure or promise that retry will resolve an unknown cause.
+- Keep precise domain vocabulary. In Chaingraph, UTXO, BIP329 and JSONL can identify concepts or formats users need. Keep "Spend status unknown", observation dates and incomplete coverage where they affect interpretation; never simplify uncertainty into zero, unspent or proof of ownership.
+- API names, configuration variables, storage formats and internal paths belong in explicit setup, file inspection or troubleshooting when they enable a concrete task. On a working surface, make the user consequence understandable before offering relevant technical details. Do not create a details disclosure merely to retain an unnecessary explanation.
+
+These examples illustrate decisions, not approved replacements for existing application strings:
+
+| Situation | Preferred direction |
+| --- | --- |
+| Selection is already clear from the row treatment and semantic state | Omit an additional "Selected item" sentence. |
+| Internal import reason is `tag-budget` | Explain "No room for more tags" and offer removing unused tags or importing fewer entries if supported. |
+| Spending search reaches a history limit | State that the spending search is incomplete for the affected item; keep unknown status and place relevant index configuration in troubleshooting. |
+| Browser compression APIs are unavailable | Explain which workspace operation the browser cannot perform and offer verified compatibility guidance; API names are diagnostic detail. |
+| User deliberately inspects the exported file | Keep BIP329, JSONL, field names and exact values where they identify the actual file content. |
 
 ### Copy budget
 
@@ -120,7 +152,7 @@ Use these as defaults, not absolute limits:
 
 ### Copy rules
 
-UI copy should help the user understand the current state or take the next action. Express state through controls and labels before adding explanatory prose. Do not turn implementation constraints, validation rules, internal reasoning, or hypothetical misunderstandings into permanent disclaimers. Keep necessary qualifications next to the result or action they affect.
+Write only the meaning that remains after choosing the interface treatment. Do not turn internal reasoning, implementation reminders or hypothetical misunderstandings into permanent disclaimers. Keep necessary qualifications next to the result or action they affect.
 
 - When adding information, rewrite the complete text instead of appending another caveat. Read conditional fragments together as the user will encounter them; avoid joining unrelated purposes with abrupt punctuation.
 - Keep descriptions, settings, and current status separate. Fix misleading state presentation rather than explaining it away: show "Not scanned" instead of a zero count followed by a disclaimer that no scan has run.
@@ -128,7 +160,6 @@ UI copy should help the user understand the current state or take the next actio
 - Do not add a subtitle under every heading.
 - Do not add helper text just because a control can be explained.
 - Do not restate information already visible in the title, selection, tab, column heading, or surrounding region.
-- Do not explain implementation details in normal-state UI.
 - Use active voice and action-specific labels.
 - Keep terminology consistent across controls, feedback, and documentation.
 - Use sentence case unless the established product language says otherwise.
@@ -397,9 +428,9 @@ When implementing a UI change:
 5. Keep repeated values in tokens or shared primitives where the project already uses that pattern.
 6. Use real product content and realistic edge-case fixtures for validation.
 
-## 19. Required reduction pass
+## 19. Required communication and reduction pass
 
-After the first implementation, perform a deletion pass before calling the UI finished.
+After the first draft or implementation, review the complete interaction before calling it finished. Read headings, controls, status, feedback and conditional messages together as the user encounters them, including accessible names and descriptions. Perform this through source inspection when browser validation is outside scope.
 
 Inspect every heading, sentence, label, icon, badge, divider, border, container, and action.
 
@@ -407,13 +438,13 @@ For each element ask:
 
 1. Does it help the user understand, decide, act, recover, or navigate?
 2. Is the same meaning already communicated elsewhere?
-3. Can layout or grouping communicate this more efficiently?
+3. Can placement, grouping, a value, selection or an established icon communicate this clearly with less reading?
 4. Is it needed in the common state, or only in an exceptional/advanced state?
 5. Would removing it materially reduce usability or accessibility?
 
-If not, remove it.
+Remove elements that serve no task or repeat meaning already communicated. Rewrite or move information whose purpose is necessary but whose representation is wrong. Preserve instructions, uncertainty, consequences and accessible meaning that users still need.
 
-Specifically attempt to remove 30 to 50 percent of explanatory UI copy from the first draft without reducing task comprehension. This is a forcing function, not a target metric. Keep text that is genuinely necessary.
+For remaining text, check that it expresses the user's task rather than the implementation's reasoning, uses consistent domain terms, and makes only supported claims about causes, data preservation and recovery. Shorten after correcting purpose and meaning. There is no percentage or word-count target; a short technical explanation can still be the wrong message.
 
 ## 20. Visual verification
 
@@ -441,6 +472,10 @@ Do not approve a substantial UI change until the relevant answers are yes:
 - Is the next likely action easy to find?
 - Are primary, secondary, and tertiary information visually distinct?
 - Did the design avoid rendering every backend field as a visible label/value pair?
+- Was text omitted where the interface already communicates the meaning, while preserving accessibility?
+- Do messages describe the affected item, user operation or consequence rather than implementation mechanics?
+- Are causes, data-preservation assurances and recovery actions supported by actual behavior?
+- Are necessary domain terms and evidence qualifications preserved, with technical detail limited to tasks that need it?
 - Is repeated context removed?
 - Is advanced detail progressively disclosed rather than permanently displayed?
 - Are normal states quiet and exceptional states noticeable?

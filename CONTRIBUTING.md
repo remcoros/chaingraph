@@ -111,6 +111,14 @@ that restate the implementation. When browser validation is in scope, exercise
 the real workflow with mouse and keyboard on desktop and phone widths, and count
 clicks and scrolling, not just green assertions.
 
+For UI and copy changes, follow the product language rules in
+[AGENTS.md](AGENTS.md#product-ui-and-language) and the
+[product UI design skill](.agents/skills/product-ui-design/SKILL.md).
+Choose whether information needs text before editing words. Review messages in
+their interaction context, including errors supplied by non-UI helpers; preserve
+evidence qualifications and verify recovery and saved-data claims. Apply the
+same criteria in review. These checks do not authorize browser validation.
+
 Keep alternative designs in separate branches and compare working previews
 before adopting a redesign. Do not push or publish because a local check
 passed; the [release process](docs/release-process.md) describes the
