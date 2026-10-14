@@ -72,6 +72,11 @@ Deeper topic notes: [encryption and storage](encryption-and-storage.md),
 
 ## Rendering
 
+Vite's [dependency cache configuration](https://vite.dev/config/shared-options#cachedir)
+and [dependency optimization options](https://vite.dev/config/dep-optimization-options)
+inform the isolated caches used by development-transform integration checks.
+The tests keep their optimization output separate from running dev sessions.
+
 | Source                                                                                                                                                                                                                                                                                                                                      | Applied                                                                                                                        |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | [Three.js](https://github.com/mrdoob/three.js) ([InstancedMesh](https://threejs.org/docs/pages/InstancedMesh.html), [InstancedBufferGeometry](https://threejs.org/docs/pages/InstancedBufferGeometry.html), [OrbitControls](https://threejs.org/docs/pages/OrbitControls.html), [MIT](https://github.com/mrdoob/three.js/blob/dev/LICENSE)) | Instanced cubes/spheres/octahedra, one instance per connection with camera-space ribbons and arrowheads, damped orbit/pan/zoom |

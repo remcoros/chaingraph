@@ -1,4 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { build, transform } from 'esbuild';
 import { transformSync } from 'oxc-transform-react';
@@ -6,6 +8,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createServer, loadConfigFromFile, type ViteDevServer } from 'vite';
 
 let server: ViteDevServer;
+let developmentServer: ViteDevServer;
+let cacheDirectory: string;
+let graphDependencyUrl: URL;
 
 beforeAll(async () => {
   // Load the real dev config. SSR tests and production builds do not run the
@@ -15,8 +20,45 @@ beforeAll(async () => {
     'vite.config.ts',
   );
   if (!loaded) throw new Error('Could not load the Vite development configuration.');
+  cacheDirectory = await mkdtemp(resolve('node_modules/.vite-dev-workers-'));
+  // Model a live dev session without touching a developer's actual cache or ports.
+  loaded.config.cacheDir = join(cacheDirectory, 'development');
+  developmentServer = await createServer({
+    ...loaded.config,
+    configFile: false,
+    mode: 'development',
+    logLevel: 'silent',
+    server: {
+      ...loaded.config.server,
+      host: '127.0.0.1',
+      port: 0,
+      strictPort: false,
+      watch: null,
+      hmr: false,
+      preTransformRequests: false,
+      proxy: {},
+    },
+    optimizeDeps: {
+      noDiscovery: true,
+      include: ['three', 'three/addons/controls/OrbitControls.js', 'react-dom/client'],
+    },
+  });
+  await developmentServer.listen();
+  const origin = developmentServer.resolvedUrls!.local[0];
+  const renderer = await fetch(
+    new URL('/src/App/Workspace/Workbenches/Graph/Renderer/FlowRenderer.ts', origin),
+  );
+  expect(renderer.status).toBe(200);
+  const dependency = (await renderer.text()).match(
+    /["']([^"']*three_addons_controls_OrbitControls__js[^"']*)["']/,
+  );
+  expect(dependency).not.toBeNull();
+  graphDependencyUrl = new URL(dependency![1], origin);
   server = await createServer({
     ...loaded.config,
+    // React's plugin adds optimized runtimes even with an empty include list.
+    // Keep transform checks from replacing a running dev server's dependency files.
+    cacheDir: join(cacheDirectory, 'checks'),
     configFile: false,
     mode: 'development',
     logLevel: 'silent',
@@ -27,6 +69,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server?.close();
+  await developmentServer?.close();
+  if (cacheDirectory) await rm(cacheDirectory, { recursive: true, force: true });
 });
 
 it('runs the transform checks without watching the repository', () => {
@@ -87,6 +131,16 @@ it('preserves Fast Refresh for JSX modules', async () => {
 it('keeps Fast Refresh instrumentation out of non-JSX hook modules', async () => {
   const result = await server.transformRequest('/src/App/useAppState.ts');
   expect(result?.code).not.toMatch(/\$Refresh(?:Reg|Sig)\$/);
+});
+
+it('keeps a live Graph dependency available after the worker transform checks optimize React', async () => {
+  await server.transformRequest('/src/App/App.tsx');
+  // Await this server's optimized runtime so any replacement of the shared cache has completed.
+  const runtime = await server.transformRequest('/src/App/useAppState.ts');
+  const dependency = runtime!.code.match(/["']([^"']*react_compiler-runtime\.js[^"']*)["']/);
+  expect(dependency).not.toBeNull();
+  await server.transformRequest(dependency![1]);
+  expect((await fetch(graphDependencyUrl)).status).toBe(200);
 });
 
 it('does not silently drop memoization for hook modules outside the filename convention', async () => {

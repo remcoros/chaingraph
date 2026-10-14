@@ -963,6 +963,13 @@ hook compilation coverage so the narrower filter cannot silently drop existing
 memoization. Production builds and SSR example tests alone do not cover this
 development-only boundary.
 
+The transform checks use a temporary dependency cache separate from development
+sessions. React's Vite plugin still adds optimized runtimes when the checks
+disable discovery; sharing the normal cache would replace a running server's
+Graph dependencies. A second real Vite server verifies that its deferred
+OrbitControls request remains available after the checks optimize React. Both
+test caches and the loopback listener are removed when the suite finishes.
+
 Release verification adds `npm run test:production`: HTTP checks of built
 assets, CSP and security headers and network discovery, then a narrow browser
 run of the bundled encryption worker under production CSP, a WebGL context, and
