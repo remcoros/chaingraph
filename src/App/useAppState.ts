@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createChainDataAcquisition } from '../Core/Workspace/Session/chainDataAcquisition';
 import type { Workspace } from '../Core/Workspace/workspace';
 import { useBackendNetworks } from './useBackendNetworks';
+import { DEMO_MODE } from '../buildMode';
 import { useWorkspaces } from './Workspace/useWorkspaces';
 import type { SavedWorkspace } from '../Core/Workspace/Persistence';
 import { appServices } from './appServices';
@@ -22,9 +23,18 @@ export function useAppState() {
   const workspaceId = activeWorkspace?.id;
   const workspaceNetwork = activeWorkspace?.network;
   const workspaceDemo = activeWorkspace?.demo;
+  const [connectionCheck, setConnectionCheck] = useState(0);
+  const { networks, statuses, discoveryError } = useBackendNetworks(connectionCheck);
+  const allowNetwork =
+    !DEMO_MODE &&
+    !!workspaceNetwork &&
+    !!networks?.includes(workspaceNetwork) &&
+    !!statuses[workspaceNetwork]?.connected &&
+    !discoveryError;
   const chainDataAcquisition = useMemo(
     () =>
       createChainDataAcquisition({
+        allowNetwork,
         activeWorkspace:
           workspaceId && workspaceNetwork
             ? { id: workspaceId, network: workspaceNetwork, demo: !!workspaceDemo }
@@ -32,17 +42,16 @@ export function useAppState() {
         getUnlocked: getUnlockedWorkspace,
         fetchScope,
       }),
-    [workspaceId, workspaceNetwork, workspaceDemo, getUnlockedWorkspace, fetchScope],
+    [workspaceId, workspaceNetwork, workspaceDemo, getUnlockedWorkspace, fetchScope, allowNetwork],
   );
   const [create, setCreate] = useState<string>();
   const [unlock, setUnlock] = useState<SavedWorkspace>();
   const [fileDialog, setFileDialog] = useState<File>();
   const [aboutOpen, setAboutOpen] = useState<false | 'guide' | 'about' | 'connection'>(false);
-  const [connectionCheck, setConnectionCheck] = useState(0);
-  const { networks, statuses, discoveryError } = useBackendNetworks(connectionCheck);
   const displayNetwork = activeWorkspace?.network ?? networks?.[0];
   const status = displayNetwork ? statuses[displayNetwork] : undefined;
   const unsupportedNetwork =
+    !DEMO_MODE &&
     !!activeWorkspace &&
     !activeWorkspace.demo &&
     !!networks &&
@@ -56,6 +65,9 @@ export function useAppState() {
   const connected = !!status?.connected && !statusError;
   const [deleteEntry, setDeleteEntry] = useState<SavedWorkspace>();
   const [examplesOpen, setExamplesOpen] = useState(false);
+  const [demoStartOpen, setDemoStartOpen] = useState(false);
+  const startWorkspace = () => (DEMO_MODE ? setDemoStartOpen(true) : setCreate('empty'));
+  const exampleNetworks = DEMO_MODE ? ['mainnet' as const] : discoveryError ? undefined : networks;
   const [notice, setNoticeValue] = useState<Feedback>();
   const [noticeSequence, setNoticeSequence] = useState(0);
   const setNotice = useCallback<SetNotice>((feedback, options) => {
@@ -148,6 +160,10 @@ export function useAppState() {
     workspaceId,
     create,
     setCreate,
+    startWorkspace,
+    demoStartOpen,
+    setDemoStartOpen,
+    exampleNetworks,
     unlock,
     setUnlock,
     fileDialog,

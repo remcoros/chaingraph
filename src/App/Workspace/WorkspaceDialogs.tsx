@@ -1,4 +1,5 @@
 import { CopyButton } from '../Controls/CopyButton';
+import { DEMO_MODE } from '../../buildMode';
 import { Modal } from '../Dialogs/Modal';
 import { WorkspaceDetailsDialog } from './Dialogs/WorkspaceDetailsDialog';
 import { WalletDialog } from './Wallets/Dialogs/WalletDialog';
@@ -144,38 +145,53 @@ export function WalletDialogs({ workspace }: Props) {
           onClose={() => workspace.dialogs.closeWalletRename()}
         />
       )}
-      {workspace.dialogs.addWalletOpen && activeWorkspace && (
-        <WalletDialog
-          network={activeWorkspace.network}
-          onAdd={(newWallet) => {
-            if (
-              activeWorkspace.wallets.definitions.some(
-                (wallet) =>
-                  wallet.key === newWallet.key && wallet.scriptType === newWallet.scriptType,
-              )
-            ) {
-              workspace.setError('That wallet is already in this workspace.');
-              return;
-            }
-            workspace.edit((current) => ({
-              ...current,
-              wallets: {
-                ...current.wallets,
-                definitions: [...current.wallets.definitions, newWallet],
-              },
-            }));
-            workspace.selection.setSelectedWallet(newWallet.id);
-            workspace.selection.setSelectedId(undefined);
-            workspace.graph.panels.setPanels((current) => ({
-              ...current,
-              right: { ...current.right, tab: 'inspect' },
-              mobile: 'right',
-            }));
-            workspace.switchWorkbench('wallet', { focus: 'workbench' });
-          }}
-          onClose={() => workspace.dialogs.closeAddWallet()}
-        />
-      )}
+      {workspace.dialogs.addWalletOpen &&
+        activeWorkspace &&
+        (DEMO_MODE ? (
+          <Modal
+            title="Explore the public wallet"
+            onClose={() => workspace.dialogs.closeAddWallet()}
+          >
+            <p>
+              Wallet discovery needs a live Bitcoin connection. Use the public BIP84 wallet example
+              to review saved transactions and coins.
+            </p>
+            <div className="button-row">
+              <button onClick={() => workspace.dialogs.closeAddWallet()}>Close</button>
+            </div>
+          </Modal>
+        ) : (
+          <WalletDialog
+            network={activeWorkspace.network}
+            onAdd={(newWallet) => {
+              if (
+                activeWorkspace.wallets.definitions.some(
+                  (wallet) =>
+                    wallet.key === newWallet.key && wallet.scriptType === newWallet.scriptType,
+                )
+              ) {
+                workspace.setError('That wallet is already in this workspace.');
+                return;
+              }
+              workspace.edit((current) => ({
+                ...current,
+                wallets: {
+                  ...current.wallets,
+                  definitions: [...current.wallets.definitions, newWallet],
+                },
+              }));
+              workspace.selection.setSelectedWallet(newWallet.id);
+              workspace.selection.setSelectedId(undefined);
+              workspace.graph.panels.setPanels((current) => ({
+                ...current,
+                right: { ...current.right, tab: 'inspect' },
+                mobile: 'right',
+              }));
+              workspace.switchWorkbench('wallet', { focus: 'workbench' });
+            }}
+            onClose={() => workspace.dialogs.closeAddWallet()}
+          />
+        ))}
     </>
   );
 }

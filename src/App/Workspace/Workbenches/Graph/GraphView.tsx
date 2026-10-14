@@ -545,7 +545,8 @@ export default function GraphView(props: GraphViewProps) {
   const hasHoveredItem = hoveredNode !== undefined || hoveredGroup !== undefined;
   const traceReason = props.busy
     ? 'Another operation is running.'
-    : hoveredNode?.kind === 'output' && transaction
+    : (hoveredNode?.kind === 'output' && transaction) ||
+        transaction?.vin.some((input) => input.txid && props.transactions?.[input.txid])
       ? undefined
       : props.traceDisabledReason;
 

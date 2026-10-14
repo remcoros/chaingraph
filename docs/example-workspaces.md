@@ -5,6 +5,10 @@ Chaingraph's own read-only Core/Electrum proxy and stored as snapshots in
 `src/App/Examples/templateData/`. Labels, notes, icons, bookmarks and tags are
 original educational annotations. Tags describe observed amounts, script forms
 and exact spending links; none of them is an ownership or participant claim.
+The separate [static demo build](static-demo.md) exposes three dedicated
+investigations instead of this configured-network catalog. Its wallet capture
+includes all 214 transactions within the saved 20-address scope and dated UTXO
+checks. Those dedicated snapshots do not replace the normal examples below.
 
 ## Catalog
 
@@ -79,6 +83,9 @@ A snapshot holds `network`, `retrievedAt`, `roots` and `transactions`. Labels,
 notes, icons, bookmarks, tags and the opening view are built in code in
 `src/App/Examples/workspaceTemplates.ts`, not stored in the JSON, so editing prose
 never means refetching chain data.
+Snapshots can also declare their workspace schema version and include a public
+wallet and canonical `addressUtxos` observations. The existing creation worker
+validates these through the same workspace parser before opening a copy.
 
 An input's funding output can be recorded two ways:
 

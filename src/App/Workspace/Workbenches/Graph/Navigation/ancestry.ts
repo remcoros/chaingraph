@@ -8,6 +8,7 @@ export async function loadAncestors(
   depth: 1 | 2,
   options: {
     signal?: AbortSignal;
+    loadedOnly?: boolean;
     /** Bound to the initiating workspace network, or an offline fixture. */
     fetch: (txid: string, signal?: AbortSignal) => Promise<Transaction>;
     onProgress?: (message: string) => void;
@@ -22,6 +23,7 @@ export async function loadAncestors(
   let requested = 0;
   let failed = 0;
   let truncated = false;
+  let incomplete = false;
   for (let level = 1; level <= depth; level++) {
     options.signal?.throwIfAborted();
     const ids = [
@@ -29,7 +31,8 @@ export async function loadAncestors(
     ].filter((id) => !visited.has(id));
     ids.forEach((id) => visited.add(id));
     const missing = ids.filter((id) => !known.has(id));
-    const batch = missing.slice(0, MAX_SCAN_TRANSACTIONS - requested);
+    incomplete ||= missing.length > 0;
+    const batch = options.loadedOnly ? [] : missing.slice(0, MAX_SCAN_TRANSACTIONS - requested);
     truncated ||= batch.length < missing.length;
     requested += batch.length;
     let done = 0;
@@ -54,6 +57,7 @@ export async function loadAncestors(
     transactions,
     failed,
     truncated,
+    ...(options.loadedOnly ? { incomplete } : {}),
     // Explicit traversal reveals cached ancestors too, without downloading them again.
     resolvedTransactionIds: [...visited].filter((id) => known.has(id)),
     previousTransactionIds: [...visited].filter(

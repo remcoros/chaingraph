@@ -70,6 +70,15 @@ npx vitest run src/Core/Workspace/ConnectionScan tests/integration/connection-sc
 npm run test:live             # read-only smoke against configured real networks
 ```
 
+### Static demo build
+
+`npm run build:demo` writes the backend-free demo to `dist-demo/` using the
+`/chaingraph/` project base by default. `npm run check:demo` checks that emitted
+artifact without a server or browser. Use `CHAINGRAPH_BASE_PATH=/` for root
+hosting. Normal builds still use `dist/`. The
+[static demo guide](docs/static-demo.md) covers Pages setup and publication;
+local builds do not deploy.
+
 ### Production and browser checks
 
 Build and start the app (`npm run build && SERVER_PORT=4300 npm start`), then:

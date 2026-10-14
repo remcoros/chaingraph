@@ -85,6 +85,8 @@ export async function rpc<T>(
   params: unknown[],
   signal?: AbortSignal,
 ): Promise<T> {
+  if (typeof __DEMO_MODE__ !== 'undefined' && __DEMO_MODE__)
+    throw new Error('This demo uses saved Bitcoin data. Live lookups are unavailable.');
   assertNetwork(network);
   const response = await fetch('/api/rpc', {
     method: 'POST',
@@ -151,6 +153,7 @@ function assertNetwork(network: Network): void {
 
 /** Configured capabilities remain available when one upstream pair is offline. */
 export async function backendNetworks(signal?: AbortSignal): Promise<Network[]> {
+  if (typeof __DEMO_MODE__ !== 'undefined' && __DEMO_MODE__) return [];
   const response = await fetch('/api/networks', { signal });
   if (!response.ok) throw new Error('Could not discover configured Bitcoin networks.');
   const parsed = capabilitiesSchema.safeParse(await response.json());
@@ -169,6 +172,7 @@ export async function backendStatus(
   network: Network,
   signal?: AbortSignal,
 ): Promise<BackendStatus> {
+  if (typeof __DEMO_MODE__ !== 'undefined' && __DEMO_MODE__) return { network, connected: false };
   assertNetwork(network);
   const response = await fetch(`/api/status?network=${network}`, { signal });
   if (!response.ok) throw new Error('Backend unavailable');

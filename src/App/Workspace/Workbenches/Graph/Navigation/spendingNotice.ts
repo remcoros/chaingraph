@@ -26,6 +26,8 @@ export async function spendingNotice(
     vout === undefined
       ? `Transaction ${short(transaction.txid)}`
       : `Output ${short(transaction.txid)}:${vout}`;
+  if (result.provenance?.exact === 'not-attempted' && !result.provenance.fallback)
+    return `${subject}: ${result.transactions.length ? 'Saved spending links shown.' : 'No spending transaction is saved.'} Further spends remain unknown. Connect to a matching Bitcoin backend to search beyond saved data.`;
   if (result.provenance?.fallback === 'history-limit') {
     const message =
       result.provenance.exact === 'not-configured'

@@ -11,6 +11,8 @@
     "dev": "node --use-system-ca --import tsx scripts/dev.ts",
     "dev:live": "node --use-system-ca --import tsx scripts/dev.ts",
     "build": "npm run --silent check:compiler && npm run --silent build:app",
+    "build:demo": "CHAINGRAPH_DEMO=1 npm run build",
+    "check:demo": "node scripts/check-demo.mjs",
     "build:app": "tsc --noEmit --pretty false && vite build --logLevel warn",
     "start": "node --use-system-ca --import tsx server/index.ts",
     "start:live": "node --use-system-ca --import tsx server/index.ts",

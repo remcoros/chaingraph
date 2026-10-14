@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DEMO_MODE } from '../../buildMode';
 import {
   FolderOpen,
   LockKeyhole,
@@ -78,7 +79,7 @@ export function WorkspaceHome({
         <ul className="welcome-trust">
           <li>
             <Server size={15} aria-hidden="true" />
-            <span>Fully self-hosted</span>
+            <span>{DEMO_MODE ? 'Saved public Bitcoin data' : 'Fully self-hosted'}</span>
           </li>
           <li>
             <LockKeyhole size={15} aria-hidden="true" />
@@ -178,9 +179,20 @@ export function WorkspaceHome({
         <div className="welcome-note">
           <ShieldCheck size={20} />
           <p>
-            <strong>Make sure to connect to your own back-end and Bitcoin/Electrum node.</strong>{' '}
-            Wallet/xpub discovery happens in your browser, but the backend still receives requests
-            for script-hash and transaction queries.
+            {DEMO_MODE ? (
+              <>
+                This demo has no live Bitcoin connection. Explore saved examples and export your
+                encrypted workspace to continue on your own installation.
+              </>
+            ) : (
+              <>
+                <strong>
+                  Make sure to connect to your own back-end and Bitcoin/Electrum node.
+                </strong>{' '}
+                Wallet/xpub discovery happens in your browser, but the backend still receives
+                requests for script-hash and transaction queries.
+              </>
+            )}
           </p>
         </div>
       </div>

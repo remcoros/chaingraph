@@ -6,6 +6,9 @@ Chaingraph is a self-hosted, watch-only Bitcoin workbench for people who want to
 
 It runs against your Bitcoin Core node and Electrum server. Workspace contents
 are saved encrypted in your browser; workspace names remain public.
+Saved records also work without a chain connection. A separate
+[static demo build](docs/static-demo.md) provides three prepared public-data
+examples without a backend.
 
 > Chaingraph is not a custodial wallet or a public service. It never touches private keys, cannot sign or spend, and does not identify people.
 
@@ -184,7 +187,8 @@ automatically and can be exported as encrypted files for backup or transfer.
   to preserve the complete workspace.
 - The backend has no login and binds to loopback by default. It is meant for one
   trusted user on a trusted machine or behind your own authenticated HTTPS proxy.
-  Public or shared hosting is not supported.
+  Public or shared backend hosting is not supported. The static demo serves
+  captured public data and has no chain backend.
 
 ## Limits
 

@@ -117,6 +117,8 @@ export type AddressObservations = Pick<
 >;
 
 interface Inputs {
+  /** Transient admission from App connection policy, never a document restriction. */
+  allowNetwork?: boolean;
   activeWorkspace?: Pick<Workspace, 'id' | 'network' | 'demo'>;
   getUnlocked: (id: string) =>
     | {
@@ -130,6 +132,7 @@ interface Inputs {
 }
 
 export function createChainDataAcquisition({
+  allowNetwork = true,
   activeWorkspace,
   getUnlocked,
   fetchScope,
@@ -152,12 +155,14 @@ export function createChainDataAcquisition({
     if (!activeWorkspace) throw new Error('Open a workspace first.');
     const session = currentSession(activeWorkspace.id);
     if (!session) throw new DOMException('Workspace session ended.', 'AbortError');
-    if (activeWorkspace.demo)
-      throw new Error('Live lookups are disabled for legacy synthetic workspaces.');
     return session;
   };
   const requestSignal = (signal?: AbortSignal) => {
     requireSession(signal);
+    if (!allowNetwork || activeWorkspace?.demo)
+      throw new Error(
+        'Live Bitcoin data is unavailable. Connect to a matching backend to load or refresh records.',
+      );
     return signal ? AbortSignal.any([signal, fetchScope!.signal]) : fetchScope!.signal;
   };
   const getTransaction = async (
@@ -354,8 +359,7 @@ export function createChainDataAcquisition({
     const session = currentSession(activeWorkspace.id);
     if (!session || session.locking)
       throw new DOMException('Workspace session ended.', 'AbortError');
-    if (activeWorkspace.demo)
-      throw new Error('Live lookups are disabled for legacy synthetic workspaces.');
+    requestSignal(signal);
     const txid = id.toLowerCase();
     if (!session.data.chainData.transactions[txid]) return false;
     const transaction = await fetchTransaction(activeWorkspace.network, txid, signal, undefined, {
@@ -374,6 +378,25 @@ export function createChainDataAcquisition({
     read: {
       spending: async (transaction, vout, signal, offset, unavailableTxids) => {
         const session = requireSession(signal);
+        if (!allowNetwork || activeWorkspace?.demo) {
+          const wanted = new Set(
+            transaction.vout
+              .filter((output) => vout === undefined || output.n === vout)
+              .map((output) => output.n),
+          );
+          return {
+            transactions: Object.values(session.data.chainData.transactions).filter((candidate) =>
+              candidate.vin.some(
+                (input) =>
+                  input.txid === transaction.txid &&
+                  input.vout !== undefined &&
+                  wanted.has(input.vout),
+              ),
+            ),
+            truncated: true,
+            provenance: { exact: 'not-attempted' },
+          };
+        }
         const result = await loadSpending(
           transaction,
           {

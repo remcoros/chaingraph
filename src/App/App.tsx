@@ -1,4 +1,5 @@
 import './component-styles';
+import { DEMO_MODE } from '../buildMode';
 import { TransactionFetchProvider } from './Workspace/TransactionFetchProvider';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
 import { BookOpen, FolderOpen, Info, Library, Plus } from 'lucide-react';
@@ -11,7 +12,7 @@ import { HelpMenu } from './Help/HelpMenu';
 import { AboutDialog } from './Help/AboutDialog';
 import { WorkspaceHome } from './FrontPage/WorkspaceHome';
 
-import { WORKSPACE_TEMPLATES } from './Examples/workspaceTemplates';
+import { AVAILABLE_WORKSPACE_TEMPLATES as WORKSPACE_TEMPLATES } from './Examples/workspaceTemplates';
 import { loadTemplateWorkspace } from './Examples/templateWorkspace';
 import { MAX_ENCRYPTED_FILE_BYTES } from '../Core/Workspace/Persistence';
 import { createWorkspace } from '../Core/Workspace/createWorkspace';
@@ -53,7 +54,7 @@ export default function App() {
           }}
           aria-label="Chaingraph home"
         >
-          <img className="wordmark-icon" src="/favicon.svg" alt="" />
+          <img className="wordmark-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
           <span>
             chaingraph<span className="wordmark-dot">.</span>
           </span>
@@ -94,7 +95,7 @@ export default function App() {
             data-testid="new-workspace-button"
             aria-label="New workspace"
             title="New workspace"
-            onClick={() => app.setCreate('empty')}
+            onClick={app.startWorkspace}
           >
             <Plus size={16} />
           </button>
@@ -103,15 +104,23 @@ export default function App() {
           onClick={() => app.setAboutOpen('connection')}
           aria-label="Connection details"
           className={`connection connection-action ${app.connected ? 'online' : ''}`}
-          title={app.status?.error || app.statusError || 'Your self-hosted backend'}
+          title={
+            DEMO_MODE
+              ? 'Saved public Bitcoin data, without a live backend'
+              : app.status?.error || app.statusError || 'Your self-hosted backend'
+          }
         >
           <span className="status-dot" />
           <span className="connection-text">
-            {app.connected
-              ? `${app.status?.network} · ${app.status?.height?.toLocaleString() ?? 'connected'}`
-              : 'Offline'}
+            {DEMO_MODE
+              ? 'Demo'
+              : app.connected
+                ? `${app.status?.network} · ${app.status?.height?.toLocaleString() ?? 'connected'}`
+                : 'Offline'}
           </span>
-          <span className="connection-network">{app.displayNetwork ?? 'Offline'}</span>
+          <span className="connection-network">
+            {DEMO_MODE ? 'Saved data' : (app.displayNetwork ?? 'Offline')}
+          </span>
         </button>
         <HelpMenu
           actions={[
@@ -124,7 +133,7 @@ export default function App() {
             {
               label: 'Example workspaces',
               icon: <Library size={15} aria-hidden="true" />,
-              disabled: !!app.discoveryError || !app.networks?.length,
+              disabled: !app.exampleNetworks?.length,
               onSelect: () => app.setExamplesOpen(true),
             },
             {
@@ -140,8 +149,8 @@ export default function App() {
         <WorkspaceHome
           saved={workspaces.saved}
           sessions={workspaces.unlocked}
-          onCreate={() => app.setCreate('empty')}
-          networks={app.discoveryError ? undefined : app.networks}
+          onCreate={app.startWorkspace}
+          networks={app.exampleNetworks}
           onTemplate={app.setCreate}
           onExamples={() => app.setExamplesOpen(true)}
           onOpenFile={() => fileInput.current?.click()}
@@ -151,13 +160,31 @@ export default function App() {
         />
       ) : (
         <TransactionFetchProvider acquisition={app.chainDataAcquisition}>
-          <Workspace workspace={workspace} />
+          <Workspace
+            workspace={workspace}
+            connectionNotice={
+              !activeWorkspace.demo &&
+              !workspace.canLoadChainData && (
+                <span
+                  className="connection-notice"
+                  role={
+                    app.unsupportedNetwork || app.discoveryError || (app.status && !app.connected)
+                      ? 'alert'
+                      : 'status'
+                  }
+                >
+                  {workspace.chainDataDisabledReason} Saved data remains available for offline
+                  analysis.
+                </span>
+              )
+            }
+          />
         </TransactionFetchProvider>
       )}
       <WorkspaceSettingsDialog workspace={workspace} />
       {app.examplesOpen && (
         <ExamplesDialog
-          networks={app.discoveryError ? undefined : app.networks}
+          networks={app.exampleNetworks}
           onClose={() => app.setExamplesOpen(false)}
           onTemplate={(id) => {
             app.setExamplesOpen(false);
@@ -204,18 +231,6 @@ export default function App() {
         </Modal>
       )}
       <ToastNotification app={app} workspace={workspace} />
-      {activeWorkspace && !activeWorkspace.demo && !workspace.canLoadChainData && (
-        <div
-          className="connection-banner"
-          role={
-            app.unsupportedNetwork || app.discoveryError || (app.status && !app.connected)
-              ? 'alert'
-              : 'status'
-          }
-        >
-          {workspace.chainDataDisabledReason} Saved data remains available for offline analysis.
-        </div>
-      )}
       <input
         ref={fileInput}
         type="file"
@@ -232,9 +247,29 @@ export default function App() {
       />
       <WorkspaceLabelExchange workspace={workspace} />
       <EntityRemovalDialog workspace={workspace} />
+      {app.demoStartOpen && (
+        <Modal title="Start with an example" onClose={() => app.setDemoStartOpen(false)}>
+          <p>
+            This is the Chaingraph demo, using saved public Bitcoin data. Choose an example
+            workspace to explore transactions, review a wallet and try analysis.
+          </p>
+          <div className="button-row">
+            <button onClick={() => app.setDemoStartOpen(false)}>Cancel</button>
+            <button
+              className="primary"
+              onClick={() => {
+                app.setDemoStartOpen(false);
+                app.setExamplesOpen(true);
+              }}
+            >
+              Choose an example
+            </button>
+          </div>
+        </Modal>
+      )}
       {app.create && (
         <CreateWorkspaceDialog
-          networks={app.discoveryError ? undefined : app.networks}
+          networks={app.exampleNetworks}
           key={app.create}
           template={WORKSPACE_TEMPLATES.find((template) => template.id === app.create)}
           onCreate={async (request, signal) => {
@@ -250,7 +285,7 @@ export default function App() {
                   description: request.description,
                 };
             signal.throwIfAborted();
-            if (!app.networks?.includes(data.network))
+            if (!app.exampleNetworks?.includes(data.network))
               throw new Error(
                 `Backend does not support ${data.network}. Check the backend connection.`,
               );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DEMO_MODE } from '../buildMode';
 import type { Network } from '../Core/Bitcoin';
 import { backendNetworks, backendStatus, type BackendStatus } from '../Core/ChainData/api';
 
@@ -8,6 +9,7 @@ export function useBackendNetworks(refreshToken: number) {
   const [statuses, setStatuses] = useState<Partial<Record<Network, BackendStatus>>>({});
   const [discoveryError, setDiscoveryError] = useState('');
   useEffect(() => {
+    if (DEMO_MODE) return;
     const lifetime = new AbortController();
     const pending = new Map<Network, AbortController>();
     let supported = new Set<Network>();

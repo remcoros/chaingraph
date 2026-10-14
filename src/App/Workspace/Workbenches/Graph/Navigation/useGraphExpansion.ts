@@ -79,15 +79,10 @@ export function useGraphExpansion({
       buildGraph(snapshot).nodes.find((n) => n.id === nodeId);
     if (!node?.txid || node.kind === 'address') return;
     const generation = selectionGeneration.current;
-    if (
-      !canTraceAncestry &&
-      !(
-        direction === 'funding' &&
-        node.kind === 'output' &&
-        snapshot.chainData.transactions[node.txid]
-      )
-    )
+    if (!canTraceAncestry && !snapshot.chainData.transactions[node.txid]) {
+      setNotice('This transaction is not saved. Connect to a matching Bitcoin backend to load it.');
       return;
+    }
     if (options?.preserveCamera) {
       preserveSelectionCamera(selectedId);
       setFocusRequest(undefined);
@@ -139,6 +134,7 @@ export function useGraphExpansion({
           const before = getUnlocked(activeWorkspace.id)!.data;
           const result = await loadAncestors([transaction], before.chainData.transactions, 1, {
             signal,
+            loadedOnly: !canTraceAncestry,
             fetch: (id, signal) => getTransaction(id, signal, 'background'),
             onProgress: setOperation,
           });
@@ -166,7 +162,11 @@ export function useGraphExpansion({
                 ),
               ]),
             );
-            setNotice(ancestryNotice(result));
+            setNotice(
+              !canTraceAncestry && result.incomplete
+                ? 'Saved funding transactions shown. Other input transactions are not saved; connect to a matching Bitcoin backend to load them.'
+                : ancestryNotice(result),
+            );
           }
         }
       } else {

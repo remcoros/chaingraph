@@ -68,7 +68,7 @@ export function useGraphLookup({
         if (!canLoadChainData && !existing) return;
         reveal(addressReference(text));
         state.clear();
-        addressEvidence.startAddressHistoryLoad(text);
+        if (canLoadChainData) addressEvidence.startAddressHistoryLoad(text);
         return;
       }
       if (!canLoadChainData) return;

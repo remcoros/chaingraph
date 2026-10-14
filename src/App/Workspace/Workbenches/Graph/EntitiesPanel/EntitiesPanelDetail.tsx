@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { DEMO_MODE } from '../../../../../buildMode';
 import {
   Tag,
   Bookmark,
@@ -345,7 +346,11 @@ export function EntitiesPanelDetail({
       )}
       <div className="panel-bottom">
         <ShieldCheck size={14} />
-        {activeWorkspace.demo ? 'Synthetic data only' : 'Watch-only · your node'}
+        {DEMO_MODE
+          ? 'Watch-only · demo'
+          : activeWorkspace.demo
+            ? 'Synthetic data only'
+            : 'Watch-only · your node'}
       </div>
     </aside>
   );

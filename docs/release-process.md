@@ -116,6 +116,21 @@ Stable releases verify the full version, minor version and `latest` tags.
 Prereleases verify only their full prerelease version. See
 [REPRODUCIBILITY.md](../REPRODUCIBILITY.md) for independent manual inspection.
 
+## Public demo publication
+
+The separate [Deploy demo workflow](../.github/workflows/demo-pages.yml) builds
+and deploys the captured-data demo after a stable GitHub Release is published.
+Tag pushes and draft/prerelease publication do not deploy it. The workflow uses
+the release's exact annotated tag, runs the normal checks and demo artifact
+checks, and uploads only `dist-demo/` to GitHub Pages. Manual deployment accepts
+an existing published stable tag, including an explicit rollback. It does not
+publish or modify the container release.
+
+The workflow and build support must be present in the selected release tag.
+One-time Pages settings and manual deployment are described in
+[static demo](static-demo.md#github-pages-deployment). `npm run build:demo` is a
+local build command and does not deploy anything.
+
 ## Abort an unmerged preparation
 
 To remove an abandoned, unmerged preparation, run:

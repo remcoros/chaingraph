@@ -587,13 +587,16 @@ export function LabelExchangeDialog({ workspace }: { workspace: WorkspaceControl
                     {exampleProfiles.map((exampleProfile) => (
                       <a
                         key={exampleProfile}
-                        href={`/examples/bip329/${exampleProfile}.jsonl`}
+                        href={`${import.meta.env.BASE_URL}examples/bip329/${exampleProfile}.jsonl`}
                         download
                       >
                         {LABEL_PROFILES.find((item) => item.id === exampleProfile)!.name}
                       </a>
                     ))}
-                    <a href="/examples/bip329/review-cases.jsonl" download>
+                    <a
+                      href={`${import.meta.env.BASE_URL}examples/bip329/review-cases.jsonl`}
+                      download
+                    >
                       Conflicts / errors
                     </a>
                   </div>

@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '../../buildMode';
 import { resolveWalletUtxoObservation } from '../../Core/Workspace/Wallets/WalletUtxos/walletUtxoObservation';
 import { useWalletUtxos } from './Wallets/WalletUtxos';
 import type { WalletUtxoRecord } from '../../Core/Workspace/Wallets/walletRecords';
@@ -293,7 +294,6 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
   const resetWorkspacePresentation = useEffectEvent(() => {
     workspaceOperation.cancel();
     preserveSelectionCamera(undefined);
-    tour.show(undefined);
     setOperation('');
     setSelectedId(activeWorkspace?.view.selectionId);
     connectionScanTargets.reset();
@@ -378,22 +378,25 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     setNotice,
   });
   const canLoadChainData =
+    !DEMO_MODE &&
     connected &&
     !!activeWorkspace &&
     !!networks?.includes(activeWorkspace.network) &&
     !activeWorkspace.demo;
-  const chainDataDisabledReason = activeWorkspace?.demo
-    ? 'Legacy synthetic workspace. Live lookups are disabled; create an example workspace to explore real transactions.'
-    : unsupportedNetwork
-      ? `Backend does not support ${activeWorkspace!.network}.`
-      : discoveryError ||
-        (!networks
-          ? 'Discovering supported networks…'
-          : !status
-            ? `Checking ${activeWorkspace?.network ?? displayNetwork ?? 'Bitcoin'} connection…`
-            : !connected
-              ? `${activeWorkspace?.network ?? displayNetwork ?? 'Bitcoin'} backend is unavailable.`
-              : undefined);
+  const chainDataDisabledReason = DEMO_MODE
+    ? 'Live lookups are unavailable in this demo.'
+    : activeWorkspace?.demo
+      ? 'Legacy synthetic workspace. Live lookups are disabled; create an example workspace to explore real transactions.'
+      : unsupportedNetwork
+        ? `Backend does not support ${activeWorkspace!.network}.`
+        : discoveryError ||
+          (!networks
+            ? 'Discovering supported networks…'
+            : !status
+              ? `Checking ${activeWorkspace?.network ?? displayNetwork ?? 'Bitcoin'} connection…`
+              : !connected
+                ? `${activeWorkspace?.network ?? displayNetwork ?? 'Bitcoin'} backend is unavailable.`
+                : undefined);
   const canTraceAncestry = canLoadChainData;
   const transactionEvidence = app.chainDataAcquisition;
   const evidenceWallet = wallet ?? activeWorkspace?.wallets.definitions[0];

@@ -1345,11 +1345,24 @@ small,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.statusbar.has-connection-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  align-items: center;
+}
+.statusbar .connection-notice {
+  display: block;
+  text-align: center;
+  overflow-wrap: anywhere;
+  color: var(--color-warning);
+}
 .status-separator {
   color: var(--color-rule);
 }
 .statusbar .save-status {
   flex-shrink: 0;
+  justify-self: end;
+  white-space: nowrap;
   font-size: 8px;
 }
 .statusbar button {
@@ -1448,20 +1461,6 @@ small,
 .feedback-message:focus-visible {
   outline: 1px solid var(--color-accent);
   outline-offset: 2px;
-}
-.connection-banner {
-  position: fixed;
-  bottom: 30px;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  padding: 5px 12px;
-  text-align: center;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-rule);
-  color: var(--color-warning);
-  font-size: 9px;
-  pointer-events: none;
 }
 @media (min-width: 640px) {
   .welcome {

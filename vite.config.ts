@@ -4,10 +4,37 @@ import { readFileSync } from 'node:fs';
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 const defaultSource = 'https://github.com/remcoros/chaingraph';
 const source = process.env.CHAINGRAPH_SOURCE_URL ?? defaultSource;
+const demo = process.env.CHAINGRAPH_DEMO === '1';
 if (source && !/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/.test(source))
   throw new Error('CHAINGRAPH_SOURCE_URL must be an HTTPS GitHub repository URL.');
 export default defineConfig({
+  base: process.env.CHAINGRAPH_BASE_PATH ?? (demo ? '/chaingraph/' : '/'),
   plugins: [
+    {
+      name: 'static-demo-policy',
+      transformIndexHtml: {
+        order: 'post',
+        handler: () =>
+          demo
+            ? [
+                {
+                  tag: 'meta',
+                  attrs: {
+                    'http-equiv': 'Content-Security-Policy',
+                    content:
+                      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'",
+                  },
+                  injectTo: 'head-prepend',
+                },
+                {
+                  tag: 'meta',
+                  attrs: { name: 'referrer', content: 'no-referrer' },
+                  injectTo: 'head-prepend',
+                },
+              ]
+            : [],
+      },
+    },
     react({
       // React Compiler memoizes components and hooks automatically, which is the
       // safety net for a UI written with almost no hand-rolled useCallback/memo.
@@ -31,6 +58,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __SOURCE_URL__: JSON.stringify(source.replace(/\/$/, '')),
+    __DEMO_MODE__: demo,
   },
   server: {
     port: 3001,
@@ -50,6 +78,7 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: demo ? 'dist-demo' : 'dist',
     chunkSizeWarningLimit: 1500,
     rolldownOptions: {
       output: {

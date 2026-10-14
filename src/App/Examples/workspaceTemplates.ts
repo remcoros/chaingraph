@@ -1,3 +1,7 @@
+import demoEqualOutputsUrl from './templateData/demo-equal-outputs.json?url';
+import demoBranchingPathUrl from './templateData/demo-branching-path.json?url';
+import demoPublicWalletUrl from './templateData/demo-public-wallet.json?url';
+import { DEMO_MODE } from '../../buildMode';
 import { formatBitcoinAmount } from '../../Core/Formatting';
 import mainnetBatchOutputsUrl from './templateData/mainnet-batch-outputs.json?url';
 import mainnetEqualOutputsUrl from './templateData/mainnet-equal-outputs.json?url';
@@ -191,12 +195,42 @@ export const WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
   },
 ];
 
+/** Dedicated captured investigations. Normal builds retain the configured-network catalog. */
+export const DEMO_WORKSPACE_TEMPLATES: readonly WorkspaceTemplate[] = [
+  {
+    ...WORKSPACE_TEMPLATES.find((entry) => entry.id === 'mainnet-public-wallet')!,
+    id: 'demo-public-wallet',
+    name: 'Public BIP84 test wallet',
+    description:
+      'Review all saved history for receive and change indexes 0 to 9, with dated coin observations, wallet net changes and input evidence. Coverage stops at these addresses. The test seed is public: never send funds here.',
+    summary: 'A bounded wallet review with saved transactions, coins and flows. Never deposit.',
+  },
+  {
+    ...WORKSPACE_TEMPLATES.find((entry) => entry.id === 'mainnet-large-value-path')!,
+    id: 'demo-branching-path',
+    name: 'A branching transaction path',
+    description:
+      'Follow exact spending links through two funding branches that meet at a large split. Reveal saved neighbors and compare amounts without assigning input value to any particular output.',
+    summary: 'Seven transactions, two funding branches and a shared downstream split.',
+  },
+  {
+    ...WORKSPACE_TEMPLATES.find((entry) => entry.id === 'mainnet-equal-outputs')!,
+    id: 'demo-equal-outputs',
+    name: 'Five equal outputs',
+    summary: 'A published Whirlpool example, its known successor and complete input evidence.',
+  },
+];
+export const AVAILABLE_WORKSPACE_TEMPLATES = DEMO_MODE
+  ? DEMO_WORKSPACE_TEMPLATES
+  : WORKSPACE_TEMPLATES;
+
 interface Snapshot {
   network: string;
   retrievedAt: string;
   roots: string[];
   transactions: Record<string, Transaction>;
   workspaceVersion?: number;
+  addressUtxos?: Workspace['chainData']['addressUtxos'];
   wallet?: Omit<Wallet, 'id'>;
 }
 
@@ -206,6 +240,18 @@ interface SnapshotSource {
 }
 
 const SNAPSHOT_SOURCES: Record<string, SnapshotSource> = {
+  'demo-public-wallet': {
+    assetUrl: demoPublicWalletUrl,
+    filePath: './templateData/demo-public-wallet.json',
+  },
+  'demo-branching-path': {
+    assetUrl: demoBranchingPathUrl,
+    filePath: './templateData/demo-branching-path.json',
+  },
+  'demo-equal-outputs': {
+    assetUrl: demoEqualOutputsUrl,
+    filePath: './templateData/demo-equal-outputs.json',
+  },
   'mainnet-equal-outputs': {
     assetUrl: mainnetEqualOutputsUrl,
     filePath: './templateData/mainnet-equal-outputs.json',
@@ -254,9 +300,17 @@ function parseSnapshot(text: string): Snapshot {
   const parsed = parseWorkspace({
     ...document,
     version: raw.workspaceVersion ?? 5,
-    chainData: { ...document.chainData, transactions: raw.transactions },
+    chainData: {
+      ...document.chainData,
+      transactions: raw.transactions,
+      addressUtxos: raw.addressUtxos,
+    },
   });
-  return { ...raw, transactions: parsed.chainData.transactions };
+  return {
+    ...raw,
+    transactions: parsed.chainData.transactions,
+    addressUtxos: parsed.chainData.addressUtxos,
+  };
 }
 
 async function fetchSnapshot(assetUrl: string): Promise<Snapshot> {
@@ -313,13 +367,23 @@ export async function createTemplateWorkspace(
   name?: string,
   description?: string,
 ): Promise<Workspace> {
-  const template = WORKSPACE_TEMPLATES.find((entry) => entry.id === id);
+  const template = [...WORKSPACE_TEMPLATES, ...DEMO_WORKSPACE_TEMPLATES].find(
+    (entry) => entry.id === id,
+  );
+  const captured = id.startsWith('demo-');
+  const sourceId =
+    id === 'demo-public-wallet'
+      ? 'mainnet-public-wallet'
+      : id === 'demo-equal-outputs'
+        ? 'mainnet-equal-outputs'
+        : id;
   if (!template) throw new Error('Unknown workspace template.');
   const snapshot = await loadSnapshot(id);
   if (snapshot.network !== template.network) throw new Error('Template network mismatch.');
   const workspace = createWorkspace(name ?? template.name, template.network);
   workspace.description = description ?? template.description;
   workspace.chainData.transactions = snapshot.transactions;
+  workspace.chainData.addressUtxos = snapshot.addressUtxos;
 
   // Scope the display of parents that the snapshot loads in full. Parents recorded
   // only as attached input prevouts carry no further outputs to scope.
@@ -352,7 +416,48 @@ export async function createTemplateWorkspace(
   const snapshotNote = `Public chain snapshot retrieved ${snapshot.retrievedAt}. Confirmation counts are historical observations. Missing spending data does not establish current unspent status.`;
   let selected = transactionReference(snapshot.roots[0]);
 
-  if (id === 'mainnet-equal-outputs') {
+  if (sourceId === 'demo-branching-path') {
+    const transactions = Object.values(snapshot.transactions);
+    const descendant = transactions.find((tx) => tx.txid === largeSeed)!;
+    for (const [index, tx] of transactions.entries()) {
+      const branches = transactions.filter((child) =>
+        child.vin.some((input) => input.txid === tx.txid),
+      );
+      annotate(
+        transactionReference(tx.txid),
+        tx.txid === largeSeed
+          ? 'The downstream split'
+          : tx.txid === snapshot.roots[0]
+            ? 'Start: funding branch'
+            : branches.length > 1
+              ? 'Compare two spending branches'
+              : `Funding branch ${index + 1}`,
+        `${tx.txid === largeSeed ? 'Two saved funding branches converge here. Compare the large outputs; neither size nor script identifies payment, change or an owner.' : branches.length > 1 ? 'Outputs 1 and 2 are consumed by different saved successors. One goes directly to the downstream split; the other reaches it through another transaction. Use this bookmark to compare the two paths. These are exact outpoint links, not allocation or ownership claims.' : 'Follow the saved spending links to reveal the next transaction. Inputs and outputs describe exact outpoints, not allocation of a particular input to a particular output.'} ${snapshotNote}`,
+        '🔗',
+        true,
+      );
+      const links = transactions.flatMap((child) =>
+        child.vin
+          .filter((input) => input.txid === tx.txid)
+          .map((input) => outpointReference(tx.txid, input.vout!)),
+      );
+      if (links.length)
+        tag(
+          `Branch ${index + 1}`,
+          index % 2 ? TAG_COLOR.lavender : TAG_COLOR.cyan,
+          'Exact outpoints consumed by saved successors, without ownership attribution.',
+          links,
+        );
+    }
+    for (const output of descendant.vout)
+      annotate(
+        outpointReference(descendant.txid, output.n),
+        output.n === 1 ? 'Largest output at the split' : 'Compare the sibling output',
+        'No later spending transaction is saved for this output. Its current spend status is unknown.',
+        '◇',
+        true,
+      );
+  } else if (sourceId === 'mainnet-equal-outputs') {
     annotate(
       transactionReference(equalSeed),
       'Five equal outputs',
@@ -402,7 +507,7 @@ export async function createTemplateWorkspace(
       `Two successor outputs of ${formatBitcoinAmount(9_136_520)}.`,
       [outpointReference(equalSpender, 2), outpointReference(equalSpender, 3)],
     );
-  } else if (id === 'mainnet-op-return') {
+  } else if (sourceId === 'mainnet-op-return') {
     selected = outpointReference(messageSeed, 0);
     annotate(
       transactionReference(messageSeed),
@@ -436,7 +541,7 @@ export async function createTemplateWorkspace(
       'P2PKH script form. This tag does not claim current UTXO status.',
       [outpointReference(messageSeed, 1)],
     );
-  } else if (id === 'testnet4-spent-output') {
+  } else if (sourceId === 'testnet4-spent-output') {
     selected = outpointReference(spentSeed, 1);
     annotate(
       transactionReference(spentSeed),
@@ -471,7 +576,7 @@ export async function createTemplateWorkspace(
       'Creating transaction, exact spent outpoint, and its known spender.',
       [transactionReference(spentSeed), selected, transactionReference(spentSpender)],
     );
-  } else if (id === 'testnet4-fan-out') {
+  } else if (sourceId === 'testnet4-fan-out') {
     selected = outpointReference(fanoutSeed, 0);
     annotate(
       transactionReference(fanoutSeed),
@@ -517,7 +622,7 @@ export async function createTemplateWorkspace(
       outpointReference(fanoutSeed, 52),
     ]);
   }
-  if (id === 'mainnet-large-value-path') {
+  if (sourceId === 'mainnet-large-value-path') {
     selected = outpointReference(largeSeed, 1);
     annotate(
       transactionReference(largeSeed),
@@ -570,7 +675,7 @@ export async function createTemplateWorkspace(
         transactionReference(largeSeed),
       ],
     );
-  } else if (id === 'mainnet-batch-outputs') {
+  } else if (sourceId === 'mainnet-batch-outputs') {
     const outputs = snapshot.transactions[batchSeed].vout;
     const ranked = [...outputs].sort((a, b) => sats(b.value) - sats(a.value));
     selected = outpointReference(batchSeed, ranked[0].n);
@@ -615,7 +720,7 @@ export async function createTemplateWorkspace(
           .map((output) => outpointReference(batchSeed, output.n)),
       );
     }
-  } else if (id === 'mainnet-wabisabi') {
+  } else if (sourceId === 'mainnet-wabisabi') {
     const transaction = snapshot.transactions[wabisabiSeed];
     annotate(
       transactionReference(wabisabiSeed),
@@ -661,7 +766,7 @@ export async function createTemplateWorkspace(
       '🐋',
       true,
     );
-  } else if (id === 'mainnet-public-wallet') {
+  } else if (sourceId === 'mainnet-public-wallet') {
     if (!snapshot.wallet) throw new Error('Public wallet template is missing its wallet data.');
     const wallet = { ...snapshot.wallet, id: crypto.randomUUID() };
     workspace.wallets.definitions = [wallet];
@@ -684,13 +789,14 @@ export async function createTemplateWorkspace(
           !workspace.view.inputContext[transaction.txid].includes(output.n)
         )
           workspace.view.inputContext[transaction.txid].push(output.n);
-        annotate(
-          node,
-          branch === 0 ? 'Demo wallet receive output' : 'Demo wallet change-branch output',
-          `${formatBitcoinAmount(sats(output.value))} to an address derived from the intentionally published demo zpub at branch ${branch}. This establishes a key derivation match, not the identity of a person. A change derivation branch is not proof of the economic purpose of this output.`,
-          '👛',
-          matched[branch].length <= 2,
-        );
+        if (!captured || matched[branch].length <= 4)
+          annotate(
+            node,
+            branch === 0 ? 'Demo wallet receive output' : 'Demo wallet change-branch output',
+            `${formatBitcoinAmount(sats(output.value))} to an address derived from the intentionally published demo zpub at branch ${branch}. This establishes a key derivation match, not the identity of a person. A change derivation branch is not proof of the economic purpose of this output.`,
+            '👛',
+            matched[branch].length <= 2,
+          );
       }
     }
     for (const [branch, nodes] of matched.entries()) {
@@ -712,12 +818,12 @@ export async function createTemplateWorkspace(
       annotate(
         transactionReference(root),
         `Demo wallet ${consumesWalletOutput ? 'spending' : 'funding'} hop ${index + 1}`,
-        `This transaction ${consumesWalletOutput ? 'spends an output at' : 'funds'} a saved address derived from the public BIP84 test zpub. The test seed is public: never deposit funds here. Open Wallets to inspect or continue discovery; the bundled address set and history are a bounded sample, not the full wallet balance. ${snapshotNote}`,
+        `This transaction ${consumesWalletOutput ? 'spends an output at' : 'funds'} a saved address derived from the public BIP84 test zpub. The test seed is public: never deposit funds here. ${captured ? 'Open Wallet to inspect the saved records;' : 'Open Wallets to inspect or continue discovery;'} the bundled address set and history are a bounded sample, not the full wallet balance. ${snapshotNote}`,
         '👛',
         true,
       );
     }
-  } else if (id === 'testnet4-mixed-path') {
+  } else if (sourceId === 'testnet4-mixed-path') {
     selected = outpointReference(mixedSeed, 0);
     annotate(
       transactionReference(mixedSeed),
@@ -778,15 +884,26 @@ export async function createTemplateWorkspace(
   }
   workspace.view = {
     ...workspace.view,
-    sizeBy: id === 'mainnet-large-value-path' ? 'value' : workspace.view.sizeBy,
-    highlightMode: id === 'mainnet-public-wallet' ? 'wallets' : workspace.view.highlightMode,
+    sizeBy: sourceId === 'mainnet-large-value-path' ? 'value' : workspace.view.sizeBy,
+    highlightMode: sourceId === 'mainnet-public-wallet' ? 'wallets' : workspace.view.highlightMode,
     showLabels: true,
     showTags: true,
     showIcons: true,
     selectionId: selected,
-    graphNodeIds: initialTemplateGraph(workspace, snapshot.roots, selected),
+    graphNodeIds:
+      captured && id === 'demo-branching-path'
+        ? [
+            ...new Set([
+              transactionReference(snapshot.roots[0]),
+              ...transactionNodeIds(snapshot.transactions[snapshot.roots[0]], 'inputs'),
+              ...transactionNodeIds(snapshot.transactions[snapshot.roots[0]], 'outputs'),
+            ]),
+          ]
+        : initialTemplateGraph(workspace, snapshot.roots, selected),
+    workbench: id === 'demo-public-wallet' ? 'wallet' : workspace.view.workbench,
+    selectedWallet: workspace.wallets.definitions[0]?.id,
     panels: {
-      left: { tab: id === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks' },
+      left: { tab: sourceId === 'mainnet-public-wallet' ? 'wallets' : 'bookmarks' },
       right: { tab: 'inspect' },
       flow: { transactionId: snapshot.roots[0], height: 'expanded' },
     },

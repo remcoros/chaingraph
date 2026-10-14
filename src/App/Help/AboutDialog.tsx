@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DEMO_MODE } from '../../buildMode';
 import { BookOpen, ExternalLink, Info, Keyboard, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Modal } from '../Dialogs';
 import type { BackendStatus } from '../../Core/ChainData/api';
@@ -134,6 +135,18 @@ export function AboutDialog({
             A related transaction can include other participants. Manual tags group your
             observations independently from analysis findings. Use Tags to group imported labels or
             apply a counterparty to an address and its outputs.
+          </p>
+        </div>
+      ) : tab === 'connection' && DEMO_MODE ? (
+        <div className="help-content">
+          <h3>Saved public Bitcoin data</h3>
+          <p>
+            This demo has no chain backend. Explore loaded records, run local analysis and save your
+            edits in encrypted workspaces.
+          </p>
+          <p>
+            Snapshot dates describe past observations. Export a workspace and open it on a
+            matching-network self-hosted installation to load more evidence.
           </p>
         </div>
       ) : tab === 'connection' ? (

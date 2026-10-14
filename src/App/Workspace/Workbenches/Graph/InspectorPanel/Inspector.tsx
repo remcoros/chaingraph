@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { short } from '../../../../../Core/Formatting';
 import {
+  outpointReference,
   transactionReference,
   addressReference,
 } from '../../../../../Core/Workspace/entityReferences';
@@ -458,8 +459,12 @@ export function NodeInspector({
           : 'Connect to a node on this workspace network to expand its paths.'
         : undefined);
   const hasPrevious = !tx || tx.vin.some((input) => !!input.txid);
+  const hasSavedFunding =
+    !!tx &&
+    (selected.kind === 'output' ||
+      tx.vin.some((input) => input.txid && activeWorkspace.chainData.transactions[input.txid]));
   const previousReason =
-    (selected.kind === 'output' && tx && !busy ? undefined : unavailable) ||
+    (hasSavedFunding && !busy ? undefined : unavailable) ||
     (selected.kind === 'address' || !selected.txid
       ? 'Select a transaction or output to load its previous transactions.'
       : !hasPrevious && selected.kind !== 'output'
@@ -489,8 +494,12 @@ export function NodeInspector({
     (!utxo.observation ||
       Date.parse(walletObservation.checkedAt) > Date.parse(utxo.observation.checkedAt));
   const unspendable = selectedOutput !== undefined && isProvablyUnspendable(selectedOutput);
+  const hasSavedSpending =
+    selected.kind === 'output'
+      ? loadedSpends.has(selected.id)
+      : !!tx?.vout.some((output) => loadedSpends.has(outpointReference(tx.txid, output.n)));
   const spendingReason =
-    unavailable ||
+    (hasSavedSpending && !busy ? undefined : unavailable) ||
     (unspendable ? 'OP_RETURN outputs are unspendable.' : undefined) ||
     (selected.kind === 'address'
       ? 'Select a transaction or output to find spending transactions.'

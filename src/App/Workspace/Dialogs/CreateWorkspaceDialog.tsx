@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { DEMO_MODE } from '../../../buildMode';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
 import type { Network } from '../../../Core/Bitcoin';
 import type { WorkspaceTemplate } from '../../Examples/workspaceTemplates';
@@ -192,8 +193,10 @@ export function CreateWorkspaceDialog({
         </label>
         {template && (
           <p className="small muted">
-            The example uses {template.network}. Bundled chain data is a snapshot; refresh or trace
-            further through your backend.
+            The example uses {template.network}.{' '}
+            {DEMO_MODE
+              ? 'Explore its saved records without a live Bitcoin connection.'
+              : 'Bundled chain data is a snapshot; refresh or trace further through your backend.'}
           </p>
         )}
         <PasswordField

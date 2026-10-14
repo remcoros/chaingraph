@@ -34,7 +34,13 @@ export interface Tour {
  */
 export function useTour(subject: TourSubject): Tour {
   const { workspaceId, hasWallets, hasSelection, hasTransactions } = subject;
-  const [activeId, setActiveId] = useState<string>();
+  const [visit, setVisit] = useState<{
+    workspaceId: string | undefined;
+    activeId: string | undefined;
+  }>({ workspaceId, activeId: undefined });
+  // A topic belongs to one workspace visit; returning must not resume an old tour.
+  if (visit.workspaceId !== workspaceId) setVisit({ workspaceId, activeId: undefined });
+  const activeId = visit.workspaceId === workspaceId ? visit.activeId : undefined;
   const steps = availableTourSteps(WORKBENCH_TOUR, {
     hasSelection,
     hasTransactions,
@@ -53,12 +59,12 @@ export function useTour(subject: TourSubject): Tour {
     try {
       if (!localStorage.getItem(SEEN_KEY)) {
         // oxlint-disable-next-line react/set-state-in-effect -- Reads and marks a visit in localStorage; the tour it opens follows that external record.
-        setActiveId(WORKBENCH_TOUR[0].id);
+        setVisit({ workspaceId, activeId: WORKBENCH_TOUR[0].id });
         localStorage.setItem(SEEN_KEY, '1');
       }
     } catch {
       // A denied/full store must not crash an unlocked workspace or block export.
-      setActiveId(WORKBENCH_TOUR[0].id);
+      setVisit({ workspaceId, activeId: WORKBENCH_TOUR[0].id });
     }
   }, [workspaceId]);
 
@@ -68,7 +74,7 @@ export function useTour(subject: TourSubject): Tour {
     activeId,
     needsExample,
     example,
-    start: () => setActiveId(WORKBENCH_TOUR[0].id),
-    show: setActiveId,
+    start: () => setVisit({ workspaceId, activeId: WORKBENCH_TOUR[0].id }),
+    show: (activeId) => setVisit({ workspaceId, activeId }),
   };
 }

@@ -97,6 +97,14 @@ and translate implementation facts into useful state, consequences and recovery.
 
 ## Deployment
 
+Static demo hosting and policy: [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)
+and [MDN frame-ancestors](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors),
+consulted 2026-10-14. Pages automation also follows GitHub's
+[custom workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+and [workflow trigger](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)
+documentation. The demo uses meta CSP where available; it does not claim
+that HTML can supply response-only framing or MIME protections.
+
 | Source                                                                                                                                                                                                                                                                                                                                                   | Applied                                                                                                                        |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/), [Compose environment files](https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/), [attestations](https://docs.docker.com/build/ci/github-actions/attestations/), [build-push-action](https://github.com/docker/build-push-action) | Build stage plus slim runtime, read-only root, dropped capabilities, provenance and SBOM; build args hold only public metadata |

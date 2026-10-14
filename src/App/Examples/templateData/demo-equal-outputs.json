@@ -1,0 +1,310 @@
+{
+  "workspaceVersion": 8,
+  "network": "mainnet",
+  "retrievedAt": "2026-10-14T10:51:02.977Z",
+  "roots": [
+    "323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2",
+    "015d9cf0a12057d009395710611c65109f36b3eaefa3a694594bf243c097f404"
+  ],
+  "transactions": {
+    "323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2": {
+      "txid": "323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2",
+      "vin": [
+        {
+          "txid": "333f45431e47b9543772013ac83a9b33cc58dc3245ccfd48b972107bb8405c13",
+          "vout": 8,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.0501,
+            "scriptPubKey": {
+              "hex": "001443985bccbe28f2678ee90c7169a5b620d167d6a5",
+              "address": "bc1qgwv9hn979rex0rhfp3cknfdkyrgk04493gclvv",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "5fab266662be1b2705aa5790b1924978c14e7c1525d6966f5aaa129bc8f62695",
+          "vout": 1,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.05,
+            "scriptPubKey": {
+              "hex": "00145d9105feb5163eb6374a87ad85997204aeb78b7c",
+              "address": "bc1qtkgstl44zcltvd62s7kctxtjqjht0zmufhqr9f",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "8a9d461ef53ac3d6c13b5d80720996a0a93b1a7adbc6c68ba8c29733aa5d8c16",
+          "vout": 150,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.0501,
+            "scriptPubKey": {
+              "hex": "0014a28e1237a5792b22cf801e37aa0fe611566fc973",
+              "address": "bc1q528pyda90y4j9nuqrcm65rlxz9txljtn208dqm",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "b76e75372049605789cae79d60635be1fa483d1d2c877a05ec93fb9b199384a4",
+          "vout": 2,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.05,
+            "scriptPubKey": {
+              "hex": "00149f39ae1db51efd6eb3639e4338ebeb5d10097169",
+              "address": "bc1qnuu6u8d4rm7kavmrnepn36ltt5gqjutf34rtfv",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "c209f94473c3cf044bd2d5245ac90a87df96cfed38436466dee25447bff4ab72",
+          "vout": 3,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.0501,
+            "scriptPubKey": {
+              "hex": "001439c8c5c60037afcc41d996e7df0581c551df49fc",
+              "address": "bc1q88yvt3sqx7hucswejmna7pvpc4ga7j0ukfppwq",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        }
+      ],
+      "vout": [
+        {
+          "value": 0.05,
+          "scriptPubKey": {
+            "hex": "001406f788c2baca46d03e48fdd27f9e48799d1f64c8",
+            "address": "bc1qqmmc3s46efrdq0jglhf8l8jg0xw37exgne6q3k",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 0
+        },
+        {
+          "value": 0.05,
+          "scriptPubKey": {
+            "hex": "00141caf1f8283db1d5e6f90fa020c4f44bfcb81d995",
+            "address": "bc1qrjh3lq5rmvw4umuslgpqcn6yhl9crkv45z03gg",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 1
+        },
+        {
+          "value": 0.05,
+          "scriptPubKey": {
+            "hex": "0014239c27def665e5136b29d14cf1e5c2d325d1f0c0",
+            "address": "bc1qywwz0hhkvhj3x6ef69x0rewz6vjaruxqxva0fz",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 2
+        },
+        {
+          "value": 0.05,
+          "scriptPubKey": {
+            "hex": "00144e1fa58e6c601117d4ccb2450699a3c1222d6535",
+            "address": "bc1qfc06trnvvqg304xvkfzsdxdrcy3z6ef4lflsxt",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 3
+        },
+        {
+          "value": 0.05,
+          "scriptPubKey": {
+            "hex": "0014be588d8043f9a40edfbbed135691a3cee3c4d59d",
+            "address": "bc1qhevgmqzrlxjqahama5f4dydrem3uf4vaj43kg2",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 4
+        }
+      ],
+      "status": {
+        "kind": "confirmed",
+        "confirmations": 396711,
+        "blocktime": 1557046992,
+        "time": 1557046992,
+        "blockhash": "0000000000000000001885cd48dcfcaa1e1716b856ada3e634916f63552addf2",
+        "blockHeight": 574682,
+        "observation": { "source": "core", "observedAt": "2026-10-14T10:51:01.788Z" }
+      },
+      "size": 911,
+      "vsize": 506
+    },
+    "015d9cf0a12057d009395710611c65109f36b3eaefa3a694594bf243c097f404": {
+      "txid": "015d9cf0a12057d009395710611c65109f36b3eaefa3a694594bf243c097f404",
+      "vin": [
+        {
+          "txid": "1afd5324ac6c47d898c6a80ffe160cc9cfe0970942982e455c27a4914703e678",
+          "vout": 0,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.00203486,
+            "scriptPubKey": {
+              "hex": "001423914381d81d4a55eb7199e79a1c0e57d31e9601",
+              "address": "bc1qywg58qwcr499t6m3n8ne58qw2lf3a9splm7pmd",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "323df21f0b0756f98336437aa3d2fb87e02b59f1946b714a7b09df04d429dec2",
+          "vout": 2,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.05,
+            "scriptPubKey": {
+              "hex": "0014239c27def665e5136b29d14cf1e5c2d325d1f0c0",
+              "address": "bc1qywwz0hhkvhj3x6ef69x0rewz6vjaruxqxva0fz",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "38e6b7ea2a4b0ce46477021ae5afd82759d89dcd483840cb55f1c31e6213bb28",
+          "vout": 0,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.00011126,
+            "scriptPubKey": {
+              "hex": "00148333521b6b9390c2cd5a8c027835c80ef8691c8a",
+              "address": "bc1qsve4yxmtjwgv9n263sp8sdwgpmuxj8y28mlyn3",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "5b993db351b72636841adb2bb4ab3cf84b626451dfc93354fca2ea411dc008a0",
+          "vout": 0,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.00009829,
+            "scriptPubKey": {
+              "hex": "0014b797038a1f550f4194e6076229ef8fa552ff4457",
+              "address": "bc1qk7ts8zsl2585r98xqa3znmu054f073zha0dnha",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "9c3b0fe37923bd67f6c8f2875738a812e3a689dbacec8c46fffba18001a7e696",
+          "vout": 3,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.09572867,
+            "scriptPubKey": {
+              "hex": "0014e232a55a970e56fc356f2cbd90aaf9834cf96fef",
+              "address": "bc1quge22k5hpet0cdt09j7ep2hesdx0jml029h0ux",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "c82906594cb6fa529b3993fcc78223ebf32b02c4efb314e7596b9accc595a8d7",
+          "vout": 0,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.00013796,
+            "scriptPubKey": {
+              "hex": "001426b4263de4cd65425f49ade66f6300395baf0c6b",
+              "address": "bc1qy66zv00ye4j5yh6f4hnx7ccq89d67rrthaze4r",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "e7ef8cd944126177097ba7c11e078ae8d83abd6ff37c0a5c90a32c1ad344e2b1",
+          "vout": 0,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.0015,
+            "scriptPubKey": {
+              "hex": "001446ac263f28b2d67d9be8915e5fcbe71a90bd939d",
+              "address": "bc1qg6kzv0egktt8mxlgj909ljl8r2gtmyuayzm2rk",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "f88eeeb0796a3820059f6ce9be8471f342a7167462486028ac7c83a6b0c17adc",
+          "vout": 0,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.00082835,
+            "scriptPubKey": {
+              "hex": "001431ab8d140efdb21ad19ed6e03146c571ab9cb6c0",
+              "address": "bc1qxx4c69qwlkep45v76msrz3k9wx4eedkqnzecag",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        },
+        {
+          "txid": "fb41fc83c041ea545d2625d4d334143e46af5b31b5f7e48cadedabeedf47de70",
+          "vout": 3,
+          "sequence": 4294967295,
+          "prevout": {
+            "value": 0.05,
+            "scriptPubKey": {
+              "hex": "0014e256c6afa879c57878d87cf8b453ffb7f3374c63",
+              "address": "bc1quftvdtag08zhs7xc0nutg5llklenwnrr55vjqn",
+              "type": "witness_v0_keyhash"
+            }
+          }
+        }
+      ],
+      "vout": [
+        {
+          "value": 0.00791116,
+          "scriptPubKey": {
+            "hex": "00147ffa80e8430f9856479aeb24a9fe870571508d99",
+            "address": "bc1q0lagp6zrp7v9v3u6avj2nl58q4c4prve0zj6qz",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 0
+        },
+        {
+          "value": 0.00907419,
+          "scriptPubKey": {
+            "hex": "0014dec9f50b2208534c2c3b3ed33b9fac9de028aa31",
+            "address": "bc1qmmyl2zezppf5ctpm8mfnh8avnhsz32335tvyga",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 1
+        },
+        {
+          "value": 0.0913652,
+          "scriptPubKey": {
+            "hex": "00145b17c5feed302f917fcf652d21d0ea2e168f97f6",
+            "address": "bc1qtvtutlhdxqhezl70v5kjr5829ctgl9lkelr3es",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 2
+        },
+        {
+          "value": 0.0913652,
+          "scriptPubKey": {
+            "hex": "0014d337a7fa6ae3cb32feefe2c98ffdd764eaf83e3e",
+            "address": "bc1q6vm607n2u09n9lh0utycllwhvn40s0376e6t4z",
+            "type": "witness_v0_keyhash"
+          },
+          "n": 3
+        }
+      ],
+      "status": {
+        "kind": "confirmed",
+        "confirmations": 391034,
+        "blocktime": 1560329241,
+        "time": 1560329241,
+        "blockhash": "000000000000000000241d69e5f533c42b6c10556048d97b3121a067ab5cf661",
+        "blockHeight": 580359,
+        "observation": { "source": "core", "observedAt": "2026-10-14T10:51:02.271Z" }
+      },
+      "size": 1472,
+      "vsize": 746
+    }
+  }
+}

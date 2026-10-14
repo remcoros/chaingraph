@@ -139,6 +139,15 @@ selection and source eligibility. React supplies progress and interaction guards
 App composes one capability per active session and adapts it through context
 for transaction-detail consumers. Captured workspace operations also check the
 session token, so callbacks cannot borrow a later reopening of the same ID.
+App supplies transient network admission separately from session validity:
+cached transaction reads and saved spending links work without live admission.
+Graph ancestry can reveal only saved parents while offline, without trying
+missing transactions. Inspector navigation checks saved parents and exact spend
+links across all saved transactions, independently of canvas membership; live
+refresh and UTXO checks still require network admission.
+The demo build omits discovery and polling and the live
+ChainData HTTP entries reject requests before transport. This policy is not
+persisted on captured documents. See [static demo](static-demo.md).
 
 Request order comes from the existing fetch scope, not persisted sequence
 numbers. A late older result cannot overwrite a newer accepted observation;
@@ -917,10 +926,18 @@ annotations and validates off the UI thread. Copies get fresh IDs and behave as
 ordinary workspaces. A legacy `demo` flag only stops previously saved synthetic
 IDs from reaching upstreams. See
 [example-workspaces.md](example-workspaces.md).
+The separate compile-time demo build exposes three dedicated captured
+investigations, including canonical dated address-UTXO observations. They use
+the same worker, parser and encrypted lifecycle and remain `demo: false`.
 
-**Guided tour.** `src/App/Help/steps.ts` lists steps with stable IDs,
+**Guided tour.** `src/App/Help/steps.tsx` lists steps with stable IDs,
 copy, target selectors, fallbacks and optional `when` predicates; order is the
-array order. `GuidedTour.tsx` overlays a measured spotlight and never launches
+array order. `useTour` owns first-use admission and scopes the active topic to
+the current workspace visit. Switching workspaces or returning home dismisses
+the tour without resuming it on return. The origin-local seen flag records the
+first automatic offer; manual starts remain available. Workspace presentation
+reset does not close the tour, so first use is independent of effect order.
+`GuidedTour.tsx` overlays a measured spotlight and never launches
 scans or edits data. Add a `data-tour` anchor and a step; test direct jumps,
 missing targets and narrow viewports.
 

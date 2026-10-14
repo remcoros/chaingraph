@@ -1,4 +1,5 @@
 import type { Network } from '../../Core/Bitcoin';
+import { DEMO_MODE } from '../../buildMode';
 import { Modal } from '../Dialogs';
 import { WorkspaceTemplateCards } from './WorkspaceTemplateCards';
 
@@ -15,7 +16,10 @@ export function ExamplesDialog({
     <Modal title="Example workspaces" onClose={onClose} className="example-workspaces-dialog">
       <p className="muted">
         Real transactions with starter labels, tags and bookmarks. Choose an example to create your
-        own encrypted workspace. Only networks configured on your backend are shown.
+        own encrypted workspace.{' '}
+        {DEMO_MODE
+          ? 'The demo uses saved data without a live backend.'
+          : 'Only networks configured on your backend are shown.'}
       </p>
       {networks?.length ? (
         <WorkspaceTemplateCards networks={networks} onTemplate={onTemplate} />

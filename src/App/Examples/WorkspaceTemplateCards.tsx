@@ -1,6 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { Network } from '../../Core/Bitcoin';
-import { WORKSPACE_TEMPLATES } from './workspaceTemplates';
+import { AVAILABLE_WORKSPACE_TEMPLATES as WORKSPACE_TEMPLATES } from './workspaceTemplates';
 
 export function WorkspaceTemplateCards({
   networks,
@@ -52,9 +52,11 @@ export function WorkspaceTemplateCards({
                         href={template.sources[0].url}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label={`Open ${template.name} on mempool.space`}
+                        aria-label={`Open ${template.name} source`}
+                        title={template.sources[0].title}
                       >
-                        mempool.space <ArrowUpRight size={12} aria-hidden="true" />
+                        {new URL(template.sources[0].url).hostname}{' '}
+                        <ArrowUpRight size={12} aria-hidden="true" />
                       </a>
                     </div>
                   </article>

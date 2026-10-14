@@ -33,6 +33,21 @@ editable copy; no chain download is needed. Start from a bookmark and follow its
 notes. The wallet example uses a deliberately published test `zpub`; never send
 funds to its addresses.
 
+**Static demo.** The demo offers three prepared investigations: the public BIP84
+test wallet, a branching transaction path and five equal outputs. **New workspace**
+directs you to these examples, then the usual name and password dialog. Import,
+autosave, lock, undo/redo and encrypted export work as usual. Wallet-key entry and
+live discovery are unavailable. Export a workspace and open it on a self-hosted
+installation with the matching network to extend it.
+
+**Without a chain connection.** Inspect saved transactions and flows, reveal
+saved neighbors, edit annotations, use bookmarks, run local analysis and scan
+connections between selected loaded records. A missing transaction stays
+incomplete. Coins show the dates and coverage of retained address checks;
+no saved check means unknown, while a dated empty check means no coins were
+observed for those addresses at that time. The demo wallet's coverage ends at
+receive and change indexes 0 to 9, rather than establishing a full wallet balance.
+
 **Guided tour.** The first-use tour covers the main controls. Restart it any time
 from **Help and samples → Show guided tour**; use **Tour contents** to jump to a
 topic. The tour only previews panels and never changes your data.

@@ -1,6 +1,7 @@
 import { ConnectionScanTargetToolbar } from './Selection/ConnectionScanTargetToolbar';
 import { GitBranch, List, LoaderCircle, LockKeyhole, Wallet as WalletIcon } from 'lucide-react';
 import { SelectionToolbar } from './Selection/SelectionToolbar';
+import type { ReactNode } from 'react';
 
 import type { WorkspaceController } from './useWorkspace';
 import { GraphWorkbench } from './Workbenches/Graph/GraphWorkbench';
@@ -8,7 +9,13 @@ import { WorkspaceToolbar } from './WorkspaceToolbar';
 import { WalletWorkbench } from './Workbenches/Wallet/WalletWorkbench';
 import { AnalysisWorkbench } from './Workbenches/Analysis/AnalysisWorkbench';
 
-export function Workspace({ workspace }: { workspace: WorkspaceController }) {
+export function Workspace({
+  workspace,
+  connectionNotice,
+}: {
+  workspace: WorkspaceController;
+  connectionNotice?: ReactNode;
+}) {
   const {
     shownWorkbench,
     workbench,
@@ -109,7 +116,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
           {...connectionScanTargets.preview}
         />
       )}
-      <footer className="statusbar">
+      <footer className={`statusbar${connectionNotice ? ' has-connection-notice' : ''}`}>
         <span>
           {operation ? (
             <>
@@ -143,6 +150,7 @@ export function Workspace({ workspace }: { workspace: WorkspaceController }) {
             </>
           )}
         </span>
+        {connectionNotice}
         <span className="save-status">
           <LockKeyhole size={12} />
           {workspaces.storageError
