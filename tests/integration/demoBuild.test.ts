@@ -33,76 +33,76 @@ it.each([
   },
 );
 
-async function selectionFixture() {
+async function freshnessFixture() {
   const workflow = await readFile('.github/workflows/demo-pages.yml', 'utf8');
   // Exercise the actual workflow shell, replacing only the read-only GitHub I/O.
-  const selection = workflow
-    .split('name: Select published stable release')[1]
+  const freshness = workflow
+    .split('name: Check source is still current')[1]
     .split('        run: |\n')[1]
-    .split('      - uses:')[0]
+    .split('      - id: deployment')[0]
     .replace(/^          /gm, '');
-  const directory = await mkdtemp(join(tmpdir(), 'chaingraph-demo-release-'));
-  await writeFile(join(directory, 'gh'), '#!/bin/sh\nprintf "%s" "$FIXTURE_RELEASE"\n', {
-    mode: 0o700,
-  });
+  const directory = await mkdtemp(join(tmpdir(), 'chaingraph-demo-freshness-'));
+  await writeFile(
+    join(directory, 'gh'),
+    '#!/bin/sh\nif [ "$FIXTURE_GH_STATUS" != 0 ]; then exit "$FIXTURE_GH_STATUS"; fi\nprintf "%s\\n" "$FIXTURE_MAIN_COMMIT"\n',
+    { mode: 0o700 },
+  );
   const output = join(directory, 'output');
+  const summary = join(directory, 'summary');
   await writeFile(output, '');
-  const release = {
-    tagName: 'v1.2.3',
-    isDraft: false,
-    isPrerelease: false,
-    publishedAt: '2026-10-14T10:00:00Z',
-  };
+  await writeFile(summary, '');
+  const commit = 'a'.repeat(40);
   return {
     directory,
     output,
-    release,
-    run: (tag = 'v1.2.3', metadata = release) =>
-      spawnSync('bash', ['-c', selection], {
+    summary,
+    commit,
+    run: (current = commit, status = 0) =>
+      spawnSync('bash', ['-c', freshness], {
         encoding: 'utf8',
         timeout: 5000,
         env: {
           ...process.env,
           PATH: `${directory}:${process.env.PATH}`,
-          RELEASE_TAG: tag,
+          EVENT_COMMIT: commit,
           GITHUB_REPOSITORY: 'example/project',
           GITHUB_OUTPUT: output,
-          FIXTURE_RELEASE: JSON.stringify(metadata),
+          GITHUB_STEP_SUMMARY: summary,
+          FIXTURE_MAIN_COMMIT: current,
+          FIXTURE_GH_STATUS: String(status),
         },
       }),
   };
 }
 
-it('admits the exact published stable tag to checkout and rejects drafts, prereleases and mismatched release metadata', async () => {
-  const fixture = await selectionFixture();
+it('admits the built commit for deployment when it still matches main', async () => {
+  const fixture = await freshnessFixture();
   try {
     expect(fixture.run().status).toBe(0);
-    expect(await readFile(fixture.output, 'utf8')).toBe('tag=v1.2.3\n');
-    for (const override of [
-      { isDraft: true },
-      { isPrerelease: true },
-      { tagName: 'v9.9.9' },
-      { publishedAt: '' },
-    ]) {
-      expect(fixture.run('v1.2.3', { ...fixture.release, ...override }).status).not.toBe(0);
-    }
+    expect(await readFile(fixture.output, 'utf8')).toBe('current=true\n');
   } finally {
     await rm(fixture.directory, { recursive: true, force: true });
   }
 });
 
-it('rejects branch names, option-like inputs and shell expressions before selection', async () => {
-  const fixture = await selectionFixture();
+it('skips a superseded build, including an older workflow rerun', async () => {
+  const fixture = await freshnessFixture();
   try {
-    for (const tag of [
-      'main',
-      '--help',
-      'v1.2.3-rc.1',
-      'v01.2.3',
-      'v1.2.3$(exit 0)',
-      'v1.2.3\ntag=main',
-    ])
-      expect(fixture.run(tag).status).not.toBe(0);
+    const current = 'b'.repeat(40);
+    expect(fixture.run(current).status).toBe(0);
+    expect(await readFile(fixture.output, 'utf8')).toBe('current=false\n');
+    const summary = await readFile(fixture.summary, 'utf8');
+    expect(summary).toContain(fixture.commit);
+    expect(summary).toContain(current);
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+it('does not admit deployment when the current main commit cannot be checked', async () => {
+  const fixture = await freshnessFixture();
+  try {
+    expect(fixture.run('', 1).status).not.toBe(0);
     expect(await readFile(fixture.output, 'utf8')).toBe('');
   } finally {
     await rm(fixture.directory, { recursive: true, force: true });

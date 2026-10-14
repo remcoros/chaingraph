@@ -60,9 +60,8 @@ one-time setup on GitHub:
 1. Open **Settings → Pages → Build and deployment** and choose **GitHub Actions**
    as the source. No generated-files branch is needed.
 2. Check **Settings → Environments → github-pages**. If deployment branch/tag
-   restrictions are enabled, permit the `main` branch for manual dispatch and
-   `v*` tags for release events. Keep any desired reviewer requirement; the
-   deploy job will wait for that approval.
+   restrictions are enabled, permit the `main` branch. Keep any desired
+   reviewer requirement; the deploy job will wait for that approval.
 3. Use HTTPS for the Pages site. No custom domain is required.
 
 The workflow uses GitHub's Pages configuration, artifact-upload and deployment
@@ -71,26 +70,29 @@ Actions, pinned to commit SHAs. It reads the actual site base from
 change repository settings or need a personal access token. See
 [GitHub's custom Pages workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
-**Automatic deployment:** publishing a stable GitHub Release triggers the
-workflow. Pushing a tag, creating a draft or publishing a prerelease does not
-advance the demo. This follows the existing release process: its container
-workflow creates a draft; the local release command signs the mapping and
-publishes the release after confirmation. Publication using GitHub Actions'
-[`GITHUB_TOKEN` does not trigger another workflow](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow). The existing local release command uses the maintainer's authenticated `gh` session.
+**Automatic deployment:** every push to `main` triggers the workflow. The demo
+previews the current product, including features that have not been released.
+Tag pushes and release publication do not update it. Pushes made by automation
+using GitHub Actions' [`GITHUB_TOKEN` do not trigger another push workflow](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
 
-**Manual deployment or rollback:** open **Actions → Deploy demo → Run workflow**,
-choose `main` as the workflow branch and enter the exact published stable tag,
-for example `v0.2.0`. The selected tag must contain this demo build support.
-Branches, drafts, prereleases and tags without published releases are rejected.
-An older published stable tag can deliberately replace the current demo.
+**Manual deployment:** open **Actions → Deploy demo → Run workflow** and choose
+`main` as the workflow branch to rebuild and deploy its current commit. No tag
+input is needed. Dispatches from other branches or tags are skipped. To roll
+back the demo, revert the relevant change on `main`; the resulting push follows
+the same checks.
 
-Both paths check out the selected annotated tag, verify its resolved commit and
-matching package/changelog version, run `npm run check`, then run the same
+Both paths check out the exact triggering commit, verify its identity and
+package/changelog version, run `npm run check`, then run the same
 `npm run build:demo` and `npm run check:demo` used locally. Only `dist-demo/` is
 uploaded to Pages. The deploy job waits for the build and has the Pages/OIDC
-write permissions; build jobs have read permissions. Deployments are serialized
-across tags and manual runs. A failed build never reaches the deployment job.
-The run's environment link reports the deployed site URL.
+write permissions; build jobs have read permissions. Runs are serialized across
+pushes and manual dispatches, with newer pending runs replacing earlier pending
+ones. Immediately before publication, the workflow checks that its source commit
+still matches `main` and skips a superseded candidate. A deployment already
+underway is allowed to finish, so the demo can briefly lag behind `main`. If the
+latest build fails, the existing demo stays available. The run's summary records
+the source commit or reason for skipping deployment; its environment link
+reports the deployed site URL.
 
 Pages serves the generated static files; it runs no Node server or chain API.
 Do not configure a public API proxy or put a private backend URL into the build.

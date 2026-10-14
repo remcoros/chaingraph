@@ -119,14 +119,15 @@ Prereleases verify only their full prerelease version. See
 ## Public demo publication
 
 The separate [Deploy demo workflow](../.github/workflows/demo-pages.yml) builds
-and deploys the captured-data demo after a stable GitHub Release is published.
-Tag pushes and draft/prerelease publication do not deploy it. The workflow uses
-the release's exact annotated tag, runs the normal checks and demo artifact
-checks, and uploads only `dist-demo/` to GitHub Pages. Manual deployment accepts
-an existing published stable tag, including an explicit rollback. It does not
-publish or modify the container release.
+and deploys the captured-data demo on pushes to `main`. The demo previews the
+current product independently of container releases; tag pushes and release
+publication do not update it. The workflow builds the exact triggering commit,
+runs the normal checks and demo artifact checks, and uploads only `dist-demo/`
+to GitHub Pages. Superseded commits are skipped before publication, while an
+active deployment is allowed to finish. Manual deployment rebuilds the current
+`main`; rollback uses a revert on `main`. The workflow does not publish or
+modify a container release.
 
-The workflow and build support must be present in the selected release tag.
 One-time Pages settings and manual deployment are described in
 [static demo](static-demo.md#github-pages-deployment). `npm run build:demo` is a
 local build command and does not deploy anything.
