@@ -120,10 +120,13 @@ export function WorkspaceHome({
         {saved.length === 0 ? (
           <div className="saved-empty">
             <FolderOpen size={32} />
-            <h3>Your next investigation starts here.</h3>
-            <p>
-              Wallets, graph paths, and annotations live together in a password-protected workspace.
-            </p>
+            <div>
+              <h3>Your next investigation starts here.</h3>
+              <p>
+                Wallets, graph paths, and annotations live together in a password-protected
+                workspace.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="saved-list">

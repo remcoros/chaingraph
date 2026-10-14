@@ -458,12 +458,18 @@ small,
   letter-spacing: 0;
 }
 .saved-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
   padding: 45px 8px;
   color: var(--color-muted);
 }
 .saved-empty svg {
+  flex-shrink: 0;
   color: var(--color-faint);
-  margin-bottom: 18px;
+}
+.saved-empty > div {
+  min-width: 0;
 }
 .saved-empty h3 {
   color: var(--color-ink);
