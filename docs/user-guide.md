@@ -173,6 +173,12 @@ immediately, even offline. The **Previous** selector beside the input loads one
 or two levels of earlier transactions along with the lookup; it defaults to off
 and both levels share a 500-transaction budget.
 
+Links ending in `#?s=txid`, `#?s=txid:index` or `#?s=address` show a linked-lookup
+banner and clear the reference from the address bar. Open or unlock a workspace,
+then click the reference to add it and open Graph. The active workspace chooses
+the network. If the lookup cannot complete, the banner stays so you can retry in
+that workspace or switch to another. Use its dismiss button to discard the link.
+
 With a transaction selected, **Load previous txs** adds one earlier level. For an
 output, **Open creating tx** loads only the transaction that created it, and
 **Find spending txs** looks for transactions that spent it (or any output of a

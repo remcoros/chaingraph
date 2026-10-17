@@ -42,8 +42,8 @@ export function DeepLinkBanner({ app, workspace }: DeepLinkBannerProps) {
       app.setNotice('The link does not contain a valid transaction ID, output, or address.');
       return;
     }
-    await workspace.graph.lookup.submit(ref);
-    if (workspace.graph.lookup.resolveLoaded(ref)) app.setDeepLinkRef(undefined);
+    if (await workspace.graph.lookup.submit(ref))
+      app.setDeepLinkRef((pending) => (pending === ref ? undefined : pending));
   };
   return (
     <div className="deep-link-banner" data-testid="deep-link-banner" role="status">

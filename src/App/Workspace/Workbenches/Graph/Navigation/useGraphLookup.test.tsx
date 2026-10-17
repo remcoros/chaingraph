@@ -81,10 +81,12 @@ it.each([
     );
   });
   expect(f.core.setOperation).not.toHaveBeenCalled();
+  let completed = false;
   await act(async () => {
-    await f.result.current.lookup.submit(text);
+    completed = await f.result.current.lookup.submit(text);
     await background;
   });
+  expect(completed).toBe(true);
   expect(backgroundSignal.aborted).toBe(true);
   expect(f.reveal).toHaveBeenCalledWith(expected);
   expect(f.result.current.state.resetToken).toBe(1);
@@ -111,7 +113,9 @@ it('keeps a cached lookup from changing selection during another foreground oper
       });
     });
   });
-  await act(() => f.result.current.lookup.submit(TX_FUNDING));
+  await act(async () => {
+    expect(await f.result.current.lookup.submit(TX_FUNDING)).toBe(false);
+  });
   expect(f.reveal).not.toHaveBeenCalled();
   expect(f.observe).not.toHaveBeenCalled();
   expect(f.result.current.state.resetToken).toBe(0);
@@ -121,7 +125,9 @@ it('keeps a cached lookup from changing selection during another foreground oper
 
 it('still opens loaded evidence while live lookups are unavailable', async () => {
   const f = fixture(true, false);
-  await act(() => f.result.current.lookup.submit(TX_FUNDING));
+  await act(async () => {
+    expect(await f.result.current.lookup.submit(TX_FUNDING)).toBe(true);
+  });
   expect(f.reveal).toHaveBeenCalledWith(`tx:${TX_FUNDING}`);
   expect(f.read).not.toHaveBeenCalled();
 });
@@ -140,13 +146,13 @@ it('drops a lookup if selection changes while automatic work is yielding', async
       { background: true },
     );
   });
-  let lookup!: Promise<void>;
+  let lookup!: Promise<boolean>;
   await act(async () => {
     lookup = f.result.current.lookup.submit(TX_FUNDING);
     f.selection.generation.current++;
     release();
     await background;
-    await lookup;
+    expect(await lookup).toBe(false);
   });
   expect(f.reveal).not.toHaveBeenCalled();
   expect(f.observe).not.toHaveBeenCalled();

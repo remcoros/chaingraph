@@ -141,6 +141,12 @@ for transaction-detail consumers. Captured workspace operations also check the
 session token, so callbacks cannot borrow a later reopening of the same ID.
 App supplies transient network admission separately from session validity:
 cached transaction reads and saved spending links work without live admission.
+Graph lookup reports completion through its existing `submit` intention rather
+than requiring callers to infer success from loaded evidence. Workspace opens
+Graph after completion, capturing the originating workbench for a contextual
+return. The global linked-lookup banner clears only the reference that completed;
+rejected, unavailable, cancelled and failed lookups leave it pending. Operation
+admission and background preemption remain with `useWorkspaceOperation`.
 Graph ancestry can reveal only saved parents while offline, without trying
 missing transactions. Inspector navigation checks saved parents and exact spend
 links across all saved transactions, independently of canvas membership; live
