@@ -624,6 +624,13 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
     return (next: WorkbenchMode, options?: WorkbenchSwitchOptions) =>
       changeWorkbench(next, options, capturedOrigin);
   }
+  async function submitGraphLookup(text: string) {
+    const showGraph = workbenchActionSwitch(workbench);
+    const completed = await graphLookup.submit(text);
+    if (completed)
+      showGraph('graph', { interaction: workbench === 'graph' ? 'switch' : 'handoff' });
+    return completed;
+  }
   // The factory only creates event handlers; refs are read when an action runs, not during render.
   // oxlint-disable-next-line react/refs
   // What Graph publishes to the other workbenches, assembled once.
@@ -714,7 +721,7 @@ export function useWorkspace(app: ReturnType<typeof useAppState>) {
       actions: graphActions,
       address: graphAddress,
       navigation: graphExpansion,
-      lookup: { ...lookup, submit: graphLookup.submit },
+      lookup: { ...lookup, submit: submitGraphLookup },
       flowInputs,
       scanTargets: connectionScanTargets,
     },

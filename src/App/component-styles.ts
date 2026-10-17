@@ -24,3 +24,4 @@ import './Workspace/Workbenches/Wallet/wallet-workbench.css';
 import './Controls/multi-select-filter.css';
 import './Workspace/Workbenches/workbenches.css';
 import './Workspace/Workbenches/Graph/EntitiesPanel/entity-browser.css';
+import './deeplink-banner.css';

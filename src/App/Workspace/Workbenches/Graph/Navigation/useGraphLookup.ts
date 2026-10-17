@@ -44,11 +44,13 @@ export function useGraphLookup({
   const { transactions: recordTransactions } = transactions.observe;
   const { run } = operation;
 
-  async function submit(text: string) {
-    if (!activeWorkspace || !text.trim()) return;
+  /** True only after an admitted lookup completes; failures use the operation's feedback. */
+  async function submit(text: string): Promise<boolean> {
+    if (!activeWorkspace || !text.trim()) return false;
     text = text.trim();
     if (/^(bc1|tb1)/i.test(text)) text = text.toLowerCase();
     const submittedGeneration = selectionGeneration.current;
+    let completed = false;
     await run(async (signal) => {
       if (
         activeWorkspaceRef.current?.id !== activeWorkspace.id ||
@@ -56,22 +58,26 @@ export function useGraphLookup({
       )
         return;
       const existing = state.resolveLoaded(text);
+      if (!canLoadChainData && !existing)
+        throw new Error(
+          'Cannot add this reference: it is not loaded in this workspace and live lookup is unavailable.',
+        );
       if (existing && !existing.startsWith('addr:')) {
         recordTransactions(activeWorkspace.id, [], { promotionIds: [existing.split(':')[1]] });
         reveal(existing);
         if (!canLoadChainData || !prefetchDepth) {
           state.clear();
+          completed = true;
           return;
         }
       }
       if (!/^[0-9a-f]{64}(:\d+)?$/i.test(text)) {
-        if (!canLoadChainData && !existing) return;
         reveal(addressReference(text));
         state.clear();
         if (canLoadChainData) addressEvidence.startAddressHistoryLoad(text);
+        completed = true;
         return;
       }
-      if (!canLoadChainData) return;
       const generation = selectionGeneration.current;
       const [id, index] = text.split(':');
       setOperation('Loading transaction…');
@@ -118,7 +124,9 @@ export function useGraphLookup({
           setNotice(ancestryNotice(result));
       }
       state.clear();
+      completed = true;
     });
+    return completed;
   }
 
   return { submit };

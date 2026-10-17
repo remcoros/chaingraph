@@ -14,7 +14,7 @@ export interface GraphLookupFormProps {
   onQueryError: (message: string) => void;
   /** Resolves text that is already present in the workspace, so offline lookups stay enabled. */
   resolveLoaded: (text: string) => string | undefined;
-  onSubmit: (text: string) => void | Promise<void>;
+  onSubmit: (text: string) => Promise<boolean>;
 }
 
 /**

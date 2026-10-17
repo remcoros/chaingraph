@@ -6,6 +6,7 @@ import { DEMO_MODE } from '../buildMode';
 import { useWorkspaces } from './Workspace/useWorkspaces';
 import type { SavedWorkspace } from '../Core/Workspace/Persistence';
 import { appServices } from './appServices';
+import { parseLookupFragment } from './deepLink';
 import {
   createFeedback,
   type Feedback,
@@ -68,6 +69,20 @@ export function useAppState() {
   const [demoStartOpen, setDemoStartOpen] = useState(false);
   const startWorkspace = () => (DEMO_MODE ? setDemoStartOpen(true) : setCreate('empty'));
   const exampleNetworks = DEMO_MODE ? ['mainnet' as const] : discoveryError ? undefined : networks;
+  const [deepLinkRef, setDeepLinkRef] = useState<string>();
+  // A #?s= fragment is external navigation intent: consume it once and clear it
+  // from the address bar so the reference never re-enters history or logs.
+  useEffect(() => {
+    const consume = () => {
+      const ref = parseLookupFragment(window.location.hash);
+      if (ref === undefined) return;
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      setDeepLinkRef(ref);
+    };
+    consume();
+    window.addEventListener('hashchange', consume);
+    return () => window.removeEventListener('hashchange', consume);
+  }, []);
   const [notice, setNoticeValue] = useState<Feedback>();
   const [noticeSequence, setNoticeSequence] = useState(0);
   const setNotice = useCallback<SetNotice>((feedback, options) => {
@@ -184,6 +199,8 @@ export function useAppState() {
     setDeleteEntry,
     examplesOpen,
     setExamplesOpen,
+    deepLinkRef,
+    setDeepLinkRef,
     notice,
     setNotice,
     noticeSequence,
