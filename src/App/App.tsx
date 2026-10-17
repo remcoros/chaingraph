@@ -4,6 +4,7 @@ import { TransactionFetchProvider } from './Workspace/TransactionFetchProvider';
 import { ExamplesDialog } from './Examples/ExamplesDialog';
 import { BookOpen, FolderOpen, Info, Library, Plus } from 'lucide-react';
 import { ToastNotification } from './Controls/ToastNotification';
+import { DeepLinkBanner } from './DeepLinkBanner';
 import { Modal } from './Dialogs';
 import { CreateWorkspaceDialog } from './Workspace/Dialogs/CreateWorkspaceDialog';
 import { ImportWorkspaceDialog } from './Workspace/Dialogs/ImportWorkspaceDialog';
@@ -231,6 +232,7 @@ export default function App() {
         </Modal>
       )}
       <ToastNotification app={app} workspace={workspace} />
+      <DeepLinkBanner app={app} workspace={workspace} />
       <input
         ref={fileInput}
         type="file"
